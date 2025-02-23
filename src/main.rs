@@ -1,6 +1,6 @@
 mod d20;
 
-use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
+use std::{cell::RefCell, collections::HashSet, io};
 
 use d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 
@@ -14,7 +14,7 @@ fn main() {
         protection: 3,
         limit_defense_from_dex: None,
     };
-    let chain_mail = ArmorPiece {
+    let _chain_mail = ArmorPiece {
         protection: 5,
         limit_defense_from_dex: Some(4),
     };
@@ -48,7 +48,7 @@ fn main() {
             Condition::Bleeding,
         ))),
     };
-    let rapier = Weapon {
+    let _rapier = Weapon {
         name: "Rapier",
         action_point_cost: 2,
         damage: 1,
@@ -58,7 +58,7 @@ fn main() {
         on_attacked_reaction: Some(parry),
         on_true_hit: Some(AttackHitEffect::SkipExertion),
     };
-    let war_hammer = Weapon {
+    let _war_hammer = Weapon {
         name: "War hammer",
         action_point_cost: 2,
         damage: 2,
@@ -77,7 +77,7 @@ fn main() {
             Condition::Dazed(1),
         ))),
     };
-    let bow = Weapon {
+    let _bow = Weapon {
         name: "Bow",
         action_point_cost: 2,
         damage: 2,
@@ -276,8 +276,7 @@ fn main() {
                 // inflict new Dazed stacks, which should not be covered here.
                 let spent = action_points_before_action - character.action_points;
                 if character.conditions.dazed > 0 {
-                    character.conditions.dazed =
-                        character.conditions.dazed.saturating_sub(spent as u32);
+                    character.conditions.dazed = character.conditions.dazed.saturating_sub(spent);
                     if character.conditions.dazed == 0 {
                         println!("{} recovered from Dazed", character.name);
                     }
@@ -391,7 +390,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                     weapon.name,
                     label,
                     weapon.action_point_cost,
-                    as_percentage(prob_attack_hit(&character, *hand, &other_character))
+                    as_percentage(prob_attack_hit(character, *hand, other_character))
                 )
             }
 
@@ -407,11 +406,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 spell.name,
                 spell.action_point_cost,
                 spell.mana_cost,
-                as_percentage(prob_spell_hit(
-                    &character,
-                    spell.spell_type,
-                    &other_character
-                ))
+                as_percentage(prob_spell_hit(character, spell.spell_type, other_character))
             ),
         };
         println!("  {}. {}", i + 1, label);
@@ -433,13 +428,9 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
             for &enhancement in &character.known_attack_enhancements {
                 available_attack_enhancements.push(("".to_owned(), enhancement))
             }
-            available_attack_enhancements = available_attack_enhancements
-                .into_iter()
-                .filter(|(_, enhancement)| {
-                    character.action_points - reserved_action_points
-                        >= enhancement.action_point_cost
-                })
-                .collect();
+            available_attack_enhancements.retain(|(_, enhancement)| {
+                character.action_points - reserved_action_points >= enhancement.action_point_cost
+            });
 
             if !available_attack_enhancements.is_empty() {
                 println!(
@@ -466,7 +457,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 loop {
                     input.clear();
                     stdin.read_line(input).unwrap();
-                    let line = input.trim_end_matches("\r\n").trim_end_matches("\n");
+                    let line = input.trim_end_matches("\r\n").trim_end_matches('\n');
                     if line.is_empty() {
                         // player picked no enhancements
                         break;
@@ -474,8 +465,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                     let picked_numbers = line
                         .split_whitespace()
                         .map(|w| w.parse::<u32>())
-                        .filter(|res| res.is_ok())
-                        .map(|res| res.unwrap())
+                        .filter_map(|res| res.ok())
                         .collect::<HashSet<_>>();
                     if picked_numbers.is_empty() {
                         println!("Invalid input. Provide valid numbers, or an empty line.");
@@ -541,7 +531,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
 }
 
 fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttackedReaction> {
-    let mut available_reactions = defender.usable_on_attacked_reactions();
+    let available_reactions = defender.usable_on_attacked_reactions();
 
     if !available_reactions.is_empty() {
         println!("({} AP remaining) React to attack:", defender.action_points);
@@ -565,7 +555,7 @@ fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttacked
 }
 
 fn player_choose_on_attacked_hit_reaction(defender: &Character) -> Option<OnAttackedHitReaction> {
-    let mut reactions = defender.usable_on_hit_reactions();
+    let reactions = defender.usable_on_hit_reactions();
 
     if !reactions.is_empty() {
         println!(
@@ -598,7 +588,7 @@ fn player_make_choice(max_allowed: u32) -> u32 {
     loop {
         input.clear();
         stdin.read_line(input).unwrap();
-        let line = input.trim_end_matches("\r\n").trim_end_matches("\n");
+        let line = input.trim_end_matches("\r\n").trim_end_matches('\n');
         if let Ok(i) = line.parse::<u32>() {
             if 1 <= i && i <= max_allowed {
                 return i;
@@ -630,7 +620,7 @@ fn print_attack_intro(attacker: &Character, hand: HandType, defender: &Character
 }
 
 fn as_percentage(probability: f32) -> String {
-    if probability < 0.01 || 0.99 < probability {
+    if !(0.01..=0.99).contains(&probability) {
         format!("{:.1}%", probability * 100f32)
     } else {
         format!("{:.0}%", probability * 100f32)
@@ -772,12 +762,12 @@ fn perform_attack(
 
     let roll = roll_d20_with_advantage(advantage);
     let res = roll + attack_modifier;
-    if advantage < 0 {
-        println!("Rolling {} dice with disadvantage...", advantage.abs() + 1)
-    } else if advantage > 0 {
-        println!("Rolling {} dice with advantage...", advantage + 1)
-    } else {
-        println!("Rolling 1 die...");
+    match advantage.cmp(&0) {
+        std::cmp::Ordering::Less => {
+            println!("Rolling {} dice with disadvantage...", advantage.abs() + 1)
+        }
+        std::cmp::Ordering::Equal => println!("Rolling 1 die..."),
+        std::cmp::Ordering::Greater => println!("Rolling {} dice with advantage...", advantage + 1),
     }
     println!(
         "Rolled: {} (+{}) = {}, vs def={}, armor={}",
@@ -890,7 +880,7 @@ fn perform_attack(
         println!("{} lost Braced", defender.name);
     }
 
-    return did_hit;
+    did_hit
 }
 
 fn perform_effect_application(
@@ -915,7 +905,7 @@ struct Characters(Vec<RefCell<Character>>);
 
 impl Characters {
     fn new(characters: Vec<Character>) -> Self {
-        Self(characters.into_iter().map(|ch| RefCell::new(ch)).collect())
+        Self(characters.into_iter().map(RefCell::new).collect())
     }
 
     fn get(&self, i: usize) -> &RefCell<Character> {
@@ -1135,10 +1125,9 @@ impl Character {
         self.known_actions
             .iter()
             .filter(|action: &&BaseAction| match action {
-                BaseAction::Attack(hand) => match self.weapon(*hand) {
-                    Some(weapon) if ap >= weapon.action_point_cost => true,
-                    _ => false,
-                },
+                BaseAction::Attack(hand) => {
+                    matches!(self.weapon(*hand), Some(weapon) if ap >= weapon.action_point_cost)
+                }
                 BaseAction::SelfEffect(self_effect_action) => {
                     ap >= self_effect_action.action_point_cost
                 }

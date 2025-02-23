@@ -1,14 +1,13 @@
 use rand::{self, Rng};
 
 pub fn probability_of_d20_reaching(target: u32, advantage_level: i32) -> f32 {
-    assert!(1 <= target && target <= 20);
+    assert!((1..=20).contains(&target));
     let p_miss = (target as f32 - 1f32) / 20f32;
-    let p = if advantage_level >= 0 {
+    if advantage_level >= 0 {
         1f32 - p_miss.powi(advantage_level + 1)
     } else {
         (1f32 - p_miss).powi(advantage_level.abs() + 1)
-    };
-    p
+    }
 }
 
 pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
