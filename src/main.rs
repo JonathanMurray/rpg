@@ -4,6 +4,11 @@ use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
 
 use d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 
+// You get this many AP per round
+const ACTION_POINTS_PER_TURN: u32 = 6;
+// You're not allowed to bring your AP below this number, with reactions
+const REACTION_AP_THRESHOLD: u32 = 3;
+
 fn main() {
     let leather_armor = ArmorPiece {
         protection: 3,
@@ -17,8 +22,9 @@ fn main() {
         name: "Dagger",
         action_point_cost: 1,
         damage: 1,
-        finesse: true,
-        attack_action_enhancement: Default::default(),
+        grip: WeaponGrip::Light,
+        attack_attribute: AttackAttribute::Finesse,
+        attack_enhancement: Default::default(),
         on_attacked_reaction: Default::default(),
         on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
             Condition::Weakened(1),
@@ -34,8 +40,9 @@ fn main() {
         name: "Sword",
         action_point_cost: 2,
         damage: 1,
-        finesse: true,
-        attack_action_enhancement: Default::default(),
+        grip: WeaponGrip::Versatile,
+        attack_attribute: AttackAttribute::Finesse,
+        attack_enhancement: Default::default(),
         on_attacked_reaction: Some(parry),
         on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
             Condition::Bleeding,
@@ -45,8 +52,9 @@ fn main() {
         name: "Rapier",
         action_point_cost: 2,
         damage: 1,
-        finesse: true,
-        attack_action_enhancement: Default::default(),
+        grip: WeaponGrip::MainHand,
+        attack_attribute: AttackAttribute::Finesse,
+        attack_enhancement: Default::default(),
         on_attacked_reaction: Some(parry),
         on_true_hit: Some(AttackHitEffect::SkipExertion),
     };
@@ -54,8 +62,9 @@ fn main() {
         name: "War hammer",
         action_point_cost: 2,
         damage: 2,
-        finesse: false,
-        attack_action_enhancement: Some(AttackEnhancement {
+        grip: WeaponGrip::TwoHanded,
+        attack_attribute: AttackAttribute::Strength,
+        attack_enhancement: Some(AttackEnhancement {
             name: "All-in attack",
             action_point_cost: 1,
             stamina_cost: 0,
@@ -72,8 +81,9 @@ fn main() {
         name: "Bow",
         action_point_cost: 2,
         damage: 2,
-        finesse: true, //TODO
-        attack_action_enhancement: Some(AttackEnhancement {
+        grip: WeaponGrip::TwoHanded,
+        attack_attribute: AttackAttribute::Dexterity,
+        attack_enhancement: Some(AttackEnhancement {
             name: "Careful aim",
             action_point_cost: 1,
             stamina_cost: 0,
@@ -93,7 +103,7 @@ fn main() {
         stamina_cost: 1,
         bonus_damage: 0,
         apply_on_self_before: None,
-        on_hit_effect: Some(ApplyEffect::Stunned(1)),
+        on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
     };
 
     let spells = vec![
@@ -109,14 +119,23 @@ fn main() {
             action_point_cost: 2,
             mana_cost: 1,
             damage: 1,
-            on_hit_effect: Some(ApplyEffect::Stunned(1)),
+            on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
         },
     ];
 
-    let mut bob = Character::new("Bob", 10, 10, 4);
-    bob.main_hand = Some(dagger);
-    bob.off_hand = Some(dagger);
-    bob.armor = Some(chain_mail);
+    let small_shield = Shield {
+        name: "Small shield",
+        defense: 2,
+        on_attacked_hit_reaction: Some(OnAttackedHitReaction {
+            name: "Shield bash",
+            action_point_cost: 1,
+            effect: OnAttackedHitReactionEffect::ShieldBash,
+        }),
+    };
+
+    let mut bob = Character::new("Bob", 10, 2, 4);
+    bob.main_hand.weapon = Some(dagger);
+    bob.off_hand.shield = Some(small_shield);
     bob.known_attack_enhancements.push(crushing_strike);
     bob.known_attacked_reactions.push(OnAttackedReaction {
         name: "Side step",
@@ -124,29 +143,28 @@ fn main() {
         stamina_cost: 1,
         effect: OnAttackedReactionEffect::SideStep,
     });
+    bob.known_on_hit_reactions.push(OnAttackedHitReaction {
+        name: "Rage",
+        action_point_cost: 1,
+        effect: OnAttackedHitReactionEffect::Rage,
+    });
     for spell in spells {
         bob.known_actions.push(BaseAction::CastSpell(spell));
     }
 
-    let mut alice = Character::new("Alice", 4, 2, 3);
-    alice.main_hand = Some(dagger);
+    let mut alice = Character::new("Alice", 2, 7, 3);
+    alice.main_hand.weapon = Some(dagger);
+    alice.off_hand.shield = Some(small_shield);
     alice.armor = Some(leather_armor);
 
-    alice.receive_condition(Condition::Stunned);
+    bob.action_points = ACTION_POINTS_PER_TURN;
+    alice.action_points = ACTION_POINTS_PER_TURN;
 
-    let action_points_per_turn = 5;
-
-    bob.action_points = action_points_per_turn;
-    alice.action_points = action_points_per_turn;
-
-    dbg!(&bob);
-    dbg!(&alice);
-
-    let characters = Characters::new(vec![bob, alice]);
+    let characters = Characters::new(vec![alice, bob]);
 
     loop {
         for i in 0..2 {
-            let players_turn = i == 0;
+            let players_turn = i == 1;
             let mut character = characters.get(i).borrow_mut();
             let mut other_character = characters.get((i + 1) % 2).borrow_mut();
 
@@ -174,22 +192,28 @@ fn main() {
                 let action = if players_turn {
                     player_choose_action(&character, &other_character)
                 } else {
-                    Action::MainHandAttack(Default::default())
+                    Action::Attack {
+                        hand: HandType::MainHand,
+                        enhancements: Default::default(),
+                    }
                 };
 
+                let action_points_before_action = character.action_points;
+                let mut did_attack_and_hit = false;
+
                 match action {
-                    Action::MainHandAttack(attack_enhancements) => {
+                    Action::Attack { hand, enhancements } => {
                         character.action_points -=
-                            character.main_hand.as_ref().unwrap().action_point_cost as i32;
-                        for enhancement in &attack_enhancements {
-                            character.action_points -= enhancement.action_point_cost as i32;
+                            character.weapon(hand).unwrap().action_point_cost;
+                        for enhancement in &enhancements {
+                            character.action_points -= enhancement.action_point_cost;
                             character.stamina.lose(enhancement.stamina_cost);
                             if let Some(condition) = enhancement.apply_on_self_before {
                                 character.receive_condition(condition);
                             }
                         }
 
-                        print_attack_intro(&character, &other_character);
+                        print_attack_intro(&character, hand, &other_character);
 
                         let defender_reaction = if players_turn {
                             None
@@ -198,44 +222,30 @@ fn main() {
                         };
 
                         if let Some(reaction) = defender_reaction {
-                            other_character.action_points -= reaction.action_point_cost as i32;
+                            other_character.action_points -= reaction.action_point_cost;
                         }
 
-                        let did_attack_hit = perform_attack(
+                        did_attack_and_hit = perform_attack(
                             &mut character,
-                            attack_enhancements,
+                            enhancements,
+                            hand,
                             &mut other_character,
                             defender_reaction,
                         );
-
-                        if did_attack_hit {
-                            if !players_turn {
-                                if let Some(reaction) =
-                                    player_choose_on_attacked_hit_reaction(&other_character)
-                                {
-                                    match reaction.effect {
-                                        OnAttackedHitReactionEffect::Rage => {
-                                            other_character.receive_condition(Condition::Raging);
-                                        }
-                                    }
-                                }
-                            }
-                        }
                     }
                     Action::SelfEffect(SelfEffectAction {
                         name: _,
                         action_point_cost,
                         effect,
                     }) => {
-                        character.action_points -= action_point_cost as i32;
+                        character.action_points -= action_point_cost;
                         perform_effect_application(effect, &mut character, "");
                     }
                     Action::CastSpell(spell) => {
-                        character.action_points -= spell.action_point_cost as i32;
+                        character.action_points -= spell.action_point_cost;
                         character.mana.lose(spell.mana_cost);
 
                         let target = other_character.mental_resistence();
-
                         let roll = roll_d20_with_advantage(0);
                         let res = roll + character.intellect();
                         println!(
@@ -245,7 +255,6 @@ fn main() {
                             res,
                             target,
                         );
-
                         if res >= target {
                             println!("  It's a spell hit");
                             let damage = spell.damage;
@@ -263,6 +272,75 @@ fn main() {
                         }
                     }
                 }
+
+                // You recover from 1 stack of Dazed for each AP you spend
+                // This must happen before "on attacked and hit" reactions because those might
+                // inflict new Dazed stacks, which should not be covered here.
+                let spent = action_points_before_action - character.action_points;
+                if character.conditions.dazed > 0 {
+                    character.conditions.dazed =
+                        character.conditions.dazed.saturating_sub(spent as u32);
+                    if character.conditions.dazed == 0 {
+                        println!("{} recovered from Dazed", character.name);
+                    }
+                }
+
+                if did_attack_and_hit {
+                    // You recover from 1 stack of Dazed each time you're hit by an attack
+                    if other_character.conditions.dazed > 0 {
+                        other_character.conditions.dazed -= 1;
+                        if character.conditions.dazed == 0 {
+                            println!("{} recovered from Dazed", character.name);
+                        }
+                    }
+
+                    if !players_turn {
+                        if let Some(reaction) =
+                            player_choose_on_attacked_hit_reaction(&other_character)
+                        {
+                            other_character.action_points -= reaction.action_point_cost;
+                            match reaction.effect {
+                                OnAttackedHitReactionEffect::Rage => {
+                                    println!("  {} started Raging", other_character.name);
+                                    other_character.receive_condition(Condition::Raging);
+                                }
+                                OnAttackedHitReactionEffect::ShieldBash => {
+                                    println!("  {} used Shield bash", other_character.name);
+
+                                    let target = character.physical_resistence();
+                                    let roll = roll_d20_with_advantage(0);
+                                    let res = roll + other_character.strength();
+                                    println!(
+                                        "Rolled: {} (+{} str) = {}, vs physical resist={}",
+                                        roll,
+                                        other_character.strength(),
+                                        res,
+                                        target,
+                                    );
+                                    if res >= target {
+                                        let stacks = if res < target + 5 {
+                                            println!("  Hit!");
+                                            1
+                                        } else if res < target + 10 {
+                                            println!("  Heavy hit!");
+                                            2
+                                        } else {
+                                            println!("  Critical hit!");
+                                            3
+                                        };
+                                        perform_effect_application(
+                                            ApplyEffect::Condition(Condition::Dazed(stacks)),
+                                            &mut character,
+                                            "Shield bash",
+                                        );
+                                    } else {
+                                        println!("  Miss!");
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             if character.conditions.bleeding > 0 {
@@ -277,11 +355,6 @@ fn main() {
                 }
             }
 
-            if character.conditions.dazed > 0 {
-                character.conditions.dazed = 0;
-                println!("{} recovered from Dazed", character.name);
-            }
-
             if character.conditions.weakened > 0 {
                 character.conditions.weakened = 0;
                 println!("{} recovered from Weakened", character.name);
@@ -294,8 +367,10 @@ fn main() {
 
             println!("End of turn.");
 
-            character.action_points += action_points_per_turn;
-            character.attack_exertion = 0;
+            character.action_points =
+                (character.action_points + ACTION_POINTS_PER_TURN).min(ACTION_POINTS_PER_TURN);
+            character.main_hand.exertion = 0;
+            character.off_hand.exertion = 0;
             character.stamina.gain(1);
         }
     }
@@ -307,12 +382,21 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
     println!("Choose an action:");
     for (i, action) in available_actions.iter().enumerate() {
         let label = match action {
-            BaseAction::MainHandAttack => format!(
-                "[{}: Attack] ({} AP, hit={})",
-                character.main_hand.as_ref().unwrap().name,
-                character.main_hand.as_ref().unwrap().action_point_cost,
-                as_percentage(prob_attack_hit(&character, &other_character))
-            ),
+            BaseAction::Attack(hand) => {
+                let weapon = character.weapon(*hand).unwrap();
+                let label = match hand {
+                    HandType::MainHand => "Attack",
+                    HandType::OffHand => "Off-hand attack",
+                };
+                format!(
+                    "[{}: {}] ({} AP, hit={})",
+                    weapon.name,
+                    label,
+                    weapon.action_point_cost,
+                    as_percentage(prob_attack_hit(&character, *hand, &other_character))
+                )
+            }
+
             BaseAction::SelfEffect(SelfEffectAction {
                 name,
                 action_point_cost,
@@ -333,14 +417,14 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
     let action_choice = read_user_choice(available_actions.len() as u32);
 
     match &available_actions[action_choice as usize - 1] {
-        BaseAction::MainHandAttack => {
-            let weapon = character.main_hand.as_ref().unwrap();
-            let reserved_action_points = weapon.action_point_cost as i32;
+        BaseAction::Attack(attack_hand) => {
+            let weapon = character.weapon(*attack_hand).unwrap();
+            let reserved_action_points = weapon.action_point_cost;
 
             let mut available_attack_enhancements = vec![];
             let mut picked_attack_enhancements = vec![];
 
-            if let Some(enhancement) = weapon.attack_action_enhancement {
+            if let Some(enhancement) = weapon.attack_enhancement {
                 let prefix = format!("{}: ", weapon.name);
                 available_attack_enhancements.push((prefix, enhancement))
             }
@@ -351,7 +435,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 .into_iter()
                 .filter(|(_, enhancement)| {
                     character.action_points - reserved_action_points
-                        >= enhancement.action_point_cost as i32
+                        >= enhancement.action_point_cost
                 })
                 .collect();
 
@@ -405,7 +489,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                         })
                         .sum();
 
-                    if character.action_points - reserved_action_points >= total_cost as i32 {
+                    if character.action_points - reserved_action_points >= total_cost {
                         for i in picked_numbers {
                             picked_attack_enhancements
                                 .push(available_attack_enhancements[i as usize - 1].1);
@@ -418,7 +502,10 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 }
             }
 
-            Action::MainHandAttack(picked_attack_enhancements)
+            Action::Attack {
+                hand: *attack_hand,
+                enhancements: picked_attack_enhancements,
+            }
         }
         BaseAction::SelfEffect(self_effect) => Action::SelfEffect(*self_effect),
         BaseAction::CastSpell(spell) => Action::CastSpell(*spell),
@@ -426,20 +513,7 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
 }
 
 fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttackedReaction> {
-    let mut available_reactions = vec![];
-
-    for reaction in &defender.known_attacked_reactions {
-        if defender.action_points >= reaction.action_point_cost as i32 {
-            available_reactions.push(("".to_string(), *reaction));
-        }
-    }
-    if let Some(weapon) = &defender.main_hand {
-        if let Some(reaction) = weapon.on_attacked_reaction {
-            if defender.action_points >= reaction.action_point_cost as i32 {
-                available_reactions.push((format!("{}: ", weapon.name), reaction));
-            }
-        }
-    }
+    let mut available_reactions = defender.usable_on_attacked_reactions();
 
     if !available_reactions.is_empty() {
         println!("({} AP remaining) React to attack:", defender.action_points);
@@ -463,34 +537,27 @@ fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttacked
 }
 
 fn player_choose_on_attacked_hit_reaction(defender: &Character) -> Option<OnAttackedHitReaction> {
-    let mut available_reactions = vec![];
-    let rage = OnAttackedHitReaction {
-        name: "Rage",
-        action_point_cost: 1,
-        effect: OnAttackedHitReactionEffect::Rage,
-    };
-    if !defender.conditions.raging && defender.action_points >= rage.action_point_cost as i32 {
-        available_reactions.push(rage);
-    }
+    let mut reactions = defender.usable_on_hit_reactions();
 
-    if !available_reactions.is_empty() {
+    if !reactions.is_empty() {
         println!(
             "({} AP remaining) React to being hit:",
             defender.action_points
         );
-        for (i, reaction) in available_reactions.iter().enumerate() {
+        for (i, (prefix, reaction)) in reactions.iter().enumerate() {
             println!(
-                "  {}. [{}] ({} AP)",
+                "  {}. [{}{}] ({} AP)",
                 i + 1,
+                prefix,
                 reaction.name,
                 reaction.action_point_cost
             );
         }
 
-        println!("  {}. Skip", available_reactions.len() + 1);
-        let chosen_index = read_user_choice(available_reactions.len() as u32 + 1) as usize - 1;
-        if chosen_index < available_reactions.len() {
-            return Some(available_reactions[chosen_index]);
+        println!("  {}. Skip", reactions.len() + 1);
+        let chosen_index = read_user_choice(reactions.len() as u32 + 1) as usize - 1;
+        if chosen_index < reactions.len() {
+            return Some(reactions[chosen_index].1);
         }
     }
 
@@ -512,22 +579,25 @@ fn read_user_choice(max_allowed: u32) -> u32 {
     }
 }
 
-fn print_attack_intro(attacker: &Character, defender: &Character) {
+fn print_attack_intro(attacker: &Character, hand: HandType, defender: &Character) {
     println!(
         "{} attacks {} (d20+{} vs {})",
         attacker.name,
         defender.name,
-        attacker.main_hand_attack_modifier(),
+        attacker.attack_modifier(hand),
         defender.defense()
     );
-    println!(
-        "  {}{}",
-        attacker.explain_attack_circumstances(),
+    let explanation = format!(
+        "{}{}",
+        attacker.explain_attack_circumstances(hand),
         defender.explain_incoming_attack_circumstances()
     );
+    if !explanation.is_empty() {
+        println!("  {explanation}");
+    }
     println!(
         "  Chance to hit: {}",
-        as_percentage(prob_attack_hit(attacker, defender))
+        as_percentage(prob_attack_hit(attacker, hand, defender))
     );
 }
 
@@ -539,11 +609,11 @@ fn as_percentage(probability: f32) -> String {
     }
 }
 
-fn prob_attack_hit(attacker: &Character, defender: &Character) -> f32 {
-    let advantage_level = attacker.attack_advantage() + defender.incoming_attack_advantage();
+fn prob_attack_hit(attacker: &Character, hand: HandType, defender: &Character) -> f32 {
+    let advantage_level = attacker.attack_advantage(hand) + defender.incoming_attack_advantage();
     let target = defender
         .defense()
-        .saturating_sub(attacker.main_hand_attack_modifier())
+        .saturating_sub(attacker.attack_modifier(hand))
         .max(1);
     probability_of_d20_reaching(target, advantage_level)
 }
@@ -559,10 +629,11 @@ fn prob_spell_hit(caster: &Character, defender: &Character) -> f32 {
 fn perform_attack(
     attacker: &mut Character,
     attack_enhancements: Vec<AttackEnhancement>,
+    hand_type: HandType,
     defender: &mut Character,
     defender_reaction: Option<OnAttackedReaction>,
 ) -> bool {
-    let mut advantage = attacker.attack_advantage() + defender.incoming_attack_advantage();
+    let advantage = attacker.attack_advantage(hand_type) + defender.incoming_attack_advantage();
 
     let mut defense = defender.defense();
 
@@ -571,11 +642,13 @@ fn perform_attack(
     let mut skip_attack_exertion = false;
     let mut did_hit = false;
 
+    let attack_modifier = attacker.attack_modifier(hand_type);
+
     if let Some(reaction) = defender_reaction {
         match reaction.effect {
             OnAttackedReactionEffect::Parry => {
                 defender_reacted_with_parry = true;
-                let bonus_def = defender.strength();
+                let bonus_def = defender.attack_modifier(HandType::MainHand);
                 println!(
                     "  Defense: {} +{} (Parry) = {}",
                     defense,
@@ -583,10 +656,7 @@ fn perform_attack(
                     defense + bonus_def
                 );
                 defense += bonus_def;
-                let p_hit = probability_of_d20_reaching(
-                    defense - attacker.main_hand_attack_modifier(),
-                    advantage,
-                );
+                let p_hit = probability_of_d20_reaching(defense - attack_modifier, advantage);
                 println!("  Chance to hit: {:.1}%", p_hit * 100f32);
             }
             OnAttackedReactionEffect::SideStep => {
@@ -599,21 +669,25 @@ fn perform_attack(
                     defense + bonus_def
                 );
                 defense += bonus_def;
-                let p_hit = probability_of_d20_reaching(
-                    defense - attacker.main_hand_attack_modifier(),
-                    advantage,
-                );
+                let p_hit = probability_of_d20_reaching(defense - attack_modifier, advantage);
                 println!("  Chance to hit: {:.1}%", p_hit * 100f32);
             }
         }
     }
 
     let roll = roll_d20_with_advantage(advantage);
-    let res = roll + attacker.main_hand_attack_modifier();
+    let res = roll + attack_modifier;
+    if advantage < 0 {
+        println!("Rolling {} dice with disadvantage...", advantage.abs() + 1)
+    } else if advantage > 0 {
+        println!("Rolling {} dice with advantage...", advantage + 1)
+    } else {
+        println!("Rolling 1 die...");
+    }
     println!(
         "Rolled: {} (+{}) = {}, vs def={}, armor={}",
         roll,
-        attacker.main_hand_attack_modifier(),
+        attack_modifier,
         res,
         defense,
         defender.protection_from_armor()
@@ -632,10 +706,13 @@ fn perform_attack(
         did_hit = true;
 
         let mut on_true_hit_effect = None;
-        let weapon = attacker.main_hand.as_ref().unwrap();
+        let weapon = attacker.weapon(hand_type).unwrap();
         let mut damage = weapon.damage;
 
-        let damage_prefix = format!("  Damage: {} (weapon)", weapon.damage);
+        let damage_prefix = format!("  Damage: {} (weapon)", damage);
+
+        // TODO increase damage if using versatile weapon as 2-handed
+
         if res < defense + defender.protection_from_armor() {
             println!("Hit!");
             print!("{damage_prefix}");
@@ -688,8 +765,12 @@ fn perform_attack(
     if skip_attack_exertion {
         println!("The attack did not lead to exertion (true hit)");
     } else {
-        attacker.attack_exertion += 1;
-        println!("The attack led to exertion ({})", attacker.attack_exertion);
+        let hand = match hand_type {
+            HandType::MainHand => &mut attacker.main_hand,
+            HandType::OffHand => &mut attacker.off_hand,
+        };
+        hand.exertion += 1;
+        println!("The attack led to exertion ({})", hand.exertion);
     }
 
     if attacker.conditions.dazed > 0 {
@@ -719,10 +800,9 @@ fn perform_effect_application(
     context: &'static str,
 ) {
     match effect {
-        ApplyEffect::Stunned(n) => {
-            receiver.action_points -= n as i32;
-            receiver.receive_condition(Condition::Stunned);
-            print!("  {} lost {} AP and became Stunned", receiver.name, n);
+        ApplyEffect::RemoveActionPoints(n) => {
+            receiver.action_points -= n;
+            print!("  {} lost {} AP", receiver.name, n);
         }
         ApplyEffect::Condition(condition) => {
             receiver.receive_condition(condition);
@@ -756,7 +836,7 @@ struct AttackEnhancement {
 
 #[derive(Debug, Copy, Clone)]
 enum ApplyEffect {
-    Stunned(u32),
+    RemoveActionPoints(u32),
     Condition(Condition),
 }
 
@@ -784,6 +864,7 @@ struct OnAttackedHitReaction {
 #[derive(Debug, Copy, Clone)]
 enum OnAttackedHitReactionEffect {
     Rage,
+    ShieldBash,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -816,7 +897,10 @@ struct Conditions {
 
 #[derive(Debug)]
 enum Action {
-    MainHandAttack(Vec<AttackEnhancement>),
+    Attack {
+        hand: HandType,
+        enhancements: Vec<AttackEnhancement>,
+    },
     SelfEffect(SelfEffectAction),
     CastSpell(Spell),
 }
@@ -830,9 +914,15 @@ struct SelfEffectAction {
 
 #[derive(Debug, Copy, Clone)]
 enum BaseAction {
-    MainHandAttack,
+    Attack(HandType),
     SelfEffect(SelfEffectAction),
     CastSpell(Spell),
+}
+
+#[derive(Debug, Copy, Clone)]
+enum HandType {
+    MainHand,
+    OffHand,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -844,6 +934,13 @@ struct Spell {
     on_hit_effect: Option<ApplyEffect>,
 }
 
+#[derive(Debug, Copy, Clone, Default)]
+struct Hand {
+    weapon: Option<Weapon>,
+    shield: Option<Shield>,
+    exertion: u32,
+}
+
 #[derive(Debug)]
 struct Character {
     name: &'static str,
@@ -853,15 +950,15 @@ struct Character {
     health: NumberedResource,
     mana: NumberedResource,
     armor: Option<ArmorPiece>,
-    main_hand: Option<Weapon>,
-    off_hand: Option<Weapon>,
+    main_hand: Hand,
+    off_hand: Hand,
     conditions: Conditions,
-    action_points: i32,
+    action_points: u32,
     stamina: NumberedResource,
-    attack_exertion: u32,
     known_attack_enhancements: Vec<AttackEnhancement>,
     known_actions: Vec<BaseAction>,
     known_attacked_reactions: Vec<OnAttackedReaction>,
+    known_on_hit_reactions: Vec<OnAttackedHitReaction>,
 }
 
 impl Character {
@@ -880,10 +977,10 @@ impl Character {
             conditions: Default::default(),
             action_points: 0,
             stamina: NumberedResource::new((str + dex).saturating_sub(5)),
-            attack_exertion: 0,
             known_attack_enhancements: Default::default(),
             known_actions: vec![
-                BaseAction::MainHandAttack,
+                BaseAction::Attack(HandType::MainHand),
+                BaseAction::Attack(HandType::OffHand),
                 BaseAction::SelfEffect(SelfEffectAction {
                     name: "Brace",
                     action_point_cost: 1,
@@ -891,39 +988,95 @@ impl Character {
                 }),
             ],
             known_attacked_reactions: Default::default(),
+            known_on_hit_reactions: Default::default(),
         }
+    }
+
+    fn hand(&self, hand_type: HandType) -> &Hand {
+        match hand_type {
+            HandType::MainHand => &self.main_hand,
+            HandType::OffHand => &self.off_hand,
+        }
+    }
+
+    fn weapon(&self, hand: HandType) -> Option<Weapon> {
+        self.hand(hand).weapon
     }
 
     fn usable_actions(&self) -> Vec<BaseAction> {
         let ap = self.action_points;
         self.known_actions
             .iter()
-            .filter(|action| match action {
-                BaseAction::MainHandAttack => match self.main_hand {
-                    Some(weapon) if ap >= weapon.action_point_cost as i32 => true,
+            .filter(|action: &&BaseAction| match action {
+                BaseAction::Attack(hand) => match self.weapon(*hand) {
+                    Some(weapon) if ap >= weapon.action_point_cost => true,
                     _ => false,
                 },
                 BaseAction::SelfEffect(self_effect_action) => {
-                    ap >= self_effect_action.action_point_cost as i32
+                    ap >= self_effect_action.action_point_cost
                 }
                 BaseAction::CastSpell(spell) => {
-                    ap >= spell.action_point_cost as i32 && self.mana.current >= spell.mana_cost
+                    ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
                 }
             })
             .copied()
             .collect()
     }
 
+    fn usable_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
+        let mut usable = vec![];
+        for reaction in &self.known_attacked_reactions {
+            if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
+                usable.push(("".to_string(), *reaction));
+            }
+        }
+        // TODO: off-hand reactions?
+        if let Some(weapon) = &self.main_hand.weapon {
+            if let Some(reaction) = weapon.on_attacked_reaction {
+                if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
+                    usable.push((format!("{}: ", weapon.name), reaction));
+                }
+            }
+        }
+        usable
+    }
+
+    fn usable_on_hit_reactions(&self) -> Vec<(String, OnAttackedHitReaction)> {
+        let mut available_reactions = vec![];
+
+        for reaction in &self.known_on_hit_reactions {
+            if let OnAttackedHitReactionEffect::Rage = reaction.effect {
+                if self.conditions.raging {
+                    // Can't use this reaction while already raging
+                    continue;
+                }
+            }
+            if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
+                available_reactions.push(("".to_string(), *reaction));
+            }
+        }
+
+        if let Some(shield) = self.off_hand.shield {
+            if let Some(reaction) = shield.on_attacked_hit_reaction {
+                if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
+                    available_reactions.push((format!("{}: ", shield.name), reaction));
+                }
+            }
+        }
+
+        available_reactions
+    }
+
     fn strength(&self) -> u32 {
-        self.base_strength - self.conditions.weakened
+        (self.base_strength as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn dexterity(&self) -> u32 {
-        self.base_dexterity - self.conditions.weakened
+        (self.base_dexterity as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn intellect(&self) -> u32 {
-        self.base_intellect - self.conditions.weakened
+        (self.base_intellect as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn is_dazed(&self) -> bool {
@@ -932,8 +1085,13 @@ impl Character {
 
     fn defense(&self) -> u32 {
         let from_dex = self.defense_bonus_from_dexterity();
+        let from_shield = self
+            .off_hand
+            .shield
+            .map(|shield| shield.defense)
+            .unwrap_or(0);
         let from_braced = if self.conditions.braced { 3 } else { 0 };
-        10 + from_dex + from_braced
+        10 + from_dex + from_shield + from_braced
     }
 
     fn defense_bonus_from_dexterity(&self) -> u32 {
@@ -950,23 +1108,33 @@ impl Character {
         10 + self.intellect()
     }
 
+    fn physical_resistence(&self) -> u32 {
+        10 + self.strength()
+    }
+
     fn protection_from_armor(&self) -> u32 {
         self.armor.map(|armor| armor.protection).unwrap_or(0)
     }
 
-    fn main_hand_attack_modifier(&self) -> u32 {
+    fn attack_modifier(&self, hand: HandType) -> u32 {
         let str = self.strength();
         let dex = self.dexterity();
-        if self.main_hand.as_ref().unwrap().finesse {
-            str.max(dex)
-        } else {
-            str
+        let weapon = self.weapon(hand).unwrap();
+        let mut modifier = match weapon.attack_attribute {
+            AttackAttribute::Strength => str,
+            AttackAttribute::Dexterity => dex,
+            AttackAttribute::Finesse => str.max(dex),
+        };
+        if matches!(hand, HandType::OffHand) {
+            modifier -= 3;
         }
+        modifier
     }
 
-    fn attack_advantage(&self) -> i32 {
+    fn attack_advantage(&self, hand_type: HandType) -> i32 {
         let mut res = 0i32;
-        res -= self.attack_exertion as i32;
+
+        res -= self.hand(hand_type).exertion as i32;
         if self.is_dazed() {
             res -= 1;
         }
@@ -979,9 +1147,9 @@ impl Character {
         res
     }
 
-    fn explain_attack_circumstances(&self) -> String {
+    fn explain_attack_circumstances(&self, hand_type: HandType) -> String {
         let mut s = String::new();
-        if self.attack_exertion > 0 {
+        if self.hand(hand_type).exertion > 0 {
             s.push_str("[exerted -]");
         }
         if self.is_dazed() {
@@ -1066,9 +1234,31 @@ struct Weapon {
     name: &'static str,
     action_point_cost: u32,
     damage: u32,
-    // By default, meele weapons use STR, but Finesse weapons use DEX if it's higher than STR
-    finesse: bool,
-    attack_action_enhancement: Option<AttackEnhancement>,
+    grip: WeaponGrip,
+    attack_attribute: AttackAttribute,
+    attack_enhancement: Option<AttackEnhancement>,
     on_attacked_reaction: Option<OnAttackedReaction>,
     on_true_hit: Option<AttackHitEffect>,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct Shield {
+    name: &'static str,
+    defense: u32,
+    on_attacked_hit_reaction: Option<OnAttackedHitReaction>,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum AttackAttribute {
+    Strength,
+    Dexterity,
+    Finesse,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum WeaponGrip {
+    Light,
+    MainHand,
+    Versatile,
+    TwoHanded,
 }
