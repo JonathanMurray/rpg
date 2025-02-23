@@ -113,7 +113,9 @@ fn main() {
         },
     ];
 
-    let mut bob = Character::new("Bob", 10, 10, 4, bow);
+    let mut bob = Character::new("Bob", 10, 10, 4);
+    bob.main_hand = Some(dagger);
+    bob.off_hand = Some(dagger);
     bob.armor = Some(chain_mail);
     bob.known_attack_enhancements.push(crushing_strike);
     bob.known_attacked_reactions.push(OnAttackedReaction {
@@ -123,10 +125,11 @@ fn main() {
         effect: OnAttackedReactionEffect::SideStep,
     });
     for spell in spells {
-        bob.known_actions.push(Action::CastSpell(spell));
+        bob.known_actions.push(BaseAction::CastSpell(spell));
     }
 
-    let mut alice = Character::new("Alice", 4, 2, 3, dagger);
+    let mut alice = Character::new("Alice", 4, 2, 3);
+    alice.main_hand = Some(dagger);
     alice.armor = Some(leather_armor);
 
     alice.receive_condition(Condition::Stunned);
@@ -171,12 +174,13 @@ fn main() {
                 let action = if players_turn {
                     player_choose_action(&character, &other_character)
                 } else {
-                    Action::Attack(Default::default())
+                    Action::MainHandAttack(Default::default())
                 };
 
                 match action {
-                    Action::Attack(attack_enhancements) => {
-                        character.action_points -= character.weapon.action_point_cost as i32;
+                    Action::MainHandAttack(attack_enhancements) => {
+                        character.action_points -=
+                            character.main_hand.as_ref().unwrap().action_point_cost as i32;
                         for enhancement in &attack_enhancements {
                             character.action_points -= enhancement.action_point_cost as i32;
                             character.stamina.lose(enhancement.stamina_cost);
@@ -218,11 +222,11 @@ fn main() {
                             }
                         }
                     }
-                    Action::ApplyOnSelf {
+                    Action::SelfEffect(SelfEffectAction {
                         name: _,
                         action_point_cost,
                         effect,
-                    } => {
+                    }) => {
                         character.action_points -= action_point_cost as i32;
                         perform_effect_application(effect, &mut character, "");
                     }
@@ -298,51 +302,25 @@ fn main() {
 }
 
 fn player_choose_action(character: &Character, other_character: &Character) -> Action {
-    let mut available_actions = vec![];
-
-    for action in &character.known_actions {
-        match action {
-            Action::Attack(_) => {
-                if character.action_points >= character.weapon.action_point_cost as i32 {
-                    available_actions.push(action);
-                }
-            }
-            Action::ApplyOnSelf {
-                name: _,
-                action_point_cost,
-                effect: _,
-            } => {
-                if character.action_points >= *action_point_cost as i32 {
-                    available_actions.push(action)
-                }
-            }
-            Action::CastSpell(spell) => {
-                if character.action_points >= spell.action_point_cost as i32
-                    && character.mana.current >= spell.mana_cost
-                {
-                    available_actions.push(action);
-                }
-            }
-        }
-    }
+    let available_actions = character.usable_actions();
 
     println!("Choose an action:");
     for (i, action) in available_actions.iter().enumerate() {
         let label = match action {
-            Action::Attack(_) => format!(
+            BaseAction::MainHandAttack => format!(
                 "[{}: Attack] ({} AP, hit={})",
-                character.weapon.name,
-                character.weapon.action_point_cost,
+                character.main_hand.as_ref().unwrap().name,
+                character.main_hand.as_ref().unwrap().action_point_cost,
                 as_percentage(prob_attack_hit(&character, &other_character))
             ),
-            Action::ApplyOnSelf {
+            BaseAction::SelfEffect(SelfEffectAction {
                 name,
                 action_point_cost,
                 effect: _,
-            } => {
+            }) => {
                 format!("[{}] ({} AP)", name, action_point_cost)
             }
-            Action::CastSpell(spell) => format!(
+            BaseAction::CastSpell(spell) => format!(
                 "[{}] ({} AP, {} mana, hit={})",
                 spell.name,
                 spell.action_point_cost,
@@ -355,14 +333,15 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
     let action_choice = read_user_choice(available_actions.len() as u32);
 
     match &available_actions[action_choice as usize - 1] {
-        Action::Attack(_) => {
-            let reserved_action_points = character.weapon.action_point_cost as i32;
+        BaseAction::MainHandAttack => {
+            let weapon = character.main_hand.as_ref().unwrap();
+            let reserved_action_points = weapon.action_point_cost as i32;
 
             let mut available_attack_enhancements = vec![];
             let mut picked_attack_enhancements = vec![];
 
-            if let Some(enhancement) = character.weapon.attack_action_enhancement {
-                let prefix = format!("{}: ", character.weapon.name);
+            if let Some(enhancement) = weapon.attack_action_enhancement {
+                let prefix = format!("{}: ", weapon.name);
                 available_attack_enhancements.push((prefix, enhancement))
             }
             for &enhancement in &character.known_attack_enhancements {
@@ -439,18 +418,10 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 }
             }
 
-            Action::Attack(picked_attack_enhancements)
+            Action::MainHandAttack(picked_attack_enhancements)
         }
-        Action::ApplyOnSelf {
-            name,
-            action_point_cost,
-            effect,
-        } => Action::ApplyOnSelf {
-            name,
-            action_point_cost: *action_point_cost,
-            effect: *effect,
-        },
-        Action::CastSpell(spell) => Action::CastSpell(*spell),
+        BaseAction::SelfEffect(self_effect) => Action::SelfEffect(*self_effect),
+        BaseAction::CastSpell(spell) => Action::CastSpell(*spell),
     }
 }
 
@@ -462,9 +433,11 @@ fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttacked
             available_reactions.push(("".to_string(), *reaction));
         }
     }
-    if let Some(reaction) = &defender.weapon.on_attacked_reaction {
-        if defender.action_points >= reaction.action_point_cost as i32 {
-            available_reactions.push((format!("{}: ", defender.weapon.name), *reaction));
+    if let Some(weapon) = &defender.main_hand {
+        if let Some(reaction) = weapon.on_attacked_reaction {
+            if defender.action_points >= reaction.action_point_cost as i32 {
+                available_reactions.push((format!("{}: ", weapon.name), reaction));
+            }
         }
     }
 
@@ -544,7 +517,7 @@ fn print_attack_intro(attacker: &Character, defender: &Character) {
         "{} attacks {} (d20+{} vs {})",
         attacker.name,
         defender.name,
-        attacker.attack_modifier(),
+        attacker.main_hand_attack_modifier(),
         defender.defense()
     );
     println!(
@@ -570,7 +543,7 @@ fn prob_attack_hit(attacker: &Character, defender: &Character) -> f32 {
     let advantage_level = attacker.attack_advantage() + defender.incoming_attack_advantage();
     let target = defender
         .defense()
-        .saturating_sub(attacker.attack_modifier())
+        .saturating_sub(attacker.main_hand_attack_modifier())
         .max(1);
     probability_of_d20_reaching(target, advantage_level)
 }
@@ -610,8 +583,10 @@ fn perform_attack(
                     defense + bonus_def
                 );
                 defense += bonus_def;
-                let p_hit =
-                    probability_of_d20_reaching(defense - attacker.attack_modifier(), advantage);
+                let p_hit = probability_of_d20_reaching(
+                    defense - attacker.main_hand_attack_modifier(),
+                    advantage,
+                );
                 println!("  Chance to hit: {:.1}%", p_hit * 100f32);
             }
             OnAttackedReactionEffect::SideStep => {
@@ -624,19 +599,21 @@ fn perform_attack(
                     defense + bonus_def
                 );
                 defense += bonus_def;
-                let p_hit =
-                    probability_of_d20_reaching(defense - attacker.attack_modifier(), advantage);
+                let p_hit = probability_of_d20_reaching(
+                    defense - attacker.main_hand_attack_modifier(),
+                    advantage,
+                );
                 println!("  Chance to hit: {:.1}%", p_hit * 100f32);
             }
         }
     }
 
     let roll = roll_d20_with_advantage(advantage);
-    let res = roll + attacker.attack_modifier();
+    let res = roll + attacker.main_hand_attack_modifier();
     println!(
         "Rolled: {} (+{}) = {}, vs def={}, armor={}",
         roll,
-        attacker.attack_modifier(),
+        attacker.main_hand_attack_modifier(),
         res,
         defense,
         defender.protection_from_armor()
@@ -655,14 +632,15 @@ fn perform_attack(
         did_hit = true;
 
         let mut on_true_hit_effect = None;
-        let mut damage = attacker.weapon.damage;
+        let weapon = attacker.main_hand.as_ref().unwrap();
+        let mut damage = weapon.damage;
 
-        let damage_prefix = format!("  Damage: {} (weapon)", attacker.weapon.damage);
+        let damage_prefix = format!("  Damage: {} (weapon)", weapon.damage);
         if res < defense + defender.protection_from_armor() {
             println!("Hit!");
             print!("{damage_prefix}");
         } else {
-            on_true_hit_effect = attacker.weapon.on_true_hit;
+            on_true_hit_effect = weapon.on_true_hit;
             let (label, bonus_dmg) = if res < defense + defender.protection_from_armor() + 5 {
                 ("True hit", 1)
             } else if res < defense + defender.protection_from_armor() + 10 {
@@ -838,12 +816,22 @@ struct Conditions {
 
 #[derive(Debug)]
 enum Action {
-    Attack(Vec<AttackEnhancement>),
-    ApplyOnSelf {
-        name: &'static str,
-        action_point_cost: u32,
-        effect: ApplyEffect,
-    },
+    MainHandAttack(Vec<AttackEnhancement>),
+    SelfEffect(SelfEffectAction),
+    CastSpell(Spell),
+}
+
+#[derive(Debug, Copy, Clone)]
+struct SelfEffectAction {
+    name: &'static str,
+    action_point_cost: u32,
+    effect: ApplyEffect,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum BaseAction {
+    MainHandAttack,
+    SelfEffect(SelfEffectAction),
     CastSpell(Spell),
 }
 
@@ -865,18 +853,19 @@ struct Character {
     health: NumberedResource,
     mana: NumberedResource,
     armor: Option<ArmorPiece>,
-    weapon: Weapon,
+    main_hand: Option<Weapon>,
+    off_hand: Option<Weapon>,
     conditions: Conditions,
     action_points: i32,
     stamina: NumberedResource,
     attack_exertion: u32,
     known_attack_enhancements: Vec<AttackEnhancement>,
-    known_actions: Vec<Action>,
+    known_actions: Vec<BaseAction>,
     known_attacked_reactions: Vec<OnAttackedReaction>,
 }
 
 impl Character {
-    fn new(name: &'static str, str: u32, dex: u32, int: u32, weapon: Weapon) -> Self {
+    fn new(name: &'static str, str: u32, dex: u32, int: u32) -> Self {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
         Self {
             name,
@@ -886,22 +875,43 @@ impl Character {
             health: NumberedResource::new(5 + str),
             mana: NumberedResource::new(mana),
             armor: None,
-            weapon,
+            main_hand: Default::default(),
+            off_hand: Default::default(),
             conditions: Default::default(),
             action_points: 0,
             stamina: NumberedResource::new((str + dex).saturating_sub(5)),
             attack_exertion: 0,
             known_attack_enhancements: Default::default(),
             known_actions: vec![
-                Action::Attack(Default::default()),
-                Action::ApplyOnSelf {
+                BaseAction::MainHandAttack,
+                BaseAction::SelfEffect(SelfEffectAction {
                     name: "Brace",
                     action_point_cost: 1,
                     effect: ApplyEffect::Condition(Condition::Braced),
-                },
+                }),
             ],
             known_attacked_reactions: Default::default(),
         }
+    }
+
+    fn usable_actions(&self) -> Vec<BaseAction> {
+        let ap = self.action_points;
+        self.known_actions
+            .iter()
+            .filter(|action| match action {
+                BaseAction::MainHandAttack => match self.main_hand {
+                    Some(weapon) if ap >= weapon.action_point_cost as i32 => true,
+                    _ => false,
+                },
+                BaseAction::SelfEffect(self_effect_action) => {
+                    ap >= self_effect_action.action_point_cost as i32
+                }
+                BaseAction::CastSpell(spell) => {
+                    ap >= spell.action_point_cost as i32 && self.mana.current >= spell.mana_cost
+                }
+            })
+            .copied()
+            .collect()
     }
 
     fn strength(&self) -> u32 {
@@ -944,10 +954,10 @@ impl Character {
         self.armor.map(|armor| armor.protection).unwrap_or(0)
     }
 
-    fn attack_modifier(&self) -> u32 {
+    fn main_hand_attack_modifier(&self) -> u32 {
         let str = self.strength();
         let dex = self.dexterity();
-        if self.weapon.finesse {
+        if self.main_hand.as_ref().unwrap().finesse {
             str.max(dex)
         } else {
             str
@@ -1051,7 +1061,7 @@ struct ArmorPiece {
     limit_defense_from_dex: Option<u32>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 struct Weapon {
     name: &'static str,
     action_point_cost: u32,
