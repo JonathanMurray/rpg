@@ -114,7 +114,11 @@ fn main() {
             damage: 0,
             on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
             spell_type: SpellType::Mental,
-            possible_enhancement: None,
+            possible_enhancement: Some(SpellEnhancement {
+                name: "Targets lose action points",
+                mana_cost: 1,
+                effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
+            }),
         },
         Spell {
             name: "Mind blast",
@@ -192,10 +196,6 @@ fn main() {
             }
 
             while character.action_points > 0 {
-                if character.conditions.stunned {
-                    character.conditions.stunned = false;
-                    println!("{} recovered from Stunned", character.name);
-                }
                 println!();
                 println!(
                     "({} AP, {}/{} stamina, {}/{} mana)",
@@ -696,7 +696,16 @@ fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender:
                 defender.health.lose(damage);
                 println!("  {} took {} damage", defender.name, damage);
             }
-            if let Some(effect) = spell.on_hit_effect {
+
+            let on_hit_effect = match spell.possible_enhancement {
+                Some(SpellEnhancement {
+                    effect: SpellEnhancementEffect::OnHitEffect(effect),
+                    ..
+                }) if enhanced => Some(effect),
+                _ => spell.on_hit_effect,
+            };
+
+            if let Some(effect) = on_hit_effect {
                 perform_effect_application(effect, defender, spell.name);
             }
         } else {
@@ -924,7 +933,7 @@ struct AttackEnhancement {
     on_hit_effect: Option<ApplyEffect>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(Condition),
@@ -963,10 +972,9 @@ enum AttackHitEffect {
     SkipExertion,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum Condition {
     Dazed(u32),
-    Stunned,
     Bleeding,
     Braced,
     Raging,
@@ -977,7 +985,6 @@ enum Condition {
 #[derive(Debug, Copy, Clone, Default)]
 struct Conditions {
     dazed: u32,
-    stunned: bool,
     bleeding: u32,
     braced: bool,
     raging: bool,
@@ -1039,6 +1046,7 @@ struct SpellEnhancement {
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum SpellEnhancementEffect {
     CastTwice,
+    OnHitEffect(ApplyEffect),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1287,19 +1295,11 @@ impl Character {
     }
 
     fn incoming_attack_advantage(&self) -> i32 {
-        let mut res = 0;
-        if self.conditions.stunned {
-            // attacker has advantage
-            res += 1;
-        }
-        res
+        0
     }
 
     fn explain_incoming_attack_circumstances(&self) -> String {
         let mut s = String::new();
-        if self.conditions.stunned {
-            s.push_str("[stunned +]")
-        }
         if self.is_dazed() {
             s.push_str("[dazed +]")
         }
@@ -1312,7 +1312,6 @@ impl Character {
     fn receive_condition(&mut self, condition: Condition) {
         match condition {
             Condition::Dazed(n) => self.conditions.dazed += n,
-            Condition::Stunned => self.conditions.stunned = true,
             Condition::Bleeding => self.conditions.bleeding += 1,
             Condition::Braced => self.conditions.braced = true,
             Condition::Raging => self.conditions.raging = true,
