@@ -113,6 +113,8 @@ fn main() {
             mana_cost: 1,
             damage: 0,
             on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+            spell_type: SpellType::Mental,
+            possible_enhancement: None,
         },
         Spell {
             name: "Mind blast",
@@ -120,6 +122,21 @@ fn main() {
             mana_cost: 1,
             damage: 1,
             on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
+            spell_type: SpellType::Mental,
+            possible_enhancement: Some(SpellEnhancement {
+                name: "Cast twice",
+                mana_cost: 1,
+                effect: SpellEnhancementEffect::CastTwice,
+            }),
+        },
+        Spell {
+            name: "Fireball",
+            action_point_cost: 3,
+            mana_cost: 1,
+            damage: 2,
+            on_hit_effect: None,
+            spell_type: SpellType::Projectile,
+            possible_enhancement: None,
         },
     ];
 
@@ -133,7 +150,7 @@ fn main() {
         }),
     };
 
-    let mut bob = Character::new("Bob", 10, 2, 4);
+    let mut bob = Character::new("Bob", 5, 5, 4);
     bob.main_hand.weapon = Some(dagger);
     bob.off_hand.shield = Some(small_shield);
     bob.known_attack_enhancements.push(crushing_strike);
@@ -153,18 +170,17 @@ fn main() {
     }
 
     let mut alice = Character::new("Alice", 2, 7, 3);
-    alice.main_hand.weapon = Some(dagger);
-    alice.off_hand.shield = Some(small_shield);
+    alice.main_hand.weapon = Some(sword);
     alice.armor = Some(leather_armor);
 
     bob.action_points = ACTION_POINTS_PER_TURN;
     alice.action_points = ACTION_POINTS_PER_TURN;
 
-    let characters = Characters::new(vec![alice, bob]);
+    let characters = Characters::new(vec![bob, alice]);
 
     loop {
         for i in 0..2 {
-            let players_turn = i == 1;
+            let players_turn = i == 0;
             let mut character = characters.get(i).borrow_mut();
             let mut other_character = characters.get((i + 1) % 2).borrow_mut();
 
@@ -241,35 +257,17 @@ fn main() {
                         character.action_points -= action_point_cost;
                         perform_effect_application(effect, &mut character, "");
                     }
-                    Action::CastSpell(spell) => {
+                    Action::CastSpell { spell, enhanced } => {
                         character.action_points -= spell.action_point_cost;
                         character.mana.lose(spell.mana_cost);
 
-                        let target = other_character.mental_resistence();
-                        let roll = roll_d20_with_advantage(0);
-                        let res = roll + character.intellect();
-                        println!(
-                            "Rolled: {} (+{} int) = {}, vs mental resist={}",
-                            roll,
-                            character.intellect(),
-                            res,
-                            target,
-                        );
-                        if res >= target {
-                            println!("  It's a spell hit");
-                            let damage = spell.damage;
-                            other_character.health.lose(damage);
-                            println!("  {} took {} damage", other_character.name, damage);
-                            if let Some(effect) = spell.on_hit_effect {
-                                perform_effect_application(
-                                    effect,
-                                    &mut other_character,
-                                    spell.name,
-                                );
-                            }
-                        } else {
-                            println!("  It's a spell miss");
+                        if enhanced {
+                            character
+                                .mana
+                                .lose(spell.possible_enhancement.unwrap().mana_cost);
                         }
+
+                        perform_spell(&mut character, spell, enhanced, &mut other_character);
                     }
                 }
 
@@ -409,12 +407,16 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
                 spell.name,
                 spell.action_point_cost,
                 spell.mana_cost,
-                as_percentage(prob_spell_hit(&character, &other_character))
+                as_percentage(prob_spell_hit(
+                    &character,
+                    spell.spell_type,
+                    &other_character
+                ))
             ),
         };
         println!("  {}. {}", i + 1, label);
     }
-    let action_choice = read_user_choice(available_actions.len() as u32);
+    let action_choice = player_make_choice(available_actions.len() as u32);
 
     match &available_actions[action_choice as usize - 1] {
         BaseAction::Attack(attack_hand) => {
@@ -508,7 +510,33 @@ fn player_choose_action(character: &Character, other_character: &Character) -> A
             }
         }
         BaseAction::SelfEffect(self_effect) => Action::SelfEffect(*self_effect),
-        BaseAction::CastSpell(spell) => Action::CastSpell(*spell),
+        BaseAction::CastSpell(spell) => {
+            let mut enhanced = false;
+
+            if let Some(enhancement) = spell.possible_enhancement {
+                if character.mana.current - spell.mana_cost >= enhancement.mana_cost {
+                    println!(
+                        "({}/{} mana)",
+                        character.mana.current - spell.mana_cost,
+                        character.mana.max
+                    );
+                    println!("Add spell enhancement");
+                    println!(
+                        "  1. [{}] ({} mana)",
+                        enhancement.name, enhancement.mana_cost
+                    );
+                    println!("  2. Skip");
+
+                    let choice = player_make_choice(2);
+                    enhanced = choice == 1;
+                }
+            }
+
+            Action::CastSpell {
+                spell: *spell,
+                enhanced,
+            }
+        }
     }
 }
 
@@ -527,7 +555,7 @@ fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAttacked
         }
 
         println!("  {}. Skip", available_reactions.len() + 1);
-        let chosen_index = read_user_choice(available_reactions.len() as u32 + 1) as usize - 1;
+        let chosen_index = player_make_choice(available_reactions.len() as u32 + 1) as usize - 1;
         if chosen_index < available_reactions.len() {
             return Some(available_reactions[chosen_index].1);
         }
@@ -555,7 +583,7 @@ fn player_choose_on_attacked_hit_reaction(defender: &Character) -> Option<OnAtta
         }
 
         println!("  {}. Skip", reactions.len() + 1);
-        let chosen_index = read_user_choice(reactions.len() as u32 + 1) as usize - 1;
+        let chosen_index = player_make_choice(reactions.len() as u32 + 1) as usize - 1;
         if chosen_index < reactions.len() {
             return Some(reactions[chosen_index].1);
         }
@@ -564,7 +592,7 @@ fn player_choose_on_attacked_hit_reaction(defender: &Character) -> Option<OnAtta
     None
 }
 
-fn read_user_choice(max_allowed: u32) -> u32 {
+fn player_make_choice(max_allowed: u32) -> u32 {
     let stdin = io::stdin();
     let input = &mut String::new();
     loop {
@@ -618,12 +646,70 @@ fn prob_attack_hit(attacker: &Character, hand: HandType, defender: &Character) -
     probability_of_d20_reaching(target, advantage_level)
 }
 
-fn prob_spell_hit(caster: &Character, defender: &Character) -> f32 {
-    let target = defender
-        .mental_resistence()
-        .saturating_sub(caster.intellect())
-        .max(1);
+fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Character) -> f32 {
+    let defender_value = match spell_type {
+        SpellType::Mental => defender.mental_resistence(),
+        SpellType::Projectile => defender.defense(),
+    };
+    let target = defender_value.saturating_sub(caster.intellect()).max(1);
     probability_of_d20_reaching(target, 0)
+}
+
+fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender: &mut Character) {
+    let (target_label, target) = match spell.spell_type {
+        SpellType::Mental => ("mental resist", defender.mental_resistence()),
+        SpellType::Projectile => ("defense", defender.defense()),
+    };
+
+    let cast_n_times = if enhanced
+        && spell.possible_enhancement.unwrap().effect == SpellEnhancementEffect::CastTwice
+    {
+        2
+    } else {
+        1
+    };
+
+    println!(
+        "{} casts {} on {} (d20+{} vs {})",
+        caster.name,
+        spell.name,
+        defender.name,
+        caster.intellect(),
+        target
+    );
+
+    for i in 0..cast_n_times {
+        let roll = roll_d20_with_advantage(0);
+        let res = roll + caster.intellect();
+        println!(
+            "Rolled: {} (+{} int) = {}, vs {}={}",
+            roll,
+            caster.intellect(),
+            res,
+            target_label,
+            target,
+        );
+        if res >= target {
+            println!("  The spell was successful!");
+            let damage = spell.damage;
+            if damage > 0 {
+                defender.health.lose(damage);
+                println!("  {} took {} damage", defender.name, damage);
+            }
+            if let Some(effect) = spell.on_hit_effect {
+                perform_effect_application(effect, defender, spell.name);
+            }
+        } else {
+            match spell.spell_type {
+                SpellType::Mental => println!("  {} resisted the spell!", defender.name),
+                SpellType::Projectile => println!("  The spell missed!"),
+            }
+        }
+
+        if i < cast_n_times - 1 {
+            println!("{} casts again!", caster.name)
+        }
+    }
 }
 
 fn perform_attack(
@@ -709,9 +795,13 @@ fn perform_attack(
         let weapon = attacker.weapon(hand_type).unwrap();
         let mut damage = weapon.damage;
 
-        let damage_prefix = format!("  Damage: {} (weapon)", damage);
+        let mut damage_prefix = format!("  Damage: {} ({})", damage, weapon.name);
 
-        // TODO increase damage if using versatile weapon as 2-handed
+        if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.is_empty() {
+            let bonus_dmg = 1;
+            damage_prefix.push_str(&format!(" +{} (two-handed)", bonus_dmg));
+            damage += bonus_dmg;
+        }
 
         if res < defense + defender.protection_from_armor() {
             println!("Hit!");
@@ -902,7 +992,10 @@ enum Action {
         enhancements: Vec<AttackEnhancement>,
     },
     SelfEffect(SelfEffectAction),
-    CastSpell(Spell),
+    CastSpell {
+        spell: Spell,
+        enhanced: bool,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -932,6 +1025,26 @@ struct Spell {
     mana_cost: u32,
     damage: u32,
     on_hit_effect: Option<ApplyEffect>,
+    spell_type: SpellType,
+    possible_enhancement: Option<SpellEnhancement>,
+}
+
+#[derive(Debug, Copy, Clone)]
+struct SpellEnhancement {
+    name: &'static str,
+    mana_cost: u32,
+    effect: SpellEnhancementEffect,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+enum SpellEnhancementEffect {
+    CastTwice,
+}
+
+#[derive(Debug, Copy, Clone)]
+enum SpellType {
+    Mental,
+    Projectile,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -939,6 +1052,12 @@ struct Hand {
     weapon: Option<Weapon>,
     shield: Option<Shield>,
     exertion: u32,
+}
+
+impl Hand {
+    fn is_empty(&self) -> bool {
+        self.weapon.is_none() && self.shield.is_none()
+    }
 }
 
 #[derive(Debug)]
