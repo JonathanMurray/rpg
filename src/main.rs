@@ -1,8 +1,13 @@
 mod d20;
+mod data;
 
 use std::{cell::RefCell, collections::HashSet, io};
 
 use d20::{probability_of_d20_reaching, roll_d20_with_advantage};
+use data::{
+    CRUSHING_STRIKE, DAGGER, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SIDE_STEP,
+    SMALL_SHIELD, SWORD,
+};
 
 // You get this many AP per round
 const ACTION_POINTS_PER_TURN: u32 = 6;
@@ -10,172 +15,19 @@ const ACTION_POINTS_PER_TURN: u32 = 6;
 const REACTION_AP_THRESHOLD: u32 = 3;
 
 fn main() {
-    let leather_armor = ArmorPiece {
-        protection: 3,
-        limit_defense_from_dex: None,
-    };
-    let _chain_mail = ArmorPiece {
-        protection: 5,
-        limit_defense_from_dex: Some(4),
-    };
-    let dagger = Weapon {
-        name: "Dagger",
-        action_point_cost: 1,
-        damage: 1,
-        grip: WeaponGrip::Light,
-        attack_attribute: AttackAttribute::Finesse,
-        attack_enhancement: Default::default(),
-        on_attacked_reaction: Default::default(),
-        on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-            Condition::Weakened(1),
-        ))),
-    };
-    let parry = OnAttackedReaction {
-        name: "Parry",
-        action_point_cost: 1,
-        stamina_cost: 0,
-        effect: OnAttackedReactionEffect::Parry,
-    };
-    let sword = Weapon {
-        name: "Sword",
-        action_point_cost: 2,
-        damage: 1,
-        grip: WeaponGrip::Versatile,
-        attack_attribute: AttackAttribute::Finesse,
-        attack_enhancement: Default::default(),
-        on_attacked_reaction: Some(parry),
-        on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-            Condition::Bleeding,
-        ))),
-    };
-    let _rapier = Weapon {
-        name: "Rapier",
-        action_point_cost: 2,
-        damage: 1,
-        grip: WeaponGrip::MainHand,
-        attack_attribute: AttackAttribute::Finesse,
-        attack_enhancement: Default::default(),
-        on_attacked_reaction: Some(parry),
-        on_true_hit: Some(AttackHitEffect::SkipExertion),
-    };
-    let _war_hammer = Weapon {
-        name: "War hammer",
-        action_point_cost: 2,
-        damage: 2,
-        grip: WeaponGrip::TwoHanded,
-        attack_attribute: AttackAttribute::Strength,
-        attack_enhancement: Some(AttackEnhancement {
-            name: "All-in attack",
-            action_point_cost: 1,
-            stamina_cost: 0,
-            bonus_damage: 1,
-            apply_on_self_before: None,
-            on_hit_effect: None,
-        }),
-        on_attacked_reaction: Some(parry),
-        on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-            Condition::Dazed(1),
-        ))),
-    };
-    let _bow = Weapon {
-        name: "Bow",
-        action_point_cost: 2,
-        damage: 2,
-        grip: WeaponGrip::TwoHanded,
-        attack_attribute: AttackAttribute::Dexterity,
-        attack_enhancement: Some(AttackEnhancement {
-            name: "Careful aim",
-            action_point_cost: 1,
-            stamina_cost: 0,
-            bonus_damage: 0,
-            apply_on_self_before: Some(Condition::CarefulAim),
-            on_hit_effect: None,
-        }),
-        on_attacked_reaction: None,
-        on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-            Condition::Weakened(1),
-        ))),
-    };
-
-    let crushing_strike = AttackEnhancement {
-        name: "Crushing strike",
-        action_point_cost: 0,
-        stamina_cost: 1,
-        bonus_damage: 0,
-        apply_on_self_before: None,
-        on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
-    };
-
-    let spells = vec![
-        Spell {
-            name: "Scream",
-            action_point_cost: 2,
-            mana_cost: 1,
-            damage: 0,
-            on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
-            spell_type: SpellType::Mental,
-            possible_enhancement: Some(SpellEnhancement {
-                name: "Targets lose action points",
-                mana_cost: 1,
-                effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
-            }),
-        },
-        Spell {
-            name: "Mind blast",
-            action_point_cost: 2,
-            mana_cost: 1,
-            damage: 1,
-            on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
-            spell_type: SpellType::Mental,
-            possible_enhancement: Some(SpellEnhancement {
-                name: "Cast twice",
-                mana_cost: 1,
-                effect: SpellEnhancementEffect::CastTwice,
-            }),
-        },
-        Spell {
-            name: "Fireball",
-            action_point_cost: 3,
-            mana_cost: 1,
-            damage: 2,
-            on_hit_effect: None,
-            spell_type: SpellType::Projectile,
-            possible_enhancement: None,
-        },
-    ];
-
-    let small_shield = Shield {
-        name: "Small shield",
-        defense: 2,
-        on_attacked_hit_reaction: Some(OnAttackedHitReaction {
-            name: "Shield bash",
-            action_point_cost: 1,
-            effect: OnAttackedHitReactionEffect::ShieldBash,
-        }),
-    };
-
     let mut bob = Character::new("Bob", 5, 5, 4);
-    bob.main_hand.weapon = Some(dagger);
-    bob.off_hand.shield = Some(small_shield);
-    bob.known_attack_enhancements.push(crushing_strike);
-    bob.known_attacked_reactions.push(OnAttackedReaction {
-        name: "Side step",
-        action_point_cost: 1,
-        stamina_cost: 1,
-        effect: OnAttackedReactionEffect::SideStep,
-    });
-    bob.known_on_hit_reactions.push(OnAttackedHitReaction {
-        name: "Rage",
-        action_point_cost: 1,
-        effect: OnAttackedHitReactionEffect::Rage,
-    });
-    for spell in spells {
-        bob.known_actions.push(BaseAction::CastSpell(spell));
-    }
+    bob.main_hand.weapon = Some(DAGGER);
+    bob.off_hand.shield = Some(SMALL_SHIELD);
+    bob.known_attack_enhancements.push(CRUSHING_STRIKE);
+    bob.known_attacked_reactions.push(SIDE_STEP);
+    bob.known_on_hit_reactions.push(RAGE);
+    bob.known_actions.push(BaseAction::CastSpell(SCREAM));
+    bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
+    bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
     let mut alice = Character::new("Alice", 2, 7, 3);
-    alice.main_hand.weapon = Some(sword);
-    alice.armor = Some(leather_armor);
+    alice.main_hand.weapon = Some(SWORD);
+    alice.armor = Some(LEATHER_ARMOR);
 
     bob.action_points = ACTION_POINTS_PER_TURN;
     alice.action_points = ACTION_POINTS_PER_TURN;
@@ -687,17 +539,19 @@ fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender:
                 println!("  {} took {} damage", defender.name, damage);
             }
 
-            let on_hit_effect = match spell.possible_enhancement {
+            if let Some(effect) = spell.on_hit_effect {
+                perform_effect_application(effect, defender, spell.name);
+            }
+
+            match spell.possible_enhancement {
                 Some(SpellEnhancement {
                     effect: SpellEnhancementEffect::OnHitEffect(effect),
                     ..
-                }) if enhanced => Some(effect),
-                _ => spell.on_hit_effect,
+                }) if enhanced => {
+                    perform_effect_application(effect, defender, "Spell enhancement");
+                }
+                _ => {}
             };
-
-            if let Some(effect) = on_hit_effect {
-                perform_effect_application(effect, defender, spell.name);
-            }
         } else {
             match spell.spell_type {
                 SpellType::Mental => println!("  {} resisted the spell!", defender.name),
