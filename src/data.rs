@@ -1,4 +1,4 @@
-use crate::{
+use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
     OnAttackedHitReaction, OnAttackedHitReactionEffect, OnAttackedReaction,
     OnAttackedReactionEffect, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
