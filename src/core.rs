@@ -77,17 +77,7 @@ impl CoreGame {
 
         match action {
             Action::Attack { hand, enhancements } => {
-                character.action_points -= character.weapon(hand).unwrap().action_point_cost;
-                for enhancement in &enhancements {
-                    character.action_points -= enhancement.action_point_cost;
-                    character.stamina.lose(enhancement.stamina_cost);
-                    if let Some(condition) = enhancement.apply_on_self_before {
-                        character.receive_condition(condition);
-                    }
-                }
-
-                print_attack_intro(&character, hand, &other_character);
-
+                perform_pre_attack(&mut character, hand, &enhancements[..], &other_character);
                 drop(character);
                 drop(other_character);
                 return if !players_turn {
@@ -110,15 +100,6 @@ impl CoreGame {
                 perform_effect_application(effect, &mut character, "");
             }
             Action::CastSpell { spell, enhanced } => {
-                character.action_points -= spell.action_point_cost;
-                character.mana.lose(spell.mana_cost);
-
-                if enhanced {
-                    character
-                        .mana
-                        .lose(spell.possible_enhancement.unwrap().mana_cost);
-                }
-
                 perform_spell(&mut character, spell, enhanced, &mut other_character);
             }
         }
@@ -132,26 +113,21 @@ impl CoreGame {
         self,
         action_points_before_action: u32,
         hand: HandType,
-        enhancements: Vec<AttackEnhancement>,
-        reaction: Option<OnAttackedReaction>,
+        attack_enhancements: Vec<AttackEnhancement>,
+        defender_reaction: Option<OnAttackedReaction>,
     ) -> WaitingFor {
-        let mut character = self.active_character();
-        let mut other_character = self.other_character();
-
-        if let Some(reaction) = reaction {
-            other_character.action_points -= reaction.action_point_cost;
-        }
-
+        let mut attacker = self.active_character();
+        let mut defender = self.other_character();
         let did_attack_and_hit = perform_attack(
-            &mut character,
-            enhancements,
+            &mut attacker,
+            attack_enhancements,
             hand,
-            &mut other_character,
-            reaction,
+            &mut defender,
+            defender_reaction,
         );
+        drop(attacker);
+        drop(defender);
 
-        drop(character);
-        drop(other_character);
         return self
             .enter_state_right_after_action(action_points_before_action, did_attack_and_hit);
     }
@@ -169,21 +145,11 @@ impl CoreGame {
         // This must happen before "on attacked and hit" reactions because those might
         // inflict new Dazed stacks, which should not be covered here.
         let spent = action_points_before_action - character.action_points;
-        if character.conditions.dazed > 0 {
-            character.conditions.dazed = character.conditions.dazed.saturating_sub(spent);
-            if character.conditions.dazed == 0 {
-                println!("{} recovered from Dazed", character.name);
-            }
-        }
+        perform_recover_from_dazed(&mut character, spent);
 
         if did_attack_and_hit {
             // You recover from 1 stack of Dazed each time you're hit by an attack
-            if other_character.conditions.dazed > 0 {
-                other_character.conditions.dazed -= 1;
-                if character.conditions.dazed == 0 {
-                    println!("{} recovered from Dazed", character.name);
-                }
-            }
+            perform_recover_from_dazed(&mut other_character, 1);
 
             if !players_turn {
                 drop(character);
@@ -208,46 +174,7 @@ impl CoreGame {
             let mut other_character = self.other_character();
 
             if let Some(reaction) = reaction {
-                other_character.action_points -= reaction.action_point_cost;
-                match reaction.effect {
-                    OnAttackedHitReactionEffect::Rage => {
-                        println!("  {} started Raging", other_character.name);
-                        other_character.receive_condition(Condition::Raging);
-                    }
-                    OnAttackedHitReactionEffect::ShieldBash => {
-                        println!("  {} used Shield bash", other_character.name);
-
-                        let target = character.physical_resistence();
-                        let roll = roll_d20_with_advantage(0);
-                        let res = roll + other_character.strength();
-                        println!(
-                            "Rolled: {} (+{} str) = {}, vs physical resist={}",
-                            roll,
-                            other_character.strength(),
-                            res,
-                            target,
-                        );
-                        if res >= target {
-                            let stacks = if res < target + 5 {
-                                println!("  Hit!");
-                                1
-                            } else if res < target + 10 {
-                                println!("  Heavy hit!");
-                                2
-                            } else {
-                                println!("  Critical hit!");
-                                3
-                            };
-                            perform_effect_application(
-                                ApplyEffect::Condition(Condition::Dazed(stacks)),
-                                &mut character,
-                                "Shield bash",
-                            );
-                        } else {
-                            println!("  Miss!");
-                        }
-                    }
-                }
+                perform_on_hit_reaction(&mut character, &mut other_character, reaction);
             }
         }
 
@@ -259,36 +186,7 @@ impl CoreGame {
         let mut character = self.characters.get(self.active_character_i).borrow_mut();
 
         if character.action_points == 0 {
-            if character.conditions.bleeding > 0 {
-                character.health.lose(1);
-                println!(
-                    "{} took 1 damage from Bleeding and went down to {}/{} health",
-                    character.name, character.health.current, character.health.max
-                );
-                character.conditions.bleeding -= 1;
-                if character.conditions.bleeding == 0 {
-                    println!("{} stopped Bleeding", character.name);
-                }
-            }
-
-            if character.conditions.weakened > 0 {
-                character.conditions.weakened = 0;
-                println!("{} recovered from Weakened", character.name);
-            }
-
-            if character.conditions.raging {
-                character.conditions.raging = false;
-                println!("{} stopped Raging", character.name)
-            }
-
-            println!("End of turn.");
-
-            character.action_points =
-                (character.action_points + ACTION_POINTS_PER_TURN).min(ACTION_POINTS_PER_TURN);
-            character.main_hand.exertion = 0;
-            character.off_hand.exertion = 0;
-            character.stamina.gain(1);
-
+            perform_end_of_turn_character(&mut character);
             self.active_character_i = (self.active_character_i + 1) % self.characters.0.len();
             players_turn = !players_turn;
             character = self.characters.get(self.active_character_i).borrow_mut();
@@ -361,28 +259,6 @@ impl WaitingForOnAttackedHitReaction {
     }
 }
 
-fn print_attack_intro(attacker: &Character, hand: HandType, defender: &Character) {
-    println!(
-        "{} attacks {} (d20+{} vs {})",
-        attacker.name,
-        defender.name,
-        attacker.attack_modifier(hand),
-        defender.defense()
-    );
-    let explanation = format!(
-        "{}{}",
-        attacker.explain_attack_circumstances(hand),
-        defender.explain_incoming_attack_circumstances()
-    );
-    if !explanation.is_empty() {
-        println!("  {explanation}");
-    }
-    println!(
-        "  Chance to hit: {}",
-        as_percentage(prob_attack_hit(attacker, hand, defender))
-    );
-}
-
 pub fn as_percentage(probability: f32) -> String {
     if !(0.01..=0.99).contains(&probability) {
         format!("{:.1}%", probability * 100f32)
@@ -409,7 +285,104 @@ pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Char
     probability_of_d20_reaching(target, 0)
 }
 
+fn perform_on_hit_reaction(
+    character: &mut Character,
+    other_character: &mut Character,
+    reaction: OnAttackedHitReaction,
+) {
+    other_character.action_points -= reaction.action_point_cost;
+    match reaction.effect {
+        OnAttackedHitReactionEffect::Rage => {
+            println!("  {} started Raging", other_character.name);
+            other_character.receive_condition(Condition::Raging);
+        }
+        OnAttackedHitReactionEffect::ShieldBash => {
+            println!("  {} used Shield bash", other_character.name);
+
+            let target = character.physical_resistence();
+            let roll = roll_d20_with_advantage(0);
+            let res = roll + other_character.strength();
+            println!(
+                "Rolled: {} (+{} str) = {}, vs physical resist={}",
+                roll,
+                other_character.strength(),
+                res,
+                target,
+            );
+            if res >= target {
+                let stacks = if res < target + 5 {
+                    println!("  Hit!");
+                    1
+                } else if res < target + 10 {
+                    println!("  Heavy hit!");
+                    2
+                } else {
+                    println!("  Critical hit!");
+                    3
+                };
+                perform_effect_application(
+                    ApplyEffect::Condition(Condition::Dazed(stacks)),
+                    character,
+                    "Shield bash",
+                );
+            } else {
+                println!("  Miss!");
+            }
+        }
+    }
+}
+
+fn perform_end_of_turn_character(character: &mut Character) {
+    if character.conditions.bleeding > 0 {
+        character.health.lose(1);
+        println!(
+            "{} took 1 damage from Bleeding and went down to {}/{} health",
+            character.name, character.health.current, character.health.max
+        );
+        character.conditions.bleeding -= 1;
+        if character.conditions.bleeding == 0 {
+            println!("{} stopped Bleeding", character.name);
+        }
+    }
+
+    if character.conditions.weakened > 0 {
+        character.conditions.weakened = 0;
+        println!("{} recovered from Weakened", character.name);
+    }
+
+    if character.conditions.raging {
+        character.conditions.raging = false;
+        println!("{} stopped Raging", character.name)
+    }
+
+    character.action_points =
+        (character.action_points + ACTION_POINTS_PER_TURN).min(ACTION_POINTS_PER_TURN);
+    character.main_hand.exertion = 0;
+    character.off_hand.exertion = 0;
+    character.stamina.gain(1);
+
+    println!("End of turn.");
+}
+
+fn perform_recover_from_dazed(character: &mut Character, stacks: u32) {
+    if character.conditions.dazed > 0 {
+        character.conditions.dazed = character.conditions.dazed.saturating_sub(stacks);
+        if character.conditions.dazed == 0 {
+            println!("{} recovered from Dazed", character.name);
+        }
+    }
+}
+
 fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender: &mut Character) {
+    caster.action_points -= spell.action_point_cost;
+    caster.mana.lose(spell.mana_cost);
+
+    if enhanced {
+        caster
+            .mana
+            .lose(spell.possible_enhancement.unwrap().mana_cost);
+    }
+
     let (target_label, target) = match spell.spell_type {
         SpellType::Mental => ("mental resist", defender.mental_resistence()),
         SpellType::Projectile => ("defense", defender.defense()),
@@ -477,6 +450,42 @@ fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender:
     }
 }
 
+fn perform_pre_attack(
+    attacker: &mut Character,
+    hand: HandType,
+    enhancements: &[AttackEnhancement],
+    defender: &Character,
+) {
+    attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
+    for enhancement in enhancements {
+        attacker.action_points -= enhancement.action_point_cost;
+        attacker.stamina.lose(enhancement.stamina_cost);
+        if let Some(condition) = enhancement.apply_on_self_before {
+            attacker.receive_condition(condition);
+        }
+    }
+
+    println!(
+        "{} attacks {} (d20+{} vs {})",
+        attacker.name,
+        defender.name,
+        attacker.attack_modifier(hand),
+        defender.defense()
+    );
+    let explanation = format!(
+        "{}{}",
+        attacker.explain_attack_circumstances(hand),
+        defender.explain_incoming_attack_circumstances()
+    );
+    if !explanation.is_empty() {
+        println!("  {explanation}");
+    }
+    println!(
+        "  Chance to hit: {}",
+        as_percentage(prob_attack_hit(attacker, hand, defender))
+    );
+}
+
 fn perform_attack(
     attacker: &mut Character,
     attack_enhancements: Vec<AttackEnhancement>,
@@ -484,6 +493,10 @@ fn perform_attack(
     defender: &mut Character,
     defender_reaction: Option<OnAttackedReaction>,
 ) -> bool {
+    if let Some(reaction) = defender_reaction {
+        defender.action_points -= reaction.action_point_cost;
+    }
+
     let advantage = attacker.attack_advantage(hand_type) + defender.incoming_attack_advantage();
 
     let mut defense = defender.defense();
@@ -626,14 +639,6 @@ fn perform_attack(
         };
         hand.exertion += 1;
         println!("The attack led to exertion ({})", hand.exertion);
-    }
-
-    if attacker.conditions.dazed > 0 {
-        attacker.conditions.dazed -= 1;
-        println!(
-            "{} lost 1 Dazed (down to {})",
-            attacker.name, attacker.conditions.dazed
-        );
     }
 
     if attacker.conditions.careful_aim {
