@@ -13,7 +13,9 @@ use macroquad::{
     text::{draw_text, measure_text, Font, TextDimensions},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
-use rpg::core::{Action, BaseAction, Character, CoreGame, WaitingFor};
+use rpg::core::{
+    Action, BaseAction, Character, CoreGame, OnAttackedReaction, OnHitReaction, WaitingFor,
+};
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -27,27 +29,8 @@ async fn main() {
 
     let event_queue = Rc::new(RefCell::new(vec![]));
 
-    for mut action in character_ref.known_actions.iter().copied() {
-        if let BaseAction::Attack { hand, .. } = action {
-            if character_ref.weapon(hand).is_none() {
-                continue;
-            }
-            match character_ref.weapon(hand) {
-                Some(weapon) => {
-                    action = BaseAction::Attack {
-                        hand,
-                        action_point_cost: weapon.action_point_cost,
-                    };
-                }
-                None => continue,
-            }
-        }
-
-        let mut btn = new_action_button(&character_ref, action);
-        btn.event_sender = Some(EventSender {
-            queue: Rc::clone(&event_queue),
-        });
-
+    for (name, action) in character_ref.known_actions() {
+        let mut btn = new_action_button(name, ButtonAction::Action(action), &event_queue);
         match action {
             BaseAction::Attack { .. } => combat_buttons.push(btn),
             BaseAction::SelfEffect(..) => skill_buttons.push(btn),
@@ -59,12 +42,28 @@ async fn main() {
     let skill_row = buttons_row(skill_buttons);
     let spell_row = buttons_row(spell_buttons);
 
+    let mut reaction_buttons = vec![];
+    for (name, reaction) in character_ref.known_on_attacked_reactions() {
+        let btn = new_action_button(
+            name,
+            ButtonAction::OnAttackedReaction(reaction),
+            &event_queue,
+        );
+        reaction_buttons.push(btn);
+    }
+    for (name, reaction) in character_ref.known_on_hit_reactions() {
+        let btn = new_action_button(name, ButtonAction::OnHitReaction(reaction), &event_queue);
+        reaction_buttons.push(btn);
+    }
+
+    /*
     let bash_btn = action_button("Bash", "", 2, 0, 0);
     let parry_btn = action_button("Parry", "", 1, 0, 0);
     let rage_btn = action_button("Rage", "", 1, 0, 0);
     let sidestep_btn = action_button("Side step", "", 1, 0, 1);
+     */
 
-    let reactions_row = buttons_row(vec![bash_btn, parry_btn, rage_btn, sidestep_btn]);
+    let reactions_row = buttons_row(reaction_buttons);
 
     let stats_section = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
@@ -170,63 +169,93 @@ async fn main() {
 
         for event in event_queue.borrow_mut().drain(..) {
             match event {
-                Event::Hover(hovered, base_action) => {
+                Event::Hover(hovered, button_action) => {
                     if hovered {
-                        let ap = match base_action {
-                            BaseAction::Attack {
-                                hand,
-                                action_point_cost,
-                            } => action_point_cost,
-                            BaseAction::SelfEffect(self_effect_action) => {
-                                self_effect_action.action_point_cost
+                        let ap = match button_action {
+                            ButtonAction::Action(base_action) => match base_action {
+                                BaseAction::Attack {
+                                    action_point_cost, ..
+                                } => action_point_cost,
+                                BaseAction::SelfEffect(sea) => sea.action_point_cost,
+                                BaseAction::CastSpell(spell) => spell.action_point_cost,
+                            },
+                            ButtonAction::OnAttackedReaction(reaction) => {
+                                reaction.action_point_cost
                             }
-                            BaseAction::CastSpell(spell) => spell.action_point_cost,
+                            ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
                         };
                         action_points_row.reserved = ap;
                     } else {
                         action_points_row.reserved = 0;
                     }
                 }
-                Event::Click(base_action) => {
-                    println!("CLICKED: {:?}", base_action);
+                Event::Click(button_action) => {
+                    println!("CLICKED: {:?}", button_action);
                     match waiting_for {
-                        WaitingFor::Action(action_chooser) => {
-                            let character_ref = action_chooser.game.player_character();
-                            if character_ref.can_use_action(base_action) {
-                                let action = match base_action {
-                                    BaseAction::Attack {
-                                        hand,
-                                        action_point_cost: _,
-                                    } => Action::Attack {
-                                        hand,
-                                        // TODO allow player to choose enhancements
-                                        enhancements: Default::default(),
-                                    },
-                                    BaseAction::SelfEffect(self_effect_action) => {
-                                        Action::SelfEffect(self_effect_action)
-                                    }
-                                    // TODO allow player to choose spell enhancement
-                                    BaseAction::CastSpell(spell) => Action::CastSpell {
-                                        spell,
-                                        enhanced: false,
-                                    },
-                                };
+                        WaitingFor::Action(chooser) => {
+                            let character_ref = chooser.game.player_character();
 
-                                drop(character_ref);
-                                waiting_for = action_chooser.commit(action);
-                                let character = waiting_for.game().player_character();
-                                mana_bar.borrow_mut().set_current(character.mana.current);
-                                action_points_row.current = character.action_points;
-                            } else {
-                                println!("CANNOT USE THAT ACTION");
-                                drop(character_ref);
-                                waiting_for = WaitingFor::Action(action_chooser)
+                            match button_action {
+                                ButtonAction::Action(base_action)
+                                    if character_ref.can_use_action(base_action) =>
+                                {
+                                    let action = match base_action {
+                                        BaseAction::Attack {
+                                            hand,
+                                            action_point_cost: _,
+                                        } => Action::Attack {
+                                            hand,
+                                            // TODO allow player to choose enhancements
+                                            enhancements: Default::default(),
+                                        },
+                                        BaseAction::SelfEffect(self_effect_action) => {
+                                            Action::SelfEffect(self_effect_action)
+                                        }
+                                        // TODO allow player to choose spell enhancement
+                                        BaseAction::CastSpell(spell) => Action::CastSpell {
+                                            spell,
+                                            enhanced: false,
+                                        },
+                                    };
+
+                                    drop(character_ref);
+                                    waiting_for = chooser.commit(action);
+                                    let character = waiting_for.game().player_character();
+                                    mana_bar.borrow_mut().set_current(character.mana.current);
+                                    action_points_row.current = character.action_points;
+                                }
+                                _ => {
+                                    println!("NOT A VALID ACTION");
+                                    drop(character_ref);
+                                    waiting_for = WaitingFor::Action(chooser)
+                                }
                             }
                         }
-                        WaitingFor::OnAttackedReaction(attacked_reaction_chooser) => {
-                            todo!()
+                        WaitingFor::OnAttackedReaction(chooser) => {
+                            let character_ref = chooser.game.player_character();
+                            match button_action {
+                                ButtonAction::OnAttackedReaction(reaction) => {
+                                    let can_use =
+                                        character_ref.can_use_on_attacked_reaction(reaction);
+                                    drop(character_ref);
+                                    if can_use {
+                                        waiting_for = chooser.commit(Some(reaction));
+                                        let character = waiting_for.game().player_character();
+                                        mana_bar.borrow_mut().set_current(character.mana.current);
+                                        action_points_row.current = character.action_points;
+                                    } else {
+                                        waiting_for = WaitingFor::OnAttackedReaction(chooser);
+                                    }
+                                }
+                                _ => {
+                                    println!("NOT A VALID ON ATTACKED REACTION");
+                                    drop(character_ref);
+                                    waiting_for = WaitingFor::OnAttackedReaction(chooser)
+                                }
+                            }
                         }
-                        WaitingFor::OnAttackedHitReaction(attacked_hit_reaction_chooser) => {
+                        WaitingFor::OnHitReaction(hit_reaction_chooser) => {
+                            // TODO
                             todo!()
                         }
                     }
@@ -242,11 +271,11 @@ async fn main() {
 
 fn print_instruction(waiting_for: &WaitingFor) {
     match &waiting_for {
-        WaitingFor::Action(waiting_for_action) => println!("CHOOSE ACTION"),
-        WaitingFor::OnAttackedReaction(waiting_for_on_attacked_reaction) => {
+        WaitingFor::Action(action_chooser) => println!("CHOOSE ACTION"),
+        WaitingFor::OnAttackedReaction(reaction_chooser) => {
             println!("REACT TO ATTACK")
         }
-        WaitingFor::OnAttackedHitReaction(waiting_for_on_attacked_hit_reaction) => {
+        WaitingFor::OnHitReaction(reaction_chooser) => {
             println!("REACT TO BEING HIT")
         }
     }
@@ -461,10 +490,10 @@ fn action_button(
         border_color: Some(LIGHTGRAY),
     };
     ActionButton::new(
-        BaseAction::Attack {
+        ButtonAction::Action(BaseAction::Attack {
             hand: rpg::core::HandType::MainHand,
             action_point_cost: 0,
-        },
+        }),
         button_size,
         btn_style,
         text,
@@ -476,7 +505,11 @@ fn action_button(
     )
 }
 
-fn new_action_button(character: &Character, action: BaseAction) -> ActionButton {
+fn new_action_button(
+    mut subtext: String,
+    action: ButtonAction,
+    event_queue: &Rc<RefCell<Vec<Event>>>,
+) -> ActionButton {
     let button_size = (100.0, 50.0);
     let highlight_color = YELLOW;
     let btn_style = Style {
@@ -484,34 +517,41 @@ fn new_action_button(character: &Character, action: BaseAction) -> ActionButton 
         border_color: Some(LIGHTGRAY),
     };
 
-    let mut subtext = String::new();
     let text;
     let mut mana_points = 0;
-    let mut stamina_points = 0;
+    let stamina_points = 0;
     let action_points;
 
     match action {
-        BaseAction::Attack {
-            hand,
-            action_point_cost,
-        } => {
-            text = "Attack";
-            subtext = format!("({})", character.weapon(hand).unwrap().name);
-            action_points = action_point_cost;
+        ButtonAction::Action(base_action) => match base_action {
+            BaseAction::Attack {
+                action_point_cost, ..
+            } => {
+                text = "Attack";
+                action_points = action_point_cost;
+            }
+            BaseAction::SelfEffect(self_effect_action) => {
+                text = self_effect_action.name;
+                action_points = self_effect_action.action_point_cost;
+            }
+            BaseAction::CastSpell(spell) => {
+                text = spell.name;
+                subtext = "(Spell)".to_string();
+                action_points = spell.action_point_cost;
+                mana_points = spell.mana_cost;
+            }
+        },
+        ButtonAction::OnAttackedReaction(reaction) => {
+            text = reaction.name;
+            action_points = reaction.action_point_cost;
         }
-        BaseAction::SelfEffect(self_effect_action) => {
-            text = self_effect_action.name;
-            action_points = self_effect_action.action_point_cost;
-        }
-        BaseAction::CastSpell(spell) => {
-            text = spell.name;
-            subtext = "(Spell)".to_string();
-            action_points = spell.action_point_cost;
-            mana_points = spell.mana_cost;
+        ButtonAction::OnHitReaction(reaction) => {
+            text = reaction.name;
+            action_points = reaction.action_point_cost;
         }
     }
 
-    ActionButton::new(
+    let mut btn = ActionButton::new(
         action,
         button_size,
         btn_style,
@@ -521,7 +561,12 @@ fn new_action_button(character: &Character, action: BaseAction) -> ActionButton 
         action_points,
         mana_points,
         stamina_points,
-    )
+    );
+
+    btn.event_sender = Some(EventSender {
+        queue: Rc::clone(event_queue),
+    });
+    btn
 }
 
 fn attribute_row(attribute: (&'static str, i32), stats: Vec<(&'static str, f32)>) -> Container {
@@ -862,8 +907,15 @@ impl Drawable for TextLine {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+enum ButtonAction {
+    Action(BaseAction),
+    OnAttackedReaction(OnAttackedReaction),
+    OnHitReaction(OnHitReaction),
+}
+
 struct ActionButton {
-    action: BaseAction,
+    action: ButtonAction,
     size: (f32, f32),
     style: Style,
     content: Box<Element>,
@@ -876,7 +928,7 @@ struct ActionButton {
 
 impl ActionButton {
     fn new(
-        action: BaseAction,
+        action: ButtonAction,
         size: (f32, f32),
         style: Style,
         text: impl Into<String>,
@@ -987,8 +1039,8 @@ impl ActionButton {
 }
 
 enum Event {
-    Hover(bool, BaseAction),
-    Click(BaseAction),
+    Hover(bool, ButtonAction),
+    Click(ButtonAction),
 }
 
 struct Circle {

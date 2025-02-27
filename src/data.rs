@@ -1,8 +1,7 @@
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-    OnAttackedHitReaction, OnAttackedHitReactionEffect, OnAttackedReaction,
-    OnAttackedReactionEffect, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
-    Weapon, WeaponGrip,
+    OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Shield,
+    Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -95,10 +94,10 @@ pub const BOW: Weapon = Weapon {
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     defense: 2,
-    on_attacked_hit_reaction: Some(OnAttackedHitReaction {
+    on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
         action_point_cost: 1,
-        effect: OnAttackedHitReactionEffect::ShieldBash,
+        effect: OnHitReactionEffect::ShieldBash,
     }),
 };
 
@@ -125,10 +124,10 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     effect: OnAttackedReactionEffect::SideStep,
 };
 
-pub const RAGE: OnAttackedHitReaction = OnAttackedHitReaction {
+pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
     action_point_cost: 1,
-    effect: OnAttackedHitReactionEffect::Rage,
+    effect: OnHitReactionEffect::Rage,
 };
 
 pub const SCREAM: Spell = Spell {

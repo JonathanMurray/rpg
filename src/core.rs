@@ -34,7 +34,7 @@ impl CoreGame {
 
     pub fn new() -> ActionChooser {
         let mut bob = Character::new("Bob", 5, 5, 4);
-        bob.main_hand.weapon = Some(DAGGER);
+        bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         bob.known_attacked_reactions.push(SIDE_STEP);
@@ -158,9 +158,7 @@ impl CoreGame {
             if !players_turn {
                 drop(character);
                 drop(other_character);
-                return WaitingFor::OnAttackedHitReaction(AttackedHitReactionChooser {
-                    game: self,
-                });
+                return WaitingFor::OnHitReaction(HitReactionChooser { game: self });
             }
         }
 
@@ -169,10 +167,7 @@ impl CoreGame {
         self.enter_state_longer_after_action()
     }
 
-    fn enter_state_react_after_being_hit(
-        self,
-        reaction: Option<OnAttackedHitReaction>,
-    ) -> WaitingFor {
+    fn enter_state_react_after_being_hit(self, reaction: Option<OnHitReaction>) -> WaitingFor {
         {
             let mut character = self.active_character();
             let mut other_character = self.other_character();
@@ -223,7 +218,7 @@ impl CoreGame {
 pub enum WaitingFor {
     Action(ActionChooser),
     OnAttackedReaction(AttackedReactionChooser),
-    OnAttackedHitReaction(AttackedHitReactionChooser),
+    OnHitReaction(HitReactionChooser),
 }
 
 impl WaitingFor {
@@ -231,7 +226,7 @@ impl WaitingFor {
         match self {
             WaitingFor::Action(this) => &this.game,
             WaitingFor::OnAttackedReaction(this) => &this.game,
-            WaitingFor::OnAttackedHitReaction(this) => &this.game,
+            WaitingFor::OnHitReaction(this) => &this.game,
         }
     }
 }
@@ -264,12 +259,12 @@ impl AttackedReactionChooser {
     }
 }
 
-pub struct AttackedHitReactionChooser {
+pub struct HitReactionChooser {
     pub game: CoreGame,
 }
 
-impl AttackedHitReactionChooser {
-    pub fn commit(self, reaction: Option<OnAttackedHitReaction>) -> WaitingFor {
+impl HitReactionChooser {
+    pub fn commit(self, reaction: Option<OnHitReaction>) -> WaitingFor {
         return self.game.enter_state_react_after_being_hit(reaction);
     }
 }
@@ -303,15 +298,15 @@ pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Char
 fn perform_on_hit_reaction(
     character: &mut Character,
     other_character: &mut Character,
-    reaction: OnAttackedHitReaction,
+    reaction: OnHitReaction,
 ) {
     other_character.action_points -= reaction.action_point_cost;
     match reaction.effect {
-        OnAttackedHitReactionEffect::Rage => {
+        OnHitReactionEffect::Rage => {
             println!("  {} started Raging", other_character.name);
             other_character.receive_condition(Condition::Raging);
         }
-        OnAttackedHitReactionEffect::ShieldBash => {
+        OnHitReactionEffect::ShieldBash => {
             println!("  {} used Shield bash", other_character.name);
 
             let target = character.physical_resistence();
@@ -731,14 +726,14 @@ pub enum OnAttackedReactionEffect {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct OnAttackedHitReaction {
+pub struct OnHitReaction {
     pub name: &'static str,
     pub action_point_cost: u32,
-    pub effect: OnAttackedHitReactionEffect,
+    pub effect: OnHitReactionEffect,
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum OnAttackedHitReactionEffect {
+pub enum OnHitReactionEffect {
     Rage,
     ShieldBash,
 }
@@ -863,9 +858,9 @@ pub struct Character {
     pub action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
-    pub known_actions: Vec<BaseAction>,
+    known_actions: Vec<BaseAction>,
     known_attacked_reactions: Vec<OnAttackedReaction>,
-    known_on_hit_reactions: Vec<OnAttackedHitReaction>,
+    known_on_hit_reactions: Vec<OnHitReaction>,
 }
 
 impl Character {
@@ -914,6 +909,25 @@ impl Character {
 
     pub fn weapon(&self, hand: HandType) -> Option<Weapon> {
         self.hand(hand).weapon
+    }
+
+    pub fn known_actions(&self) -> Vec<(String, BaseAction)> {
+        self.known_actions
+            .iter()
+            .filter_map(|action: &BaseAction| match action {
+                BaseAction::Attack { hand, .. } => self.weapon(*hand).map(|weapon| {
+                    (
+                        weapon.name.to_string(),
+                        BaseAction::Attack {
+                            hand: *hand,
+                            action_point_cost: weapon.action_point_cost,
+                        },
+                    )
+                }),
+                BaseAction::SelfEffect(_self_effect_action) => Some(("".to_string(), *action)),
+                BaseAction::CastSpell(_spell) => Some(("".to_string(), *action)),
+            })
+            .collect()
     }
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {
@@ -972,41 +986,69 @@ impl Character {
     ) -> Vec<(String, AttackEnhancement)> {
         let weapon = self.weapon(attack_hand).unwrap();
 
-        let mut available_attack_enhancements = vec![];
+        let mut usable = vec![];
         if let Some(enhancement) = weapon.attack_enhancement {
-            available_attack_enhancements.push((format!("{}: ", weapon.name), enhancement))
+            usable.push((format!("{}: ", weapon.name), enhancement))
         }
         for enhancement in &self.known_attack_enhancements {
-            available_attack_enhancements.push(("".to_owned(), *enhancement))
+            usable.push(("".to_owned(), *enhancement))
         }
-        available_attack_enhancements
-            .retain(|(_, enhancement)| available_action_points >= enhancement.action_point_cost);
-        available_attack_enhancements
+        usable.retain(|(_, enhancement)| available_action_points >= enhancement.action_point_cost);
+        usable
+    }
+
+    pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
+        let mut known = vec![];
+        for reaction in &self.known_attacked_reactions {
+            known.push(("".to_string(), *reaction));
+        }
+        // TODO: off-hand reactions?
+        if let Some(weapon) = &self.main_hand.weapon {
+            if let Some(reaction) = weapon.on_attacked_reaction {
+                known.push((weapon.name.to_string(), reaction));
+            }
+        }
+        known
     }
 
     pub fn usable_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
         let mut usable = vec![];
         for reaction in &self.known_attacked_reactions {
-            if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
-                usable.push(("".to_string(), *reaction));
-            }
+            usable.push(("".to_string(), *reaction));
         }
         // TODO: off-hand reactions?
         if let Some(weapon) = &self.main_hand.weapon {
             if let Some(reaction) = weapon.on_attacked_reaction {
-                if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
-                    usable.push((format!("{}: ", weapon.name), reaction));
-                }
+                usable.push((weapon.name.to_string(), reaction));
             }
         }
+        usable.retain(|reaction| self.can_use_on_attacked_reaction(reaction.1));
         usable
     }
 
-    pub fn usable_on_hit_reactions(&self) -> Vec<(String, OnAttackedHitReaction)> {
+    pub fn can_use_on_attacked_reaction(&self, reaction: OnAttackedReaction) -> bool {
+        self.action_points >= reaction.action_point_cost
+            && self.stamina.current >= reaction.stamina_cost
+    }
+
+    pub fn known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
+        let mut known = vec![];
+        for reaction in &self.known_on_hit_reactions {
+            known.push(("".to_string(), *reaction));
+        }
+        if let Some(shield) = self.off_hand.shield {
+            if let Some(reaction) = shield.on_hit_reaction {
+                known.push((shield.name.to_string(), reaction));
+            }
+        }
+        known
+    }
+
+    pub fn usable_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
         let mut available_reactions = vec![];
 
         for reaction in &self.known_on_hit_reactions {
-            if let OnAttackedHitReactionEffect::Rage = reaction.effect {
+            if let OnHitReactionEffect::Rage = reaction.effect {
                 if self.conditions.raging {
                     // Can't use this reaction while already raging
                     continue;
@@ -1018,9 +1060,9 @@ impl Character {
         }
 
         if let Some(shield) = self.off_hand.shield {
-            if let Some(reaction) = shield.on_attacked_hit_reaction {
+            if let Some(reaction) = shield.on_hit_reaction {
                 if self.action_points - reaction.action_point_cost >= REACTION_AP_THRESHOLD {
-                    available_reactions.push((format!("{}: ", shield.name), reaction));
+                    available_reactions.push((shield.name.to_string(), reaction));
                 }
             }
         }
@@ -1197,7 +1239,7 @@ pub struct Weapon {
 pub struct Shield {
     pub name: &'static str,
     pub defense: u32,
-    pub on_attacked_hit_reaction: Option<OnAttackedHitReaction>,
+    pub on_hit_reaction: Option<OnHitReaction>,
 }
 
 #[derive(Debug, Copy, Clone)]

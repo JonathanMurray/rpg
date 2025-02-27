@@ -2,7 +2,7 @@ use std::{collections::HashSet, io};
 
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, BaseAction, Character, CoreGame,
-    HandType, OnAttackedHitReaction, OnAttackedReaction, SelfEffectAction, WaitingFor,
+    HandType, OnAttackedReaction, OnHitReaction, SelfEffectAction, WaitingFor,
 };
 
 fn main() {
@@ -25,9 +25,9 @@ fn main() {
                 drop(defender);
                 waiting_for = state.commit(reaction);
             }
-            WaitingFor::OnAttackedHitReaction(state) => {
+            WaitingFor::OnHitReaction(state) => {
                 let defender = state.game.other_character();
-                let reaction = player_choose_on_attacked_hit_reaction(&defender);
+                let reaction = player_choose_on_hit_reaction(&defender);
                 drop(defender);
                 waiting_for = state.commit(reaction);
             }
@@ -214,9 +214,7 @@ pub fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAtta
     None
 }
 
-pub fn player_choose_on_attacked_hit_reaction(
-    defender: &Character,
-) -> Option<OnAttackedHitReaction> {
+pub fn player_choose_on_hit_reaction(defender: &Character) -> Option<OnHitReaction> {
     let reactions = defender.usable_on_hit_reactions();
 
     if !reactions.is_empty() {
