@@ -6,7 +6,8 @@ use rpg::core::{
 };
 
 fn main() {
-    let mut waiting_for = CoreGame::new();
+    let waiting_for = CoreGame::new();
+    let mut waiting_for = WaitingFor::Action(waiting_for);
 
     loop {
         match waiting_for {
@@ -40,7 +41,10 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
     println!("Choose an action:");
     for (i, action) in available_actions.iter().enumerate() {
         let label = match action {
-            BaseAction::Attack(hand) => {
+            BaseAction::Attack {
+                hand,
+                action_point_cost,
+            } => {
                 let weapon = character.weapon(*hand).unwrap();
                 let label = match hand {
                     HandType::MainHand => "Attack",
@@ -75,12 +79,15 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
     let action_choice = player_make_choice(available_actions.len() as u32);
 
     match &available_actions[action_choice as usize - 1] {
-        BaseAction::Attack(attack_hand) => {
-            let weapon = character.weapon(*attack_hand).unwrap();
+        BaseAction::Attack {
+            hand,
+            action_point_cost,
+        } => {
+            let weapon = character.weapon(*hand).unwrap();
             let reserved_action_points = weapon.action_point_cost;
 
             let available_attack_enhancements = character.usable_attack_enhancements(
-                *attack_hand,
+                *hand,
                 character.action_points - reserved_action_points,
             );
             let mut picked_attack_enhancements = vec![];
@@ -148,7 +155,7 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
             }
 
             Action::Attack {
-                hand: *attack_hand,
+                hand: *hand,
                 enhancements: picked_attack_enhancements,
             }
         }

@@ -13,31 +13,56 @@ use macroquad::{
     text::{draw_text, measure_text, Font, TextDimensions},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
+use rpg::core::{Action, BaseAction, Character, CoreGame, WaitingFor};
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let mut atk_btn = action_button("Attack", 2, 0, 0);
+    let waiting_for = CoreGame::new();
+
+    let character_ref = waiting_for.game.player_character();
+
+    let mut combat_buttons = vec![];
+    let mut skill_buttons = vec![];
+    let mut spell_buttons = vec![];
 
     let event_queue = Rc::new(RefCell::new(vec![]));
-    let event_sender = EventSender {
-        queue: Rc::clone(&event_queue),
-    };
 
-    atk_btn.on_hover = Some(event_sender);
+    for mut action in character_ref.known_actions.iter().copied() {
+        if let BaseAction::Attack { hand, .. } = action {
+            if character_ref.weapon(hand).is_none() {
+                continue;
+            }
+            match character_ref.weapon(hand) {
+                Some(weapon) => {
+                    action = BaseAction::Attack {
+                        hand,
+                        action_point_cost: weapon.action_point_cost,
+                    };
+                }
+                None => continue,
+            }
+        }
 
-    let brace_btn = action_button("Brace", 1, 0, 1);
-    let move_btn = action_button("Move", 1, 0, 0);
-    let fireball_btn = action_button("Fireball", 3, 1, 0);
-    let mindblast_btn = action_button("Mindblast", 2, 1, 0);
+        let mut btn = new_action_button(&character_ref, action);
+        btn.event_sender = Some(EventSender {
+            queue: Rc::clone(&event_queue),
+        });
 
-    let bash_btn = action_button("Bash", 2, 0, 0);
-    let parry_btn = action_button("Parry", 1, 0, 0);
-    let rage_btn = action_button("Rage", 1, 0, 0);
-    let sidestep_btn = action_button("Side step", 1, 0, 1);
+        match action {
+            BaseAction::Attack { .. } => combat_buttons.push(btn),
+            BaseAction::SelfEffect(..) => skill_buttons.push(btn),
+            BaseAction::CastSpell(..) => spell_buttons.push(btn),
+        }
+    }
 
-    let combat_row = buttons_row(vec![atk_btn]);
-    let skill_row = buttons_row(vec![brace_btn, move_btn]);
-    let spell_row = buttons_row(vec![fireball_btn, mindblast_btn]);
+    let combat_row = buttons_row(combat_buttons);
+    let skill_row = buttons_row(skill_buttons);
+    let spell_row = buttons_row(spell_buttons);
+
+    let bash_btn = action_button("Bash", "", 2, 0, 0);
+    let parry_btn = action_button("Parry", "", 1, 0, 0);
+    let rage_btn = action_button("Rage", "", 1, 0, 0);
+    let sidestep_btn = action_button("Side step", "", 1, 0, 1);
 
     let reactions_row = buttons_row(vec![bash_btn, parry_btn, rage_btn, sidestep_btn]);
 
@@ -75,7 +100,7 @@ async fn main() {
     });
 
     let mut tabs = Tabs::new(
-        1,
+        0,
         vec![
             ("Actions", actions_section),
             ("Reactions", reactions_section),
@@ -83,8 +108,21 @@ async fn main() {
         ],
     );
 
-    let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(5, 10, "HP", RED)));
+    let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character_ref.health.current,
+        character_ref.health.max,
+        "HP",
+        RED,
+    )));
     let cloned_health_bar = Rc::clone(&health_bar);
+
+    let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character_ref.mana.current,
+        character_ref.mana.max,
+        "MANA",
+        BLUE,
+    )));
+    let cloned_mana_bar = Rc::clone(&mana_bar);
 
     let mut resource_bars = Container {
         layout_dir: LayoutDirection::Horizontal,
@@ -92,14 +130,24 @@ async fn main() {
         align: Align::End,
         elements: vec![
             Element::Rc(cloned_health_bar),
-            Element::Box(Box::new(LabelledResourceBar::new(7, 8, "MANA", BLUE))),
-            Element::Box(Box::new(LabelledResourceBar::new(3, 4, "STA", GREEN))),
+            Element::Rc(cloned_mana_bar),
+            Element::Box(Box::new(LabelledResourceBar::new(
+                character_ref.stamina.current,
+                character_ref.stamina.max,
+                "STA",
+                GREEN,
+            ))),
         ],
         ..Default::default()
     };
 
     let mut action_points_label = TextLine::new("Action points", 18);
     let mut action_points_row = ActionPointsRow::new();
+
+    drop(character_ref);
+    let mut waiting_for = WaitingFor::Action(waiting_for);
+
+    print_instruction(&waiting_for);
 
     loop {
         clear_background(BLACK);
@@ -121,10 +169,70 @@ async fn main() {
         }
 
         for event in event_queue.borrow_mut().drain(..) {
-            if event {
-                action_points_row.reserved = 2;
-            } else {
-                action_points_row.reserved = 0;
+            match event {
+                Event::Hover(hovered, base_action) => {
+                    if hovered {
+                        let ap = match base_action {
+                            BaseAction::Attack {
+                                hand,
+                                action_point_cost,
+                            } => action_point_cost,
+                            BaseAction::SelfEffect(self_effect_action) => {
+                                self_effect_action.action_point_cost
+                            }
+                            BaseAction::CastSpell(spell) => spell.action_point_cost,
+                        };
+                        action_points_row.reserved = ap;
+                    } else {
+                        action_points_row.reserved = 0;
+                    }
+                }
+                Event::Click(base_action) => {
+                    println!("CLICKED: {:?}", base_action);
+                    match waiting_for {
+                        WaitingFor::Action(action_chooser) => {
+                            let character_ref = action_chooser.game.player_character();
+                            if character_ref.can_use_action(base_action) {
+                                let action = match base_action {
+                                    BaseAction::Attack {
+                                        hand,
+                                        action_point_cost: _,
+                                    } => Action::Attack {
+                                        hand,
+                                        // TODO allow player to choose enhancements
+                                        enhancements: Default::default(),
+                                    },
+                                    BaseAction::SelfEffect(self_effect_action) => {
+                                        Action::SelfEffect(self_effect_action)
+                                    }
+                                    // TODO allow player to choose spell enhancement
+                                    BaseAction::CastSpell(spell) => Action::CastSpell {
+                                        spell,
+                                        enhanced: false,
+                                    },
+                                };
+
+                                drop(character_ref);
+                                waiting_for = action_chooser.commit(action);
+                                let character = waiting_for.game().player_character();
+                                mana_bar.borrow_mut().set_current(character.mana.current);
+                                action_points_row.current = character.action_points;
+                            } else {
+                                println!("CANNOT USE THAT ACTION");
+                                drop(character_ref);
+                                waiting_for = WaitingFor::Action(action_chooser)
+                            }
+                        }
+                        WaitingFor::OnAttackedReaction(attacked_reaction_chooser) => {
+                            todo!()
+                        }
+                        WaitingFor::OnAttackedHitReaction(attacked_hit_reaction_chooser) => {
+                            todo!()
+                        }
+                    }
+
+                    print_instruction(&waiting_for);
+                }
             }
         }
 
@@ -132,12 +240,24 @@ async fn main() {
     }
 }
 
+fn print_instruction(waiting_for: &WaitingFor) {
+    match &waiting_for {
+        WaitingFor::Action(waiting_for_action) => println!("CHOOSE ACTION"),
+        WaitingFor::OnAttackedReaction(waiting_for_on_attacked_reaction) => {
+            println!("REACT TO ATTACK")
+        }
+        WaitingFor::OnAttackedHitReaction(waiting_for_on_attacked_hit_reaction) => {
+            println!("REACT TO BEING HIT")
+        }
+    }
+}
+
 struct EventSender {
-    queue: Rc<RefCell<Vec<bool>>>,
+    queue: Rc<RefCell<Vec<Event>>>,
 }
 
 impl EventSender {
-    fn send(&self, value: bool) {
+    fn send(&self, value: Event) {
         self.queue.borrow_mut().push(value);
     }
 }
@@ -162,14 +282,14 @@ impl ActionPointsRow {
     }
 
     fn draw(&mut self, x: f32, y: f32) {
-        assert!(self.reserved <= self.current);
+        //assert!(self.reserved <= self.current);
         assert!(self.current <= self.max);
 
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
         let r = self.cell_size.1 * 0.3;
         for i in 0..self.max {
-            if i < self.current - self.reserved {
+            if i < self.current.saturating_sub(self.reserved) {
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
@@ -182,6 +302,13 @@ impl ActionPointsRow {
                     y0 + self.cell_size.1 / 2.0,
                     r,
                     WHITE,
+                );
+            } else if i < self.reserved {
+                draw_circle(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    RED,
                 );
             } else {
                 draw_circle(
@@ -321,7 +448,8 @@ fn buttons_row(buttons: Vec<ActionButton>) -> Element {
 }
 
 fn action_button(
-    text: &'static str,
+    text: impl Into<String>,
+    subtext: impl Into<String>,
     action_points: u32,
     mana_points: u32,
     stamina_points: u32,
@@ -333,9 +461,62 @@ fn action_button(
         border_color: Some(LIGHTGRAY),
     };
     ActionButton::new(
+        BaseAction::Attack {
+            hand: rpg::core::HandType::MainHand,
+            action_point_cost: 0,
+        },
         button_size,
         btn_style,
         text,
+        subtext,
+        highlight_color,
+        action_points,
+        mana_points,
+        stamina_points,
+    )
+}
+
+fn new_action_button(character: &Character, action: BaseAction) -> ActionButton {
+    let button_size = (100.0, 50.0);
+    let highlight_color = YELLOW;
+    let btn_style = Style {
+        background_color: Some(DARKGRAY),
+        border_color: Some(LIGHTGRAY),
+    };
+
+    let mut subtext = String::new();
+    let text;
+    let mut mana_points = 0;
+    let mut stamina_points = 0;
+    let action_points;
+
+    match action {
+        BaseAction::Attack {
+            hand,
+            action_point_cost,
+        } => {
+            text = "Attack";
+            subtext = format!("({})", character.weapon(hand).unwrap().name);
+            action_points = action_point_cost;
+        }
+        BaseAction::SelfEffect(self_effect_action) => {
+            text = self_effect_action.name;
+            action_points = self_effect_action.action_point_cost;
+        }
+        BaseAction::CastSpell(spell) => {
+            text = spell.name;
+            subtext = "(Spell)".to_string();
+            action_points = spell.action_point_cost;
+            mana_points = spell.mana_cost;
+        }
+    }
+
+    ActionButton::new(
+        action,
+        button_size,
+        btn_style,
+        text,
+        subtext,
         highlight_color,
         action_points,
         mana_points,
@@ -682,6 +863,7 @@ impl Drawable for TextLine {
 }
 
 struct ActionButton {
+    action: BaseAction,
     size: (f32, f32),
     style: Style,
     content: Box<Element>,
@@ -689,14 +871,16 @@ struct ActionButton {
     points_row: Container,
     point_radius: f32,
     hovered: bool,
-    on_hover: Option<EventSender>,
+    event_sender: Option<EventSender>,
 }
 
 impl ActionButton {
     fn new(
+        action: BaseAction,
         size: (f32, f32),
         style: Style,
         text: impl Into<String>,
+        subtext: impl Into<String>,
         highlight_border_color: Color,
         action_points: u32,
         mana_points: u32,
@@ -738,15 +922,30 @@ impl ActionButton {
             ..Default::default()
         };
 
+        let text = Element::Text(TextLine::new(text, 20));
+        let subtext = subtext.into();
+        let content = if subtext.len() > 0 {
+            Box::new(Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                margin: 8.0,
+                align: Align::Center,
+                elements: vec![text, Element::Text(TextLine::new(subtext, 16))],
+                ..Default::default()
+            }))
+        } else {
+            Box::new(text)
+        };
+
         Self {
+            action,
             size,
             style,
-            content: Box::new(Element::Text(TextLine::new(text, 20))),
+            content,
             highlight_border_color,
             points_row,
             point_radius: r,
             hovered: false,
-            on_hover: None,
+            event_sender: None,
         }
     }
 
@@ -759,8 +958,14 @@ impl ActionButton {
         let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
         if hovered != self.hovered {
             self.hovered = hovered;
-            if let Some(event_sender) = &self.on_hover {
-                event_sender.send(hovered);
+            if let Some(event_sender) = &self.event_sender {
+                event_sender.send(Event::Hover(hovered, self.action));
+            }
+        }
+
+        if hovered && is_mouse_button_pressed(MouseButton::Left) {
+            if let Some(event_sender) = &self.event_sender {
+                event_sender.send(Event::Click(self.action));
             }
         }
 
@@ -779,6 +984,11 @@ impl ActionButton {
 
         draw_debug(x, y, w, h);
     }
+}
+
+enum Event {
+    Hover(bool, BaseAction),
+    Click(BaseAction),
 }
 
 struct Circle {

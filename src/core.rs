@@ -19,6 +19,10 @@ pub struct CoreGame {
 }
 
 impl CoreGame {
+    pub fn player_character(&self) -> RefMut<Character> {
+        self.characters.get(self.player_character_i).borrow_mut()
+    }
+
     pub fn active_character(&self) -> RefMut<Character> {
         self.characters.get(self.active_character_i).borrow_mut()
     }
@@ -28,7 +32,7 @@ impl CoreGame {
         self.characters.get(i).borrow_mut()
     }
 
-    pub fn new() -> WaitingFor {
+    pub fn new() -> ActionChooser {
         let mut bob = Character::new("Bob", 5, 5, 4);
         bob.main_hand.weapon = Some(DAGGER);
         bob.off_hand.shield = Some(SMALL_SHIELD);
@@ -66,7 +70,7 @@ impl CoreGame {
         );
 
         drop(character);
-        WaitingFor::Action(WaitingForAction { game })
+        ActionChooser { game }
     }
 
     fn enter_state_action(self, action: Action) -> WaitingFor {
@@ -81,7 +85,7 @@ impl CoreGame {
                 drop(character);
                 drop(other_character);
                 return if !players_turn {
-                    WaitingFor::OnAttackedReaction(WaitingForOnAttackedReaction {
+                    WaitingFor::OnAttackedReaction(AttackedReactionChooser {
                         game: self,
                         action_points_before_action,
                         hand,
@@ -154,7 +158,7 @@ impl CoreGame {
             if !players_turn {
                 drop(character);
                 drop(other_character);
-                return WaitingFor::OnAttackedHitReaction(WaitingForOnAttackedHitReaction {
+                return WaitingFor::OnAttackedHitReaction(AttackedHitReactionChooser {
                     game: self,
                 });
             }
@@ -205,8 +209,9 @@ impl CoreGame {
         drop(character);
 
         if players_turn {
-            return WaitingFor::Action(WaitingForAction { game: self });
+            return WaitingFor::Action(ActionChooser { game: self });
         } else {
+            // TODO make sure to only pick an action that the character affords
             return self.enter_state_action(Action::Attack {
                 hand: HandType::MainHand,
                 enhancements: Default::default(),
@@ -216,29 +221,39 @@ impl CoreGame {
 }
 
 pub enum WaitingFor {
-    Action(WaitingForAction),
-    OnAttackedReaction(WaitingForOnAttackedReaction),
-    OnAttackedHitReaction(WaitingForOnAttackedHitReaction),
+    Action(ActionChooser),
+    OnAttackedReaction(AttackedReactionChooser),
+    OnAttackedHitReaction(AttackedHitReactionChooser),
 }
 
-pub struct WaitingForAction {
+impl WaitingFor {
+    pub fn game(&self) -> &CoreGame {
+        match self {
+            WaitingFor::Action(this) => &this.game,
+            WaitingFor::OnAttackedReaction(this) => &this.game,
+            WaitingFor::OnAttackedHitReaction(this) => &this.game,
+        }
+    }
+}
+
+pub struct ActionChooser {
     pub game: CoreGame,
 }
 
-impl WaitingForAction {
+impl ActionChooser {
     pub fn commit(self, action: Action) -> WaitingFor {
         self.game.enter_state_action(action)
     }
 }
 
-pub struct WaitingForOnAttackedReaction {
+pub struct AttackedReactionChooser {
     pub game: CoreGame,
     action_points_before_action: u32,
     hand: HandType,
     enhancements: Vec<AttackEnhancement>,
 }
 
-impl WaitingForOnAttackedReaction {
+impl AttackedReactionChooser {
     pub fn commit(self, reaction: Option<OnAttackedReaction>) -> WaitingFor {
         return self.game.enter_state_attack(
             self.action_points_before_action,
@@ -249,11 +264,11 @@ impl WaitingForOnAttackedReaction {
     }
 }
 
-pub struct WaitingForOnAttackedHitReaction {
+pub struct AttackedHitReactionChooser {
     pub game: CoreGame,
 }
 
-impl WaitingForOnAttackedHitReaction {
+impl AttackedHitReactionChooser {
     pub fn commit(self, reaction: Option<OnAttackedHitReaction>) -> WaitingFor {
         return self.game.enter_state_react_after_being_hit(reaction);
     }
@@ -374,6 +389,7 @@ fn perform_recover_from_dazed(character: &mut Character, stacks: u32) {
 }
 
 fn perform_spell(caster: &mut Character, spell: Spell, enhanced: bool, defender: &mut Character) {
+    assert!(caster.action_points >= spell.action_point_cost);
     caster.action_points -= spell.action_point_cost;
     caster.mana.lose(spell.mana_cost);
 
@@ -775,7 +791,10 @@ pub struct SelfEffectAction {
 
 #[derive(Debug, Copy, Clone)]
 pub enum BaseAction {
-    Attack(HandType),
+    Attack {
+        hand: HandType,
+        action_point_cost: u32,
+    },
     SelfEffect(SelfEffectAction),
     CastSpell(Spell),
 }
@@ -835,7 +854,7 @@ pub struct Character {
     base_strength: u32,
     base_dexterity: u32,
     base_intellect: u32,
-    health: NumberedResource,
+    pub health: NumberedResource,
     pub mana: NumberedResource,
     armor: Option<ArmorPiece>,
     main_hand: Hand,
@@ -844,7 +863,7 @@ pub struct Character {
     pub action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
-    known_actions: Vec<BaseAction>,
+    pub known_actions: Vec<BaseAction>,
     known_attacked_reactions: Vec<OnAttackedReaction>,
     known_on_hit_reactions: Vec<OnAttackedHitReaction>,
 }
@@ -867,8 +886,14 @@ impl Character {
             stamina: NumberedResource::new((str + dex).saturating_sub(5)),
             known_attack_enhancements: Default::default(),
             known_actions: vec![
-                BaseAction::Attack(HandType::MainHand),
-                BaseAction::Attack(HandType::OffHand),
+                BaseAction::Attack {
+                    hand: HandType::MainHand,
+                    action_point_cost: 0,
+                },
+                BaseAction::Attack {
+                    hand: HandType::OffHand,
+                    action_point_cost: 0,
+                },
                 BaseAction::SelfEffect(SelfEffectAction {
                     name: "Brace",
                     action_point_cost: 1,
@@ -895,19 +920,49 @@ impl Character {
         let ap = self.action_points;
         self.known_actions
             .iter()
-            .filter(|action: &&BaseAction| match action {
-                BaseAction::Attack(hand) => {
-                    matches!(self.weapon(*hand), Some(weapon) if ap >= weapon.action_point_cost)
+            .filter_map(|action: &BaseAction| match action {
+                BaseAction::Attack {
+                    hand,
+                    action_point_cost: _,
+                } => match self.weapon(*hand) {
+                    Some(weapon) if ap >= weapon.action_point_cost => Some(BaseAction::Attack {
+                        hand: *hand,
+                        action_point_cost: weapon.action_point_cost,
+                    }),
+                    _ => None,
+                },
+                action @ BaseAction::SelfEffect(self_effect_action) => {
+                    if ap >= self_effect_action.action_point_cost {
+                        Some(*action)
+                    } else {
+                        None
+                    }
                 }
-                BaseAction::SelfEffect(self_effect_action) => {
-                    ap >= self_effect_action.action_point_cost
-                }
-                BaseAction::CastSpell(spell) => {
-                    ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
+                action @ BaseAction::CastSpell(spell) => {
+                    if ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost {
+                        Some(*action)
+                    } else {
+                        None
+                    }
                 }
             })
-            .copied()
             .collect()
+    }
+
+    pub fn can_use_action(&self, action: BaseAction) -> bool {
+        let ap = self.action_points;
+        match action {
+            BaseAction::Attack {
+                hand,
+                action_point_cost: _,
+            } => matches!(self.weapon(hand), Some(weapon) if ap >= weapon.action_point_cost),
+            BaseAction::SelfEffect(self_effect_action) => {
+                ap >= self_effect_action.action_point_cost
+            }
+            BaseAction::CastSpell(spell) => {
+                ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
+            }
+        }
     }
 
     pub fn usable_attack_enhancements(
