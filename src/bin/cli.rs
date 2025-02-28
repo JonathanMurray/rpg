@@ -1,12 +1,12 @@
-use std::{collections::HashSet, io};
+use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
 
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, BaseAction, Character, CoreGame,
-    HandType, OnAttackedReaction, OnHitReaction, SelfEffectAction, WaitingFor,
+    HandType, Logger, OnAttackedReaction, OnHitReaction, SelfEffectAction, WaitingFor,
 };
 
 fn main() {
-    let waiting_for = CoreGame::new();
+    let waiting_for = CoreGame::new(Rc::new(RefCell::new(StdoutLogger)));
     let mut waiting_for = WaitingFor::Action(waiting_for);
 
     loop {
@@ -32,6 +32,14 @@ fn main() {
                 waiting_for = state.commit(reaction);
             }
         }
+    }
+}
+
+struct StdoutLogger;
+
+impl Logger for StdoutLogger {
+    fn log(&mut self, line: String) {
+        println!("{line}")
     }
 }
 
@@ -201,7 +209,12 @@ pub fn player_choose_on_attacked_reaction(defender: &Character) -> Option<OnAtta
                 (0, sta) => format!("{} sta", sta),
                 (ap, sta) => format!("{} AP, {} sta", ap, sta),
             };
-            println!("  {}. [{}{}] ({})", i + 1, prefix, reaction.name, cost);
+            let label = if prefix.len() > 0 {
+                format!("{}: {}", prefix, reaction.name)
+            } else {
+                reaction.name.to_string()
+            };
+            println!("  {}. [{}] ({})", i + 1, label, cost);
         }
 
         println!("  {}. Skip", reactions.len() + 1);

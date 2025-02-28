@@ -14,12 +14,14 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
 use rpg::core::{
-    Action, BaseAction, Character, CoreGame, OnAttackedReaction, OnHitReaction, WaitingFor,
+    Action, BaseAction, Character, CoreGame, Logger, OnAttackedReaction, OnHitReaction, WaitingFor,
 };
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let waiting_for = CoreGame::new();
+    let log = Rc::new(RefCell::new(Log::new()));
+    let cloned_log = Rc::clone(&log);
+    let waiting_for = CoreGame::new(cloned_log);
 
     let character_ref = waiting_for.game.player_character();
 
@@ -30,7 +32,7 @@ async fn main() {
     let event_queue = Rc::new(RefCell::new(vec![]));
 
     for (name, action) in character_ref.known_actions() {
-        let mut btn = new_action_button(name, ButtonAction::Action(action), &event_queue);
+        let btn = new_action_button(name, ButtonAction::Action(action), &event_queue);
         match action {
             BaseAction::Attack { .. } => combat_buttons.push(btn),
             BaseAction::SelfEffect(..) => skill_buttons.push(btn),
@@ -56,29 +58,34 @@ async fn main() {
         reaction_buttons.push(btn);
     }
 
-    /*
-    let bash_btn = action_button("Bash", "", 2, 0, 0);
-    let parry_btn = action_button("Parry", "", 1, 0, 0);
-    let rage_btn = action_button("Rage", "", 1, 0, 0);
-    let sidestep_btn = action_button("Side step", "", 1, 0, 1);
-     */
-
     let reactions_row = buttons_row(reaction_buttons);
 
     let stats_section = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         elements: vec![
             Element::Container(attribute_row(
-                ("STR", 5),
-                vec![("Health", 10.0), ("Physical resist", 15.0)],
+                ("STR", character_ref.base_strength),
+                vec![
+                    ("Health", character_ref.health.max as f32),
+                    (
+                        "Physical resist",
+                        character_ref.physical_resistence() as f32,
+                    ),
+                ],
             )),
             Element::Container(attribute_row(
-                ("DEX", 4),
-                vec![("Defense", 14.0), ("Movement", 2.3)],
+                ("DEX", character_ref.base_dexterity),
+                vec![
+                    ("Defense", character_ref.defense() as f32),
+                    ("Movement", 99.9),
+                ],
             )),
             Element::Container(attribute_row(
-                ("INT", 6),
-                vec![("Mana", 8.0), ("Mental resist", 16.0)],
+                ("INT", character_ref.base_intellect),
+                vec![
+                    ("Mana", character_ref.mana.max as f32),
+                    ("Mental resist", character_ref.mental_resistence() as f32),
+                ],
             )),
         ],
         ..Default::default()
@@ -123,6 +130,14 @@ async fn main() {
     )));
     let cloned_mana_bar = Rc::clone(&mana_bar);
 
+    let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character_ref.stamina.current,
+        character_ref.stamina.max,
+        "STA",
+        GREEN,
+    )));
+    let cloned_stamina_bar = Rc::clone(&stamina_bar);
+
     let mut resource_bars = Container {
         layout_dir: LayoutDirection::Horizontal,
         margin: 15.0,
@@ -130,12 +145,7 @@ async fn main() {
         elements: vec![
             Element::Rc(cloned_health_bar),
             Element::Rc(cloned_mana_bar),
-            Element::Box(Box::new(LabelledResourceBar::new(
-                character_ref.stamina.current,
-                character_ref.stamina.max,
-                "STA",
-                GREEN,
-            ))),
+            Element::Rc(cloned_stamina_bar),
         ],
         ..Default::default()
     };
@@ -146,7 +156,7 @@ async fn main() {
     drop(character_ref);
     let mut waiting_for = WaitingFor::Action(waiting_for);
 
-    print_instruction(&waiting_for);
+    print_instruction(&waiting_for, &mut log.borrow_mut());
 
     loop {
         clear_background(BLACK);
@@ -158,14 +168,7 @@ async fn main() {
         action_points_label.draw(20.0, 10.0);
         action_points_row.draw(20.0, 30.0);
 
-        if is_key_pressed(macroquad::input::KeyCode::Up) {
-            health_bar.borrow_mut().set_current(8);
-            action_points_row.reserved = 2;
-        }
-        if is_key_pressed(macroquad::input::KeyCode::Down) {
-            health_bar.borrow_mut().set_current(4);
-            action_points_row.reserved = 0;
-        }
+        log.borrow_mut().draw(20.0, 400.0);
 
         for event in event_queue.borrow_mut().drain(..) {
             match event {
@@ -190,7 +193,6 @@ async fn main() {
                     }
                 }
                 Event::Click(button_action) => {
-                    println!("CLICKED: {:?}", button_action);
                     match waiting_for {
                         WaitingFor::Action(chooser) => {
                             let character_ref = chooser.game.player_character();
@@ -221,11 +223,17 @@ async fn main() {
                                     drop(character_ref);
                                     waiting_for = chooser.commit(action);
                                     let character = waiting_for.game().player_character();
+                                    health_bar
+                                        .borrow_mut()
+                                        .set_current(character.health.current);
                                     mana_bar.borrow_mut().set_current(character.mana.current);
+                                    stamina_bar
+                                        .borrow_mut()
+                                        .set_current(character.stamina.current);
                                     action_points_row.current = character.action_points;
                                 }
                                 _ => {
-                                    println!("NOT A VALID ACTION");
+                                    log.borrow_mut().add(format!("NOT A VALID ACTION"));
                                     drop(character_ref);
                                     waiting_for = WaitingFor::Action(chooser)
                                 }
@@ -241,26 +249,57 @@ async fn main() {
                                     if can_use {
                                         waiting_for = chooser.commit(Some(reaction));
                                         let character = waiting_for.game().player_character();
+                                        health_bar
+                                            .borrow_mut()
+                                            .set_current(character.health.current);
                                         mana_bar.borrow_mut().set_current(character.mana.current);
+                                        stamina_bar
+                                            .borrow_mut()
+                                            .set_current(character.stamina.current);
                                         action_points_row.current = character.action_points;
                                     } else {
                                         waiting_for = WaitingFor::OnAttackedReaction(chooser);
                                     }
                                 }
                                 _ => {
-                                    println!("NOT A VALID ON ATTACKED REACTION");
+                                    log.borrow_mut()
+                                        .add(format!("NOT A VALID ON ATTACKED REACTION"));
                                     drop(character_ref);
                                     waiting_for = WaitingFor::OnAttackedReaction(chooser)
                                 }
                             }
                         }
-                        WaitingFor::OnHitReaction(hit_reaction_chooser) => {
-                            // TODO
-                            todo!()
+                        WaitingFor::OnHitReaction(chooser) => {
+                            let character_ref = chooser.game.player_character();
+                            match button_action {
+                                ButtonAction::OnHitReaction(reaction) => {
+                                    let can_use = character_ref.can_use_on_hit_reaction(reaction);
+                                    drop(character_ref);
+                                    if can_use {
+                                        waiting_for = chooser.commit(Some(reaction));
+                                        let character = waiting_for.game().player_character();
+                                        health_bar
+                                            .borrow_mut()
+                                            .set_current(character.health.current);
+                                        mana_bar.borrow_mut().set_current(character.mana.current);
+                                        stamina_bar
+                                            .borrow_mut()
+                                            .set_current(character.stamina.current);
+                                        action_points_row.current = character.action_points;
+                                    } else {
+                                        waiting_for = WaitingFor::OnHitReaction(chooser);
+                                    }
+                                }
+                                _ => {
+                                    log.borrow_mut().add(format!("NOT A VALID ON HIT REACTION"));
+                                    drop(character_ref);
+                                    waiting_for = WaitingFor::OnHitReaction(chooser)
+                                }
+                            }
                         }
                     }
 
-                    print_instruction(&waiting_for);
+                    print_instruction(&waiting_for, &mut log.borrow_mut());
                 }
             }
         }
@@ -269,15 +308,11 @@ async fn main() {
     }
 }
 
-fn print_instruction(waiting_for: &WaitingFor) {
+fn print_instruction(waiting_for: &WaitingFor, log: &mut Log) {
     match &waiting_for {
-        WaitingFor::Action(action_chooser) => println!("CHOOSE ACTION"),
-        WaitingFor::OnAttackedReaction(reaction_chooser) => {
-            println!("REACT TO ATTACK")
-        }
-        WaitingFor::OnHitReaction(reaction_chooser) => {
-            println!("REACT TO BEING HIT")
-        }
+        WaitingFor::Action(action_chooser) => log.add("CHOOSE ACTION"),
+        WaitingFor::OnAttackedReaction(reaction_chooser) => log.add("REACT TO ATTACK"),
+        WaitingFor::OnHitReaction(reaction_chooser) => log.add("REACT TO BEING HIT"),
     }
 }
 
@@ -288,6 +323,43 @@ struct EventSender {
 impl EventSender {
     fn send(&self, value: Event) {
         self.queue.borrow_mut().push(value);
+    }
+}
+
+struct Log {
+    lines: Container,
+}
+
+impl Logger for Log {
+    fn log(&mut self, line: String) {
+        self.add(line);
+    }
+}
+
+impl Log {
+    fn new() -> Self {
+        let elements = vec![];
+        Self {
+            lines: Container {
+                layout_dir: LayoutDirection::Vertical,
+                elements,
+                margin: 10.0,
+                ..Default::default()
+            },
+        }
+    }
+
+    fn add(&mut self, text: impl Into<String>) {
+        if self.lines.elements.len() == 10 {
+            self.lines.elements.remove(0);
+        }
+        self.lines
+            .elements
+            .push(Element::Text(TextLine::new(text, 20)));
+    }
+
+    fn draw(&mut self, x: f32, y: f32) {
+        self.lines.draw(x, y);
     }
 }
 
@@ -519,7 +591,7 @@ fn new_action_button(
 
     let text;
     let mut mana_points = 0;
-    let stamina_points = 0;
+    let mut stamina_points = 0;
     let action_points;
 
     match action {
@@ -544,6 +616,7 @@ fn new_action_button(
         ButtonAction::OnAttackedReaction(reaction) => {
             text = reaction.name;
             action_points = reaction.action_point_cost;
+            stamina_points = reaction.stamina_cost;
         }
         ButtonAction::OnHitReaction(reaction) => {
             text = reaction.name;
@@ -569,7 +642,7 @@ fn new_action_button(
     btn
 }
 
-fn attribute_row(attribute: (&'static str, i32), stats: Vec<(&'static str, f32)>) -> Container {
+fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>) -> Container {
     let attribute_element = Element::Text(TextLine::new(
         format!("{}: {}", attribute.0, attribute.1),
         22,
@@ -630,7 +703,7 @@ enum Element {
 
 impl Element {
     fn size(&self) -> (f32, f32) {
-        match self {
+        let size = match self {
             Element::Btn(btn) => btn.size,
             Element::Container(container) => container.size(),
             Element::Text(text) => text.size,
@@ -639,7 +712,10 @@ impl Element {
             Element::TabLink(link) => link.size,
             Element::Box(drawable) => drawable.size(),
             Element::Rc(drawable) => drawable.borrow().size(),
-        }
+        };
+
+        assert!(size.0.is_finite() && size.1.is_finite());
+        size
     }
 
     fn draw(&mut self, x: f32, y: f32) {
@@ -790,6 +866,7 @@ impl Container {
         let mut h = 0.0;
         for element in &self.elements {
             let size = element.size();
+
             match self.layout_dir {
                 LayoutDirection::Horizontal => {
                     w += size.0;
@@ -882,10 +959,15 @@ impl TextLine {
         this
     }
 
-    fn set_string(&mut self, string: String) {
+    fn set_string(&mut self, string: impl Into<String>) {
+        let string = string.into();
         let text_dimensions = measure_text(&string, None, self.font_size, 1.0);
         self.string = string;
-        self.size = (text_dimensions.width, text_dimensions.height);
+        self.size = (
+            text_dimensions.width.max(0.0),
+            text_dimensions.height.max(0.0),
+        );
+        assert!(self.size.0.is_finite() && self.size.1.is_finite());
         self.offset_y = text_dimensions.offset_y;
     }
 }
