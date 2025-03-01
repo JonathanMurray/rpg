@@ -31,11 +31,15 @@ async fn main() {
     let game = CoreGame::new(cloned_logbuf);
 
     let player_character = Rc::clone(game.player_character());
+    let non_player_character = Rc::clone(game.non_player_character());
 
-    let mut user_interface = UserInterface::new(Rc::clone(&player_character));
+    let mut user_interface = UserInterface::new(
+        Rc::clone(&player_character),
+        Rc::clone(&non_player_character),
+    );
 
     let mut character_names = CharacterNames::new(
-        &[&player_character.borrow(), &game.non_player_character()],
+        &[&player_character.borrow(), &non_player_character.borrow()],
         game.active_character_i,
     );
 
@@ -305,7 +309,8 @@ impl ActivityPopup {
 }
 
 struct UserInterface {
-    character: Rc<RefCell<Character>>,
+    player_character: Rc<RefCell<Character>>,
+    other_character: Rc<RefCell<Character>>,
     reserved_action_points: u32,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: ActivityPopupState,
@@ -324,14 +329,17 @@ struct UserInterface {
 }
 
 impl UserInterface {
-    fn new(character: Rc<RefCell<Character>>) -> Self {
+    fn new(
+        player_character: Rc<RefCell<Character>>,
+        other_character: Rc<RefCell<Character>>,
+    ) -> Self {
         let mut combat_buttons = vec![];
         let mut skill_buttons = vec![];
         let mut spell_buttons = vec![];
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let character_ref = character.borrow();
+        let character_ref = player_character.borrow();
 
         let mut next_button_id = 1;
 
@@ -490,9 +498,10 @@ impl UserInterface {
         drop(character_ref);
 
         Self {
+            player_character,
+            other_character,
             next_available_button_id: next_button_id,
             hovered_button: None,
-            character,
             log: Log::new(),
             tabs,
             resource_bars,
@@ -540,7 +549,10 @@ impl UserInterface {
         let mut popup_buttons = vec![];
         match state {
             ActivityPopupState::CommitAttackAction(hand) => {
-                let enhancements = self.character.borrow().usable_attack_enhancements(hand);
+                let enhancements = self
+                    .player_character
+                    .borrow()
+                    .usable_attack_enhancements(hand);
                 for (subtext, enhancement) in enhancements {
                     let btn_action = ButtonAction::AttackEnhancement(enhancement);
                     let btn = self.new_button(subtext, btn_action);
@@ -550,7 +562,11 @@ impl UserInterface {
             }
             ActivityPopupState::CommitSpellAction(spell) => {
                 if let Some(enhancement) = spell.possible_enhancement {
-                    if self.character.borrow().can_use_spell_enhancement(spell) {
+                    if self
+                        .player_character
+                        .borrow()
+                        .can_use_spell_enhancement(spell)
+                    {
                         let btn_action = ButtonAction::SpellEnhancement(enhancement);
                         let btn = self.new_button("".to_string(), btn_action);
                         popup_buttons.push(btn);
@@ -565,7 +581,10 @@ impl UserInterface {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToAttack => {
-                let reactions = self.character.borrow().usable_on_attacked_reactions();
+                let reactions = self
+                    .player_character
+                    .borrow()
+                    .usable_on_attacked_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -574,7 +593,7 @@ impl UserInterface {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToHit => {
-                let reactions = self.character.borrow().usable_on_hit_reactions();
+                let reactions = self.player_character.borrow().usable_on_hit_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -652,26 +671,36 @@ impl UserInterface {
                             _ => false,
                         };
 
-                        if may_choose_action && self.character.borrow().can_use_action(base_action)
+                        if may_choose_action
+                            && self.player_character.borrow().can_use_action(base_action)
                         {
                             match base_action {
                                 BaseAction::Attack {
                                     hand,
                                     action_point_cost,
                                 } => {
-                                    // TODO check range
+                                    let attack_reaches =
+                                        self.player_character.borrow().can_reach_with_attack(
+                                            hand,
+                                            self.other_character.borrow().position,
+                                        );
+                                    if attack_reaches {
+                                        self.reserved_action_points = action_point_cost;
+                                        let weapon =
+                                            self.player_character.borrow().weapon(hand).unwrap();
+                                        let description = format!(
+                                            "Attack with {}: {} damage",
+                                            weapon.name, weapon.damage
+                                        );
 
-                                    self.reserved_action_points = action_point_cost;
-                                    let weapon = self.character.borrow().weapon(hand).unwrap();
-                                    let description = format!(
-                                        "Attack with {}: {} damage",
-                                        weapon.name, weapon.damage
-                                    );
+                                        self.set_state(
+                                            ActivityPopupState::CommitAttackAction(hand),
+                                            vec![description],
+                                        );
+                                    } else {
+                                        println!("Doesn't reach attacking");
+                                    }
 
-                                    self.set_state(
-                                        ActivityPopupState::CommitAttackAction(hand),
-                                        vec![description],
-                                    );
                                     None
                                 }
                                 BaseAction::SelfEffect(sea) => {
@@ -718,7 +747,7 @@ impl UserInterface {
                     ButtonAction::AttackEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitAttackAction(hand) => {
                             if self
-                                .character
+                                .player_character
                                 .borrow()
                                 .can_use_attack_enhancement(hand, &enhancement)
                             {
@@ -738,7 +767,11 @@ impl UserInterface {
                     },
                     ButtonAction::SpellEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitSpellAction(spell) => {
-                            if self.character.borrow().can_use_spell_enhancement(spell) {
+                            if self
+                                .player_character
+                                .borrow()
+                                .can_use_spell_enhancement(spell)
+                            {
                                 Some(Event::ChoseAction(Action::CastSpell {
                                     spell,
                                     enhanced: true,
@@ -756,7 +789,7 @@ impl UserInterface {
                     ButtonAction::OnAttackedReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToAttack {
                             if self
-                                .character
+                                .player_character
                                 .borrow()
                                 .can_use_on_attacked_reaction(reaction)
                             {
@@ -772,7 +805,11 @@ impl UserInterface {
                     }
                     ButtonAction::OnHitReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToHit {
-                            if self.character.borrow().can_use_on_hit_reaction(reaction) {
+                            if self
+                                .player_character
+                                .borrow()
+                                .can_use_on_hit_reaction(reaction)
+                            {
                                 Some(Event::ChoseHitReaction(Some(reaction)))
                             } else {
                                 println!("Cannot afford this reaction at this time");

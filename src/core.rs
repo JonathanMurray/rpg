@@ -51,9 +51,9 @@ impl CoreGame {
         self.characters.get(self.player_character_i)
     }
 
-    pub fn non_player_character(&self) -> RefMut<Character> {
+    pub fn non_player_character(&self) -> &Rc<RefCell<Character>> {
         let i = (self.player_character_i + 1) % self.characters.0.len();
-        self.characters.get(i).borrow_mut()
+        self.characters.get(i)
     }
 
     pub fn active_character(&self) -> RefMut<Character> {
@@ -79,6 +79,8 @@ impl CoreGame {
             Action::Attack { hand, enhancements } => {
                 let mut attacker = character;
                 let defender = other_character;
+
+                assert!(attacker.can_reach_with_attack(hand, defender.position));
 
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
                 for enhancement in &enhancements {
@@ -586,16 +588,31 @@ impl CoreGame {
             character = self.characters.get(self.active_character_i).borrow_mut();
         }
 
-        drop(character);
-
         if players_turn {
-            return GameState::ChooseAction(StateChooseAction { game: self });
+            drop(character);
+            GameState::ChooseAction(StateChooseAction { game: self })
         } else {
-            // TODO make sure to only pick an action that the character affords
-            return self.enter_state_action(Action::Attack {
-                hand: HandType::MainHand,
-                enhancements: Default::default(),
-            });
+            // TODO make sure to only pick an action that the character can actually do (afford, in range, etc)
+
+            let other_character = self.inactive_character();
+            let can_reach_with_attack =
+                character.can_reach_with_attack(HandType::MainHand, other_character.position);
+
+            drop(character);
+            drop(other_character);
+
+            let action = if can_reach_with_attack {
+                Action::Attack {
+                    hand: HandType::MainHand,
+                    enhancements: Default::default(),
+                }
+            } else {
+                // TODO
+                Action::Move {
+                    action_point_cost: 1,
+                }
+            };
+            self.enter_state_action(action)
         }
     }
 
@@ -1002,6 +1019,17 @@ impl Character {
         self.hand(hand).weapon
     }
 
+    pub fn can_reach_with_attack(&self, hand: HandType, target_position: (u32, u32)) -> bool {
+        let weapon = self.weapon(hand).unwrap();
+        let range_squared = match weapon.range {
+            WeaponRange::Melee => 2,
+            WeaponRange::Ranged(r) => r * r,
+        } as i32;
+        let distance_squared = (target_position.0 as i32 - self.position.0 as i32).pow(2)
+            + (target_position.1 as i32 - self.position.1 as i32).pow(2);
+        distance_squared <= range_squared
+    }
+
     pub fn known_actions(&self) -> Vec<(String, BaseAction)> {
         self.known_actions
             .iter()
@@ -1303,6 +1331,7 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone)]
 pub struct Weapon {
     pub name: &'static str,
+    pub range: WeaponRange,
     pub action_point_cost: u32,
     pub damage: u32,
     pub grip: WeaponGrip,
@@ -1332,4 +1361,10 @@ pub enum WeaponGrip {
     MainHand,
     Versatile,
     TwoHanded,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum WeaponRange {
+    Melee,
+    Ranged(u32),
 }

@@ -1,7 +1,7 @@
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
     OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Shield,
-    Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
+    Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip, WeaponRange,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -16,6 +16,7 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
 
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
+    range: WeaponRange::Melee,
     action_point_cost: 1,
     damage: 1,
     grip: WeaponGrip::Light,
@@ -29,6 +30,7 @@ pub const DAGGER: Weapon = Weapon {
 
 pub const SWORD: Weapon = Weapon {
     name: "Sword",
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 1,
     grip: WeaponGrip::Versatile,
@@ -42,6 +44,7 @@ pub const SWORD: Weapon = Weapon {
 
 pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 1,
     grip: WeaponGrip::MainHand,
@@ -53,6 +56,7 @@ pub const RAPIER: Weapon = Weapon {
 
 pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 2,
     grip: WeaponGrip::TwoHanded,
@@ -73,6 +77,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
 
 pub const BOW: Weapon = Weapon {
     name: "Bow",
+    range: WeaponRange::Ranged(5),
     action_point_cost: 2,
     damage: 2,
     grip: WeaponGrip::TwoHanded,
