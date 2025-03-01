@@ -132,13 +132,14 @@ pub const RAGE: OnHitReaction = OnHitReaction {
 
 pub const SCREAM: Spell = Spell {
     name: "Scream",
+    description: "Daze the enemy",
     action_point_cost: 2,
     mana_cost: 1,
     damage: 0,
     on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
-        name: "Take action points",
+        name: "Stagger",
         mana_cost: 1,
         effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
     }),
@@ -146,13 +147,14 @@ pub const SCREAM: Spell = Spell {
 
 pub const MIND_BLAST: Spell = Spell {
     name: "Mind blast",
+    description: "Damage and stagger the enemy",
     action_point_cost: 2,
     mana_cost: 1,
     damage: 1,
     on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
-        name: "Double cast",
+        name: "Dualcast",
         mana_cost: 1,
         effect: SpellEnhancementEffect::CastTwice,
     }),
@@ -160,6 +162,7 @@ pub const MIND_BLAST: Spell = Spell {
 
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
+    description: "Damage the enemy",
     action_point_cost: 3,
     mana_cost: 1,
     damage: 2,

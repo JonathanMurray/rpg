@@ -148,6 +148,7 @@ impl CoreGame {
                 name,
                 action_point_cost,
                 effect,
+                ..
             }) => {
                 character.action_points -= action_point_cost;
 
@@ -196,10 +197,12 @@ impl CoreGame {
         caster.action_points -= spell.action_point_cost;
         caster.mana.lose(spell.mana_cost);
 
+        let mut enhancement_str = String::new();
         if enhanced {
-            caster
-                .mana
-                .lose(spell.possible_enhancement.unwrap().mana_cost);
+            let enhancement = spell.possible_enhancement.unwrap();
+            caster.mana.lose(enhancement.mana_cost);
+
+            enhancement_str = format!(" ({})", enhancement.name)
         }
 
         let (target_label, target) = match spell.spell_type {
@@ -216,12 +219,13 @@ impl CoreGame {
         };
 
         self.log(format!(
-            "{} casts {} on {} (d20+{} vs {})",
+            "{} casts {} on {} (d20+{} vs {}){}",
             caster.name,
             spell.name,
             defender.name,
             caster.intellect(),
-            target
+            target,
+            enhancement_str
         ));
 
         for i in 0..cast_n_times {
@@ -250,9 +254,10 @@ impl CoreGame {
                 match spell.possible_enhancement {
                     Some(SpellEnhancement {
                         effect: SpellEnhancementEffect::OnHitEffect(effect),
+                        name,
                         ..
                     }) if enhanced => {
-                        self.perform_effect_application(effect, defender, "Spell enhancement");
+                        self.perform_effect_application(effect, defender, name);
                     }
                     _ => {}
                 };
@@ -803,9 +808,10 @@ pub enum Action {
     },
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SelfEffectAction {
     pub name: &'static str,
+    pub description: &'static str,
     pub action_point_cost: u32,
     pub effect: ApplyEffect,
 }
@@ -839,9 +845,10 @@ pub enum HandType {
     OffHand,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spell {
     pub name: &'static str,
+    pub description: &'static str,
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub damage: u32,
@@ -850,7 +857,7 @@ pub struct Spell {
     pub possible_enhancement: Option<SpellEnhancement>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnhancement {
     pub name: &'static str,
     pub mana_cost: u32,
@@ -863,7 +870,7 @@ pub enum SpellEnhancementEffect {
     OnHitEffect(ApplyEffect),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellType {
     Mental,
     Projectile,
@@ -930,6 +937,7 @@ impl Character {
                 },
                 BaseAction::SelfEffect(SelfEffectAction {
                     name: "Brace",
+                    description: "+defense the next time you're attacked",
                     action_point_cost: 1,
                     effect: ApplyEffect::Condition(Condition::Braced),
                 }),
@@ -1026,7 +1034,7 @@ impl Character {
 
         let mut usable = vec![];
         if let Some(enhancement) = weapon.attack_enhancement {
-            usable.push((format!("{}: ", weapon.name), enhancement))
+            usable.push((weapon.name.to_string(), enhancement))
         }
         for enhancement in &self.known_attack_enhancements {
             usable.push(("".to_owned(), *enhancement))
@@ -1106,6 +1114,11 @@ impl Character {
             }
         }
         self.action_points >= reaction.action_point_cost
+    }
+
+    pub fn can_use_spell_enhancement(&self, spell: Spell) -> bool {
+        let enhancement = spell.possible_enhancement.unwrap();
+        self.mana.current >= spell.mana_cost + enhancement.mana_cost
     }
 
     fn strength(&self) -> u32 {
