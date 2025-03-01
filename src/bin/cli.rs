@@ -89,15 +89,12 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
     match &available_actions[action_choice as usize - 1] {
         BaseAction::Attack {
             hand,
-            action_point_cost,
+            action_point_cost: _,
         } => {
             let weapon = character.weapon(*hand).unwrap();
             let reserved_action_points = weapon.action_point_cost;
 
-            let available_attack_enhancements = character.usable_attack_enhancements(
-                *hand,
-                character.action_points - reserved_action_points,
-            );
+            let available_attack_enhancements = character.usable_attack_enhancements(*hand);
             let mut picked_attack_enhancements = vec![];
 
             if !available_attack_enhancements.is_empty() {

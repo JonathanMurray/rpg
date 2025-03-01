@@ -58,7 +58,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(AttackEnhancement {
-        name: "All-in attack",
+        name: "All-in",
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 1,
@@ -102,7 +102,7 @@ pub const SMALL_SHIELD: Shield = Shield {
 };
 
 pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
-    name: "Crushing strike",
+    name: "Crushing",
     action_point_cost: 0,
     stamina_cost: 1,
     bonus_damage: 0,

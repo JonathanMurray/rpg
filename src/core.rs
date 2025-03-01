@@ -5,6 +5,7 @@ use std::rc::Rc;
 use macroquad::miniquad::log;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
+use crate::data::WAR_HAMMER;
 use crate::data::{
     CRUSHING_STRIKE, DAGGER, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SIDE_STEP,
     SMALL_SHIELD, SWORD,
@@ -12,8 +13,6 @@ use crate::data::{
 
 // You get this many AP per round
 const ACTION_POINTS_PER_TURN: u32 = 6;
-// You're not allowed to bring your AP below this number, with reactions
-const REACTION_AP_THRESHOLD: u32 = 3;
 
 pub struct CoreGame {
     characters: Characters,
@@ -25,8 +24,8 @@ pub struct CoreGame {
 impl CoreGame {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> StateChooseAction {
         let mut bob = Character::new("Bob", 5, 1, 4);
-        bob.main_hand.weapon = Some(SWORD);
-        bob.off_hand.shield = Some(SMALL_SHIELD);
+        bob.main_hand.weapon = Some(WAR_HAMMER);
+        bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_on_hit_reactions.push(RAGE);
@@ -34,7 +33,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
-        let mut alice = Character::new("Alice", 2, 10, 3);
+        let mut alice = Character::new("Alice", 2, 2, 3);
         alice.main_hand.weapon = Some(SWORD);
         alice.armor = Some(LEATHER_ARMOR);
 
@@ -52,8 +51,8 @@ impl CoreGame {
         StateChooseAction { game }
     }
 
-    pub fn player_character(&self) -> RefMut<Character> {
-        self.characters.get(self.player_character_i).borrow_mut()
+    pub fn player_character(&self) -> &Rc<RefCell<Character>> {
+        self.characters.get(self.player_character_i)
     }
 
     pub fn non_player_character(&self) -> RefMut<Character> {
@@ -65,7 +64,7 @@ impl CoreGame {
         self.characters.get(self.active_character_i).borrow_mut()
     }
 
-    pub fn characters(&self) -> &[RefCell<Character>] {
+    pub fn characters(&self) -> &[Rc<RefCell<Character>>] {
         &self.characters.0
     }
 
@@ -86,6 +85,7 @@ impl CoreGame {
                 let defender = other_character;
 
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
+
                 for enhancement in &enhancements {
                     attacker.action_points -= enhancement.action_point_cost;
                     attacker.stamina.lose(enhancement.stamina_cost);
@@ -94,12 +94,23 @@ impl CoreGame {
                     }
                 }
 
+                let enhancements_str = if !enhancements.is_empty() {
+                    let names: Vec<String> = enhancements
+                        .iter()
+                        .map(|enhancement| enhancement.name.to_string())
+                        .collect();
+                    format!(" ({})", names.join(", "))
+                } else {
+                    "".to_string()
+                };
+
                 let attacks_str = format!(
-                    "{} attacks {} (d20+{} vs {})",
+                    "{} attacks {} (d20+{} vs {}){}",
                     attacker.name,
                     defender.name,
                     attacker.attack_modifier(hand),
-                    defender.defense()
+                    defender.defense(),
+                    enhancements_str
                 );
 
                 self.log(attacks_str.clone());
@@ -693,14 +704,19 @@ pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Char
     probability_of_d20_reaching(target, 0)
 }
 
-struct Characters(Vec<RefCell<Character>>);
+struct Characters(Vec<Rc<RefCell<Character>>>);
 
 impl Characters {
     fn new(characters: Vec<Character>) -> Self {
-        Self(characters.into_iter().map(RefCell::new).collect())
+        Self(
+            characters
+                .into_iter()
+                .map(|ch| Rc::new(RefCell::new(ch)))
+                .collect(),
+        )
     }
 
-    fn get(&self, i: usize) -> &RefCell<Character> {
+    fn get(&self, i: usize) -> &Rc<RefCell<Character>> {
         self.0.get(i).unwrap()
     }
 }
@@ -817,7 +833,7 @@ impl BaseAction {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum HandType {
     MainHand,
     OffHand,
@@ -1002,10 +1018,9 @@ impl Character {
         }
     }
 
-    pub fn usable_attack_enhancements(
+    pub fn known_attack_enhancements(
         &self,
         attack_hand: HandType,
-        available_action_points: u32,
     ) -> Vec<(String, AttackEnhancement)> {
         let weapon = self.weapon(attack_hand).unwrap();
 
@@ -1016,8 +1031,27 @@ impl Character {
         for enhancement in &self.known_attack_enhancements {
             usable.push(("".to_owned(), *enhancement))
         }
-        usable.retain(|(_, enhancement)| available_action_points >= enhancement.action_point_cost);
         usable
+    }
+
+    pub fn usable_attack_enhancements(
+        &self,
+        attack_hand: HandType,
+    ) -> Vec<(String, AttackEnhancement)> {
+        let mut usable = self.known_attack_enhancements(attack_hand);
+
+        usable.retain(|(_, enhancement)| self.can_use_attack_enhancement(attack_hand, enhancement));
+        usable
+    }
+
+    pub fn can_use_attack_enhancement(
+        &self,
+        attack_hand: HandType,
+        enhancement: &AttackEnhancement,
+    ) -> bool {
+        let weapon = self.weapon(attack_hand).unwrap();
+        self.action_points >= weapon.action_point_cost + enhancement.action_point_cost
+            && self.stamina.current >= enhancement.stamina_cost
     }
 
     pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
@@ -1035,16 +1069,7 @@ impl Character {
     }
 
     pub fn usable_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
-        let mut usable = vec![];
-        for reaction in &self.known_attacked_reactions {
-            usable.push(("".to_string(), *reaction));
-        }
-        // TODO: off-hand reactions?
-        if let Some(weapon) = &self.main_hand.weapon {
-            if let Some(reaction) = weapon.on_attacked_reaction {
-                usable.push((weapon.name.to_string(), reaction));
-            }
-        }
+        let mut usable = self.known_on_attacked_reactions();
         usable.retain(|reaction| self.can_use_on_attacked_reaction(reaction.1));
         usable
     }
@@ -1068,15 +1093,7 @@ impl Character {
     }
 
     pub fn usable_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
-        let mut usable = vec![];
-        for reaction in &self.known_on_hit_reactions {
-            usable.push(("".to_string(), *reaction));
-        }
-        if let Some(shield) = self.off_hand.shield {
-            if let Some(reaction) = shield.on_hit_reaction {
-                usable.push((shield.name.to_string(), reaction));
-            }
-        }
+        let mut usable = self.known_on_hit_reactions();
         usable.retain(|r| self.can_use_on_hit_reaction(r.1));
         usable
     }
