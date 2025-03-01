@@ -16,7 +16,7 @@ use macroquad::{
 };
 use rpg::core::{
     Action, BaseAction, Character, CoreGame, GameState, Logger, OnAttackedReaction, OnHitReaction,
-    StateReactToAttack, StateReactToHit,
+    SelfEffectAction, Spell, StateReactToAttack, StateReactToHit,
 };
 
 #[macroquad::main(window_conf)]
@@ -46,125 +46,48 @@ async fn main() {
         user_interface.draw();
         character_names.draw(50.0, 20.0);
 
-        for event in user_interface.events() {
-            match event {
-                Event::Hover(hovered, button_action) => {
-                    let reserved_ap = if hovered {
-                        button_action.action_point_cost()
-                    } else {
-                        0
-                    };
-                    user_interface.set_reserved_action_points(reserved_ap);
-                }
-                Event::Click(button_action) => {
-                    match state {
-                        State::AwaitingPlayerInput(game_state) => {
-                            match game_state {
-                                GameState::ChooseAction(choose_action) => {
-                                    let character = choose_action.game.player_character();
+        match state {
+            State::AwaitingPlayerInput(mut game_state) => {
+                let events = user_interface.update();
 
-                                    let game_state = match button_action {
-                                        ButtonAction::Action(base_action)
-                                            if character.can_use_action(base_action) =>
-                                        {
-                                            let action = match base_action {
-                                                BaseAction::Attack {
-                                                    hand,
-                                                    action_point_cost: _,
-                                                } => Action::Attack {
-                                                    hand,
-                                                    // TODO allow player to choose enhancements
-                                                    enhancements: Default::default(),
-                                                },
-                                                BaseAction::SelfEffect(self_effect_action) => {
-                                                    Action::SelfEffect(self_effect_action)
-                                                }
-                                                // TODO allow player to choose spell enhancement
-                                                BaseAction::CastSpell(spell) => Action::CastSpell {
-                                                    spell,
-                                                    enhanced: false,
-                                                },
-                                            };
-
-                                            drop(character);
-                                            let game_state = choose_action.proceed(action);
-                                            user_interface.update_character_resources(
-                                                &game_state.game().player_character(),
-                                            );
-                                            game_state
-                                        }
-                                        _ => {
-                                            println!("Invalid action!");
-                                            drop(character);
-                                            GameState::ChooseAction(choose_action)
-                                        }
-                                    };
-                                    state = State::CatchingUp(game_state);
-                                }
-                                GameState::ReactToAttack(react_to_attack) => {
-                                    let game_state = match button_action {
-                                        ButtonAction::OnAttackedReaction(maybe_reaction) => {
-                                            let is_valid_choice = maybe_reaction
-                                                .map(|reaction| {
-                                                    react_to_attack
-                                                        .game
-                                                        .player_character()
-                                                        .can_use_on_attacked_reaction(reaction)
-                                                })
-                                                .unwrap_or(true);
-                                            if is_valid_choice {
-                                                let game_state =
-                                                    react_to_attack.proceed(maybe_reaction);
-                                                user_interface.update_character_resources(
-                                                    &game_state.game().player_character(),
-                                                );
-                                                game_state
-                                            } else {
-                                                println!("Invalid reaction choice");
-                                                GameState::ReactToAttack(react_to_attack)
-                                            }
-                                        }
-                                        _ => {
-                                            println!("Invalid reaction choice");
-                                            GameState::ReactToAttack(react_to_attack)
-                                        }
-                                    };
-                                    state = State::CatchingUp(game_state);
-                                }
-                                GameState::ReactToHit(react_to_hit) => {
-                                    let game_state = match button_action {
-                                        ButtonAction::OnHitReaction(maybe_reaction) => {
-                                            let is_valid_choice = maybe_reaction
-                                                .map(|reaction| {
-                                                    react_to_hit
-                                                        .game
-                                                        .player_character()
-                                                        .can_use_on_hit_reaction(reaction)
-                                                })
-                                                .unwrap_or(true);
-                                            if is_valid_choice {
-                                                let game_state =
-                                                    react_to_hit.proceed(maybe_reaction);
-                                                user_interface.update_character_resources(
-                                                    &game_state.game().player_character(),
-                                                );
-                                                game_state
-                                            } else {
-                                                GameState::ReactToHit(react_to_hit)
-                                            }
-                                        }
-                                        _ => {
-                                            println!("Invalid on hit reaction!");
-                                            GameState::ReactToHit(react_to_hit)
-                                        }
-                                    };
-                                    state = State::CatchingUp(game_state);
-                                }
+                if !events.is_empty() {
+                    for event in events {
+                        match event {
+                            Event::ChoseAttackedReaction(reaction) => {
+                                let GameState::ReactToAttack(react_to_attack) = game_state else {
+                                    panic!();
+                                };
+                                game_state = react_to_attack.proceed(reaction);
+                            }
+                            Event::ChoseHitReaction(reaction) => {
+                                let GameState::ReactToHit(react_to_hit) = game_state else {
+                                    panic!();
+                                };
+                                game_state = react_to_hit.proceed(reaction);
+                            }
+                            Event::ChoseSelfEffectAction(se_action) => {
+                                let GameState::ChooseAction(choose_action) = game_state else {
+                                    panic!();
+                                };
+                                game_state = choose_action.proceed(Action::SelfEffect(se_action));
+                            }
+                            Event::ChoseCastSpellAction(spell) => {
+                                let GameState::ChooseAction(choose_action) = game_state else {
+                                    panic!();
+                                };
+                                // TODO allow enhancing spell
+                                game_state = choose_action.proceed(Action::CastSpell {
+                                    spell,
+                                    enhanced: false,
+                                });
                             }
                         }
-                        State::CatchingUp(..) => {}
                     }
 
+                    user_interface
+                        .update_character_resources(&game_state.game().player_character());
+
+                    state = State::CatchingUp(game_state);
                     change_state(&state, &mut user_interface);
 
                     character_names
@@ -173,7 +96,17 @@ async fn main() {
                     {
                         character_names.set_action_points(i, character.borrow().action_points);
                     }
+                } else {
+                    state = State::AwaitingPlayerInput(game_state)
                 }
+            }
+            State::CatchingUp(game_state) => {
+                let events = user_interface.update();
+                assert!(
+                    events.is_empty(),
+                    "Didn't expect events from UI while we're catching up with game"
+                );
+                state = State::CatchingUp(game_state)
             }
         }
 
@@ -244,8 +177,10 @@ fn change_state(state: &State, user_interface: &mut UserInterface) {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum ActivityPopupState {
     ChooseAction,
+    ChooseAttackEnhancements,
     ReactToAttack,
     ReactToHit,
     Idle,
@@ -262,7 +197,10 @@ impl ActivityPopup {
     fn draw(&mut self, x: f32, y: f32) {
         match &self.state {
             ActivityPopupState::ChooseAction => {
-                draw_text("Choosen an action!", x, y, 20.0, WHITE);
+                draw_text("Choose an action!", x, y, 20.0, WHITE);
+            }
+            ActivityPopupState::ChooseAttackEnhancements => {
+                draw_text("Choose attack enhancements", x, y, 20.0, WHITE);
             }
             ActivityPopupState::ReactToAttack => {
                 draw_text("react to attack!", x, y, 20.0, WHITE);
@@ -302,6 +240,7 @@ impl ActivityPopup {
     }
 
     fn set_state(&mut self, state: ActivityPopupState, lines: Vec<String>) {
+        dbg!(state);
         self.state = state;
         self.lines = lines;
     }
@@ -313,11 +252,12 @@ struct UserInterface {
     resource_bars: Container,
     action_points_label: TextLine,
     action_points_row: ActionPointsRow,
-    event_queue: Rc<RefCell<Vec<Event>>>,
+    event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     activity_popup: ActivityPopup,
+    state: ActivityPopupState,
 }
 
 impl UserInterface {
@@ -465,7 +405,9 @@ impl UserInterface {
         };
 
         let action_points_label = TextLine::new("Action points", 18);
-        let action_points_row = ActionPointsRow::new();
+        let action_points_row = ActionPointsRow::new(character_ref.action_points);
+
+        let state = ActivityPopupState::ChooseAction;
 
         Self {
             log: Log::new(),
@@ -478,11 +420,12 @@ impl UserInterface {
             mana_bar,
             stamina_bar,
             activity_popup: ActivityPopup {
-                state: ActivityPopupState::ChooseAction,
+                state,
                 lines: Default::default(),
                 attacked_reaction_popup_buttons,
                 hit_reaction_popup_buttons,
             },
+            state,
         }
     }
 
@@ -501,8 +444,104 @@ impl UserInterface {
         self.log.draw(800.0, y0);
     }
 
-    fn events(&mut self) -> Vec<Event> {
-        self.event_queue.take()
+    fn set_state(&mut self, state: ActivityPopupState, lines: Vec<String>) {
+        self.state = state;
+        self.activity_popup.set_state(state, lines);
+    }
+
+    fn update(&mut self) -> Vec<Event> {
+        self.event_queue
+            .take()
+            .into_iter()
+            .filter_map(|event| self.handle_event(event))
+            .collect()
+    }
+
+    fn handle_event(&mut self, event: InternalUiEvent) -> Option<Event> {
+        let can_choose_action = self.state == ActivityPopupState::ChooseAction
+            || self.state == ActivityPopupState::ChooseAttackEnhancements;
+        let ap = self.action_points_row.current;
+        let stamina = self.stamina_bar.borrow().current();
+        let mana = self.mana_bar.borrow().current();
+
+        match event {
+            InternalUiEvent::Hover(hovered, button_action) => {
+                let reserved_ap = if hovered {
+                    button_action.action_point_cost()
+                } else {
+                    0
+                };
+                self.set_reserved_action_points(reserved_ap);
+                None
+            }
+
+            InternalUiEvent::Click(btn_action) => match btn_action {
+                ButtonAction::Action(BaseAction::Attack {
+                    hand: _,
+                    action_point_cost,
+                }) => {
+                    if can_choose_action && ap >= action_point_cost {
+                        self.set_state(ActivityPopupState::ChooseAttackEnhancements, vec![]);
+                    } else {
+                        println!("Cannot choose attack action at this time");
+                    }
+                    None
+                }
+                ButtonAction::Action(BaseAction::SelfEffect(se)) => {
+                    if can_choose_action && ap >= se.action_point_cost {
+                        Some(Event::ChoseSelfEffectAction(se))
+                    } else {
+                        println!("Cannot use this self effect at this time");
+                        None
+                    }
+                }
+                ButtonAction::Action(BaseAction::CastSpell(spell)) => {
+                    if can_choose_action
+                        && ap >= spell.action_point_cost
+                        && mana >= spell.mana_cost
+                    {
+                        Some(Event::ChoseCastSpellAction(spell))
+                    } else {
+                        println!("Cannot cast this spell at this time");
+                        None
+                    }
+                }
+                ButtonAction::OnAttackedReaction(reaction) => {
+                    if self.state == ActivityPopupState::ReactToAttack {
+                        let is_valid_choice = reaction
+                            .map(|reaction| {
+                                ap >= reaction.action_point_cost && stamina >= reaction.stamina_cost
+                            })
+                            .unwrap_or(true);
+                        if is_valid_choice {
+                            Some(Event::ChoseAttackedReaction(reaction))
+                        } else {
+                            println!("Cannot afford this reaction at this time");
+                            None
+                        }
+                    } else {
+                        println!("Cannot use this reaction at this time");
+                        None
+                    }
+                }
+                ButtonAction::OnHitReaction(reaction) => {
+                    if self.state == ActivityPopupState::ReactToHit {
+                        let is_valid_choice = reaction
+                            .map(|reaction| ap >= reaction.action_point_cost)
+                            .unwrap_or(true);
+                        if is_valid_choice {
+                            Some(Event::ChoseHitReaction(reaction))
+                        } else {
+                            println!("Cannot afford this reaction at this time");
+                            None
+                        }
+                    } else {
+                        println!("Cannot use this reaction at this time");
+                        None
+                    }
+                }
+            },
+        }
     }
 
     fn set_reserved_action_points(&mut self, reserved: u32) {
@@ -520,10 +559,6 @@ impl UserInterface {
             .borrow_mut()
             .set_current(character.stamina.current);
         self.action_points_row.current = character.action_points;
-    }
-
-    fn log(&mut self, message: impl Into<String>) {
-        self.log.add(message.into());
     }
 }
 
@@ -627,11 +662,11 @@ impl Drawable for CharacterName {
 }
 
 struct EventSender {
-    queue: Rc<RefCell<Vec<Event>>>,
+    queue: Rc<RefCell<Vec<InternalUiEvent>>>,
 }
 
 impl EventSender {
-    fn send(&self, value: Event) {
+    fn send(&self, value: InternalUiEvent) {
         self.queue.borrow_mut().push(value);
     }
 }
@@ -689,9 +724,9 @@ struct ActionPointsRow {
 }
 
 impl ActionPointsRow {
-    fn new() -> Self {
+    fn new(action_points: u32) -> Self {
         Self {
-            current: 5,
+            current: action_points,
             reserved: 0,
             max: 6,
             cell_size: (20.0, 20.0),
@@ -843,6 +878,10 @@ impl LabelledResourceBar {
             .borrow_mut()
             .set_string(format!("{}/{}", value, self.max_value));
     }
+
+    fn current(&self) -> u32 {
+        self.bar.borrow().current
+    }
 }
 
 impl Drawable for LabelledResourceBar {
@@ -868,7 +907,7 @@ fn buttons_row(buttons: Vec<ActionButton>) -> Element {
 fn action_button(
     mut subtext: String,
     action: ButtonAction,
-    event_queue: &Rc<RefCell<Vec<Event>>>,
+    event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
 ) -> ActionButton {
     let button_size = (100.0, 50.0);
     let highlight_color = YELLOW;
@@ -1401,13 +1440,13 @@ impl ActionButton {
         if hovered != self.hovered {
             self.hovered = hovered;
             if let Some(event_sender) = &self.event_sender {
-                event_sender.send(Event::Hover(hovered, self.action));
+                event_sender.send(InternalUiEvent::Hover(hovered, self.action));
             }
         }
 
         if hovered && is_mouse_button_pressed(MouseButton::Left) {
             if let Some(event_sender) = &self.event_sender {
-                event_sender.send(Event::Click(self.action));
+                event_sender.send(InternalUiEvent::Click(self.action));
             }
         }
 
@@ -1428,9 +1467,16 @@ impl ActionButton {
     }
 }
 
-enum Event {
+enum InternalUiEvent {
     Hover(bool, ButtonAction),
     Click(ButtonAction),
+}
+
+enum Event {
+    ChoseAttackedReaction(Option<OnAttackedReaction>),
+    ChoseHitReaction(Option<OnHitReaction>),
+    ChoseSelfEffectAction(SelfEffectAction),
+    ChoseCastSpellAction(Spell),
 }
 
 struct Circle {
