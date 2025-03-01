@@ -2,8 +2,6 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::rc::Rc;
 
-use macroquad::miniquad::log;
-
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 use crate::data::WAR_HAMMER;
 use crate::data::{
@@ -23,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> StateChooseAction {
-        let mut bob = Character::new("Bob", 5, 1, 4);
+        let mut bob = Character::new("Bob", 5, 1, 4, (1, 1));
         bob.main_hand.weapon = Some(WAR_HAMMER);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -33,7 +31,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
-        let mut alice = Character::new("Alice", 2, 2, 3);
+        let mut alice = Character::new("Alice", 2, 2, 3, (3, 4));
         alice.main_hand.weapon = Some(SWORD);
         alice.armor = Some(LEATHER_ARMOR);
 
@@ -158,6 +156,7 @@ impl CoreGame {
             Action::CastSpell { spell, enhanced } => {
                 self.perform_spell(&mut character, spell, enhanced, &mut other_character);
             }
+            Action::Move => todo!("Handle move action in core"),
         }
 
         drop(character);
@@ -637,6 +636,27 @@ impl GameState {
             GameState::ReactToHit(this) => &this.game,
         }
     }
+
+    pub fn unwrap_choose_action(self) -> StateChooseAction {
+        match self {
+            GameState::ChooseAction(inner) => inner,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_react_to_attack(self) -> StateReactToAttack {
+        match self {
+            GameState::ReactToAttack(inner) => inner,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_react_to_hit(self) -> StateReactToHit {
+        match self {
+            GameState::ReactToHit(inner) => inner,
+            _ => panic!(),
+        }
+    }
 }
 
 pub trait Logger {
@@ -806,6 +826,7 @@ pub enum Action {
         spell: Spell,
         enhanced: bool,
     },
+    Move,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -824,17 +845,21 @@ pub enum BaseAction {
     },
     SelfEffect(SelfEffectAction),
     CastSpell(Spell),
+    Move {
+        action_point_cost: u32,
+    },
 }
 
 impl BaseAction {
     pub fn action_point_cost(&self) -> u32 {
         match self {
             BaseAction::Attack {
-                hand,
+                hand: _,
                 action_point_cost,
             } => *action_point_cost,
             BaseAction::SelfEffect(self_effect_action) => self_effect_action.action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
+            BaseAction::Move { action_point_cost } => *action_point_cost,
         }
     }
 }
@@ -891,12 +916,14 @@ impl Hand {
 
 #[derive(Debug)]
 pub struct Character {
+    pub position: (u32, u32),
     pub name: &'static str,
     pub base_strength: u32,
     pub base_dexterity: u32,
     pub base_intellect: u32,
     pub health: NumberedResource,
     pub mana: NumberedResource,
+    pub move_speed: f32,
     armor: Option<ArmorPiece>,
     main_hand: Hand,
     off_hand: Hand,
@@ -910,15 +937,17 @@ pub struct Character {
 }
 
 impl Character {
-    fn new(name: &'static str, str: u32, dex: u32, int: u32) -> Self {
+    fn new(name: &'static str, str: u32, dex: u32, int: u32, position: (u32, u32)) -> Self {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
         Self {
+            position,
             name,
             base_strength: str,
             base_dexterity: dex,
             base_intellect: int,
             health: NumberedResource::new(5 + str),
             mana: NumberedResource::new(mana),
+            move_speed: 1.0 + dex as f32 * 0.25,
             armor: None,
             main_hand: Default::default(),
             off_hand: Default::default(),
@@ -941,6 +970,9 @@ impl Character {
                     action_point_cost: 1,
                     effect: ApplyEffect::Condition(Condition::Braced),
                 }),
+                BaseAction::Move {
+                    action_point_cost: 1,
+                },
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
@@ -973,38 +1005,19 @@ impl Character {
                 }),
                 BaseAction::SelfEffect(_self_effect_action) => Some(("".to_string(), *action)),
                 BaseAction::CastSpell(_spell) => Some(("".to_string(), *action)),
+                BaseAction::Move { .. } => Some(("".to_string(), *action)),
             })
             .collect()
     }
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {
-        let ap = self.action_points;
-        self.known_actions
+        self.known_actions()
             .iter()
-            .filter_map(|action: &BaseAction| match action {
-                BaseAction::Attack {
-                    hand,
-                    action_point_cost: _,
-                } => match self.weapon(*hand) {
-                    Some(weapon) if ap >= weapon.action_point_cost => Some(BaseAction::Attack {
-                        hand: *hand,
-                        action_point_cost: weapon.action_point_cost,
-                    }),
-                    _ => None,
-                },
-                action @ BaseAction::SelfEffect(self_effect_action) => {
-                    if ap >= self_effect_action.action_point_cost {
-                        Some(*action)
-                    } else {
-                        None
-                    }
-                }
-                action @ BaseAction::CastSpell(spell) => {
-                    if ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost {
-                        Some(*action)
-                    } else {
-                        None
-                    }
+            .filter_map(|(_, action)| {
+                if self.can_use_action(*action) {
+                    Some(*action)
+                } else {
+                    None
                 }
             })
             .collect()
@@ -1023,6 +1036,7 @@ impl Character {
             BaseAction::CastSpell(spell) => {
                 ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
             }
+            BaseAction::Move { action_point_cost } => ap >= action_point_cost,
         }
     }
 

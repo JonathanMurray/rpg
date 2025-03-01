@@ -1,4 +1,7 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{
+    cell::{self, RefCell},
+    rc::Rc,
+};
 
 use macroquad::{
     color::{
@@ -38,17 +41,25 @@ async fn main() {
         game.active_character_i,
     );
 
-    let game_state = GameState::ChooseAction(game_state);
+    let characters_on_grid = game
+        .characters()
+        .iter()
+        .map(|character| (&character.borrow().name[0..1], character.borrow().position))
+        .collect();
 
-    let mut state = State::AwaitingPlayerInput(game_state);
+    let mut game_grid = GameGrid::new(characters_on_grid);
+
+    let mut state = State::AwaitingPlayerInput(GameState::ChooseAction(game_state));
 
     change_state(&state, &mut user_interface);
 
     let mut timer = 0.0;
 
     loop {
-        user_interface.draw();
+        clear_background(BLACK);
         character_names.draw(50.0, 20.0);
+        game_grid.draw(100.0, 150.0);
+        user_interface.draw(640.0);
 
         match state {
             State::AwaitingPlayerInput(mut game_state) => {
@@ -58,36 +69,26 @@ async fn main() {
                     for event in events {
                         match event {
                             Event::ChoseAttackedReaction(reaction) => {
-                                let GameState::ReactToAttack(react_to_attack) = game_state else {
-                                    panic!();
-                                };
-                                game_state = react_to_attack.proceed(reaction);
+                                game_state = game_state.unwrap_react_to_attack().proceed(reaction);
                             }
                             Event::ChoseHitReaction(reaction) => {
-                                let GameState::ReactToHit(react_to_hit) = game_state else {
-                                    panic!();
-                                };
-                                game_state = react_to_hit.proceed(reaction);
+                                game_state = game_state.unwrap_react_to_hit().proceed(reaction);
                             }
                             Event::ChoseAttackAction(hand, enhancements) => {
-                                let GameState::ChooseAction(choose_action) = game_state else {
-                                    panic!();
-                                };
-                                game_state =
-                                    choose_action.proceed(Action::Attack { hand, enhancements });
+                                let action = Action::Attack { hand, enhancements };
+                                game_state = game_state.unwrap_choose_action().proceed(action);
                             }
                             Event::ChoseSelfEffectAction(se_action) => {
-                                let GameState::ChooseAction(choose_action) = game_state else {
-                                    panic!();
-                                };
-                                game_state = choose_action.proceed(Action::SelfEffect(se_action));
+                                let action = Action::SelfEffect(se_action);
+                                game_state = game_state.unwrap_choose_action().proceed(action);
                             }
                             Event::ChoseCastSpellAction(spell, enhanced) => {
-                                let GameState::ChooseAction(choose_action) = game_state else {
-                                    panic!();
-                                };
+                                let action = Action::CastSpell { spell, enhanced };
+                                game_state = game_state.unwrap_choose_action().proceed(action);
+                            }
+                            Event::ChoseMoveAction => {
                                 game_state =
-                                    choose_action.proceed(Action::CastSpell { spell, enhanced });
+                                    game_state.unwrap_choose_action().proceed(Action::Move);
                             }
                         }
                     }
@@ -143,6 +144,56 @@ async fn main() {
     }
 }
 
+struct GameGrid {
+    characters: Vec<(TextLine, (u32, u32))>,
+}
+
+impl GameGrid {
+    fn new(characters: Vec<(impl Into<String>, (u32, u32))>) -> Self {
+        let characters = characters
+            .into_iter()
+            .map(|(s, pos)| (TextLine::new(s, 25), pos))
+            .collect();
+
+        Self { characters }
+    }
+
+    fn draw(&mut self, x: f32, y: f32) {
+        let cell_w = 25.0;
+        let grid_dimensions = (20, 12);
+        for col in 0..grid_dimensions.0 + 1 {
+            let x0 = x + col as f32 * cell_w;
+            draw_line(
+                x0,
+                y,
+                x0,
+                y + grid_dimensions.1 as f32 * cell_w,
+                1.0,
+                DARKGRAY,
+            );
+            for row in 0..grid_dimensions.1 + 1 {
+                let y0 = y + row as f32 * cell_w;
+                draw_line(
+                    x,
+                    y0,
+                    x + grid_dimensions.0 as f32 * cell_w,
+                    y0,
+                    1.0,
+                    DARKGRAY,
+                );
+            }
+        }
+
+        let text_margin = 5.0;
+        for (text, position) in &mut self.characters {
+            text.draw(
+                x + text_margin + position.0 as f32 * cell_w,
+                y + text_margin + position.1 as f32 * cell_w,
+            );
+        }
+    }
+}
+
 enum State {
     AwaitingPlayerInput(GameState),
     CatchingUp(GameState),
@@ -182,6 +233,7 @@ enum ActivityPopupState {
     CommitAttackAction(HandType),
     CommitSpellAction(Spell),
     CommitSelfEffectAction(SelfEffectAction),
+    CommitMove,
     ReactToAttack,
     ReactToHit,
     Idle,
@@ -220,6 +272,9 @@ impl ActivityPopup {
                 draw_text("Add enhancement or proceed", x0, y0, 20.0, WHITE);
             }
             ActivityPopupState::CommitSelfEffectAction(..) => {
+                draw_text("Proceed?", x0, y0, 20.0, WHITE);
+            }
+            ActivityPopupState::CommitMove => {
                 draw_text("Proceed?", x0, y0, 20.0, WHITE);
             }
             ActivityPopupState::ReactToAttack => {
@@ -307,6 +362,9 @@ impl UserInterface {
                     }
 
                     spell_buttons.push(btn)
+                }
+                BaseAction::Move { action_point_cost } => {
+                    skill_buttons.push(btn);
                 }
             }
         }
@@ -472,26 +530,15 @@ impl UserInterface {
         btn
     }
 
-    fn draw(&mut self) {
-        clear_background(BLACK);
+    fn draw(&mut self, y: f32) {
+        self.activity_popup.draw(100.0, y - 170.0);
 
-        let y0 = 640.0;
-
-        self.activity_popup.draw(100.0, y0 - 170.0);
-
-        draw_line(
-            0.0,
-            y0,
-            window_conf().window_width as f32,
-            y0,
-            2.0,
-            DARKGRAY,
-        );
-        self.action_points_label.draw(20.0, y0 + 10.0);
-        self.action_points_row.draw(20.0, y0 + 30.0);
-        self.tabs.draw(20.0, y0 + 70.0);
-        self.resource_bars.draw(500.0, y0 + 80.0);
-        self.log.draw(650.0, y0);
+        draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
+        self.action_points_label.draw(20.0, y + 10.0);
+        self.action_points_row.draw(20.0, y + 30.0);
+        self.tabs.draw(20.0, y + 70.0);
+        self.resource_bars.draw(500.0, y + 80.0);
+        self.log.draw(650.0, y);
     }
 
     fn set_state(&mut self, state: ActivityPopupState, lines: Vec<String>) {
@@ -519,6 +566,9 @@ impl UserInterface {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::CommitSelfEffectAction(..) => {
+                popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
+            }
+            ActivityPopupState::CommitMove => {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToAttack => {
@@ -605,6 +655,7 @@ impl UserInterface {
                             ActivityPopupState::CommitAttackAction(..) => true,
                             ActivityPopupState::CommitSpellAction(..) => true,
                             ActivityPopupState::CommitSelfEffectAction(..) => true,
+                            ActivityPopupState::CommitMove => true,
                             _ => false,
                         };
 
@@ -650,6 +701,15 @@ impl UserInterface {
                                     }
                                     self.set_state(
                                         ActivityPopupState::CommitSpellAction(spell),
+                                        vec![description],
+                                    );
+                                    None
+                                }
+                                BaseAction::Move { action_point_cost } => {
+                                    self.reserved_action_points = action_point_cost;
+                                    let description = format!("Move on the grid");
+                                    self.set_state(
+                                        ActivityPopupState::CommitMove,
                                         vec![description],
                                     );
                                     None
@@ -735,6 +795,7 @@ impl UserInterface {
                         ActivityPopupState::CommitSelfEffectAction(sea) => {
                             Some(Event::ChoseSelfEffectAction(sea))
                         }
+                        ActivityPopupState::CommitMove => Some(Event::ChoseMoveAction),
                         ActivityPopupState::ReactToAttack => {
                             Some(Event::ChoseAttackedReaction(None))
                         }
@@ -1138,6 +1199,10 @@ fn action_button(
                 text = spell.name;
                 action_points = spell.action_point_cost;
                 mana_points = spell.mana_cost;
+            }
+            BaseAction::Move { action_point_cost } => {
+                action_points = action_point_cost;
+                text = "Move";
             }
         },
         ButtonAction::AttackEnhancement(enhancement) => {
@@ -1702,6 +1767,7 @@ enum Event {
     ChoseAttackAction(HandType, Vec<AttackEnhancement>),
     ChoseSelfEffectAction(SelfEffectAction),
     ChoseCastSpellAction(Spell, bool),
+    ChoseMoveAction,
 }
 
 struct Circle {
