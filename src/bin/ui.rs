@@ -11,308 +11,618 @@ use macroquad::{
         draw_rectangle_lines, DrawRectangleParams,
     },
     text::{draw_text, measure_text, Font, TextDimensions},
+    time::{self, get_frame_time},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
 use rpg::core::{
-    Action, BaseAction, Character, CoreGame, Logger, OnAttackedReaction, OnHitReaction, WaitingFor,
+    Action, BaseAction, Character, CoreGame, GameState, Logger, OnAttackedReaction, OnHitReaction,
+    StateReactToAttack, StateReactToHit,
 };
 
 #[macroquad::main(window_conf)]
 async fn main() {
-    let log = Rc::new(RefCell::new(Log::new()));
-    let cloned_log = Rc::clone(&log);
-    let waiting_for = CoreGame::new(cloned_log);
+    let logbuf = Rc::new(RefCell::new(LogBuf(Default::default())));
+    let cloned_logbuf = Rc::clone(&logbuf);
 
-    let character_ref = waiting_for.game.player_character();
+    let game_state = CoreGame::new(cloned_logbuf);
 
-    let mut combat_buttons = vec![];
-    let mut skill_buttons = vec![];
-    let mut spell_buttons = vec![];
+    let game = &game_state.game;
+    let mut user_interface = UserInterface::new(&game.player_character());
 
-    let event_queue = Rc::new(RefCell::new(vec![]));
-
-    for (name, action) in character_ref.known_actions() {
-        let btn = new_action_button(name, ButtonAction::Action(action), &event_queue);
-        match action {
-            BaseAction::Attack { .. } => combat_buttons.push(btn),
-            BaseAction::SelfEffect(..) => skill_buttons.push(btn),
-            BaseAction::CastSpell(..) => spell_buttons.push(btn),
-        }
-    }
-
-    let combat_row = buttons_row(combat_buttons);
-    let skill_row = buttons_row(skill_buttons);
-    let spell_row = buttons_row(spell_buttons);
-
-    let mut reaction_buttons = vec![];
-    for (name, reaction) in character_ref.known_on_attacked_reactions() {
-        let btn = new_action_button(
-            name,
-            ButtonAction::OnAttackedReaction(reaction),
-            &event_queue,
-        );
-        reaction_buttons.push(btn);
-    }
-    for (name, reaction) in character_ref.known_on_hit_reactions() {
-        let btn = new_action_button(name, ButtonAction::OnHitReaction(reaction), &event_queue);
-        reaction_buttons.push(btn);
-    }
-
-    let reactions_row = buttons_row(reaction_buttons);
-
-    let stats_section = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        elements: vec![
-            Element::Container(attribute_row(
-                ("STR", character_ref.base_strength),
-                vec![
-                    ("Health", character_ref.health.max as f32),
-                    (
-                        "Physical resist",
-                        character_ref.physical_resistence() as f32,
-                    ),
-                ],
-            )),
-            Element::Container(attribute_row(
-                ("DEX", character_ref.base_dexterity),
-                vec![
-                    ("Defense", character_ref.defense() as f32),
-                    ("Movement", 99.9),
-                ],
-            )),
-            Element::Container(attribute_row(
-                ("INT", character_ref.base_intellect),
-                vec![
-                    ("Mana", character_ref.mana.max as f32),
-                    ("Mental resist", character_ref.mental_resistence() as f32),
-                ],
-            )),
-        ],
-        ..Default::default()
-    });
-
-    let actions_section = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        margin: 10.0,
-        elements: vec![combat_row, skill_row, spell_row],
-        ..Default::default()
-    });
-
-    let reactions_section = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        margin: 10.0,
-        elements: vec![reactions_row],
-        ..Default::default()
-    });
-
-    let mut tabs = Tabs::new(
-        0,
-        vec![
-            ("Actions", actions_section),
-            ("Reactions", reactions_section),
-            ("Stats", stats_section),
-        ],
+    let mut character_names = CharacterNames::new(
+        &[&game.player_character(), &game.non_player_character()],
+        game.active_character_i,
     );
 
-    let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character_ref.health.current,
-        character_ref.health.max,
-        "HP",
-        RED,
-    )));
-    let cloned_health_bar = Rc::clone(&health_bar);
+    let game_state = GameState::ChooseAction(game_state);
 
-    let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character_ref.mana.current,
-        character_ref.mana.max,
-        "MANA",
-        BLUE,
-    )));
-    let cloned_mana_bar = Rc::clone(&mana_bar);
+    let mut state = State::AwaitingPlayerInput(game_state);
 
-    let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character_ref.stamina.current,
-        character_ref.stamina.max,
-        "STA",
-        GREEN,
-    )));
-    let cloned_stamina_bar = Rc::clone(&stamina_bar);
+    change_state(&state, &mut user_interface);
 
-    let mut resource_bars = Container {
-        layout_dir: LayoutDirection::Horizontal,
-        margin: 15.0,
-        align: Align::End,
-        elements: vec![
-            Element::Rc(cloned_health_bar),
-            Element::Rc(cloned_mana_bar),
-            Element::Rc(cloned_stamina_bar),
-        ],
-        ..Default::default()
-    };
-
-    let mut action_points_label = TextLine::new("Action points", 18);
-    let mut action_points_row = ActionPointsRow::new();
-
-    drop(character_ref);
-    let mut waiting_for = WaitingFor::Action(waiting_for);
-
-    print_instruction(&waiting_for, &mut log.borrow_mut());
+    let mut timer = 0.0;
 
     loop {
-        clear_background(BLACK);
+        user_interface.draw();
+        character_names.draw(50.0, 20.0);
 
-        tabs.draw(20.0, 100.0);
-
-        resource_bars.draw(500.0, 150.0);
-
-        action_points_label.draw(20.0, 10.0);
-        action_points_row.draw(20.0, 30.0);
-
-        log.borrow_mut().draw(20.0, 400.0);
-
-        for event in event_queue.borrow_mut().drain(..) {
+        for event in user_interface.events() {
             match event {
                 Event::Hover(hovered, button_action) => {
-                    if hovered {
-                        let ap = match button_action {
-                            ButtonAction::Action(base_action) => match base_action {
-                                BaseAction::Attack {
-                                    action_point_cost, ..
-                                } => action_point_cost,
-                                BaseAction::SelfEffect(sea) => sea.action_point_cost,
-                                BaseAction::CastSpell(spell) => spell.action_point_cost,
-                            },
-                            ButtonAction::OnAttackedReaction(reaction) => {
-                                reaction.action_point_cost
-                            }
-                            ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
-                        };
-                        action_points_row.reserved = ap;
+                    let reserved_ap = if hovered {
+                        button_action.action_point_cost()
                     } else {
-                        action_points_row.reserved = 0;
-                    }
+                        0
+                    };
+                    user_interface.set_reserved_action_points(reserved_ap);
                 }
                 Event::Click(button_action) => {
-                    match waiting_for {
-                        WaitingFor::Action(chooser) => {
-                            let character_ref = chooser.game.player_character();
+                    match state {
+                        State::AwaitingPlayerInput(game_state) => {
+                            match game_state {
+                                GameState::ChooseAction(choose_action) => {
+                                    let character = choose_action.game.player_character();
 
-                            match button_action {
-                                ButtonAction::Action(base_action)
-                                    if character_ref.can_use_action(base_action) =>
-                                {
-                                    let action = match base_action {
-                                        BaseAction::Attack {
-                                            hand,
-                                            action_point_cost: _,
-                                        } => Action::Attack {
-                                            hand,
-                                            // TODO allow player to choose enhancements
-                                            enhancements: Default::default(),
-                                        },
-                                        BaseAction::SelfEffect(self_effect_action) => {
-                                            Action::SelfEffect(self_effect_action)
+                                    let game_state = match button_action {
+                                        ButtonAction::Action(base_action)
+                                            if character.can_use_action(base_action) =>
+                                        {
+                                            let action = match base_action {
+                                                BaseAction::Attack {
+                                                    hand,
+                                                    action_point_cost: _,
+                                                } => Action::Attack {
+                                                    hand,
+                                                    // TODO allow player to choose enhancements
+                                                    enhancements: Default::default(),
+                                                },
+                                                BaseAction::SelfEffect(self_effect_action) => {
+                                                    Action::SelfEffect(self_effect_action)
+                                                }
+                                                // TODO allow player to choose spell enhancement
+                                                BaseAction::CastSpell(spell) => Action::CastSpell {
+                                                    spell,
+                                                    enhanced: false,
+                                                },
+                                            };
+
+                                            drop(character);
+                                            let game_state = choose_action.proceed(action);
+                                            user_interface.update_character_resources(
+                                                &game_state.game().player_character(),
+                                            );
+                                            game_state
                                         }
-                                        // TODO allow player to choose spell enhancement
-                                        BaseAction::CastSpell(spell) => Action::CastSpell {
-                                            spell,
-                                            enhanced: false,
-                                        },
+                                        _ => {
+                                            println!("Invalid action!");
+                                            drop(character);
+                                            GameState::ChooseAction(choose_action)
+                                        }
                                     };
-
-                                    drop(character_ref);
-                                    waiting_for = chooser.commit(action);
-                                    let character = waiting_for.game().player_character();
-                                    health_bar
-                                        .borrow_mut()
-                                        .set_current(character.health.current);
-                                    mana_bar.borrow_mut().set_current(character.mana.current);
-                                    stamina_bar
-                                        .borrow_mut()
-                                        .set_current(character.stamina.current);
-                                    action_points_row.current = character.action_points;
+                                    state = State::CatchingUp(game_state);
                                 }
-                                _ => {
-                                    log.borrow_mut().add(format!("NOT A VALID ACTION"));
-                                    drop(character_ref);
-                                    waiting_for = WaitingFor::Action(chooser)
+                                GameState::ReactToAttack(react_to_attack) => {
+                                    let game_state = match button_action {
+                                        ButtonAction::OnAttackedReaction(maybe_reaction) => {
+                                            let is_valid_choice = maybe_reaction
+                                                .map(|reaction| {
+                                                    react_to_attack
+                                                        .game
+                                                        .player_character()
+                                                        .can_use_on_attacked_reaction(reaction)
+                                                })
+                                                .unwrap_or(true);
+                                            if is_valid_choice {
+                                                let game_state =
+                                                    react_to_attack.proceed(maybe_reaction);
+                                                user_interface.update_character_resources(
+                                                    &game_state.game().player_character(),
+                                                );
+                                                game_state
+                                            } else {
+                                                println!("Invalid reaction choice");
+                                                GameState::ReactToAttack(react_to_attack)
+                                            }
+                                        }
+                                        _ => {
+                                            println!("Invalid reaction choice");
+                                            GameState::ReactToAttack(react_to_attack)
+                                        }
+                                    };
+                                    state = State::CatchingUp(game_state);
                                 }
-                            }
-                        }
-                        WaitingFor::OnAttackedReaction(chooser) => {
-                            let character_ref = chooser.game.player_character();
-                            match button_action {
-                                ButtonAction::OnAttackedReaction(reaction) => {
-                                    let can_use =
-                                        character_ref.can_use_on_attacked_reaction(reaction);
-                                    drop(character_ref);
-                                    if can_use {
-                                        waiting_for = chooser.commit(Some(reaction));
-                                        let character = waiting_for.game().player_character();
-                                        health_bar
-                                            .borrow_mut()
-                                            .set_current(character.health.current);
-                                        mana_bar.borrow_mut().set_current(character.mana.current);
-                                        stamina_bar
-                                            .borrow_mut()
-                                            .set_current(character.stamina.current);
-                                        action_points_row.current = character.action_points;
-                                    } else {
-                                        waiting_for = WaitingFor::OnAttackedReaction(chooser);
-                                    }
-                                }
-                                _ => {
-                                    log.borrow_mut()
-                                        .add(format!("NOT A VALID ON ATTACKED REACTION"));
-                                    drop(character_ref);
-                                    waiting_for = WaitingFor::OnAttackedReaction(chooser)
-                                }
-                            }
-                        }
-                        WaitingFor::OnHitReaction(chooser) => {
-                            let character_ref = chooser.game.player_character();
-                            match button_action {
-                                ButtonAction::OnHitReaction(reaction) => {
-                                    let can_use = character_ref.can_use_on_hit_reaction(reaction);
-                                    drop(character_ref);
-                                    if can_use {
-                                        waiting_for = chooser.commit(Some(reaction));
-                                        let character = waiting_for.game().player_character();
-                                        health_bar
-                                            .borrow_mut()
-                                            .set_current(character.health.current);
-                                        mana_bar.borrow_mut().set_current(character.mana.current);
-                                        stamina_bar
-                                            .borrow_mut()
-                                            .set_current(character.stamina.current);
-                                        action_points_row.current = character.action_points;
-                                    } else {
-                                        waiting_for = WaitingFor::OnHitReaction(chooser);
-                                    }
-                                }
-                                _ => {
-                                    log.borrow_mut().add(format!("NOT A VALID ON HIT REACTION"));
-                                    drop(character_ref);
-                                    waiting_for = WaitingFor::OnHitReaction(chooser)
+                                GameState::ReactToHit(react_to_hit) => {
+                                    let game_state = match button_action {
+                                        ButtonAction::OnHitReaction(maybe_reaction) => {
+                                            let is_valid_choice = maybe_reaction
+                                                .map(|reaction| {
+                                                    react_to_hit
+                                                        .game
+                                                        .player_character()
+                                                        .can_use_on_hit_reaction(reaction)
+                                                })
+                                                .unwrap_or(true);
+                                            if is_valid_choice {
+                                                let game_state =
+                                                    react_to_hit.proceed(maybe_reaction);
+                                                user_interface.update_character_resources(
+                                                    &game_state.game().player_character(),
+                                                );
+                                                game_state
+                                            } else {
+                                                GameState::ReactToHit(react_to_hit)
+                                            }
+                                        }
+                                        _ => {
+                                            println!("Invalid on hit reaction!");
+                                            GameState::ReactToHit(react_to_hit)
+                                        }
+                                    };
+                                    state = State::CatchingUp(game_state);
                                 }
                             }
                         }
+                        State::CatchingUp(..) => {}
                     }
 
-                    print_instruction(&waiting_for, &mut log.borrow_mut());
+                    change_state(&state, &mut user_interface);
+
+                    character_names
+                        .set_active_character(state.game_state().game().active_character_i);
+                    for (i, character) in state.game_state().game().characters().iter().enumerate()
+                    {
+                        character_names.set_action_points(i, character.borrow().action_points);
+                    }
                 }
             }
         }
+
+        state = match state {
+            State::AwaitingPlayerInput(..) => state,
+            State::CatchingUp(game_state) => {
+                timer += get_frame_time();
+
+                if logbuf.borrow_mut().0.is_empty() {
+                    let new_state = State::AwaitingPlayerInput(game_state);
+                    change_state(&new_state, &mut user_interface);
+                    new_state
+                } else {
+                    let tick = 0.1;
+                    while timer > tick {
+                        timer -= tick;
+                        let line = logbuf.borrow_mut().0.remove(0);
+                        user_interface.log.add(line);
+                    }
+
+                    State::CatchingUp(game_state)
+                }
+            }
+        };
 
         next_frame().await
     }
 }
 
-fn print_instruction(waiting_for: &WaitingFor, log: &mut Log) {
-    match &waiting_for {
-        WaitingFor::Action(action_chooser) => log.add("CHOOSE ACTION"),
-        WaitingFor::OnAttackedReaction(reaction_chooser) => log.add("REACT TO ATTACK"),
-        WaitingFor::OnHitReaction(reaction_chooser) => log.add("REACT TO BEING HIT"),
+enum State {
+    AwaitingPlayerInput(GameState),
+    CatchingUp(GameState),
+}
+
+impl State {
+    fn game_state(&self) -> &GameState {
+        match self {
+            State::AwaitingPlayerInput(game_state) => game_state,
+            State::CatchingUp(game_state) => game_state,
+        }
+    }
+}
+
+fn change_state(state: &State, user_interface: &mut UserInterface) {
+    match state {
+        State::AwaitingPlayerInput(game_state) => match game_state {
+            GameState::ChooseAction(..) => {
+                user_interface
+                    .activity_popup
+                    .set_state(ActivityPopupState::ChooseAction, vec![]);
+            }
+            GameState::ReactToAttack(StateReactToAttack { lines, .. }) => {
+                user_interface
+                    .activity_popup
+                    .set_state(ActivityPopupState::ReactToAttack, lines.clone());
+            }
+            GameState::ReactToHit(StateReactToHit { lines, .. }) => {
+                user_interface
+                    .activity_popup
+                    .set_state(ActivityPopupState::ReactToHit, lines.clone());
+            }
+        },
+        State::CatchingUp(..) => {
+            user_interface
+                .activity_popup
+                .set_state(ActivityPopupState::Idle, vec![]);
+        }
+    }
+}
+
+enum ActivityPopupState {
+    ChooseAction,
+    ReactToAttack,
+    ReactToHit,
+    Idle,
+}
+
+struct ActivityPopup {
+    state: ActivityPopupState,
+    lines: Vec<String>,
+    attacked_reaction_popup_buttons: Vec<ActionButton>,
+    hit_reaction_popup_buttons: Vec<ActionButton>,
+}
+
+impl ActivityPopup {
+    fn draw(&mut self, x: f32, y: f32) {
+        match &self.state {
+            ActivityPopupState::ChooseAction => {
+                draw_text("Choosen an action!", x, y, 20.0, WHITE);
+            }
+            ActivityPopupState::ReactToAttack => {
+                draw_text("react to attack!", x, y, 20.0, WHITE);
+                let mut y0 = y;
+                for line in &self.lines {
+                    y0 += 20.0;
+                    draw_text(line, x, y0, 20.0, WHITE);
+                }
+
+                let mut x0 = x;
+                y0 += 20.0;
+                for btn in &mut self.attacked_reaction_popup_buttons {
+                    btn.draw(x0, y0);
+                    x0 += btn.size.0 + 10.0;
+                }
+            }
+            ActivityPopupState::ReactToHit => {
+                draw_text("react to hit!", x, y, 20.0, WHITE);
+
+                let mut y0 = y;
+                for line in &self.lines {
+                    y0 += 20.0;
+                    draw_text(line, x, y0, 20.0, WHITE);
+                }
+
+                let mut x0 = x;
+                y0 += 20.0;
+                for btn in &mut self.hit_reaction_popup_buttons {
+                    btn.draw(x0, y0);
+                    x0 += btn.size.0 + 10.0;
+                }
+            }
+            ActivityPopupState::Idle => {
+                draw_text(".....", x, y, 20.0, WHITE);
+            }
+        }
+    }
+
+    fn set_state(&mut self, state: ActivityPopupState, lines: Vec<String>) {
+        self.state = state;
+        self.lines = lines;
+    }
+}
+
+struct UserInterface {
+    log: Log,
+    tabs: Tabs,
+    resource_bars: Container,
+    action_points_label: TextLine,
+    action_points_row: ActionPointsRow,
+    event_queue: Rc<RefCell<Vec<Event>>>,
+    health_bar: Rc<RefCell<LabelledResourceBar>>,
+    mana_bar: Rc<RefCell<LabelledResourceBar>>,
+    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
+    activity_popup: ActivityPopup,
+}
+
+impl UserInterface {
+    fn new(character_ref: &Character) -> Self {
+        let mut combat_buttons = vec![];
+        let mut skill_buttons = vec![];
+        let mut spell_buttons = vec![];
+
+        let event_queue = Rc::new(RefCell::new(vec![]));
+
+        for (name, action) in character_ref.known_actions() {
+            let btn = action_button(name, ButtonAction::Action(action), &event_queue);
+            match action {
+                BaseAction::Attack { .. } => combat_buttons.push(btn),
+                BaseAction::SelfEffect(..) => skill_buttons.push(btn),
+                BaseAction::CastSpell(..) => spell_buttons.push(btn),
+            }
+        }
+
+        let combat_row = buttons_row(combat_buttons);
+        let skill_row = buttons_row(skill_buttons);
+        let spell_row = buttons_row(spell_buttons);
+
+        let mut reaction_buttons = vec![];
+
+        let mut attacked_reaction_popup_buttons = vec![];
+        for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
+            let btn_action = ButtonAction::OnAttackedReaction(Some(reaction));
+            reaction_buttons.push(action_button(subtext.clone(), btn_action, &event_queue));
+            attacked_reaction_popup_buttons.push(action_button(subtext, btn_action, &event_queue))
+        }
+        if !attacked_reaction_popup_buttons.is_empty() {
+            attacked_reaction_popup_buttons.push(action_button(
+                "".to_string(),
+                ButtonAction::OnAttackedReaction(None),
+                &event_queue,
+            ))
+        }
+
+        let mut hit_reaction_popup_buttons = vec![];
+        for (subtext, reaction) in character_ref.known_on_hit_reactions() {
+            let btn_action = ButtonAction::OnHitReaction(Some(reaction));
+            let btn = action_button(subtext.clone(), btn_action, &event_queue);
+            reaction_buttons.push(btn);
+            hit_reaction_popup_buttons.push(action_button(subtext, btn_action, &event_queue));
+        }
+        if !hit_reaction_popup_buttons.is_empty() {
+            hit_reaction_popup_buttons.push(action_button(
+                "".to_string(),
+                ButtonAction::OnHitReaction(None),
+                &event_queue,
+            ))
+        }
+
+        let reactions_row = buttons_row(reaction_buttons);
+
+        let stats_section = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            elements: vec![
+                Element::Container(attribute_row(
+                    ("STR", character_ref.base_strength),
+                    vec![
+                        ("Health", character_ref.health.max as f32),
+                        (
+                            "Physical resist",
+                            character_ref.physical_resistence() as f32,
+                        ),
+                    ],
+                )),
+                Element::Container(attribute_row(
+                    ("DEX", character_ref.base_dexterity),
+                    vec![
+                        ("Defense", character_ref.defense() as f32),
+                        ("Movement", 99.9),
+                    ],
+                )),
+                Element::Container(attribute_row(
+                    ("INT", character_ref.base_intellect),
+                    vec![
+                        ("Mana", character_ref.mana.max as f32),
+                        ("Mental resist", character_ref.mental_resistence() as f32),
+                    ],
+                )),
+            ],
+            ..Default::default()
+        });
+
+        let actions_section = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 10.0,
+            elements: vec![combat_row, skill_row, spell_row],
+            ..Default::default()
+        });
+
+        let reactions_section = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 10.0,
+            elements: vec![reactions_row],
+            ..Default::default()
+        });
+
+        let tabs = Tabs::new(
+            0,
+            vec![
+                ("Actions", actions_section),
+                ("Reactions", reactions_section),
+                ("Stats", stats_section),
+            ],
+        );
+
+        let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character_ref.health.current,
+            character_ref.health.max,
+            "HP",
+            RED,
+        )));
+        let cloned_health_bar = Rc::clone(&health_bar);
+
+        let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character_ref.mana.current,
+            character_ref.mana.max,
+            "MANA",
+            BLUE,
+        )));
+        let cloned_mana_bar = Rc::clone(&mana_bar);
+
+        let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character_ref.stamina.current,
+            character_ref.stamina.max,
+            "STA",
+            GREEN,
+        )));
+        let cloned_stamina_bar = Rc::clone(&stamina_bar);
+
+        let resource_bars = Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 15.0,
+            align: Align::End,
+            elements: vec![
+                Element::Rc(cloned_health_bar),
+                Element::Rc(cloned_mana_bar),
+                Element::Rc(cloned_stamina_bar),
+            ],
+            ..Default::default()
+        };
+
+        let action_points_label = TextLine::new("Action points", 18);
+        let action_points_row = ActionPointsRow::new();
+
+        Self {
+            log: Log::new(),
+            tabs,
+            resource_bars,
+            action_points_label,
+            action_points_row,
+            event_queue,
+            health_bar,
+            mana_bar,
+            stamina_bar,
+            activity_popup: ActivityPopup {
+                state: ActivityPopupState::ChooseAction,
+                lines: Default::default(),
+                attacked_reaction_popup_buttons,
+                hit_reaction_popup_buttons,
+            },
+        }
+    }
+
+    fn draw(&mut self) {
+        clear_background(BLACK);
+
+        let y0 = 600.0;
+
+        self.activity_popup.draw(100.0, y0 - 140.0);
+
+        draw_line(0.0, y0, window_conf().window_width as f32, y0, 1.0, WHITE);
+        self.tabs.draw(20.0, y0 + 100.0);
+        self.resource_bars.draw(500.0, y0 + 150.0);
+        self.action_points_label.draw(20.0, y0 + 10.0);
+        self.action_points_row.draw(20.0, y0 + 30.0);
+        self.log.draw(800.0, y0);
+    }
+
+    fn events(&mut self) -> Vec<Event> {
+        self.event_queue.take()
+    }
+
+    fn set_reserved_action_points(&mut self, reserved: u32) {
+        self.action_points_row.reserved = reserved;
+    }
+
+    fn update_character_resources(&mut self, character: &Character) {
+        self.health_bar
+            .borrow_mut()
+            .set_current(character.health.current);
+        self.mana_bar
+            .borrow_mut()
+            .set_current(character.mana.current);
+        self.stamina_bar
+            .borrow_mut()
+            .set_current(character.stamina.current);
+        self.action_points_row.current = character.action_points;
+    }
+
+    fn log(&mut self, message: impl Into<String>) {
+        self.log.add(message.into());
+    }
+}
+
+struct CharacterNames {
+    row: Container,
+    active_i: usize,
+    character_names: Vec<Rc<RefCell<CharacterName>>>,
+}
+
+impl CharacterNames {
+    fn new(characters: &[&Character], active_i: usize) -> Self {
+        let character_names: Vec<Rc<RefCell<CharacterName>>> = characters
+            .iter()
+            .map(|character| {
+                Rc::new(RefCell::new(CharacterName::new(
+                    character.name,
+                    character.action_points,
+                )))
+            })
+            .collect();
+
+        let mut elements = vec![];
+        for char_name in &character_names {
+            let cloned = Rc::clone(char_name);
+            elements.push(Element::Rc(cloned));
+        }
+
+        let row = Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 10.0,
+            elements,
+            ..Default::default()
+        };
+
+        let mut this = Self {
+            row,
+            active_i,
+            character_names,
+        };
+
+        this.set_active_character(active_i);
+        this
+    }
+
+    fn set_active_character(&mut self, character_i: usize) {
+        self.character_names[self.active_i].borrow_mut().active = false;
+        self.active_i = character_i;
+        self.character_names[self.active_i].borrow_mut().active = true;
+    }
+
+    fn set_action_points(&mut self, character_i: usize, action_points: u32) {
+        self.character_names[character_i].borrow_mut().action_points = action_points;
+    }
+
+    fn draw(&mut self, x: f32, y: f32) {
+        self.row.draw(x, y)
+    }
+}
+
+struct CharacterName {
+    text: TextLine,
+    active: bool,
+    padding: f32,
+    action_points: u32,
+}
+
+impl CharacterName {
+    fn new(name: impl Into<String>, action_points: u32) -> Self {
+        Self {
+            text: TextLine::new(name, 20),
+            active: false,
+            padding: 15.0,
+            action_points,
+        }
+    }
+}
+
+impl Drawable for CharacterName {
+    fn draw(&mut self, x: f32, y: f32) {
+        if self.active {
+            let (w, h) = self.size();
+            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
+        }
+        self.text.draw(self.padding + x, self.padding + y);
+        draw_text(
+            &format!("{} AP", self.action_points),
+            self.padding + x,
+            y + 60.0,
+            20.0,
+            WHITE,
+        );
+    }
+
+    fn size(&self) -> (f32, f32) {
+        let text_size = self.text.size();
+        (
+            text_size.0 + self.padding * 2.0,
+            text_size.1 + self.padding * 2.0,
+        )
     }
 }
 
@@ -326,14 +636,16 @@ impl EventSender {
     }
 }
 
-struct Log {
-    lines: Container,
+struct LogBuf(Vec<String>);
+
+impl Logger for LogBuf {
+    fn log(&mut self, line: String) {
+        self.0.push(line);
+    }
 }
 
-impl Logger for Log {
-    fn log(&mut self, line: String) {
-        self.add(line);
-    }
+struct Log {
+    lines: Container,
 }
 
 impl Log {
@@ -342,20 +654,25 @@ impl Log {
         Self {
             lines: Container {
                 layout_dir: LayoutDirection::Vertical,
+                style: Style {
+                    border_color: Some(WHITE),
+                    ..Default::default()
+                },
                 elements,
-                margin: 10.0,
+                padding: 10.0,
+                margin: 5.0,
                 ..Default::default()
             },
         }
     }
 
     fn add(&mut self, text: impl Into<String>) {
-        if self.lines.elements.len() == 10 {
+        if self.lines.elements.len() == 15 {
             self.lines.elements.remove(0);
         }
         self.lines
             .elements
-            .push(Element::Text(TextLine::new(text, 20)));
+            .push(Element::Text(TextLine::new(text, 18)));
     }
 
     fn draw(&mut self, x: f32, y: f32) {
@@ -539,7 +856,7 @@ impl Drawable for LabelledResourceBar {
 }
 
 fn buttons_row(buttons: Vec<ActionButton>) -> Element {
-    let elements = buttons.into_iter().map(|btn| Element::Btn(btn)).collect();
+    let elements = buttons.into_iter().map(Element::Btn).collect();
     Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
         margin: 10.0,
@@ -549,35 +866,6 @@ fn buttons_row(buttons: Vec<ActionButton>) -> Element {
 }
 
 fn action_button(
-    text: impl Into<String>,
-    subtext: impl Into<String>,
-    action_points: u32,
-    mana_points: u32,
-    stamina_points: u32,
-) -> ActionButton {
-    let button_size = (100.0, 50.0);
-    let highlight_color = YELLOW;
-    let btn_style = Style {
-        background_color: Some(DARKGRAY),
-        border_color: Some(LIGHTGRAY),
-    };
-    ActionButton::new(
-        ButtonAction::Action(BaseAction::Attack {
-            hand: rpg::core::HandType::MainHand,
-            action_point_cost: 0,
-        }),
-        button_size,
-        btn_style,
-        text,
-        subtext,
-        highlight_color,
-        action_points,
-        mana_points,
-        stamina_points,
-    )
-}
-
-fn new_action_button(
     mut subtext: String,
     action: ButtonAction,
     event_queue: &Rc<RefCell<Vec<Event>>>,
@@ -592,7 +880,7 @@ fn new_action_button(
     let text;
     let mut mana_points = 0;
     let mut stamina_points = 0;
-    let action_points;
+    let mut action_points = 0;
 
     match action {
         ButtonAction::Action(base_action) => match base_action {
@@ -613,14 +901,20 @@ fn new_action_button(
                 mana_points = spell.mana_cost;
             }
         },
-        ButtonAction::OnAttackedReaction(reaction) => {
+        ButtonAction::OnAttackedReaction(Some(reaction)) => {
             text = reaction.name;
             action_points = reaction.action_point_cost;
             stamina_points = reaction.stamina_cost;
         }
-        ButtonAction::OnHitReaction(reaction) => {
+        ButtonAction::OnAttackedReaction(None) => {
+            text = "Skip";
+        }
+        ButtonAction::OnHitReaction(Some(reaction)) => {
             text = reaction.name;
             action_points = reaction.action_point_cost;
+        }
+        ButtonAction::OnHitReaction(None) => {
+            text = "Skip";
         }
     }
 
@@ -669,7 +963,6 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
             ..Default::default()
         },
         elements: vec![attribute_element, stats_list],
-        ..Default::default()
     }
 }
 
@@ -946,9 +1239,7 @@ struct TextLine {
 }
 
 impl TextLine {
-    fn new(text: impl Into<String>, font_size: u16) -> Self {
-        let string = text.into();
-
+    fn new(string: impl Into<String>, font_size: u16) -> Self {
         let mut this = Self {
             size: (0.0, 0.0),
             string: "".to_string(),
@@ -960,7 +1251,10 @@ impl TextLine {
     }
 
     fn set_string(&mut self, string: impl Into<String>) {
-        let string = string.into();
+        let mut string = string.into();
+        if string.is_empty() {
+            string.push_str("~~~");
+        }
         let text_dimensions = measure_text(&string, None, self.font_size, 1.0);
         self.string = string;
         self.size = (
@@ -992,8 +1286,22 @@ impl Drawable for TextLine {
 #[derive(Debug, Copy, Clone)]
 enum ButtonAction {
     Action(BaseAction),
-    OnAttackedReaction(OnAttackedReaction),
-    OnHitReaction(OnHitReaction),
+    OnAttackedReaction(Option<OnAttackedReaction>),
+    OnHitReaction(Option<OnHitReaction>),
+}
+
+impl ButtonAction {
+    fn action_point_cost(&self) -> u32 {
+        match self {
+            ButtonAction::Action(base_action) => base_action.action_point_cost(),
+            ButtonAction::OnAttackedReaction(reaction) => reaction
+                .map(|reaction| reaction.action_point_cost)
+                .unwrap_or(0),
+            ButtonAction::OnHitReaction(reaction) => reaction
+                .map(|reaction| reaction.action_point_cost)
+                .unwrap_or(0),
+        }
+    }
 }
 
 struct ActionButton {
@@ -1058,7 +1366,7 @@ impl ActionButton {
 
         let text = Element::Text(TextLine::new(text, 20));
         let subtext = subtext.into();
-        let content = if subtext.len() > 0 {
+        let content = if !subtext.is_empty() {
             Box::new(Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 8.0,

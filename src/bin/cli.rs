@@ -2,34 +2,34 @@ use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
 
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, BaseAction, Character, CoreGame,
-    HandType, Logger, OnAttackedReaction, OnHitReaction, SelfEffectAction, WaitingFor,
+    GameState, HandType, Logger, OnAttackedReaction, OnHitReaction, SelfEffectAction,
 };
 
 fn main() {
     let waiting_for = CoreGame::new(Rc::new(RefCell::new(StdoutLogger)));
-    let mut waiting_for = WaitingFor::Action(waiting_for);
+    let mut waiting_for = GameState::ChooseAction(waiting_for);
 
     loop {
         match waiting_for {
-            WaitingFor::Action(state) => {
+            GameState::ChooseAction(state) => {
                 let active_character = state.game.active_character();
-                let other_character = state.game.other_character();
+                let other_character = state.game.inactive_character();
                 let action = player_choose_action(&active_character, &other_character);
                 drop(active_character);
                 drop(other_character);
-                waiting_for = state.commit(action);
+                waiting_for = state.proceed(action);
             }
-            WaitingFor::OnAttackedReaction(state) => {
-                let defender = state.game.other_character();
+            GameState::ReactToAttack(state) => {
+                let defender = state.game.inactive_character();
                 let reaction = player_choose_on_attacked_reaction(&defender);
                 drop(defender);
-                waiting_for = state.commit(reaction);
+                waiting_for = state.proceed(reaction);
             }
-            WaitingFor::OnHitReaction(state) => {
-                let defender = state.game.other_character();
+            GameState::ReactToHit(state) => {
+                let defender = state.game.inactive_character();
                 let reaction = player_choose_on_hit_reaction(&defender);
                 drop(defender);
-                waiting_for = state.commit(reaction);
+                waiting_for = state.proceed(reaction);
             }
         }
     }

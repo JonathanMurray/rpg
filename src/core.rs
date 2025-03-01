@@ -17,14 +17,14 @@ const REACTION_AP_THRESHOLD: u32 = 3;
 
 pub struct CoreGame {
     characters: Characters,
-    active_character_i: usize,
+    pub active_character_i: usize,
     player_character_i: usize,
     logger: Rc<RefCell<dyn Logger>>,
 }
 
 impl CoreGame {
-    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> ActionChooser {
-        let mut bob = Character::new("Bob", 5, 5, 4);
+    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> StateChooseAction {
+        let mut bob = Character::new("Bob", 5, 1, 4);
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -34,7 +34,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
-        let mut alice = Character::new("Alice", 2, 7, 3);
+        let mut alice = Character::new("Alice", 2, 10, 3);
         alice.main_hand.weapon = Some(SWORD);
         alice.armor = Some(LEATHER_ARMOR);
 
@@ -49,63 +49,98 @@ impl CoreGame {
             logger,
         };
 
-        {
-            let character = game.active_character();
-            game.log("");
-            game.log(format!(
-                "({} AP, {}/{} stamina, {}/{} mana)",
-                character.action_points,
-                character.stamina.current,
-                character.stamina.max,
-                character.mana.current,
-                character.mana.max
-            ));
-        }
-
-        ActionChooser { game }
+        StateChooseAction { game }
     }
 
     pub fn player_character(&self) -> RefMut<Character> {
         self.characters.get(self.player_character_i).borrow_mut()
     }
 
+    pub fn non_player_character(&self) -> RefMut<Character> {
+        let i = (self.player_character_i + 1) % self.characters.0.len();
+        self.characters.get(i).borrow_mut()
+    }
+
     pub fn active_character(&self) -> RefMut<Character> {
         self.characters.get(self.active_character_i).borrow_mut()
     }
 
-    pub fn other_character(&self) -> RefMut<Character> {
+    pub fn characters(&self) -> &[RefCell<Character>] {
+        &self.characters.0
+    }
+
+    pub fn inactive_character(&self) -> RefMut<Character> {
         let i = (self.active_character_i + 1) % self.characters.0.len();
         self.characters.get(i).borrow_mut()
     }
 
-    fn enter_state_action(mut self, action: Action) -> WaitingFor {
+    fn enter_state_action(self, action: Action) -> GameState {
         let players_turn = self.player_character_i == self.active_character_i;
         let mut character = self.active_character();
-        let mut other_character = self.other_character();
+        let mut other_character = self.inactive_character();
         let action_points_before_action = character.action_points;
 
         match action {
             Action::Attack { hand, enhancements } => {
-                self.perform_pre_attack(&mut character, hand, &enhancements[..], &other_character);
-                drop(character);
-                drop(other_character);
+                let mut attacker = character;
+                let defender = other_character;
+
+                attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
+                for enhancement in &enhancements {
+                    attacker.action_points -= enhancement.action_point_cost;
+                    attacker.stamina.lose(enhancement.stamina_cost);
+                    if let Some(condition) = enhancement.apply_on_self_before {
+                        attacker.receive_condition(condition);
+                    }
+                }
+
+                let attacks_str = format!(
+                    "{} attacks {} (d20+{} vs {})",
+                    attacker.name,
+                    defender.name,
+                    attacker.attack_modifier(hand),
+                    defender.defense()
+                );
+
+                self.log(attacks_str.clone());
+
+                let mut lines = vec![];
+                lines.push(attacks_str);
+                let explanation = format!(
+                    "{}{}",
+                    attacker.explain_attack_circumstances(hand),
+                    defender.explain_incoming_attack_circumstances()
+                );
+                if !explanation.is_empty() {
+                    lines.push(format!("  {explanation}"));
+                }
+                lines.push(format!(
+                    "  Chance to hit: {}",
+                    as_percentage(prob_attack_hit(&attacker, hand, &defender))
+                ));
+
+                drop(attacker);
+                drop(defender);
                 return if !players_turn {
-                    WaitingFor::OnAttackedReaction(AttackedReactionChooser {
+                    GameState::ReactToAttack(StateReactToAttack {
                         game: self,
                         action_points_before_action,
                         hand,
                         enhancements,
+                        lines,
                     })
                 } else {
                     self.enter_state_attack(action_points_before_action, hand, enhancements, None)
                 };
             }
             Action::SelfEffect(SelfEffectAction {
-                name: _,
+                name,
                 action_point_cost,
                 effect,
             }) => {
                 character.action_points -= action_point_cost;
+
+                self.log(format!("{} uses {}", character.name, name));
                 self.perform_effect_application(effect, &mut character, "");
             }
             Action::CastSpell { spell, enhanced } => {
@@ -115,7 +150,7 @@ impl CoreGame {
 
         drop(character);
         drop(other_character);
-        return self.enter_state_right_after_action(action_points_before_action, false);
+        return self.enter_state_right_after_action(action_points_before_action, None);
     }
 
     fn perform_effect_application(
@@ -225,43 +260,6 @@ impl CoreGame {
         }
     }
 
-    fn perform_pre_attack(
-        &self,
-        attacker: &mut Character,
-        hand: HandType,
-        enhancements: &[AttackEnhancement],
-        defender: &Character,
-    ) {
-        attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
-        for enhancement in enhancements {
-            attacker.action_points -= enhancement.action_point_cost;
-            attacker.stamina.lose(enhancement.stamina_cost);
-            if let Some(condition) = enhancement.apply_on_self_before {
-                attacker.receive_condition(condition);
-            }
-        }
-
-        self.log(format!(
-            "{} attacks {} (d20+{} vs {})",
-            attacker.name,
-            defender.name,
-            attacker.attack_modifier(hand),
-            defender.defense()
-        ));
-        let explanation = format!(
-            "{}{}",
-            attacker.explain_attack_circumstances(hand),
-            defender.explain_incoming_attack_circumstances()
-        );
-        if !explanation.is_empty() {
-            self.log(format!("  {explanation}"));
-        }
-        self.log(format!(
-            "  Chance to hit: {}",
-            as_percentage(prob_attack_hit(attacker, hand, defender))
-        ));
-    }
-
     fn log(&self, line: impl Into<String>) {
         self.logger.borrow_mut().log(line.into());
     }
@@ -269,38 +267,12 @@ impl CoreGame {
     fn enter_state_attack(
         self,
         action_points_before_action: u32,
-        hand: HandType,
-        attack_enhancements: Vec<AttackEnhancement>,
-        defender_reaction: Option<OnAttackedReaction>,
-    ) -> WaitingFor {
-        let mut attacker = self.active_character();
-        let mut defender = self.other_character();
-        let did_attack_and_hit = self.perform_attack(
-            &mut attacker,
-            attack_enhancements,
-            hand,
-            &mut defender,
-            defender_reaction,
-        );
-        drop(attacker);
-        drop(defender);
-
-        return self
-            .enter_state_right_after_action(action_points_before_action, did_attack_and_hit);
-    }
-
-    fn perform_attack(
-        &self,
-        attacker: &mut Character,
-        attack_enhancements: Vec<AttackEnhancement>,
         hand_type: HandType,
-        defender: &mut Character,
+        attack_enhancements: Vec<AttackEnhancement>,
         defender_reaction: Option<OnAttackedReaction>,
-    ) -> bool {
-        if let Some(reaction) = defender_reaction {
-            defender.action_points -= reaction.action_point_cost;
-            defender.stamina.lose(reaction.stamina_cost);
-        }
+    ) -> GameState {
+        let mut attacker = self.active_character();
+        let mut defender = self.inactive_character();
 
         let advantage = attacker.attack_advantage(hand_type) + defender.incoming_attack_advantage();
 
@@ -309,11 +281,17 @@ impl CoreGame {
         let mut defender_reacted_with_parry = false;
         let mut defender_reacted_with_sidestep = false;
         let mut skip_attack_exertion = false;
-        let mut did_hit = false;
+
+        let mut attack_hit_lines = None;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
 
         if let Some(reaction) = defender_reaction {
+            defender.action_points -= reaction.action_point_cost;
+            defender.stamina.lose(reaction.stamina_cost);
+
+            self.log(format!("{} reacts with {}", defender.name, reaction.name));
+
             match reaction.effect {
                 OnAttackedReactionEffect::Parry => {
                     defender_reacted_with_parry = true;
@@ -375,8 +353,6 @@ impl CoreGame {
                 self.log("  Missed!")
             }
         } else {
-            did_hit = true;
-
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
             let mut damage = weapon.damage;
@@ -425,10 +401,15 @@ impl CoreGame {
                 defender.name, damage, defender.health.current, defender.health.max
             ));
 
+            attack_hit_lines = Some(vec![format!(
+                "{} took {} damage from an attack by {}",
+                defender.name, damage, attacker.name
+            )]);
+
             if let Some(effect) = on_true_hit_effect {
                 match effect {
                     AttackHitEffect::Apply(effect) => {
-                        self.perform_effect_application(effect, defender, "true hit");
+                        self.perform_effect_application(effect, &mut defender, "true hit");
                     }
                     AttackHitEffect::SkipExertion => skip_attack_exertion = true,
                 }
@@ -436,20 +417,20 @@ impl CoreGame {
 
             for enhancement in &attack_enhancements {
                 if let Some(effect) = enhancement.on_hit_effect {
-                    self.perform_effect_application(effect, defender, enhancement.name);
+                    self.perform_effect_application(effect, &mut defender, enhancement.name);
                 }
             }
         }
 
         if skip_attack_exertion {
-            self.log("The attack did not lead to exertion (true hit)".to_string());
+            self.log("  The attack did not lead to exertion (true hit)".to_string());
         } else {
             let hand = match hand_type {
                 HandType::MainHand => &mut attacker.main_hand,
                 HandType::OffHand => &mut attacker.off_hand,
             };
             hand.exertion += 1;
-            self.log(format!("The attack led to exertion ({})", hand.exertion));
+            self.log(format!("  The attack led to exertion ({})", hand.exertion));
         }
 
         if attacker.conditions.careful_aim {
@@ -462,17 +443,20 @@ impl CoreGame {
             self.log(format!("{} lost Braced", defender.name));
         }
 
-        did_hit
+        drop(attacker);
+        drop(defender);
+
+        return self.enter_state_right_after_action(action_points_before_action, attack_hit_lines);
     }
 
     fn enter_state_right_after_action(
         self,
         action_points_before_action: u32,
-        did_attack_and_hit: bool,
-    ) -> WaitingFor {
+        attack_hit_lines: Option<Vec<String>>,
+    ) -> GameState {
         let players_turn = self.player_character_i == self.active_character_i;
         let mut character = self.active_character();
-        let mut other_character = self.other_character();
+        let mut other_character = self.inactive_character();
 
         // You recover from 1 stack of Dazed for each AP you spend
         // This must happen before "on attacked and hit" reactions because those might
@@ -480,14 +464,14 @@ impl CoreGame {
         let spent = action_points_before_action - character.action_points;
         self.perform_recover_from_dazed(&mut character, spent);
 
-        if did_attack_and_hit {
+        if let Some(lines) = attack_hit_lines {
             // You recover from 1 stack of Dazed each time you're hit by an attack
             self.perform_recover_from_dazed(&mut other_character, 1);
 
             if !players_turn {
                 drop(character);
                 drop(other_character);
-                return WaitingFor::OnHitReaction(HitReactionChooser { game: self });
+                return GameState::ReactToHit(StateReactToHit { game: self, lines });
             }
         }
 
@@ -505,10 +489,10 @@ impl CoreGame {
         }
     }
 
-    fn enter_state_react_after_being_hit(self, reaction: Option<OnHitReaction>) -> WaitingFor {
+    fn enter_state_react_after_being_hit(self, reaction: Option<OnHitReaction>) -> GameState {
         {
             let mut character = self.active_character();
-            let mut other_character = self.other_character();
+            let mut other_character = self.inactive_character();
 
             if let Some(reaction) = reaction {
                 self.perform_on_hit_reaction(&mut character, &mut other_character, reaction);
@@ -566,7 +550,7 @@ impl CoreGame {
         }
     }
 
-    fn enter_state_longer_after_action(mut self) -> WaitingFor {
+    fn enter_state_longer_after_action(mut self) -> GameState {
         let mut players_turn = self.player_character_i == self.active_character_i;
         let mut character = self.characters.get(self.active_character_i).borrow_mut();
 
@@ -577,20 +561,10 @@ impl CoreGame {
             character = self.characters.get(self.active_character_i).borrow_mut();
         }
 
-        self.logger.borrow_mut().log("".to_string());
-        self.logger.borrow_mut().log(format!(
-            "({} AP, {}/{} stamina, {}/{} mana)",
-            character.action_points,
-            character.stamina.current,
-            character.stamina.max,
-            character.mana.current,
-            character.mana.max
-        ));
-
         drop(character);
 
         if players_turn {
-            return WaitingFor::Action(ActionChooser { game: self });
+            return GameState::ChooseAction(StateChooseAction { game: self });
         } else {
             // TODO make sure to only pick an action that the character affords
             return self.enter_state_action(Action::Attack {
@@ -633,18 +607,18 @@ impl CoreGame {
     }
 }
 
-pub enum WaitingFor {
-    Action(ActionChooser),
-    OnAttackedReaction(AttackedReactionChooser),
-    OnHitReaction(HitReactionChooser),
+pub enum GameState {
+    ChooseAction(StateChooseAction),
+    ReactToAttack(StateReactToAttack),
+    ReactToHit(StateReactToHit),
 }
 
-impl WaitingFor {
+impl GameState {
     pub fn game(&self) -> &CoreGame {
         match self {
-            WaitingFor::Action(this) => &this.game,
-            WaitingFor::OnAttackedReaction(this) => &this.game,
-            WaitingFor::OnHitReaction(this) => &this.game,
+            GameState::ChooseAction(this) => &this.game,
+            GameState::ReactToAttack(this) => &this.game,
+            GameState::ReactToHit(this) => &this.game,
         }
     }
 }
@@ -653,25 +627,26 @@ pub trait Logger {
     fn log(&mut self, line: String);
 }
 
-pub struct ActionChooser {
+pub struct StateChooseAction {
     pub game: CoreGame,
 }
 
-impl ActionChooser {
-    pub fn commit(self, action: Action) -> WaitingFor {
+impl StateChooseAction {
+    pub fn proceed(self, action: Action) -> GameState {
         self.game.enter_state_action(action)
     }
 }
 
-pub struct AttackedReactionChooser {
+pub struct StateReactToAttack {
     pub game: CoreGame,
     action_points_before_action: u32,
     hand: HandType,
     enhancements: Vec<AttackEnhancement>,
+    pub lines: Vec<String>,
 }
 
-impl AttackedReactionChooser {
-    pub fn commit(self, reaction: Option<OnAttackedReaction>) -> WaitingFor {
+impl StateReactToAttack {
+    pub fn proceed(self, reaction: Option<OnAttackedReaction>) -> GameState {
         return self.game.enter_state_attack(
             self.action_points_before_action,
             self.hand,
@@ -681,12 +656,13 @@ impl AttackedReactionChooser {
     }
 }
 
-pub struct HitReactionChooser {
+pub struct StateReactToHit {
     pub game: CoreGame,
+    pub lines: Vec<String>,
 }
 
-impl HitReactionChooser {
-    pub fn commit(self, reaction: Option<OnHitReaction>) -> WaitingFor {
+impl StateReactToHit {
+    pub fn proceed(self, reaction: Option<OnHitReaction>) -> GameState {
         return self.game.enter_state_react_after_being_hit(reaction);
     }
 }
@@ -828,6 +804,19 @@ pub enum BaseAction {
     CastSpell(Spell),
 }
 
+impl BaseAction {
+    pub fn action_point_cost(&self) -> u32 {
+        match self {
+            BaseAction::Attack {
+                hand,
+                action_point_cost,
+            } => *action_point_cost,
+            BaseAction::SelfEffect(self_effect_action) => self_effect_action.action_point_cost,
+            BaseAction::CastSpell(spell) => spell.action_point_cost,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum HandType {
     MainHand,
@@ -879,7 +868,7 @@ impl Hand {
 
 #[derive(Debug)]
 pub struct Character {
-    name: &'static str,
+    pub name: &'static str,
     pub base_strength: u32,
     pub base_dexterity: u32,
     pub base_intellect: u32,
