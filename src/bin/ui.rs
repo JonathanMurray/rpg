@@ -20,7 +20,7 @@ use macroquad::{
 use rpg::core::{
     Action, AttackEnhancement, BaseAction, Character, CoreGame, GameState, Hand, HandType, Logger,
     OnAttackedReaction, OnHitReaction, SelfEffectAction, Spell, SpellEnhancement,
-    StateReactToAttack, StateReactToHit,
+    StateChooseAction, StateReactToAttack, StateReactToHit,
 };
 
 #[macroquad::main(window_conf)]
@@ -28,9 +28,7 @@ async fn main() {
     let logbuf = Rc::new(RefCell::new(LogBuf(Default::default())));
     let cloned_logbuf = Rc::clone(&logbuf);
 
-    let game_state = CoreGame::new(cloned_logbuf);
-
-    let game = &game_state.game;
+    let game = CoreGame::new(cloned_logbuf);
 
     let player_character = Rc::clone(game.player_character());
 
@@ -49,7 +47,7 @@ async fn main() {
 
     let mut game_grid = GameGrid::new(characters_on_grid);
 
-    let mut state = State::AwaitingPlayerInput(GameState::ChooseAction(game_state));
+    let mut state = State::AwaitingPlayerInput(GameState::ChooseAction(StateChooseAction { game }));
 
     change_state(&state, &mut user_interface);
 
@@ -74,21 +72,8 @@ async fn main() {
                             Event::ChoseHitReaction(reaction) => {
                                 game_state = game_state.unwrap_react_to_hit().proceed(reaction);
                             }
-                            Event::ChoseAttackAction(hand, enhancements) => {
-                                let action = Action::Attack { hand, enhancements };
+                            Event::ChoseAction(action) => {
                                 game_state = game_state.unwrap_choose_action().proceed(action);
-                            }
-                            Event::ChoseSelfEffectAction(se_action) => {
-                                let action = Action::SelfEffect(se_action);
-                                game_state = game_state.unwrap_choose_action().proceed(action);
-                            }
-                            Event::ChoseCastSpellAction(spell, enhanced) => {
-                                let action = Action::CastSpell { spell, enhanced };
-                                game_state = game_state.unwrap_choose_action().proceed(action);
-                            }
-                            Event::ChoseMoveAction => {
-                                game_state =
-                                    game_state.unwrap_choose_action().proceed(Action::Move);
                             }
                         }
                     }
@@ -117,6 +102,8 @@ async fn main() {
                 state = State::CatchingUp(game_state)
             }
         }
+
+        game_grid.update_positions(state.game_state().game().characters());
 
         state = match state {
             State::AwaitingPlayerInput(..) => state,
@@ -156,6 +143,12 @@ impl GameGrid {
             .collect();
 
         Self { characters }
+    }
+
+    fn update_positions(&mut self, characters: &[Rc<RefCell<Character>>]) {
+        for (i, character) in characters.iter().enumerate() {
+            self.characters[i].1 = character.borrow().position;
+        }
     }
 
     fn draw(&mut self, x: f32, y: f32) {
@@ -233,7 +226,7 @@ enum ActivityPopupState {
     CommitAttackAction(HandType),
     CommitSpellAction(Spell),
     CommitSelfEffectAction(SelfEffectAction),
-    CommitMove,
+    CommitMove { action_point_cost: u32 },
     ReactToAttack,
     ReactToHit,
     Idle,
@@ -274,7 +267,7 @@ impl ActivityPopup {
             ActivityPopupState::CommitSelfEffectAction(..) => {
                 draw_text("Proceed?", x0, y0, 20.0, WHITE);
             }
-            ActivityPopupState::CommitMove => {
+            ActivityPopupState::CommitMove { .. } => {
                 draw_text("Proceed?", x0, y0, 20.0, WHITE);
             }
             ActivityPopupState::ReactToAttack => {
@@ -568,7 +561,7 @@ impl UserInterface {
             ActivityPopupState::CommitSelfEffectAction(..) => {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
-            ActivityPopupState::CommitMove => {
+            ActivityPopupState::CommitMove { .. } => {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToAttack => {
@@ -655,7 +648,7 @@ impl UserInterface {
                             ActivityPopupState::CommitAttackAction(..) => true,
                             ActivityPopupState::CommitSpellAction(..) => true,
                             ActivityPopupState::CommitSelfEffectAction(..) => true,
-                            ActivityPopupState::CommitMove => true,
+                            ActivityPopupState::CommitMove { .. } => true,
                             _ => false,
                         };
 
@@ -666,6 +659,8 @@ impl UserInterface {
                                     hand,
                                     action_point_cost,
                                 } => {
+                                    // TODO check range
+
                                     self.reserved_action_points = action_point_cost;
                                     let weapon = self.character.borrow().weapon(hand).unwrap();
                                     let description = format!(
@@ -709,7 +704,7 @@ impl UserInterface {
                                     self.reserved_action_points = action_point_cost;
                                     let description = format!("Move on the grid");
                                     self.set_state(
-                                        ActivityPopupState::CommitMove,
+                                        ActivityPopupState::CommitMove { action_point_cost },
                                         vec![description],
                                     );
                                     None
@@ -727,7 +722,10 @@ impl UserInterface {
                                 .borrow()
                                 .can_use_attack_enhancement(hand, &enhancement)
                             {
-                                Some(Event::ChoseAttackAction(hand, vec![enhancement]))
+                                Some(Event::ChoseAction(Action::Attack {
+                                    hand,
+                                    enhancements: vec![enhancement],
+                                }))
                             } else {
                                 println!("Cannot use this attack enhancement");
                                 None
@@ -741,7 +739,10 @@ impl UserInterface {
                     ButtonAction::SpellEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitSpellAction(spell) => {
                             if self.character.borrow().can_use_spell_enhancement(spell) {
-                                Some(Event::ChoseCastSpellAction(spell, true))
+                                Some(Event::ChoseAction(Action::CastSpell {
+                                    spell,
+                                    enhanced: true,
+                                }))
                             } else {
                                 println!("Cannot use this spell enhancement");
                                 None
@@ -783,23 +784,31 @@ impl UserInterface {
                         }
                     }
                     ButtonAction::Proceed => match self.state {
-                        ActivityPopupState::ChooseAction => {
-                            panic!("Invalid state. How to proceed from choosing action?")
-                        }
-                        ActivityPopupState::CommitAttackAction(hand_type) => {
-                            Some(Event::ChoseAttackAction(hand_type, vec![]))
+                        ActivityPopupState::CommitAttackAction(hand) => {
+                            Some(Event::ChoseAction(Action::Attack {
+                                hand,
+                                enhancements: vec![],
+                            }))
                         }
                         ActivityPopupState::CommitSpellAction(spell) => {
-                            Some(Event::ChoseCastSpellAction(spell, false))
+                            Some(Event::ChoseAction(Action::CastSpell {
+                                spell,
+                                enhanced: false,
+                            }))
                         }
                         ActivityPopupState::CommitSelfEffectAction(sea) => {
-                            Some(Event::ChoseSelfEffectAction(sea))
+                            Some(Event::ChoseAction(Action::SelfEffect(sea)))
                         }
-                        ActivityPopupState::CommitMove => Some(Event::ChoseMoveAction),
+                        ActivityPopupState::CommitMove { action_point_cost } => {
+                            Some(Event::ChoseAction(Action::Move { action_point_cost }))
+                        }
                         ActivityPopupState::ReactToAttack => {
                             Some(Event::ChoseAttackedReaction(None))
                         }
                         ActivityPopupState::ReactToHit => Some(Event::ChoseHitReaction(None)),
+                        ActivityPopupState::ChooseAction => {
+                            panic!("Invalid state. How to proceed from choosing action?")
+                        }
                         ActivityPopupState::Idle => {
                             panic!("Invalid state. How to proceed from idle?")
                         }
@@ -1764,10 +1773,7 @@ enum InternalUiEvent {
 enum Event {
     ChoseAttackedReaction(Option<OnAttackedReaction>),
     ChoseHitReaction(Option<OnHitReaction>),
-    ChoseAttackAction(HandType, Vec<AttackEnhancement>),
-    ChoseSelfEffectAction(SelfEffectAction),
-    ChoseCastSpellAction(Spell, bool),
-    ChoseMoveAction,
+    ChoseAction(Action),
 }
 
 struct Circle {

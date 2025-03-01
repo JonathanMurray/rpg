@@ -20,8 +20,8 @@ pub struct CoreGame {
 }
 
 impl CoreGame {
-    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> StateChooseAction {
-        let mut bob = Character::new("Bob", 5, 1, 4, (1, 1));
+    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Self {
+        let mut bob = Character::new("Bob", 5, 1, 4, (1, 4));
         bob.main_hand.weapon = Some(WAR_HAMMER);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -39,14 +39,12 @@ impl CoreGame {
         alice.action_points = ACTION_POINTS_PER_TURN;
 
         let characters = Characters::new(vec![bob, alice]);
-        let game = Self {
+        Self {
             characters,
             active_character_i: 0,
             player_character_i: 0,
             logger,
-        };
-
-        StateChooseAction { game }
+        }
     }
 
     pub fn player_character(&self) -> &Rc<RefCell<Character>> {
@@ -83,7 +81,6 @@ impl CoreGame {
                 let defender = other_character;
 
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
-
                 for enhancement in &enhancements {
                     attacker.action_points -= enhancement.action_point_cost;
                     attacker.stamina.lose(enhancement.stamina_cost);
@@ -91,7 +88,6 @@ impl CoreGame {
                         attacker.receive_condition(condition);
                     }
                 }
-
                 let enhancements_str = if !enhancements.is_empty() {
                     let names: Vec<String> = enhancements
                         .iter()
@@ -110,7 +106,6 @@ impl CoreGame {
                     defender.defense(),
                     enhancements_str
                 );
-
                 self.log(attacks_str.clone());
 
                 let mut lines = vec![];
@@ -156,7 +151,22 @@ impl CoreGame {
             Action::CastSpell { spell, enhanced } => {
                 self.perform_spell(&mut character, spell, enhanced, &mut other_character);
             }
-            Action::Move => todo!("Handle move action in core"),
+            Action::Move { action_point_cost } => {
+                character.action_points -= action_point_cost;
+                let new_position = (character.position.0 + 1, character.position.1);
+                if other_character.position == new_position {
+                    self.log(format!(
+                        "{} tried moving but position was blocked",
+                        character.name
+                    ));
+                } else {
+                    self.log(format!(
+                        "{} moved from {:?} to {:?}",
+                        character.name, character.position, new_position
+                    ));
+                    character.position = new_position;
+                }
+            }
         }
 
         drop(character);
@@ -826,7 +836,9 @@ pub enum Action {
         spell: Spell,
         enhanced: bool,
     },
-    Move,
+    Move {
+        action_point_cost: u32,
+    },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
