@@ -1,5 +1,5 @@
 use std::{
-    cell::{self, RefCell},
+    cell::{self, Ref, RefCell},
     rc::Rc,
 };
 
@@ -38,17 +38,15 @@ async fn main() {
     let game = CoreGame::new(cloned_logbuf);
 
     let player_character = Rc::clone(game.player_character());
-    let non_player_character = Rc::clone(game.non_player_character());
 
-    let mut user_interface = UserInterface::new(
-        Rc::clone(&player_character),
-        Rc::clone(&non_player_character),
-    );
+    let mut ui_characters = vec![];
+    for character in game.characters() {
+        ui_characters.push(Rc::clone(character));
+    }
 
-    let mut character_names = CharacterNames::new(
-        &[&player_character.borrow(), &non_player_character.borrow()],
-        game.active_character_i,
-    );
+    let mut user_interface = UserInterface::new(ui_characters);
+
+    let mut character_names = CharacterNames::new(game.characters(), game.active_character_i);
 
     let mut state = match game.begin() {
         game_state @ GameState::AwaitingBot(..) => State::CatchingUp(game_state),
@@ -88,13 +86,6 @@ async fn main() {
 
                     state = State::CatchingUp(game_state);
                     change_state(&state, &mut user_interface);
-
-                    character_names
-                        .set_active_character(state.game_state().game().active_character_i);
-                    for (i, character) in state.game_state().game().characters().iter().enumerate()
-                    {
-                        character_names.set_action_points(i, character.borrow().action_points);
-                    }
                 } else {
                     state = State::AwaitingPlayerInput(game_state)
                 }
@@ -107,6 +98,11 @@ async fn main() {
                 );
                 state = State::CatchingUp(game_state)
             }
+        }
+
+        character_names.set_active_character(state.game_state().game().active_character_i);
+        for (i, character) in state.game_state().game().characters().iter().enumerate() {
+            character_names.set_action_points(i, character.borrow().action_points);
         }
 
         user_interface.update_character_positions();
@@ -162,9 +158,10 @@ impl GameGrid {
         }
     }
 
-    fn update_positions(&mut self, characters: &[&Character]) {
+    fn update_positions(&mut self, characters: &[Rc<RefCell<Character>>]) {
         for (i, character) in characters.iter().enumerate() {
-            self.characters[i].1 = (character.position.0 as i32, character.position.1 as i32);
+            let pos = character.borrow().position;
+            self.characters[i].1 = (pos.0 as i32, pos.1 as i32);
         }
     }
 
@@ -416,8 +413,7 @@ impl ActivityPopup {
 }
 
 struct UserInterface {
-    player_character: Rc<RefCell<Character>>,
-    other_character: Rc<RefCell<Character>>,
+    characters: Vec<Rc<RefCell<Character>>>,
     reserved_action_points: u32,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: ActivityPopupState,
@@ -437,17 +433,14 @@ struct UserInterface {
 }
 
 impl UserInterface {
-    fn new(
-        player_character: Rc<RefCell<Character>>,
-        other_character: Rc<RefCell<Character>>,
-    ) -> Self {
+    fn new(characters: Vec<Rc<RefCell<Character>>>) -> Self {
         let mut combat_buttons = vec![];
         let mut skill_buttons = vec![];
         let mut spell_buttons = vec![];
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let character_ref = player_character.borrow();
+        let character_ref = characters[0].borrow();
 
         let mut next_button_id = 1;
 
@@ -603,22 +596,17 @@ impl UserInterface {
 
         let state = ActivityPopupState::ChooseAction;
 
-        let characters_on_grid = vec![
-            (&character_ref.name[0..1], character_ref.position),
-            (
-                &other_character.borrow().name[0..1],
-                other_character.borrow().position,
-            ),
-        ];
-
-        let game_grid = GameGrid::new(characters_on_grid);
-
         drop(character_ref);
+
+        let mut grid_characters = vec![];
+        for character in &characters {
+            grid_characters.push((&character.borrow().name[0..1], character.borrow().position));
+        }
+        let game_grid = GameGrid::new(grid_characters);
 
         Self {
             game_grid,
-            player_character,
-            other_character,
+            characters,
             next_available_button_id: next_button_id,
             hovered_button: None,
             log: Log::new(),
@@ -673,6 +661,10 @@ impl UserInterface {
         self.log.draw(650.0, y);
     }
 
+    fn player_character(&self) -> Ref<Character> {
+        self.characters[0].borrow()
+    }
+
     fn set_state(&mut self, state: ActivityPopupState, mut lines: Vec<String>) {
         self.state = state;
 
@@ -681,10 +673,7 @@ impl UserInterface {
         let mut is_targetting_enemy = false;
         match state {
             ActivityPopupState::CommitAttackAction(hand) => {
-                let enhancements = self
-                    .player_character
-                    .borrow()
-                    .usable_attack_enhancements(hand);
+                let enhancements = self.player_character().usable_attack_enhancements(hand);
                 for (subtext, enhancement) in enhancements {
                     let btn_action = ButtonAction::AttackEnhancement(enhancement);
                     let btn = self.new_button(subtext, btn_action);
@@ -695,11 +684,7 @@ impl UserInterface {
             }
             ActivityPopupState::CommitSpellAction(spell) => {
                 if let Some(enhancement) = spell.possible_enhancement {
-                    if self
-                        .player_character
-                        .borrow()
-                        .can_use_spell_enhancement(spell)
-                    {
+                    if self.player_character().can_use_spell_enhancement(spell) {
                         let btn_action = ButtonAction::SpellEnhancement(enhancement);
                         let btn = self.new_button("".to_string(), btn_action);
                         popup_buttons.push(btn);
@@ -717,10 +702,7 @@ impl UserInterface {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToAttack => {
-                let reactions = self
-                    .player_character
-                    .borrow()
-                    .usable_on_attacked_reactions();
+                let reactions = self.player_character().usable_on_attacked_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -729,7 +711,7 @@ impl UserInterface {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToHit => {
-                let reactions = self.player_character.borrow().usable_on_hit_reactions();
+                let reactions = self.player_character().usable_on_hit_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -815,23 +797,23 @@ impl UserInterface {
                             _ => false,
                         };
 
-                        if may_choose_action
-                            && self.player_character.borrow().can_use_action(base_action)
+                        if may_choose_action && self.player_character().can_use_action(base_action)
                         {
                             match base_action {
                                 BaseAction::Attack {
                                     hand,
                                     action_point_cost,
                                 } => {
+                                    // TODO other targets
+                                    let target_character = &self.characters[1];
                                     let attack_reaches =
-                                        self.player_character.borrow().can_reach_with_attack(
+                                        self.player_character().can_reach_with_attack(
                                             hand,
-                                            self.other_character.borrow().position,
+                                            target_character.borrow().position,
                                         );
                                     if attack_reaches {
                                         self.reserved_action_points = action_point_cost;
-                                        let weapon =
-                                            self.player_character.borrow().weapon(hand).unwrap();
+                                        let weapon = self.player_character().weapon(hand).unwrap();
                                         let description = format!(
                                             "Attack ({}: {} damage)",
                                             weapon.name, weapon.damage
@@ -895,13 +877,14 @@ impl UserInterface {
                     ButtonAction::AttackEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitAttackAction(hand) => {
                             if self
-                                .player_character
-                                .borrow()
+                                .player_character()
                                 .can_use_attack_enhancement(hand, &enhancement)
                             {
                                 Some(Event::ChoseAction(Action::Attack {
                                     hand,
                                     enhancements: vec![enhancement],
+                                    // TODO other targets
+                                    target_character_i: 1,
                                 }))
                             } else {
                                 println!("Cannot use this attack enhancement");
@@ -915,14 +898,12 @@ impl UserInterface {
                     },
                     ButtonAction::SpellEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitSpellAction(spell) => {
-                            if self
-                                .player_character
-                                .borrow()
-                                .can_use_spell_enhancement(spell)
-                            {
+                            if self.player_character().can_use_spell_enhancement(spell) {
                                 Some(Event::ChoseAction(Action::CastSpell {
                                     spell,
                                     enhanced: true,
+                                    // TODO other targets
+                                    target_character_i: 1,
                                 }))
                             } else {
                                 println!("Cannot use this spell enhancement");
@@ -937,8 +918,7 @@ impl UserInterface {
                     ButtonAction::OnAttackedReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToAttack {
                             if self
-                                .player_character
-                                .borrow()
+                                .player_character()
                                 .can_use_on_attacked_reaction(reaction)
                             {
                                 Some(Event::ChoseAttackedReaction(Some(reaction)))
@@ -953,11 +933,7 @@ impl UserInterface {
                     }
                     ButtonAction::OnHitReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToHit {
-                            if self
-                                .player_character
-                                .borrow()
-                                .can_use_on_hit_reaction(reaction)
-                            {
+                            if self.player_character().can_use_on_hit_reaction(reaction) {
                                 Some(Event::ChoseHitReaction(Some(reaction)))
                             } else {
                                 println!("Cannot afford this reaction at this time");
@@ -973,12 +949,16 @@ impl UserInterface {
                             Some(Event::ChoseAction(Action::Attack {
                                 hand,
                                 enhancements: vec![],
+                                // TODO other targets
+                                target_character_i: 1,
                             }))
                         }
                         ActivityPopupState::CommitSpellAction(spell) => {
                             Some(Event::ChoseAction(Action::CastSpell {
                                 spell,
                                 enhanced: false,
+                                // TODO other targets
+                                target_character_i: 1,
                             }))
                         }
                         ActivityPopupState::CommitSelfEffectAction(sea) => {
@@ -1023,10 +1003,7 @@ impl UserInterface {
     }
 
     fn update_character_positions(&mut self) {
-        self.game_grid.update_positions(&[
-            &self.player_character.borrow(),
-            &self.other_character.borrow(),
-        ]);
+        self.game_grid.update_positions(&self.characters);
     }
 }
 
@@ -1037,13 +1014,13 @@ struct CharacterNames {
 }
 
 impl CharacterNames {
-    fn new(characters: &[&Character], active_i: usize) -> Self {
+    fn new(characters: &[Rc<RefCell<Character>>], active_i: usize) -> Self {
         let character_names: Vec<Rc<RefCell<CharacterName>>> = characters
             .iter()
             .map(|character| {
                 Rc::new(RefCell::new(CharacterName::new(
-                    character.name,
-                    character.action_points,
+                    character.borrow().name,
+                    character.borrow().action_points,
                 )))
             })
             .collect();
