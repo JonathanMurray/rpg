@@ -1,7 +1,8 @@
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-    OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Shield,
-    Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip, WeaponRange,
+    OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect,
+    SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon,
+    WeaponGrip, WeaponRange,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -133,6 +134,13 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
+};
+
+pub const BRACE: SelfEffectAction = SelfEffectAction {
+    name: "Brace",
+    description: "+def next attack",
+    action_point_cost: 1,
+    effect: ApplyEffect::Condition(Condition::Braced),
 };
 
 pub const SCREAM: Spell = Spell {

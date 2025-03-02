@@ -7,6 +7,7 @@ use macroquad::rand::ChooseRandom;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 use crate::data::BOW;
+use crate::data::BRACE;
 use crate::data::WAR_HAMMER;
 use crate::data::{
     CRUSHING_STRIKE, DAGGER, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SIDE_STEP,
@@ -1050,12 +1051,7 @@ impl Character {
                     hand: HandType::OffHand,
                     action_point_cost: 0,
                 },
-                BaseAction::SelfEffect(SelfEffectAction {
-                    name: "Brace",
-                    description: "+def next attack",
-                    action_point_cost: 1,
-                    effect: ApplyEffect::Condition(Condition::Braced),
-                }),
+                BaseAction::SelfEffect(BRACE),
                 BaseAction::Move {
                     action_point_cost: 1,
                 },
