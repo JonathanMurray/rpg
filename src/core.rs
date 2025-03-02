@@ -116,6 +116,7 @@ impl CoreGame {
                 );
                 self.log(attacks_str.clone());
 
+                // TODO construct this text in ui.rs instead? It can have more full control over what to show
                 let mut lines = vec![];
                 lines.push(attacks_str);
                 let explanation = format!(
@@ -463,6 +464,8 @@ impl CoreGame {
 
             attack_hit = Some((
                 defender_character_i,
+                // TODO construct this text in ui.rs instead? It can have more full control over what to show
+                // The only structural information contained in here is how much damage was dealt
                 vec![format!(
                     "{} took {} damage from an attack by {}",
                     defender.name, damage, attacker.name
@@ -713,7 +716,7 @@ pub trait Logger {
 }
 
 pub struct StateChooseAction {
-    pub game: CoreGame,
+    game: CoreGame,
 }
 
 impl StateChooseAction {
@@ -723,7 +726,7 @@ impl StateChooseAction {
 }
 
 pub struct StateReactToAttack {
-    pub game: CoreGame,
+    game: CoreGame,
     attacked_character_i: usize,
     action_points_before_action: u32,
     hand: HandType,
@@ -744,8 +747,8 @@ impl StateReactToAttack {
 }
 
 pub struct StateReactToHit {
-    pub game: CoreGame,
-    pub reacting_character_i: usize,
+    game: CoreGame,
+    reacting_character_i: usize,
     pub lines: Vec<String>,
 }
 
@@ -758,7 +761,7 @@ impl StateReactToHit {
 }
 
 pub struct StateAwaitingBot {
-    pub game: CoreGame,
+    game: CoreGame,
 }
 
 impl StateAwaitingBot {
