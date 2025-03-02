@@ -8,7 +8,9 @@ use macroquad::{
         self, Color, BLACK, BLUE, DARKBROWN, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN, LIGHTGRAY,
         MAGENTA, ORANGE, PURPLE, RED, WHITE, YELLOW,
     },
-    input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
+    input::{
+        is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
+    },
     miniquad,
     rand::{self, ChooseRandom},
     shapes::{
@@ -48,14 +50,6 @@ async fn main() {
         game.active_character_i,
     );
 
-    let characters_on_grid = game
-        .characters()
-        .iter()
-        .map(|character| (&character.borrow().name[0..1], character.borrow().position))
-        .collect();
-
-    let mut game_grid = GameGrid::new(characters_on_grid);
-
     let mut state = match game.begin() {
         game_state @ GameState::AwaitingBot(..) => State::CatchingUp(game_state),
         game_state @ _ => State::AwaitingPlayerInput(game_state),
@@ -68,7 +62,7 @@ async fn main() {
     loop {
         clear_background(BLACK);
         character_names.draw(50.0, 20.0);
-        game_grid.draw(100.0, 150.0);
+
         user_interface.draw(640.0);
 
         match state {
@@ -115,7 +109,7 @@ async fn main() {
             }
         }
 
-        game_grid.update_positions(state.game_state().game().characters());
+        user_interface.update_character_positions();
 
         state = match state {
             State::AwaitingPlayerInput(..) => state,
@@ -149,44 +143,67 @@ async fn main() {
 }
 
 struct GameGrid {
-    characters: Vec<(TextLine, (u32, u32))>,
+    characters: Vec<(TextLine, (i32, i32))>,
+    movement_preview: Option<(i32, i32)>,
+    target_character_i: Option<usize>,
 }
 
 impl GameGrid {
     fn new(characters: Vec<(impl Into<String>, (u32, u32))>) -> Self {
         let characters = characters
             .into_iter()
-            .map(|(s, pos)| (TextLine::new(s, 25), pos))
+            .map(|(s, pos)| (TextLine::new(s, 25), (pos.0 as i32, pos.1 as i32)))
             .collect();
 
-        Self { characters }
-    }
-
-    fn update_positions(&mut self, characters: &[Rc<RefCell<Character>>]) {
-        for (i, character) in characters.iter().enumerate() {
-            self.characters[i].1 = character.borrow().position;
+        Self {
+            characters,
+            movement_preview: None,
+            target_character_i: None,
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn update_positions(&mut self, characters: &[&Character]) {
+        for (i, character) in characters.iter().enumerate() {
+            self.characters[i].1 = (character.position.0 as i32, character.position.1 as i32);
+        }
+    }
+
+    fn draw(&mut self, x: f32, y: f32) -> Option<(i32, i32)> {
         let cell_w = 25.0;
         let grid_dimensions = (20, 12);
+
+        let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w;
+        let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w;
+
+        let draw_square = |(grid_x, grid_y), color| {
+            draw_rectangle_lines(
+                grid_x_to_screen(grid_x),
+                grid_y_to_screen(grid_y),
+                cell_w,
+                cell_w,
+                1.0,
+                color,
+            )
+        };
+
+        let mut tell_ui_to_enter_move_state = None;
+
         for col in 0..grid_dimensions.0 + 1 {
-            let x0 = x + col as f32 * cell_w;
+            let x0 = grid_x_to_screen(col);
             draw_line(
                 x0,
-                y,
+                grid_y_to_screen(0),
                 x0,
-                y + grid_dimensions.1 as f32 * cell_w,
+                grid_y_to_screen(grid_dimensions.1),
                 1.0,
                 DARKGRAY,
             );
             for row in 0..grid_dimensions.1 + 1 {
-                let y0 = y + row as f32 * cell_w;
+                let y0 = grid_y_to_screen(row);
                 draw_line(
-                    x,
+                    grid_x_to_screen(0),
                     y0,
-                    x + grid_dimensions.0 as f32 * cell_w,
+                    grid_x_to_screen(grid_dimensions.0),
                     y0,
                     1.0,
                     DARKGRAY,
@@ -197,10 +214,81 @@ impl GameGrid {
         let text_margin = 5.0;
         for (text, position) in &mut self.characters {
             text.draw(
-                x + text_margin + position.0 as f32 * cell_w,
-                y + text_margin + position.1 as f32 * cell_w,
+                grid_x_to_screen(position.0) + text_margin,
+                grid_y_to_screen(position.1) + text_margin,
             );
         }
+
+        let (mouse_x, mouse_y) = mouse_position();
+        let mouse_local = (mouse_x - x, mouse_y - y);
+
+        // TODO: don't assume that player is the first in the vec
+        let (player_x, player_y) = self.characters[0].1;
+        let (other_char_x, other_char_y) = self.characters[1].1;
+
+        if (0f32..grid_dimensions.0 as f32 * cell_w).contains(&mouse_local.0)
+            && (0f32..grid_dimensions.1 as f32 * cell_w).contains(&mouse_local.1)
+        {
+            let (mouse_grid_x, mouse_grid_y) = (
+                (mouse_local.0 / cell_w) as i32,
+                (mouse_local.1 / cell_w) as i32,
+            );
+
+            let dx = mouse_grid_x - player_x;
+            let dy = mouse_grid_y - player_y;
+
+            let valid = dx.abs() <= 1
+                && dy.abs() <= 1
+                && (dx, dy) != (0, 0)
+                && (mouse_grid_x, mouse_grid_y) != (other_char_x, other_char_y);
+
+            let square_color = if valid { YELLOW } else { RED };
+            if self.movement_preview.is_some() || valid {
+                draw_square((mouse_grid_x, mouse_grid_y), square_color);
+            }
+
+            if is_mouse_button_down(MouseButton::Left) && valid {
+                if self.movement_preview.is_none() {
+                    tell_ui_to_enter_move_state = Some((dx, dy));
+                }
+                self.movement_preview = Some((dx, dy));
+            }
+        }
+
+        if let Some(movement_preview) = self.movement_preview {
+            let arrow_color = ORANGE;
+            draw_line(
+                grid_x_to_screen(player_x) + cell_w / 2.0,
+                grid_y_to_screen(player_y) + cell_w / 2.0,
+                grid_x_to_screen(player_x + movement_preview.0) + cell_w / 2.0,
+                grid_y_to_screen(player_y + movement_preview.1) + cell_w / 2.0,
+                1.0,
+                arrow_color,
+            );
+            draw_line(
+                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.3,
+                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.3,
+                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.7,
+                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.7,
+                3.0,
+                arrow_color,
+            );
+            draw_line(
+                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.3,
+                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.7,
+                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.7,
+                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.3,
+                3.0,
+                arrow_color,
+            );
+        }
+
+        if let Some(character_i) = self.target_character_i {
+            let target_pos = self.characters[character_i].1;
+            draw_square(target_pos, MAGENTA);
+        }
+
+        tell_ui_to_enter_move_state
     }
 }
 
@@ -246,7 +334,10 @@ enum ActivityPopupState {
     CommitAttackAction(HandType),
     CommitSpellAction(Spell),
     CommitSelfEffectAction(SelfEffectAction),
-    CommitMove { action_point_cost: u32 },
+    CommitMove {
+        action_point_cost: u32,
+        direction: (i32, i32),
+    },
     ReactToAttack,
     ReactToHit,
     Idle,
@@ -288,7 +379,7 @@ impl ActivityPopup {
                 draw_text("Proceed?", x0, y0, 20.0, WHITE);
             }
             ActivityPopupState::CommitMove { .. } => {
-                draw_text("Proceed?", x0, y0, 20.0, WHITE);
+                draw_text("Change the direction or proceed", x0, y0, 20.0, WHITE);
             }
             ActivityPopupState::ReactToAttack => {
                 draw_text("React to the attack?", x0, y0, 20.0, WHITE);
@@ -342,6 +433,7 @@ struct UserInterface {
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     activity_popup: ActivityPopup,
+    game_grid: GameGrid,
 }
 
 impl UserInterface {
@@ -511,9 +603,20 @@ impl UserInterface {
 
         let state = ActivityPopupState::ChooseAction;
 
+        let characters_on_grid = vec![
+            (&character_ref.name[0..1], character_ref.position),
+            (
+                &other_character.borrow().name[0..1],
+                other_character.borrow().position,
+            ),
+        ];
+
+        let game_grid = GameGrid::new(characters_on_grid);
+
         drop(character_ref);
 
         Self {
+            game_grid,
             player_character,
             other_character,
             next_available_button_id: next_button_id,
@@ -549,6 +652,17 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
+        let maybe_enter_move_state = self.game_grid.draw(100.0, y - 490.0);
+        if let Some(direction) = maybe_enter_move_state {
+            self.set_state(
+                ActivityPopupState::CommitMove {
+                    action_point_cost: 1,
+                    direction,
+                },
+                vec![],
+            );
+        }
+
         self.activity_popup.draw(100.0, y - 170.0);
 
         draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
@@ -559,10 +673,12 @@ impl UserInterface {
         self.log.draw(650.0, y);
     }
 
-    fn set_state(&mut self, state: ActivityPopupState, lines: Vec<String>) {
+    fn set_state(&mut self, state: ActivityPopupState, mut lines: Vec<String>) {
         self.state = state;
 
         let mut popup_buttons = vec![];
+        let mut movement_preview = None;
+        let mut is_targetting_enemy = false;
         match state {
             ActivityPopupState::CommitAttackAction(hand) => {
                 let enhancements = self
@@ -575,6 +691,7 @@ impl UserInterface {
                     popup_buttons.push(btn);
                 }
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
+                is_targetting_enemy = true;
             }
             ActivityPopupState::CommitSpellAction(spell) => {
                 if let Some(enhancement) = spell.possible_enhancement {
@@ -589,11 +706,14 @@ impl UserInterface {
                     }
                 }
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
+                is_targetting_enemy = true;
             }
             ActivityPopupState::CommitSelfEffectAction(..) => {
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
-            ActivityPopupState::CommitMove { .. } => {
+            ActivityPopupState::CommitMove { direction, .. } => {
+                lines.push(format!("Movement"));
+                movement_preview = Some(direction);
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::ReactToAttack => {
@@ -622,6 +742,14 @@ impl UserInterface {
         }
 
         self.activity_popup.set_state(state, lines, popup_buttons);
+
+        self.game_grid.movement_preview = movement_preview;
+        self.game_grid.target_character_i = if is_targetting_enemy {
+            // TODO enemy index
+            Some(1)
+        } else {
+            None
+        };
     }
 
     fn update(&mut self) -> Vec<Event> {
@@ -705,7 +833,7 @@ impl UserInterface {
                                         let weapon =
                                             self.player_character.borrow().weapon(hand).unwrap();
                                         let description = format!(
-                                            "Attack with {}: {} damage",
+                                            "Attack ({}: {} damage)",
                                             weapon.name, weapon.damage
                                         );
 
@@ -747,11 +875,15 @@ impl UserInterface {
                                 }
                                 BaseAction::Move { action_point_cost } => {
                                     self.reserved_action_points = action_point_cost;
-                                    let description = format!("Move on the grid");
+
                                     self.set_state(
-                                        ActivityPopupState::CommitMove { action_point_cost },
-                                        vec![description],
+                                        ActivityPopupState::CommitMove {
+                                            action_point_cost,
+                                            direction: (1, 0),
+                                        },
+                                        vec![],
                                     );
+
                                     None
                                 }
                             }
@@ -852,8 +984,14 @@ impl UserInterface {
                         ActivityPopupState::CommitSelfEffectAction(sea) => {
                             Some(Event::ChoseAction(Action::SelfEffect(sea)))
                         }
-                        ActivityPopupState::CommitMove { action_point_cost } => {
-                            Some(Event::ChoseAction(Action::Move { action_point_cost }))
+                        ActivityPopupState::CommitMove {
+                            action_point_cost, ..
+                        } => {
+                            let direction = self.game_grid.movement_preview.take().unwrap();
+                            Some(Event::ChoseAction(Action::Move {
+                                action_point_cost,
+                                direction,
+                            }))
                         }
                         ActivityPopupState::ReactToAttack => {
                             Some(Event::ChoseAttackedReaction(None))
@@ -882,6 +1020,13 @@ impl UserInterface {
             .borrow_mut()
             .set_current(character.stamina.current);
         self.action_points_row.current = character.action_points;
+    }
+
+    fn update_character_positions(&mut self) {
+        self.game_grid.update_positions(&[
+            &self.player_character.borrow(),
+            &self.other_character.borrow(),
+        ]);
     }
 }
 

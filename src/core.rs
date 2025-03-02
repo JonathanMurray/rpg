@@ -165,9 +165,15 @@ impl CoreGame {
             Action::CastSpell { spell, enhanced } => {
                 self.perform_spell(&mut character, spell, enhanced, &mut other_character);
             }
-            Action::Move { action_point_cost } => {
+            Action::Move {
+                action_point_cost,
+                direction,
+            } => {
                 character.action_points -= action_point_cost;
-                let new_position = (character.position.0 + 1, character.position.1);
+                let new_position = (
+                    (character.position.0 as i32 + direction.0) as u32,
+                    (character.position.1 as i32 + direction.1) as u32,
+                );
                 if other_character.position == new_position {
                     self.log(format!(
                         "{} tried moving but position was blocked",
@@ -761,7 +767,10 @@ impl StateAwaitingBot {
                         });
                     }
                     BaseAction::Move { action_point_cost } => {
-                        chosen_action = Some(Action::Move { action_point_cost });
+                        chosen_action = Some(Action::Move {
+                            action_point_cost,
+                            direction: (1, 0),
+                        });
                     }
                 }
             }
@@ -901,6 +910,7 @@ pub enum Action {
         enhanced: bool,
     },
     Move {
+        direction: (i32, i32),
         action_point_cost: u32,
     },
 }
@@ -1042,7 +1052,7 @@ impl Character {
                 },
                 BaseAction::SelfEffect(SelfEffectAction {
                     name: "Brace",
-                    description: "+defense the next time you're attacked",
+                    description: "+def next attack",
                     action_point_cost: 1,
                     effect: ApplyEffect::Condition(Condition::Braced),
                 }),
