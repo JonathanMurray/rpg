@@ -2,7 +2,11 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::rc::Rc;
 
+use macroquad::rand;
+use macroquad::rand::ChooseRandom;
+
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
+use crate::data::BOW;
 use crate::data::WAR_HAMMER;
 use crate::data::{
     CRUSHING_STRIKE, DAGGER, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SIDE_STEP,
@@ -31,8 +35,8 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
-        let mut alice = Character::new("Alice", 2, 2, 3, (3, 4));
-        alice.main_hand.weapon = Some(SWORD);
+        let mut alice = Character::new("Alice", 2, 2, 3, (2, 4));
+        alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
         bob.action_points = ACTION_POINTS_PER_TURN;
@@ -41,9 +45,17 @@ impl CoreGame {
         let characters = Characters::new(vec![bob, alice]);
         Self {
             characters,
-            active_character_i: 0,
             player_character_i: 0,
+            active_character_i: 0,
             logger,
+        }
+    }
+
+    pub fn begin(self) -> GameState {
+        if self.active_character_i == self.player_character_i {
+            GameState::AwaitingPlayerAction(StateChooseAction { game: self })
+        } else {
+            GameState::AwaitingBot(StateAwaitingBot { game: self })
         }
     }
 
@@ -128,7 +140,7 @@ impl CoreGame {
                 drop(attacker);
                 drop(defender);
                 return if !players_turn {
-                    GameState::ReactToAttack(StateReactToAttack {
+                    GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
                         game: self,
                         action_points_before_action,
                         hand,
@@ -498,7 +510,7 @@ impl CoreGame {
             if !players_turn {
                 drop(character);
                 drop(other_character);
-                return GameState::ReactToHit(StateReactToHit { game: self, lines });
+                return GameState::AwaitingPlayerHitReaction(StateReactToHit { game: self, lines });
             }
         }
 
@@ -590,29 +602,10 @@ impl CoreGame {
 
         if players_turn {
             drop(character);
-            GameState::ChooseAction(StateChooseAction { game: self })
+            GameState::AwaitingPlayerAction(StateChooseAction { game: self })
         } else {
-            // TODO make sure to only pick an action that the character can actually do (afford, in range, etc)
-
-            let other_character = self.inactive_character();
-            let can_reach_with_attack =
-                character.can_reach_with_attack(HandType::MainHand, other_character.position);
-
             drop(character);
-            drop(other_character);
-
-            let action = if can_reach_with_attack {
-                Action::Attack {
-                    hand: HandType::MainHand,
-                    enhancements: Default::default(),
-                }
-            } else {
-                // TODO
-                Action::Move {
-                    action_point_cost: 1,
-                }
-            };
-            self.enter_state_action(action)
+            GameState::AwaitingBot(StateAwaitingBot { game: self })
         }
     }
 
@@ -650,37 +643,39 @@ impl CoreGame {
 }
 
 pub enum GameState {
-    ChooseAction(StateChooseAction),
-    ReactToAttack(StateReactToAttack),
-    ReactToHit(StateReactToHit),
+    AwaitingPlayerAction(StateChooseAction),
+    AwaitingPlayerAttackReaction(StateReactToAttack),
+    AwaitingPlayerHitReaction(StateReactToHit),
+    AwaitingBot(StateAwaitingBot),
 }
 
 impl GameState {
     pub fn game(&self) -> &CoreGame {
         match self {
-            GameState::ChooseAction(this) => &this.game,
-            GameState::ReactToAttack(this) => &this.game,
-            GameState::ReactToHit(this) => &this.game,
+            GameState::AwaitingPlayerAction(this) => &this.game,
+            GameState::AwaitingPlayerAttackReaction(this) => &this.game,
+            GameState::AwaitingPlayerHitReaction(this) => &this.game,
+            GameState::AwaitingBot(this) => &this.game,
         }
     }
 
     pub fn unwrap_choose_action(self) -> StateChooseAction {
         match self {
-            GameState::ChooseAction(inner) => inner,
+            GameState::AwaitingPlayerAction(inner) => inner,
             _ => panic!(),
         }
     }
 
     pub fn unwrap_react_to_attack(self) -> StateReactToAttack {
         match self {
-            GameState::ReactToAttack(inner) => inner,
+            GameState::AwaitingPlayerAttackReaction(inner) => inner,
             _ => panic!(),
         }
     }
 
     pub fn unwrap_react_to_hit(self) -> StateReactToHit {
         match self {
-            GameState::ReactToHit(inner) => inner,
+            GameState::AwaitingPlayerHitReaction(inner) => inner,
             _ => panic!(),
         }
     }
@@ -727,6 +722,58 @@ pub struct StateReactToHit {
 impl StateReactToHit {
     pub fn proceed(self, reaction: Option<OnHitReaction>) -> GameState {
         return self.game.enter_state_react_after_being_hit(reaction);
+    }
+}
+
+pub struct StateAwaitingBot {
+    pub game: CoreGame,
+}
+
+impl StateAwaitingBot {
+    pub fn proceed(self) -> GameState {
+        // TODO make sure to only pick an action that the character can actually do (afford, in range, etc)
+        let game = self.game;
+        let character = game.active_character();
+        let other_character = game.inactive_character();
+
+        let mut actions = character.usable_actions();
+        let mut chosen_action = None;
+
+        while !actions.is_empty() {
+            let i = rand::gen_range(0, actions.len());
+            let action = actions.swap_remove(i);
+
+            if character.can_use_action(action) {
+                match action {
+                    BaseAction::Attack { hand, .. } => {
+                        if character.can_reach_with_attack(hand, other_character.position) {
+                            chosen_action = Some(Action::Attack {
+                                hand,
+                                enhancements: vec![],
+                            });
+                        }
+                    }
+                    BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
+                    BaseAction::CastSpell(spell) => {
+                        chosen_action = Some(Action::CastSpell {
+                            spell,
+                            enhanced: false,
+                        });
+                    }
+                    BaseAction::Move { action_point_cost } => {
+                        chosen_action = Some(Action::Move { action_point_cost });
+                    }
+                }
+            }
+            if chosen_action.is_some() {
+                break;
+            }
+        }
+
+        drop(character);
+        drop(other_character);
+
+        game.enter_state_action(chosen_action.unwrap())
     }
 }
 

@@ -9,6 +9,8 @@ use macroquad::{
         MAGENTA, ORANGE, PURPLE, RED, WHITE, YELLOW,
     },
     input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
+    miniquad,
+    rand::{self, ChooseRandom},
     shapes::{
         draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex,
         draw_rectangle_lines, DrawRectangleParams,
@@ -25,6 +27,9 @@ use rpg::core::{
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    // Seed the random numbers
+    rand::srand(miniquad::date::now() as u64);
+
     let logbuf = Rc::new(RefCell::new(LogBuf(Default::default())));
     let cloned_logbuf = Rc::clone(&logbuf);
 
@@ -51,7 +56,10 @@ async fn main() {
 
     let mut game_grid = GameGrid::new(characters_on_grid);
 
-    let mut state = State::AwaitingPlayerInput(GameState::ChooseAction(StateChooseAction { game }));
+    let mut state = match game.begin() {
+        game_state @ GameState::AwaitingBot(..) => State::CatchingUp(game_state),
+        game_state @ _ => State::AwaitingPlayerInput(game_state),
+    };
 
     change_state(&state, &mut user_interface);
 
@@ -115,11 +123,16 @@ async fn main() {
                 timer += get_frame_time();
 
                 if logbuf.borrow_mut().0.is_empty() {
-                    let new_state = State::AwaitingPlayerInput(game_state);
-                    change_state(&new_state, &mut user_interface);
-                    new_state
+                    if let GameState::AwaitingBot(awaiting_bot) = game_state {
+                        let new_game_state = awaiting_bot.proceed();
+                        State::CatchingUp(new_game_state)
+                    } else {
+                        let new_state = State::AwaitingPlayerInput(game_state);
+                        change_state(&new_state, &mut user_interface);
+                        new_state
+                    }
                 } else {
-                    let tick = 0.1;
+                    let tick = 0.2;
                     while timer > tick {
                         timer -= tick;
                         let line = logbuf.borrow_mut().0.remove(0);
@@ -208,14 +221,17 @@ impl State {
 fn change_state(state: &State, user_interface: &mut UserInterface) {
     match state {
         State::AwaitingPlayerInput(game_state) => match game_state {
-            GameState::ChooseAction(..) => {
+            GameState::AwaitingPlayerAction(..) => {
                 user_interface.set_state(ActivityPopupState::ChooseAction, vec![]);
             }
-            GameState::ReactToAttack(StateReactToAttack { lines, .. }) => {
+            GameState::AwaitingPlayerAttackReaction(StateReactToAttack { lines, .. }) => {
                 user_interface.set_state(ActivityPopupState::ReactToAttack, lines.clone());
             }
-            GameState::ReactToHit(StateReactToHit { lines, .. }) => {
+            GameState::AwaitingPlayerHitReaction(StateReactToHit { lines, .. }) => {
                 user_interface.set_state(ActivityPopupState::ReactToHit, lines.clone());
+            }
+            GameState::AwaitingBot(..) => {
+                unreachable!("The game is awaiting bot, but the UI is awaiting player input?");
             }
         },
         State::CatchingUp(..) => {
