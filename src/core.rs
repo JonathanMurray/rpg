@@ -861,7 +861,7 @@ impl Characters {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AttackEnhancement {
     pub name: &'static str,
     pub action_point_cost: u32,
@@ -871,13 +871,13 @@ pub struct AttackEnhancement {
     pub on_hit_effect: Option<ApplyEffect>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(Condition),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnAttackedReaction {
     pub name: &'static str,
     pub action_point_cost: u32,
@@ -885,20 +885,20 @@ pub struct OnAttackedReaction {
     pub effect: OnAttackedReactionEffect,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum OnAttackedReactionEffect {
     Parry,
     SideStep,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnHitReaction {
     pub name: &'static str,
     pub action_point_cost: u32,
     pub effect: OnHitReactionEffect,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum OnHitReactionEffect {
     Rage,
     ShieldBash,
@@ -910,7 +910,7 @@ pub enum AttackHitEffect {
     SkipExertion,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum Condition {
     Dazed(u32),
     Bleeding,
@@ -949,7 +949,7 @@ pub enum Action {
     },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SelfEffectAction {
     pub name: &'static str,
     pub description: &'static str,
@@ -957,7 +957,7 @@ pub struct SelfEffectAction {
     pub effect: ApplyEffect,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum BaseAction {
     Attack {
         hand: HandType,
@@ -984,13 +984,13 @@ impl BaseAction {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum HandType {
     MainHand,
     OffHand,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct Spell {
     pub name: &'static str,
     pub description: &'static str,
@@ -1003,20 +1003,20 @@ pub struct Spell {
     pub range: u32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellEnhancement {
     pub name: &'static str,
     pub mana_cost: u32,
     pub effect: SpellEnhancementEffect,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum SpellEnhancementEffect {
     CastTwice,
     OnHitEffect(ApplyEffect),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum SpellType {
     Mental,
     Projectile,

@@ -1,5 +1,6 @@
 use std::{
-    cell::{self, Ref, RefCell},
+    cell::{self, Cell, Ref, RefCell},
+    collections::HashMap,
     rc::Rc,
 };
 
@@ -218,7 +219,7 @@ impl GameGrid {
         }
 
         let text_margin = 5.0;
-        for (text, position) in &mut self.characters {
+        for (text, position) in &self.characters {
             text.draw(
                 grid_x_to_screen(position.0) + text_margin,
                 grid_y_to_screen(position.1) + text_margin,
@@ -387,7 +388,7 @@ impl ActivityPopup {
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         if matches!(self.state, ActivityPopupState::Idle) {
             return;
         }
@@ -435,7 +436,7 @@ impl ActivityPopup {
         }
 
         y0 += 20.0;
-        for btn in &mut self.buttons {
+        for btn in &self.buttons {
             btn.draw(x0, y0);
             x0 += btn.size.0 + 10.0;
         }
@@ -473,6 +474,7 @@ struct UserInterface {
     state: ActivityPopupState,
     hovered_button: Option<(u32, ButtonAction)>,
     next_available_button_id: u32,
+    tracked_buttons: HashMap<String, Rc<ActionButton>>,
 
     log: Log,
     tabs: Tabs,
@@ -499,14 +501,17 @@ impl UserInterface {
         let mut next_button_id = 1;
 
         let mut new_button = |name, btn_action| {
-            let btn = action_button(name, btn_action, &event_queue, next_button_id);
+            let btn = ActionButton::new(name, btn_action, &event_queue, next_button_id);
             next_button_id += 1;
             btn
         };
 
+        let mut tracked_buttons = HashMap::new();
+
         let mut spell_enhancement_buttons = vec![];
         for (name, action) in character_ref.known_actions() {
-            let btn = new_button(name, ButtonAction::Action(action));
+            let btn = Rc::new(new_button(name, ButtonAction::Action(action)));
+            let cloned_btn = Rc::clone(&btn);
             match action {
                 BaseAction::Attack { .. } => combat_buttons.push(btn),
                 BaseAction::SelfEffect(..) => skill_buttons.push(btn),
@@ -517,18 +522,33 @@ impl UserInterface {
                         btn.enabled = false;
                         spell_enhancement_buttons.push(btn);
                     }
-
-                    spell_buttons.push(btn)
+                    spell_buttons.push(btn);
                 }
                 BaseAction::Move { .. } => {
                     skill_buttons.push(btn);
                 }
             }
+            tracked_buttons.insert(base_action_id(action), cloned_btn);
         }
 
-        let combat_row = buttons_row(combat_buttons);
-        let skill_row = buttons_row(skill_buttons);
-        let spell_row = buttons_row(spell_buttons);
+        let combat_row = buttons_row(
+            combat_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
+        let skill_row = buttons_row(
+            skill_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
+        let spell_row = buttons_row(
+            spell_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
 
         let mut reaction_buttons = vec![];
         for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
@@ -552,9 +572,19 @@ impl UserInterface {
             attack_enhancement_buttons.push(btn);
         }
 
-        let reactions_row = buttons_row(reaction_buttons);
-        let attack_enhancements_row = buttons_row(attack_enhancement_buttons);
-        let spell_enhancements_row = buttons_row(spell_enhancement_buttons);
+        let reactions_row = buttons_row(reaction_buttons.into_iter().map(Element::Btn).collect());
+        let attack_enhancements_row = buttons_row(
+            attack_enhancement_buttons
+                .into_iter()
+                .map(Element::Btn)
+                .collect(),
+        );
+        let spell_enhancements_row = buttons_row(
+            spell_enhancement_buttons
+                .into_iter()
+                .map(Element::Btn)
+                .collect(),
+        );
 
         let stats_section = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
@@ -643,9 +673,9 @@ impl UserInterface {
             margin: 15.0,
             align: Align::End,
             elements: vec![
-                Element::Rc(cloned_health_bar),
-                Element::Rc(cloned_mana_bar),
-                Element::Rc(cloned_stamina_bar),
+                Element::RcRefCell(cloned_health_bar),
+                Element::RcRefCell(cloned_mana_bar),
+                Element::RcRefCell(cloned_stamina_bar),
             ],
             ..Default::default()
         };
@@ -685,11 +715,12 @@ impl UserInterface {
             stamina_bar,
             activity_popup: ActivityPopup::new(state),
             state,
+            tracked_buttons,
         }
     }
 
     fn new_button(&mut self, subtext: String, btn_action: ButtonAction) -> ActionButton {
-        let btn = action_button(
+        let btn = ActionButton::new(
             subtext,
             btn_action,
             &self.event_queue,
@@ -727,6 +758,11 @@ impl UserInterface {
                 hand,
                 action_point_cost,
             } => {
+                self.set_highlighted_button(Some(base_action_id(BaseAction::Attack {
+                    hand: hand,
+                    action_point_cost,
+                })));
+
                 let weapon = self.player_character().weapon(hand).unwrap();
                 lines.push(format!(
                     "{} attack ({} AP)",
@@ -744,6 +780,8 @@ impl UserInterface {
                 has_target = true;
             }
             ActivityPopupState::CommitSpellAction(spell) => {
+                self.set_highlighted_button(Some(base_action_id(BaseAction::CastSpell(spell))));
+
                 lines.push(format!(
                     "{} ({} AP, {} mana)",
                     spell.name, spell.action_point_cost, spell.mana_cost
@@ -765,12 +803,17 @@ impl UserInterface {
                 has_target = true;
             }
             ActivityPopupState::CommitSelfEffectAction(sea) => {
+                self.set_highlighted_button(Some(base_action_id(BaseAction::SelfEffect(sea))));
+
                 lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
                 lines.push(sea.description.to_string());
                 self.reserved_action_points = sea.action_point_cost;
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::CommitMove { action_point_cost } => {
+                self.set_highlighted_button(Some(base_action_id(BaseAction::Move {
+                    action_point_cost,
+                })));
                 self.reserved_action_points = action_point_cost;
                 lines.push(format!("Movement ({} AP)", action_point_cost));
                 movement_preview = Some((1, 0));
@@ -902,7 +945,7 @@ impl UserInterface {
 
     fn handle_event(&mut self, event: InternalUiEvent) -> Option<Event> {
         match event {
-            InternalUiEvent::ButtonHovered(hovered, button_id, button_action) => {
+            InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
                 if hovered {
                     self.hovered_button = Some((button_id, button_action));
                 } else {
@@ -914,7 +957,7 @@ impl UserInterface {
                 }
             }
 
-            InternalUiEvent::ButtonClicked(btn_action) => {
+            InternalUiEvent::ButtonClicked(button_id, btn_action) => {
                 self.reserved_action_points = 0;
 
                 match btn_action {
@@ -930,48 +973,37 @@ impl UserInterface {
 
                         if may_choose_action && self.player_character().can_use_action(base_action)
                         {
-                            match base_action {
+                            let state = match base_action {
                                 BaseAction::Attack {
                                     hand,
                                     action_point_cost,
-                                } => {
-                                    self.set_state(
-                                        ActivityPopupState::CommitAttackAction {
-                                            hand,
-                                            action_point_cost,
-                                        },
-                                        vec![],
-                                    );
-                                }
+                                } => ActivityPopupState::CommitAttackAction {
+                                    hand,
+                                    action_point_cost,
+                                },
                                 BaseAction::SelfEffect(sea) => {
-                                    self.set_state(
-                                        ActivityPopupState::CommitSelfEffectAction(sea),
-                                        vec![],
-                                    );
+                                    ActivityPopupState::CommitSelfEffectAction(sea)
                                 }
                                 BaseAction::CastSpell(spell) => {
-                                    self.set_state(
-                                        ActivityPopupState::CommitSpellAction(spell),
-                                        vec![],
-                                    );
+                                    ActivityPopupState::CommitSpellAction(spell)
                                 }
                                 BaseAction::Move { action_point_cost } => {
-                                    self.set_state(
-                                        ActivityPopupState::CommitMove { action_point_cost },
-                                        vec![],
-                                    );
+                                    ActivityPopupState::CommitMove { action_point_cost }
                                 }
-                            }
+                            };
+                            self.set_state(state, vec![]);
                         } else {
                             println!("Cannot choose this action at this time");
                         }
                     }
+
                     ButtonAction::AttackEnhancement(enhancement) => match self.state {
                         ActivityPopupState::CommitAttackAction { hand, .. } => {
                             if self
                                 .player_character()
                                 .can_use_attack_enhancement(hand, &enhancement)
                             {
+                                self.set_highlighted_button(None);
                                 let target_character_i = self.game_grid.target_character_i.unwrap();
                                 return Some(Event::ChoseAction(Action::Attack {
                                     hand,
@@ -986,9 +1018,11 @@ impl UserInterface {
                             println!("Cannot choose attack enhancement at this time");
                         }
                     },
+
                     ButtonAction::SpellEnhancement(_enhancement) => match self.state {
                         ActivityPopupState::CommitSpellAction(spell) => {
                             if self.player_character().can_use_spell_enhancement(spell) {
+                                self.set_highlighted_button(None);
                                 let target_character_i = self.game_grid.target_character_i.unwrap();
                                 return Some(Event::ChoseAction(Action::CastSpell {
                                     spell,
@@ -1003,6 +1037,47 @@ impl UserInterface {
                             println!("Cannot choose spell enhancement at this time");
                         }
                     },
+
+                    ButtonAction::Proceed => {
+                        self.set_highlighted_button(None);
+
+                        let event = match self.state {
+                            ActivityPopupState::CommitAttackAction { hand, .. } => {
+                                let target_character_i = self.game_grid.target_character_i.unwrap();
+                                Event::ChoseAction(Action::Attack {
+                                    hand,
+                                    enhancements: vec![],
+                                    target_character_i,
+                                })
+                            }
+                            ActivityPopupState::CommitSpellAction(spell) => {
+                                let target_character_i = self.game_grid.target_character_i.unwrap();
+                                Event::ChoseAction(Action::CastSpell {
+                                    spell,
+                                    enhanced: false,
+                                    target_character_i,
+                                })
+                            }
+                            ActivityPopupState::CommitSelfEffectAction(sea) => {
+                                Event::ChoseAction(Action::SelfEffect(sea))
+                            }
+                            ActivityPopupState::CommitMove {
+                                action_point_cost, ..
+                            } => {
+                                let direction = self.game_grid.movement_preview.take().unwrap();
+                                Event::ChoseAction(Action::Move {
+                                    action_point_cost,
+                                    direction,
+                                })
+                            }
+                            ActivityPopupState::ReactToAttack => Event::ChoseAttackedReaction(None),
+                            ActivityPopupState::ReactToHit => Event::ChoseHitReaction(None),
+                            ActivityPopupState::ChooseAction => unreachable!(),
+                            ActivityPopupState::Idle => unreachable!(),
+                        };
+                        return Some(event);
+                    }
+
                     ButtonAction::OnAttackedReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToAttack {
                             if self
@@ -1017,6 +1092,7 @@ impl UserInterface {
                             println!("Cannot use this reaction at this time");
                         }
                     }
+
                     ButtonAction::OnHitReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToHit {
                             if self.player_character().can_use_on_hit_reaction(reaction) {
@@ -1028,48 +1104,6 @@ impl UserInterface {
                             println!("Cannot use this reaction at this time");
                         }
                     }
-                    ButtonAction::Proceed => match self.state {
-                        ActivityPopupState::CommitAttackAction { hand, .. } => {
-                            let target_character_i = self.game_grid.target_character_i.unwrap();
-                            return Some(Event::ChoseAction(Action::Attack {
-                                hand,
-                                enhancements: vec![],
-                                target_character_i,
-                            }));
-                        }
-                        ActivityPopupState::CommitSpellAction(spell) => {
-                            let target_character_i = self.game_grid.target_character_i.unwrap();
-                            return Some(Event::ChoseAction(Action::CastSpell {
-                                spell,
-                                enhanced: false,
-                                target_character_i,
-                            }));
-                        }
-                        ActivityPopupState::CommitSelfEffectAction(sea) => {
-                            return Some(Event::ChoseAction(Action::SelfEffect(sea)))
-                        }
-                        ActivityPopupState::CommitMove {
-                            action_point_cost, ..
-                        } => {
-                            let direction = self.game_grid.movement_preview.take().unwrap();
-                            return Some(Event::ChoseAction(Action::Move {
-                                action_point_cost,
-                                direction,
-                            }));
-                        }
-                        ActivityPopupState::ReactToAttack => {
-                            return Some(Event::ChoseAttackedReaction(None))
-                        }
-                        ActivityPopupState::ReactToHit => {
-                            return Some(Event::ChoseHitReaction(None))
-                        }
-                        ActivityPopupState::ChooseAction => {
-                            panic!("Invalid state. How to proceed from choosing action?")
-                        }
-                        ActivityPopupState::Idle => {
-                            panic!("Invalid state. How to proceed from idle?")
-                        }
-                    },
                 }
             }
 
@@ -1102,6 +1136,13 @@ impl UserInterface {
         None
     }
 
+    fn set_highlighted_button(&self, highlighted_button_action: Option<String>) {
+        for (base_action_id, btn) in &self.tracked_buttons {
+            btn.highlighted
+                .set(highlighted_button_action.as_ref() == Some(base_action_id));
+        }
+    }
+
     fn update_character_resources(&mut self, character: &Character) {
         self.health_bar
             .borrow_mut()
@@ -1113,6 +1154,18 @@ impl UserInterface {
             .borrow_mut()
             .set_current(character.stamina.current);
         self.action_points_row.current = character.action_points;
+    }
+}
+
+fn base_action_id(base_action: BaseAction) -> String {
+    match base_action {
+        BaseAction::Attack {
+            hand,
+            action_point_cost,
+        } => format!("ATTACK_{:?}", hand),
+        BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
+        BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
+        BaseAction::Move { action_point_cost } => format!("MOVE"),
     }
 }
 
@@ -1132,7 +1185,7 @@ impl CharacterPortraits {
         let mut elements = vec![];
         for portrait in &portraits {
             let cloned = Rc::clone(portrait);
-            elements.push(Element::Rc(cloned));
+            elements.push(Element::RcRefCell(cloned));
         }
 
         let row = Container {
@@ -1167,7 +1220,7 @@ impl CharacterPortraits {
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
         let y0 = y + self.row.size().1;
         draw_line(
@@ -1204,7 +1257,7 @@ impl CharacterPortrait {
 }
 
 impl Drawable for CharacterPortrait {
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         if self.active {
             let (w, h) = self.size();
             draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
@@ -1279,7 +1332,7 @@ impl Log {
             .push(Element::Text(TextLine::new(text, 18)));
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
         self.lines.draw(x + 10.0, y + 10.0);
     }
@@ -1304,7 +1357,7 @@ impl ActionPointsRow {
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         assert!(self.current <= self.max);
 
         let mut x0 = x + self.padding;
@@ -1362,7 +1415,7 @@ impl ActionPointsRow {
 }
 
 trait Drawable {
-    fn draw(&mut self, x: f32, y: f32);
+    fn draw(&self, x: f32, y: f32);
     fn size(&self) -> (f32, f32);
 }
 
@@ -1374,7 +1427,7 @@ struct ResourceBar {
 }
 
 impl Drawable for ResourceBar {
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         let cell_size = self.cell_size;
         let mut y0 = y;
         for i in 0..self.max {
@@ -1426,8 +1479,8 @@ impl LabelledResourceBar {
             align: Align::Center,
             margin: 5.0,
             elements: vec![
-                Element::Rc(cloned_bar),
-                Element::Rc(cloned_value_text),
+                Element::RcRefCell(cloned_bar),
+                Element::RcRefCell(cloned_value_text),
                 Element::Text(label_text),
             ],
             ..Default::default()
@@ -1450,7 +1503,7 @@ impl LabelledResourceBar {
 }
 
 impl Drawable for LabelledResourceBar {
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         self.list.draw(x, y)
     }
 
@@ -1459,96 +1512,13 @@ impl Drawable for LabelledResourceBar {
     }
 }
 
-fn buttons_row(buttons: Vec<ActionButton>) -> Element {
-    let elements = buttons.into_iter().map(Element::Btn).collect();
+fn buttons_row(buttons: Vec<Element>) -> Element {
     Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
         margin: 5.0,
-        elements,
+        elements: buttons,
         ..Default::default()
     })
-}
-
-fn action_button(
-    subtext: String,
-    action: ButtonAction,
-    event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
-    id: u32,
-) -> ActionButton {
-    let button_size = (90.0, 50.0);
-    let highlight_color = YELLOW;
-    let btn_style = Style {
-        background_color: Some(DARKGRAY),
-        border_color: Some(LIGHTGRAY),
-    };
-
-    let text;
-    let mut mana_points = 0;
-    let mut stamina_points = 0;
-    let mut action_points = 0;
-
-    match action {
-        ButtonAction::Action(base_action) => match base_action {
-            BaseAction::Attack {
-                action_point_cost, ..
-            } => {
-                text = "Attack";
-                action_points = action_point_cost;
-            }
-            BaseAction::SelfEffect(self_effect_action) => {
-                text = self_effect_action.name;
-                action_points = self_effect_action.action_point_cost;
-            }
-            BaseAction::CastSpell(spell) => {
-                text = spell.name;
-                action_points = spell.action_point_cost;
-                mana_points = spell.mana_cost;
-            }
-            BaseAction::Move { action_point_cost } => {
-                action_points = action_point_cost;
-                text = "Move";
-            }
-        },
-        ButtonAction::AttackEnhancement(enhancement) => {
-            text = enhancement.name;
-            action_points = enhancement.action_point_cost;
-            stamina_points = enhancement.stamina_cost;
-        }
-        ButtonAction::Proceed => {
-            text = "Proceed";
-        }
-        ButtonAction::SpellEnhancement(enhancement) => {
-            text = enhancement.name;
-            mana_points = enhancement.mana_cost;
-        }
-        ButtonAction::OnAttackedReaction(reaction) => {
-            text = reaction.name;
-            action_points = reaction.action_point_cost;
-            stamina_points = reaction.stamina_cost;
-        }
-        ButtonAction::OnHitReaction(reaction) => {
-            text = reaction.name;
-            action_points = reaction.action_point_cost;
-        }
-    }
-
-    let mut btn = ActionButton::new(
-        id,
-        action,
-        button_size,
-        btn_style,
-        text,
-        subtext,
-        highlight_color,
-        action_points,
-        mana_points,
-        stamina_points,
-    );
-
-    btn.event_sender = Some(EventSender {
-        queue: Rc::clone(event_queue),
-    });
-    btn
 }
 
 fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>) -> Container {
@@ -1606,7 +1576,8 @@ enum Element {
     Rect(Rectangle),
     TabLink(TabLink),
     Box(Box<dyn Drawable>),
-    Rc(Rc<RefCell<dyn Drawable>>),
+    RcRefCell(Rc<RefCell<dyn Drawable>>),
+    Rc(Rc<dyn Drawable>),
 }
 
 impl Element {
@@ -1619,14 +1590,15 @@ impl Element {
             Element::Rect(rect) => rect.size,
             Element::TabLink(link) => link.size,
             Element::Box(drawable) => drawable.size(),
-            Element::Rc(drawable) => drawable.borrow().size(),
+            Element::RcRefCell(drawable) => drawable.borrow().size(),
+            Element::Rc(drawable) => drawable.size(),
         };
 
         assert!(size.0.is_finite() && size.1.is_finite());
         size
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         match self {
             Element::Btn(btn) => btn.draw(x, y),
             Element::Container(container) => container.draw(x, y),
@@ -1635,7 +1607,8 @@ impl Element {
             Element::Rect(rect) => rect.draw(x, y),
             Element::TabLink(link) => link.draw(x, y),
             Element::Box(drawable) => drawable.draw(x, y),
-            Element::Rc(drawable) => drawable.borrow_mut().draw(x, y),
+            Element::RcRefCell(drawable) => drawable.borrow_mut().draw(x, y),
+            Element::Rc(drawable) => drawable.draw(x, y),
         }
     }
 
@@ -1648,7 +1621,7 @@ impl Element {
 }
 
 struct Tabs {
-    links_row: Container,
+    links: Container,
     tabs: Vec<Element>,
     active_i: usize,
 }
@@ -1666,7 +1639,7 @@ impl Tabs {
 
         let tabs: Vec<Element> = links_and_tabs.into_iter().map(|t| t.1).collect();
         Self {
-            links_row,
+            links: links_row,
             tabs,
             active_i,
         }
@@ -1675,22 +1648,22 @@ impl Tabs {
     fn draw(&mut self, x: f32, y: f32) {
         // If a link was clicked, update the state of all links
         let mut maybe_clicked_i = None;
-        for (i, element) in self.links_row.elements.iter_mut().enumerate() {
-            if element.unwrap_tab_link().was_clicked {
+        for (i, link) in self.links.elements.iter_mut().enumerate() {
+            if link.unwrap_tab_link().was_clicked.get() {
                 maybe_clicked_i = Some(i);
                 self.active_i = i;
                 break;
             }
         }
         if let Some(clicked_i) = maybe_clicked_i {
-            for (i, element) in self.links_row.elements.iter_mut().enumerate() {
+            for (i, element) in self.links.elements.iter_mut().enumerate() {
                 let tab_link = element.unwrap_tab_link();
-                tab_link.was_clicked = false;
+                tab_link.was_clicked.set(false);
                 tab_link.active = i == clicked_i;
             }
         }
 
-        self.links_row.draw(x, y);
+        self.links.draw(x, y);
 
         self.tabs[self.active_i].draw(x, y + 40.0);
     }
@@ -1701,7 +1674,7 @@ struct TabLink {
     active: bool,
     padding: f32,
     size: (f32, f32),
-    was_clicked: bool,
+    was_clicked: Cell<bool>,
 }
 
 impl TabLink {
@@ -1714,11 +1687,11 @@ impl TabLink {
             active: false,
             padding,
             size: (padding * 2.0 + text_size.0, padding * 2.0 + text_size.1),
-            was_clicked: false,
+            was_clicked: Cell::new(false),
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         if self.active {
             draw_rectangle(x, y, self.size.0, self.size.1, DARKGREEN);
         }
@@ -1727,7 +1700,7 @@ impl TabLink {
             let (mouse_x, mouse_y) = mouse_position();
             if (x..=x + self.size.0).contains(&mouse_x) && (y..=y + self.size.1).contains(&mouse_y)
             {
-                self.was_clicked = true;
+                self.was_clicked.set(true);
             }
         }
 
@@ -1805,13 +1778,13 @@ impl Container {
         (w, h)
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         let size = self.size();
         self.style.draw(x, y, size);
 
         let mut x0 = x + self.padding;
         let mut y0 = y + self.padding;
-        for element in &mut self.elements {
+        for element in &self.elements {
             let (element_w, element_h) = element.size();
 
             let offset = match (&self.align, &self.layout_dir) {
@@ -1882,7 +1855,7 @@ impl TextLine {
 }
 
 impl Drawable for TextLine {
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         draw_text(
             &self.string,
             x,
@@ -1898,7 +1871,7 @@ impl Drawable for TextLine {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 enum ButtonAction {
     Action(BaseAction),
     OnAttackedReaction(OnAttackedReaction),
@@ -1927,27 +1900,79 @@ struct ActionButton {
     size: (f32, f32),
     style: Style,
     content: Box<Element>,
-    highlight_border_color: Color,
+    hover_border_color: Color,
     points_row: Container,
     point_radius: f32,
-    hovered: bool,
+    hovered: Cell<bool>,
     enabled: bool,
+    highlighted: Cell<bool>,
     event_sender: Option<EventSender>,
 }
 
 impl ActionButton {
     fn new(
-        id: u32,
+        subtext: String,
         action: ButtonAction,
-        size: (f32, f32),
-        style: Style,
-        text: impl Into<String>,
-        subtext: impl Into<String>,
-        highlight_border_color: Color,
-        action_points: u32,
-        mana_points: u32,
-        stamina_points: u32,
+        event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
+        id: u32,
     ) -> Self {
+        let text;
+        let mut mana_points = 0;
+        let mut stamina_points = 0;
+        let mut action_points = 0;
+
+        match action {
+            ButtonAction::Action(base_action) => match base_action {
+                BaseAction::Attack {
+                    action_point_cost, ..
+                } => {
+                    text = "Attack";
+                    action_points = action_point_cost;
+                }
+                BaseAction::SelfEffect(self_effect_action) => {
+                    text = self_effect_action.name;
+                    action_points = self_effect_action.action_point_cost;
+                }
+                BaseAction::CastSpell(spell) => {
+                    text = spell.name;
+                    action_points = spell.action_point_cost;
+                    mana_points = spell.mana_cost;
+                }
+                BaseAction::Move { action_point_cost } => {
+                    action_points = action_point_cost;
+                    text = "Move";
+                }
+            },
+            ButtonAction::AttackEnhancement(enhancement) => {
+                text = enhancement.name;
+                action_points = enhancement.action_point_cost;
+                stamina_points = enhancement.stamina_cost;
+            }
+            ButtonAction::Proceed => {
+                text = "Proceed";
+            }
+            ButtonAction::SpellEnhancement(enhancement) => {
+                text = enhancement.name;
+                mana_points = enhancement.mana_cost;
+            }
+            ButtonAction::OnAttackedReaction(reaction) => {
+                text = reaction.name;
+                action_points = reaction.action_point_cost;
+                stamina_points = reaction.stamina_cost;
+            }
+            ButtonAction::OnHitReaction(reaction) => {
+                text = reaction.name;
+                action_points = reaction.action_point_cost;
+            }
+        }
+
+        let size = (90.0, 50.0);
+        let style = Style {
+            background_color: Some(DARKGRAY),
+            border_color: Some(LIGHTGRAY),
+        };
+        let hover_border_color = YELLOW;
+
         let r = 4.0;
         let mut point_icons = vec![];
         for _ in 0..action_points {
@@ -1985,7 +2010,6 @@ impl ActionButton {
         };
 
         let text = Element::Text(TextLine::new(text, 20));
-        let subtext = subtext.into();
         let content = if !subtext.is_empty() {
             Box::new(Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -2004,25 +2028,30 @@ impl ActionButton {
             size,
             style,
             content,
-            highlight_border_color,
+            hover_border_color,
             points_row,
             point_radius: r,
-            hovered: false,
+            hovered: Cell::new(false),
             enabled: true,
-            event_sender: None,
+            highlighted: Cell::new(false),
+            event_sender: Some(EventSender {
+                queue: Rc::clone(&event_queue),
+            }),
         }
     }
 
     fn notify_hidden(&self) {
-        if self.hovered {
+        if self.hovered.get() {
             if let Some(event_sender) = &self.event_sender {
                 // Since this button has become hidden, it's no longer hovered
-                event_sender.send(InternalUiEvent::ButtonHovered(false, self.id, self.action));
+                event_sender.send(InternalUiEvent::ButtonHovered(self.id, self.action, false));
             }
         }
     }
+}
 
-    fn draw(&mut self, x: f32, y: f32) {
+impl Drawable for ActionButton {
+    fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size;
         self.style.draw(x, y, self.size);
 
@@ -2030,26 +2059,30 @@ impl ActionButton {
 
         if self.enabled {
             let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
-            if hovered != self.hovered {
-                self.hovered = hovered;
+            if hovered != self.hovered.get() {
+                self.hovered.set(hovered);
                 if let Some(event_sender) = &self.event_sender {
                     event_sender.send(InternalUiEvent::ButtonHovered(
-                        hovered,
                         self.id,
                         self.action,
+                        hovered,
                     ));
                 }
             }
             if hovered {
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if let Some(event_sender) = &self.event_sender {
-                        event_sender.send(InternalUiEvent::ButtonClicked(self.action));
+                        event_sender.send(InternalUiEvent::ButtonClicked(self.id, self.action));
                     }
                 }
-                draw_rectangle_lines(x, y, w, h, 1.0, self.highlight_border_color);
+                draw_rectangle_lines(x, y, w, h, 1.0, self.hover_border_color);
             }
         } else {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
+        }
+
+        if self.highlighted.get() {
+            draw_rectangle_lines(x, y, w, h, 2.0, GREEN);
         }
 
         let margin_x = (w - self.content.size().0) / 2.0;
@@ -2063,11 +2096,15 @@ impl ActionButton {
 
         draw_debug(x, y, w, h);
     }
+
+    fn size(&self) -> (f32, f32) {
+        self.size
+    }
 }
 
 enum InternalUiEvent {
-    ButtonHovered(bool, u32, ButtonAction),
-    ButtonClicked(ButtonAction),
+    ButtonHovered(u32, ButtonAction, bool),
+    ButtonClicked(u32, ButtonAction),
     SwitchedToMoveInGrid,
     SwitchedToAttackInGrid,
 }
