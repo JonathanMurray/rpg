@@ -40,7 +40,7 @@ impl CoreGame {
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new("Charlie", 1, 1, 1, (0, 3));
+        let mut charlie = Character::new("Charlie", 1, 1, 1, (8, 2));
         charlie.main_hand.weapon = Some(BOW);
 
         let characters = Characters::new(vec![bob, alice, charlie]);
@@ -170,6 +170,7 @@ impl CoreGame {
                 target_character_i,
             } => {
                 let mut target_character = self.characters.get(target_character_i).borrow_mut();
+                assert!(character.can_reach_with_spell(spell, target_character.position));
                 self.perform_spell(&mut character, spell, enhanced, &mut target_character);
             }
             Action::Move {
@@ -999,6 +1000,7 @@ pub struct Spell {
     pub on_hit_effect: Option<ApplyEffect>,
     pub spell_type: SpellType,
     pub possible_enhancement: Option<SpellEnhancement>,
+    pub range: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1106,13 +1108,11 @@ impl Character {
 
     pub fn can_reach_with_attack(&self, hand: HandType, target_position: (u32, u32)) -> bool {
         let weapon = self.weapon(hand).unwrap();
-        let range_squared = match weapon.range {
-            WeaponRange::Melee => 2,
-            WeaponRange::Ranged(r) => r * r,
-        } as i32;
-        let distance_squared = (target_position.0 as i32 - self.position.0 as i32).pow(2)
-            + (target_position.1 as i32 - self.position.1 as i32).pow(2);
-        distance_squared <= range_squared
+        within_range(weapon.range.squared(), self.position, target_position)
+    }
+
+    pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
+        within_range(spell.range.pow(2), self.position, target_position)
     }
 
     pub fn known_actions(&self) -> Vec<(String, BaseAction)> {
@@ -1340,7 +1340,7 @@ impl Character {
         res
     }
 
-    fn explain_attack_circumstances(&self, hand_type: HandType) -> String {
+    pub fn explain_attack_circumstances(&self, hand_type: HandType) -> String {
         let mut s = String::new();
         if self.hand(hand_type).exertion > 0 {
             s.push_str("[exerted -]");
@@ -1364,7 +1364,7 @@ impl Character {
         0
     }
 
-    fn explain_incoming_attack_circumstances(&self) -> String {
+    pub fn explain_incoming_attack_circumstances(&self) -> String {
         let mut s = String::new();
         if self.is_dazed() {
             s.push_str("[dazed +]")
@@ -1385,6 +1385,12 @@ impl Character {
             Condition::Weakened(n) => self.conditions.weakened += n,
         }
     }
+}
+
+fn within_range(range_squared: u32, source: (u32, u32), destination: (u32, u32)) -> bool {
+    let distance_squared = (destination.0 as i32 - source.0 as i32).pow(2)
+        + (destination.1 as i32 - source.1 as i32).pow(2);
+    distance_squared <= range_squared as i32
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1452,4 +1458,13 @@ pub enum WeaponGrip {
 pub enum WeaponRange {
     Melee,
     Ranged(u32),
+}
+
+impl WeaponRange {
+    fn squared(&self) -> u32 {
+        match self {
+            WeaponRange::Melee => 2,
+            WeaponRange::Ranged(r) => r.pow(2),
+        }
+    }
 }

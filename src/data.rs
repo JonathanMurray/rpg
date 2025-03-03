@@ -156,6 +156,7 @@ pub const SCREAM: Spell = Spell {
         mana_cost: 1,
         effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
     }),
+    range: 4,
 };
 
 pub const MIND_BLAST: Spell = Spell {
@@ -171,6 +172,7 @@ pub const MIND_BLAST: Spell = Spell {
         mana_cost: 1,
         effect: SpellEnhancementEffect::CastTwice,
     }),
+    range: 5,
 };
 
 pub const FIREBALL: Spell = Spell {
@@ -182,4 +184,5 @@ pub const FIREBALL: Spell = Spell {
     on_hit_effect: None,
     spell_type: SpellType::Projectile,
     possible_enhancement: None,
+    range: 5,
 };

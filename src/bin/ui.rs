@@ -6,7 +6,7 @@ use std::{
 use macroquad::{
     color::{
         self, Color, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN,
-        LIGHTGRAY, MAGENTA, ORANGE, PINK, PURPLE, RED, WHITE, YELLOW,
+        LIGHTGRAY, MAGENTA, MAROON, ORANGE, PINK, PURPLE, RED, WHITE, YELLOW,
     },
     input::{
         is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
@@ -139,10 +139,11 @@ struct GameGrid {
     active_character_i: usize,
     movement_preview: Option<(i32, i32)>,
     target_character_i: Option<usize>,
+    event_sender: EventSender,
 }
 
 impl GameGrid {
-    fn new(characters: Vec<(impl Into<String>, (u32, u32))>) -> Self {
+    fn new(characters: Vec<(impl Into<String>, (u32, u32))>, event_sender: EventSender) -> Self {
         let characters = characters
             .into_iter()
             .map(|(s, pos)| (TextLine::new(s, 25), (pos.0 as i32, pos.1 as i32)))
@@ -153,6 +154,7 @@ impl GameGrid {
             active_character_i: 0,
             movement_preview: None,
             target_character_i: None,
+            event_sender,
         }
     }
 
@@ -164,7 +166,7 @@ impl GameGrid {
         }
     }
 
-    fn draw(&mut self, x: f32, y: f32) -> bool {
+    fn draw(&mut self, x: f32, y: f32) {
         let cell_w = 25.0;
         let grid_dimensions = (20, 12);
 
@@ -191,8 +193,6 @@ impl GameGrid {
             cell_w,
             BROWN,
         );
-
-        let mut tell_ui_to_enter_move_state = false;
 
         for col in 0..grid_dimensions.0 + 1 {
             let x0 = grid_x_to_screen(col);
@@ -259,22 +259,24 @@ impl GameGrid {
 
             if valid_move_destination {
                 draw_square((mouse_grid_x, mouse_grid_y), YELLOW);
+                if is_mouse_button_down(MouseButton::Left) {
+                    if self.movement_preview.is_none() {
+                        self.event_sender
+                            .send(InternalUiEvent::SwitchedToMoveInGrid);
+                    }
+                    self.movement_preview = Some((dx, dy));
+                }
+            } else if let Some(i) = hovered_npc_i {
+                draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
+                if is_mouse_button_down(MouseButton::Left) {
+                    if self.target_character_i.is_none() {
+                        self.event_sender
+                            .send(InternalUiEvent::SwitchedToAttackInGrid);
+                    }
+                    self.target_character_i = Some(i);
+                }
             } else if self.movement_preview.is_some() {
                 draw_square((mouse_grid_x, mouse_grid_y), RED);
-            } else if self.target_character_i.is_some() {
-                if let Some(npc_i) = hovered_npc_i {
-                    draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
-                    if is_mouse_button_down(MouseButton::Left) {
-                        self.target_character_i = Some(npc_i);
-                    }
-                }
-            }
-
-            if is_mouse_button_down(MouseButton::Left) && valid_move_destination {
-                if self.movement_preview.is_none() {
-                    tell_ui_to_enter_move_state = true;
-                }
-                self.movement_preview = Some((dx, dy));
             }
         }
 
@@ -310,8 +312,6 @@ impl GameGrid {
             let target_pos = self.characters[character_i].1;
             draw_square(target_pos, MAGENTA);
         }
-
-        tell_ui_to_enter_move_state
     }
 }
 
@@ -371,11 +371,22 @@ enum ActivityPopupState {
 struct ActivityPopup {
     state: ActivityPopupState,
     lines: Vec<String>,
-    buttons: Vec<ActionButton>,
     details: Option<String>,
+    buttons: Vec<ActionButton>,
+    enabled: bool,
 }
 
 impl ActivityPopup {
+    fn new(state: ActivityPopupState) -> Self {
+        Self {
+            state,
+            lines: vec![],
+            details: None,
+            buttons: vec![],
+            enabled: true,
+        }
+    }
+
     fn draw(&mut self, x: f32, y: f32) {
         if matches!(self.state, ActivityPopupState::Idle) {
             return;
@@ -396,35 +407,44 @@ impl ActivityPopup {
             y0 += 20.0;
         }
 
-        match &self.state {
-            ActivityPopupState::ChooseAction => {
-                draw_text("Choose an action!", x0, y0, 20.0, WHITE);
+        if self.enabled {
+            match &self.state {
+                ActivityPopupState::ChooseAction => {
+                    draw_text("Choose an action!", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::CommitAttackAction { .. } => {
+                    draw_text("Add enhancement or proceed", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::CommitSpellAction(_spell) => {
+                    draw_text("Add enhancement or proceed", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::CommitSelfEffectAction(..) => {
+                    draw_text("Proceed?", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::CommitMove { .. } => {
+                    draw_text("Change the direction or proceed", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::ReactToAttack => {
+                    draw_text("React to the attack?", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::ReactToHit => {
+                    draw_text("React to being hit?", x0, y0, 20.0, WHITE);
+                }
+                ActivityPopupState::Idle => unreachable!(),
             }
-            ActivityPopupState::CommitAttackAction { .. } => {
-                draw_text("Add enhancement or proceed", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::CommitSpellAction(_spell) => {
-                draw_text("Add enhancement or proceed", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::CommitSelfEffectAction(..) => {
-                draw_text("Proceed?", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::CommitMove { .. } => {
-                draw_text("Change the direction or proceed", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::ReactToAttack => {
-                draw_text("React to the attack?", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::ReactToHit => {
-                draw_text("React to being hit?", x0, y0, 20.0, WHITE);
-            }
-            ActivityPopupState::Idle => unreachable!(),
         }
 
         y0 += 20.0;
         for btn in &mut self.buttons {
             btn.draw(x0, y0);
             x0 += btn.size.0 + 10.0;
+        }
+    }
+
+    fn set_enabled(&mut self, enabled: bool) {
+        self.enabled = enabled;
+        for btn in &mut self.buttons {
+            btn.enabled = enabled;
         }
     }
 
@@ -493,13 +513,14 @@ impl UserInterface {
                 BaseAction::CastSpell(spell) => {
                     if let Some(enhancement) = spell.possible_enhancement {
                         let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                        let btn = new_button(spell.name.to_string(), btn_action);
+                        let mut btn = new_button(spell.name.to_string(), btn_action);
+                        btn.enabled = false;
                         spell_enhancement_buttons.push(btn);
                     }
 
                     spell_buttons.push(btn)
                 }
-                BaseAction::Move { action_point_cost } => {
+                BaseAction::Move { .. } => {
                     skill_buttons.push(btn);
                 }
             }
@@ -512,18 +533,22 @@ impl UserInterface {
         let mut reaction_buttons = vec![];
         for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
             let btn_action = ButtonAction::OnAttackedReaction(reaction);
-            reaction_buttons.push(new_button(subtext.clone(), btn_action));
+            let mut btn = new_button(subtext.clone(), btn_action);
+            btn.enabled = false;
+            reaction_buttons.push(btn);
         }
         for (subtext, reaction) in character_ref.known_on_hit_reactions() {
             let btn_action = ButtonAction::OnHitReaction(reaction);
-            let btn = new_button(subtext.clone(), btn_action);
+            let mut btn = new_button(subtext.clone(), btn_action);
+            btn.enabled = false;
             reaction_buttons.push(btn);
         }
 
         let mut attack_enhancement_buttons = vec![];
         for (subtext, enhancement) in character_ref.known_attack_enhancements(HandType::MainHand) {
             let btn_action = ButtonAction::AttackEnhancement(enhancement);
-            let btn = new_button(subtext, btn_action);
+            let mut btn = new_button(subtext.clone(), btn_action);
+            btn.enabled = false;
             attack_enhancement_buttons.push(btn);
         }
 
@@ -569,7 +594,6 @@ impl UserInterface {
             ..Default::default()
         });
 
-        // TODO These buttons should not be "active" (not clickable or hoverable)
         let secondary_actions_section = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 5.0,
@@ -637,7 +661,12 @@ impl UserInterface {
         for character in &characters {
             grid_characters.push((&character.borrow().name[0..1], character.borrow().position));
         }
-        let game_grid = GameGrid::new(grid_characters);
+        let game_grid = GameGrid::new(
+            grid_characters,
+            EventSender {
+                queue: Rc::clone(&event_queue),
+            },
+        );
 
         Self {
             game_grid,
@@ -654,12 +683,7 @@ impl UserInterface {
             health_bar,
             mana_bar,
             stamina_bar,
-            activity_popup: ActivityPopup {
-                state,
-                lines: Default::default(),
-                buttons: vec![],
-                details: None,
-            },
+            activity_popup: ActivityPopup::new(state),
             state,
         }
     }
@@ -676,43 +700,7 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
-        let enter_move_state = self.game_grid.draw(100.0, y - 490.0);
-        if enter_move_state {
-            self.set_state(
-                ActivityPopupState::CommitMove {
-                    action_point_cost: 1,
-                },
-                vec![],
-            );
-        }
-
-        let target_character = self
-            .game_grid
-            .target_character_i
-            .map(|i| &self.characters[i]);
-
-        self.activity_popup.details = target_character.map(|target_char| {
-            let target_char = target_char.borrow();
-            match self.state {
-                ActivityPopupState::CommitAttackAction { hand, .. } => {
-                    let chance = as_percentage(prob_attack_hit(
-                        &self.player_character(),
-                        hand,
-                        &target_char,
-                    ));
-                    format!("target: {}, hit chance: {}", target_char.name, chance)
-                }
-                ActivityPopupState::CommitSpellAction(spell) => {
-                    let chance = as_percentage(prob_spell_hit(
-                        &self.player_character(),
-                        spell.spell_type,
-                        &target_char,
-                    ));
-                    format!("target: {}, success chance: {}", target_char.name, chance)
-                }
-                _ => unreachable!(),
-            }
-        });
+        self.game_grid.draw(100.0, y - 490.0);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
@@ -739,6 +727,12 @@ impl UserInterface {
                 hand,
                 action_point_cost,
             } => {
+                let weapon = self.player_character().weapon(hand).unwrap();
+                lines.push(format!(
+                    "{} attack ({} AP)",
+                    weapon.name, weapon.action_point_cost
+                ));
+                lines.push(format!("{} damage", weapon.damage));
                 self.reserved_action_points = action_point_cost;
                 let enhancements = self.player_character().usable_attack_enhancements(hand);
                 for (subtext, enhancement) in enhancements {
@@ -750,6 +744,15 @@ impl UserInterface {
                 has_target = true;
             }
             ActivityPopupState::CommitSpellAction(spell) => {
+                lines.push(format!(
+                    "{} ({} AP, {} mana)",
+                    spell.name, spell.action_point_cost, spell.mana_cost
+                ));
+                let mut description = spell.description.to_string();
+                if spell.damage > 0 {
+                    description.push_str(&format!(" ({} damage)", spell.damage));
+                }
+                lines.push(description);
                 self.reserved_action_points = spell.action_point_cost;
                 if let Some(enhancement) = spell.possible_enhancement {
                     if self.player_character().can_use_spell_enhancement(spell) {
@@ -762,12 +765,14 @@ impl UserInterface {
                 has_target = true;
             }
             ActivityPopupState::CommitSelfEffectAction(sea) => {
+                lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
+                lines.push(sea.description.to_string());
                 self.reserved_action_points = sea.action_point_cost;
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
             ActivityPopupState::CommitMove { action_point_cost } => {
                 self.reserved_action_points = action_point_cost;
-                lines.push(format!("Movement"));
+                lines.push(format!("Movement ({} AP)", action_point_cost));
                 movement_preview = Some((1, 0));
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
@@ -839,6 +844,59 @@ impl UserInterface {
         };
         self.action_points_row.reserved_and_hovered = ap;
 
+        self.activity_popup.set_enabled(true);
+        self.activity_popup.details = None;
+
+        if let Some(i) = self.game_grid.target_character_i {
+            let target_char = self.characters[i].borrow();
+            match self.state {
+                ActivityPopupState::CommitAttackAction { hand, .. } => {
+                    if self
+                        .player_character()
+                        .can_reach_with_attack(hand, target_char.position)
+                    {
+                        let chance = as_percentage(prob_attack_hit(
+                            &self.player_character(),
+                            hand,
+                            &target_char,
+                        ));
+                        let mut explanation =
+                            self.player_character().explain_attack_circumstances(hand);
+                        explanation.push_str(&target_char.explain_incoming_attack_circumstances());
+                        self.activity_popup.details = Some(format!(
+                            "target: {}, hit chance: {} {}",
+                            target_char.name, chance, explanation
+                        ));
+                    } else {
+                        self.activity_popup.details =
+                            Some(format!("target: {}, OUT OF RANGE", target_char.name));
+                        self.activity_popup.set_enabled(false);
+                    }
+                }
+                ActivityPopupState::CommitSpellAction(spell) => {
+                    if self
+                        .player_character()
+                        .can_reach_with_spell(spell, target_char.position)
+                    {
+                        let chance = as_percentage(prob_spell_hit(
+                            &self.player_character(),
+                            spell.spell_type,
+                            &target_char,
+                        ));
+                        self.activity_popup.details = Some(format!(
+                            "target: {}, success chance: {}",
+                            target_char.name, chance
+                        ));
+                    } else {
+                        self.activity_popup.details =
+                            Some(format!("target: {}, OUT OF RANGE", target_char.name));
+                        self.activity_popup.set_enabled(false);
+                    }
+                }
+                _ => unreachable!(),
+            }
+        }
+
         public_events
     }
 
@@ -854,7 +912,6 @@ impl UserInterface {
                         }
                     }
                 }
-                None
             }
 
             InternalUiEvent::ButtonClicked(btn_action) => {
@@ -878,55 +935,35 @@ impl UserInterface {
                                     hand,
                                     action_point_cost,
                                 } => {
-                                    let weapon = self.player_character().weapon(hand).unwrap();
-                                    let description = format!(
-                                        "Attack ({}: {} damage)",
-                                        weapon.name, weapon.damage
-                                    );
                                     self.set_state(
                                         ActivityPopupState::CommitAttackAction {
                                             hand,
                                             action_point_cost,
                                         },
-                                        vec![description],
+                                        vec![],
                                     );
-                                    None
                                 }
                                 BaseAction::SelfEffect(sea) => {
-                                    let description = format!("{}: {}", sea.name, sea.description);
                                     self.set_state(
                                         ActivityPopupState::CommitSelfEffectAction(sea),
-                                        vec![description],
+                                        vec![],
                                     );
-                                    None
                                 }
                                 BaseAction::CastSpell(spell) => {
-                                    let mut description = format!(
-                                        "{}: {}",
-                                        spell.name,
-                                        spell.description.to_string()
-                                    );
-                                    if spell.damage > 0 {
-                                        description
-                                            .push_str(&format!(" ({} damage)", spell.damage));
-                                    }
                                     self.set_state(
                                         ActivityPopupState::CommitSpellAction(spell),
-                                        vec![description],
+                                        vec![],
                                     );
-                                    None
                                 }
                                 BaseAction::Move { action_point_cost } => {
                                     self.set_state(
                                         ActivityPopupState::CommitMove { action_point_cost },
                                         vec![],
                                     );
-                                    None
                                 }
                             }
                         } else {
                             println!("Cannot choose this action at this time");
-                            None
                         }
                     }
                     ButtonAction::AttackEnhancement(enhancement) => match self.state {
@@ -936,38 +973,34 @@ impl UserInterface {
                                 .can_use_attack_enhancement(hand, &enhancement)
                             {
                                 let target_character_i = self.game_grid.target_character_i.unwrap();
-                                Some(Event::ChoseAction(Action::Attack {
+                                return Some(Event::ChoseAction(Action::Attack {
                                     hand,
                                     enhancements: vec![enhancement],
                                     target_character_i,
-                                }))
+                                }));
                             } else {
                                 println!("Cannot use this attack enhancement");
-                                None
                             }
                         }
                         _ => {
                             println!("Cannot choose attack enhancement at this time");
-                            None
                         }
                     },
                     ButtonAction::SpellEnhancement(_enhancement) => match self.state {
                         ActivityPopupState::CommitSpellAction(spell) => {
                             if self.player_character().can_use_spell_enhancement(spell) {
                                 let target_character_i = self.game_grid.target_character_i.unwrap();
-                                Some(Event::ChoseAction(Action::CastSpell {
+                                return Some(Event::ChoseAction(Action::CastSpell {
                                     spell,
                                     enhanced: true,
                                     target_character_i,
-                                }))
+                                }));
                             } else {
                                 println!("Cannot use this spell enhancement");
-                                None
                             }
                         }
                         _ => {
                             println!("Cannot choose spell enhancement at this time");
-                            None
                         }
                     },
                     ButtonAction::OnAttackedReaction(reaction) => {
@@ -976,62 +1009,60 @@ impl UserInterface {
                                 .player_character()
                                 .can_use_on_attacked_reaction(reaction)
                             {
-                                Some(Event::ChoseAttackedReaction(Some(reaction)))
+                                return Some(Event::ChoseAttackedReaction(Some(reaction)));
                             } else {
                                 println!("Cannot afford this reaction at this time");
-                                None
                             }
                         } else {
                             println!("Cannot use this reaction at this time");
-                            None
                         }
                     }
                     ButtonAction::OnHitReaction(reaction) => {
                         if self.state == ActivityPopupState::ReactToHit {
                             if self.player_character().can_use_on_hit_reaction(reaction) {
-                                Some(Event::ChoseHitReaction(Some(reaction)))
+                                return Some(Event::ChoseHitReaction(Some(reaction)));
                             } else {
                                 println!("Cannot afford this reaction at this time");
-                                None
                             }
                         } else {
                             println!("Cannot use this reaction at this time");
-                            None
                         }
                     }
                     ButtonAction::Proceed => match self.state {
                         ActivityPopupState::CommitAttackAction { hand, .. } => {
                             let target_character_i = self.game_grid.target_character_i.unwrap();
-                            Some(Event::ChoseAction(Action::Attack {
+                            return Some(Event::ChoseAction(Action::Attack {
                                 hand,
                                 enhancements: vec![],
                                 target_character_i,
-                            }))
+                            }));
                         }
                         ActivityPopupState::CommitSpellAction(spell) => {
                             let target_character_i = self.game_grid.target_character_i.unwrap();
-                            Some(Event::ChoseAction(Action::CastSpell {
+                            return Some(Event::ChoseAction(Action::CastSpell {
                                 spell,
                                 enhanced: false,
                                 target_character_i,
-                            }))
+                            }));
                         }
                         ActivityPopupState::CommitSelfEffectAction(sea) => {
-                            Some(Event::ChoseAction(Action::SelfEffect(sea)))
+                            return Some(Event::ChoseAction(Action::SelfEffect(sea)))
                         }
                         ActivityPopupState::CommitMove {
                             action_point_cost, ..
                         } => {
                             let direction = self.game_grid.movement_preview.take().unwrap();
-                            Some(Event::ChoseAction(Action::Move {
+                            return Some(Event::ChoseAction(Action::Move {
                                 action_point_cost,
                                 direction,
-                            }))
+                            }));
                         }
                         ActivityPopupState::ReactToAttack => {
-                            Some(Event::ChoseAttackedReaction(None))
+                            return Some(Event::ChoseAttackedReaction(None))
                         }
-                        ActivityPopupState::ReactToHit => Some(Event::ChoseHitReaction(None)),
+                        ActivityPopupState::ReactToHit => {
+                            return Some(Event::ChoseHitReaction(None))
+                        }
                         ActivityPopupState::ChooseAction => {
                             panic!("Invalid state. How to proceed from choosing action?")
                         }
@@ -1041,7 +1072,34 @@ impl UserInterface {
                     },
                 }
             }
+
+            InternalUiEvent::SwitchedToMoveInGrid => {
+                self.set_state(
+                    ActivityPopupState::CommitMove {
+                        action_point_cost: 1,
+                    },
+                    vec![],
+                );
+            }
+
+            InternalUiEvent::SwitchedToAttackInGrid => {
+                let hand = HandType::MainHand;
+                let action_point_cost = self
+                    .player_character()
+                    .weapon(hand)
+                    .unwrap()
+                    .action_point_cost;
+                self.set_state(
+                    ActivityPopupState::CommitAttackAction {
+                        hand,
+                        action_point_cost,
+                    },
+                    vec![],
+                );
+            }
         }
+
+        None
     }
 
     fn update_character_resources(&mut self, character: &Character) {
@@ -1873,6 +1931,7 @@ struct ActionButton {
     points_row: Container,
     point_radius: f32,
     hovered: bool,
+    enabled: bool,
     event_sender: Option<EventSender>,
 }
 
@@ -1949,6 +2008,7 @@ impl ActionButton {
             points_row,
             point_radius: r,
             hovered: false,
+            enabled: true,
             event_sender: None,
         }
     }
@@ -1968,26 +2028,28 @@ impl ActionButton {
 
         let (mouse_x, mouse_y) = mouse_position();
 
-        let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
-        if hovered != self.hovered {
-            self.hovered = hovered;
-            if let Some(event_sender) = &self.event_sender {
-                event_sender.send(InternalUiEvent::ButtonHovered(
-                    hovered,
-                    self.id,
-                    self.action,
-                ));
+        if self.enabled {
+            let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
+            if hovered != self.hovered {
+                self.hovered = hovered;
+                if let Some(event_sender) = &self.event_sender {
+                    event_sender.send(InternalUiEvent::ButtonHovered(
+                        hovered,
+                        self.id,
+                        self.action,
+                    ));
+                }
             }
-        }
-
-        if hovered && is_mouse_button_pressed(MouseButton::Left) {
-            if let Some(event_sender) = &self.event_sender {
-                event_sender.send(InternalUiEvent::ButtonClicked(self.action));
+            if hovered {
+                if is_mouse_button_pressed(MouseButton::Left) {
+                    if let Some(event_sender) = &self.event_sender {
+                        event_sender.send(InternalUiEvent::ButtonClicked(self.action));
+                    }
+                }
+                draw_rectangle_lines(x, y, w, h, 1.0, self.highlight_border_color);
             }
-        }
-
-        if hovered {
-            draw_rectangle_lines(x, y, w, h, 1.0, self.highlight_border_color);
+        } else {
+            draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
 
         let margin_x = (w - self.content.size().0) / 2.0;
@@ -2006,6 +2068,8 @@ impl ActionButton {
 enum InternalUiEvent {
     ButtonHovered(bool, u32, ButtonAction),
     ButtonClicked(ButtonAction),
+    SwitchedToMoveInGrid,
+    SwitchedToAttackInGrid,
 }
 
 enum Event {
