@@ -340,20 +340,34 @@ fn change_state(state: &State, user_interface: &mut UserInterface) {
     match state {
         State::AwaitingPlayerInput(game_state) => match game_state {
             GameState::AwaitingPlayerAction(..) => {
-                user_interface.set_state(ActivityPopupState::ChooseAction, vec![]);
+                user_interface.set_state(ActivityPopupState::ChooseAction);
             }
-            GameState::AwaitingPlayerAttackReaction(StateReactToAttack { lines, .. }) => {
-                user_interface.set_state(ActivityPopupState::ReactToAttack, lines.clone());
+            GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
+                attacking_character_i,
+                hand,
+                ..
+            }) => {
+                user_interface.set_state(ActivityPopupState::ReactToAttack {
+                    attacking_character_i: *attacking_character_i,
+                    hand: *hand,
+                });
             }
-            GameState::AwaitingPlayerHitReaction(StateReactToHit { lines, .. }) => {
-                user_interface.set_state(ActivityPopupState::ReactToHit, lines.clone());
+            GameState::AwaitingPlayerHitReaction(StateReactToHit {
+                attacking_character_i,
+                damage,
+                ..
+            }) => {
+                user_interface.set_state(ActivityPopupState::ReactToHit {
+                    attacking_character_i: *attacking_character_i,
+                    damage: *damage,
+                });
             }
             GameState::AwaitingBot(..) => {
                 unreachable!("The game is awaiting bot, but the UI is awaiting player input?");
             }
         },
         State::CatchingUp(..) => {
-            user_interface.set_state(ActivityPopupState::Idle, vec![]);
+            user_interface.set_state(ActivityPopupState::Idle);
         }
     }
 }
@@ -362,15 +376,21 @@ fn change_state(state: &State, user_interface: &mut UserInterface) {
 enum ActivityPopupState {
     ChooseAction,
     CommitAction(BaseAction),
-    ReactToAttack,
-    ReactToHit,
+    ReactToAttack {
+        hand: HandType,
+        attacking_character_i: usize,
+    },
+    ReactToHit {
+        attacking_character_i: usize,
+        damage: u32,
+    },
     Idle,
 }
 
 struct ActivityPopup {
     state: ActivityPopupState,
-    lines: Vec<String>,
-    details: Option<String>,
+    initial_lines: Vec<String>,
+    last_line: Option<String>,
     buttons: Vec<ActionButton>,
     enabled: bool,
 }
@@ -379,8 +399,8 @@ impl ActivityPopup {
     fn new(state: ActivityPopupState) -> Self {
         Self {
             state,
-            lines: vec![],
-            details: None,
+            initial_lines: vec![],
+            last_line: None,
             buttons: vec![],
             enabled: true,
         }
@@ -396,13 +416,13 @@ impl ActivityPopup {
         let mut x0 = x + 10.0;
         let mut y0 = y + 20.0;
 
-        for line in &self.lines {
+        for line in &self.initial_lines {
             draw_text(line, x0, y0, 20.0, WHITE);
             y0 += 20.0;
         }
 
-        if let Some(details) = &self.details {
-            draw_text(&details, x0, y0, 20.0, WHITE);
+        if let Some(line) = &self.last_line {
+            draw_text(&line, x0, y0, 20.0, WHITE);
             y0 += 20.0;
         }
 
@@ -425,10 +445,10 @@ impl ActivityPopup {
                         }
                     };
                 }
-                ActivityPopupState::ReactToAttack => {
+                ActivityPopupState::ReactToAttack { .. } => {
                     draw_text("React to the attack?", x0, y0, 20.0, WHITE);
                 }
-                ActivityPopupState::ReactToHit => {
+                ActivityPopupState::ReactToHit { .. } => {
                     draw_text("React to being hit?", x0, y0, 20.0, WHITE);
                 }
                 ActivityPopupState::Idle => unreachable!(),
@@ -462,7 +482,7 @@ impl ActivityPopup {
         }
 
         self.state = state;
-        self.lines = lines;
+        self.initial_lines = lines;
         self.buttons = buttons;
     }
 }
@@ -747,9 +767,10 @@ impl UserInterface {
         self.characters[0].borrow()
     }
 
-    fn set_state(&mut self, state: ActivityPopupState, mut lines: Vec<String>) {
+    fn set_state(&mut self, state: ActivityPopupState) {
         self.state = state;
 
+        let mut lines = vec![];
         let mut popup_buttons = vec![];
         let mut movement_preview = None;
         let mut has_target = false;
@@ -822,7 +843,35 @@ impl UserInterface {
                 }
             },
 
-            ActivityPopupState::ReactToAttack => {
+            ActivityPopupState::ReactToAttack {
+                attacking_character_i,
+                hand,
+            } => {
+                let attacker = self.characters[attacking_character_i].borrow();
+                let defender = self.player_character();
+                let attacks_str = format!(
+                    "{} attacks {} (d20+{} vs {})",
+                    attacker.name,
+                    defender.name,
+                    attacker.attack_modifier(hand),
+                    defender.defense(),
+                );
+                lines.push(attacks_str);
+                let explanation = format!(
+                    "{}{}",
+                    attacker.explain_attack_circumstances(hand),
+                    defender.explain_incoming_attack_circumstances()
+                );
+                if !explanation.is_empty() {
+                    lines.push(format!("  {explanation}"));
+                }
+                lines.push(format!(
+                    "  Chance to hit: {}",
+                    as_percentage(prob_attack_hit(&attacker, hand, &defender))
+                ));
+                drop(attacker);
+                drop(defender);
+
                 let reactions = self.player_character().usable_on_attacked_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
@@ -831,7 +880,16 @@ impl UserInterface {
                 }
                 popup_buttons.push(self.new_button("".to_string(), ButtonAction::Proceed));
             }
-            ActivityPopupState::ReactToHit => {
+            ActivityPopupState::ReactToHit {
+                attacking_character_i,
+                damage,
+            } => {
+                lines.push(format!(
+                    "{} took {} damage from an attack by {}",
+                    self.player_character().name,
+                    damage,
+                    self.characters[attacking_character_i].borrow().name
+                ));
                 let reactions = self.player_character().usable_on_hit_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
@@ -893,7 +951,7 @@ impl UserInterface {
         self.action_points_row.reserved_and_hovered = ap;
 
         self.activity_popup.set_enabled(true);
-        self.activity_popup.details = None;
+        self.activity_popup.last_line = None;
 
         if let Some(i) = self.game_grid.target_character_i {
             let target_char = self.characters[i].borrow();
@@ -913,16 +971,16 @@ impl UserInterface {
                                 self.player_character().explain_attack_circumstances(hand);
                             explanation
                                 .push_str(&target_char.explain_incoming_attack_circumstances());
-                            self.activity_popup.details = Some(format!(
+                            self.activity_popup.last_line = Some(format!(
                                 "target: {}, hit chance: {} {}",
                                 target_char.name, chance, explanation
                             ));
                         } else {
-                            self.activity_popup.details = Some("CAN NOT ATTACK".to_string());
+                            self.activity_popup.last_line = Some("CAN NOT ATTACK".to_string());
                             self.activity_popup.set_enabled(false);
                         }
                     } else {
-                        self.activity_popup.details =
+                        self.activity_popup.last_line =
                             Some(format!("target: {}, OUT OF RANGE", target_char.name));
                         self.activity_popup.set_enabled(false);
                     }
@@ -937,12 +995,12 @@ impl UserInterface {
                             spell.spell_type,
                             &target_char,
                         ));
-                        self.activity_popup.details = Some(format!(
+                        self.activity_popup.last_line = Some(format!(
                             "target: {}, success chance: {}",
                             target_char.name, chance
                         ));
                     } else {
-                        self.activity_popup.details =
+                        self.activity_popup.last_line =
                             Some(format!("target: {}, OUT OF RANGE", target_char.name));
                         self.activity_popup.set_enabled(false);
                     }
@@ -981,7 +1039,7 @@ impl UserInterface {
 
                         if may_choose_action && self.player_character().can_use_action(base_action)
                         {
-                            self.set_state(ActivityPopupState::CommitAction(base_action), vec![]);
+                            self.set_state(ActivityPopupState::CommitAction(base_action));
                         } else {
                             println!("Cannot choose this action at this time");
                         }
@@ -1056,8 +1114,10 @@ impl UserInterface {
                                 };
                                 Event::ChoseAction(action)
                             }
-                            ActivityPopupState::ReactToAttack => Event::ChoseAttackedReaction(None),
-                            ActivityPopupState::ReactToHit => Event::ChoseHitReaction(None),
+                            ActivityPopupState::ReactToAttack { .. } => {
+                                Event::ChoseAttackedReaction(None)
+                            }
+                            ActivityPopupState::ReactToHit { .. } => Event::ChoseHitReaction(None),
                             ActivityPopupState::ChooseAction => unreachable!(),
                             ActivityPopupState::Idle => unreachable!(),
                         };
@@ -1065,7 +1125,7 @@ impl UserInterface {
                     }
 
                     ButtonAction::OnAttackedReaction(reaction) => {
-                        if self.state == ActivityPopupState::ReactToAttack {
+                        if matches!(self.state, ActivityPopupState::ReactToAttack { .. }) {
                             if self
                                 .player_character()
                                 .can_use_on_attacked_reaction(reaction)
@@ -1080,7 +1140,7 @@ impl UserInterface {
                     }
 
                     ButtonAction::OnHitReaction(reaction) => {
-                        if self.state == ActivityPopupState::ReactToHit {
+                        if matches!(self.state, ActivityPopupState::ReactToHit { .. }) {
                             if self.player_character().can_use_on_hit_reaction(reaction) {
                                 return Some(Event::ChoseHitReaction(Some(reaction)));
                             } else {
@@ -1094,12 +1154,9 @@ impl UserInterface {
             }
 
             InternalUiEvent::SwitchedToMoveInGrid => {
-                self.set_state(
-                    ActivityPopupState::CommitAction(BaseAction::Move {
-                        action_point_cost: 1,
-                    }),
-                    vec![],
-                );
+                self.set_state(ActivityPopupState::CommitAction(BaseAction::Move {
+                    action_point_cost: 1,
+                }));
             }
 
             InternalUiEvent::SwitchedToAttackInGrid => {
@@ -1109,13 +1166,10 @@ impl UserInterface {
                     .weapon(hand)
                     .unwrap()
                     .action_point_cost;
-                self.set_state(
-                    ActivityPopupState::CommitAction(BaseAction::Attack {
-                        hand,
-                        action_point_cost,
-                    }),
-                    vec![],
-                );
+                self.set_state(ActivityPopupState::CommitAction(BaseAction::Attack {
+                    hand,
+                    action_point_cost,
+                }));
             }
         }
 

@@ -116,31 +116,16 @@ impl CoreGame {
                 );
                 self.log(attacks_str.clone());
 
-                // TODO construct this text in ui.rs instead? It can have more full control over what to show
-                let mut lines = vec![];
-                lines.push(attacks_str);
-                let explanation = format!(
-                    "{}{}",
-                    attacker.explain_attack_circumstances(hand),
-                    defender.explain_incoming_attack_circumstances()
-                );
-                if !explanation.is_empty() {
-                    lines.push(format!("  {explanation}"));
-                }
-                lines.push(format!(
-                    "  Chance to hit: {}",
-                    as_percentage(prob_attack_hit(&attacker, hand, &defender))
-                ));
-
                 drop(attacker);
                 drop(defender);
                 return if !players_turn {
+                    let attacking_character_i = self.active_character_i;
                     GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
                         game: self,
                         action_points_before_action,
                         hand,
                         enhancements,
-                        lines,
+                        attacking_character_i,
                         attacked_character_i: target_character_i,
                     })
                 } else {
@@ -467,10 +452,7 @@ impl CoreGame {
                 defender_character_i,
                 // TODO construct this text in ui.rs instead? It can have more full control over what to show
                 // The only structural information contained in here is how much damage was dealt
-                vec![format!(
-                    "{} took {} damage from an attack by {}",
-                    defender.name, damage, attacker.name
-                )],
+                damage,
             ));
 
             if let Some(effect) = on_true_hit_effect {
@@ -519,7 +501,7 @@ impl CoreGame {
     fn enter_state_right_after_action(
         self,
         action_points_before_action: u32,
-        attack_hit: Option<(usize, Vec<String>)>,
+        attack_hit: Option<(usize, u32)>,
     ) -> GameState {
         let players_turn = self.player_character_i == self.active_character_i;
         let mut character = self.active_character();
@@ -530,7 +512,9 @@ impl CoreGame {
         let spent = action_points_before_action - character.action_points;
         self.perform_recover_from_dazed(&mut character, spent);
 
-        if let Some((attacked_character_i, lines)) = attack_hit {
+        if let Some((attacked_character_i, damage)) = attack_hit {
+            // TODO this can remove a Dazed that was just added from the attack, which is bad.
+
             // You recover from 1 stack of Dazed each time you're hit by an attack
             self.perform_recover_from_dazed(
                 &mut self.characters.get(attacked_character_i).borrow_mut(),
@@ -539,9 +523,11 @@ impl CoreGame {
 
             if !players_turn {
                 drop(character);
+                let attacking_character_i = self.active_character_i;
                 return GameState::AwaitingPlayerHitReaction(StateReactToHit {
                     game: self,
-                    lines,
+                    damage,
+                    attacking_character_i,
                     reacting_character_i: attacked_character_i,
                 });
             }
@@ -730,9 +716,9 @@ pub struct StateReactToAttack {
     game: CoreGame,
     attacked_character_i: usize,
     action_points_before_action: u32,
-    hand: HandType,
-    enhancements: Vec<AttackEnhancement>,
-    pub lines: Vec<String>,
+    pub enhancements: Vec<AttackEnhancement>,
+    pub hand: HandType,
+    pub attacking_character_i: usize,
 }
 
 impl StateReactToAttack {
@@ -749,8 +735,9 @@ impl StateReactToAttack {
 
 pub struct StateReactToHit {
     game: CoreGame,
+    pub attacking_character_i: usize,
     reacting_character_i: usize,
-    pub lines: Vec<String>,
+    pub damage: u32,
 }
 
 impl StateReactToHit {
@@ -1309,7 +1296,7 @@ impl Character {
         self.armor.map(|armor| armor.protection).unwrap_or(0)
     }
 
-    fn attack_modifier(&self, hand: HandType) -> u32 {
+    pub fn attack_modifier(&self, hand: HandType) -> u32 {
         let str = self.strength();
         let dex = self.dexterity();
         let weapon = self.weapon(hand).unwrap();
