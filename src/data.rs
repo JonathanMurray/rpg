@@ -64,6 +64,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(AttackEnhancement {
         name: "All-in",
+        description: "+1 damage",
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 1,
@@ -85,6 +86,7 @@ pub const BOW: Weapon = Weapon {
     attack_attribute: AttackAttribute::Dexterity,
     attack_enhancement: Some(AttackEnhancement {
         name: "Careful aim",
+        description: "Advantage",
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 0,
@@ -102,6 +104,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     defense: 2,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
+        description: "Possibly daze attacker",
         action_point_cost: 1,
         effect: OnHitReactionEffect::ShieldBash,
     }),
@@ -109,6 +112,7 @@ pub const SMALL_SHIELD: Shield = Shield {
 
 pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
     name: "Crushing",
+    description: "Stagger",
     action_point_cost: 0,
     stamina_cost: 1,
     bonus_damage: 0,
@@ -118,6 +122,7 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
+    description: "+def",
     action_point_cost: 1,
     stamina_cost: 0,
     effect: OnAttackedReactionEffect::Parry,
@@ -125,6 +130,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
+    description: "+def",
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect::SideStep,
@@ -132,6 +138,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
 
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
+    description: "Advantage on attacks",
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
 };

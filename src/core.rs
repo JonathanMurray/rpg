@@ -27,10 +27,10 @@ pub struct CoreGame {
 impl CoreGame {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Self {
         let mut bob = Character::new("Bob", 5, 1, 4, (1, 4));
-        bob.main_hand.weapon = Some(WAR_HAMMER);
+        bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
-        bob.known_attacked_reactions.push(SIDE_STEP);
+        //bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -851,6 +851,7 @@ impl Characters {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AttackEnhancement {
     pub name: &'static str,
+    pub description: &'static str,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub bonus_damage: u32,
@@ -867,6 +868,7 @@ pub enum ApplyEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnAttackedReaction {
     pub name: &'static str,
+    pub description: &'static str,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
@@ -881,6 +883,7 @@ pub enum OnAttackedReactionEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnHitReaction {
     pub name: &'static str,
+    pub description: &'static str,
     pub action_point_cost: u32,
     pub effect: OnHitReactionEffect,
 }
@@ -1448,10 +1451,19 @@ pub enum WeaponRange {
 }
 
 impl WeaponRange {
-    fn squared(&self) -> u32 {
+    pub fn squared(&self) -> u32 {
         match self {
             WeaponRange::Melee => 2,
             WeaponRange::Ranged(r) => r.pow(2),
+        }
+    }
+}
+
+impl From<WeaponRange> for f32 {
+    fn from(weapon_range: WeaponRange) -> Self {
+        match weapon_range {
+            WeaponRange::Melee => 2f32.sqrt(),
+            WeaponRange::Ranged(r) => r as f32,
         }
     }
 }
