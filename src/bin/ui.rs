@@ -256,8 +256,8 @@ impl GameGrid {
     }
 
     fn draw(&mut self, x: f32, y: f32) {
-        let cell_w = 25.0;
-        let grid_dimensions = (20, 12);
+        let cell_w = 40.0;
+        let grid_dimensions = (20, 8);
 
         let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w;
         let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w;
@@ -311,7 +311,11 @@ impl GameGrid {
 
         if self.movement_preview.is_some() {
             for (pos, _) in &self.pathfind_grid.distances {
-                draw_square(*pos, GREEN);
+                if (0..grid_dimensions.0).contains(&pos.0)
+                    && (0..grid_dimensions.1).contains(&pos.1)
+                {
+                    draw_square(*pos, GREEN);
+                }
             }
         }
 
@@ -373,7 +377,7 @@ impl GameGrid {
             }
         }
 
-        let text_margin = 5.0;
+        let text_margin = 13.0;
         for (text, position) in &self.characters {
             text.draw(
                 grid_x_to_screen(position.0) + text_margin,
@@ -398,11 +402,7 @@ impl GameGrid {
                 (mouse_local.1 / cell_w) as i32,
             );
 
-            //let dx = mouse_grid_x - player_x;
-            //let dy = mouse_grid_y - player_y;
-
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
-            //let valid_move_destination = dx.abs() <= 1 && dy.abs() <= 1 && !collision;
 
             let valid_move_destination = match self
                 .pathfind_grid
@@ -1039,7 +1039,7 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
-        self.game_grid.draw(100.0, y - 490.0);
+        self.game_grid.draw(100.0, y - 495.0);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
