@@ -20,7 +20,7 @@ const ACTION_POINTS_PER_TURN: u32 = 6;
 pub struct CoreGame {
     characters: Characters,
     pub active_character_i: usize,
-    player_character_i: usize,
+    pub player_character_i: usize,
     logger: Rc<RefCell<dyn Logger>>,
 }
 
@@ -47,7 +47,7 @@ impl CoreGame {
         Self {
             characters,
             player_character_i: 0,
-            active_character_i: 0,
+            active_character_i: 1,
             logger,
         }
     }
@@ -56,7 +56,7 @@ impl CoreGame {
         if self.active_character_i == self.player_character_i {
             GameState::AwaitingPlayerAction(StateChooseAction { game: self })
         } else {
-            GameState::AwaitingBot(StateAwaitingBot { game: self })
+            GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
         }
     }
 
@@ -169,33 +169,44 @@ impl CoreGame {
                     character.stamina.spend(enhancement.stamina_cost);
                 }
 
-                let new_position = positions[0];
-                let mut collision = false;
-                for (i, character) in self.characters().iter().enumerate() {
-                    if i == self.active_character_i {
-                        continue; // Avoid borrowing already borrowed active character
-                    }
-                    if new_position == character.borrow().position {
-                        collision = true;
-                    }
-                }
-                if collision {
-                    self.log(format!(
-                        "{} tried moving but position was blocked",
-                        character.name
-                    ));
-                } else {
-                    self.log(format!(
-                        "{} moved from {:?} to {:?}",
-                        character.name, character.position, new_position
-                    ));
-                    character.position = new_position;
-                }
+                drop(character);
+                return self.perform_movement(positions, action_points_before_action);
             }
         }
 
         drop(character);
         return self.enter_state_right_after_action(action_points_before_action, None);
+    }
+
+    fn perform_movement(
+        self,
+        mut positions: Vec<(u32, u32)>,
+        action_points_before_action: u32,
+    ) -> GameState {
+        let mut character = self.active_character();
+        let new_position = positions.remove(0);
+        for (i, character) in self.characters().iter().enumerate() {
+            if i == self.active_character_i {
+                continue; // Avoid borrowing already borrowed active character
+            }
+            assert!(new_position != character.borrow().position)
+        }
+        self.log(format!(
+            "{} moved from {:?} to {:?}",
+            character.name, character.position, new_position
+        ));
+        character.position = new_position;
+        drop(character);
+
+        if !positions.is_empty() {
+            GameState::PerformingMovement(StatePerformingMovement {
+                game: self,
+                remaining_positions: positions,
+                action_points_before_action,
+            })
+        } else {
+            self.enter_state_right_after_action(action_points_before_action, None)
+        }
     }
 
     fn perform_effect_application(
@@ -625,7 +636,7 @@ impl CoreGame {
         if self.player_character_i == self.active_character_i {
             GameState::AwaitingPlayerAction(StateChooseAction { game: self })
         } else {
-            GameState::AwaitingBot(StateAwaitingBot { game: self })
+            GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
         }
     }
 
@@ -666,7 +677,8 @@ pub enum GameState {
     AwaitingPlayerAction(StateChooseAction),
     AwaitingPlayerAttackReaction(StateReactToAttack),
     AwaitingPlayerHitReaction(StateReactToHit),
-    AwaitingBot(StateAwaitingBot),
+    AwaitingBotChooseAction(StateAwaitingBotChooseAction),
+    PerformingMovement(StatePerformingMovement),
 }
 
 impl GameState {
@@ -675,7 +687,8 @@ impl GameState {
             GameState::AwaitingPlayerAction(this) => &this.game,
             GameState::AwaitingPlayerAttackReaction(this) => &this.game,
             GameState::AwaitingPlayerHitReaction(this) => &this.game,
-            GameState::AwaitingBot(this) => &this.game,
+            GameState::AwaitingBotChooseAction(this) => &this.game,
+            GameState::PerformingMovement(this) => &this.game,
         }
     }
 
@@ -712,6 +725,18 @@ pub struct StateChooseAction {
 impl StateChooseAction {
     pub fn proceed(self, action: Action) -> GameState {
         self.game.enter_state_action(action)
+    }
+}
+pub struct StatePerformingMovement {
+    game: CoreGame,
+    remaining_positions: Vec<(u32, u32)>,
+    action_points_before_action: u32,
+}
+
+impl StatePerformingMovement {
+    pub fn proceed(self) -> GameState {
+        self.game
+            .perform_movement(self.remaining_positions, self.action_points_before_action)
     }
 }
 
@@ -751,64 +776,13 @@ impl StateReactToHit {
     }
 }
 
-pub struct StateAwaitingBot {
-    game: CoreGame,
+pub struct StateAwaitingBotChooseAction {
+    pub game: CoreGame,
 }
 
-impl StateAwaitingBot {
-    pub fn proceed(self) -> GameState {
-        // TODO make sure to only pick an action that the character can actually do (afford, in range, etc)
-        let game = self.game;
-        let character = game.active_character();
-        let player_character = game.player_character().borrow_mut();
-
-        let mut actions = character.usable_actions();
-        let mut chosen_action = None;
-
-        while !actions.is_empty() {
-            let i = rand::gen_range(0, actions.len());
-            let action = actions.swap_remove(i);
-
-            if character.can_use_action(action) {
-                match action {
-                    BaseAction::Attack { hand, .. } => {
-                        if character.can_reach_with_attack(hand, player_character.position) {
-                            chosen_action = Some(Action::Attack {
-                                hand,
-                                enhancements: vec![],
-                                target_character_i: game.player_character_i,
-                            });
-                        }
-                    }
-                    BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
-                    BaseAction::CastSpell(spell) => {
-                        chosen_action = Some(Action::CastSpell {
-                            spell,
-                            enhanced: false,
-                            target_character_i: game.player_character_i,
-                        });
-                    }
-                    BaseAction::Move {
-                        action_point_cost,
-                        range: _,
-                    } => {
-                        chosen_action = Some(Action::Move {
-                            action_point_cost,
-                            positions: vec![(character.position.0 + 1, character.position.1)],
-                            enhancements: vec![],
-                        });
-                    }
-                }
-            }
-            if chosen_action.is_some() {
-                break;
-            }
-        }
-
-        drop(character);
-        drop(player_character);
-
-        game.enter_state_action(chosen_action.unwrap())
+impl StateAwaitingBotChooseAction {
+    pub fn proceed(self, action: Action) -> GameState {
+        self.game.enter_state_action(action)
     }
 }
 
@@ -1224,7 +1198,7 @@ impl Character {
             },
             MovementEnhancement {
                 name: "Sprint",
-                action_point_cost:1,
+                action_point_cost: 1,
                 stamina_cost: 1,
                 add_percentage: 200,
             },

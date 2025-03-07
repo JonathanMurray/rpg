@@ -23,12 +23,14 @@ use macroquad::{
     time::{self, get_frame_time},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
+use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
     Character, CoreGame, GameState, Hand, HandType, Logger, MovementEnhancement,
     OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell, SpellEnhancement,
     StateChooseAction, StateReactToAttack, StateReactToHit,
 };
+use rpg::pathfind::PathfindGrid;
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -52,7 +54,7 @@ async fn main() {
     let mut character_names = CharacterPortraits::new(game.characters(), game.active_character_i);
 
     let mut state = match game.begin() {
-        game_state @ GameState::AwaitingBot(..) => State::CatchingUp(game_state),
+        game_state @ GameState::AwaitingBotChooseAction(..) => State::CatchingUp(game_state),
         game_state @ _ => State::AwaitingPlayerInput(game_state),
     };
 
@@ -109,16 +111,24 @@ async fn main() {
                 timer += get_frame_time();
 
                 if logbuf.borrow_mut().0.is_empty() {
-                    if let GameState::AwaitingBot(awaiting_bot) = game_state {
-                        let new_game_state = awaiting_bot.proceed();
-                        State::CatchingUp(new_game_state)
-                    } else {
-                        let new_state = State::AwaitingPlayerInput(game_state);
-                        change_state(&new_state, &mut user_interface);
-                        new_state
+                    match game_state {
+                        GameState::AwaitingBotChooseAction(awaiting_bot) => {
+                            let action = bot_choose_action(&awaiting_bot.game);
+                            let new_game_state = awaiting_bot.proceed(action);
+                            State::CatchingUp(new_game_state)
+                        }
+                        GameState::PerformingMovement(performing_movement) => {
+                            let new_game_state = performing_movement.proceed();
+                            State::CatchingUp(new_game_state)
+                        }
+                        _ => {
+                            let new_state = State::AwaitingPlayerInput(game_state);
+                            change_state(&new_state, &mut user_interface);
+                            new_state
+                        }
                     }
                 } else {
-                    let tick = 0.2;
+                    let tick = 0.3;
                     while timer > tick {
                         timer -= tick;
                         let line = logbuf.borrow_mut().0.remove(0);
@@ -137,6 +147,7 @@ async fn main() {
 }
 
 struct GameGrid {
+    pathfind_grid: PathfindGrid,
     characters: Vec<(TextLine, (i32, i32))>,
     active_character_i: usize,
     movement_range: f32,
@@ -155,6 +166,7 @@ impl GameGrid {
             .collect();
 
         Self {
+            pathfind_grid: PathfindGrid::new(),
             characters,
             active_character_i: 0,
             movement_range: 0.0,
@@ -170,11 +182,20 @@ impl GameGrid {
         // TODO don't assume that player is the first in the vec
         self.receptive_to_input = active_character_i == 0;
 
+        self.pathfind_grid.blocked_positions.clear();
+
         self.active_character_i = active_character_i;
         for (i, character) in characters.iter().enumerate() {
             let pos = character.borrow().position;
             self.characters[i].1 = (pos.0 as i32, pos.1 as i32);
+
+            self.pathfind_grid
+                .blocked_positions
+                .insert((pos.0 as i32, pos.1 as i32));
         }
+
+        let pos = self.characters[self.active_character_i].1;
+        self.pathfind_grid.run(pos, self.movement_range);
     }
 
     fn set_movement_range(&mut self, range: f32) {
@@ -184,6 +205,9 @@ impl GameGrid {
                 movement_preview.remove(0);
             }
         }
+
+        let pos = self.characters[self.active_character_i].1;
+        self.pathfind_grid.run(pos, self.movement_range);
     }
 
     fn take_movement_path(&mut self) -> Vec<(u32, u32)> {
@@ -191,6 +215,7 @@ impl GameGrid {
             .take()
             .unwrap()
             .into_iter()
+            .rev()
             .map(|(dist, (x, y))| (x as u32, y as u32))
             .collect()
     }
@@ -249,59 +274,8 @@ impl GameGrid {
             }
         }
 
-        // pos -> (dist, enter_from)
-        let distances = {
-            let mut blocked: HashSet<(i32, i32)> = Default::default();
-            for (_, character_pos) in &self.characters {
-                if *character_pos != (player_x, player_y) {
-                    blocked.insert(*character_pos);
-                }
-            }
-
-            // pos -> (dist, enter_from)
-            let mut visited: HashMap<(i32, i32), (f32, (i32, i32))> = Default::default();
-
-            // (pos, dist, enter_from)
-            let mut next: Vec<((i32, i32), f32, (i32, i32))> =
-                vec![((player_x, player_y), 0.0, (player_x, player_y))];
-            let sqrt_2 = 2f32.sqrt();
-
-            while !next.is_empty() {
-                let (node, dist, enter_from) = next.remove(0);
-
-                if let Some((prev_dist, _prev_enter_from)) = visited.get(&node) {
-                    if *prev_dist <= dist {
-                        // We already know about anoter shorter route to this node. No point in investigating this route
-                        continue;
-                    }
-                }
-
-                visited.insert(node, (dist, enter_from));
-                let (x, y) = node;
-
-                let neighbors = [
-                    ((x - 1, y - 1), dist + sqrt_2),
-                    ((x - 1, y), dist + 1.0),
-                    ((x - 1, y + 1), dist + sqrt_2),
-                    ((x, y - 1), dist + 1.0),
-                    ((x, y + 1), dist + 1.0),
-                    ((x + 1, y - 1), dist + sqrt_2),
-                    ((x + 1, y), dist + 1.0),
-                    ((x + 1, y + 1), dist + sqrt_2),
-                ];
-
-                for (pos, neighbor_dist) in neighbors {
-                    if neighbor_dist <= self.movement_range && !blocked.contains(&node) {
-                        next.push((pos, neighbor_dist, node));
-                    }
-                }
-            }
-
-            visited
-        };
-
         if self.movement_preview.is_some() {
-            for (pos, _) in &distances {
+            for (pos, _) in &self.pathfind_grid.distances {
                 draw_square(*pos, GREEN);
             }
         }
@@ -395,7 +369,11 @@ impl GameGrid {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
             //let valid_move_destination = dx.abs() <= 1 && dy.abs() <= 1 && !collision;
 
-            let valid_move_destination = match distances.get(&(mouse_grid_x, mouse_grid_y)) {
+            let valid_move_destination = match self
+                .pathfind_grid
+                .distances
+                .get(&(mouse_grid_x, mouse_grid_y))
+            {
                 Some((dist, _enter_from)) => *dist <= self.movement_range,
                 _ => false,
             } && !collision;
@@ -416,13 +394,13 @@ impl GameGrid {
                             .send(InternalUiEvent::SwitchedToMoveInGrid);
                     }
 
-                    let dist_enter_from = distances.get(&destination).unwrap();
+                    let dist_enter_from = self.pathfind_grid.distances.get(&destination).unwrap();
                     let mut dist = dist_enter_from.0;
                     let mut movement_preview = vec![(dist, destination)];
                     let mut pos = dist_enter_from.1;
 
                     loop {
-                        let dist_enter_from = distances.get(&pos).unwrap();
+                        let dist_enter_from = self.pathfind_grid.distances.get(&pos).unwrap();
                         dist = dist_enter_from.0;
                         movement_preview.push((dist, pos));
                         if pos == (player_x, player_y) {
@@ -530,8 +508,8 @@ fn change_state(state: &State, user_interface: &mut UserInterface) {
                     damage: *damage,
                 });
             }
-            GameState::AwaitingBot(..) => {
-                unreachable!("The game is awaiting bot, but the UI is awaiting player input?");
+            GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
+                unreachable!();
             }
         },
         State::CatchingUp(..) => {
@@ -696,7 +674,7 @@ impl ActivityPopup {
                     // Some choices work like radio boxes
                     if matches!(self.state, UiState::ReactToAttack { .. })
                         || matches!(self.state, UiState::ReactToHit { .. })
-                            || matches!(clicked_btn.action, ButtonAction::MovementEnhancement { .. })
+                        || matches!(clicked_btn.action, ButtonAction::MovementEnhancement { .. })
                     {
                         for btn in self.choice_buttons.values() {
                             if btn.id != id {
@@ -1252,7 +1230,6 @@ impl UserInterface {
         self.activity_popup
             .set_state(state, popup_lines, popup_buttons);
 
-        //TODO
         let move_range = self.player_character().move_range;
         self.game_grid.set_movement_range(move_range);
 
