@@ -26,7 +26,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Self {
-        let mut bob = Character::new("Bob", 5, 1, 4, (1, 4));
+        let mut bob = Character::new("Bob", 5, 4, 4, (1, 4));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -40,7 +40,7 @@ impl CoreGame {
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new("Charlie", 1, 1, 1, (8, 2));
+        let mut charlie = Character::new("Charlie", 1, 1, 1, (3, 4));
         charlie.main_hand.weapon = Some(BOW);
 
         let characters = Characters::new(vec![bob, alice, charlie]);
@@ -91,7 +91,7 @@ impl CoreGame {
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
                 for enhancement in &enhancements {
                     attacker.action_points -= enhancement.action_point_cost;
-                    attacker.stamina.lose(enhancement.stamina_cost);
+                    attacker.stamina.spend(enhancement.stamina_cost);
                     if let Some(condition) = enhancement.apply_on_self_before {
                         attacker.receive_condition(condition);
                     }
@@ -160,13 +160,16 @@ impl CoreGame {
             }
             Action::Move {
                 action_point_cost,
-                direction,
+                positions,
+                enhancements,
             } => {
                 character.action_points -= action_point_cost;
-                let new_position = (
-                    (character.position.0 as i32 + direction.0) as u32,
-                    (character.position.1 as i32 + direction.1) as u32,
-                );
+                for enhancement in &enhancements {
+                    character.action_points -= enhancement.action_point_cost;
+                    character.stamina.spend(enhancement.stamina_cost);
+                }
+
+                let new_position = positions[0];
                 let mut collision = false;
                 for (i, character) in self.characters().iter().enumerate() {
                     if i == self.active_character_i {
@@ -225,12 +228,12 @@ impl CoreGame {
     ) {
         assert!(caster.action_points >= spell.action_point_cost);
         caster.action_points -= spell.action_point_cost;
-        caster.mana.lose(spell.mana_cost);
+        caster.mana.spend(spell.mana_cost);
 
         let mut enhancement_str = String::new();
         if enhanced {
             let enhancement = spell.possible_enhancement.unwrap();
-            caster.mana.lose(enhancement.mana_cost);
+            caster.mana.spend(enhancement.mana_cost);
 
             enhancement_str = format!(" ({})", enhancement.name)
         }
@@ -335,7 +338,7 @@ impl CoreGame {
 
         if let Some(reaction) = defender_reaction {
             defender.action_points -= reaction.action_point_cost;
-            defender.stamina.lose(reaction.stamina_cost);
+            defender.stamina.spend(reaction.stamina_cost);
 
             self.log(format!("{} reacts with {}", defender.name, reaction.name));
 
@@ -785,10 +788,14 @@ impl StateAwaitingBot {
                             target_character_i: game.player_character_i,
                         });
                     }
-                    BaseAction::Move { action_point_cost } => {
+                    BaseAction::Move {
+                        action_point_cost,
+                        range: _,
+                    } => {
                         chosen_action = Some(Action::Move {
                             action_point_cost,
-                            direction: (1, 0),
+                            positions: vec![(character.position.0 + 1, character.position.1)],
+                            enhancements: vec![],
                         });
                     }
                 }
@@ -934,7 +941,8 @@ pub enum Action {
         target_character_i: usize,
     },
     Move {
-        direction: (i32, i32),
+        positions: Vec<(u32, u32)>,
+        enhancements: Vec<MovementEnhancement>,
         action_point_cost: u32,
     },
 }
@@ -947,7 +955,7 @@ pub struct SelfEffectAction {
     pub effect: ApplyEffect,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BaseAction {
     Attack {
         hand: HandType,
@@ -956,6 +964,7 @@ pub enum BaseAction {
     SelfEffect(SelfEffectAction),
     CastSpell(Spell),
     Move {
+        range: f32,
         action_point_cost: u32,
     },
 }
@@ -969,7 +978,9 @@ impl BaseAction {
             } => *action_point_cost,
             BaseAction::SelfEffect(self_effect_action) => self_effect_action.action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
-            BaseAction::Move { action_point_cost } => *action_point_cost,
+            BaseAction::Move {
+                action_point_cost, ..
+            } => *action_point_cost,
         }
     }
 }
@@ -1012,6 +1023,14 @@ pub enum SpellType {
     Projectile,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct MovementEnhancement {
+    pub name: &'static str,
+    pub action_point_cost: u32,
+    pub stamina_cost: u32,
+    pub add_percentage: u32,
+}
+
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Hand {
     weapon: Option<Weapon>,
@@ -1034,7 +1053,7 @@ pub struct Character {
     pub base_intellect: u32,
     pub health: NumberedResource,
     pub mana: NumberedResource,
-    pub move_speed: f32,
+    pub move_range: f32,
     armor: Option<ArmorPiece>,
     main_hand: Hand,
     off_hand: Hand,
@@ -1050,6 +1069,7 @@ pub struct Character {
 impl Character {
     fn new(name: &'static str, str: u32, dex: u32, int: u32, position: (u32, u32)) -> Self {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
+        let move_range = 0.75 + dex as f32 * 0.25;
         Self {
             position,
             name,
@@ -1058,7 +1078,7 @@ impl Character {
             base_intellect: int,
             health: NumberedResource::new(5 + str),
             mana: NumberedResource::new(mana),
-            move_speed: 1.0 + dex as f32 * 0.25,
+            move_range,
             armor: None,
             main_hand: Default::default(),
             off_hand: Default::default(),
@@ -1078,6 +1098,7 @@ impl Character {
                 BaseAction::SelfEffect(BRACE),
                 BaseAction::Move {
                     action_point_cost: 1,
+                    range: move_range,
                 },
             ],
             known_attacked_reactions: Default::default(),
@@ -1102,7 +1123,7 @@ impl Character {
     }
 
     pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
-        within_range(spell.range.pow(2), self.position, target_position)
+        within_range(spell.range.pow(2) as f32, self.position, target_position)
     }
 
     pub fn known_actions(&self) -> Vec<(String, BaseAction)> {
@@ -1151,7 +1172,9 @@ impl Character {
             BaseAction::CastSpell(spell) => {
                 ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
             }
-            BaseAction::Move { action_point_cost } => ap >= action_point_cost,
+            BaseAction::Move {
+                action_point_cost, ..
+            } => ap >= action_point_cost,
         }
     }
 
@@ -1189,6 +1212,27 @@ impl Character {
         let weapon = self.weapon(attack_hand).unwrap();
         self.action_points >= weapon.action_point_cost + enhancement.action_point_cost
             && self.stamina.current >= enhancement.stamina_cost
+    }
+
+    pub fn usable_movement_enhancements(&self) -> Vec<MovementEnhancement> {
+        let mut enhancements = vec![
+            MovementEnhancement {
+                name: "Extend",
+                action_point_cost: 1,
+                stamina_cost: 0,
+                add_percentage: 100,
+            },
+            MovementEnhancement {
+                name: "Sprint",
+                action_point_cost:1,
+                stamina_cost: 1,
+                add_percentage: 200,
+            },
+        ];
+        enhancements.retain(|e| {
+            self.action_points >= e.action_point_cost && self.stamina.current >= e.stamina_cost
+        });
+        enhancements
     }
 
     pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
@@ -1377,10 +1421,10 @@ impl Character {
     }
 }
 
-fn within_range(range_squared: u32, source: (u32, u32), destination: (u32, u32)) -> bool {
+fn within_range(range_squared: f32, source: (u32, u32), destination: (u32, u32)) -> bool {
     let distance_squared = (destination.0 as i32 - source.0 as i32).pow(2)
         + (destination.1 as i32 - source.1 as i32).pow(2);
-    distance_squared <= range_squared as i32
+    distance_squared as f32 <= range_squared
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1398,6 +1442,11 @@ impl NumberedResource {
         self.current = self.current.saturating_sub(amount); // cannot go below 0
     }
 
+    fn spend(&mut self, amount: u32) {
+        assert!(self.current >= amount);
+        self.current -= amount;
+    }
+
     fn gain(&mut self, amount: u32) {
         self.current = (self.current + amount).min(self.max);
     }
@@ -1412,7 +1461,7 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone)]
 pub struct Weapon {
     pub name: &'static str,
-    pub range: WeaponRange,
+    pub range: Range,
     pub action_point_cost: u32,
     pub damage: u32,
     pub grip: WeaponGrip,
@@ -1445,25 +1494,28 @@ pub enum WeaponGrip {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum WeaponRange {
+pub enum Range {
     Melee,
     Ranged(u32),
+    Float(f32),
 }
 
-impl WeaponRange {
-    pub fn squared(&self) -> u32 {
+impl Range {
+    pub fn squared(&self) -> f32 {
         match self {
-            WeaponRange::Melee => 2,
-            WeaponRange::Ranged(r) => r.pow(2),
+            Range::Melee => 2.0,
+            Range::Ranged(r) => r.pow(2) as f32,
+            Range::Float(f) => f.powf(2.0),
         }
     }
 }
 
-impl From<WeaponRange> for f32 {
-    fn from(weapon_range: WeaponRange) -> Self {
-        match weapon_range {
-            WeaponRange::Melee => 2f32.sqrt(),
-            WeaponRange::Ranged(r) => r as f32,
+impl From<Range> for f32 {
+    fn from(range: Range) -> Self {
+        match range {
+            Range::Melee => 2f32.sqrt(),
+            Range::Ranged(r) => r as f32,
+            Range::Float(f) => f,
         }
     }
 }

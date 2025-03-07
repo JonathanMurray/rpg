@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::{
     cell::{self, Cell, Ref, RefCell},
     collections::HashMap,
@@ -24,9 +25,9 @@ use macroquad::{
 };
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CoreGame, GameState, Hand, HandType, Logger, OnAttackedReaction, OnHitReaction,
-    SelfEffectAction, Spell, SpellEnhancement, StateChooseAction, StateReactToAttack,
-    StateReactToHit, WeaponRange,
+    Character, CoreGame, GameState, Hand, HandType, Logger, MovementEnhancement,
+    OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell, SpellEnhancement,
+    StateChooseAction, StateReactToAttack, StateReactToHit,
 };
 
 #[macroquad::main(window_conf)]
@@ -138,11 +139,12 @@ async fn main() {
 struct GameGrid {
     characters: Vec<(TextLine, (i32, i32))>,
     active_character_i: usize,
-    movement_preview: Option<(i32, i32)>,
+    movement_range: f32,
+    movement_preview: Option<Vec<(f32, (i32, i32))>>,
     target_character_i: Option<usize>,
     event_sender: EventSender,
     receptive_to_input: bool,
-    range_indicator: Option<WeaponRange>,
+    range_indicator: Option<Range>,
 }
 
 impl GameGrid {
@@ -155,7 +157,8 @@ impl GameGrid {
         Self {
             characters,
             active_character_i: 0,
-            movement_preview: None,
+            movement_range: 0.0,
+            movement_preview: Default::default(),
             target_character_i: None,
             event_sender,
             receptive_to_input: false,
@@ -172,6 +175,24 @@ impl GameGrid {
             let pos = character.borrow().position;
             self.characters[i].1 = (pos.0 as i32, pos.1 as i32);
         }
+    }
+
+    fn set_movement_range(&mut self, range: f32) {
+        self.movement_range = range;
+        if let Some(movement_preview) = &mut self.movement_preview {
+            while !movement_preview.is_empty() && movement_preview[0].0 > range {
+                movement_preview.remove(0);
+            }
+        }
+    }
+
+    fn take_movement_path(&mut self) -> Vec<(u32, u32)> {
+        self.movement_preview
+            .take()
+            .unwrap()
+            .into_iter()
+            .map(|(dist, (x, y))| (x as u32, y as u32))
+            .collect()
     }
 
     fn draw(&mut self, x: f32, y: f32) {
@@ -225,6 +246,63 @@ impl GameGrid {
                     1.0,
                     DARKGRAY,
                 );
+            }
+        }
+
+        // pos -> (dist, enter_from)
+        let distances = {
+            let mut blocked: HashSet<(i32, i32)> = Default::default();
+            for (_, character_pos) in &self.characters {
+                if *character_pos != (player_x, player_y) {
+                    blocked.insert(*character_pos);
+                }
+            }
+
+            // pos -> (dist, enter_from)
+            let mut visited: HashMap<(i32, i32), (f32, (i32, i32))> = Default::default();
+
+            // (pos, dist, enter_from)
+            let mut next: Vec<((i32, i32), f32, (i32, i32))> =
+                vec![((player_x, player_y), 0.0, (player_x, player_y))];
+            let sqrt_2 = 2f32.sqrt();
+
+            while !next.is_empty() {
+                let (node, dist, enter_from) = next.remove(0);
+
+                if let Some((prev_dist, _prev_enter_from)) = visited.get(&node) {
+                    if *prev_dist <= dist {
+                        // We already know about anoter shorter route to this node. No point in investigating this route
+                        continue;
+                    }
+                }
+
+                visited.insert(node, (dist, enter_from));
+                let (x, y) = node;
+
+                let neighbors = [
+                    ((x - 1, y - 1), dist + sqrt_2),
+                    ((x - 1, y), dist + 1.0),
+                    ((x - 1, y + 1), dist + sqrt_2),
+                    ((x, y - 1), dist + 1.0),
+                    ((x, y + 1), dist + 1.0),
+                    ((x + 1, y - 1), dist + sqrt_2),
+                    ((x + 1, y), dist + 1.0),
+                    ((x + 1, y + 1), dist + sqrt_2),
+                ];
+
+                for (pos, neighbor_dist) in neighbors {
+                    if neighbor_dist <= self.movement_range && !blocked.contains(&node) {
+                        next.push((pos, neighbor_dist, node));
+                    }
+                }
+            }
+
+            visited
+        };
+
+        if self.movement_preview.is_some() {
+            for (pos, _) in &distances {
+                draw_square(*pos, GREEN);
             }
         }
 
@@ -311,11 +389,16 @@ impl GameGrid {
                 (mouse_local.1 / cell_w) as i32,
             );
 
-            let dx = mouse_grid_x - player_x;
-            let dy = mouse_grid_y - player_y;
+            //let dx = mouse_grid_x - player_x;
+            //let dy = mouse_grid_y - player_y;
 
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
-            let valid_move_destination = dx.abs() <= 1 && dy.abs() <= 1 && !collision;
+            //let valid_move_destination = dx.abs() <= 1 && dy.abs() <= 1 && !collision;
+
+            let valid_move_destination = match distances.get(&(mouse_grid_x, mouse_grid_y)) {
+                Some((dist, _enter_from)) => *dist <= self.movement_range,
+                _ => false,
+            } && !collision;
 
             let mut hovered_npc_i = None;
             for (i, (_name, pos)) in self.characters.iter().enumerate() {
@@ -325,13 +408,29 @@ impl GameGrid {
             }
 
             if valid_move_destination {
-                draw_square((mouse_grid_x, mouse_grid_y), YELLOW);
+                let destination = (mouse_grid_x, mouse_grid_y);
+                draw_square(destination, YELLOW);
                 if is_mouse_button_down(MouseButton::Left) {
                     if self.movement_preview.is_none() {
                         self.event_sender
                             .send(InternalUiEvent::SwitchedToMoveInGrid);
                     }
-                    self.movement_preview = Some((dx, dy));
+
+                    let dist_enter_from = distances.get(&destination).unwrap();
+                    let mut dist = dist_enter_from.0;
+                    let mut movement_preview = vec![(dist, destination)];
+                    let mut pos = dist_enter_from.1;
+
+                    loop {
+                        let dist_enter_from = distances.get(&pos).unwrap();
+                        dist = dist_enter_from.0;
+                        movement_preview.push((dist, pos));
+                        if pos == (player_x, player_y) {
+                            break;
+                        }
+                        pos = dist_enter_from.1;
+                    }
+                    self.movement_preview = Some(movement_preview);
                 }
             } else if let Some(i) = hovered_npc_i {
                 draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
@@ -341,38 +440,47 @@ impl GameGrid {
                             .send(InternalUiEvent::SwitchedToAttackInGrid);
                     }
                     self.target_character_i = Some(i);
+                    self.movement_preview = None;
                 }
-            } else if self.movement_preview.is_some() {
+            } else if !self.movement_preview.is_some() {
                 draw_square((mouse_grid_x, mouse_grid_y), RED);
             }
         }
 
-        if let Some(movement_preview) = self.movement_preview {
-            let arrow_color = ORANGE;
-            draw_line(
-                grid_x_to_screen(player_x) + cell_w / 2.0,
-                grid_y_to_screen(player_y) + cell_w / 2.0,
-                grid_x_to_screen(player_x + movement_preview.0) + cell_w / 2.0,
-                grid_y_to_screen(player_y + movement_preview.1) + cell_w / 2.0,
-                1.0,
-                arrow_color,
-            );
-            draw_line(
-                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.3,
-                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.3,
-                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.7,
-                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.7,
-                3.0,
-                arrow_color,
-            );
-            draw_line(
-                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.3,
-                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.7,
-                grid_x_to_screen(player_x + movement_preview.0) + cell_w * 0.7,
-                grid_y_to_screen(player_y + movement_preview.1) + cell_w * 0.3,
-                3.0,
-                arrow_color,
-            );
+        if let Some(movement_preview) = &self.movement_preview {
+            if !movement_preview.is_empty() {
+                let arrow_color = ORANGE;
+                for i in 0..movement_preview.len() - 1 {
+                    let a = movement_preview[i].1;
+                    let b = movement_preview[i + 1].1;
+                    draw_line(
+                        grid_x_to_screen(a.0) + cell_w / 2.0,
+                        grid_y_to_screen(a.1) + cell_w / 2.0,
+                        grid_x_to_screen(b.0) + cell_w / 2.0,
+                        grid_y_to_screen(b.1) + cell_w / 2.0,
+                        1.0,
+                        arrow_color,
+                    );
+                }
+
+                let end = movement_preview.first().unwrap().1;
+                draw_line(
+                    grid_x_to_screen(end.0) + cell_w * 0.3,
+                    grid_y_to_screen(end.1) + cell_w * 0.3,
+                    grid_x_to_screen(end.0) + cell_w * 0.7,
+                    grid_y_to_screen(end.1) + cell_w * 0.7,
+                    3.0,
+                    arrow_color,
+                );
+                draw_line(
+                    grid_x_to_screen(end.0) + cell_w * 0.3,
+                    grid_y_to_screen(end.1) + cell_w * 0.7,
+                    grid_x_to_screen(end.0) + cell_w * 0.7,
+                    grid_y_to_screen(end.1) + cell_w * 0.3,
+                    3.0,
+                    arrow_color,
+                );
+            }
         }
 
         if let Some(character_i) = self.target_character_i {
@@ -504,15 +612,15 @@ impl ActivityPopup {
         }
 
         let mut choice_description_line = "".to_string();
-        for button_id in &self.selected_button_ids {
-            let action = self.choice_buttons[button_id].action;
+        for action in self.selected_actions() {
             choice_description_line.push('[');
             let s = match action {
                 ButtonAction::AttackEnhancement(enhancement) => enhancement.description,
                 ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
+                ButtonAction::MovementEnhancement(enhancement) => enhancement.name,
                 ButtonAction::OnAttackedReaction(reaction) => reaction.description,
                 ButtonAction::OnHitReaction(reaction) => reaction.description,
-                _ => unreachable!(),
+                ButtonAction::Action(..) | ButtonAction::Proceed => unreachable!(),
             };
             choice_description_line.push_str(s);
             choice_description_line.push(']');
@@ -528,8 +636,14 @@ impl ActivityPopup {
                             draw_text("Proceed?", x0, y0, 20.0, WHITE);
                             y0 += 20.0;
                         }
-                        BaseAction::Move { .. } => {
-                            draw_text("Change the direction or proceed", x0, y0, 20.0, WHITE);
+                        BaseAction::Move { range, .. } => {
+                            let percentage: u32 = self
+                                .selected_actions()
+                                .map(|action| action.unwrap_movement_enhancement().add_percentage)
+                                .sum();
+                            let range = range * (1.0 + percentage as f32 / 100.0);
+                            let text = format!("range: {range}");
+                            draw_text(&text, x0, y0, 20.0, WHITE);
                             y0 += 20.0;
                         }
                         BaseAction::Attack { .. } => {}
@@ -557,7 +671,8 @@ impl ActivityPopup {
         self.proceed_button.draw(x0, y0);
     }
 
-    fn update(&mut self) {
+    fn update(&mut self) -> Option<u32> {
+        let mut changed_movement_range = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, _button_action, hovered) => {
@@ -574,8 +689,14 @@ impl ActivityPopup {
                     let clicked_btn = &self.choice_buttons[&id];
                     clicked_btn.toggle_highlighted();
 
+                    if let ButtonAction::MovementEnhancement(..) = clicked_btn.action {
+                        changed_movement_range = true;
+                    }
+
+                    // Some choices work like radio boxes
                     if matches!(self.state, UiState::ReactToAttack { .. })
                         || matches!(self.state, UiState::ReactToHit { .. })
+                            || matches!(clicked_btn.action, ButtonAction::MovementEnhancement { .. })
                     {
                         for btn in self.choice_buttons.values() {
                             if btn.id != id {
@@ -594,6 +715,18 @@ impl ActivityPopup {
                 _ => unreachable!(),
             };
         }
+
+        if changed_movement_range {
+            let mut added_percentage = 0;
+            for action in self.selected_actions() {
+                if let ButtonAction::MovementEnhancement(enhancement) = action {
+                    added_percentage += enhancement.add_percentage;
+                }
+            }
+            Some(added_percentage)
+        } else {
+            None
+        }
     }
 
     fn take_selected_actions(&mut self) -> Vec<ButtonAction> {
@@ -603,10 +736,16 @@ impl ActivityPopup {
             .collect()
     }
 
+    fn selected_actions(&self) -> impl Iterator<Item = &ButtonAction> {
+        self.selected_button_ids
+            .iter()
+            .map(|id| &self.choice_buttons[&id].action)
+    }
+
     fn action_points(&self) -> u32 {
         let mut ap = self.base_action_points;
-        for id in &self.selected_button_ids {
-            ap += self.action_point_cost(self.choice_buttons[&id].action);
+        for action in self.selected_actions() {
+            ap += self.action_point_cost(*action);
         }
         if let Some(id) = self.hovered_button_id {
             if !self.selected_button_ids.contains(&id) {
@@ -622,7 +761,8 @@ impl ActivityPopup {
             ButtonAction::SpellEnhancement(_enhancement) => 0,
             ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost,
             ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
-            _ => unreachable!(),
+            ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
+            ButtonAction::Action(..) | ButtonAction::Proceed => unreachable!(),
         }
     }
 
@@ -662,7 +802,9 @@ impl ActivityPopup {
                 } => action_point_cost,
                 BaseAction::SelfEffect(sea) => sea.action_point_cost,
                 BaseAction::CastSpell(spell) => spell.action_point_cost,
-                BaseAction::Move { action_point_cost } => action_point_cost,
+                BaseAction::Move {
+                    action_point_cost, ..
+                } => action_point_cost,
             }
         } else {
             0
@@ -959,9 +1101,11 @@ impl UserInterface {
     fn set_state(&mut self, state: UiState) {
         self.state = state;
 
-        let mut lines = vec![];
+        let mut popup_lines = vec![];
         let mut popup_buttons = vec![];
-        let mut movement_preview = None;
+        //let mut movement_preview = vec![];
+        let mut movement_range = 0.0;
+        let mut movement = false;
         let mut has_target = false;
 
         match state {
@@ -973,17 +1117,14 @@ impl UserInterface {
                         hand,
                         action_point_cost,
                     } => {
-                        self.set_highlighted_button(Some(base_action_id(BaseAction::Attack {
-                            hand: hand,
-                            action_point_cost,
-                        })));
+                        self.set_highlighted_button(Some(base_action_id(base_action)));
 
                         let weapon = self.player_character().weapon(hand).unwrap();
-                        lines.push(format!(
+                        popup_lines.push(format!(
                             "{} attack ({} AP)",
                             weapon.name, weapon.action_point_cost
                         ));
-                        lines.push(format!("{} damage", weapon.damage));
+                        popup_lines.push(format!("{} damage", weapon.damage));
                         let enhancements = self.player_character().usable_attack_enhancements(hand);
                         for (subtext, enhancement) in enhancements {
                             let btn = self
@@ -993,19 +1134,15 @@ impl UserInterface {
                         has_target = true;
                     }
                     BaseAction::SelfEffect(sea) => {
-                        self.set_highlighted_button(Some(base_action_id(BaseAction::SelfEffect(
-                            sea,
-                        ))));
+                        self.set_highlighted_button(Some(base_action_id(base_action)));
 
-                        lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
-                        lines.push(sea.description.to_string());
+                        popup_lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
+                        popup_lines.push(sea.description.to_string());
                     }
                     BaseAction::CastSpell(spell) => {
-                        self.set_highlighted_button(Some(base_action_id(BaseAction::CastSpell(
-                            spell,
-                        ))));
+                        self.set_highlighted_button(Some(base_action_id(base_action)));
 
-                        lines.push(format!(
+                        popup_lines.push(format!(
                             "{} ({} AP, {} mana)",
                             spell.name, spell.action_point_cost, spell.mana_cost
                         ));
@@ -1013,7 +1150,7 @@ impl UserInterface {
                         if spell.damage > 0 {
                             description.push_str(&format!(" ({} damage)", spell.damage));
                         }
-                        lines.push(description);
+                        popup_lines.push(description);
                         if let Some(enhancement) = spell.possible_enhancement {
                             if self.player_character().can_use_spell_enhancement(spell) {
                                 let btn_action = ButtonAction::SpellEnhancement(enhancement);
@@ -1023,12 +1160,23 @@ impl UserInterface {
                         }
                         has_target = true;
                     }
-                    BaseAction::Move { action_point_cost } => {
-                        self.set_highlighted_button(Some(base_action_id(BaseAction::Move {
-                            action_point_cost,
-                        })));
-                        lines.push(format!("Movement ({} AP)", action_point_cost));
-                        movement_preview = Some((1, 0));
+                    BaseAction::Move {
+                        action_point_cost, ..
+                    } => {
+                        self.set_highlighted_button(Some(base_action_id(base_action)));
+                        popup_lines.push(format!("Movement ({} AP)", action_point_cost));
+
+                        let enhancements = self.player_character().usable_movement_enhancements();
+                        for enhancement in enhancements {
+                            let btn = self.new_button(
+                                "".to_string(),
+                                ButtonAction::MovementEnhancement(enhancement),
+                            );
+                            popup_buttons.push(btn);
+                        }
+                        movement = true;
+                        movement_range = 1.5;
+                        //movement_preview = Some((1, 0));
                     }
                 }
             }
@@ -1048,16 +1196,16 @@ impl UserInterface {
                     attacker.attack_modifier(hand),
                     defender.defense(),
                 );
-                lines.push(attacks_str);
+                popup_lines.push(attacks_str);
                 let explanation = format!(
                     "{}{}",
                     attacker.explain_attack_circumstances(hand),
                     defender.explain_incoming_attack_circumstances()
                 );
                 if !explanation.is_empty() {
-                    lines.push(format!("  {explanation}"));
+                    popup_lines.push(format!("  {explanation}"));
                 }
-                lines.push(format!(
+                popup_lines.push(format!(
                     "  Chance to hit: {}",
                     as_percentage(prob_attack_hit(&attacker, hand, &defender))
                 ));
@@ -1078,7 +1226,7 @@ impl UserInterface {
             } => {
                 self.set_action_buttons_enabled(false);
 
-                lines.push(format!(
+                popup_lines.push(format!(
                     "{} took {} damage from an attack by {}",
                     self.player_character().name,
                     damage,
@@ -1101,9 +1249,21 @@ impl UserInterface {
             }
         }
 
-        self.activity_popup.set_state(state, lines, popup_buttons);
+        self.activity_popup
+            .set_state(state, popup_lines, popup_buttons);
 
-        self.game_grid.movement_preview = movement_preview;
+        //TODO
+        let move_range = self.player_character().move_range;
+        self.game_grid.set_movement_range(move_range);
+
+        if movement {
+            if self.game_grid.movement_preview.is_none() {
+                self.game_grid.movement_preview = Some(vec![]);
+            }
+        } else {
+            self.game_grid.movement_preview = None;
+        }
+
         if has_target {
             if self.game_grid.target_character_i.is_none() {
                 // We pick an arbitrary enemy if none is picked already
@@ -1117,7 +1277,13 @@ impl UserInterface {
     fn update(&mut self, active_character_i: usize) -> Vec<Event> {
         self.game_grid.update(active_character_i, &self.characters);
 
-        self.activity_popup.update();
+        let maybe_updated_movement_range = self.activity_popup.update();
+
+        if let Some(added_percentage) = maybe_updated_movement_range {
+            let move_range =
+                self.player_character().move_range * (1.0 + added_percentage as f32 / 100.0);
+            self.game_grid.set_movement_range(move_range);
+        }
 
         let public_events = self
             .event_queue
@@ -1279,10 +1445,26 @@ impl UserInterface {
                                             target_character_i: target_char_i.unwrap(),
                                         }
                                     }
-                                    BaseAction::Move { action_point_cost } => Action::Move {
+                                    BaseAction::Move {
                                         action_point_cost,
-                                        direction: self.game_grid.movement_preview.take().unwrap(),
-                                    },
+                                        range,
+                                    } => {
+                                        let enhancements = self
+                                            .activity_popup
+                                            .take_selected_actions()
+                                            .into_iter()
+                                            .map(|action| match action {
+                                                ButtonAction::MovementEnhancement(e) => e,
+                                                _ => unreachable!(),
+                                            })
+                                            .collect();
+
+                                        Action::Move {
+                                            action_point_cost,
+                                            enhancements,
+                                            positions: self.game_grid.take_movement_path(),
+                                        }
+                                    }
                                 };
                                 Event::ChoseAction(action)
                             }
@@ -1318,8 +1500,10 @@ impl UserInterface {
             }
 
             InternalUiEvent::SwitchedToMoveInGrid => {
+                let move_range = self.player_character().move_range;
                 self.set_state(UiState::CommitAction(BaseAction::Move {
                     action_point_cost: 1,
+                    range: move_range,
                 }));
             }
 
@@ -1363,13 +1547,10 @@ impl UserInterface {
 
 fn base_action_id(base_action: BaseAction) -> String {
     match base_action {
-        BaseAction::Attack {
-            hand,
-            action_point_cost,
-        } => format!("ATTACK_{:?}", hand),
+        BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
         BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
         BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
-        BaseAction::Move { action_point_cost } => format!("MOVE"),
+        BaseAction::Move { .. } => format!("MOVE"),
     }
 }
 
@@ -2075,13 +2256,14 @@ impl Drawable for TextLine {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 enum ButtonAction {
     Action(BaseAction),
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
     SpellEnhancement(SpellEnhancement),
+    MovementEnhancement(MovementEnhancement),
     Proceed,
 }
 
@@ -2094,6 +2276,14 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::SpellEnhancement(..) => 0,
             ButtonAction::Proceed => 0,
+            ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
+        }
+    }
+
+    fn unwrap_movement_enhancement(&self) -> MovementEnhancement {
+        match self {
+            ButtonAction::MovementEnhancement(enhancement) => *enhancement,
+            _ => panic!(),
         }
     }
 }
@@ -2142,7 +2332,10 @@ impl ActionButton {
                     action_points = spell.action_point_cost;
                     mana_points = spell.mana_cost;
                 }
-                BaseAction::Move { action_point_cost } => {
+                BaseAction::Move {
+                    action_point_cost,
+                    range,
+                } => {
                     action_points = action_point_cost;
                     text = "Move";
                 }
@@ -2167,6 +2360,11 @@ impl ActionButton {
             ButtonAction::OnHitReaction(reaction) => {
                 text = reaction.name;
                 action_points = reaction.action_point_cost;
+            }
+            ButtonAction::MovementEnhancement(enhancement) => {
+                text = enhancement.name;
+                action_points = enhancement.action_point_cost;
+                stamina_points = enhancement.stamina_cost;
             }
         }
 
