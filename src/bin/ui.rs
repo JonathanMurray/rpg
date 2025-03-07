@@ -51,98 +51,133 @@ async fn main() {
 
     let mut user_interface = UserInterface::new(ui_characters);
 
-    let mut character_names = CharacterPortraits::new(game.characters(), game.active_character_i);
+    let mut character_portraits =
+        CharacterPortraits::new(game.characters(), game.active_character_i);
 
-    let mut state = match game.begin() {
-        game_state @ GameState::AwaitingBotChooseAction(..) => State::CatchingUp(game_state),
-        game_state @ _ => State::AwaitingPlayerInput(game_state),
-    };
-
-    change_state(&state, &mut user_interface);
-
+    let mut game_state = game.begin();
+    let mut catching_up = true;
     let mut timer = 0.0;
+
+    change_state(&game_state, catching_up, &mut user_interface);
 
     loop {
         clear_background(BLACK);
-        character_names.draw(50.0, 20.0);
+        character_portraits.draw(50.0, 20.0);
 
         user_interface.draw(640.0);
 
-        let active_character_i = state.game_state().game().active_character_i;
+        let active_character_i = game_state.game().active_character_i;
         let events = user_interface.update(active_character_i);
-
-        match state {
-            State::AwaitingPlayerInput(mut game_state) => {
-                if !events.is_empty() {
-                    for event in events {
-                        match event {
-                            Event::ChoseAttackedReaction(reaction) => {
-                                game_state = game_state.unwrap_react_to_attack().proceed(reaction);
-                            }
-                            Event::ChoseHitReaction(reaction) => {
-                                game_state = game_state.unwrap_react_to_hit().proceed(reaction);
-                            }
-                            Event::ChoseAction(action) => {
-                                game_state = game_state.unwrap_choose_action().proceed(action);
-                            }
-                        }
-                    }
-
-                    state = State::CatchingUp(game_state);
-                    change_state(&state, &mut user_interface);
-                } else {
-                    state = State::AwaitingPlayerInput(game_state)
-                }
-            }
-            State::CatchingUp(game_state) => {
-                assert!(
-                    events.is_empty(),
-                    "Didn't expect events from UI while we're catching up with game"
-                );
-                state = State::CatchingUp(game_state)
-            }
-        }
-
-        character_names.update(state.game_state().game());
-
-        state = match state {
-            State::AwaitingPlayerInput(..) => state,
-            State::CatchingUp(game_state) => {
-                timer += get_frame_time();
-
-                if logbuf.borrow_mut().0.is_empty() {
-                    match game_state {
-                        GameState::AwaitingBotChooseAction(awaiting_bot) => {
-                            let action = bot_choose_action(&awaiting_bot.game);
-                            let new_game_state = awaiting_bot.proceed(action);
-                            State::CatchingUp(new_game_state)
-                        }
-                        GameState::PerformingMovement(performing_movement) => {
-                            let new_game_state = performing_movement.proceed();
-                            State::CatchingUp(new_game_state)
-                        }
-                        _ => {
-                            let new_state = State::AwaitingPlayerInput(game_state);
-                            change_state(&new_state, &mut user_interface);
-                            new_state
-                        }
-                    }
-                } else {
-                    let tick = 0.3;
-                    while timer > tick {
-                        timer -= tick;
-                        let line = logbuf.borrow_mut().0.remove(0);
-                        user_interface.log.add(line);
-                    }
-
-                    State::CatchingUp(game_state)
-                }
-            }
-        };
 
         user_interface.update_character_resources(&player_character.borrow());
 
+        character_portraits.update(game_state.game());
+
+        if !events.is_empty() {
+            for event in events {
+                match event {
+                    Event::ChoseAttackedReaction(reaction) => {
+                        game_state = game_state.unwrap_react_to_attack().proceed(reaction);
+                    }
+                    Event::ChoseHitReaction(reaction) => {
+                        game_state = game_state.unwrap_react_to_hit().proceed(reaction);
+                    }
+                    Event::ChoseAction(action) => {
+                        game_state = game_state.unwrap_choose_action().proceed(action);
+                    }
+                }
+            }
+
+            catching_up = true;
+            timer = 0.0;
+            change_state(&game_state, catching_up, &mut user_interface);
+        }
+
+        for line in logbuf.borrow_mut().0.drain(..) {
+            user_interface.log.add(line);
+        }
+
+        if catching_up {
+            timer += get_frame_time();
+            if timer > 1.0 {
+                catching_up = false;
+
+                match game_state {
+                    GameState::AwaitingBotChooseAction(awaiting_bot) => {
+                        let action = bot_choose_action(&awaiting_bot.game);
+                        game_state = awaiting_bot.proceed(action);
+                        catching_up = true;
+                        timer = 0.0;
+                        change_state(&game_state, catching_up, &mut user_interface);
+                    }
+                    GameState::PerformingMovement(performing_movement) => {
+                        game_state = performing_movement.proceed();
+                        catching_up = true;
+                        timer = 0.0;
+                        change_state(&game_state, catching_up, &mut user_interface);
+                    }
+                    _ => {
+                        catching_up = false;
+                        change_state(&game_state, catching_up, &mut user_interface);
+                    }
+                }
+            }
+        }
+
+        match game_state {
+            GameState::AwaitingPlayerAttackReaction(..)
+            | GameState::AwaitingPlayerHitReaction(..)
+                if catching_up =>
+            {
+                // The reaction popup should show up immediately
+                catching_up = false;
+                change_state(&game_state, catching_up, &mut user_interface);
+            }
+            _ => {}
+        }
+
         next_frame().await
+    }
+}
+
+// TODO should be part of UI struct?
+fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut UserInterface) {
+    if catching_up {
+        println!("catching up");
+        user_interface.set_state(UiState::Idle);
+    } else {
+        match game_state {
+            GameState::AwaitingPlayerAction(..) => {
+                println!("awaiting player action");
+                user_interface.set_state(UiState::ChooseAction);
+            }
+            GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
+                attacking_character_i,
+                hand,
+                ..
+            }) => {
+                println!("awaiting player attack reaction");
+                user_interface.set_state(UiState::ReactToAttack {
+                    attacking_character_i: *attacking_character_i,
+                    hand: *hand,
+                });
+            }
+            GameState::AwaitingPlayerHitReaction(StateReactToHit {
+                attacking_character_i,
+                damage,
+                ..
+            }) => {
+                println!("awaiting player hit reaction");
+                user_interface.set_state(UiState::ReactToHit {
+                    attacking_character_i: *attacking_character_i,
+                    damage: *damage,
+                });
+            }
+            GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
+                println!("awaiting bot, or performing movement");
+                user_interface.set_state(UiState::Idle);
+            }
+        }
     }
 }
 
@@ -216,7 +251,7 @@ impl GameGrid {
             .unwrap()
             .into_iter()
             .rev()
-            .map(|(dist, (x, y))| (x as u32, y as u32))
+            .map(|(_dist, (x, y))| (x as u32, y as u32))
             .collect()
     }
 
@@ -464,56 +499,6 @@ impl GameGrid {
         if let Some(character_i) = self.target_character_i {
             let target_pos = self.characters[character_i].1;
             draw_square(target_pos, MAGENTA);
-        }
-    }
-}
-
-enum State {
-    AwaitingPlayerInput(GameState),
-    CatchingUp(GameState),
-}
-
-impl State {
-    fn game_state(&self) -> &GameState {
-        match self {
-            State::AwaitingPlayerInput(game_state) => game_state,
-            State::CatchingUp(game_state) => game_state,
-        }
-    }
-}
-
-fn change_state(state: &State, user_interface: &mut UserInterface) {
-    match state {
-        State::AwaitingPlayerInput(game_state) => match game_state {
-            GameState::AwaitingPlayerAction(..) => {
-                user_interface.set_state(UiState::ChooseAction);
-            }
-            GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
-                attacking_character_i,
-                hand,
-                ..
-            }) => {
-                user_interface.set_state(UiState::ReactToAttack {
-                    attacking_character_i: *attacking_character_i,
-                    hand: *hand,
-                });
-            }
-            GameState::AwaitingPlayerHitReaction(StateReactToHit {
-                attacking_character_i,
-                damage,
-                ..
-            }) => {
-                user_interface.set_state(UiState::ReactToHit {
-                    attacking_character_i: *attacking_character_i,
-                    damage: *damage,
-                });
-            }
-            GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
-                unreachable!();
-            }
-        },
-        State::CatchingUp(..) => {
-            user_interface.set_state(UiState::Idle);
         }
     }
 }
@@ -840,7 +825,7 @@ impl UserInterface {
                 BaseAction::CastSpell(spell) => {
                     if let Some(enhancement) = spell.possible_enhancement {
                         let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                        let mut btn = new_button(spell.name.to_string(), btn_action);
+                        let btn = new_button(spell.name.to_string(), btn_action);
                         btn.enabled.set(false);
                         spell_enhancement_buttons.push(btn);
                     }
@@ -1081,8 +1066,6 @@ impl UserInterface {
 
         let mut popup_lines = vec![];
         let mut popup_buttons = vec![];
-        //let mut movement_preview = vec![];
-        let mut movement_range = 0.0;
         let mut movement = false;
         let mut has_target = false;
 
@@ -1153,8 +1136,6 @@ impl UserInterface {
                             popup_buttons.push(btn);
                         }
                         movement = true;
-                        movement_range = 1.5;
-                        //movement_preview = Some((1, 0));
                     }
                 }
             }
@@ -1284,6 +1265,8 @@ impl UserInterface {
         self.activity_popup.set_enabled(true);
         self.activity_popup.target_line = None;
         self.game_grid.range_indicator = None;
+
+        // TODO disable activity popup Proceed button if no movement has been chosen
 
         if let Some(i) = self.game_grid.target_character_i {
             let target_char = self.characters[i].borrow();
@@ -1424,7 +1407,7 @@ impl UserInterface {
                                     }
                                     BaseAction::Move {
                                         action_point_cost,
-                                        range,
+                                        range: _,
                                     } => {
                                         let enhancements = self
                                             .activity_popup
