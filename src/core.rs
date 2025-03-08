@@ -1106,7 +1106,7 @@ impl Character {
         position: (u32, u32),
     ) -> Self {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
-        let move_range = 0.75 + dex as f32 * 0.25;
+        let move_range = 0.8 + dex as f32 * 0.2;
         Self {
             index: None,
             player_controlled,
@@ -1265,7 +1265,7 @@ impl Character {
                 name: "Sprint",
                 action_point_cost: 1,
                 stamina_cost: 1,
-                add_percentage: 200,
+                add_percentage: 150,
             },
         ];
         enhancements.retain(|e| {

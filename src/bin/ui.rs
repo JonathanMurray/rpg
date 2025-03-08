@@ -6,6 +6,9 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use macroquad::texture::{
+    draw_texture, draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
+};
 use macroquad::{
     color::{
         self, Color, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN,
@@ -50,7 +53,14 @@ async fn main() {
         ui_characters.push(Rc::clone(character));
     }
 
-    let mut user_interface = UserInterface::new(ui_characters, game.active_character_i);
+    let character_texture = load_texture("character4.png").await.unwrap();
+    character_texture.set_filter(FilterMode::Nearest);
+
+    let mut user_interface = UserInterface::new(
+        ui_characters,
+        game.active_character_i,
+        character_texture.clone(),
+    );
 
     let mut character_portraits =
         CharacterPortraits::new(game.characters(), game.active_character_i);
@@ -69,17 +79,14 @@ async fn main() {
         let elapsed = get_frame_time();
 
         let active_character_i = game_state.game().active_character_i;
-        let active_character = &game_state.game().characters()[active_character_i];
         let ui_events = user_interface.update(active_character_i, elapsed);
 
         clear_background(BLACK);
         character_portraits.draw(10.0, 10.0);
 
-        user_interface.draw(640.0);
+        user_interface.draw(670.0);
 
-        if active_character.borrow().player_controlled {
-            user_interface.update_character_resources(&active_character.borrow());
-        }
+        user_interface.update_character_resources(game_state.game().characters());
 
         character_portraits.update(game_state.game());
 
@@ -192,6 +199,7 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
 }
 
 struct GameGrid {
+    character_texture: Texture2D,
     event_sender: EventSender,
     pathfind_grid: PathfindGrid,
     characters: Vec<(TextLine, (i32, i32), bool)>,
@@ -227,7 +235,11 @@ impl Effect {
 }
 
 impl GameGrid {
-    fn new(characters: &[Rc<RefCell<Character>>], event_sender: EventSender) -> Self {
+    fn new(
+        characters: &[Rc<RefCell<Character>>],
+        event_sender: EventSender,
+        character_texture: Texture2D,
+    ) -> Self {
         let characters = characters
             .into_iter()
             .map(|character| {
@@ -241,9 +253,10 @@ impl GameGrid {
             .collect();
 
         Self {
+            character_texture,
             pathfind_grid: PathfindGrid::new(),
             characters,
-            effects: vec![Effect::new((1, 1), "Hello")],
+            effects: vec![],
             active_character_i: 0,
             movement_range: 0.0,
             movement_preview: Default::default(),
@@ -310,8 +323,19 @@ impl GameGrid {
     }
 
     fn draw(&mut self, x: f32, y: f32) {
-        let cell_w = 40.0;
+        let cell_w = 64.0;
         let grid_dimensions = (20, 8);
+
+        let bg_color = GRAY;
+        let grid_color = Color::new(0.4, 0.4, 0.4, 1.00);
+
+        draw_rectangle(
+            x,
+            y,
+            cell_w * grid_dimensions.0 as f32,
+            cell_w * grid_dimensions.1 as f32,
+            bg_color,
+        );
 
         let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w;
         let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w;
@@ -319,23 +343,16 @@ impl GameGrid {
         let active_character_pos = self.characters[self.active_character_i].1;
 
         let draw_square = |(grid_x, grid_y), color| {
+            let margin = -1.0;
             draw_rectangle_lines(
-                grid_x_to_screen(grid_x),
-                grid_y_to_screen(grid_y),
-                cell_w,
-                cell_w,
-                1.0,
+                grid_x_to_screen(grid_x) - margin,
+                grid_y_to_screen(grid_y) - margin,
+                cell_w + margin * 2.0,
+                cell_w + margin * 2.0,
+                2.0,
                 color,
             )
         };
-
-        draw_rectangle(
-            grid_x_to_screen(active_character_pos.0),
-            grid_y_to_screen(active_character_pos.1),
-            cell_w,
-            cell_w,
-            BROWN,
-        );
 
         for col in 0..grid_dimensions.0 + 1 {
             let x0 = grid_x_to_screen(col);
@@ -345,7 +362,7 @@ impl GameGrid {
                 x0,
                 grid_y_to_screen(grid_dimensions.1),
                 1.0,
-                DARKGRAY,
+                grid_color,
             );
             for row in 0..grid_dimensions.1 + 1 {
                 let y0 = grid_y_to_screen(row);
@@ -355,7 +372,7 @@ impl GameGrid {
                     grid_x_to_screen(grid_dimensions.0),
                     y0,
                     1.0,
-                    DARKGRAY,
+                    grid_color,
                 );
             }
         }
@@ -364,6 +381,7 @@ impl GameGrid {
             for (pos, _) in &self.pathfind_grid.distances {
                 if (0..grid_dimensions.0).contains(&pos.0)
                     && (0..grid_dimensions.1).contains(&pos.1)
+                    && *pos != active_character_pos
                 {
                     draw_square(*pos, GREEN);
                 }
@@ -433,9 +451,22 @@ impl GameGrid {
 
         let text_margin = 13.0;
         for (text, position, _) in &self.characters {
+            /*
             text.draw(
                 grid_x_to_screen(position.0) + text_margin,
                 grid_y_to_screen(position.1) + text_margin,
+            );
+             */
+
+            draw_texture_ex(
+                &self.character_texture,
+                grid_x_to_screen(position.0),
+                grid_y_to_screen(position.1),
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some((cell_w, cell_w).into()),
+                    ..Default::default()
+                },
             );
         }
 
@@ -478,7 +509,8 @@ impl GameGrid {
             if valid_move_destination {
                 let destination = (mouse_grid_x, mouse_grid_y);
                 draw_square(destination, YELLOW);
-                if is_mouse_button_down(MouseButton::Left) {
+                // TODO don't react to this mouse click if it's on top of the Popup UI element
+                if is_mouse_button_pressed(MouseButton::Left) {
                     if self.movement_preview.is_none() {
                         self.event_sender
                             .send(InternalUiEvent::SwitchedToMoveInGrid);
@@ -498,11 +530,13 @@ impl GameGrid {
                         }
                         pos = dist_enter_from.1;
                     }
+                    println!("Set movement preview to {:?}", movement_preview);
                     self.movement_preview = Some(movement_preview);
                 }
             } else if let Some(i) = hovered_npc_i {
                 draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
-                if is_mouse_button_down(MouseButton::Left) {
+                // TODO don't react to this mouse click if it's on top of the Popup UI element
+                if is_mouse_button_pressed(MouseButton::Left) {
                     if self.target_character_i.is_none() {
                         self.event_sender
                             .send(InternalUiEvent::SwitchedToAttackInGrid);
@@ -526,7 +560,7 @@ impl GameGrid {
                         grid_y_to_screen(a.1) + cell_w / 2.0,
                         grid_x_to_screen(b.0) + cell_w / 2.0,
                         grid_y_to_screen(b.1) + cell_w / 2.0,
-                        1.0,
+                        2.0,
                         arrow_color,
                     );
                 }
@@ -561,10 +595,31 @@ impl GameGrid {
                 grid_y_to_screen(actor_pos.1) + cell_w / 2.0,
                 grid_x_to_screen(target_pos.0) + cell_w / 2.0,
                 grid_y_to_screen(target_pos.1) + cell_w / 2.0,
-                1.0,
+                3.0,
                 MAGENTA,
             );
         }
+
+        {
+            let margin = 2.0;
+            draw_rectangle_lines(
+                grid_x_to_screen(active_character_pos.0) - margin,
+                grid_y_to_screen(active_character_pos.1) - margin,
+                cell_w + margin * 2.0,
+                cell_w + margin * 2.0,
+                2.0,
+                GOLD,
+            );
+        }
+
+        draw_rectangle_lines(
+            x,
+            y,
+            cell_w * grid_dimensions.0 as f32,
+            cell_w * grid_dimensions.1 as f32,
+            1.0,
+            GRAY,
+        );
 
         for effect in &self.effects {
             let font_size = 24;
@@ -635,13 +690,15 @@ impl ActivityPopup {
         let mut x0 = x + 10.0;
         let mut y0 = y + 20.0;
 
+        let bg_color = DARKBROWN;
+
         if matches!(self.state, UiState::ChoosingAction) {
-            draw_rectangle(x, y, 500.0, 30.0, DARKBROWN);
+            draw_rectangle(x, y, 500.0, 30.0, bg_color);
             draw_text("Choose an action!", x0, y0, 20.0, WHITE);
             return;
         }
 
-        draw_rectangle(x, y, 500.0, 160.0, DARKBROWN);
+        draw_rectangle(x, y, 500.0, 160.0, bg_color);
 
         for line in &self.initial_lines {
             draw_text(line, x0, y0, 20.0, WHITE);
@@ -871,7 +928,11 @@ struct CharacterUi {
 }
 
 impl UserInterface {
-    fn new(characters: Vec<Rc<RefCell<Character>>>, active_character_i: usize) -> Self {
+    fn new(
+        characters: Vec<Rc<RefCell<Character>>>,
+        active_character_i: usize,
+        character_texture: Texture2D,
+    ) -> Self {
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
@@ -1096,6 +1157,7 @@ impl UserInterface {
             EventSender {
                 queue: Rc::clone(&event_queue),
             },
+            character_texture,
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
@@ -1132,15 +1194,17 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
-        self.game_grid.draw(100.0, y - 495.0);
+        self.game_grid.draw(10.0, 90.0);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
-        self.player_portraits.draw(700.0, y - 60.0);
+        self.player_portraits.draw(270.0, y + 10.0);
 
         draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
+
+        // TODO when switching to an inactive character, the UI must be disabled, so you can't pick invalid actions
         self.character_uis
             .get_mut(&self.player_portraits.selected_i.get())
             .unwrap()
@@ -1660,16 +1724,24 @@ impl UserInterface {
         }
     }
 
-    fn update_character_resources(&mut self, character: &Character) {
-        let ui = &self.character_uis[&self.active_character_i];
-        ui.health_bar
-            .borrow_mut()
-            .set_current(character.health.current);
-        ui.mana_bar.borrow_mut().set_current(character.mana.current);
-        ui.stamina_bar
-            .borrow_mut()
-            .set_current(character.stamina.current);
-        self.action_points_row.current = character.action_points;
+    fn update_character_resources(&mut self, characters: &[Rc<RefCell<Character>>]) {
+        for (i, character) in characters.iter().enumerate() {
+            let character = character.borrow();
+            if self.character_uis.contains_key(&i) {
+                let ui = &self.character_uis[&i];
+                ui.health_bar
+                    .borrow_mut()
+                    .set_current(character.health.current);
+                ui.mana_bar.borrow_mut().set_current(character.mana.current);
+                ui.stamina_bar
+                    .borrow_mut()
+                    .set_current(character.stamina.current);
+            }
+        }
+
+        self.action_points_row.current = self.characters[self.player_portraits.selected_i.get()]
+            .borrow()
+            .action_points;
     }
 }
 
@@ -1904,6 +1976,7 @@ impl PlayerCharacterPortrait {
 impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size();
+        draw_rectangle(x, y, w, h, DARKGRAY);
         if self.selected.get() {
             draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
         }
@@ -2805,6 +2878,7 @@ enum InternalUiEvent {
     SwitchedToAttackInGrid,
 }
 
+#[derive(Debug)]
 enum Event {
     ChoseAttackedReaction(Option<OnAttackedReaction>),
     ChoseHitReaction(Option<OnHitReaction>),
