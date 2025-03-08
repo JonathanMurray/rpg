@@ -2,9 +2,6 @@ use std::cell::RefCell;
 use std::cell::RefMut;
 use std::rc::Rc;
 
-use macroquad::rand;
-use macroquad::rand::ChooseRandom;
-
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 use crate::data::BOW;
 use crate::data::BRACE;
@@ -14,19 +11,17 @@ use crate::data::{
     SMALL_SHIELD, SWORD,
 };
 
-// You get this many AP per round
-const ACTION_POINTS_PER_TURN: u32 = 6;
+pub const ACTION_POINTS_PER_TURN: u32 = 6;
 
 pub struct CoreGame {
     characters: Characters,
     pub active_character_i: usize,
-    pub player_character_i: usize,
     logger: Rc<RefCell<dyn Logger>>,
 }
 
 impl CoreGame {
     pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Self {
-        let mut bob = Character::new("Bob", 5, 4, 4, (1, 4));
+        let mut bob = Character::new(true, "Bob", 5, 4, 4, (1, 4));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -36,32 +31,30 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
-        let mut alice = Character::new("Alice", 2, 2, 3, (2, 4));
+        let mut alice = Character::new(false, "Alice", 2, 2, 3, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new("Charlie", 1, 1, 1, (3, 4));
+        let mut charlie = Character::new(false, "Charlie", 1, 1, 1, (3, 4));
         charlie.main_hand.weapon = Some(BOW);
 
-        let characters = Characters::new(vec![bob, alice, charlie]);
+        let mut david = Character::new(true, "David", 10, 10, 10, (5, 7));
+        david.main_hand.weapon = Some(WAR_HAMMER);
+
+        let characters = Characters::new(vec![bob, david, alice, charlie]);
         Self {
             characters,
-            player_character_i: 0,
-            active_character_i: 1,
+            active_character_i: 0,
             logger,
         }
     }
 
     pub fn begin(self) -> GameState {
-        if self.active_character_i == self.player_character_i {
+        if self.active_character().player_controlled {
             GameState::AwaitingPlayerAction(StateChooseAction { game: self })
         } else {
             GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
         }
-    }
-
-    pub fn player_character(&self) -> &Rc<RefCell<Character>> {
-        self.characters.get(self.player_character_i)
     }
 
     pub fn active_character(&self) -> RefMut<Character> {
@@ -73,7 +66,8 @@ impl CoreGame {
     }
 
     fn enter_state_action(self, action: Action) -> GameState {
-        let players_turn = self.player_character_i == self.active_character_i;
+        let players_turn = self.active_character().player_controlled;
+
         let mut character = self.active_character();
         let action_points_before_action = character.action_points;
 
@@ -517,7 +511,7 @@ impl CoreGame {
         action_points_before_action: u32,
         attack_hit: Option<(usize, u32)>,
     ) -> GameState {
-        let players_turn = self.player_character_i == self.active_character_i;
+        let players_turn = self.active_character().player_controlled;
         let mut character = self.active_character();
 
         // You recover from 1 stack of Dazed for each AP you spend
@@ -633,7 +627,7 @@ impl CoreGame {
             }
         }
 
-        if self.player_character_i == self.active_character_i {
+        if self.active_character().player_controlled {
             GameState::AwaitingPlayerAction(StateChooseAction { game: self })
         } else {
             GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
@@ -742,7 +736,7 @@ impl StatePerformingMovement {
 
 pub struct StateReactToAttack {
     game: CoreGame,
-    attacked_character_i: usize,
+    pub attacked_character_i: usize,
     action_points_before_action: u32,
     pub enhancements: Vec<AttackEnhancement>,
     pub hand: HandType,
@@ -764,7 +758,7 @@ impl StateReactToAttack {
 pub struct StateReactToHit {
     game: CoreGame,
     pub attacking_character_i: usize,
-    reacting_character_i: usize,
+    pub reacting_character_i: usize,
     pub damage: u32,
 }
 
@@ -950,7 +944,7 @@ impl BaseAction {
                 hand: _,
                 action_point_cost,
             } => *action_point_cost,
-            BaseAction::SelfEffect(self_effect_action) => self_effect_action.action_point_cost,
+            BaseAction::SelfEffect(sea) => sea.action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move {
                 action_point_cost, ..
@@ -1020,6 +1014,7 @@ impl Hand {
 
 #[derive(Debug)]
 pub struct Character {
+    pub player_controlled: bool,
     pub position: (u32, u32),
     pub name: &'static str,
     pub base_strength: u32,
@@ -1041,10 +1036,18 @@ pub struct Character {
 }
 
 impl Character {
-    fn new(name: &'static str, str: u32, dex: u32, int: u32, position: (u32, u32)) -> Self {
+    fn new(
+        player_controlled: bool,
+        name: &'static str,
+        str: u32,
+        dex: u32,
+        int: u32,
+        position: (u32, u32),
+    ) -> Self {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
         let move_range = 0.75 + dex as f32 * 0.25;
         Self {
+            player_controlled,
             position,
             name,
             base_strength: str,

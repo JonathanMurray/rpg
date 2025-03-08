@@ -18,22 +18,38 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
         if character.can_use_action(action) {
             match action {
                 BaseAction::Attack { hand, .. } => {
-                    let player_character = game.player_character().borrow_mut();
-                    if character.can_reach_with_attack(hand, player_character.position) {
-                        chosen_action = Some(Action::Attack {
-                            hand,
-                            enhancements: vec![],
-                            target_character_i: game.player_character_i,
-                        });
+                    for (i, other_character) in game.characters().iter().enumerate() {
+                        if i == game.active_character_i {
+                            continue; //Avoid borrowing already borrowed
+                        }
+                        if other_character.borrow().player_controlled
+                            && character
+                                .can_reach_with_attack(hand, other_character.borrow().position)
+                        {
+                            chosen_action = Some(Action::Attack {
+                                hand,
+                                enhancements: vec![],
+                                target_character_i: i,
+                            });
+                            break;
+                        }
                     }
                 }
                 BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
                 BaseAction::CastSpell(spell) => {
-                    chosen_action = Some(Action::CastSpell {
-                        spell,
-                        enhanced: false,
-                        target_character_i: game.player_character_i,
-                    });
+                    for (i, other_character) in game.characters().iter().enumerate() {
+                        if i == game.active_character_i {
+                            continue; //Avoid borrowing already borrowed
+                        }
+                        if other_character.borrow().player_controlled {
+                            chosen_action = Some(Action::CastSpell {
+                                spell,
+                                enhanced: false,
+                                target_character_i: i,
+                            });
+                            break;
+                        }
+                    }
                 }
                 BaseAction::Move {
                     action_point_cost,

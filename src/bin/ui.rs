@@ -28,7 +28,7 @@ use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
     Character, CoreGame, GameState, Hand, HandType, Logger, MovementEnhancement,
     OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell, SpellEnhancement,
-    StateChooseAction, StateReactToAttack, StateReactToHit,
+    StateChooseAction, StateReactToAttack, StateReactToHit, ACTION_POINTS_PER_TURN,
 };
 use rpg::pathfind::PathfindGrid;
 
@@ -42,14 +42,12 @@ async fn main() {
 
     let game = CoreGame::new(cloned_logbuf);
 
-    let player_character = Rc::clone(game.player_character());
-
     let mut ui_characters = vec![];
     for character in game.characters() {
         ui_characters.push(Rc::clone(character));
     }
 
-    let mut user_interface = UserInterface::new(ui_characters);
+    let mut user_interface = UserInterface::new(ui_characters, game.active_character_i);
 
     let mut character_portraits =
         CharacterPortraits::new(game.characters(), game.active_character_i);
@@ -61,15 +59,18 @@ async fn main() {
     change_state(&game_state, catching_up, &mut user_interface);
 
     loop {
+        let active_character_i = game_state.game().active_character_i;
+        let active_character = &game_state.game().characters()[active_character_i];
+        let events = user_interface.update(active_character_i);
+
         clear_background(BLACK);
         character_portraits.draw(50.0, 20.0);
 
         user_interface.draw(640.0);
 
-        let active_character_i = game_state.game().active_character_i;
-        let events = user_interface.update(active_character_i);
-
-        user_interface.update_character_resources(&player_character.borrow());
+        if active_character.borrow().player_controlled {
+            user_interface.update_character_resources(&active_character.borrow());
+        }
 
         character_portraits.update(game_state.game());
 
@@ -99,21 +100,18 @@ async fn main() {
 
         if catching_up {
             timer += get_frame_time();
-            if timer > 1.0 {
-                catching_up = false;
-
+            if timer > 0.5 {
+                timer = 0.0;
                 match game_state {
                     GameState::AwaitingBotChooseAction(awaiting_bot) => {
                         let action = bot_choose_action(&awaiting_bot.game);
                         game_state = awaiting_bot.proceed(action);
                         catching_up = true;
-                        timer = 0.0;
                         change_state(&game_state, catching_up, &mut user_interface);
                     }
                     GameState::PerformingMovement(performing_movement) => {
                         game_state = performing_movement.proceed();
                         catching_up = true;
-                        timer = 0.0;
                         change_state(&game_state, catching_up, &mut user_interface);
                     }
                     _ => {
@@ -140,7 +138,6 @@ async fn main() {
     }
 }
 
-// TODO should be part of UI struct?
 fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut UserInterface) {
     if catching_up {
         println!("catching up");
@@ -149,28 +146,32 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
         match game_state {
             GameState::AwaitingPlayerAction(..) => {
                 println!("awaiting player action");
-                user_interface.set_state(UiState::ChooseAction);
+                user_interface.set_state(UiState::ChoosingAction);
             }
             GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
                 attacking_character_i,
                 hand,
+                attacked_character_i,
                 ..
             }) => {
                 println!("awaiting player attack reaction");
-                user_interface.set_state(UiState::ReactToAttack {
+                user_interface.set_state(UiState::ReactingToAttack {
                     attacking_character_i: *attacking_character_i,
                     hand: *hand,
+                    attacked_character_i: *attacked_character_i,
                 });
             }
             GameState::AwaitingPlayerHitReaction(StateReactToHit {
                 attacking_character_i,
                 damage,
+                reacting_character_i,
                 ..
             }) => {
                 println!("awaiting player hit reaction");
-                user_interface.set_state(UiState::ReactToHit {
+                user_interface.set_state(UiState::ReactingToHit {
                     attacking_character_i: *attacking_character_i,
                     damage: *damage,
+                    attacked_character_i: *reacting_character_i,
                 });
             }
             GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
@@ -182,22 +183,31 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
 }
 
 struct GameGrid {
+    event_sender: EventSender,
     pathfind_grid: PathfindGrid,
-    characters: Vec<(TextLine, (i32, i32))>,
+    characters: Vec<(TextLine, (i32, i32), bool)>,
+
     active_character_i: usize,
     movement_range: f32,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
     target_character_i: Option<usize>,
-    event_sender: EventSender,
-    receptive_to_input: bool,
     range_indicator: Option<Range>,
+
+    receptive_to_input: bool,
 }
 
 impl GameGrid {
-    fn new(characters: Vec<(impl Into<String>, (u32, u32))>, event_sender: EventSender) -> Self {
+    fn new(characters: &[Rc<RefCell<Character>>], event_sender: EventSender) -> Self {
         let characters = characters
             .into_iter()
-            .map(|(s, pos)| (TextLine::new(s, 25), (pos.0 as i32, pos.1 as i32)))
+            .map(|character| {
+                let char = character.borrow();
+                (
+                    TextLine::new(&char.name[0..1], 25),
+                    (char.position.0 as i32, char.position.1 as i32),
+                    char.player_controlled,
+                )
+            })
             .collect();
 
         Self {
@@ -214,8 +224,7 @@ impl GameGrid {
     }
 
     fn update(&mut self, active_character_i: usize, characters: &[Rc<RefCell<Character>>]) {
-        // TODO don't assume that player is the first in the vec
-        self.receptive_to_input = active_character_i == 0;
+        self.receptive_to_input = characters[active_character_i].borrow().player_controlled;
 
         self.pathfind_grid.blocked_positions.clear();
 
@@ -275,9 +284,6 @@ impl GameGrid {
             )
         };
 
-        // TODO: don't assume that player is the first in the vec
-        let (player_x, player_y) = self.characters[0].1;
-
         draw_rectangle(
             grid_x_to_screen(active_character_pos.0),
             grid_y_to_screen(active_character_pos.1),
@@ -319,16 +325,19 @@ impl GameGrid {
             }
         }
 
+        let (active_char_x, active_char_y) = self.characters[self.active_character_i].1;
+
         if let Some(range) = self.range_indicator {
             let range_ceil = (f32::from(range)).ceil() as i32;
             let range_squared = range.squared() as i32;
-            let within =
-                |x: i32, y: i32| (x - player_x).pow(2) + (y - player_y).pow(2) <= range_squared;
-            for x in
-                (player_x - range_ceil).max(0)..=(player_x + range_ceil).min(grid_dimensions.0 - 1)
+            let within = |x: i32, y: i32| {
+                (x - active_char_x).pow(2) + (y - active_char_y).pow(2) <= range_squared
+            };
+            for x in (active_char_x - range_ceil).max(0)
+                ..=(active_char_x + range_ceil).min(grid_dimensions.0 - 1)
             {
-                for y in (player_y - range_ceil).max(0)
-                    ..=(player_y + range_ceil).min(grid_dimensions.1 - 1)
+                for y in (active_char_y - range_ceil).max(0)
+                    ..=(active_char_y + range_ceil).min(grid_dimensions.1 - 1)
                 {
                     if within(x, y) {
                         let color = YELLOW;
@@ -378,7 +387,7 @@ impl GameGrid {
         }
 
         let text_margin = 13.0;
-        for (text, position) in &self.characters {
+        for (text, position, _) in &self.characters {
             text.draw(
                 grid_x_to_screen(position.0) + text_margin,
                 grid_y_to_screen(position.1) + text_margin,
@@ -389,7 +398,7 @@ impl GameGrid {
         let mouse_local = (mouse_x - x, mouse_y - y);
 
         let mut character_positions = vec![];
-        for (_, pos) in &self.characters {
+        for (_, pos, _) in &self.characters {
             character_positions.push(*pos);
         }
 
@@ -414,8 +423,8 @@ impl GameGrid {
             } && !collision;
 
             let mut hovered_npc_i = None;
-            for (i, (_name, pos)) in self.characters.iter().enumerate() {
-                if *pos == (mouse_grid_x, mouse_grid_y) && *pos != (player_x, player_y) {
+            for (i, (_name, pos, player_controlled)) in self.characters.iter().enumerate() {
+                if *pos == (mouse_grid_x, mouse_grid_y) && !player_controlled {
                     hovered_npc_i = Some(i);
                 }
             }
@@ -438,7 +447,7 @@ impl GameGrid {
                         let dist_enter_from = self.pathfind_grid.distances.get(&pos).unwrap();
                         dist = dist_enter_from.0;
                         movement_preview.push((dist, pos));
-                        if pos == (player_x, player_y) {
+                        if pos == (active_char_x, active_char_y) {
                             break;
                         }
                         pos = dist_enter_from.1;
@@ -505,14 +514,16 @@ impl GameGrid {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 enum UiState {
-    ChooseAction,
-    CommitAction(BaseAction),
-    ReactToAttack {
+    ChoosingAction,
+    ConfiguringAction(BaseAction),
+    ReactingToAttack {
         hand: HandType,
         attacking_character_i: usize,
+        attacked_character_i: usize,
     },
-    ReactToHit {
+    ReactingToHit {
         attacking_character_i: usize,
+        attacked_character_i: usize,
         damage: u32,
     },
     Idle,
@@ -556,7 +567,7 @@ impl ActivityPopup {
         let mut x0 = x + 10.0;
         let mut y0 = y + 20.0;
 
-        if matches!(self.state, UiState::ChooseAction) {
+        if matches!(self.state, UiState::ChoosingAction) {
             draw_rectangle(x, y, 500.0, 30.0, DARKBROWN);
             draw_text("Choose an action!", x0, y0, 20.0, WHITE);
             return;
@@ -593,7 +604,7 @@ impl ActivityPopup {
 
         if self.enabled {
             match &self.state {
-                UiState::CommitAction(base_action) => {
+                UiState::ConfiguringAction(base_action) => {
                     match base_action {
                         BaseAction::SelfEffect(..) => {
                             draw_text("Proceed?", x0, y0, 20.0, WHITE);
@@ -609,20 +620,18 @@ impl ActivityPopup {
                             draw_text(&text, x0, y0, 20.0, WHITE);
                             y0 += 20.0;
                         }
-                        BaseAction::Attack { .. } => {}
-                        BaseAction::CastSpell(..) => {}
+                        BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
                     };
                 }
-                UiState::ReactToAttack { .. } => {
+                UiState::ReactingToAttack { .. } => {
                     draw_text("Reaction:", x0, y0, 20.0, WHITE);
                     y0 += 20.0;
                 }
-                UiState::ReactToHit { .. } => {
+                UiState::ReactingToHit { .. } => {
                     draw_text("Reaction:", x0, y0, 20.0, WHITE);
                     y0 += 20.0;
                 }
-                UiState::Idle => unreachable!(),
-                UiState::ChooseAction => unreachable!(),
+                UiState::Idle | UiState::ChoosingAction => unreachable!(),
             }
         }
 
@@ -657,8 +666,8 @@ impl ActivityPopup {
                     }
 
                     // Some choices work like radio boxes
-                    if matches!(self.state, UiState::ReactToAttack { .. })
-                        || matches!(self.state, UiState::ReactToHit { .. })
+                    if matches!(self.state, UiState::ReactingToAttack { .. })
+                        || matches!(self.state, UiState::ReactingToHit { .. })
                         || matches!(clicked_btn.action, ButtonAction::MovementEnhancement { .. })
                     {
                         for btn in self.choice_buttons.values() {
@@ -758,17 +767,8 @@ impl ActivityPopup {
         self.choice_buttons = buttons_map;
         self.selected_button_ids.clear();
 
-        self.base_action_points = if let UiState::CommitAction(base_action) = state {
-            match base_action {
-                BaseAction::Attack {
-                    action_point_cost, ..
-                } => action_point_cost,
-                BaseAction::SelfEffect(sea) => sea.action_point_cost,
-                BaseAction::CastSpell(spell) => spell.action_point_cost,
-                BaseAction::Move {
-                    action_point_cost, ..
-                } => action_point_cost,
-            }
+        self.base_action_points = if let UiState::ConfiguringAction(base_action) = state {
+            base_action.action_point_cost()
         } else {
             0
         };
@@ -779,32 +779,32 @@ struct UserInterface {
     characters: Vec<Rc<RefCell<Character>>>,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: UiState,
+
     hovered_button: Option<(u32, ButtonAction)>,
     next_available_button_id: u32,
-    tracked_buttons: HashMap<String, Rc<ActionButton>>,
+    active_character_i: usize,
 
-    log: Log,
-    tabs: Tabs,
-    resource_bars: Container,
+    game_grid: GameGrid,
+    activity_popup: ActivityPopup,
+    player_portraits: PlayerPortraits,
     action_points_label: TextLine,
     action_points_row: ActionPointsRow,
+    character_uis: HashMap<usize, CharacterUi>,
+    log: Log,
+}
+
+struct CharacterUi {
+    tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
+    tabs: Tabs,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
-    activity_popup: ActivityPopup,
-    game_grid: GameGrid,
+    resource_bars: Container,
 }
 
 impl UserInterface {
-    fn new(characters: Vec<Rc<RefCell<Character>>>) -> Self {
-        let mut combat_buttons = vec![];
-        let mut skill_buttons = vec![];
-        let mut spell_buttons = vec![];
-
+    fn new(characters: Vec<Rc<RefCell<Character>>>, active_character_i: usize) -> Self {
         let event_queue = Rc::new(RefCell::new(vec![]));
-
-        let character_ref = characters[0].borrow();
-
         let mut next_button_id = 1;
 
         let mut new_button = |subtext, btn_action| {
@@ -813,193 +813,212 @@ impl UserInterface {
             btn
         };
 
-        let mut tracked_buttons = HashMap::new();
+        let mut character_uis: HashMap<usize, CharacterUi> = Default::default();
 
-        let mut spell_enhancement_buttons = vec![];
-        for (name, action) in character_ref.known_actions() {
-            let btn = Rc::new(new_button(name, ButtonAction::Action(action)));
-            let cloned_btn = Rc::clone(&btn);
-            match action {
-                BaseAction::Attack { .. } => combat_buttons.push(btn),
-                BaseAction::SelfEffect(..) => skill_buttons.push(btn),
-                BaseAction::CastSpell(spell) => {
-                    if let Some(enhancement) = spell.possible_enhancement {
-                        let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                        let btn = new_button(spell.name.to_string(), btn_action);
-                        btn.enabled.set(false);
-                        spell_enhancement_buttons.push(btn);
-                    }
-                    spell_buttons.push(btn);
-                }
-                BaseAction::Move { .. } => {
-                    skill_buttons.push(btn);
-                }
+        for (i, character) in characters.iter().enumerate() {
+            let character_ref = character.borrow();
+            if !character_ref.player_controlled {
+                continue;
             }
-            tracked_buttons.insert(base_action_id(action), cloned_btn);
+
+            let mut tracked_action_buttons = HashMap::new();
+            let mut combat_buttons = vec![];
+            let mut skill_buttons = vec![];
+            let mut spell_buttons = vec![];
+
+            let mut spell_enhancement_buttons = vec![];
+            for (name, action) in character_ref.known_actions() {
+                let btn = Rc::new(new_button(name, ButtonAction::Action(action)));
+                let cloned_btn = Rc::clone(&btn);
+                match action {
+                    BaseAction::Attack { .. } => combat_buttons.push(btn),
+                    BaseAction::SelfEffect(..) => skill_buttons.push(btn),
+                    BaseAction::CastSpell(spell) => {
+                        if let Some(enhancement) = spell.possible_enhancement {
+                            let btn_action = ButtonAction::SpellEnhancement(enhancement);
+                            let btn = new_button(spell.name.to_string(), btn_action);
+                            btn.enabled.set(false);
+                            spell_enhancement_buttons.push(btn);
+                        }
+                        spell_buttons.push(btn);
+                    }
+                    BaseAction::Move { .. } => {
+                        skill_buttons.push(btn);
+                    }
+                }
+                tracked_action_buttons.insert(base_action_id(action), cloned_btn);
+            }
+
+            let combat_row = buttons_row(
+                combat_buttons
+                    .into_iter()
+                    .map(|btn| Element::Rc(btn))
+                    .collect(),
+            );
+            let skill_row = buttons_row(
+                skill_buttons
+                    .into_iter()
+                    .map(|btn| Element::Rc(btn))
+                    .collect(),
+            );
+            let spell_row = buttons_row(
+                spell_buttons
+                    .into_iter()
+                    .map(|btn| Element::Rc(btn))
+                    .collect(),
+            );
+
+            let mut reaction_buttons = vec![];
+            for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
+                let btn_action = ButtonAction::OnAttackedReaction(reaction);
+                let btn = new_button(subtext.clone(), btn_action);
+                btn.enabled.set(false);
+                reaction_buttons.push(btn);
+            }
+            for (subtext, reaction) in character_ref.known_on_hit_reactions() {
+                let btn_action = ButtonAction::OnHitReaction(reaction);
+                let btn = new_button(subtext.clone(), btn_action);
+                btn.enabled.set(false);
+                reaction_buttons.push(btn);
+            }
+            let reactions_row =
+                buttons_row(reaction_buttons.into_iter().map(Element::Btn).collect());
+
+            let mut attack_enhancement_buttons = vec![];
+            for (subtext, enhancement) in
+                character_ref.known_attack_enhancements(HandType::MainHand)
+            {
+                let btn_action = ButtonAction::AttackEnhancement(enhancement);
+                let btn = new_button(subtext.clone(), btn_action);
+                btn.enabled.set(false);
+                attack_enhancement_buttons.push(btn);
+            }
+            let attack_enhancements_row = buttons_row(
+                attack_enhancement_buttons
+                    .into_iter()
+                    .map(Element::Btn)
+                    .collect(),
+            );
+            let spell_enhancements_row = buttons_row(
+                spell_enhancement_buttons
+                    .into_iter()
+                    .map(Element::Btn)
+                    .collect(),
+            );
+
+            let stats_section = Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                elements: vec![
+                    Element::Container(attribute_row(
+                        ("STR", character_ref.base_strength),
+                        vec![
+                            ("Health", character_ref.health.max as f32),
+                            (
+                                "Physical resist",
+                                character_ref.physical_resistence() as f32,
+                            ),
+                        ],
+                    )),
+                    Element::Container(attribute_row(
+                        ("DEX", character_ref.base_dexterity),
+                        vec![
+                            ("Defense", character_ref.defense() as f32),
+                            ("Movement", 99.9),
+                        ],
+                    )),
+                    Element::Container(attribute_row(
+                        ("INT", character_ref.base_intellect),
+                        vec![
+                            ("Mana", character_ref.mana.max as f32),
+                            ("Mental resist", character_ref.mental_resistence() as f32),
+                        ],
+                    )),
+                ],
+                ..Default::default()
+            });
+
+            let actions_section = Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                margin: 5.0,
+                elements: vec![combat_row, skill_row, spell_row],
+                ..Default::default()
+            });
+
+            let secondary_actions_section = Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                margin: 5.0,
+                elements: vec![
+                    reactions_row,
+                    attack_enhancements_row,
+                    spell_enhancements_row,
+                ],
+                ..Default::default()
+            });
+
+            let tabs = Tabs::new(
+                0,
+                vec![
+                    ("Actions", actions_section),
+                    ("Secondary", secondary_actions_section),
+                    ("Stats", stats_section),
+                ],
+            );
+
+            let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+                character_ref.health.current,
+                character_ref.health.max,
+                "HP",
+                RED,
+            )));
+            let cloned_health_bar = Rc::clone(&health_bar);
+
+            let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+                character_ref.mana.current,
+                character_ref.mana.max,
+                "MANA",
+                BLUE,
+            )));
+            let cloned_mana_bar = Rc::clone(&mana_bar);
+
+            let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+                character_ref.stamina.current,
+                character_ref.stamina.max,
+                "STA",
+                GREEN,
+            )));
+            let cloned_stamina_bar = Rc::clone(&stamina_bar);
+
+            let resource_bars = Container {
+                layout_dir: LayoutDirection::Horizontal,
+                margin: 15.0,
+                align: Align::End,
+                elements: vec![
+                    Element::RcRefCell(cloned_health_bar),
+                    Element::RcRefCell(cloned_mana_bar),
+                    Element::RcRefCell(cloned_stamina_bar),
+                ],
+                ..Default::default()
+            };
+
+            let character_ui = CharacterUi {
+                tracked_action_buttons,
+                tabs,
+                health_bar,
+                mana_bar,
+                stamina_bar,
+                resource_bars,
+            };
+
+            character_uis.insert(i, character_ui);
         }
-
-        let combat_row = buttons_row(
-            combat_buttons
-                .into_iter()
-                .map(|btn| Element::Rc(btn))
-                .collect(),
-        );
-        let skill_row = buttons_row(
-            skill_buttons
-                .into_iter()
-                .map(|btn| Element::Rc(btn))
-                .collect(),
-        );
-        let spell_row = buttons_row(
-            spell_buttons
-                .into_iter()
-                .map(|btn| Element::Rc(btn))
-                .collect(),
-        );
-
-        let mut reaction_buttons = vec![];
-        for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
-            let btn_action = ButtonAction::OnAttackedReaction(reaction);
-            let btn = new_button(subtext.clone(), btn_action);
-            btn.enabled.set(false);
-            reaction_buttons.push(btn);
-        }
-        for (subtext, reaction) in character_ref.known_on_hit_reactions() {
-            let btn_action = ButtonAction::OnHitReaction(reaction);
-            let btn = new_button(subtext.clone(), btn_action);
-            btn.enabled.set(false);
-            reaction_buttons.push(btn);
-        }
-
-        let mut attack_enhancement_buttons = vec![];
-        for (subtext, enhancement) in character_ref.known_attack_enhancements(HandType::MainHand) {
-            let btn_action = ButtonAction::AttackEnhancement(enhancement);
-            let btn = new_button(subtext.clone(), btn_action);
-            btn.enabled.set(false);
-            attack_enhancement_buttons.push(btn);
-        }
-
-        let reactions_row = buttons_row(reaction_buttons.into_iter().map(Element::Btn).collect());
-        let attack_enhancements_row = buttons_row(
-            attack_enhancement_buttons
-                .into_iter()
-                .map(Element::Btn)
-                .collect(),
-        );
-        let spell_enhancements_row = buttons_row(
-            spell_enhancement_buttons
-                .into_iter()
-                .map(Element::Btn)
-                .collect(),
-        );
-
-        let stats_section = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            elements: vec![
-                Element::Container(attribute_row(
-                    ("STR", character_ref.base_strength),
-                    vec![
-                        ("Health", character_ref.health.max as f32),
-                        (
-                            "Physical resist",
-                            character_ref.physical_resistence() as f32,
-                        ),
-                    ],
-                )),
-                Element::Container(attribute_row(
-                    ("DEX", character_ref.base_dexterity),
-                    vec![
-                        ("Defense", character_ref.defense() as f32),
-                        ("Movement", 99.9),
-                    ],
-                )),
-                Element::Container(attribute_row(
-                    ("INT", character_ref.base_intellect),
-                    vec![
-                        ("Mana", character_ref.mana.max as f32),
-                        ("Mental resist", character_ref.mental_resistence() as f32),
-                    ],
-                )),
-            ],
-            ..Default::default()
-        });
-
-        let actions_section = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            margin: 5.0,
-            elements: vec![combat_row, skill_row, spell_row],
-            ..Default::default()
-        });
-
-        let secondary_actions_section = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            margin: 5.0,
-            elements: vec![
-                reactions_row,
-                attack_enhancements_row,
-                spell_enhancements_row,
-            ],
-            ..Default::default()
-        });
-
-        let tabs = Tabs::new(
-            0,
-            vec![
-                ("Actions", actions_section),
-                ("Secondary", secondary_actions_section),
-                ("Stats", stats_section),
-            ],
-        );
-
-        let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-            character_ref.health.current,
-            character_ref.health.max,
-            "HP",
-            RED,
-        )));
-        let cloned_health_bar = Rc::clone(&health_bar);
-
-        let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-            character_ref.mana.current,
-            character_ref.mana.max,
-            "MANA",
-            BLUE,
-        )));
-        let cloned_mana_bar = Rc::clone(&mana_bar);
-
-        let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-            character_ref.stamina.current,
-            character_ref.stamina.max,
-            "STA",
-            GREEN,
-        )));
-        let cloned_stamina_bar = Rc::clone(&stamina_bar);
-
-        let resource_bars = Container {
-            layout_dir: LayoutDirection::Horizontal,
-            margin: 15.0,
-            align: Align::End,
-            elements: vec![
-                Element::RcRefCell(cloned_health_bar),
-                Element::RcRefCell(cloned_mana_bar),
-                Element::RcRefCell(cloned_stamina_bar),
-            ],
-            ..Default::default()
-        };
 
         let action_points_label = TextLine::new("Action points", 18);
-        let action_points_row = ActionPointsRow::new(character_ref.action_points);
+        let action_points_row = ActionPointsRow::new();
 
-        let state = UiState::ChooseAction;
+        let state = UiState::ChoosingAction;
 
-        drop(character_ref);
-
-        let mut grid_characters = vec![];
-        for character in &characters {
-            grid_characters.push((&character.borrow().name[0..1], character.borrow().position));
-        }
         let game_grid = GameGrid::new(
-            grid_characters,
+            &characters,
             EventSender {
                 queue: Rc::clone(&event_queue),
             },
@@ -1007,23 +1026,23 @@ impl UserInterface {
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
 
+        let player_portraits = PlayerPortraits::new(&characters, active_character_i);
+
         Self {
             game_grid,
             characters,
+            player_portraits,
+            active_character_i,
+
             next_available_button_id: next_button_id,
             hovered_button: None,
             log: Log::new(),
-            tabs,
-            resource_bars,
+            character_uis,
             action_points_label,
             action_points_row,
             event_queue: Rc::clone(&event_queue),
-            health_bar,
-            mana_bar,
-            stamina_bar,
             activity_popup: ActivityPopup::new(state, popup_proceed_btn),
             state,
-            tracked_buttons,
         }
     }
 
@@ -1043,22 +1062,32 @@ impl UserInterface {
 
         self.activity_popup.draw(100.0, y - 170.0);
 
+        self.player_portraits.draw(700.0, y - 60.0);
+
         draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
-        self.tabs.draw(20.0, y + 70.0);
-        self.resource_bars.draw(500.0, y + 80.0);
+        self.character_uis
+            .get_mut(&self.player_portraits.selected_i.get())
+            .unwrap()
+            .tabs
+            .draw(20.0, y + 70.0);
+        self.character_uis[&self.player_portraits.selected_i.get()]
+            .resource_bars
+            .draw(450.0, y + 80.0);
         self.log.draw(650.0, y);
     }
 
-    fn player_character(&self) -> Ref<Character> {
-        self.characters[0].borrow()
-    }
-
     fn set_action_buttons_enabled(&self, enabled: bool) {
-        for (_, btn) in &self.tracked_buttons {
+        for (_, btn) in
+            &self.character_uis[&self.player_portraits.selected_i.get()].tracked_action_buttons
+        {
             btn.enabled.set(enabled);
         }
+    }
+
+    fn active_character(&self) -> Ref<Character> {
+        self.characters[self.active_character_i].borrow()
     }
 
     fn set_state(&mut self, state: UiState) {
@@ -1070,23 +1099,23 @@ impl UserInterface {
         let mut has_target = false;
 
         match state {
-            UiState::CommitAction(base_action) => {
+            UiState::ConfiguringAction(base_action) => {
                 self.set_action_buttons_enabled(true);
 
                 match base_action {
                     BaseAction::Attack {
                         hand,
-                        action_point_cost,
+                        action_point_cost: _,
                     } => {
                         self.set_highlighted_button(Some(base_action_id(base_action)));
 
-                        let weapon = self.player_character().weapon(hand).unwrap();
+                        let weapon = self.active_character().weapon(hand).unwrap();
                         popup_lines.push(format!(
                             "{} attack ({} AP)",
                             weapon.name, weapon.action_point_cost
                         ));
                         popup_lines.push(format!("{} damage", weapon.damage));
-                        let enhancements = self.player_character().usable_attack_enhancements(hand);
+                        let enhancements = self.active_character().usable_attack_enhancements(hand);
                         for (subtext, enhancement) in enhancements {
                             let btn = self
                                 .new_button(subtext, ButtonAction::AttackEnhancement(enhancement));
@@ -1113,7 +1142,7 @@ impl UserInterface {
                         }
                         popup_lines.push(description);
                         if let Some(enhancement) = spell.possible_enhancement {
-                            if self.player_character().can_use_spell_enhancement(spell) {
+                            if self.active_character().can_use_spell_enhancement(spell) {
                                 let btn_action = ButtonAction::SpellEnhancement(enhancement);
                                 let btn = self.new_button("".to_string(), btn_action);
                                 popup_buttons.push(btn);
@@ -1127,7 +1156,7 @@ impl UserInterface {
                         self.set_highlighted_button(Some(base_action_id(base_action)));
                         popup_lines.push(format!("Movement ({} AP)", action_point_cost));
 
-                        let enhancements = self.player_character().usable_movement_enhancements();
+                        let enhancements = self.active_character().usable_movement_enhancements();
                         for enhancement in enhancements {
                             let btn = self.new_button(
                                 "".to_string(),
@@ -1140,14 +1169,16 @@ impl UserInterface {
                 }
             }
 
-            UiState::ReactToAttack {
+            UiState::ReactingToAttack {
                 attacking_character_i,
                 hand,
+                attacked_character_i,
             } => {
                 self.set_action_buttons_enabled(false);
 
                 let attacker = self.characters[attacking_character_i].borrow();
-                let defender = self.player_character();
+                let defender = self.characters[attacked_character_i].borrow();
+
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
@@ -1168,10 +1199,9 @@ impl UserInterface {
                     "  Chance to hit: {}",
                     as_percentage(prob_attack_hit(&attacker, hand, &defender))
                 ));
+                let reactions = defender.usable_on_attacked_reactions();
                 drop(attacker);
                 drop(defender);
-
-                let reactions = self.player_character().usable_on_attacked_reactions();
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -1179,19 +1209,22 @@ impl UserInterface {
                 }
             }
 
-            UiState::ReactToHit {
+            UiState::ReactingToHit {
                 attacking_character_i,
                 damage,
+                attacked_character_i,
             } => {
                 self.set_action_buttons_enabled(false);
 
+                let victim = self.characters[attacked_character_i].borrow();
                 popup_lines.push(format!(
                     "{} took {} damage from an attack by {}",
-                    self.player_character().name,
+                    victim.name,
                     damage,
                     self.characters[attacking_character_i].borrow().name
                 ));
-                let reactions = self.player_character().usable_on_hit_reactions();
+                let reactions = victim.usable_on_hit_reactions();
+                drop(victim);
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(subtext, btn_action);
@@ -1199,7 +1232,7 @@ impl UserInterface {
                 }
             }
 
-            UiState::ChooseAction => {
+            UiState::ChoosingAction => {
                 self.set_action_buttons_enabled(true);
             }
 
@@ -1211,7 +1244,7 @@ impl UserInterface {
         self.activity_popup
             .set_state(state, popup_lines, popup_buttons);
 
-        let move_range = self.player_character().move_range;
+        let move_range = self.active_character().move_range;
         self.game_grid.set_movement_range(move_range);
 
         if movement {
@@ -1225,7 +1258,14 @@ impl UserInterface {
         if has_target {
             if self.game_grid.target_character_i.is_none() {
                 // We pick an arbitrary enemy if none is picked already
-                self.game_grid.target_character_i = Some(1);
+
+                for (i, character) in self.characters.iter().enumerate() {
+                    if i != self.active_character_i && !character.borrow().player_controlled {
+                        self.game_grid.target_character_i = Some(i);
+                        break;
+                    }
+                }
+                assert!(self.game_grid.target_character_i.is_some());
             }
         } else {
             self.game_grid.target_character_i = None;
@@ -1233,13 +1273,26 @@ impl UserInterface {
     }
 
     fn update(&mut self, active_character_i: usize) -> Vec<Event> {
+        if active_character_i != self.active_character_i {
+            // When control switches to a new player controlled character, make the UI show that character
+            if self.characters[active_character_i]
+                .borrow()
+                .player_controlled
+            {
+                self.player_portraits
+                    .set_selected_character(active_character_i);
+            }
+        }
+
+        self.active_character_i = active_character_i;
+
         self.game_grid.update(active_character_i, &self.characters);
 
         let maybe_updated_movement_range = self.activity_popup.update();
 
         if let Some(added_percentage) = maybe_updated_movement_range {
             let move_range =
-                self.player_character().move_range * (1.0 + added_percentage as f32 / 100.0);
+                self.active_character().move_range * (1.0 + added_percentage as f32 / 100.0);
             self.game_grid.set_movement_range(move_range);
         }
 
@@ -1271,19 +1324,19 @@ impl UserInterface {
         if let Some(i) = self.game_grid.target_character_i {
             let target_char = self.characters[i].borrow();
             match self.state {
-                UiState::CommitAction(base_action @ BaseAction::Attack { hand, .. }) => {
+                UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                     if self
-                        .player_character()
+                        .active_character()
                         .can_reach_with_attack(hand, target_char.position)
                     {
-                        if self.player_character().can_use_action(base_action) {
+                        if self.active_character().can_use_action(base_action) {
                             let chance = as_percentage(prob_attack_hit(
-                                &self.player_character(),
+                                &self.active_character(),
                                 hand,
                                 &target_char,
                             ));
                             let mut explanation =
-                                self.player_character().explain_attack_circumstances(hand);
+                                self.active_character().explain_attack_circumstances(hand);
                             explanation
                                 .push_str(&target_char.explain_incoming_attack_circumstances());
                             self.activity_popup.target_line = Some(format!(
@@ -1295,7 +1348,7 @@ impl UserInterface {
                             self.activity_popup.set_enabled(false);
                         }
                     } else {
-                        let range = self.player_character().weapon(hand).unwrap().range;
+                        let range = self.active_character().weapon(hand).unwrap().range;
                         self.game_grid.range_indicator = Some(range);
 
                         self.activity_popup.target_line =
@@ -1303,13 +1356,13 @@ impl UserInterface {
                         self.activity_popup.set_enabled(false);
                     }
                 }
-                UiState::CommitAction(BaseAction::CastSpell(spell)) => {
+                UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                     if self
-                        .player_character()
+                        .active_character()
                         .can_reach_with_spell(spell, target_char.position)
                     {
                         let chance = as_percentage(prob_spell_hit(
-                            &self.player_character(),
+                            &self.active_character(),
                             spell.spell_type,
                             &target_char,
                         ));
@@ -1348,14 +1401,14 @@ impl UserInterface {
                 match btn_action {
                     ButtonAction::Action(base_action) => {
                         let may_choose_action = match self.state {
-                            UiState::ChooseAction => true,
-                            UiState::CommitAction(..) => true,
+                            UiState::ChoosingAction => true,
+                            UiState::ConfiguringAction(..) => true,
                             _ => false,
                         };
 
-                        if may_choose_action && self.player_character().can_use_action(base_action)
+                        if may_choose_action && self.active_character().can_use_action(base_action)
                         {
-                            self.set_state(UiState::CommitAction(base_action));
+                            self.set_state(UiState::ConfiguringAction(base_action));
                         } else {
                             println!("Cannot choose this action at this time");
                         }
@@ -1365,7 +1418,7 @@ impl UserInterface {
                         self.set_highlighted_button(None);
 
                         let event = match self.state {
-                            UiState::CommitAction(base_action) => {
+                            UiState::ConfiguringAction(base_action) => {
                                 let target_char_i = self.game_grid.target_character_i;
                                 let action = match base_action {
                                     BaseAction::Attack { hand, .. } => {
@@ -1428,7 +1481,7 @@ impl UserInterface {
                                 };
                                 Event::ChoseAction(action)
                             }
-                            UiState::ReactToAttack { .. } => {
+                            UiState::ReactingToAttack { .. } => {
                                 let reaction =
                                     self.activity_popup.take_selected_actions().first().map(
                                         |action| match action {
@@ -1438,7 +1491,7 @@ impl UserInterface {
                                     );
                                 Event::ChoseAttackedReaction(reaction)
                             }
-                            UiState::ReactToHit { .. } => {
+                            UiState::ReactingToHit { .. } => {
                                 let reaction =
                                     self.activity_popup.take_selected_actions().first().map(
                                         |action| match action {
@@ -1449,7 +1502,7 @@ impl UserInterface {
 
                                 Event::ChoseHitReaction(reaction)
                             }
-                            UiState::ChooseAction => unreachable!(),
+                            UiState::ChoosingAction => unreachable!(),
                             UiState::Idle => unreachable!(),
                         };
                         return Some(event);
@@ -1460,8 +1513,8 @@ impl UserInterface {
             }
 
             InternalUiEvent::SwitchedToMoveInGrid => {
-                let move_range = self.player_character().move_range;
-                self.set_state(UiState::CommitAction(BaseAction::Move {
+                let move_range = self.active_character().move_range;
+                self.set_state(UiState::ConfiguringAction(BaseAction::Move {
                     action_point_cost: 1,
                     range: move_range,
                 }));
@@ -1470,11 +1523,11 @@ impl UserInterface {
             InternalUiEvent::SwitchedToAttackInGrid => {
                 let hand = HandType::MainHand;
                 let action_point_cost = self
-                    .player_character()
+                    .active_character()
                     .weapon(hand)
                     .unwrap()
                     .action_point_cost;
-                self.set_state(UiState::CommitAction(BaseAction::Attack {
+                self.set_state(UiState::ConfiguringAction(BaseAction::Attack {
                     hand,
                     action_point_cost,
                 }));
@@ -1485,20 +1538,28 @@ impl UserInterface {
     }
 
     fn set_highlighted_button(&self, highlighted_button_action: Option<String>) {
-        for (base_action_id, btn) in &self.tracked_buttons {
+        if highlighted_button_action.is_some()
+            && self.player_portraits.selected_i.get() != self.active_character_i
+        {
+            self.player_portraits
+                .set_selected_character(self.active_character_i);
+        }
+
+        for (base_action_id, btn) in
+            &self.character_uis[&self.active_character_i].tracked_action_buttons
+        {
             btn.highlighted
                 .set(highlighted_button_action.as_ref() == Some(base_action_id));
         }
     }
 
     fn update_character_resources(&mut self, character: &Character) {
-        self.health_bar
+        let ui = &self.character_uis[&self.active_character_i];
+        ui.health_bar
             .borrow_mut()
             .set_current(character.health.current);
-        self.mana_bar
-            .borrow_mut()
-            .set_current(character.mana.current);
-        self.stamina_bar
+        ui.mana_bar.borrow_mut().set_current(character.mana.current);
+        ui.stamina_bar
             .borrow_mut()
             .set_current(character.stamina.current);
         self.action_points_row.current = character.action_points;
@@ -1517,14 +1578,14 @@ fn base_action_id(base_action: BaseAction) -> String {
 struct CharacterPortraits {
     row: Container,
     active_i: usize,
-    portraits: Vec<Rc<RefCell<CharacterPortrait>>>,
+    portraits: Vec<Rc<RefCell<TopCharacterPortrait>>>,
 }
 
 impl CharacterPortraits {
     fn new(characters: &[Rc<RefCell<Character>>], active_i: usize) -> Self {
-        let portraits: Vec<Rc<RefCell<CharacterPortrait>>> = characters
+        let portraits: Vec<Rc<RefCell<TopCharacterPortrait>>> = characters
             .iter()
-            .map(|character| Rc::new(RefCell::new(CharacterPortrait::new(&character.borrow()))))
+            .map(|character| Rc::new(RefCell::new(TopCharacterPortrait::new(&character.borrow()))))
             .collect();
 
         let mut elements = vec![];
@@ -1579,7 +1640,7 @@ impl CharacterPortraits {
     }
 }
 
-struct CharacterPortrait {
+struct TopCharacterPortrait {
     text: TextLine,
     active: bool,
     padding: f32,
@@ -1588,7 +1649,7 @@ struct CharacterPortrait {
     max_health: u32,
 }
 
-impl CharacterPortrait {
+impl TopCharacterPortrait {
     fn new(character: &Character) -> Self {
         Self {
             text: TextLine::new(character.name, 20),
@@ -1601,7 +1662,7 @@ impl CharacterPortrait {
     }
 }
 
-impl Drawable for CharacterPortrait {
+impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         if self.active {
             let (w, h) = self.size();
@@ -1622,6 +1683,120 @@ impl Drawable for CharacterPortrait {
             16.0,
             WHITE,
         );
+    }
+
+    fn size(&self) -> (f32, f32) {
+        let text_size = self.text.size();
+        (
+            text_size.0 + self.padding * 2.0,
+            text_size.1 + self.padding * 2.0,
+        )
+    }
+}
+
+struct PlayerPortraits {
+    row: Container,
+    selected_i: Cell<usize>,
+    portraits: HashMap<usize, Rc<RefCell<PlayerCharacterPortrait>>>,
+}
+
+impl PlayerPortraits {
+    fn new(characters: &[Rc<RefCell<Character>>], selected_i: usize) -> Self {
+        let mut portraits: HashMap<usize, Rc<RefCell<PlayerCharacterPortrait>>> =
+            Default::default();
+
+        for (i, character) in characters.iter().enumerate() {
+            if character.borrow().player_controlled {
+                portraits.insert(
+                    i,
+                    Rc::new(RefCell::new(PlayerCharacterPortrait::new(
+                        &character.borrow(),
+                    ))),
+                );
+            }
+        }
+
+        let mut elements = vec![];
+        for portrait in portraits.values() {
+            let cloned = Rc::clone(portrait);
+            elements.push(Element::RcRefCell(cloned));
+        }
+
+        let row = Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 10.0,
+            elements,
+            ..Default::default()
+        };
+
+        let this = Self {
+            row,
+            selected_i: Cell::new(selected_i),
+            portraits,
+        };
+
+        this.set_selected_character(selected_i);
+        this
+    }
+
+    fn set_selected_character(&self, character_i: usize) {
+        self.portraits[&self.selected_i.get()]
+            .borrow()
+            .selected
+            .set(false);
+        self.selected_i.set(character_i);
+        self.portraits[&self.selected_i.get()]
+            .borrow()
+            .selected
+            .set(true);
+    }
+
+    fn draw(&self, x: f32, y: f32) {
+        self.row.draw(x, y);
+
+        for (i, portrait) in &self.portraits {
+            if portrait.borrow().clicked.get() {
+                portrait.borrow().clicked.set(false);
+                self.set_selected_character(*i);
+                break;
+            }
+        }
+    }
+}
+
+struct PlayerCharacterPortrait {
+    text: TextLine,
+    selected: Cell<bool>,
+    padding: f32,
+    clicked: Cell<bool>,
+}
+
+impl PlayerCharacterPortrait {
+    fn new(character: &Character) -> Self {
+        Self {
+            text: TextLine::new(character.name, 20),
+            selected: Cell::new(false),
+            padding: 15.0,
+            clicked: Cell::new(false),
+        }
+    }
+}
+
+impl Drawable for PlayerCharacterPortrait {
+    fn draw(&self, x: f32, y: f32) {
+        let (w, h) = self.size();
+        if self.selected.get() {
+            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
+        }
+        self.text.draw(self.padding + x, self.padding + y);
+
+        let (mouse_x, mouse_y) = mouse_position();
+        if (x..x + w).contains(&mouse_x)
+            && (y..y + h).contains(&mouse_y)
+            && is_mouse_button_pressed(MouseButton::Left)
+        {
+            self.clicked.set(true);
+        }
     }
 
     fn size(&self) -> (f32, f32) {
@@ -1692,11 +1867,11 @@ struct ActionPointsRow {
 }
 
 impl ActionPointsRow {
-    fn new(action_points: u32) -> Self {
+    fn new() -> Self {
         Self {
-            current: action_points,
+            current: 0,
             reserved_and_hovered: 0,
-            max: 6,
+            max: ACTION_POINTS_PER_TURN,
             cell_size: (20.0, 20.0),
             padding: 3.0,
         }
@@ -1773,6 +1948,7 @@ struct ResourceBar {
 
 impl Drawable for ResourceBar {
     fn draw(&self, x: f32, y: f32) {
+        assert!(self.current <= self.max);
         let cell_size = self.cell_size;
         let mut y0 = y;
         for i in 0..self.max {
@@ -1804,11 +1980,15 @@ struct LabelledResourceBar {
 
 impl LabelledResourceBar {
     fn new(current: u32, max: u32, label: &'static str, color: Color) -> Self {
+        assert!(current <= max);
+
+        let cell_w = 20.0;
+        let cell_h = if max <= 10 { 15.0 } else { 150.0 / max as f32 };
         let bar = Rc::new(RefCell::new(ResourceBar {
             current,
             max,
             color,
-            cell_size: (20.0, 15.0),
+            cell_size: (cell_w, cell_h),
         }));
         let cloned_bar = Rc::clone(&bar);
 
@@ -1828,6 +2008,7 @@ impl LabelledResourceBar {
                 Element::RcRefCell(cloned_value_text),
                 Element::Text(label_text),
             ],
+            min_width: Some(40.0),
             ..Default::default()
         };
 
@@ -1840,6 +2021,7 @@ impl LabelledResourceBar {
     }
 
     fn set_current(&mut self, value: u32) {
+        assert!(value <= self.bar.borrow().max);
         self.bar.borrow_mut().current = value;
         self.value_text
             .borrow_mut()
@@ -1893,6 +2075,7 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
             ..Default::default()
         },
         elements: vec![attribute_element, stats_list],
+        ..Default::default()
     }
 }
 
@@ -2083,6 +2266,7 @@ struct Container {
     padding: f32,
     margin: f32,
     style: Style,
+    min_width: Option<f32>,
     elements: Vec<Element>,
 }
 
@@ -2118,6 +2302,10 @@ impl Container {
                 LayoutDirection::Horizontal => w += total_margin,
                 LayoutDirection::Vertical => h += total_margin,
             }
+        }
+
+        if let Some(min_w) = self.min_width {
+            w = w.max(min_w);
         }
 
         (w, h)
