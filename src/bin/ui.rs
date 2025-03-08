@@ -64,7 +64,7 @@ async fn main() {
         let events = user_interface.update(active_character_i);
 
         clear_background(BLACK);
-        character_portraits.draw(50.0, 20.0);
+        character_portraits.draw(10.0, 10.0);
 
         user_interface.draw(640.0);
 
@@ -1013,7 +1013,13 @@ impl UserInterface {
         }
 
         let action_points_label = TextLine::new("Action points", 18);
-        let action_points_row = ActionPointsRow::new();
+        let action_points_row = ActionPointsRow::new(
+            (20.0, 20.0),
+            Style {
+                background_color: None,
+                border_color: Some(WHITE),
+            },
+        );
 
         let state = UiState::ChoosingAction;
 
@@ -1538,18 +1544,18 @@ impl UserInterface {
     }
 
     fn set_highlighted_button(&self, highlighted_button_action: Option<String>) {
-        if highlighted_button_action.is_some()
-            && self.player_portraits.selected_i.get() != self.active_character_i
-        {
-            self.player_portraits
-                .set_selected_character(self.active_character_i);
-        }
+        if self.active_character().player_controlled {
+            if self.player_portraits.selected_i.get() != self.active_character_i {
+                self.player_portraits
+                    .set_selected_character(self.active_character_i);
+            }
 
-        for (base_action_id, btn) in
-            &self.character_uis[&self.active_character_i].tracked_action_buttons
-        {
-            btn.highlighted
-                .set(highlighted_button_action.as_ref() == Some(base_action_id));
+            for (base_action_id, btn) in
+                &self.character_uis[&self.active_character_i].tracked_action_buttons
+            {
+                btn.highlighted
+                    .set(highlighted_button_action.as_ref() == Some(base_action_id));
+            }
         }
     }
 
@@ -1620,15 +1626,25 @@ impl CharacterPortraits {
     fn update(&mut self, game: &CoreGame) {
         self.set_active_character(game.active_character_i);
         for (i, character) in game.characters().iter().enumerate() {
-            let mut portrait = self.portraits[i].borrow_mut();
-            portrait.action_points = character.borrow().action_points;
-            portrait.current_health = character.borrow().health.current;
+            let portrait = self.portraits[i].borrow_mut();
+            let character = character.borrow();
+            portrait.action_points_row.borrow_mut().current = character.action_points;
+            portrait.hp_text.borrow_mut().set_string(format!(
+                "{}/{}",
+                character.health.current, character.health.max
+            ));
         }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.row.size()
     }
 
     fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
-        let y0 = y + self.row.size().1;
+
+        let y0 = y + self.size().1 + 10.0;
+
         draw_line(
             0.0,
             y0,
@@ -1641,23 +1657,42 @@ impl CharacterPortraits {
 }
 
 struct TopCharacterPortrait {
-    text: TextLine,
     active: bool,
+    hp_text: Rc<RefCell<TextLine>>,
+    action_points_row: Rc<RefCell<ActionPointsRow>>,
     padding: f32,
-    action_points: u32,
-    current_health: u32,
-    max_health: u32,
+    container: Container,
 }
 
 impl TopCharacterPortrait {
     fn new(character: &Character) -> Self {
+        let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
+            (10.0, 10.0),
+            Style::default(),
+        )));
+        let cloned_row = Rc::clone(&action_points_row);
+
+        let hp_text = Rc::new(RefCell::new(TextLine::new("0/0", 16)));
+        let cloned_text = Rc::clone(&hp_text);
+
+        let container = Container {
+            layout_dir: LayoutDirection::Vertical,
+            align: Align::Center,
+            elements: vec![
+                Element::Text(TextLine::new(character.name, 20)),
+                Element::RcRefCell(cloned_row),
+                Element::RcRefCell(cloned_text),
+            ],
+            margin: 5.0,
+            ..Default::default()
+        };
+
         Self {
-            text: TextLine::new(character.name, 20),
             active: false,
-            padding: 15.0,
-            action_points: character.action_points,
-            current_health: character.health.current,
-            max_health: character.health.max,
+            action_points_row,
+            hp_text,
+            padding: 5.0,
+            container,
         }
     }
 }
@@ -1666,31 +1701,14 @@ impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         if self.active {
             let (w, h) = self.size();
-            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
+            draw_rectangle_lines(x, y, w, h, 1.0, GOLD);
         }
-        self.text.draw(self.padding + x, self.padding + y);
-        draw_text(
-            &format!("{} AP", self.action_points),
-            self.padding + x,
-            y + 55.0,
-            16.0,
-            WHITE,
-        );
-        draw_text(
-            &format!("{}/{}", self.current_health, self.max_health),
-            self.padding + x,
-            y + 70.0,
-            16.0,
-            WHITE,
-        );
+        self.container.draw(x + self.padding, y + self.padding);
     }
 
     fn size(&self) -> (f32, f32) {
-        let text_size = self.text.size();
-        (
-            text_size.0 + self.padding * 2.0,
-            text_size.1 + self.padding * 2.0,
-        )
+        let (w, h) = self.container.size();
+        (w + self.padding * 2.0, h + self.padding * 2.0)
     }
 }
 
@@ -1864,19 +1882,23 @@ struct ActionPointsRow {
     max: u32,
     cell_size: (f32, f32),
     padding: f32,
+    style: Style,
 }
 
 impl ActionPointsRow {
-    fn new() -> Self {
+    fn new(cell_size: (f32, f32), style: Style) -> Self {
         Self {
             current: 0,
             reserved_and_hovered: 0,
             max: ACTION_POINTS_PER_TURN,
-            cell_size: (20.0, 20.0),
+            cell_size,
             padding: 3.0,
+            style,
         }
     }
+}
 
+impl Drawable for ActionPointsRow {
     fn draw(&self, x: f32, y: f32) {
         assert!(self.current <= self.max);
 
@@ -1923,14 +1945,14 @@ impl ActionPointsRow {
             x0 += self.cell_size.0;
         }
 
-        draw_rectangle_lines(
-            x,
-            y,
+        self.style.draw(x, y, self.size());
+    }
+
+    fn size(&self) -> (f32, f32) {
+        (
             self.max as f32 * self.cell_size.0 + self.padding * 2.0,
             self.cell_size.1 + self.padding * 2.0,
-            1.0,
-            WHITE,
-        );
+        )
     }
 }
 

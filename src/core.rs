@@ -657,8 +657,8 @@ impl CoreGame {
             self.log(format!("{} stopped Raging", character.name))
         }
 
-        character.action_points =
-            (character.action_points + ACTION_POINTS_PER_TURN).min(ACTION_POINTS_PER_TURN);
+        // TODO
+        character.action_points = (character.action_points + 3).min(ACTION_POINTS_PER_TURN);
         character.main_hand.exertion = 0;
         character.off_hand.exertion = 0;
         character.stamina.gain(1);
