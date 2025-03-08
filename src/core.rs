@@ -17,10 +17,11 @@ pub struct CoreGame {
     characters: Characters,
     pub active_character_i: usize,
     logger: Rc<RefCell<dyn Logger>>,
+    event_handler: Rc<dyn GameEventHandler>,
 }
 
 impl CoreGame {
-    pub fn new(logger: Rc<RefCell<dyn Logger>>) -> Self {
+    pub fn new(logger: Rc<RefCell<dyn Logger>>, event_handler: Rc<dyn GameEventHandler>) -> Self {
         let mut bob = Character::new(true, "Bob", 5, 4, 4, (1, 4));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = None;
@@ -42,10 +43,12 @@ impl CoreGame {
         david.main_hand.weapon = Some(WAR_HAMMER);
 
         let characters = Characters::new(vec![bob, david, alice, charlie]);
+
         Self {
             characters,
             active_character_i: 0,
             logger,
+            event_handler,
         }
     }
 
@@ -141,6 +144,15 @@ impl CoreGame {
                 character.action_points -= action_point_cost;
 
                 self.log(format!("{} uses {}", character.name, name));
+
+                if let ApplyEffect::Condition(condition) = effect {
+                    self.event_handler
+                        .handle(GameEvent::CharacterReceivedSelfEffect {
+                            character_i: self.active_character_i,
+                            condition,
+                        });
+                }
+
                 self.perform_effect_application(effect, &mut character, "");
             }
             Action::CastSpell {
@@ -148,9 +160,7 @@ impl CoreGame {
                 enhanced,
                 target_character_i,
             } => {
-                let mut target_character = self.characters.get(target_character_i).borrow_mut();
-                assert!(character.can_reach_with_spell(spell, target_character.position));
-                self.perform_spell(&mut character, spell, enhanced, &mut target_character);
+                self.perform_spell(&mut character, spell, enhanced, target_character_i);
             }
             Action::Move {
                 action_point_cost,
@@ -217,6 +227,7 @@ impl CoreGame {
             }
             ApplyEffect::Condition(condition) => {
                 receiver.receive_condition(condition);
+
                 line.push_str(&format!("  {} received {:?}", receiver.name, condition));
             }
         }
@@ -229,9 +240,13 @@ impl CoreGame {
         caster: &mut Character,
         spell: Spell,
         enhanced: bool,
-        defender: &mut Character,
+        target_character_i: usize,
     ) {
+        let defender = &mut self.characters.get(target_character_i).borrow_mut();
+
+        assert!(caster.can_reach_with_spell(spell, defender.position));
         assert!(caster.action_points >= spell.action_point_cost);
+
         caster.action_points -= spell.action_point_cost;
         caster.mana.spend(spell.mana_cost);
 
@@ -283,6 +298,10 @@ impl CoreGame {
                 if damage > 0 {
                     defender.health.lose(damage);
                     self.log(format!("  {} took {} damage", defender.name, damage));
+                    self.event_handler.handle(GameEvent::CharacterTookDamage {
+                        character_i: target_character_i,
+                        amount: damage,
+                    });
                 }
 
                 if let Some(effect) = spell.on_hit_effect {
@@ -300,6 +319,8 @@ impl CoreGame {
                     _ => {}
                 };
             } else {
+                self.event_handler
+                    .handle(GameEvent::SpellMissed { target_character_i });
                 match spell.spell_type {
                     SpellType::Mental => {
                         self.log(format!("  {} resisted the spell!", defender.name))
@@ -407,6 +428,10 @@ impl CoreGame {
             } else {
                 self.log("  Missed!")
             }
+
+            self.event_handler.handle(GameEvent::AttackMissed {
+                target_character_i: defender_character_i,
+            });
         } else {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
@@ -448,6 +473,11 @@ impl CoreGame {
             dmg_str.push_str(&format!(" = {damage}"));
 
             self.log(dmg_str);
+
+            self.event_handler.handle(GameEvent::CharacterTookDamage {
+                character_i: defender_character_i,
+                amount: damage,
+            });
 
             defender.health.lose(damage);
 
@@ -708,8 +738,32 @@ impl GameState {
     }
 }
 
+// TODO
 pub trait Logger {
     fn log(&mut self, line: String);
+}
+
+pub trait GameEventHandler {
+    fn handle(&self, event: GameEvent);
+}
+
+#[derive(Debug)]
+pub enum GameEvent {
+    LogLine(String),
+    CharacterTookDamage {
+        character_i: usize,
+        amount: u32,
+    },
+    AttackMissed {
+        target_character_i: usize,
+    },
+    SpellMissed {
+        target_character_i: usize,
+    },
+    CharacterReceivedSelfEffect {
+        character_i: usize,
+        condition: Condition,
+    },
 }
 
 pub struct StateChooseAction {
@@ -813,7 +867,11 @@ impl Characters {
         Self(
             characters
                 .into_iter()
-                .map(|ch| Rc::new(RefCell::new(ch)))
+                .enumerate()
+                .map(|(i, mut ch)| {
+                    ch.index = Some(i);
+                    Rc::new(RefCell::new(ch))
+                })
                 .collect(),
         )
     }
@@ -1014,6 +1072,7 @@ impl Hand {
 
 #[derive(Debug)]
 pub struct Character {
+    index: Option<usize>,
     pub player_controlled: bool,
     pub position: (u32, u32),
     pub name: &'static str,
@@ -1035,6 +1094,8 @@ pub struct Character {
     known_on_hit_reactions: Vec<OnHitReaction>,
 }
 
+const MOVE_ACTION_COST: u32 = 1;
+
 impl Character {
     fn new(
         player_controlled: bool,
@@ -1047,6 +1108,7 @@ impl Character {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
         let move_range = 0.75 + dex as f32 * 0.25;
         Self {
+            index: None,
             player_controlled,
             position,
             name,
@@ -1074,7 +1136,7 @@ impl Character {
                 },
                 BaseAction::SelfEffect(BRACE),
                 BaseAction::Move {
-                    action_point_cost: 1,
+                    action_point_cost: MOVE_ACTION_COST,
                     range: move_range,
                 },
             ],
@@ -1207,7 +1269,8 @@ impl Character {
             },
         ];
         enhancements.retain(|e| {
-            self.action_points >= e.action_point_cost && self.stamina.current >= e.stamina_cost
+            self.action_points >= MOVE_ACTION_COST + e.action_point_cost
+                && self.stamina.current >= e.stamina_cost
         });
         enhancements
     }

@@ -26,9 +26,10 @@ use macroquad::{
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CoreGame, GameState, Hand, HandType, Logger, MovementEnhancement,
-    OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell, SpellEnhancement,
-    StateChooseAction, StateReactToAttack, StateReactToHit, ACTION_POINTS_PER_TURN,
+    Character, CoreGame, GameEvent, GameEventHandler, GameState, Hand, HandType, Logger,
+    MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell,
+    SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit,
+    ACTION_POINTS_PER_TURN,
 };
 use rpg::pathfind::PathfindGrid;
 
@@ -40,7 +41,8 @@ async fn main() {
     let logbuf = Rc::new(RefCell::new(LogBuf(Default::default())));
     let cloned_logbuf = Rc::clone(&logbuf);
 
-    let game = CoreGame::new(cloned_logbuf);
+    let event_handler = Rc::new(UiGameEventHandler::new());
+    let game = CoreGame::new(cloned_logbuf, event_handler.clone());
 
     let mut ui_characters = vec![];
     for character in game.characters() {
@@ -59,9 +61,15 @@ async fn main() {
     change_state(&game_state, catching_up, &mut user_interface);
 
     loop {
+        for event in event_handler.events.borrow_mut().drain(..) {
+            user_interface.handle_game_event(event);
+        }
+
+        let elapsed = get_frame_time();
+
         let active_character_i = game_state.game().active_character_i;
         let active_character = &game_state.game().characters()[active_character_i];
-        let events = user_interface.update(active_character_i);
+        let ui_events = user_interface.update(active_character_i, elapsed);
 
         clear_background(BLACK);
         character_portraits.draw(10.0, 10.0);
@@ -74,8 +82,8 @@ async fn main() {
 
         character_portraits.update(game_state.game());
 
-        if !events.is_empty() {
-            for event in events {
+        if !ui_events.is_empty() {
+            for event in ui_events {
                 match event {
                     Event::ChoseAttackedReaction(reaction) => {
                         game_state = game_state.unwrap_react_to_attack().proceed(reaction);
@@ -99,7 +107,7 @@ async fn main() {
         }
 
         if catching_up {
-            timer += get_frame_time();
+            timer += elapsed;
             if timer > 0.5 {
                 timer = 0.0;
                 match game_state {
@@ -187,6 +195,8 @@ struct GameGrid {
     pathfind_grid: PathfindGrid,
     characters: Vec<(TextLine, (i32, i32), bool)>,
 
+    effects: Vec<Effect>,
+
     active_character_i: usize,
     movement_range: f32,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
@@ -194,6 +204,25 @@ struct GameGrid {
     range_indicator: Option<Range>,
 
     receptive_to_input: bool,
+}
+
+struct Effect {
+    position: (i32, i32),
+    text: String,
+    remaining_duration: f32,
+    duration: f32,
+}
+
+impl Effect {
+    fn new(position: (i32, i32), text: impl Into<String>) -> Self {
+        let duration = 2.0;
+        Self {
+            position,
+            text: text.into(),
+            remaining_duration: duration,
+            duration,
+        }
+    }
 }
 
 impl GameGrid {
@@ -213,6 +242,7 @@ impl GameGrid {
         Self {
             pathfind_grid: PathfindGrid::new(),
             characters,
+            effects: vec![Effect::new((1, 1), "Hello")],
             active_character_i: 0,
             movement_range: 0.0,
             movement_preview: Default::default(),
@@ -223,7 +253,12 @@ impl GameGrid {
         }
     }
 
-    fn update(&mut self, active_character_i: usize, characters: &[Rc<RefCell<Character>>]) {
+    fn update(
+        &mut self,
+        active_character_i: usize,
+        characters: &[Rc<RefCell<Character>>],
+        elapsed: f32,
+    ) {
         self.receptive_to_input = characters[active_character_i].borrow().player_controlled;
 
         self.pathfind_grid.blocked_positions.clear();
@@ -240,6 +275,15 @@ impl GameGrid {
 
         let pos = self.characters[self.active_character_i].1;
         self.pathfind_grid.run(pos, self.movement_range);
+
+        for effect in &mut self.effects {
+            effect.remaining_duration -= elapsed;
+        }
+        self.effects.retain(|e| e.remaining_duration > 0.0);
+    }
+
+    fn add_effect(&mut self, position: (i32, i32), text: impl Into<String>) {
+        self.effects.push(Effect::new(position, text));
     }
 
     fn set_movement_range(&mut self, range: f32) {
@@ -402,10 +446,11 @@ impl GameGrid {
             character_positions.push(*pos);
         }
 
-        if (0f32..grid_dimensions.0 as f32 * cell_w).contains(&mouse_local.0)
-            && (0f32..grid_dimensions.1 as f32 * cell_w).contains(&mouse_local.1)
-            && self.receptive_to_input
-        {
+        let is_mouse_within_grid = (0f32..grid_dimensions.0 as f32 * cell_w)
+            .contains(&mouse_local.0)
+            && (0f32..grid_dimensions.1 as f32 * cell_w).contains(&mouse_local.1);
+
+        if is_mouse_within_grid && self.receptive_to_input {
             let (mouse_grid_x, mouse_grid_y) = (
                 (mouse_local.0 / cell_w) as i32,
                 (mouse_local.1 / cell_w) as i32,
@@ -506,8 +551,30 @@ impl GameGrid {
         }
 
         if let Some(character_i) = self.target_character_i {
+            let actor_pos = self.characters[self.active_character_i].1;
             let target_pos = self.characters[character_i].1;
             draw_square(target_pos, MAGENTA);
+
+            draw_line(
+                grid_x_to_screen(actor_pos.0) + cell_w / 2.0,
+                grid_y_to_screen(actor_pos.1) + cell_w / 2.0,
+                grid_x_to_screen(target_pos.0) + cell_w / 2.0,
+                grid_y_to_screen(target_pos.1) + cell_w / 2.0,
+                1.0,
+                MAGENTA,
+            );
+        }
+
+        for effect in &self.effects {
+            let font_size = 24;
+            let text_dimensions = measure_text(&effect.text, None, font_size, 1.0);
+
+            let x0 =
+                grid_x_to_screen(effect.position.0) + cell_w / 2.0 - text_dimensions.width / 2.0;
+            let y0 = grid_y_to_screen(effect.position.1)
+                - cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
+
+            draw_text(&effect.text, x0, y0, font_size as f32, YELLOW);
         }
     }
 }
@@ -1278,7 +1345,39 @@ impl UserInterface {
         }
     }
 
-    fn update(&mut self, active_character_i: usize) -> Vec<Event> {
+    fn handle_game_event(&mut self, event: GameEvent) {
+        match event {
+            GameEvent::LogLine(_) => todo!(),
+            GameEvent::CharacterTookDamage {
+                character_i,
+                amount,
+            } => {
+                let pos = self.characters[character_i].borrow().position;
+                self.game_grid
+                    .add_effect((pos.0 as i32, pos.1 as i32), format!("{}", amount));
+            }
+            GameEvent::AttackMissed { target_character_i } => {
+                let pos = self.characters[target_character_i].borrow().position;
+                self.game_grid
+                    .add_effect((pos.0 as i32, pos.1 as i32), "Miss");
+            }
+            GameEvent::SpellMissed { target_character_i } => {
+                let pos = self.characters[target_character_i].borrow().position;
+                self.game_grid
+                    .add_effect((pos.0 as i32, pos.1 as i32), "Resist");
+            }
+            GameEvent::CharacterReceivedSelfEffect {
+                character_i,
+                condition,
+            } => {
+                let pos = self.characters[character_i].borrow().position;
+                self.game_grid
+                    .add_effect((pos.0 as i32, pos.1 as i32), format!("{:?}", condition));
+            }
+        }
+    }
+
+    fn update(&mut self, active_character_i: usize, elapsed: f32) -> Vec<Event> {
         if active_character_i != self.active_character_i {
             // When control switches to a new player controlled character, make the UI show that character
             if self.characters[active_character_i]
@@ -1292,7 +1391,8 @@ impl UserInterface {
 
         self.active_character_i = active_character_i;
 
-        self.game_grid.update(active_character_i, &self.characters);
+        self.game_grid
+            .update(active_character_i, &self.characters, elapsed);
 
         let maybe_updated_movement_range = self.activity_popup.update();
 
@@ -1841,6 +1941,25 @@ struct LogBuf(Vec<String>);
 impl Logger for LogBuf {
     fn log(&mut self, line: String) {
         self.0.push(line);
+    }
+}
+
+#[derive(Debug)]
+struct UiGameEventHandler {
+    events: RefCell<Vec<GameEvent>>,
+}
+
+impl UiGameEventHandler {
+    fn new() -> Self {
+        Self {
+            events: RefCell::new(vec![]),
+        }
+    }
+}
+
+impl GameEventHandler for UiGameEventHandler {
+    fn handle(&self, event: GameEvent) {
+        self.events.borrow_mut().push(event);
     }
 }
 
