@@ -5,6 +5,7 @@ use std::{
     rc::Rc,
 };
 
+use indexmap::IndexMap;
 use macroquad::{
     color::{
         self, Color, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN,
@@ -600,7 +601,7 @@ struct ActivityPopup {
     state: UiState,
     initial_lines: Vec<String>,
     target_line: Option<String>,
-    choice_buttons: HashMap<u32, ActionButton>,
+    choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
     enabled: bool,
@@ -778,7 +779,7 @@ impl ActivityPopup {
     fn selected_actions(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_button_ids
             .iter()
-            .map(|id| &self.choice_buttons[&id].action)
+            .map(|id| &self.choice_buttons[id].action)
     }
 
     fn action_points(&self) -> u32 {
@@ -821,17 +822,17 @@ impl ActivityPopup {
             self.proceed_button.notify_hidden();
         }
 
-        let mut buttons_map = HashMap::new();
+        let mut choice_buttons = IndexMap::new();
         for mut btn in buttons {
             btn.event_sender = Some(EventSender {
                 queue: Rc::clone(&self.choice_button_events),
             });
-            buttons_map.insert(btn.id, btn);
+            choice_buttons.insert(btn.id, btn);
         }
 
         self.state = state;
         self.initial_lines = lines;
-        self.choice_buttons = buttons_map;
+        self.choice_buttons = choice_buttons;
         self.selected_button_ids.clear();
 
         self.base_action_points = if let UiState::ConfiguringAction(base_action) = state {
@@ -1815,12 +1816,12 @@ impl Drawable for TopCharacterPortrait {
 struct PlayerPortraits {
     row: Container,
     selected_i: Cell<usize>,
-    portraits: HashMap<usize, Rc<RefCell<PlayerCharacterPortrait>>>,
+    portraits: IndexMap<usize, Rc<RefCell<PlayerCharacterPortrait>>>,
 }
 
 impl PlayerPortraits {
     fn new(characters: &[Rc<RefCell<Character>>], selected_i: usize) -> Self {
-        let mut portraits: HashMap<usize, Rc<RefCell<PlayerCharacterPortrait>>> =
+        let mut portraits: IndexMap<usize, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
         for (i, character) in characters.iter().enumerate() {
