@@ -6,6 +6,8 @@ use std::{
 };
 
 use indexmap::IndexMap;
+use macroquad::input::is_key_down;
+use macroquad::miniquad::KeyCode;
 use macroquad::texture::{
     draw_texture, draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
 };
@@ -82,9 +84,10 @@ async fn main() {
         let ui_events = user_interface.update(active_character_i, elapsed);
 
         clear_background(BLACK);
-        character_portraits.draw(10.0, 10.0);
 
         user_interface.draw(670.0);
+
+        character_portraits.draw(10.0, 10.0);
 
         user_interface.update_character_resources(game_state.game().characters());
 
@@ -198,23 +201,6 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
     }
 }
 
-struct GameGrid {
-    character_texture: Texture2D,
-    event_sender: EventSender,
-    pathfind_grid: PathfindGrid,
-    characters: Vec<(TextLine, (i32, i32), bool)>,
-
-    effects: Vec<Effect>,
-
-    active_character_i: usize,
-    movement_range: f32,
-    movement_preview: Option<Vec<(f32, (i32, i32))>>,
-    target_character_i: Option<usize>,
-    range_indicator: Option<Range>,
-
-    receptive_to_input: bool,
-}
-
 struct Effect {
     position: (i32, i32),
     text: String,
@@ -232,6 +218,24 @@ impl Effect {
             duration,
         }
     }
+}
+
+struct GameGrid {
+    character_texture: Texture2D,
+    event_sender: EventSender,
+    pathfind_grid: PathfindGrid,
+    characters: Vec<(TextLine, (i32, i32), bool)>,
+    camera_position: (f32, f32),
+
+    effects: Vec<Effect>,
+
+    active_character_i: usize,
+    movement_range: f32,
+    movement_preview: Option<Vec<(f32, (i32, i32))>>,
+    target_character_i: Option<usize>,
+    range_indicator: Option<Range>,
+
+    receptive_to_input: bool,
 }
 
 impl GameGrid {
@@ -255,6 +259,7 @@ impl GameGrid {
         Self {
             character_texture,
             pathfind_grid: PathfindGrid::new(),
+            camera_position: (20.0, 0.0),
             characters,
             effects: vec![],
             active_character_i: 0,
@@ -294,6 +299,20 @@ impl GameGrid {
             effect.remaining_duration -= elapsed;
         }
         self.effects.retain(|e| e.remaining_duration > 0.0);
+
+        let camera_speed = 5.0;
+        if is_key_down(KeyCode::Left) {
+            self.camera_position.0 -= camera_speed;
+        }
+        if is_key_down(KeyCode::Right) {
+            self.camera_position.0 += camera_speed;
+        }
+        if is_key_down(KeyCode::Up) {
+            self.camera_position.1 -= camera_speed;
+        }
+        if is_key_down(KeyCode::Down) {
+            self.camera_position.1 += camera_speed;
+        }
     }
 
     fn add_effect(&mut self, position: (i32, i32), text: impl Into<String>) {
@@ -322,23 +341,24 @@ impl GameGrid {
             .collect()
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&mut self, x: f32, y: f32, w: f32, h: f32) {
         let cell_w = 64.0;
         let grid_dimensions = (20, 8);
 
         let bg_color = GRAY;
         let grid_color = Color::new(0.4, 0.4, 0.4, 1.00);
 
-        draw_rectangle(
-            x,
-            y,
-            cell_w * grid_dimensions.0 as f32,
-            cell_w * grid_dimensions.1 as f32,
-            bg_color,
-        );
+        draw_rectangle(x, y, w, h, bg_color);
 
-        let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w;
-        let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w;
+        let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w - self.camera_position.0;
+        let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w - self.camera_position.1;
+
+        let mouse_relative_to_grid = |(x, y): (f32, f32)| {
+            (
+                ((self.camera_position.0 + x) / cell_w).floor() as i32,
+                ((self.camera_position.1 + y) / cell_w).floor() as i32,
+            )
+        };
 
         let active_character_pos = self.characters[self.active_character_i].1;
 
@@ -471,23 +491,21 @@ impl GameGrid {
         }
 
         let (mouse_x, mouse_y) = mouse_position();
-        let mouse_local = (mouse_x - x, mouse_y - y);
+        let mouse_relative = (mouse_x - x, mouse_y - y);
 
         let mut character_positions = vec![];
         for (_, pos, _) in &self.characters {
             character_positions.push(*pos);
         }
 
-        let is_mouse_within_grid = (0f32..grid_dimensions.0 as f32 * cell_w)
-            .contains(&mouse_local.0)
-            && (0f32..grid_dimensions.1 as f32 * cell_w).contains(&mouse_local.1);
+        let (mouse_grid_x, mouse_grid_y) = mouse_relative_to_grid(mouse_relative);
+
+        let is_mouse_within_grid = (0f32..w).contains(&mouse_relative.0)
+            && (0..grid_dimensions.0).contains(&mouse_grid_x)
+            && (0f32..h).contains(&mouse_relative.1)
+            && (0..grid_dimensions.1).contains(&mouse_grid_y);
 
         if is_mouse_within_grid && self.receptive_to_input {
-            let (mouse_grid_x, mouse_grid_y) = (
-                (mouse_local.0 / cell_w) as i32,
-                (mouse_local.1 / cell_w) as i32,
-            );
-
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
             let valid_move_destination = match self
@@ -530,7 +548,6 @@ impl GameGrid {
                         }
                         pos = dist_enter_from.1;
                     }
-                    println!("Set movement preview to {:?}", movement_preview);
                     self.movement_preview = Some(movement_preview);
                 }
             } else if let Some(i) = hovered_npc_i {
@@ -611,15 +628,6 @@ impl GameGrid {
                 GOLD,
             );
         }
-
-        draw_rectangle_lines(
-            x,
-            y,
-            cell_w * grid_dimensions.0 as f32,
-            cell_w * grid_dimensions.1 as f32,
-            1.0,
-            GRAY,
-        );
 
         for effect in &self.effects {
             let font_size = 24;
@@ -1194,13 +1202,20 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
-        self.game_grid.draw(10.0, 90.0);
+        self.game_grid
+            .draw(0.0, 0.0, window_conf().window_width as f32, y);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
-        self.player_portraits.draw(270.0, y + 10.0);
-
+        draw_rectangle(
+            0.0,
+            y,
+            window_conf().window_width as f32,
+            window_conf().window_height as f32 - y,
+            BLACK,
+        );
         draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
+        self.player_portraits.draw(270.0, y + 10.0);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
 
@@ -1777,6 +1792,10 @@ impl CharacterPortraits {
             layout_dir: LayoutDirection::Horizontal,
             margin: 10.0,
             elements,
+            style: Style {
+                background_color: Some(BLACK),
+                border_color: None,
+            },
             ..Default::default()
         };
 
@@ -1815,17 +1834,6 @@ impl CharacterPortraits {
 
     fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
-
-        let y0 = y + self.size().1 + 10.0;
-
-        draw_line(
-            0.0,
-            y0,
-            window_conf().window_width as f32,
-            y0,
-            1.0,
-            DARKGRAY,
-        );
     }
 }
 
