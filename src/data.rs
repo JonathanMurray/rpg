@@ -199,3 +199,15 @@ pub const FIREBALL: Spell = Spell {
     possible_enhancement: None,
     range: 5,
 };
+
+pub const KILL: Spell = Spell {
+    name: "Kill",
+    description: "Kill the enemy",
+    action_point_cost: 5,
+    mana_cost: 0,
+    damage: 99,
+    on_hit_effect: None,
+    spell_type: SpellType::Projectile,
+    possible_enhancement: None,
+    range: 99,
+};

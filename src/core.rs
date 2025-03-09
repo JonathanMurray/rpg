@@ -1,10 +1,11 @@
 use std::cell::RefCell;
-use std::cell::RefMut;
+use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 use crate::data::BOW;
 use crate::data::BRACE;
+use crate::data::KILL;
 use crate::data::WAR_HAMMER;
 use crate::data::{
     CRUSHING_STRIKE, DAGGER, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SIDE_STEP,
@@ -14,16 +15,15 @@ use crate::data::{
 pub const ACTION_POINTS_PER_TURN: u32 = 6;
 
 pub struct CoreGame {
-    characters: Characters,
-    pub active_character_i: usize,
-    logger: Rc<RefCell<dyn Logger>>,
+    pub characters: Characters,
+    pub active_character_id: CharacterId,
     event_handler: Rc<dyn GameEventHandler>,
 }
 
 impl CoreGame {
-    pub fn new(logger: Rc<RefCell<dyn Logger>>, event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", 5, 4, 4, (1, 4));
-        bob.main_hand.weapon = Some(BOW);
+    pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
+        let mut bob = Character::new(true, "Bob", 10, 10, 10, (1, 4));
+        bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         //bob.known_attacked_reactions.push(SIDE_STEP);
@@ -31,8 +31,9 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
+        bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Alice", 2, 2, 3, (2, 4));
+        let mut alice = Character::new(false, "Alice", 1, 1, 1, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
@@ -43,12 +44,11 @@ impl CoreGame {
         let mut david = Character::new(true, "David", 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
 
-        let characters = Characters::new(vec![bob, david, alice, charlie]);
+        let characters = Characters::new(vec![bob, alice, charlie, david]);
 
         Self {
             characters,
-            active_character_i: 0,
-            logger,
+            active_character_id: 0,
             event_handler,
         }
     }
@@ -62,11 +62,7 @@ impl CoreGame {
     }
 
     pub fn active_character(&self) -> RefMut<Character> {
-        self.characters.get(self.active_character_i).borrow_mut()
-    }
-
-    pub fn characters(&self) -> &[Rc<RefCell<Character>>] {
-        &self.characters.0
+        self.characters.get_mut(self.active_character_id)
     }
 
     fn enter_state_action(self, action: Action) -> GameState {
@@ -79,10 +75,10 @@ impl CoreGame {
             Action::Attack {
                 hand,
                 enhancements,
-                target_character_i,
+                target,
             } => {
                 let mut attacker = character;
-                let defender = self.characters.get(target_character_i).borrow_mut();
+                let defender = self.characters.get_mut(target);
 
                 assert!(attacker.can_reach_with_attack(hand, defender.position));
 
@@ -117,21 +113,23 @@ impl CoreGame {
                 drop(attacker);
                 drop(defender);
                 return if !players_turn {
-                    let attacking_character_i = self.active_character_i;
-                    GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
-                        game: self,
-                        action_points_before_action,
-                        hand,
-                        enhancements,
-                        attacking_character_i,
-                        attacked_character_i: target_character_i,
-                    })
+                    let attacking_character_i = self.active_character_id;
+                    transition_to(GameState::AwaitingPlayerAttackReaction(
+                        StateReactToAttack {
+                            game: self,
+                            action_points_before_action,
+                            hand,
+                            enhancements,
+                            attacker: attacking_character_i,
+                            victim: target,
+                        },
+                    ))
                 } else {
                     self.enter_state_attack(
                         action_points_before_action,
                         hand,
                         enhancements,
-                        target_character_i,
+                        target,
                         None,
                     )
                 };
@@ -149,7 +147,7 @@ impl CoreGame {
                 if let ApplyEffect::Condition(condition) = effect {
                     self.event_handler
                         .handle(GameEvent::CharacterReceivedSelfEffect {
-                            character_i: self.active_character_i,
+                            character: self.active_character_id,
                             condition,
                         });
                 }
@@ -159,9 +157,9 @@ impl CoreGame {
             Action::CastSpell {
                 spell,
                 enhanced,
-                target_character_i,
+                target,
             } => {
-                self.perform_spell(&mut character, spell, enhanced, target_character_i);
+                self.perform_spell(&mut character, spell, enhanced, target);
             }
             Action::Move {
                 action_point_cost,
@@ -180,7 +178,7 @@ impl CoreGame {
         }
 
         drop(character);
-        return self.enter_state_right_after_action(action_points_before_action, None);
+        self.enter_state_right_after_action(action_points_before_action, None)
     }
 
     fn perform_movement(
@@ -190,11 +188,10 @@ impl CoreGame {
     ) -> GameState {
         let mut character = self.active_character();
         let new_position = positions.remove(0);
-        for (i, character) in self.characters().iter().enumerate() {
-            if i == self.active_character_i {
-                continue; // Avoid borrowing already borrowed active character
+        for character in self.characters.iter() {
+            if let Ok(ch) = character.try_borrow() {
+                assert!(new_position != ch.position)
             }
-            assert!(new_position != character.borrow().position)
         }
         self.log(format!(
             "{} moved from {:?} to {:?}",
@@ -204,11 +201,11 @@ impl CoreGame {
         drop(character);
 
         if !positions.is_empty() {
-            GameState::PerformingMovement(StatePerformingMovement {
+            transition_to(GameState::PerformingMovement(StatePerformingMovement {
                 game: self,
                 remaining_positions: positions,
                 action_points_before_action,
-            })
+            }))
         } else {
             self.enter_state_right_after_action(action_points_before_action, None)
         }
@@ -241,9 +238,9 @@ impl CoreGame {
         caster: &mut Character,
         spell: Spell,
         enhanced: bool,
-        target_character_i: usize,
+        target: CharacterId,
     ) {
-        let defender = &mut self.characters.get(target_character_i).borrow_mut();
+        let defender = &mut self.characters.get_mut(target);
 
         assert!(caster.can_reach_with_spell(spell, defender.position));
         assert!(caster.action_points >= spell.action_point_cost);
@@ -297,12 +294,7 @@ impl CoreGame {
                 self.log("  The spell was successful!");
                 let damage = spell.damage;
                 if damage > 0 {
-                    defender.health.lose(damage);
-                    self.log(format!("  {} took {} damage", defender.name, damage));
-                    self.event_handler.handle(GameEvent::CharacterTookDamage {
-                        character_i: target_character_i,
-                        amount: damage,
-                    });
+                    self.perform_losing_health(defender, damage);
                 }
 
                 if let Some(effect) = spell.on_hit_effect {
@@ -320,8 +312,7 @@ impl CoreGame {
                     _ => {}
                 };
             } else {
-                self.event_handler
-                    .handle(GameEvent::SpellMissed { target_character_i });
+                self.event_handler.handle(GameEvent::SpellMissed { target });
                 match spell.spell_type {
                     SpellType::Mental => {
                         self.log(format!("  {} resisted the spell!", defender.name))
@@ -336,8 +327,21 @@ impl CoreGame {
         }
     }
 
+    fn perform_losing_health(&self, character: &mut Character, amount: u32) {
+        character.health.lose(amount);
+        self.log(format!("  {} took {} damage", character.name, amount));
+        self.event_handler.handle(GameEvent::CharacterTookDamage {
+            character: character.id.unwrap(),
+            amount,
+        });
+
+        if character.health.current == 0 {
+            character.has_died = true;
+        }
+    }
+
     fn log(&self, line: impl Into<String>) {
-        self.logger.borrow_mut().log(line.into());
+        self.event_handler.handle(GameEvent::LogLine(line.into()));
     }
 
     fn enter_state_attack(
@@ -345,11 +349,11 @@ impl CoreGame {
         action_points_before_action: u32,
         hand_type: HandType,
         attack_enhancements: Vec<AttackEnhancement>,
-        defender_character_i: usize,
+        defender_id: CharacterId,
         defender_reaction: Option<OnAttackedReaction>,
     ) -> GameState {
         let mut attacker = self.active_character();
-        let mut defender = self.characters.get(defender_character_i).borrow_mut();
+        let mut defender = self.characters.get_mut(defender_id);
 
         let advantage = attacker.attack_advantage(hand_type) + defender.incoming_attack_advantage();
 
@@ -407,7 +411,7 @@ impl CoreGame {
                 "Rolling {} dice with disadvantage...",
                 advantage.abs() + 1
             )),
-            std::cmp::Ordering::Equal => self.log(format!("Rolling 1 die...")),
+            std::cmp::Ordering::Equal => self.log("Rolling 1 die..."),
             std::cmp::Ordering::Greater => {
                 self.log(format!("Rolling {} dice with advantage...", advantage + 1))
             }
@@ -431,7 +435,7 @@ impl CoreGame {
             }
 
             self.event_handler.handle(GameEvent::AttackMissed {
-                target_character_i: defender_character_i,
+                target: defender_id,
             });
         } else {
             let mut on_true_hit_effect = None;
@@ -475,24 +479,9 @@ impl CoreGame {
 
             self.log(dmg_str);
 
-            self.event_handler.handle(GameEvent::CharacterTookDamage {
-                character_i: defender_character_i,
-                amount: damage,
-            });
+            self.perform_losing_health(&mut defender, damage);
 
-            defender.health.lose(damage);
-
-            self.log(format!(
-                "  {} took {} damage and went down to {}/{} health",
-                defender.name, damage, defender.health.current, defender.health.max
-            ));
-
-            attack_hit = Some((
-                defender_character_i,
-                // TODO construct this text in ui.rs instead? It can have more full control over what to show
-                // The only structural information contained in here is how much damage was dealt
-                damage,
-            ));
+            attack_hit = Some((defender_id, damage));
 
             if let Some(effect) = on_true_hit_effect {
                 match effect {
@@ -534,13 +523,13 @@ impl CoreGame {
         drop(attacker);
         drop(defender);
 
-        return self.enter_state_right_after_action(action_points_before_action, attack_hit);
+        self.enter_state_right_after_action(action_points_before_action, attack_hit)
     }
 
     fn enter_state_right_after_action(
         self,
         action_points_before_action: u32,
-        attack_hit: Option<(usize, u32)>,
+        attack_hit: Option<(CharacterId, u32)>,
     ) -> GameState {
         let players_turn = self.active_character().player_controlled;
         let mut character = self.active_character();
@@ -551,24 +540,21 @@ impl CoreGame {
         let spent = action_points_before_action - character.action_points;
         self.perform_recover_from_dazed(&mut character, spent);
 
-        if let Some((attacked_character_i, damage)) = attack_hit {
+        if let Some((attacked_id, damage)) = attack_hit {
             // TODO this can remove a Dazed that was just added from the attack, which is bad.
 
             // You recover from 1 stack of Dazed each time you're hit by an attack
-            self.perform_recover_from_dazed(
-                &mut self.characters.get(attacked_character_i).borrow_mut(),
-                1,
-            );
+            self.perform_recover_from_dazed(&mut self.characters.get_mut(attacked_id), 1);
 
             if !players_turn {
                 drop(character);
-                let attacking_character_i = self.active_character_i;
-                return GameState::AwaitingPlayerHitReaction(StateReactToHit {
+                let attacking_id = self.active_character_id;
+                return transition_to(GameState::AwaitingPlayerHitReaction(StateReactToHit {
                     game: self,
                     damage,
-                    attacking_character_i,
-                    reacting_character_i: attacked_character_i,
-                });
+                    attacker: attacking_id,
+                    reactor: attacked_id,
+                }));
             }
         }
 
@@ -587,18 +573,18 @@ impl CoreGame {
 
     fn enter_state_react_after_being_hit(
         self,
-        reacting_character_i: usize,
+        reacting_id: CharacterId,
         reaction: Option<OnHitReaction>,
     ) -> GameState {
         if let Some(reaction) = reaction {
             self.perform_on_hit_reaction(
                 &mut self.active_character(),
-                &mut self.characters.get(reacting_character_i).borrow_mut(),
+                &mut self.characters.get_mut(reacting_id),
                 reaction,
             );
         }
 
-        return self.enter_state_longer_after_action();
+        self.enter_state_longer_after_action()
     }
 
     fn perform_on_hit_reaction(
@@ -651,27 +637,28 @@ impl CoreGame {
 
     fn enter_state_longer_after_action(mut self) -> GameState {
         {
-            let mut character = self.characters.get(self.active_character_i).borrow_mut();
+            let mut character = self.characters.get_mut(self.active_character_id);
             if character.action_points == 0 {
                 self.perform_end_of_turn_character(&mut character);
-                self.active_character_i = (self.active_character_i + 1) % self.characters.0.len();
+                self.active_character_id = self.characters.next_id(self.active_character_id);
             }
         }
 
         if self.active_character().player_controlled {
-            GameState::AwaitingPlayerAction(StateChooseAction { game: self })
+            transition_to(GameState::AwaitingPlayerAction(StateChooseAction {
+                game: self,
+            }))
         } else {
-            GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
+            transition_to(GameState::AwaitingBotChooseAction(
+                StateAwaitingBotChooseAction { game: self },
+            ))
         }
     }
 
     fn perform_end_of_turn_character(&self, character: &mut Character) {
         if character.conditions.bleeding > 0 {
-            character.health.lose(1);
-            self.log(format!(
-                "{} took 1 damage from Bleeding and went down to {}/{} health",
-                character.name, character.health.current, character.health.max
-            ));
+            // TODO
+            self.perform_losing_health(character, 99);
             character.conditions.bleeding -= 1;
             if character.conditions.bleeding == 0 {
                 self.log(format!("{} stopped Bleeding", character.name));
@@ -688,7 +675,7 @@ impl CoreGame {
             self.log(format!("{} stopped Raging", character.name))
         }
 
-        // TODO
+        // TODO also give AP at start of turn
         character.action_points = (character.action_points + 3).min(ACTION_POINTS_PER_TURN);
         character.main_hand.exertion = 0;
         character.off_hand.exertion = 0;
@@ -696,6 +683,18 @@ impl CoreGame {
 
         self.log("End of turn.");
     }
+
+    fn remove_dead(&mut self) {
+        for id in self.characters.remove_dead() {
+            self.event_handler
+                .handle(GameEvent::CharacterDied { character: id });
+        }
+    }
+}
+
+fn transition_to(mut game_state: GameState) -> GameState {
+    game_state.game_mut().remove_dead();
+    game_state
 }
 
 pub enum GameState {
@@ -714,6 +713,16 @@ impl GameState {
             GameState::AwaitingPlayerHitReaction(this) => &this.game,
             GameState::AwaitingBotChooseAction(this) => &this.game,
             GameState::PerformingMovement(this) => &this.game,
+        }
+    }
+
+    pub fn game_mut(&mut self) -> &mut CoreGame {
+        match self {
+            GameState::AwaitingPlayerAction(this) => &mut this.game,
+            GameState::AwaitingPlayerAttackReaction(this) => &mut this.game,
+            GameState::AwaitingPlayerHitReaction(this) => &mut this.game,
+            GameState::AwaitingBotChooseAction(this) => &mut this.game,
+            GameState::PerformingMovement(this) => &mut this.game,
         }
     }
 
@@ -739,11 +748,6 @@ impl GameState {
     }
 }
 
-// TODO
-pub trait Logger {
-    fn log(&mut self, line: String);
-}
-
 pub trait GameEventHandler {
     fn handle(&self, event: GameEvent);
 }
@@ -752,18 +756,21 @@ pub trait GameEventHandler {
 pub enum GameEvent {
     LogLine(String),
     CharacterTookDamage {
-        character_i: usize,
+        character: CharacterId,
         amount: u32,
     },
     AttackMissed {
-        target_character_i: usize,
+        target: CharacterId,
     },
     SpellMissed {
-        target_character_i: usize,
+        target: CharacterId,
     },
     CharacterReceivedSelfEffect {
-        character_i: usize,
+        character: CharacterId,
         condition: Condition,
+    },
+    CharacterDied {
+        character: CharacterId,
     },
 }
 
@@ -791,37 +798,36 @@ impl StatePerformingMovement {
 
 pub struct StateReactToAttack {
     game: CoreGame,
-    pub attacked_character_i: usize,
+    pub attacker: CharacterId,
+    pub victim: CharacterId,
     action_points_before_action: u32,
     pub enhancements: Vec<AttackEnhancement>,
     pub hand: HandType,
-    pub attacking_character_i: usize,
 }
 
 impl StateReactToAttack {
     pub fn proceed(self, reaction: Option<OnAttackedReaction>) -> GameState {
-        return self.game.enter_state_attack(
+        self.game.enter_state_attack(
             self.action_points_before_action,
             self.hand,
             self.enhancements,
-            self.attacked_character_i,
+            self.victim,
             reaction,
-        );
+        )
     }
 }
 
 pub struct StateReactToHit {
     game: CoreGame,
-    pub attacking_character_i: usize,
-    pub reacting_character_i: usize,
+    pub attacker: CharacterId,
+    pub reactor: CharacterId,
     pub damage: u32,
 }
 
 impl StateReactToHit {
     pub fn proceed(self, reaction: Option<OnHitReaction>) -> GameState {
-        return self
-            .game
-            .enter_state_react_after_being_hit(self.reacting_character_i, reaction);
+        self.game
+            .enter_state_react_after_being_hit(self.reactor, reaction)
     }
 }
 
@@ -861,7 +867,7 @@ pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Char
     probability_of_d20_reaching(target, 0)
 }
 
-struct Characters(Vec<Rc<RefCell<Character>>>);
+pub struct Characters(Vec<(CharacterId, Rc<RefCell<Character>>)>);
 
 impl Characters {
     fn new(characters: Vec<Character>) -> Self {
@@ -870,15 +876,78 @@ impl Characters {
                 .into_iter()
                 .enumerate()
                 .map(|(i, mut ch)| {
-                    ch.index = Some(i);
-                    Rc::new(RefCell::new(ch))
+                    let id = i as CharacterId;
+                    ch.id = Some(id);
+                    (id, Rc::new(RefCell::new(ch)))
                 })
                 .collect(),
         )
     }
 
-    fn get(&self, i: usize) -> &Rc<RefCell<Character>> {
-        self.0.get(i).unwrap()
+    fn next_id(&self, current_id: CharacterId) -> CharacterId {
+        let mut i = 0;
+        let mut passed_current = false;
+        loop {
+            let (id, ch) = &self.0[i];
+
+            if passed_current && !ch.borrow().has_died {
+                return *id;
+            }
+
+            if *id == current_id {
+                if passed_current {
+                    panic!("No alive character found");
+                }
+                passed_current = true;
+            }
+
+            i = (i + 1) % self.0.len();
+        }
+    }
+
+    pub fn get_mut(&self, character_id: CharacterId) -> RefMut<Character> {
+        self.0
+            .iter()
+            .find(|(id, _ch)| *id == character_id)
+            .unwrap()
+            .1
+            .borrow_mut()
+    }
+
+    pub fn get(&self, character_id: CharacterId) -> Ref<Character> {
+        self.0
+            .iter()
+            .find(|(id, _ch)| *id == character_id)
+            .unwrap()
+            .1
+            .borrow()
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Rc<RefCell<Character>>> {
+        self.0.iter().map(|(_id, ch)| ch)
+    }
+
+    pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<RefCell<Character>>)> {
+        self.0.iter()
+    }
+
+    pub fn remove_dead(&mut self) -> Vec<CharacterId> {
+        let mut removed = vec![];
+        self.0.retain(|(_id, ch)| {
+            if ch.borrow().has_died {
+                removed.push(ch.borrow().id());
+                false
+            } else {
+                true
+            }
+        });
+        removed
+    }
+}
+
+impl Clone for Characters {
+    fn clone(&self) -> Self {
+        Characters(self.0.clone())
     }
 }
 
@@ -959,13 +1028,13 @@ pub enum Action {
     Attack {
         hand: HandType,
         enhancements: Vec<AttackEnhancement>,
-        target_character_i: usize,
+        target: CharacterId,
     },
     SelfEffect(SelfEffectAction),
     CastSpell {
         spell: Spell,
         enhanced: bool,
-        target_character_i: usize,
+        target: CharacterId,
     },
     Move {
         positions: Vec<(u32, u32)>,
@@ -1071,10 +1140,14 @@ impl Hand {
     }
 }
 
+pub type CharacterId = u32;
+
 #[derive(Debug)]
 pub struct Character {
-    index: Option<usize>,
+    id: Option<CharacterId>,
+    pub has_died: bool,
     pub player_controlled: bool,
+    // TODO i32 instead?
     pub position: (u32, u32),
     pub name: &'static str,
     pub base_strength: u32,
@@ -1109,7 +1182,8 @@ impl Character {
         let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
         let move_range = 0.8 + dex as f32 * 0.2;
         Self {
-            index: None,
+            id: None,
+            has_died: false,
             player_controlled,
             position,
             name,
@@ -1144,6 +1218,14 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
         }
+    }
+
+    pub fn position_i32(&self) -> (i32, i32) {
+        (self.position.0 as i32, self.position.1 as i32)
+    }
+
+    pub fn id(&self) -> CharacterId {
+        self.id.unwrap()
     }
 
     fn hand(&self, hand_type: HandType) -> &Hand {

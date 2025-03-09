@@ -1,8 +1,9 @@
 use std::collections::HashSet;
 use std::{
-    cell::{self, Cell, Ref, RefCell},
+    cell::{self, Cell, Ref, RefCell, RefMut},
     collections::HashMap,
     rc::Rc,
+    rc::Weak,
 };
 
 use indexmap::IndexMap;
@@ -35,9 +36,9 @@ use macroquad::{text, texture};
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CoreGame, GameEvent, GameEventHandler, GameState, Hand, HandType, Logger,
-    MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell,
-    SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit, TextureId,
+    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, Hand,
+    HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SelfEffectAction,
+    Spell, SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit, TextureId,
     ACTION_POINTS_PER_TURN,
 };
 use rpg::pathfind::PathfindGrid;
@@ -61,16 +62,10 @@ async fn main() {
     // Seed the random numbers
     rand::srand(miniquad::date::now() as u64);
 
-    let logbuf = Rc::new(RefCell::new(LogBuf(Default::default())));
-    let cloned_logbuf = Rc::clone(&logbuf);
-
     let event_handler = Rc::new(UiGameEventHandler::new());
-    let game = CoreGame::new(cloned_logbuf, event_handler.clone());
+    let game = CoreGame::new(event_handler.clone());
 
-    let mut ui_characters = vec![];
-    for character in game.characters() {
-        ui_characters.push(Rc::clone(character));
-    }
+    let ui_characters = game.characters.clone();
 
     let textures = load_textures(vec![
         (TextureId::Character, "character4.png"),
@@ -81,10 +76,7 @@ async fn main() {
     ])
     .await;
 
-    let mut user_interface = UserInterface::new(ui_characters, game.active_character_i, textures);
-
-    let mut character_portraits =
-        CharacterPortraits::new(game.characters(), game.active_character_i);
+    let mut user_interface = UserInterface::new(&game, textures);
 
     let mut game_state = game.begin();
     let mut catching_up = true;
@@ -99,18 +91,13 @@ async fn main() {
 
         let elapsed = get_frame_time();
 
-        let active_character_i = game_state.game().active_character_i;
-        let ui_events = user_interface.update(active_character_i, elapsed);
+        let ui_events = user_interface.update(game_state.game(), elapsed);
 
         clear_background(BLACK);
 
         user_interface.draw(670.0);
 
-        character_portraits.draw(10.0, 10.0);
-
-        user_interface.update_character_resources(game_state.game().characters());
-
-        character_portraits.update(game_state.game());
+        user_interface.update_character_resources(&game_state.game().characters);
 
         if !ui_events.is_empty() {
             for event in ui_events {
@@ -130,10 +117,6 @@ async fn main() {
             catching_up = true;
             timer = 0.0;
             change_state(&game_state, catching_up, &mut user_interface);
-        }
-
-        for line in logbuf.borrow_mut().0.drain(..) {
-            user_interface.log.add(line);
         }
 
         if catching_up {
@@ -187,29 +170,29 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
                 user_interface.set_state(UiState::ChoosingAction);
             }
             GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
-                attacking_character_i,
+                attacker,
                 hand,
-                attacked_character_i,
+                victim,
                 ..
             }) => {
                 println!("awaiting player attack reaction");
                 user_interface.set_state(UiState::ReactingToAttack {
-                    attacking_character_i: *attacking_character_i,
+                    attacker: *attacker,
                     hand: *hand,
-                    attacked_character_i: *attacked_character_i,
+                    reactor: *victim,
                 });
             }
             GameState::AwaitingPlayerHitReaction(StateReactToHit {
-                attacking_character_i,
+                attacker,
                 damage,
-                reacting_character_i,
+                reactor,
                 ..
             }) => {
                 println!("awaiting player hit reaction");
                 user_interface.set_state(UiState::ReactingToHit {
-                    attacking_character_i: *attacking_character_i,
+                    attacker: *attacker,
                     damage: *damage,
-                    attacked_character_i: *reacting_character_i,
+                    victim: *reactor,
                 });
             }
             GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
@@ -220,47 +203,52 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
     }
 }
 
-struct Effect {
+struct VisualEffect {
     position: (i32, i32),
-    text: String,
+    content: VisualEffectContent,
     remaining_duration: f32,
     duration: f32,
 }
 
-impl Effect {
-    fn new(position: (i32, i32), text: impl Into<String>) -> Self {
-        let duration = 2.0;
+enum VisualEffectContent {
+    Text(String),
+    Circle,
+}
+
+impl<T> From<T> for VisualEffectContent
+where
+    T: Into<String>,
+{
+    fn from(t: T) -> Self {
+        Self::Text(t.into())
+    }
+}
+
+impl VisualEffect {
+    fn new(position: (i32, i32), content: impl Into<VisualEffectContent>, duration: f32) -> Self {
         Self {
             position,
-            text: text.into(),
+            content: content.into(),
             remaining_duration: duration,
             duration,
         }
     }
 }
 
-struct GridCharacter {
-    position: (i32, i32),
-    texture: TextureId,
-    mainhand_texture: Option<TextureId>,
-    offhand_texture: Option<TextureId>,
-    player_controlled: bool,
-}
-
 struct GameGrid {
     textures: HashMap<TextureId, Texture2D>,
     event_sender: EventSender,
     pathfind_grid: PathfindGrid,
-    characters: Vec<GridCharacter>,
+    characters: Characters,
     camera_position: (Cell<f32>, Cell<f32>),
     dragging_camera_from: Option<(f32, f32)>,
 
-    effects: Vec<Effect>,
+    effects: Vec<VisualEffect>,
 
-    active_character_i: usize,
+    active_character_id: CharacterId,
     movement_range: f32,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
-    target_character_i: Option<usize>,
+    target_character_id: Option<CharacterId>,
     range_indicator: Option<Range>,
 
     receptive_to_input: bool,
@@ -272,34 +260,12 @@ struct GameGrid {
 
 impl GameGrid {
     fn new(
-        characters: &[Rc<RefCell<Character>>],
+        characters: &Characters,
         event_sender: EventSender,
         textures: HashMap<TextureId, Texture2D>,
         size: (f32, f32),
     ) -> Self {
-        let characters = characters
-            .into_iter()
-            .map(|character| {
-                let char = character.borrow();
-
-                let mut mainhand_texture = None;
-                let mut offhand_texture = None;
-                if let Some(weapon) = char.weapon(HandType::MainHand) {
-                    mainhand_texture = weapon.texture_id;
-                }
-                if let Some(shield) = char.shield() {
-                    offhand_texture = shield.texture_id;
-                }
-
-                GridCharacter {
-                    position: (char.position.0 as i32, char.position.1 as i32),
-                    texture: TextureId::Character,
-                    mainhand_texture,
-                    offhand_texture,
-                    player_controlled: char.player_controlled,
-                }
-            })
-            .collect();
+        let characters = characters.clone();
 
         Self {
             textures,
@@ -308,10 +274,10 @@ impl GameGrid {
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
             effects: vec![],
-            active_character_i: 0,
+            active_character_id: 0,
             movement_range: 0.0,
             movement_preview: Default::default(),
-            target_character_i: None,
+            target_character_id: None,
             event_sender,
             receptive_to_input: false,
             range_indicator: None,
@@ -321,27 +287,20 @@ impl GameGrid {
         }
     }
 
-    fn update(
-        &mut self,
-        active_character_i: usize,
-        characters: &[Rc<RefCell<Character>>],
-        elapsed: f32,
-    ) {
-        self.receptive_to_input = characters[active_character_i].borrow().player_controlled;
+    fn update(&mut self, active_character_id: CharacterId, characters: &Characters, elapsed: f32) {
+        self.receptive_to_input = characters.get(active_character_id).player_controlled;
 
         self.pathfind_grid.blocked_positions.clear();
 
-        self.active_character_i = active_character_i;
-        for (i, character) in characters.iter().enumerate() {
-            let pos = character.borrow().position;
-            self.characters[i].position = (pos.0 as i32, pos.1 as i32);
+        self.active_character_id = active_character_id;
+        for character in characters.iter() {
+            let character = character.borrow();
+            let pos = character.position_i32();
 
-            self.pathfind_grid
-                .blocked_positions
-                .insert((pos.0 as i32, pos.1 as i32));
+            self.pathfind_grid.blocked_positions.insert(pos);
         }
 
-        let pos = self.characters[self.active_character_i].position;
+        let pos = self.characters.get(self.active_character_id).position_i32();
         self.pathfind_grid.run(pos, self.movement_range);
 
         for effect in &mut self.effects {
@@ -364,8 +323,14 @@ impl GameGrid {
         }
     }
 
-    fn add_effect(&mut self, position: (i32, i32), text: impl Into<String>) {
-        self.effects.push(Effect::new(position, text));
+    fn add_text_effect(&mut self, position: (i32, i32), text: impl Into<String>) {
+        self.effects.push(VisualEffect::new(position, text, 2.0));
+        // TODO
+        self.effects.push(VisualEffect::new(
+            position,
+            VisualEffectContent::Circle,
+            0.2,
+        ));
     }
 
     fn set_movement_range(&mut self, range: f32) {
@@ -376,7 +341,7 @@ impl GameGrid {
             }
         }
 
-        let pos = self.characters[self.active_character_i].position;
+        let pos = self.characters.get(self.active_character_id).position_i32();
         self.pathfind_grid.run(pos, self.movement_range);
     }
 
@@ -410,7 +375,7 @@ impl GameGrid {
             )
         };
 
-        let active_character_pos = self.characters[self.active_character_i].position;
+        let active_character_pos = self.characters.get(self.active_character_id).position_i32();
 
         let draw_square = |(grid_x, grid_y), color| {
             let margin = -1.0;
@@ -458,7 +423,8 @@ impl GameGrid {
             }
         }
 
-        let (active_char_x, active_char_y) = self.characters[self.active_character_i].position;
+        let (active_char_x, active_char_y) =
+            self.characters.get(self.active_character_id).position_i32();
 
         if let Some(range) = self.range_indicator {
             let range_ceil = (f32::from(range)).ceil() as i32;
@@ -519,43 +485,47 @@ impl GameGrid {
             }
         }
 
-        for GridCharacter {
-            position,
-            texture,
-            mainhand_texture,
-            offhand_texture,
-            ..
-        } in &self.characters
-        {
+        for ch in self.characters.iter() {
+            let ch = ch.borrow();
+
+            let position = ch.position_i32();
+            let texture = TextureId::Character;
+
             let params = DrawTextureParams {
                 dest_size: Some((self.cell_w, self.cell_w).into()),
                 ..Default::default()
             };
+
             draw_texture_ex(
-                &self.textures[texture],
+                &self.textures[&texture],
                 grid_x_to_screen(position.0),
                 grid_y_to_screen(position.1),
                 WHITE,
                 params.clone(),
             );
 
-            if let Some(texture) = mainhand_texture {
-                draw_texture_ex(
-                    &self.textures[texture],
-                    grid_x_to_screen(position.0),
-                    grid_y_to_screen(position.1),
-                    WHITE,
-                    params.clone(),
-                );
+            if let Some(weapon) = ch.weapon(HandType::MainHand) {
+                if let Some(texture) = weapon.texture_id {
+                    draw_texture_ex(
+                        &self.textures[&texture],
+                        grid_x_to_screen(position.0),
+                        grid_y_to_screen(position.1),
+                        WHITE,
+                        params.clone(),
+                    );
+                }
             }
-            if let Some(texture) = offhand_texture {
-                draw_texture_ex(
-                    &self.textures[texture],
-                    grid_x_to_screen(position.0),
-                    grid_y_to_screen(position.1),
-                    WHITE,
-                    params,
-                );
+
+            if let Some(shield) = ch.shield() {
+                if let Some(texture) = shield.texture_id {
+                    draw_texture_ex(
+                        &self.textures[&texture],
+                        grid_x_to_screen(position.0),
+                        grid_y_to_screen(position.1),
+                        WHITE,
+                        params,
+                    );
+                }
             }
         }
 
@@ -563,8 +533,8 @@ impl GameGrid {
         let mouse_relative = (mouse_x - x, mouse_y - y);
 
         let mut character_positions = vec![];
-        for character in &self.characters {
-            character_positions.push(character.position);
+        for character in self.characters.iter() {
+            character_positions.push(character.borrow().position_i32());
         }
 
         let (mouse_grid_x, mouse_grid_y) = mouse_relative_to_grid(mouse_relative);
@@ -606,19 +576,19 @@ impl GameGrid {
                 _ => false,
             } && !collision;
 
-            let mut hovered_npc_i = None;
-            for (i, character) in self.characters.iter().enumerate() {
-                if character.position == (mouse_grid_x, mouse_grid_y)
-                    && !character.player_controlled
+            let mut hovered_npc_id = None;
+            for character in self.characters.iter() {
+                if character.borrow().position_i32() == (mouse_grid_x, mouse_grid_y)
+                    && !character.borrow().player_controlled
                 {
-                    hovered_npc_i = Some(i);
+                    // TODO: when hovering NPC, light up their TopCharacterPortrait
+                    hovered_npc_id = Some(character.borrow().id());
                 }
             }
 
             if valid_move_destination {
                 let destination = (mouse_grid_x, mouse_grid_y);
                 draw_square(destination, YELLOW);
-                // TODO don't react to this mouse click if it's on top of the Popup UI element
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if self.movement_preview.is_none() {
                         self.event_sender
@@ -641,15 +611,14 @@ impl GameGrid {
                     }
                     self.movement_preview = Some(movement_preview);
                 }
-            } else if let Some(i) = hovered_npc_i {
+            } else if let Some(id) = hovered_npc_id {
                 draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
-                // TODO don't react to this mouse click if it's on top of the Popup UI element
                 if is_mouse_button_pressed(MouseButton::Left) {
-                    if self.target_character_i.is_none() {
+                    if self.target_character_id.is_none() {
                         self.event_sender
                             .send(InternalUiEvent::SwitchedToAttackInGrid);
                     }
-                    self.target_character_i = Some(i);
+                    self.target_character_id = Some(id);
                     self.movement_preview = None;
                 }
             } else if !self.movement_preview.is_some() {
@@ -690,9 +659,9 @@ impl GameGrid {
             }
         }
 
-        if let Some(character_i) = self.target_character_i {
-            let actor_pos = self.characters[self.active_character_i].position;
-            let target_pos = self.characters[character_i].position;
+        if let Some(target_character_i) = self.target_character_id {
+            let actor_pos = self.characters.get(self.active_character_id).position_i32();
+            let target_pos = self.characters.get(target_character_i).position_i32();
             draw_square(target_pos, MAGENTA);
             draw_circle(
                 grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
@@ -742,15 +711,27 @@ impl GameGrid {
         }
 
         for effect in &self.effects {
-            let font_size = 24;
-            let text_dimensions = measure_text(&effect.text, None, font_size, 1.0);
+            match &effect.content {
+                VisualEffectContent::Text(text) => {
+                    let font_size = 24;
+                    let text_dimensions = measure_text(&text, None, font_size, 1.0);
 
-            let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
-                - text_dimensions.width / 2.0;
-            let y0 = grid_y_to_screen(effect.position.1)
-                - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
+                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
+                        - text_dimensions.width / 2.0;
+                    let y0 = grid_y_to_screen(effect.position.1)
+                        - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
 
-            draw_text(&effect.text, x0, y0, font_size as f32, YELLOW);
+                    draw_text(&text, x0, y0, font_size as f32, YELLOW);
+                }
+
+                VisualEffectContent::Circle => {
+                    let r = self.cell_w
+                        * (0.2 + 0.2 * (1.0 - effect.remaining_duration / effect.duration));
+                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
+                    let y0 = grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
+                    draw_circle(x0, y0, r, GOLD);
+                }
+            }
         }
     }
 
@@ -817,12 +798,12 @@ enum UiState {
     ConfiguringAction(BaseAction),
     ReactingToAttack {
         hand: HandType,
-        attacking_character_i: usize,
-        attacked_character_i: usize,
+        attacker: CharacterId,
+        reactor: CharacterId,
     },
     ReactingToHit {
-        attacking_character_i: usize,
-        attacked_character_i: usize,
+        attacker: CharacterId,
+        victim: CharacterId,
         damage: u32,
     },
     Idle,
@@ -1085,20 +1066,21 @@ impl ActivityPopup {
 }
 
 struct UserInterface {
-    characters: Vec<Rc<RefCell<Character>>>,
+    characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: UiState,
 
     hovered_button: Option<(u32, ButtonAction)>,
     next_available_button_id: u32,
-    active_character_i: usize,
+    active_character_id: CharacterId,
 
     game_grid: GameGrid,
     activity_popup: ActivityPopup,
+    character_portraits: CharacterPortraits,
     player_portraits: PlayerPortraits,
     action_points_label: TextLine,
     action_points_row: ActionPointsRow,
-    character_uis: HashMap<usize, CharacterUi>,
+    character_uis: HashMap<CharacterId, CharacterUi>,
     log: Log,
 }
 
@@ -1112,11 +1094,10 @@ struct CharacterUi {
 }
 
 impl UserInterface {
-    fn new(
-        characters: Vec<Rc<RefCell<Character>>>,
-        active_character_i: usize,
-        textures: HashMap<TextureId, Texture2D>,
-    ) -> Self {
+    fn new(game: &CoreGame, textures: HashMap<TextureId, Texture2D>) -> Self {
+        let characters = game.characters.clone();
+        let active_character_id = game.active_character_id;
+
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
@@ -1126,9 +1107,9 @@ impl UserInterface {
             btn
         };
 
-        let mut character_uis: HashMap<usize, CharacterUi> = Default::default();
+        let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
-        for (i, character) in characters.iter().enumerate() {
+        for (i, character) in game.characters.iter().enumerate() {
             let character_ref = character.borrow();
             if !character_ref.player_controlled {
                 continue;
@@ -1221,7 +1202,7 @@ impl UserInterface {
 
             let stats_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
-                elements: vec![
+                children: vec![
                     Element::Container(attribute_row(
                         ("STR", character_ref.base_strength),
                         vec![
@@ -1236,7 +1217,7 @@ impl UserInterface {
                         ("DEX", character_ref.base_dexterity),
                         vec![
                             ("Defense", character_ref.defense() as f32),
-                            ("Movement", 99.9),
+                            ("Movement", character_ref.move_range),
                         ],
                     )),
                     Element::Container(attribute_row(
@@ -1253,14 +1234,14 @@ impl UserInterface {
             let actions_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                elements: vec![combat_row, skill_row, spell_row],
+                children: vec![combat_row, skill_row, spell_row],
                 ..Default::default()
             });
 
             let secondary_actions_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                elements: vec![
+                children: vec![
                     reactions_row,
                     attack_enhancements_row,
                     spell_enhancements_row,
@@ -1305,7 +1286,7 @@ impl UserInterface {
                 layout_dir: LayoutDirection::Horizontal,
                 margin: 15.0,
                 align: Align::End,
-                elements: vec![
+                children: vec![
                     Element::RcRefCell(cloned_health_bar),
                     Element::RcRefCell(cloned_mana_bar),
                     Element::RcRefCell(cloned_stamina_bar),
@@ -1322,12 +1303,13 @@ impl UserInterface {
                 resource_bars,
             };
 
-            character_uis.insert(i, character_ui);
+            character_uis.insert(character.borrow().id(), character_ui);
         }
 
         let action_points_label = TextLine::new("Action points", 18);
         let action_points_row = ActionPointsRow::new(
             (20.0, 20.0),
+            0.3,
             Style {
                 background_color: None,
                 border_color: Some(WHITE),
@@ -1337,7 +1319,7 @@ impl UserInterface {
         let state = UiState::ChoosingAction;
 
         let game_grid = GameGrid::new(
-            &characters,
+            &game.characters,
             EventSender {
                 queue: Rc::clone(&event_queue),
             },
@@ -1347,13 +1329,17 @@ impl UserInterface {
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
 
-        let player_portraits = PlayerPortraits::new(&characters, active_character_i);
+        let player_portraits = PlayerPortraits::new(&game.characters, game.active_character_id);
+
+        let character_portraits =
+            CharacterPortraits::new(&game.characters, game.active_character_id);
 
         Self {
             game_grid,
             characters,
+            character_portraits,
             player_portraits,
-            active_character_i,
+            active_character_id,
 
             next_available_button_id: next_button_id,
             hovered_button: None,
@@ -1412,6 +1398,8 @@ impl UserInterface {
             .resource_bars
             .draw(450.0, y + 80.0);
         self.log.draw(650.0, y);
+
+        self.character_portraits.draw(10.0, 10.0);
     }
 
     fn set_action_buttons_enabled(&self, enabled: bool) {
@@ -1423,7 +1411,7 @@ impl UserInterface {
     }
 
     fn active_character(&self) -> Ref<Character> {
-        self.characters[self.active_character_i].borrow()
+        self.characters.get(self.active_character_id)
     }
 
     fn set_state(&mut self, state: UiState) {
@@ -1432,7 +1420,7 @@ impl UserInterface {
         let mut popup_lines = vec![];
         let mut popup_buttons = vec![];
         let mut movement = false;
-        let mut has_target = false;
+        let mut wants_target = false;
 
         match state {
             UiState::ConfiguringAction(base_action) => {
@@ -1457,7 +1445,7 @@ impl UserInterface {
                                 .new_button(subtext, ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
-                        has_target = true;
+                        wants_target = true;
                     }
                     BaseAction::SelfEffect(sea) => {
                         self.set_highlighted_button(Some(base_action_id(base_action)));
@@ -1484,7 +1472,7 @@ impl UserInterface {
                                 popup_buttons.push(btn);
                             }
                         }
-                        has_target = true;
+                        wants_target = true;
                     }
                     BaseAction::Move {
                         action_point_cost, ..
@@ -1506,14 +1494,14 @@ impl UserInterface {
             }
 
             UiState::ReactingToAttack {
-                attacking_character_i,
+                attacker: attacker_id,
                 hand,
-                attacked_character_i,
+                reactor: reactor_id,
             } => {
                 self.set_action_buttons_enabled(false);
 
-                let attacker = self.characters[attacking_character_i].borrow();
-                let defender = self.characters[attacked_character_i].borrow();
+                let attacker = self.characters.get(attacker_id);
+                let defender = self.characters.get(reactor_id);
 
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
@@ -1546,18 +1534,18 @@ impl UserInterface {
             }
 
             UiState::ReactingToHit {
-                attacking_character_i,
+                attacker: attacker_id,
                 damage,
-                attacked_character_i,
+                victim: victim_id,
             } => {
                 self.set_action_buttons_enabled(false);
 
-                let victim = self.characters[attacked_character_i].borrow();
+                let victim = self.characters.get(victim_id);
                 popup_lines.push(format!(
                     "{} took {} damage from an attack by {}",
                     victim.name,
                     damage,
-                    self.characters[attacking_character_i].borrow().name
+                    self.characters.get(attacker_id).name
                 ));
                 let reactions = victim.usable_on_hit_reactions();
                 drop(victim);
@@ -1591,75 +1579,80 @@ impl UserInterface {
             self.game_grid.movement_preview = None;
         }
 
-        if has_target {
-            if self.game_grid.target_character_i.is_none() {
+        if wants_target {
+            if self.game_grid.target_character_id.is_none() {
                 // We pick an arbitrary enemy if none is picked already
 
-                for (i, character) in self.characters.iter().enumerate() {
-                    if i != self.active_character_i && !character.borrow().player_controlled {
-                        self.game_grid.target_character_i = Some(i);
+                for (id, character) in self.characters.iter_with_ids() {
+                    if *id != self.active_character_id && !character.borrow().player_controlled {
+                        self.game_grid.target_character_id = Some(*id);
                         break;
                     }
                 }
-                assert!(self.game_grid.target_character_i.is_some());
             }
         } else {
-            self.game_grid.target_character_i = None;
+            self.game_grid.target_character_id = None;
         }
     }
 
     fn handle_game_event(&mut self, event: GameEvent) {
         match event {
-            GameEvent::LogLine(_) => todo!(),
-            GameEvent::CharacterTookDamage {
-                character_i,
-                amount,
-            } => {
-                let pos = self.characters[character_i].borrow().position;
-                self.game_grid
-                    .add_effect((pos.0 as i32, pos.1 as i32), format!("{}", amount));
+            GameEvent::LogLine(line) => {
+                self.log.add(line);
             }
-            GameEvent::AttackMissed { target_character_i } => {
-                let pos = self.characters[target_character_i].borrow().position;
+            GameEvent::CharacterTookDamage { character, amount } => {
+                let pos = self.characters.get(character).position;
                 self.game_grid
-                    .add_effect((pos.0 as i32, pos.1 as i32), "Miss");
+                    .add_text_effect((pos.0 as i32, pos.1 as i32), format!("{}", amount));
             }
-            GameEvent::SpellMissed { target_character_i } => {
-                let pos = self.characters[target_character_i].borrow().position;
+            GameEvent::AttackMissed { target } => {
+                let pos = self.characters.get(target).position;
                 self.game_grid
-                    .add_effect((pos.0 as i32, pos.1 as i32), "Resist");
+                    .add_text_effect((pos.0 as i32, pos.1 as i32), "Miss");
+            }
+            GameEvent::SpellMissed { target } => {
+                let pos = self.characters.get(target).position;
+                self.game_grid
+                    .add_text_effect((pos.0 as i32, pos.1 as i32), "Resist");
             }
             GameEvent::CharacterReceivedSelfEffect {
-                character_i,
+                character,
                 condition,
             } => {
-                let pos = self.characters[character_i].borrow().position;
+                let pos = self.characters.get(character).position;
                 self.game_grid
-                    .add_effect((pos.0 as i32, pos.1 as i32), format!("{:?}", condition));
+                    .add_text_effect((pos.0 as i32, pos.1 as i32), format!("{:?}", condition));
+            }
+            GameEvent::CharacterDied { character } => {
+                self.log
+                    .add(format!("{} died", self.characters.get(character).name));
+
+                self.characters.remove_dead();
+                self.game_grid.characters.remove_dead();
+                self.character_portraits.remove_dead();
             }
         }
     }
 
-    fn update(&mut self, active_character_i: usize, elapsed: f32) -> Vec<Event> {
-        if active_character_i != self.active_character_i {
+    fn update(&mut self, game: &CoreGame, elapsed: f32) -> Vec<Event> {
+        let active_character_id = game.active_character_id;
+
+        if active_character_id != self.active_character_id {
             // When control switches to a new player controlled character, make the UI show that character
-            if self.characters[active_character_i]
-                .borrow()
-                .player_controlled
-            {
+            if self.characters.get(active_character_id).player_controlled {
                 self.player_portraits
-                    .set_selected_character(active_character_i);
+                    .set_selected_character(active_character_id);
             }
         }
 
         self.set_action_buttons_enabled(
-            self.player_portraits.selected_i.get() == active_character_i,
+            self.player_portraits.selected_i.get() == active_character_id,
         );
 
-        self.active_character_i = active_character_i;
+        self.active_character_id = active_character_id;
 
         self.game_grid
-            .update(active_character_i, &self.characters, elapsed);
+            .update(active_character_id, &self.characters, elapsed);
 
         let maybe_updated_movement_range = self.activity_popup.update();
 
@@ -1688,16 +1681,19 @@ impl UserInterface {
             self.activity_popup.action_points()
         };
 
-        self.activity_popup.set_enabled(true);
+        let mut popup_enabled = true;
+
         self.activity_popup.target_line = None;
         self.game_grid.range_indicator = None;
 
         // TODO disable activity popup Proceed button if no movement has been chosen
+        // or if no attack/spell target has been chosen
 
-        if let Some(i) = self.game_grid.target_character_i {
-            let target_char = self.characters[i].borrow();
-            match self.state {
-                UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
+        match self.state {
+            UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
+                popup_enabled = false; // until proven otherwise
+                if let Some(i) = self.game_grid.target_character_id {
+                    let target_char = self.characters.get(i);
                     if self
                         .active_character()
                         .can_reach_with_attack(hand, target_char.position)
@@ -1716,9 +1712,9 @@ impl UserInterface {
                                 "target: {}, hit chance: {} {}",
                                 target_char.name, chance, explanation
                             ));
+                            popup_enabled = true;
                         } else {
                             self.activity_popup.target_line = Some("CAN NOT ATTACK".to_string());
-                            self.activity_popup.set_enabled(false);
                         }
                     } else {
                         let range = self.active_character().weapon(hand).unwrap().range;
@@ -1726,10 +1722,16 @@ impl UserInterface {
 
                         self.activity_popup.target_line =
                             Some(format!("target: {}, OUT OF RANGE", target_char.name));
-                        self.activity_popup.set_enabled(false);
                     }
+                } else {
+                    self.activity_popup.target_line = Some("Select a target".to_string());
                 }
-                UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
+            }
+            UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
+                popup_enabled = false; // until proven otherwise
+                if let Some(i) = self.game_grid.target_character_id {
+                    let target_char = self.characters.get(i);
+
                     if self
                         .active_character()
                         .can_reach_with_spell(spell, target_char.position)
@@ -1743,15 +1745,29 @@ impl UserInterface {
                             "target: {}, success chance: {}",
                             target_char.name, chance
                         ));
+                        popup_enabled = true;
                     } else {
                         self.activity_popup.target_line =
                             Some(format!("target: {}, OUT OF RANGE", target_char.name));
-                        self.activity_popup.set_enabled(false);
                     }
+                } else {
+                    self.activity_popup.target_line = Some("Select a target".to_string());
                 }
-                _ => unreachable!(),
             }
+            UiState::ConfiguringAction(BaseAction::Move { .. }) => {
+                popup_enabled = self
+                    .game_grid
+                    .movement_preview
+                    .as_ref()
+                    .map(|m| !m.is_empty())
+                    .unwrap_or(false);
+            }
+            _ => {}
         }
+
+        self.activity_popup.set_enabled(popup_enabled);
+
+        self.character_portraits.update(game);
 
         public_events
     }
@@ -1792,7 +1808,7 @@ impl UserInterface {
 
                         let event = match self.state {
                             UiState::ConfiguringAction(base_action) => {
-                                let target_char_i = self.game_grid.target_character_i;
+                                let target_char_i = self.game_grid.target_character_id;
                                 let action = match base_action {
                                     BaseAction::Attack { hand, .. } => {
                                         let enhancements = self
@@ -1808,7 +1824,7 @@ impl UserInterface {
                                         Action::Attack {
                                             hand,
                                             enhancements,
-                                            target_character_i: target_char_i.unwrap(),
+                                            target: target_char_i.unwrap(),
                                         }
                                     }
                                     BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
@@ -1828,7 +1844,7 @@ impl UserInterface {
                                         Action::CastSpell {
                                             spell,
                                             enhanced,
-                                            target_character_i: target_char_i.unwrap(),
+                                            target: target_char_i.unwrap(),
                                         }
                                     }
                                     BaseAction::Move {
@@ -1912,13 +1928,13 @@ impl UserInterface {
 
     fn set_highlighted_button(&self, highlighted_button_action: Option<String>) {
         if self.active_character().player_controlled {
-            if self.player_portraits.selected_i.get() != self.active_character_i {
+            if self.player_portraits.selected_i.get() != self.active_character_id {
                 self.player_portraits
-                    .set_selected_character(self.active_character_i);
+                    .set_selected_character(self.active_character_id);
             }
 
             for (base_action_id, btn) in
-                &self.character_uis[&self.active_character_i].tracked_action_buttons
+                &self.character_uis[&self.active_character_id].tracked_action_buttons
             {
                 btn.highlighted
                     .set(highlighted_button_action.as_ref() == Some(base_action_id));
@@ -1926,11 +1942,11 @@ impl UserInterface {
         }
     }
 
-    fn update_character_resources(&mut self, characters: &[Rc<RefCell<Character>>]) {
-        for (i, character) in characters.iter().enumerate() {
+    fn update_character_resources(&mut self, characters: &Characters) {
+        for (id, character) in characters.iter_with_ids() {
             let character = character.borrow();
-            if self.character_uis.contains_key(&i) {
-                let ui = &self.character_uis[&i];
+            if self.character_uis.contains_key(id) {
+                let ui = &self.character_uis[id];
                 ui.health_bar
                     .borrow_mut()
                     .set_current(character.health.current);
@@ -1941,8 +1957,9 @@ impl UserInterface {
             }
         }
 
-        self.action_points_row.current = self.characters[self.player_portraits.selected_i.get()]
-            .borrow()
+        self.action_points_row.current = self
+            .characters
+            .get(self.player_portraits.selected_i.get())
             .action_points;
     }
 }
@@ -1958,27 +1975,28 @@ fn base_action_id(base_action: BaseAction) -> String {
 
 struct CharacterPortraits {
     row: Container,
-    active_i: usize,
-    portraits: Vec<Rc<RefCell<TopCharacterPortrait>>>,
+    active_id: CharacterId,
+    portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
 }
 
 impl CharacterPortraits {
-    fn new(characters: &[Rc<RefCell<Character>>], active_i: usize) -> Self {
-        let portraits: Vec<Rc<RefCell<TopCharacterPortrait>>> = characters
-            .iter()
-            .map(|character| Rc::new(RefCell::new(TopCharacterPortrait::new(&character.borrow()))))
-            .collect();
+    fn new(characters: &Characters, active_id: CharacterId) -> Self {
+        let mut portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>> =
+            Default::default();
 
         let mut elements = vec![];
-        for portrait in &portraits {
-            let cloned = Rc::clone(portrait);
-            elements.push(Element::RcRefCell(cloned));
+
+        for (id, character) in characters.iter_with_ids() {
+            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(&character)));
+            let cloned = Rc::downgrade(&portrait);
+            portraits.insert(*id, portrait);
+            elements.push(Element::WeakRefCell(cloned));
         }
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
             margin: 10.0,
-            elements,
+            children: elements,
             style: Style {
                 background_color: Some(BLACK),
                 border_color: None,
@@ -1988,24 +2006,27 @@ impl CharacterPortraits {
 
         let mut this = Self {
             row,
-            active_i,
+            active_id,
             portraits,
         };
 
-        this.set_active_character(active_i);
+        this.set_active_character(active_id);
         this
     }
 
-    fn set_active_character(&mut self, character_i: usize) {
-        self.portraits[self.active_i].borrow_mut().active = false;
-        self.active_i = character_i;
-        self.portraits[self.active_i].borrow_mut().active = true;
+    fn set_active_character(&mut self, id: CharacterId) {
+        if let Some(portrait) = self.portraits.get(&self.active_id) {
+            // The entry may have been removed if the active character died during its turn
+            portrait.borrow_mut().active = false;
+        }
+        self.active_id = id;
+        self.portraits[&self.active_id].borrow_mut().active = true;
     }
 
     fn update(&mut self, game: &CoreGame) {
-        self.set_active_character(game.active_character_i);
-        for (i, character) in game.characters().iter().enumerate() {
-            let portrait = self.portraits[i].borrow_mut();
+        self.set_active_character(game.active_character_id);
+        for (id, character) in game.characters.iter_with_ids() {
+            let portrait = self.portraits[id].borrow_mut();
             let character = character.borrow();
             portrait.action_points_row.borrow_mut().current = character.action_points;
             portrait.hp_text.borrow_mut().set_string(format!(
@@ -2022,6 +2043,12 @@ impl CharacterPortraits {
     fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
     }
+
+    fn remove_dead(&mut self) {
+        self.portraits
+            .retain(|_id, portrait| !portrait.borrow().character.borrow().has_died);
+        self.row.remove_dropped_children();
+    }
 }
 
 struct TopCharacterPortrait {
@@ -2030,12 +2057,14 @@ struct TopCharacterPortrait {
     action_points_row: Rc<RefCell<ActionPointsRow>>,
     padding: f32,
     container: Container,
+    character: Rc<RefCell<Character>>,
 }
 
 impl TopCharacterPortrait {
-    fn new(character: &Character) -> Self {
+    fn new(character: &Rc<RefCell<Character>>) -> Self {
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
             (10.0, 10.0),
+            0.15,
             Style::default(),
         )));
         let cloned_row = Rc::clone(&action_points_row);
@@ -2046,8 +2075,8 @@ impl TopCharacterPortrait {
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
-            elements: vec![
-                Element::Text(TextLine::new(character.name, 20)),
+            children: vec![
+                Element::Text(TextLine::new(character.borrow().name, 20)),
                 Element::RcRefCell(cloned_row),
                 Element::RcRefCell(cloned_text),
             ],
@@ -2061,6 +2090,7 @@ impl TopCharacterPortrait {
             hp_text,
             padding: 5.0,
             container,
+            character: character.clone(),
         }
     }
 }
@@ -2069,7 +2099,7 @@ impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         if self.active {
             let (w, h) = self.size();
-            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
+            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, GOLD);
         }
         self.container.draw(x + self.padding, y + self.padding);
     }
@@ -2082,19 +2112,19 @@ impl Drawable for TopCharacterPortrait {
 
 struct PlayerPortraits {
     row: Container,
-    selected_i: Cell<usize>,
-    portraits: IndexMap<usize, Rc<RefCell<PlayerCharacterPortrait>>>,
+    selected_i: Cell<CharacterId>,
+    portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
 }
 
 impl PlayerPortraits {
-    fn new(characters: &[Rc<RefCell<Character>>], selected_i: usize) -> Self {
-        let mut portraits: IndexMap<usize, Rc<RefCell<PlayerCharacterPortrait>>> =
+    fn new(characters: &Characters, selected_id: CharacterId) -> Self {
+        let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
-        for (i, character) in characters.iter().enumerate() {
+        for (id, character) in characters.iter_with_ids() {
             if character.borrow().player_controlled {
                 portraits.insert(
-                    i,
+                    *id,
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         &character.borrow(),
                     ))),
@@ -2111,26 +2141,26 @@ impl PlayerPortraits {
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
             margin: 10.0,
-            elements,
+            children: elements,
             ..Default::default()
         };
 
         let this = Self {
             row,
-            selected_i: Cell::new(selected_i),
+            selected_i: Cell::new(selected_id),
             portraits,
         };
 
-        this.set_selected_character(selected_i);
+        this.set_selected_character(selected_id);
         this
     }
 
-    fn set_selected_character(&self, character_i: usize) {
+    fn set_selected_character(&self, character_id: CharacterId) {
         self.portraits[&self.selected_i.get()]
             .borrow()
             .selected
             .set(false);
-        self.selected_i.set(character_i);
+        self.selected_i.set(character_id);
         self.portraits[&self.selected_i.get()]
             .borrow()
             .selected
@@ -2205,14 +2235,6 @@ impl EventSender {
     }
 }
 
-struct LogBuf(Vec<String>);
-
-impl Logger for LogBuf {
-    fn log(&mut self, line: String) {
-        self.0.push(line);
-    }
-}
-
 #[derive(Debug)]
 struct UiGameEventHandler {
     events: RefCell<Vec<GameEvent>>,
@@ -2238,11 +2260,10 @@ struct Log {
 
 impl Log {
     fn new() -> Self {
-        let elements = vec![];
         Self {
             lines: Container {
                 layout_dir: LayoutDirection::Vertical,
-                elements,
+                children: vec![],
                 margin: 5.0,
                 ..Default::default()
             },
@@ -2250,11 +2271,11 @@ impl Log {
     }
 
     fn add(&mut self, text: impl Into<String>) {
-        if self.lines.elements.len() == 15 {
-            self.lines.elements.remove(0);
+        if self.lines.children.len() == 15 {
+            self.lines.children.remove(0);
         }
         self.lines
-            .elements
+            .children
             .push(Element::Text(TextLine::new(text, 18)));
     }
 
@@ -2271,15 +2292,17 @@ struct ActionPointsRow {
     cell_size: (f32, f32),
     padding: f32,
     style: Style,
+    radius_factor: f32,
 }
 
 impl ActionPointsRow {
-    fn new(cell_size: (f32, f32), style: Style) -> Self {
+    fn new(cell_size: (f32, f32), radius_factor: f32, style: Style) -> Self {
         Self {
             current: 0,
             reserved_and_hovered: 0,
             max: ACTION_POINTS_PER_TURN,
             cell_size,
+            radius_factor,
             padding: 3.0,
             style,
         }
@@ -2292,7 +2315,7 @@ impl Drawable for ActionPointsRow {
 
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
-        let r = self.cell_size.1 * 0.3;
+        let r = self.cell_size.1 * self.radius_factor;
         for i in 0..self.max {
             if i < self.current.saturating_sub(self.reserved_and_hovered) {
                 draw_circle(
@@ -2413,7 +2436,7 @@ impl LabelledResourceBar {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
             margin: 5.0,
-            elements: vec![
+            children: vec![
                 Element::RcRefCell(cloned_bar),
                 Element::RcRefCell(cloned_value_text),
                 Element::Text(label_text),
@@ -2453,7 +2476,7 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
     Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
         margin: 5.0,
-        elements: buttons,
+        children: buttons,
         ..Default::default()
     })
 }
@@ -2472,7 +2495,7 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
     let stats_list = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         margin: 4.0,
-        elements: stat_rows,
+        children: stat_rows,
         ..Default::default()
     });
     Container {
@@ -2484,7 +2507,7 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
             border_color: Some(GRAY),
             ..Default::default()
         },
-        elements: vec![attribute_element, stats_list],
+        children: vec![attribute_element, stats_list],
         ..Default::default()
     }
 }
@@ -2515,6 +2538,7 @@ enum Element {
     TabLink(TabLink),
     Box(Box<dyn Drawable>),
     RcRefCell(Rc<RefCell<dyn Drawable>>),
+    WeakRefCell(Weak<RefCell<dyn Drawable>>),
     Rc(Rc<dyn Drawable>),
 }
 
@@ -2530,6 +2554,7 @@ impl Element {
             Element::Box(drawable) => drawable.size(),
             Element::RcRefCell(drawable) => drawable.borrow().size(),
             Element::Rc(drawable) => drawable.size(),
+            Element::WeakRefCell(drawable) => drawable.upgrade().unwrap().borrow().size(),
         };
 
         assert!(size.0.is_finite() && size.1.is_finite());
@@ -2547,6 +2572,7 @@ impl Element {
             Element::Box(drawable) => drawable.draw(x, y),
             Element::RcRefCell(drawable) => drawable.borrow_mut().draw(x, y),
             Element::Rc(drawable) => drawable.draw(x, y),
+            Element::WeakRefCell(drawable) => drawable.upgrade().unwrap().borrow_mut().draw(x, y),
         }
     }
 
@@ -2571,7 +2597,7 @@ impl Tabs {
         links[active_i].active = true;
         let links_row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            elements: links.into_iter().map(Element::TabLink).collect(),
+            children: links.into_iter().map(Element::TabLink).collect(),
             ..Default::default()
         };
 
@@ -2586,7 +2612,7 @@ impl Tabs {
     fn draw(&mut self, x: f32, y: f32) {
         // If a link was clicked, update the state of all links
         let mut maybe_clicked_i = None;
-        for (i, link) in self.links.elements.iter_mut().enumerate() {
+        for (i, link) in self.links.children.iter_mut().enumerate() {
             if link.unwrap_tab_link().was_clicked.get() {
                 maybe_clicked_i = Some(i);
                 self.active_i = i;
@@ -2594,7 +2620,7 @@ impl Tabs {
             }
         }
         if let Some(clicked_i) = maybe_clicked_i {
-            for (i, element) in self.links.elements.iter_mut().enumerate() {
+            for (i, element) in self.links.children.iter_mut().enumerate() {
                 let tab_link = element.unwrap_tab_link();
                 tab_link.was_clicked.set(false);
                 tab_link.active = i == clicked_i;
@@ -2677,14 +2703,14 @@ struct Container {
     margin: f32,
     style: Style,
     min_width: Option<f32>,
-    elements: Vec<Element>,
+    children: Vec<Element>,
 }
 
 impl Container {
     fn size(&self) -> (f32, f32) {
         let mut w = 0.0;
         let mut h = 0.0;
-        for element in &self.elements {
+        for element in &self.children {
             let size = element.size();
 
             match self.layout_dir {
@@ -2706,8 +2732,8 @@ impl Container {
         w += self.padding * 2.0;
         h += self.padding * 2.0;
 
-        if !self.elements.is_empty() {
-            let total_margin = (self.elements.len() - 1) as f32 * self.margin;
+        if !self.children.is_empty() {
+            let total_margin = (self.children.len() - 1) as f32 * self.margin;
             match self.layout_dir {
                 LayoutDirection::Horizontal => w += total_margin,
                 LayoutDirection::Vertical => h += total_margin,
@@ -2721,13 +2747,20 @@ impl Container {
         (w, h)
     }
 
+    fn remove_dropped_children(&mut self) {
+        self.children.retain(|child| match child {
+            Element::WeakRefCell(weak) => weak.upgrade().is_some(),
+            _ => true,
+        })
+    }
+
     fn draw(&self, x: f32, y: f32) {
         let size = self.size();
         self.style.draw(x, y, size);
 
         let mut x0 = x + self.padding;
         let mut y0 = y + self.padding;
-        for element in &self.elements {
+        for element in &self.children {
             let (element_w, element_h) = element.size();
 
             let offset = match (&self.align, &self.layout_dir) {
@@ -2963,7 +2996,7 @@ impl ActionButton {
             }))
         }
         let points_row = Container {
-            elements: point_icons,
+            children: point_icons,
             margin: 2.0,
             layout_dir: LayoutDirection::Horizontal,
             ..Default::default()
@@ -2975,7 +3008,7 @@ impl ActionButton {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 8.0,
                 align: Align::Center,
-                elements: vec![text, Element::Text(TextLine::new(subtext, 15))],
+                children: vec![text, Element::Text(TextLine::new(subtext, 15))],
                 ..Default::default()
             }))
         } else {

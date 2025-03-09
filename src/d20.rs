@@ -1,7 +1,7 @@
 use rand::{self, Rng};
 
-pub fn probability_of_d20_reaching(target: u32, advantage_level: i32) -> f32 {
-    assert!((1..=20).contains(&target));
+pub fn probability_of_d20_reaching(mut target: u32, advantage_level: i32) -> f32 {
+    target = target.min(21).max(1);
     let p_miss = (target as f32 - 1f32) / 20f32;
     if advantage_level >= 0 {
         1f32 - p_miss.powi(advantage_level + 1)

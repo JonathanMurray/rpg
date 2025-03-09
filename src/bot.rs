@@ -18,8 +18,8 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
         if character.can_use_action(action) {
             match action {
                 BaseAction::Attack { hand, .. } => {
-                    for (i, other_character) in game.characters().iter().enumerate() {
-                        if i == game.active_character_i {
+                    for (id, other_character) in game.characters.iter_with_ids() {
+                        if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed
                         }
                         if other_character.borrow().player_controlled
@@ -29,7 +29,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
                             chosen_action = Some(Action::Attack {
                                 hand,
                                 enhancements: vec![],
-                                target_character_i: i,
+                                target: *id,
                             });
                             break;
                         }
@@ -37,15 +37,15 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
                 }
                 BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
                 BaseAction::CastSpell(spell) => {
-                    for (i, other_character) in game.characters().iter().enumerate() {
-                        if i == game.active_character_i {
+                    for (id, other_character) in game.characters.iter_with_ids() {
+                        if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed
                         }
                         if other_character.borrow().player_controlled {
                             chosen_action = Some(Action::CastSpell {
                                 spell,
                                 enhanced: false,
-                                target_character_i: i,
+                                target: *id,
                             });
                             break;
                         }
@@ -56,8 +56,8 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
                     range: _,
                 } => {
                     let mut pathfind_grid = PathfindGrid::new();
-                    for (i, character) in game.characters().iter().enumerate() {
-                        if i == game.active_character_i {
+                    for (id, character) in game.characters.iter_with_ids() {
+                        if *id == game.active_character_id {
                             continue; // Avoid borrowing already borrowed active character
                         }
                         let pos = character.borrow().position;
