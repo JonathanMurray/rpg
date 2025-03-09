@@ -582,21 +582,16 @@ impl GameGrid {
                     );
                 }
 
-                let end = movement_preview.first().unwrap().1;
-                draw_line(
-                    grid_x_to_screen(end.0) + cell_w * 0.3,
-                    grid_y_to_screen(end.1) + cell_w * 0.3,
-                    grid_x_to_screen(end.0) + cell_w * 0.7,
-                    grid_y_to_screen(end.1) + cell_w * 0.7,
-                    3.0,
-                    arrow_color,
+                let end = movement_preview[0].1;
+                let last_direction = (
+                    end.0 - movement_preview[1].1 .0,
+                    end.1 - movement_preview[1].1 .1,
                 );
-                draw_line(
-                    grid_x_to_screen(end.0) + cell_w * 0.3,
-                    grid_y_to_screen(end.1) + cell_w * 0.7,
-                    grid_x_to_screen(end.0) + cell_w * 0.7,
-                    grid_y_to_screen(end.1) + cell_w * 0.3,
-                    3.0,
+
+                draw_arrow(
+                    (grid_x_to_screen(end.0), grid_y_to_screen(end.1)),
+                    cell_w,
+                    last_direction,
                     arrow_color,
                 );
             }
@@ -606,6 +601,30 @@ impl GameGrid {
             let actor_pos = self.characters[self.active_character_i].1;
             let target_pos = self.characters[character_i].1;
             draw_square(target_pos, MAGENTA);
+            draw_circle(
+                grid_x_to_screen(target_pos.0) + cell_w / 2.0,
+                grid_y_to_screen(target_pos.1) + cell_w / 2.0,
+                cell_w * 0.15,
+                MAGENTA,
+            );
+            draw_arrow(
+                (
+                    grid_x_to_screen(target_pos.0),
+                    grid_y_to_screen(target_pos.1),
+                ),
+                cell_w,
+                (0, 1),
+                MAGENTA,
+            );
+            draw_arrow(
+                (
+                    grid_x_to_screen(target_pos.0),
+                    grid_y_to_screen(target_pos.1),
+                ),
+                cell_w,
+                (0, -1),
+                MAGENTA,
+            );
 
             draw_line(
                 grid_x_to_screen(actor_pos.0) + cell_w / 2.0,
@@ -640,6 +659,52 @@ impl GameGrid {
 
             draw_text(&effect.text, x0, y0, font_size as f32, YELLOW);
         }
+    }
+}
+
+fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: Color) {
+    let w = x;
+    let n = y;
+    let e = w + width;
+    let s = n + width;
+    let mid = (w + width * 0.5, n + width * 0.5);
+
+    let space = width * 0.3;
+
+    match direction {
+        (1, 0) => {
+            draw_line(w + space, n + space, mid.0, mid.1, 3.0, color);
+            draw_line(w + space, s - space, mid.0, mid.1, 3.0, color);
+        }
+        (1, 1) => {
+            draw_line(mid.0, n + space / 1.4, mid.0, mid.1, 3.0, color);
+            draw_line(w + space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
+        }
+        (0, 1) => {
+            draw_line(w + space, n + space, mid.0, mid.1, 3.0, color);
+            draw_line(e - space, n + space, mid.0, mid.1, 3.0, color);
+        }
+        (-1, 1) => {
+            draw_line(mid.0, n + space / 1.4, mid.0, mid.1, 3.0, color);
+            draw_line(e - space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
+        }
+        (-1, 0) => {
+            draw_line(e - space, n + space, mid.0, mid.1, 3.0, color);
+            draw_line(e - space, s - space, mid.0, mid.1, 3.0, color);
+        }
+        (-1, -1) => {
+            draw_line(mid.0, s - space / 1.4, mid.0, mid.1, 3.0, color);
+            draw_line(e - space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
+        }
+        (0, -1) => {
+            draw_line(w + space, s - space, mid.0, mid.1, 3.0, color);
+            draw_line(e - space, s - space, mid.0, mid.1, 3.0, color);
+        }
+        (1, -1) => {
+            draw_line(mid.0, s - space / 1.4, mid.0, mid.1, 3.0, color);
+            draw_line(w + space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
+        }
+        _ => unreachable!(),
     }
 }
 
