@@ -36,8 +36,9 @@ impl CoreGame {
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new(false, "Charlie", 1, 1, 1, (3, 4));
-        charlie.main_hand.weapon = Some(BOW);
+        let mut charlie = Character::new(false, "Charlie", 1, 2, 1, (3, 4));
+        charlie.main_hand.weapon = Some(SWORD);
+        charlie.off_hand.shield = Some(SMALL_SHIELD);
 
         let mut david = Character::new(true, "David", 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
@@ -1156,6 +1157,10 @@ impl Character {
         self.hand(hand).weapon
     }
 
+    pub fn shield(&self) -> Option<Shield> {
+        self.hand(HandType::OffHand).shield
+    }
+
     pub fn can_reach_with_attack(&self, hand: HandType, target_position: (u32, u32)) -> bool {
         let weapon = self.weapon(hand).unwrap();
         within_range(weapon.range.squared(), self.position, target_position)
@@ -1501,6 +1506,7 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone)]
 pub struct Weapon {
     pub name: &'static str,
+    pub texture_id: Option<TextureId>,
     pub range: Range,
     pub action_point_cost: u32,
     pub damage: u32,
@@ -1514,6 +1520,7 @@ pub struct Weapon {
 #[derive(Debug, Copy, Clone)]
 pub struct Shield {
     pub name: &'static str,
+    pub texture_id: Option<TextureId>,
     pub defense: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
 }
@@ -1558,4 +1565,13 @@ impl From<Range> for f32 {
             Range::Float(f) => f,
         }
     }
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum TextureId {
+    Character,
+    Warhammer,
+    Bow,
+    Sword,
+    Shield,
 }

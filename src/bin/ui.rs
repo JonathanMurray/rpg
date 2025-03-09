@@ -7,7 +7,9 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::input::is_key_down;
-use macroquad::miniquad::KeyCode;
+use macroquad::math::Rect;
+use macroquad::miniquad::window::dpi_scale;
+use macroquad::miniquad::{window, KeyCode};
 use macroquad::texture::{
     draw_texture, draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
 };
@@ -29,15 +31,30 @@ use macroquad::{
     time::{self, get_frame_time},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
+use macroquad::{text, texture};
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
     Character, CoreGame, GameEvent, GameEventHandler, GameState, Hand, HandType, Logger,
     MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SelfEffectAction, Spell,
-    SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit,
+    SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit, TextureId,
     ACTION_POINTS_PER_TURN,
 };
 use rpg::pathfind::PathfindGrid;
+
+async fn texture(path: &str) -> Texture2D {
+    let texture = load_texture(path).await.unwrap();
+    texture.set_filter(FilterMode::Nearest);
+    texture
+}
+
+async fn load_textures(paths: Vec<(TextureId, &str)>) -> HashMap<TextureId, Texture2D> {
+    let mut textures: HashMap<TextureId, Texture2D> = Default::default();
+    for (id, path) in paths {
+        textures.insert(id, texture(path).await);
+    }
+    textures
+}
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -55,14 +72,16 @@ async fn main() {
         ui_characters.push(Rc::clone(character));
     }
 
-    let character_texture = load_texture("character4.png").await.unwrap();
-    character_texture.set_filter(FilterMode::Nearest);
+    let textures = load_textures(vec![
+        (TextureId::Character, "character4.png"),
+        (TextureId::Warhammer, "warhammer.png"),
+        (TextureId::Bow, "bow.png"),
+        (TextureId::Sword, "sword.png"),
+        (TextureId::Shield, "shield.png"),
+    ])
+    .await;
 
-    let mut user_interface = UserInterface::new(
-        ui_characters,
-        game.active_character_i,
-        character_texture.clone(),
-    );
+    let mut user_interface = UserInterface::new(ui_characters, game.active_character_i, textures);
 
     let mut character_portraits =
         CharacterPortraits::new(game.characters(), game.active_character_i);
@@ -220,12 +239,21 @@ impl Effect {
     }
 }
 
+struct GridCharacter {
+    position: (i32, i32),
+    texture: TextureId,
+    mainhand_texture: Option<TextureId>,
+    offhand_texture: Option<TextureId>,
+    player_controlled: bool,
+}
+
 struct GameGrid {
-    character_texture: Texture2D,
+    textures: HashMap<TextureId, Texture2D>,
     event_sender: EventSender,
     pathfind_grid: PathfindGrid,
-    characters: Vec<(TextLine, (i32, i32), bool)>,
-    camera_position: (f32, f32),
+    characters: Vec<GridCharacter>,
+    camera_position: (Cell<f32>, Cell<f32>),
+    dragging_camera_from: Option<(f32, f32)>,
 
     effects: Vec<Effect>,
 
@@ -236,30 +264,48 @@ struct GameGrid {
     range_indicator: Option<Range>,
 
     receptive_to_input: bool,
+    cell_w: f32,
+    grid_dimensions: (i32, i32),
+
+    size: (f32, f32),
 }
 
 impl GameGrid {
     fn new(
         characters: &[Rc<RefCell<Character>>],
         event_sender: EventSender,
-        character_texture: Texture2D,
+        textures: HashMap<TextureId, Texture2D>,
+        size: (f32, f32),
     ) -> Self {
         let characters = characters
             .into_iter()
             .map(|character| {
                 let char = character.borrow();
-                (
-                    TextLine::new(&char.name[0..1], 25),
-                    (char.position.0 as i32, char.position.1 as i32),
-                    char.player_controlled,
-                )
+
+                let mut mainhand_texture = None;
+                let mut offhand_texture = None;
+                if let Some(weapon) = char.weapon(HandType::MainHand) {
+                    mainhand_texture = weapon.texture_id;
+                }
+                if let Some(shield) = char.shield() {
+                    offhand_texture = shield.texture_id;
+                }
+
+                GridCharacter {
+                    position: (char.position.0 as i32, char.position.1 as i32),
+                    texture: TextureId::Character,
+                    mainhand_texture,
+                    offhand_texture,
+                    player_controlled: char.player_controlled,
+                }
             })
             .collect();
 
         Self {
-            character_texture,
+            textures,
             pathfind_grid: PathfindGrid::new(),
-            camera_position: (20.0, 0.0),
+            dragging_camera_from: None,
+            camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
             effects: vec![],
             active_character_i: 0,
@@ -269,6 +315,9 @@ impl GameGrid {
             event_sender,
             receptive_to_input: false,
             range_indicator: None,
+            cell_w: 64.0,
+            grid_dimensions: (16, 12),
+            size,
         }
     }
 
@@ -285,14 +334,14 @@ impl GameGrid {
         self.active_character_i = active_character_i;
         for (i, character) in characters.iter().enumerate() {
             let pos = character.borrow().position;
-            self.characters[i].1 = (pos.0 as i32, pos.1 as i32);
+            self.characters[i].position = (pos.0 as i32, pos.1 as i32);
 
             self.pathfind_grid
                 .blocked_positions
                 .insert((pos.0 as i32, pos.1 as i32));
         }
 
-        let pos = self.characters[self.active_character_i].1;
+        let pos = self.characters[self.active_character_i].position;
         self.pathfind_grid.run(pos, self.movement_range);
 
         for effect in &mut self.effects {
@@ -302,16 +351,16 @@ impl GameGrid {
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
-            self.camera_position.0 -= camera_speed;
+            self.pan_camera(-camera_speed, 0.0);
         }
         if is_key_down(KeyCode::Right) {
-            self.camera_position.0 += camera_speed;
+            self.pan_camera(camera_speed, 0.0);
         }
         if is_key_down(KeyCode::Up) {
-            self.camera_position.1 -= camera_speed;
+            self.pan_camera(0.0, -camera_speed);
         }
         if is_key_down(KeyCode::Down) {
-            self.camera_position.1 += camera_speed;
+            self.pan_camera(0.0, camera_speed);
         }
     }
 
@@ -327,7 +376,7 @@ impl GameGrid {
             }
         }
 
-        let pos = self.characters[self.active_character_i].1;
+        let pos = self.characters[self.active_character_i].position;
         self.pathfind_grid.run(pos, self.movement_range);
     }
 
@@ -341,55 +390,56 @@ impl GameGrid {
             .collect()
     }
 
-    fn draw(&mut self, x: f32, y: f32, w: f32, h: f32) {
-        let cell_w = 64.0;
-        let grid_dimensions = (20, 8);
+    fn draw(&mut self, x: f32, y: f32, blocked_screen_area: Rect) {
+        let (w, h) = self.size;
 
         let bg_color = GRAY;
         let grid_color = Color::new(0.4, 0.4, 0.4, 1.00);
 
         draw_rectangle(x, y, w, h, bg_color);
 
-        let grid_x_to_screen = |grid_x: i32| x + grid_x as f32 * cell_w - self.camera_position.0;
-        let grid_y_to_screen = |grid_y: i32| y + grid_y as f32 * cell_w - self.camera_position.1;
+        let grid_x_to_screen =
+            |grid_x: i32| x + grid_x as f32 * self.cell_w - self.camera_position.0.get();
+        let grid_y_to_screen =
+            |grid_y: i32| y + grid_y as f32 * self.cell_w - self.camera_position.1.get();
 
         let mouse_relative_to_grid = |(x, y): (f32, f32)| {
             (
-                ((self.camera_position.0 + x) / cell_w).floor() as i32,
-                ((self.camera_position.1 + y) / cell_w).floor() as i32,
+                ((self.camera_position.0.get() + x) / self.cell_w).floor() as i32,
+                ((self.camera_position.1.get() + y) / self.cell_w).floor() as i32,
             )
         };
 
-        let active_character_pos = self.characters[self.active_character_i].1;
+        let active_character_pos = self.characters[self.active_character_i].position;
 
         let draw_square = |(grid_x, grid_y), color| {
             let margin = -1.0;
             draw_rectangle_lines(
                 grid_x_to_screen(grid_x) - margin,
                 grid_y_to_screen(grid_y) - margin,
-                cell_w + margin * 2.0,
-                cell_w + margin * 2.0,
+                self.cell_w + margin * 2.0,
+                self.cell_w + margin * 2.0,
                 2.0,
                 color,
             )
         };
 
-        for col in 0..grid_dimensions.0 + 1 {
+        for col in 0..self.grid_dimensions.0 + 1 {
             let x0 = grid_x_to_screen(col);
             draw_line(
                 x0,
                 grid_y_to_screen(0),
                 x0,
-                grid_y_to_screen(grid_dimensions.1),
+                grid_y_to_screen(self.grid_dimensions.1),
                 1.0,
                 grid_color,
             );
-            for row in 0..grid_dimensions.1 + 1 {
+            for row in 0..self.grid_dimensions.1 + 1 {
                 let y0 = grid_y_to_screen(row);
                 draw_line(
                     grid_x_to_screen(0),
                     y0,
-                    grid_x_to_screen(grid_dimensions.0),
+                    grid_x_to_screen(self.grid_dimensions.0),
                     y0,
                     1.0,
                     grid_color,
@@ -399,8 +449,8 @@ impl GameGrid {
 
         if self.movement_preview.is_some() {
             for (pos, _) in &self.pathfind_grid.distances {
-                if (0..grid_dimensions.0).contains(&pos.0)
-                    && (0..grid_dimensions.1).contains(&pos.1)
+                if (0..self.grid_dimensions.0).contains(&pos.0)
+                    && (0..self.grid_dimensions.1).contains(&pos.1)
                     && *pos != active_character_pos
                 {
                     draw_square(*pos, GREEN);
@@ -408,7 +458,7 @@ impl GameGrid {
             }
         }
 
-        let (active_char_x, active_char_y) = self.characters[self.active_character_i].1;
+        let (active_char_x, active_char_y) = self.characters[self.active_character_i].position;
 
         if let Some(range) = self.range_indicator {
             let range_ceil = (f32::from(range)).ceil() as i32;
@@ -417,10 +467,10 @@ impl GameGrid {
                 (x - active_char_x).pow(2) + (y - active_char_y).pow(2) <= range_squared
             };
             for x in (active_char_x - range_ceil).max(0)
-                ..=(active_char_x + range_ceil).min(grid_dimensions.0 - 1)
+                ..=(active_char_x + range_ceil).min(self.grid_dimensions.0 - 1)
             {
                 for y in (active_char_y - range_ceil).max(0)
-                    ..=(active_char_y + range_ceil).min(grid_dimensions.1 - 1)
+                    ..=(active_char_y + range_ceil).min(self.grid_dimensions.1 - 1)
                 {
                     if within(x, y) {
                         let color = YELLOW;
@@ -469,43 +519,82 @@ impl GameGrid {
             }
         }
 
-        let text_margin = 13.0;
-        for (text, position, _) in &self.characters {
-            /*
-            text.draw(
-                grid_x_to_screen(position.0) + text_margin,
-                grid_y_to_screen(position.1) + text_margin,
-            );
-             */
-
+        for GridCharacter {
+            position,
+            texture,
+            mainhand_texture,
+            offhand_texture,
+            ..
+        } in &self.characters
+        {
+            let params = DrawTextureParams {
+                dest_size: Some((self.cell_w, self.cell_w).into()),
+                ..Default::default()
+            };
             draw_texture_ex(
-                &self.character_texture,
+                &self.textures[texture],
                 grid_x_to_screen(position.0),
                 grid_y_to_screen(position.1),
                 WHITE,
-                DrawTextureParams {
-                    dest_size: Some((cell_w, cell_w).into()),
-                    ..Default::default()
-                },
+                params.clone(),
             );
+
+            if let Some(texture) = mainhand_texture {
+                draw_texture_ex(
+                    &self.textures[texture],
+                    grid_x_to_screen(position.0),
+                    grid_y_to_screen(position.1),
+                    WHITE,
+                    params.clone(),
+                );
+            }
+            if let Some(texture) = offhand_texture {
+                draw_texture_ex(
+                    &self.textures[texture],
+                    grid_x_to_screen(position.0),
+                    grid_y_to_screen(position.1),
+                    WHITE,
+                    params,
+                );
+            }
         }
 
         let (mouse_x, mouse_y) = mouse_position();
         let mouse_relative = (mouse_x - x, mouse_y - y);
 
         let mut character_positions = vec![];
-        for (_, pos, _) in &self.characters {
-            character_positions.push(*pos);
+        for character in &self.characters {
+            character_positions.push(character.position);
         }
 
         let (mouse_grid_x, mouse_grid_y) = mouse_relative_to_grid(mouse_relative);
 
         let is_mouse_within_grid = (0f32..w).contains(&mouse_relative.0)
-            && (0..grid_dimensions.0).contains(&mouse_grid_x)
+            && (0..self.grid_dimensions.0).contains(&mouse_grid_x)
             && (0f32..h).contains(&mouse_relative.1)
-            && (0..grid_dimensions.1).contains(&mouse_grid_y);
+            && (0..self.grid_dimensions.1).contains(&mouse_grid_y);
+        let is_mouse_blocked = blocked_screen_area.contains((mouse_x, mouse_y).into());
 
         if is_mouse_within_grid && self.receptive_to_input {
+            if let Some(dragging_from) = self.dragging_camera_from {
+                if is_mouse_button_down(MouseButton::Right) {
+                    let (dx, dy) = (
+                        mouse_relative.0 - dragging_from.0,
+                        mouse_relative.1 - dragging_from.1,
+                    );
+                    self.pan_camera(-dx, -dy);
+                    self.dragging_camera_from = Some(mouse_relative);
+                } else {
+                    self.dragging_camera_from = None;
+                }
+            }
+
+            if is_mouse_button_pressed(MouseButton::Right) {
+                self.dragging_camera_from = Some(mouse_relative);
+            }
+        }
+
+        if is_mouse_within_grid && !is_mouse_blocked && self.receptive_to_input {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
             let valid_move_destination = match self
@@ -518,8 +607,10 @@ impl GameGrid {
             } && !collision;
 
             let mut hovered_npc_i = None;
-            for (i, (_name, pos, player_controlled)) in self.characters.iter().enumerate() {
-                if *pos == (mouse_grid_x, mouse_grid_y) && !player_controlled {
+            for (i, character) in self.characters.iter().enumerate() {
+                if character.position == (mouse_grid_x, mouse_grid_y)
+                    && !character.player_controlled
+                {
                     hovered_npc_i = Some(i);
                 }
             }
@@ -562,7 +653,9 @@ impl GameGrid {
                     self.movement_preview = None;
                 }
             } else if !self.movement_preview.is_some() {
-                draw_square((mouse_grid_x, mouse_grid_y), RED);
+                if self.dragging_camera_from.is_none() {
+                    draw_square((mouse_grid_x, mouse_grid_y), RED);
+                }
             }
         }
 
@@ -573,10 +666,10 @@ impl GameGrid {
                     let a = movement_preview[i].1;
                     let b = movement_preview[i + 1].1;
                     draw_line(
-                        grid_x_to_screen(a.0) + cell_w / 2.0,
-                        grid_y_to_screen(a.1) + cell_w / 2.0,
-                        grid_x_to_screen(b.0) + cell_w / 2.0,
-                        grid_y_to_screen(b.1) + cell_w / 2.0,
+                        grid_x_to_screen(a.0) + self.cell_w / 2.0,
+                        grid_y_to_screen(a.1) + self.cell_w / 2.0,
+                        grid_x_to_screen(b.0) + self.cell_w / 2.0,
+                        grid_y_to_screen(b.1) + self.cell_w / 2.0,
                         2.0,
                         arrow_color,
                     );
@@ -590,7 +683,7 @@ impl GameGrid {
 
                 draw_arrow(
                     (grid_x_to_screen(end.0), grid_y_to_screen(end.1)),
-                    cell_w,
+                    self.cell_w,
                     last_direction,
                     arrow_color,
                 );
@@ -598,13 +691,13 @@ impl GameGrid {
         }
 
         if let Some(character_i) = self.target_character_i {
-            let actor_pos = self.characters[self.active_character_i].1;
-            let target_pos = self.characters[character_i].1;
+            let actor_pos = self.characters[self.active_character_i].position;
+            let target_pos = self.characters[character_i].position;
             draw_square(target_pos, MAGENTA);
             draw_circle(
-                grid_x_to_screen(target_pos.0) + cell_w / 2.0,
-                grid_y_to_screen(target_pos.1) + cell_w / 2.0,
-                cell_w * 0.15,
+                grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
+                grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
+                self.cell_w * 0.15,
                 MAGENTA,
             );
             draw_arrow(
@@ -612,7 +705,7 @@ impl GameGrid {
                     grid_x_to_screen(target_pos.0),
                     grid_y_to_screen(target_pos.1),
                 ),
-                cell_w,
+                self.cell_w,
                 (0, 1),
                 MAGENTA,
             );
@@ -621,16 +714,16 @@ impl GameGrid {
                     grid_x_to_screen(target_pos.0),
                     grid_y_to_screen(target_pos.1),
                 ),
-                cell_w,
+                self.cell_w,
                 (0, -1),
                 MAGENTA,
             );
 
             draw_line(
-                grid_x_to_screen(actor_pos.0) + cell_w / 2.0,
-                grid_y_to_screen(actor_pos.1) + cell_w / 2.0,
-                grid_x_to_screen(target_pos.0) + cell_w / 2.0,
-                grid_y_to_screen(target_pos.1) + cell_w / 2.0,
+                grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0,
+                grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0,
+                grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
+                grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
                 3.0,
                 MAGENTA,
             );
@@ -641,8 +734,8 @@ impl GameGrid {
             draw_rectangle_lines(
                 grid_x_to_screen(active_character_pos.0) - margin,
                 grid_y_to_screen(active_character_pos.1) - margin,
-                cell_w + margin * 2.0,
-                cell_w + margin * 2.0,
+                self.cell_w + margin * 2.0,
+                self.cell_w + margin * 2.0,
                 2.0,
                 GOLD,
             );
@@ -652,13 +745,23 @@ impl GameGrid {
             let font_size = 24;
             let text_dimensions = measure_text(&effect.text, None, font_size, 1.0);
 
-            let x0 =
-                grid_x_to_screen(effect.position.0) + cell_w / 2.0 - text_dimensions.width / 2.0;
+            let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
+                - text_dimensions.width / 2.0;
             let y0 = grid_y_to_screen(effect.position.1)
-                - cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
+                - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
 
             draw_text(&effect.text, x0, y0, font_size as f32, YELLOW);
         }
+    }
+
+    fn pan_camera(&self, dx: f32, dy: f32) {
+        let new_x = self.camera_position.0.get() + dx;
+        let new_y = self.camera_position.1.get() + dy;
+        let max_space = 300.0;
+        let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - self.size.0;
+        let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - self.size.1;
+        self.camera_position.0.set(new_x.max(-max_space).min(max_x));
+        self.camera_position.1.set(new_y.max(-max_space).min(max_y));
     }
 }
 
@@ -737,6 +840,8 @@ struct ActivityPopup {
     base_action_points: u32,
     selected_button_ids: Vec<u32>,
     hovered_button_id: Option<u32>,
+
+    last_drawn_size: (f32, f32),
 }
 
 impl ActivityPopup {
@@ -752,11 +857,13 @@ impl ActivityPopup {
             choice_button_events: Rc::new(RefCell::new(vec![])),
             base_action_points: 0,
             hovered_button_id: None,
+            last_drawn_size: (0.0, 0.0),
         }
     }
 
-    fn draw(&self, x: f32, y: f32) {
+    fn draw(&mut self, x: f32, y: f32) {
         if matches!(self.state, UiState::Idle) {
+            self.last_drawn_size = (0.0, 0.0);
             return;
         }
 
@@ -766,12 +873,16 @@ impl ActivityPopup {
         let bg_color = DARKBROWN;
 
         if matches!(self.state, UiState::ChoosingAction) {
-            draw_rectangle(x, y, 500.0, 30.0, bg_color);
+            let size = (500.0, 30.0);
+            draw_rectangle(x, y, size.0, size.1, bg_color);
             draw_text("Choose an action!", x0, y0, 20.0, WHITE);
+            self.last_drawn_size = size;
             return;
         }
 
-        draw_rectangle(x, y, 500.0, 160.0, bg_color);
+        let size = (500.0, 160.0);
+        draw_rectangle(x, y, size.0, size.1, bg_color);
+        self.last_drawn_size = size;
 
         for line in &self.initial_lines {
             draw_text(line, x0, y0, 20.0, WHITE);
@@ -1004,7 +1115,7 @@ impl UserInterface {
     fn new(
         characters: Vec<Rc<RefCell<Character>>>,
         active_character_i: usize,
-        character_texture: Texture2D,
+        textures: HashMap<TextureId, Texture2D>,
     ) -> Self {
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
@@ -1230,7 +1341,8 @@ impl UserInterface {
             EventSender {
                 queue: Rc::clone(&event_queue),
             },
-            character_texture,
+            textures,
+            (screen_width() as f32, 670.0),
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
@@ -1267,19 +1379,25 @@ impl UserInterface {
     }
 
     fn draw(&mut self, y: f32) {
-        self.game_grid
-            .draw(0.0, 0.0, window_conf().window_width as f32, y);
+        let popup_rectangle = Rect {
+            x: 100.0,
+            y: y - 170.0,
+            w: self.activity_popup.last_drawn_size.0,
+            h: self.activity_popup.last_drawn_size.1,
+        };
+
+        self.game_grid.draw(0.0, 0.0, popup_rectangle);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
         draw_rectangle(
             0.0,
             y,
-            window_conf().window_width as f32,
-            window_conf().window_height as f32 - y,
+            screen_width() as f32,
+            screen_height() as f32 - y,
             BLACK,
         );
-        draw_line(0.0, y, window_conf().window_width as f32, y, 2.0, DARKGRAY);
+        draw_line(0.0, y, screen_width() as f32, y, 2.0, DARKGRAY);
         self.player_portraits.draw(270.0, y + 10.0);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
@@ -1533,6 +1651,10 @@ impl UserInterface {
                     .set_selected_character(active_character_i);
             }
         }
+
+        self.set_action_buttons_enabled(
+            self.player_portraits.selected_i.get() == active_character_i,
+        );
 
         self.active_character_i = active_character_i;
 
@@ -1947,7 +2069,7 @@ impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         if self.active {
             let (w, h) = self.size();
-            draw_rectangle_lines(x, y, w, h, 1.0, GOLD);
+            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
         }
         self.container.draw(x + self.padding, y + self.padding);
     }

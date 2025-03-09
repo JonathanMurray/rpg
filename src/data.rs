@@ -1,8 +1,8 @@
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
     OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range,
-    SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon,
-    WeaponGrip,
+    SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
+    TextureId, Weapon, WeaponGrip,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -27,6 +27,7 @@ pub const DAGGER: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Weakened(1),
     ))),
+    texture_id: None,
 };
 
 pub const SWORD: Weapon = Weapon {
@@ -41,6 +42,7 @@ pub const SWORD: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Bleeding,
     ))),
+    texture_id: Some(TextureId::Sword),
 };
 
 pub const RAPIER: Weapon = Weapon {
@@ -53,6 +55,7 @@ pub const RAPIER: Weapon = Weapon {
     attack_enhancement: None,
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::SkipExertion),
+    texture_id: None,
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
@@ -75,6 +78,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Dazed(1),
     ))),
+    texture_id: Some(TextureId::Warhammer),
 };
 
 pub const BOW: Weapon = Weapon {
@@ -97,10 +101,12 @@ pub const BOW: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Weakened(1),
     ))),
+    texture_id: Some(TextureId::Bow),
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
+    texture_id: Some(TextureId::Shield),
     defense: 2,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
