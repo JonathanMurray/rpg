@@ -22,7 +22,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (1, 4));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (0, 7));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -33,15 +33,15 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Gremlin", TextureId::Character2,1, 1, 1, (2, 4));
+        let mut alice = Character::new(false, "Gremlin", TextureId::Character2, 1, 1, 1, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2,1, 2, 1, (3, 4));
+        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2, 1, 2, 1, (3, 4));
         charlie.main_hand.weapon = Some(SWORD);
         charlie.off_hand.shield = Some(SMALL_SHIELD);
 
-        let mut david = Character::new(true, "David",TextureId::Character, 10, 10, 10, (5, 7));
+        let mut david = Character::new(true, "David", TextureId::Character, 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
 
         let characters = Characters::new(vec![bob, alice, charlie, david]);
@@ -290,7 +290,16 @@ impl CoreGame {
                 target_label,
                 target,
             ));
-            if res >= target {
+
+            let success = res >= target;
+
+            self.event_handler.handle(GameEvent::CastSpell {
+                caster: caster.id(),
+                target: defender.id(),
+                success,
+            });
+
+            if success {
                 self.log("  The spell was successful!");
                 let damage = spell.damage;
                 if damage > 0 {
@@ -312,7 +321,6 @@ impl CoreGame {
                     _ => {}
                 };
             } else {
-                self.event_handler.handle(GameEvent::SpellMissed { target });
                 match spell.spell_type {
                     SpellType::Mental => {
                         self.log(format!("  {} resisted the spell!", defender.name))
@@ -762,8 +770,10 @@ pub enum GameEvent {
     AttackMissed {
         target: CharacterId,
     },
-    SpellMissed {
+    CastSpell {
+        caster: CharacterId,
         target: CharacterId,
+        success: bool,
     },
     CharacterReceivedSelfEffect {
         character: CharacterId,
@@ -1087,7 +1097,7 @@ pub enum HandType {
     OffHand,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spell {
     pub name: &'static str,
     pub description: &'static str,
@@ -1097,7 +1107,7 @@ pub struct Spell {
     pub on_hit_effect: Option<ApplyEffect>,
     pub spell_type: SpellType,
     pub possible_enhancement: Option<SpellEnhancement>,
-    pub range: u32,
+    pub range: Range,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1252,7 +1262,7 @@ impl Character {
     }
 
     pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
-        within_range(spell.range.pow(2) as f32, self.position, target_position)
+        within_range(spell.range.squared(), self.position, target_position)
     }
 
     pub fn known_actions(&self) -> Vec<(String, BaseAction)> {
@@ -1625,7 +1635,7 @@ pub enum WeaponGrip {
     TwoHanded,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Range {
     Melee,
     Ranged(u32),

@@ -212,6 +212,7 @@ struct VisualEffect {
 enum VisualEffectContent {
     Text(String),
     Circle,
+    Projectile((i32, i32)),
 }
 
 impl<T> From<T> for VisualEffectContent
@@ -329,6 +330,14 @@ impl GameGrid {
             position,
             VisualEffectContent::Circle,
             0.2,
+        ));
+    }
+
+    fn add_projectile_effect(&mut self, position: (i32, i32), target: (i32, i32)) {
+        self.effects.push(VisualEffect::new(
+            position,
+            VisualEffectContent::Projectile(target),
+            0.15,
         ));
     }
 
@@ -730,6 +739,19 @@ impl GameGrid {
                     let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
                     draw_circle(x0, y0, r, GOLD);
+                }
+
+                VisualEffectContent::Projectile(target) => {
+                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
+                    let y0 = grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
+
+                    let x1 = grid_x_to_screen(target.0) + self.cell_w / 2.0;
+                    let y1 = grid_y_to_screen(target.1) + self.cell_w / 2.0;
+
+                    let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
+                    let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
+
+                    draw_circle(x, y, self.cell_w * 0.2, RED);
                 }
             }
         }
@@ -1601,24 +1623,32 @@ impl UserInterface {
     }
 
     fn handle_game_event(&mut self, event: GameEvent) {
+        dbg!(&event);
         match event {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
             GameEvent::CharacterTookDamage { character, amount } => {
-                let pos = self.characters.get(character).position;
-                self.game_grid
-                    .add_text_effect((pos.0 as i32, pos.1 as i32), format!("{}", amount));
+                let pos = self.characters.get(character).position_i32();
+                self.game_grid.add_text_effect(pos, format!("{}", amount));
             }
             GameEvent::AttackMissed { target } => {
-                let pos = self.characters.get(target).position;
-                self.game_grid
-                    .add_text_effect((pos.0 as i32, pos.1 as i32), "Miss");
+                let pos = self.characters.get(target).position_i32();
+                self.game_grid.add_text_effect(pos, "Miss");
             }
-            GameEvent::SpellMissed { target } => {
-                let pos = self.characters.get(target).position;
-                self.game_grid
-                    .add_text_effect((pos.0 as i32, pos.1 as i32), "Resist");
+            GameEvent::CastSpell {
+                caster,
+                target,
+                success,
+            } => {
+                let caster_pos = self.characters.get(caster).position_i32();
+                let target_pos = self.characters.get(target).position_i32();
+                self.game_grid.add_projectile_effect(caster_pos, target_pos);
+
+                if !success {
+                    let target_pos = self.characters.get(target).position_i32();
+                    self.game_grid.add_text_effect(target_pos, "Resist");
+                }
             }
             GameEvent::CharacterReceivedSelfEffect {
                 character,
@@ -1749,6 +1779,8 @@ impl UserInterface {
                         ));
                         popup_enabled = true;
                     } else {
+                        let range = spell.range;
+                        self.game_grid.range_indicator = Some(range);
                         self.activity_popup.target_line =
                             Some(format!("target: {}, OUT OF RANGE", target_char.name));
                     }
@@ -2458,7 +2490,8 @@ impl LabelledResourceBar {
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
             format!("{}/{}", current, max),
-            18, WHITE
+            18,
+            WHITE,
         )));
         let cloned_value_text = Rc::clone(&value_text);
         let label_text = TextLine::new(label, 18, WHITE);
@@ -2515,12 +2548,15 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
 fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>) -> Container {
     let attribute_element = Element::Text(TextLine::new(
         format!("{}: {}", attribute.0, attribute.1),
-        22, WHITE
+        22,
+        WHITE,
     ));
 
     let stat_rows: Vec<Element> = stats
         .iter()
-        .map(|(name, value)| Element::Text(TextLine::new(format!("{} = {}", name, value), 18, WHITE)))
+        .map(|(name, value)| {
+            Element::Text(TextLine::new(format!("{} = {}", name, value), 18, WHITE))
+        })
         .collect();
 
     let stats_list = Element::Container(Container {
@@ -2831,7 +2867,7 @@ struct TextLine {
     string: String,
     offset_y: f32,
     font_size: u16,
-    color: Color
+    color: Color,
 }
 
 impl TextLine {
@@ -2841,7 +2877,7 @@ impl TextLine {
             string: "".to_string(),
             offset_y: 0.0,
             font_size,
-            color
+            color,
         };
         this.set_string(string);
         this
