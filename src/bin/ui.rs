@@ -355,7 +355,7 @@ impl GameGrid {
             .collect()
     }
 
-    fn draw(&mut self, x: f32, y: f32, blocked_screen_area: Rect) {
+    fn draw(&mut self, x: f32, y: f32, blocked_screen_area: Rect) -> Option<CharacterId> {
         let (w, h) = self.size;
 
         let bg_color = GRAY;
@@ -564,6 +564,8 @@ impl GameGrid {
             }
         }
 
+        let mut hovered_character_id = None;
+
         if is_mouse_within_grid && !is_mouse_blocked && self.receptive_to_input {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
@@ -578,11 +580,11 @@ impl GameGrid {
 
             let mut hovered_npc_id = None;
             for character in self.characters.iter() {
-                if character.borrow().position_i32() == (mouse_grid_x, mouse_grid_y)
-                    && !character.borrow().player_controlled
-                {
-                    // TODO: when hovering NPC, light up their TopCharacterPortrait
-                    hovered_npc_id = Some(character.borrow().id());
+                if character.borrow().position_i32() == (mouse_grid_x, mouse_grid_y) {
+                    hovered_character_id = Some(character.borrow().id());
+                    if !character.borrow().player_controlled {
+                        hovered_npc_id = Some(character.borrow().id());
+                    }
                 }
             }
 
@@ -733,6 +735,8 @@ impl GameGrid {
                 }
             }
         }
+
+        hovered_character_id
     }
 
     fn pan_camera(&self, dx: f32, dy: f32) {
@@ -1372,7 +1376,7 @@ impl UserInterface {
             h: self.activity_popup.last_drawn_size.1,
         };
 
-        self.game_grid.draw(0.0, 0.0, popup_rectangle);
+        let hovered_character_id = self.game_grid.draw(0.0, 0.0, popup_rectangle);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
@@ -1398,6 +1402,9 @@ impl UserInterface {
             .resource_bars
             .draw(450.0, y + 80.0);
         self.log.draw(650.0, y);
+
+        self.character_portraits
+            .set_hovered_character_id(hovered_character_id);
 
         self.character_portraits.draw(10.0, 10.0);
     }
@@ -1686,9 +1693,6 @@ impl UserInterface {
         self.activity_popup.target_line = None;
         self.game_grid.range_indicator = None;
 
-        // TODO disable activity popup Proceed button if no movement has been chosen
-        // or if no attack/spell target has been chosen
-
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
@@ -1976,6 +1980,7 @@ fn base_action_id(base_action: BaseAction) -> String {
 struct CharacterPortraits {
     row: Container,
     active_id: CharacterId,
+    hovered_id: Option<CharacterId>,
     portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
 }
 
@@ -2007,6 +2012,7 @@ impl CharacterPortraits {
         let mut this = Self {
             row,
             active_id,
+            hovered_id: None,
             portraits,
         };
 
@@ -2017,10 +2023,12 @@ impl CharacterPortraits {
     fn set_active_character(&mut self, id: CharacterId) {
         if let Some(portrait) = self.portraits.get(&self.active_id) {
             // The entry may have been removed if the active character died during its turn
-            portrait.borrow_mut().active = false;
+            portrait.borrow_mut().strong_highlight = false;
         }
         self.active_id = id;
-        self.portraits[&self.active_id].borrow_mut().active = true;
+        self.portraits[&self.active_id]
+            .borrow_mut()
+            .strong_highlight = true;
     }
 
     fn update(&mut self, game: &CoreGame) {
@@ -2040,6 +2048,19 @@ impl CharacterPortraits {
         self.row.size()
     }
 
+    fn set_hovered_character_id(&mut self, id: Option<CharacterId>) {
+        if let Some(previous_id) = self.hovered_id {
+            if let Some(portrait) = self.portraits.get(&previous_id) {
+                // The entry may have been removed if the character died recently
+                portrait.borrow_mut().weak_highlight = false;
+            }
+        }
+        self.hovered_id = id;
+        if let Some(id) = self.hovered_id {
+            self.portraits[&id].borrow_mut().weak_highlight = true;
+        }
+    }
+
     fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
     }
@@ -2052,7 +2073,8 @@ impl CharacterPortraits {
 }
 
 struct TopCharacterPortrait {
-    active: bool,
+    strong_highlight: bool,
+    weak_highlight: bool,
     hp_text: Rc<RefCell<TextLine>>,
     action_points_row: Rc<RefCell<ActionPointsRow>>,
     padding: f32,
@@ -2085,7 +2107,8 @@ impl TopCharacterPortrait {
         };
 
         Self {
-            active: false,
+            strong_highlight: false,
+            weak_highlight: false,
             action_points_row,
             hp_text,
             padding: 5.0,
@@ -2097,9 +2120,13 @@ impl TopCharacterPortrait {
 
 impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
-        if self.active {
+        if self.strong_highlight {
             let (w, h) = self.size();
             draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, GOLD);
+        }
+        if self.weak_highlight {
+            let (w, h) = self.size();
+            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, WHITE);
         }
         self.container.draw(x + self.padding, y + self.padding);
     }
