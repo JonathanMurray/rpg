@@ -22,7 +22,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (0, 7));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (15, 7));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -1353,24 +1353,30 @@ impl Character {
             && self.stamina.current >= enhancement.stamina_cost
     }
 
-    pub fn usable_movement_enhancements(&self) -> Vec<MovementEnhancement> {
+    pub fn usable_movement_enhancements(&self) -> Vec<(String, MovementEnhancement)> {
         let mut enhancements = vec![
-            MovementEnhancement {
-                name: "Extend",
-                action_point_cost: 1,
-                stamina_cost: 0,
-                add_percentage: 100,
-            },
-            MovementEnhancement {
-                name: "Sprint",
-                action_point_cost: 1,
-                stamina_cost: 1,
-                add_percentage: 150,
-            },
+            (
+                "2x".to_string(),
+                MovementEnhancement {
+                    name: "Extend",
+                    action_point_cost: 1,
+                    stamina_cost: 0,
+                    add_percentage: 100,
+                },
+            ),
+            (
+                "2.5x".to_string(),
+                MovementEnhancement {
+                    name: "Sprint",
+                    action_point_cost: 1,
+                    stamina_cost: 1,
+                    add_percentage: 150,
+                },
+            ),
         ];
-        enhancements.retain(|e| {
-            self.action_points >= MOVE_ACTION_COST + e.action_point_cost
-                && self.stamina.current >= e.stamina_cost
+        enhancements.retain(|(_, enhancement)| {
+            self.action_points >= MOVE_ACTION_COST + enhancement.action_point_cost
+                && self.stamina.current >= enhancement.stamina_cost
         });
         enhancements
     }

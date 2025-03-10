@@ -41,6 +41,7 @@ use rpg::core::{
     Spell, SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit, TextureId,
     ACTION_POINTS_PER_TURN,
 };
+use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
 
 async fn texture(path: &str) -> Texture2D {
@@ -255,6 +256,7 @@ struct GameGrid {
     cell_w: f32,
     grid_dimensions: (i32, i32),
 
+    position_on_screen: (f32, f32),
     size: (f32, f32),
 }
 
@@ -283,6 +285,7 @@ impl GameGrid {
             range_indicator: None,
             cell_w: 64.0,
             grid_dimensions: (16, 12),
+            position_on_screen: (0.0, 0.0), // is set later
             size,
         }
     }
@@ -363,18 +366,35 @@ impl GameGrid {
             .collect()
     }
 
-    fn draw(&mut self, x: f32, y: f32, blocked_screen_area: Rect) -> Option<CharacterId> {
+    fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
+        self.position_on_screen.0 + grid_x as f32 * self.cell_w - self.camera_position.0.get()
+    }
+
+    fn grid_y_to_screen(&self, grid_y: i32) -> f32 {
+        self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get()
+    }
+
+    fn draw_square(&self, (grid_x, grid_y): (i32, i32), color: Color) {
+        let margin = -1.0;
+        draw_rectangle_lines(
+            self.grid_x_to_screen(grid_x) - margin,
+            self.grid_y_to_screen(grid_y) - margin,
+            self.cell_w + margin * 2.0,
+            self.cell_w + margin * 2.0,
+            2.0,
+            color,
+        )
+    }
+
+    fn draw(&mut self, blocked_screen_area: Rect) -> Option<CharacterId> {
         let (w, h) = self.size;
 
         let bg_color = GRAY;
         let grid_color = Color::new(0.4, 0.4, 0.4, 1.00);
 
-        draw_rectangle(x, y, w, h, bg_color);
+        let (x, y) = self.position_on_screen;
 
-        let grid_x_to_screen =
-            |grid_x: i32| x + grid_x as f32 * self.cell_w - self.camera_position.0.get();
-        let grid_y_to_screen =
-            |grid_y: i32| y + grid_y as f32 * self.cell_w - self.camera_position.1.get();
+        draw_rectangle(x, y, w, h, bg_color);
 
         let mouse_relative_to_grid = |(x, y): (f32, f32)| {
             (
@@ -385,34 +405,22 @@ impl GameGrid {
 
         let active_character_pos = self.characters.get(self.active_character_id).position_i32();
 
-        let draw_square = |(grid_x, grid_y), color| {
-            let margin = -1.0;
-            draw_rectangle_lines(
-                grid_x_to_screen(grid_x) - margin,
-                grid_y_to_screen(grid_y) - margin,
-                self.cell_w + margin * 2.0,
-                self.cell_w + margin * 2.0,
-                2.0,
-                color,
-            )
-        };
-
         for col in 0..self.grid_dimensions.0 + 1 {
-            let x0 = grid_x_to_screen(col);
+            let x0 = self.grid_x_to_screen(col);
             draw_line(
                 x0,
-                grid_y_to_screen(0),
+                self.grid_y_to_screen(0),
                 x0,
-                grid_y_to_screen(self.grid_dimensions.1),
+                self.grid_y_to_screen(self.grid_dimensions.1),
                 1.0,
                 grid_color,
             );
             for row in 0..self.grid_dimensions.1 + 1 {
-                let y0 = grid_y_to_screen(row);
+                let y0 = self.grid_y_to_screen(row);
                 draw_line(
-                    grid_x_to_screen(0),
+                    self.grid_x_to_screen(0),
                     y0,
-                    grid_x_to_screen(self.grid_dimensions.0),
+                    self.grid_x_to_screen(self.grid_dimensions.0),
                     y0,
                     1.0,
                     grid_color,
@@ -426,71 +434,16 @@ impl GameGrid {
                     && (0..self.grid_dimensions.1).contains(&pos.1)
                     && *pos != active_character_pos
                 {
-                    draw_square(*pos, GREEN);
+                    // TODO
+                    self.draw_square(*pos, LIGHTGRAY);
                 }
             }
         }
 
-        let (active_char_x, active_char_y) =
-            self.characters.get(self.active_character_id).position_i32();
+        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
 
         if let Some(range) = self.range_indicator {
-            let range_ceil = (f32::from(range)).ceil() as i32;
-            let range_squared = range.squared() as i32;
-            let within = |x: i32, y: i32| {
-                (x - active_char_x).pow(2) + (y - active_char_y).pow(2) <= range_squared
-            };
-            for x in (active_char_x - range_ceil).max(0)
-                ..=(active_char_x + range_ceil).min(self.grid_dimensions.0 - 1)
-            {
-                for y in (active_char_y - range_ceil).max(0)
-                    ..=(active_char_y + range_ceil).min(self.grid_dimensions.1 - 1)
-                {
-                    if within(x, y) {
-                        let color = YELLOW;
-                        if !within(x - 1, y) {
-                            draw_line(
-                                grid_x_to_screen(x),
-                                grid_y_to_screen(y),
-                                grid_x_to_screen(x),
-                                grid_y_to_screen(y + 1),
-                                1.0,
-                                color,
-                            );
-                        }
-                        if !within(x + 1, y) {
-                            draw_line(
-                                grid_x_to_screen(x + 1),
-                                grid_y_to_screen(y),
-                                grid_x_to_screen(x + 1),
-                                grid_y_to_screen(y + 1),
-                                1.0,
-                                color,
-                            );
-                        }
-                        if !within(x, y - 1) {
-                            draw_line(
-                                grid_x_to_screen(x),
-                                grid_y_to_screen(y),
-                                grid_x_to_screen(x + 1),
-                                grid_y_to_screen(y),
-                                1.0,
-                                color,
-                            );
-                        }
-                        if !within(x, y + 1) {
-                            draw_line(
-                                grid_x_to_screen(x),
-                                grid_y_to_screen(y + 1),
-                                grid_x_to_screen(x + 1),
-                                grid_y_to_screen(y + 1),
-                                1.0,
-                                color,
-                            );
-                        }
-                    }
-                }
-            }
+            self.draw_range_indicator(active_char_pos, range);
         }
 
         for ch in self.characters.iter() {
@@ -505,8 +458,8 @@ impl GameGrid {
 
             draw_texture_ex(
                 &self.textures[&ch.texture],
-                grid_x_to_screen(position.0),
-                grid_y_to_screen(position.1),
+                self.grid_x_to_screen(position.0),
+                self.grid_y_to_screen(position.1),
                 WHITE,
                 params.clone(),
             );
@@ -515,8 +468,8 @@ impl GameGrid {
                 if let Some(texture) = weapon.texture_id {
                     draw_texture_ex(
                         &self.textures[&texture],
-                        grid_x_to_screen(position.0),
-                        grid_y_to_screen(position.1),
+                        self.grid_x_to_screen(position.0),
+                        self.grid_y_to_screen(position.1),
                         WHITE,
                         params.clone(),
                     );
@@ -527,8 +480,8 @@ impl GameGrid {
                 if let Some(texture) = shield.texture_id {
                     draw_texture_ex(
                         &self.textures[&texture],
-                        grid_x_to_screen(position.0),
-                        grid_y_to_screen(position.1),
+                        self.grid_x_to_screen(position.0),
+                        self.grid_y_to_screen(position.1),
                         WHITE,
                         params,
                     );
@@ -597,7 +550,7 @@ impl GameGrid {
 
             if valid_move_destination {
                 let destination = (mouse_grid_x, mouse_grid_y);
-                draw_square(destination, YELLOW);
+                self.draw_square(destination, YELLOW);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if self.movement_preview.is_none() {
                         self.event_sender
@@ -613,7 +566,7 @@ impl GameGrid {
                         let dist_enter_from = self.pathfind_grid.distances.get(&pos).unwrap();
                         dist = dist_enter_from.0;
                         movement_preview.push((dist, pos));
-                        if pos == (active_char_x, active_char_y) {
+                        if pos == active_char_pos {
                             break;
                         }
                         pos = dist_enter_from.1;
@@ -621,7 +574,7 @@ impl GameGrid {
                     self.movement_preview = Some(movement_preview);
                 }
             } else if let Some(id) = hovered_npc_id {
-                draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
+                self.draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if self.target_character_id.is_none() {
                         self.event_sender
@@ -632,7 +585,7 @@ impl GameGrid {
                 }
             } else if !self.movement_preview.is_some() {
                 if self.dragging_camera_from.is_none() {
-                    draw_square((mouse_grid_x, mouse_grid_y), RED);
+                    self.draw_square((mouse_grid_x, mouse_grid_y), RED);
                 }
             }
         }
@@ -643,11 +596,15 @@ impl GameGrid {
                 for i in 0..movement_preview.len() - 1 {
                     let a = movement_preview[i].1;
                     let b = movement_preview[i + 1].1;
-                    draw_line(
-                        grid_x_to_screen(a.0) + self.cell_w / 2.0,
-                        grid_y_to_screen(a.1) + self.cell_w / 2.0,
-                        grid_x_to_screen(b.0) + self.cell_w / 2.0,
-                        grid_y_to_screen(b.1) + self.cell_w / 2.0,
+                    draw_dashed_line(
+                        (
+                            self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
+                            self.grid_y_to_screen(a.1) + self.cell_w / 2.0,
+                        ),
+                        (
+                            self.grid_x_to_screen(b.0) + self.cell_w / 2.0,
+                            self.grid_y_to_screen(b.1) + self.cell_w / 2.0,
+                        ),
                         2.0,
                         arrow_color,
                     );
@@ -660,7 +617,7 @@ impl GameGrid {
                 );
 
                 draw_arrow(
-                    (grid_x_to_screen(end.0), grid_y_to_screen(end.1)),
+                    (self.grid_x_to_screen(end.0), self.grid_y_to_screen(end.1)),
                     self.cell_w,
                     last_direction,
                     arrow_color,
@@ -671,47 +628,52 @@ impl GameGrid {
         if let Some(target_character_i) = self.target_character_id {
             let actor_pos = self.characters.get(self.active_character_id).position_i32();
             let target_pos = self.characters.get(target_character_i).position_i32();
-            draw_square(target_pos, MAGENTA);
-            draw_circle(
-                grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
-                grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
-                self.cell_w * 0.15,
-                MAGENTA,
+            self.draw_square(target_pos, MAGENTA);
+            draw_circle_lines(
+                self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
+                self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
+                self.cell_w * 0.2,
+                2.0,
+                WHITE,
             );
             draw_arrow(
                 (
-                    grid_x_to_screen(target_pos.0),
-                    grid_y_to_screen(target_pos.1),
+                    self.grid_x_to_screen(target_pos.0),
+                    self.grid_y_to_screen(target_pos.1),
                 ),
                 self.cell_w,
-                (0, 1),
-                MAGENTA,
+                (1, 1),
+                WHITE,
             );
             draw_arrow(
                 (
-                    grid_x_to_screen(target_pos.0),
-                    grid_y_to_screen(target_pos.1),
+                    self.grid_x_to_screen(target_pos.0),
+                    self.grid_y_to_screen(target_pos.1),
                 ),
                 self.cell_w,
-                (0, -1),
-                MAGENTA,
+                (-1, -1),
+                WHITE,
             );
 
-            draw_line(
-                grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0,
-                grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0,
-                grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
-                grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
-                3.0,
-                MAGENTA,
+            draw_dashed_line(
+                (
+                    self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0,
+                    self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0,
+                ),
+                (
+                    self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
+                    self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
+                ),
+                2.0,
+                WHITE,
             );
         }
 
         {
             let margin = 2.0;
             draw_rectangle_lines(
-                grid_x_to_screen(active_character_pos.0) - margin,
-                grid_y_to_screen(active_character_pos.1) - margin,
+                self.grid_x_to_screen(active_character_pos.0) - margin,
+                self.grid_y_to_screen(active_character_pos.1) - margin,
                 self.cell_w + margin * 2.0,
                 self.cell_w + margin * 2.0,
                 2.0,
@@ -725,9 +687,9 @@ impl GameGrid {
                     let font_size = 24;
                     let text_dimensions = measure_text(&text, None, font_size, 1.0);
 
-                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
+                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
                         - text_dimensions.width / 2.0;
-                    let y0 = grid_y_to_screen(effect.position.1)
+                    let y0 = self.grid_y_to_screen(effect.position.1)
                         - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
 
                     draw_text(&text, x0, y0, font_size as f32, YELLOW);
@@ -736,17 +698,17 @@ impl GameGrid {
                 VisualEffectContent::Circle => {
                     let r = self.cell_w
                         * (0.2 + 0.2 * (1.0 - effect.remaining_duration / effect.duration));
-                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
-                    let y0 = grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
+                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
+                    let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
                     draw_circle(x0, y0, r, GOLD);
                 }
 
                 VisualEffectContent::Projectile(target) => {
-                    let x0 = grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
-                    let y0 = grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
+                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
+                    let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
 
-                    let x1 = grid_x_to_screen(target.0) + self.cell_w / 2.0;
-                    let y1 = grid_y_to_screen(target.1) + self.cell_w / 2.0;
+                    let x1 = self.grid_x_to_screen(target.0) + self.cell_w / 2.0;
+                    let y1 = self.grid_y_to_screen(target.1) + self.cell_w / 2.0;
 
                     let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
                     let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
@@ -759,6 +721,61 @@ impl GameGrid {
         hovered_character_id
     }
 
+    fn draw_range_indicator(&self, origin: (i32, i32), range: Range) {
+        let range_ceil = (f32::from(range)).ceil() as i32;
+        let range_squared = range.squared() as i32;
+        let within =
+            |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;
+        for x in
+            (origin.0 - range_ceil).max(0)..=(origin.0 + range_ceil).min(self.grid_dimensions.0 - 1)
+        {
+            for y in (origin.1 - range_ceil).max(0)
+                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
+            {
+                if within(x, y) {
+                    let color = RED;
+                    let thickness = 2.0;
+                    if !within(x - 1, y) {
+                        // Left border
+                        draw_dashed_line(
+                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
+                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
+                            thickness,
+                            color,
+                        );
+                    }
+                    if !within(x + 1, y) {
+                        // Right border
+                        draw_dashed_line(
+                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
+                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
+                            thickness,
+                            color,
+                        );
+                    }
+                    if !within(x, y - 1) {
+                        // Top border
+                        draw_dashed_line(
+                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
+                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
+                            thickness,
+                            color,
+                        );
+                    }
+                    if !within(x, y + 1) {
+                        // Bottom border
+                        draw_dashed_line(
+                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
+                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
+                            thickness,
+                            color,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
     fn pan_camera(&self, dx: f32, dy: f32) {
         let new_x = self.camera_position.0.get() + dx;
         let new_y = self.camera_position.1.get() + dy;
@@ -767,52 +784,6 @@ impl GameGrid {
         let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - self.size.1;
         self.camera_position.0.set(new_x.max(-max_space).min(max_x));
         self.camera_position.1.set(new_y.max(-max_space).min(max_y));
-    }
-}
-
-fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: Color) {
-    let w = x;
-    let n = y;
-    let e = w + width;
-    let s = n + width;
-    let mid = (w + width * 0.5, n + width * 0.5);
-
-    let space = width * 0.3;
-
-    match direction {
-        (1, 0) => {
-            draw_line(w + space, n + space, mid.0, mid.1, 3.0, color);
-            draw_line(w + space, s - space, mid.0, mid.1, 3.0, color);
-        }
-        (1, 1) => {
-            draw_line(mid.0, n + space / 1.4, mid.0, mid.1, 3.0, color);
-            draw_line(w + space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
-        }
-        (0, 1) => {
-            draw_line(w + space, n + space, mid.0, mid.1, 3.0, color);
-            draw_line(e - space, n + space, mid.0, mid.1, 3.0, color);
-        }
-        (-1, 1) => {
-            draw_line(mid.0, n + space / 1.4, mid.0, mid.1, 3.0, color);
-            draw_line(e - space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
-        }
-        (-1, 0) => {
-            draw_line(e - space, n + space, mid.0, mid.1, 3.0, color);
-            draw_line(e - space, s - space, mid.0, mid.1, 3.0, color);
-        }
-        (-1, -1) => {
-            draw_line(mid.0, s - space / 1.4, mid.0, mid.1, 3.0, color);
-            draw_line(e - space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
-        }
-        (0, -1) => {
-            draw_line(w + space, s - space, mid.0, mid.1, 3.0, color);
-            draw_line(e - space, s - space, mid.0, mid.1, 3.0, color);
-        }
-        (1, -1) => {
-            draw_line(mid.0, s - space / 1.4, mid.0, mid.1, 3.0, color);
-            draw_line(w + space / 1.4, mid.1, mid.0, mid.1, 3.0, color);
-        }
-        _ => unreachable!(),
     }
 }
 
@@ -1396,7 +1367,8 @@ impl UserInterface {
             h: self.activity_popup.last_drawn_size.1,
         };
 
-        let hovered_character_id = self.game_grid.draw(0.0, 0.0, popup_rectangle);
+        self.game_grid.position_on_screen = (0.0, 0.0);
+        let hovered_character_id = self.game_grid.draw(popup_rectangle);
 
         self.activity_popup.draw(100.0, y - 170.0);
 
@@ -1508,9 +1480,9 @@ impl UserInterface {
                         popup_lines.push(format!("Movement ({} AP)", action_point_cost));
 
                         let enhancements = self.active_character().usable_movement_enhancements();
-                        for enhancement in enhancements {
+                        for (subtext, enhancement) in enhancements {
                             let btn = self.new_button(
-                                "".to_string(),
+                                subtext,
                                 ButtonAction::MovementEnhancement(enhancement),
                             );
                             popup_buttons.push(btn);
