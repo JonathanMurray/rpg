@@ -1,4 +1,3 @@
-
 use std::{
     cell::{Cell, Ref, RefCell},
     collections::HashMap,
@@ -9,38 +8,32 @@ use indexmap::IndexMap;
 use macroquad::input::is_key_down;
 use macroquad::math::Rect;
 
-use macroquad::miniquad::{KeyCode};
-use macroquad::texture::{
-    draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
-};
+use macroquad::miniquad::KeyCode;
+use macroquad::texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D};
 use macroquad::{
     color::{
-        self, Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN,
-        LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE, YELLOW,
+        self, Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA,
+        ORANGE, RED, WHITE, YELLOW,
     },
-    input::{
-        is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
-    },
+    input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     miniquad,
     rand::{self},
-    shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle,
-        draw_rectangle_lines,
-    },
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text, measure_text},
-    time::{get_frame_time},
+    time::get_frame_time,
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
 
 use rpg::base_ui::{
-    draw_debug, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, Tabs, TextLine,
+    draw_debug, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, Tabs,
+    TextLine,
 };
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState,
-    HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement, StateReactToAttack, StateReactToHit, TextureId,
-    ACTION_POINTS_PER_TURN,
+    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
+    MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
+    StateReactToAttack, StateReactToHit, TextureId, ACTION_POINTS_PER_TURN,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -103,13 +96,13 @@ async fn main() {
         if !ui_events.is_empty() {
             for event in ui_events {
                 match event {
-                    Event::ChoseAttackedReaction(reaction) => {
+                    PlayerChose::AttackedReaction(reaction) => {
                         game_state = game_state.unwrap_react_to_attack().proceed(reaction);
                     }
-                    Event::ChoseHitReaction(reaction) => {
+                    PlayerChose::HitReaction(reaction) => {
                         game_state = game_state.unwrap_react_to_hit().proceed(reaction);
                     }
-                    Event::ChoseAction(action) => {
+                    PlayerChose::Action(action) => {
                         game_state = game_state.unwrap_choose_action().proceed(action);
                     }
                 }
@@ -430,12 +423,11 @@ impl GameGrid {
         }
 
         if self.movement_preview.is_some() {
-            for (pos, _) in &self.pathfind_grid.distances {
+            for pos in self.pathfind_grid.routes.keys() {
                 if (0..self.grid_dimensions.0).contains(&pos.0)
                     && (0..self.grid_dimensions.1).contains(&pos.1)
                     && *pos != active_character_pos
                 {
-                    // TODO
                     self.draw_square(*pos, LIGHTGRAY);
                 }
             }
@@ -530,14 +522,11 @@ impl GameGrid {
         if is_mouse_within_grid && !is_mouse_blocked && self.receptive_to_input {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
-            let valid_move_destination = match self
-                .pathfind_grid
-                .distances
-                .get(&(mouse_grid_x, mouse_grid_y))
-            {
-                Some((dist, _enter_from)) => *dist <= self.movement_range,
-                _ => false,
-            } && !collision;
+            let valid_move_destination =
+                match self.pathfind_grid.routes.get(&(mouse_grid_x, mouse_grid_y)) {
+                    Some(route) => route.distance_from_start <= self.movement_range,
+                    _ => false,
+                } && !collision;
 
             let mut hovered_npc_id = None;
             for character in self.characters.iter() {
@@ -558,19 +547,19 @@ impl GameGrid {
                             .send(InternalUiEvent::SwitchedToMoveInGrid);
                     }
 
-                    let dist_enter_from = self.pathfind_grid.distances.get(&destination).unwrap();
-                    let mut dist = dist_enter_from.0;
+                    let route = self.pathfind_grid.routes.get(&destination).unwrap();
+                    let mut dist = route.distance_from_start;
                     let mut movement_preview = vec![(dist, destination)];
-                    let mut pos = dist_enter_from.1;
+                    let mut pos = route.came_from;
 
                     loop {
-                        let dist_enter_from = self.pathfind_grid.distances.get(&pos).unwrap();
-                        dist = dist_enter_from.0;
+                        let route = self.pathfind_grid.routes.get(&pos).unwrap();
+                        dist = route.distance_from_start;
                         movement_preview.push((dist, pos));
                         if pos == active_char_pos {
                             break;
                         }
-                        pos = dist_enter_from.1;
+                        pos = route.came_from;
                     }
                     self.movement_preview = Some(movement_preview);
                 }
@@ -1373,13 +1362,7 @@ impl UserInterface {
 
         self.activity_popup.draw(100.0, y - 170.0);
 
-        draw_rectangle(
-            0.0,
-            y,
-            screen_width(),
-            screen_height() - y,
-            BLACK,
-        );
+        draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
         draw_line(0.0, y, screen_width(), y, 2.0, DARKGRAY);
         self.player_portraits.draw(270.0, y + 10.0);
         self.action_points_label.draw(20.0, y + 10.0);
@@ -1403,8 +1386,9 @@ impl UserInterface {
     }
 
     fn set_action_buttons_enabled(&self, enabled: bool) {
-        for (_, btn) in
-            &self.character_uis[&self.player_portraits.selected_i.get()].tracked_action_buttons
+        for btn in self.character_uis[&self.player_portraits.selected_i.get()]
+            .tracked_action_buttons
+            .values()
         {
             btn.enabled.set(enabled);
         }
@@ -1642,7 +1626,7 @@ impl UserInterface {
         }
     }
 
-    fn update(&mut self, game: &CoreGame, elapsed: f32) -> Vec<Event> {
+    fn update(&mut self, game: &CoreGame, elapsed: f32) -> Vec<PlayerChose> {
         let active_character_id = game.active_character_id;
 
         if active_character_id != self.active_character_id {
@@ -1779,7 +1763,7 @@ impl UserInterface {
         public_events
     }
 
-    fn handle_event(&mut self, event: InternalUiEvent) -> Option<Event> {
+    fn handle_event(&mut self, event: InternalUiEvent) -> Option<PlayerChose> {
         match event {
             InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
                 if hovered {
@@ -1794,11 +1778,10 @@ impl UserInterface {
             InternalUiEvent::ButtonClicked(_button_id, btn_action) => {
                 match btn_action {
                     ButtonAction::Action(base_action) => {
-                        let may_choose_action = match self.state {
-                            UiState::ChoosingAction => true,
-                            UiState::ConfiguringAction(..) => true,
-                            _ => false,
-                        };
+                        let may_choose_action = matches!(
+                            self.state,
+                            UiState::ChoosingAction | UiState::ConfiguringAction(..)
+                        );
 
                         if may_choose_action && self.active_character().can_use_action(base_action)
                         {
@@ -1873,7 +1856,7 @@ impl UserInterface {
                                         }
                                     }
                                 };
-                                Event::ChoseAction(action)
+                                PlayerChose::Action(action)
                             }
                             UiState::ReactingToAttack { .. } => {
                                 let reaction =
@@ -1883,7 +1866,7 @@ impl UserInterface {
                                             _ => unreachable!(),
                                         },
                                     );
-                                Event::ChoseAttackedReaction(reaction)
+                                PlayerChose::AttackedReaction(reaction)
                             }
                             UiState::ReactingToHit { .. } => {
                                 let reaction =
@@ -1894,7 +1877,7 @@ impl UserInterface {
                                         },
                                     );
 
-                                Event::ChoseHitReaction(reaction)
+                                PlayerChose::HitReaction(reaction)
                             }
                             UiState::ChoosingAction => unreachable!(),
                             UiState::Idle => unreachable!(),
@@ -2043,10 +2026,6 @@ impl CharacterPortraits {
                 character.health.current, character.health.max
             ));
         }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.row.size()
     }
 
     fn set_hovered_character_id(&mut self, id: Option<CharacterId>) {
@@ -2805,10 +2784,10 @@ enum InternalUiEvent {
 }
 
 #[derive(Debug)]
-enum Event {
-    ChoseAttackedReaction(Option<OnAttackedReaction>),
-    ChoseHitReaction(Option<OnHitReaction>),
-    ChoseAction(Action),
+enum PlayerChose {
+    AttackedReaction(Option<OnAttackedReaction>),
+    HitReaction(Option<OnHitReaction>),
+    Action(Action),
 }
 
 fn window_conf() -> Conf {

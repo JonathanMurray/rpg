@@ -50,15 +50,15 @@ pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: 
 pub fn draw_dashed_line(from: (f32, f32), to: (f32, f32), thickness: f32, color: Color) {
     let len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
     let n = (len / 5.0) as u32;
-    let (mut prevX, mut prevY) = from;
+    let (mut prev_x, mut prev_y) = from;
     for i in 0..n {
         let x = from.0 + (to.0 - from.0) * i as f32 / n as f32;
         let y = from.1 + (to.1 - from.1) * i as f32 / n as f32;
         if i % 2 == 0 {
-            draw_line(prevX, prevY, x, y, thickness, color);
+            draw_line(prev_x, prev_y, x, y, thickness, color);
         }
-        prevX = x;
-        prevY = y;
+        prev_x = x;
+        prev_y = y;
     }
-    draw_line(prevX, prevY, to.0, to.1, thickness, color);
+    draw_line(prev_x, prev_y, to.0, to.1, thickness, color);
 }

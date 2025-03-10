@@ -68,8 +68,8 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
                     let pos = character.position;
                     pathfind_grid.run((pos.0 as i32, pos.1 as i32), character.move_range);
 
-                    for (destination, (_distance, enter_from)) in pathfind_grid.distances {
-                        if enter_from == (pos.0 as i32, pos.1 as i32) {
+                    for (destination, route) in pathfind_grid.routes {
+                        if route.came_from == (pos.0 as i32, pos.1 as i32) {
                             chosen_action = Some(Action::Move {
                                 action_point_cost,
                                 positions: vec![(destination.0 as u32, destination.1 as u32)],
