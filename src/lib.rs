@@ -1,3 +1,4 @@
+pub mod base_ui;
 pub mod bot;
 pub mod core;
 mod d20;
