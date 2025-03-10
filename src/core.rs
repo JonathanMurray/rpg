@@ -22,7 +22,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", 10, 10, 10, (1, 4));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (1, 4));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = None;
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -33,15 +33,15 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Alice", 1, 1, 1, (2, 4));
+        let mut alice = Character::new(false, "Gremlin", TextureId::Character2,1, 1, 1, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.armor = Some(LEATHER_ARMOR);
 
-        let mut charlie = Character::new(false, "Charlie", 1, 2, 1, (3, 4));
+        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2,1, 2, 1, (3, 4));
         charlie.main_hand.weapon = Some(SWORD);
         charlie.off_hand.shield = Some(SMALL_SHIELD);
 
-        let mut david = Character::new(true, "David", 10, 10, 10, (5, 7));
+        let mut david = Character::new(true, "David",TextureId::Character, 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
 
         let characters = Characters::new(vec![bob, alice, charlie, david]);
@@ -1145,6 +1145,7 @@ pub type CharacterId = u32;
 #[derive(Debug)]
 pub struct Character {
     id: Option<CharacterId>,
+    pub texture: TextureId,
     pub has_died: bool,
     pub player_controlled: bool,
     // TODO i32 instead?
@@ -1174,6 +1175,7 @@ impl Character {
     fn new(
         player_controlled: bool,
         name: &'static str,
+        texture: TextureId,
         str: u32,
         dex: u32,
         int: u32,
@@ -1183,6 +1185,7 @@ impl Character {
         let move_range = 0.8 + dex as f32 * 0.2;
         Self {
             id: None,
+            texture,
             has_died: false,
             player_controlled,
             position,
@@ -1652,6 +1655,7 @@ impl From<Range> for f32 {
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum TextureId {
     Character,
+    Character2,
     Warhammer,
     Bow,
     Sword,

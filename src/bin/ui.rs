@@ -65,10 +65,9 @@ async fn main() {
     let event_handler = Rc::new(UiGameEventHandler::new());
     let game = CoreGame::new(event_handler.clone());
 
-    let ui_characters = game.characters.clone();
-
     let textures = load_textures(vec![
-        (TextureId::Character, "character4.png"),
+        (TextureId::Character, "character.png"),
+        (TextureId::Character2, "character2.png"),
         (TextureId::Warhammer, "warhammer.png"),
         (TextureId::Bow, "bow.png"),
         (TextureId::Sword, "sword.png"),
@@ -489,7 +488,6 @@ impl GameGrid {
             let ch = ch.borrow();
 
             let position = ch.position_i32();
-            let texture = TextureId::Character;
 
             let params = DrawTextureParams {
                 dest_size: Some((self.cell_w, self.cell_w).into()),
@@ -497,7 +495,7 @@ impl GameGrid {
             };
 
             draw_texture_ex(
-                &self.textures[&texture],
+                &self.textures[&ch.texture],
                 grid_x_to_screen(position.0),
                 grid_y_to_screen(position.1),
                 WHITE,
@@ -1310,7 +1308,7 @@ impl UserInterface {
             character_uis.insert(character.borrow().id(), character_ui);
         }
 
-        let action_points_label = TextLine::new("Action points", 18);
+        let action_points_label = TextLine::new("Action points", 18, WHITE);
         let action_points_row = ActionPointsRow::new(
             (20.0, 20.0),
             0.3,
@@ -2091,14 +2089,20 @@ impl TopCharacterPortrait {
         )));
         let cloned_row = Rc::clone(&action_points_row);
 
-        let hp_text = Rc::new(RefCell::new(TextLine::new("0/0", 16)));
+        let hp_text = Rc::new(RefCell::new(TextLine::new("0/0", 16, WHITE)));
         let cloned_text = Rc::clone(&hp_text);
+
+        let name_color = if character.borrow().player_controlled {
+            WHITE
+        } else {
+            MAGENTA
+        };
 
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
             children: vec![
-                Element::Text(TextLine::new(character.borrow().name, 20)),
+                Element::Text(TextLine::new(character.borrow().name, 20, name_color)),
                 Element::RcRefCell(cloned_row),
                 Element::RcRefCell(cloned_text),
             ],
@@ -2217,7 +2221,7 @@ struct PlayerCharacterPortrait {
 impl PlayerCharacterPortrait {
     fn new(character: &Character) -> Self {
         Self {
-            text: TextLine::new(character.name, 20),
+            text: TextLine::new(character.name, 20, WHITE),
             selected: Cell::new(false),
             padding: 15.0,
             clicked: Cell::new(false),
@@ -2303,7 +2307,7 @@ impl Log {
         }
         self.lines
             .children
-            .push(Element::Text(TextLine::new(text, 18)));
+            .push(Element::Text(TextLine::new(text, 18, WHITE)));
     }
 
     fn draw(&self, x: f32, y: f32) {
@@ -2454,10 +2458,10 @@ impl LabelledResourceBar {
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
             format!("{}/{}", current, max),
-            18,
+            18, WHITE
         )));
         let cloned_value_text = Rc::clone(&value_text);
-        let label_text = TextLine::new(label, 18);
+        let label_text = TextLine::new(label, 18, WHITE);
 
         let list = Container {
             layout_dir: LayoutDirection::Vertical,
@@ -2511,12 +2515,12 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
 fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>) -> Container {
     let attribute_element = Element::Text(TextLine::new(
         format!("{}: {}", attribute.0, attribute.1),
-        22,
+        22, WHITE
     ));
 
     let stat_rows: Vec<Element> = stats
         .iter()
-        .map(|(name, value)| Element::Text(TextLine::new(format!("{} = {}", name, value), 18)))
+        .map(|(name, value)| Element::Text(TextLine::new(format!("{} = {}", name, value), 18, WHITE)))
         .collect();
 
     let stats_list = Element::Container(Container {
@@ -2670,7 +2674,7 @@ struct TabLink {
 
 impl TabLink {
     fn new(text: impl Into<String>) -> Self {
-        let text = TextLine::new(text, 20);
+        let text = TextLine::new(text, 20, WHITE);
         let padding = 5.0;
         let text_size = text.size;
         Self {
@@ -2827,15 +2831,17 @@ struct TextLine {
     string: String,
     offset_y: f32,
     font_size: u16,
+    color: Color
 }
 
 impl TextLine {
-    fn new(string: impl Into<String>, font_size: u16) -> Self {
+    fn new(string: impl Into<String>, font_size: u16, color: Color) -> Self {
         let mut this = Self {
             size: (0.0, 0.0),
             string: "".to_string(),
             offset_y: 0.0,
             font_size,
+            color
         };
         this.set_string(string);
         this
@@ -2864,7 +2870,7 @@ impl Drawable for TextLine {
             x,
             y + self.offset_y,
             self.font_size as f32,
-            WHITE,
+            self.color,
         );
         draw_debug(x, y, self.size.0, self.size.1);
     }
@@ -3029,13 +3035,13 @@ impl ActionButton {
             ..Default::default()
         };
 
-        let text = Element::Text(TextLine::new(text, 20));
+        let text = Element::Text(TextLine::new(text, 20, WHITE));
         let content = if !subtext.is_empty() {
             Box::new(Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 8.0,
                 align: Align::Center,
-                children: vec![text, Element::Text(TextLine::new(subtext, 15))],
+                children: vec![text, Element::Text(TextLine::new(subtext, 15, WHITE))],
                 ..Default::default()
             }))
         } else {
