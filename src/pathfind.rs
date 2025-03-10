@@ -6,6 +6,12 @@ pub struct PathfindGrid {
     pub distances: HashMap<(i32, i32), (f32, (i32, i32))>,
 }
 
+impl Default for PathfindGrid {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PathfindGrid {
     pub fn new() -> Self {
         Self {

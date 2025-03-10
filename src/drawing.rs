@@ -49,7 +49,7 @@ pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: 
 
 pub fn draw_dashed_line(from: (f32, f32), to: (f32, f32), thickness: f32, color: Color) {
     let len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
-    let n = (len as f32 / 5.0) as u32;
+    let n = (len / 5.0) as u32;
     let (mut prevX, mut prevY) = from;
     for i in 0..n {
         let x = from.0 + (to.0 - from.0) * i as f32 / n as f32;

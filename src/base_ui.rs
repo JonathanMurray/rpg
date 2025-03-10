@@ -5,8 +5,7 @@ use macroquad::{
     text::{draw_text, measure_text},
 };
 use std::{
-    cell::{self, Cell, Ref, RefCell, RefMut},
-    collections::HashMap,
+    cell::{Cell, RefCell},
     rc::Rc,
     rc::Weak,
 };

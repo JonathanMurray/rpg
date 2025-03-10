@@ -1,48 +1,45 @@
-use std::collections::HashSet;
+
 use std::{
-    cell::{self, Cell, Ref, RefCell, RefMut},
+    cell::{Cell, Ref, RefCell},
     collections::HashMap,
     rc::Rc,
-    rc::Weak,
 };
 
 use indexmap::IndexMap;
 use macroquad::input::is_key_down;
 use macroquad::math::Rect;
-use macroquad::miniquad::window::dpi_scale;
-use macroquad::miniquad::{window, KeyCode};
+
+use macroquad::miniquad::{KeyCode};
 use macroquad::texture::{
-    draw_texture, draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
+    draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D,
 };
 use macroquad::{
     color::{
-        self, Color, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, DARKGREEN, GOLD, GRAY, GREEN,
-        LIGHTGRAY, MAGENTA, MAROON, ORANGE, PINK, PURPLE, RED, WHITE, YELLOW,
+        self, Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN,
+        LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE, YELLOW,
     },
     input::{
-        is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
+        is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
     },
     miniquad,
-    rand::{self, ChooseRandom},
+    rand::{self},
     shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex,
-        draw_rectangle_lines, DrawRectangleParams,
+        draw_circle, draw_circle_lines, draw_line, draw_rectangle,
+        draw_rectangle_lines,
     },
-    text::{draw_text, measure_text, Font, TextDimensions},
-    time::{self, get_frame_time},
+    text::{draw_text, measure_text},
+    time::{get_frame_time},
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
-use macroquad::{text, texture};
+
 use rpg::base_ui::{
-    draw_debug, Align, Circle, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-    TabLink, Tabs, TextLine,
+    draw_debug, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, Tabs, TextLine,
 };
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, Hand,
-    HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SelfEffectAction,
-    Spell, SpellEnhancement, StateChooseAction, StateReactToAttack, StateReactToHit, TextureId,
+    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState,
+    HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement, StateReactToAttack, StateReactToHit, TextureId,
     ACTION_POINTS_PER_TURN,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
@@ -587,10 +584,8 @@ impl GameGrid {
                     self.target_character_id = Some(id);
                     self.movement_preview = None;
                 }
-            } else if !self.movement_preview.is_some() {
-                if self.dragging_camera_from.is_none() {
-                    self.draw_square((mouse_grid_x, mouse_grid_y), RED);
-                }
+            } else if self.movement_preview.is_none() && self.dragging_camera_from.is_none() {
+                self.draw_square((mouse_grid_x, mouse_grid_y), RED);
             }
         }
 
@@ -689,14 +684,14 @@ impl GameGrid {
             match &effect.content {
                 VisualEffectContent::Text(text) => {
                     let font_size = 24;
-                    let text_dimensions = measure_text(&text, None, font_size, 1.0);
+                    let text_dimensions = measure_text(text, None, font_size, 1.0);
 
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
                         - text_dimensions.width / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1)
                         - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
 
-                    draw_text(&text, x0, y0, font_size as f32, YELLOW);
+                    draw_text(text, x0, y0, font_size as f32, YELLOW);
                 }
 
                 VisualEffectContent::Circle => {
@@ -870,7 +865,7 @@ impl ActivityPopup {
         }
 
         if let Some(line) = &self.target_line {
-            draw_text(&line, x0, y0, 20.0, WHITE);
+            draw_text(line, x0, y0, 20.0, WHITE);
             y0 += 20.0;
         }
 
@@ -939,10 +934,8 @@ impl ActivityPopup {
                 InternalUiEvent::ButtonHovered(id, _button_action, hovered) => {
                     if hovered {
                         self.hovered_button_id = Some(id);
-                    } else {
-                        if self.hovered_button_id == Some(id) {
-                            self.hovered_button_id = None;
-                        }
+                    } else if self.hovered_button_id == Some(id) {
+                        self.hovered_button_id = None;
                     }
                 }
 
@@ -1108,7 +1101,7 @@ impl UserInterface {
 
         let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
-        for (i, character) in game.characters.iter().enumerate() {
+        for (_i, character) in game.characters.iter().enumerate() {
             let character_ref = character.borrow();
             if !character_ref.player_controlled {
                 continue;
@@ -1327,7 +1320,7 @@ impl UserInterface {
                 queue: Rc::clone(&event_queue),
             },
             textures,
-            (screen_width() as f32, 670.0),
+            (screen_width(), 670.0),
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
@@ -1383,11 +1376,11 @@ impl UserInterface {
         draw_rectangle(
             0.0,
             y,
-            screen_width() as f32,
-            screen_height() as f32 - y,
+            screen_width(),
+            screen_height() - y,
             BLACK,
         );
-        draw_line(0.0, y, screen_width() as f32, y, 2.0, DARKGRAY);
+        draw_line(0.0, y, screen_width(), y, 2.0, DARKGRAY);
         self.player_portraits.draw(270.0, y + 10.0);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
@@ -1791,11 +1784,9 @@ impl UserInterface {
             InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
                 if hovered {
                     self.hovered_button = Some((button_id, button_action));
-                } else {
-                    if let Some(previously_hovered_button) = self.hovered_button {
-                        if button_id == previously_hovered_button.0 {
-                            self.hovered_button = None
-                        }
+                } else if let Some(previously_hovered_button) = self.hovered_button {
+                    if button_id == previously_hovered_button.0 {
+                        self.hovered_button = None
                     }
                 }
             }
@@ -1983,7 +1974,7 @@ fn base_action_id(base_action: BaseAction) -> String {
         BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
         BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
         BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
-        BaseAction::Move { .. } => format!("MOVE"),
+        BaseAction::Move { .. } => "MOVE".to_string(),
     }
 }
 
@@ -2002,7 +1993,7 @@ impl CharacterPortraits {
         let mut elements = vec![];
 
         for (id, character) in characters.iter_with_ids() {
-            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(&character)));
+            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(character)));
             let cloned = Rc::downgrade(&portrait);
             portraits.insert(*id, portrait);
             elements.push(Element::WeakRefCell(cloned));
@@ -2632,7 +2623,7 @@ impl ActionButton {
                 }
                 BaseAction::Move {
                     action_point_cost,
-                    range,
+                    range: _,
                 } => {
                     action_points = action_point_cost;
                     text = "Move";
@@ -2735,7 +2726,7 @@ impl ActionButton {
             enabled: Cell::new(true),
             highlighted: Cell::new(false),
             event_sender: Some(EventSender {
-                queue: Rc::clone(&event_queue),
+                queue: Rc::clone(event_queue),
             }),
         }
     }
