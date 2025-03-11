@@ -199,6 +199,7 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
                     user_interface.set_state(UiState::Idle);
                 }
             }
+
             GameState::AwaitingChooseReaction(state) => match state {
                 StateChooseReaction::Attack(inner) => {
                     println!("awaiting player attack reaction");
@@ -1646,9 +1647,14 @@ impl UserInterface {
                 let pos = self.characters.get(character).position_i32();
                 self.game_grid.add_text_effect(pos, format!("{}", amount));
             }
-            GameEvent::AttackMissed { target } => {
-                let pos = self.characters.get(target).position_i32();
-                self.game_grid.add_text_effect(pos, "Miss");
+            GameEvent::Attacked { attacker, target, hit } => {
+                let attacker_pos = self.characters.get(attacker).position_i32();
+                let target_pos = self.characters.get(target).position_i32();
+                self.game_grid
+                    .add_projectile_effect(attacker_pos, target_pos, DARKGRAY);
+                if !hit {
+                    self.game_grid.add_text_effect(target_pos, "Miss");
+                }
             }
             GameEvent::SpellWasCast {
                 caster,

@@ -436,7 +436,15 @@ impl CoreGame {
             defender.protection_from_armor()
         ));
 
-        if res < defense {
+        let hit = res >= defense;
+
+        self.event_handler.handle(GameEvent::Attacked {
+            attacker: attacker.id(),
+            target: defender_id,
+            hit,
+        });
+
+        if !hit {
             if defender_reacted_with_parry {
                 self.log("  Parried!");
             } else if defender_reacted_with_sidestep {
@@ -444,10 +452,6 @@ impl CoreGame {
             } else {
                 self.log("  Missed!")
             }
-
-            self.event_handler.handle(GameEvent::AttackMissed {
-                target: defender_id,
-            });
         } else {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
@@ -760,8 +764,10 @@ pub enum GameEvent {
         character: CharacterId,
         amount: u32,
     },
-    AttackMissed {
+    Attacked {
+        attacker: CharacterId,
         target: CharacterId,
+        hit: bool,
     },
     SpellWasCast {
         caster: CharacterId,
