@@ -1,5 +1,5 @@
 use crate::{
-    core::{Action, BaseAction, CoreGame},
+    core::{Action, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction},
     pathfind::PathfindGrid,
 };
 use macroquad::rand;
@@ -87,4 +87,28 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
     }
 
     chosen_action.unwrap()
+}
+
+pub fn bot_choose_attack_reaction(
+    game: &CoreGame,
+    reactor_id: CharacterId,
+) -> Option<OnAttackedReaction> {
+    let reactions = game
+        .characters
+        .get(reactor_id)
+        .usable_on_attacked_reactions();
+    if let Some((_, reaction)) = reactions.first() {
+        Some(*reaction)
+    } else {
+        None
+    }
+}
+
+pub fn bot_choose_hit_reaction(game: &CoreGame, reactor_id: CharacterId) -> Option<OnHitReaction> {
+    let reactions = game.characters.get(reactor_id).usable_on_hit_reactions();
+    if let Some((_, reaction)) = reactions.first() {
+        Some(*reaction)
+    } else {
+        None
+    }
 }

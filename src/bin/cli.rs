@@ -7,11 +7,11 @@ use rpg::core::{
 
 fn main() {
     let waiting_for = CoreGame::new(Rc::new(RefCell::new(StdoutLogger)));
-    let mut waiting_for = GameState::AwaitingPlayerAction(waiting_for);
+    let mut waiting_for = GameState::AwaitingChooseAction(waiting_for);
 
     loop {
         match waiting_for {
-            GameState::AwaitingPlayerAction(state) => {
+            GameState::AwaitingChooseAction(state) => {
                 let active_character = state.game.active_character();
                 let other_character = state.game.inactive_character();
                 let action = player_choose_action(&active_character, &other_character);
@@ -19,13 +19,13 @@ fn main() {
                 drop(other_character);
                 waiting_for = state.proceed(action);
             }
-            GameState::AwaitingPlayerAttackReaction(state) => {
+            GameState::AwaitingChooseAttackReaction(state) => {
                 let defender = state.game.inactive_character();
                 let reaction = player_choose_on_attacked_reaction(&defender);
                 drop(defender);
                 waiting_for = state.proceed(reaction);
             }
-            GameState::AwaitingPlayerHitReaction(state) => {
+            GameState::AwaitingChooseHitReaction(state) => {
                 let defender = state.game.inactive_character();
                 let reaction = player_choose_on_hit_reaction(&defender);
                 drop(defender);

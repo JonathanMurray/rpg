@@ -5,8 +5,8 @@ use std::{
 };
 
 use indexmap::IndexMap;
-use macroquad::input::is_key_down;
 use macroquad::math::Rect;
+use macroquad::{color::PURPLE, input::is_key_down};
 
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D};
@@ -24,10 +24,6 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
 
-use rpg::base_ui::{
-    draw_debug, table, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-    Tabs, TextLine,
-};
 use rpg::bot::bot_choose_action;
 use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
@@ -37,6 +33,13 @@ use rpg::core::{
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
+use rpg::{
+    base_ui::{
+        draw_debug, table, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
+        Tabs, TextLine,
+    },
+    bot::{bot_choose_attack_reaction, bot_choose_hit_reaction},
+};
 
 async fn texture(path: &str) -> Texture2D {
     let texture = load_texture(path).await.unwrap();
@@ -118,9 +121,9 @@ async fn main() {
             if timer > 0.5 {
                 timer = 0.0;
                 match game_state {
-                    GameState::AwaitingBotChooseAction(awaiting_bot) => {
-                        let action = bot_choose_action(&awaiting_bot.game);
-                        game_state = awaiting_bot.proceed(action);
+                    GameState::AwaitingChooseAction(state) if !state.game.is_players_turn() => {
+                        let action = bot_choose_action(&state.game);
+                        game_state = state.proceed(action);
                         catching_up = true;
                         change_state(&game_state, catching_up, &mut user_interface);
                     }
@@ -137,16 +140,37 @@ async fn main() {
             }
         }
 
-        match game_state {
-            GameState::AwaitingPlayerAttackReaction(..)
-            | GameState::AwaitingPlayerHitReaction(..)
-                if catching_up =>
-            {
-                // The reaction popup should show up immediately
-                catching_up = false;
-                change_state(&game_state, catching_up, &mut user_interface);
+        let is_players_turn = game_state.game().is_players_turn();
+
+        if is_players_turn {
+            match game_state {
+                GameState::AwaitingChooseAttackReaction(state) => {
+                    let reaction = bot_choose_attack_reaction(&state.game, state.victim);
+                    game_state = state.proceed(reaction);
+                    catching_up = true;
+                    change_state(&game_state, catching_up, &mut user_interface);
+                }
+                GameState::AwaitingChooseHitReaction(state) => {
+                    let reaction = bot_choose_hit_reaction(&state.game, state.reactor);
+                    game_state = state.proceed(reaction);
+                    catching_up = true;
+                    change_state(&game_state, catching_up, &mut user_interface);
+                }
+                _ => {}
             }
-            _ => {}
+        } else {
+            match game_state {
+                GameState::AwaitingChooseAttackReaction(..)
+                | GameState::AwaitingChooseHitReaction(..) => {
+                    if catching_up {
+                        // The reaction popup should show up immediately
+                        catching_up = false;
+                        change_state(&game_state, catching_up, &mut user_interface);
+                    }
+                    game_state = game_state
+                }
+                _ => {}
+            }
         }
 
         next_frame().await
@@ -159,11 +183,16 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
         user_interface.set_state(UiState::Idle);
     } else {
         match game_state {
-            GameState::AwaitingPlayerAction(..) => {
-                println!("awaiting player action");
-                user_interface.set_state(UiState::ChoosingAction);
+            GameState::AwaitingChooseAction(..) => {
+                if game_state.game().is_players_turn() {
+                    println!("awaiting player action");
+                    user_interface.set_state(UiState::ChoosingAction);
+                } else {
+                    println!("awaiting bot");
+                    user_interface.set_state(UiState::Idle);
+                }
             }
-            GameState::AwaitingPlayerAttackReaction(StateReactToAttack {
+            GameState::AwaitingChooseAttackReaction(StateReactToAttack {
                 attacker,
                 hand,
                 victim,
@@ -176,7 +205,7 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
                     reactor: *victim,
                 });
             }
-            GameState::AwaitingPlayerHitReaction(StateReactToHit {
+            GameState::AwaitingChooseHitReaction(StateReactToHit {
                 attacker,
                 damage,
                 reactor,
@@ -189,8 +218,8 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
                     victim: *reactor,
                 });
             }
-            GameState::AwaitingBotChooseAction(..) | GameState::PerformingMovement(..) => {
-                println!("awaiting bot, or performing movement");
+            GameState::PerformingMovement(..) => {
+                println!("performing movement");
                 user_interface.set_state(UiState::Idle);
             }
         }
@@ -207,7 +236,7 @@ struct VisualEffect {
 enum VisualEffectContent {
     Text(String),
     Circle,
-    Projectile((i32, i32)),
+    Projectile((i32, i32), Color),
 }
 
 impl<T> From<T> for VisualEffectContent
@@ -330,10 +359,10 @@ impl GameGrid {
         ));
     }
 
-    fn add_projectile_effect(&mut self, position: (i32, i32), target: (i32, i32)) {
+    fn add_projectile_effect(&mut self, position: (i32, i32), target: (i32, i32), color: Color) {
         self.effects.push(VisualEffect::new(
             position,
-            VisualEffectContent::Projectile(target),
+            VisualEffectContent::Projectile(target, color),
             0.15,
         ));
     }
@@ -691,7 +720,7 @@ impl GameGrid {
                     draw_circle(x0, y0, r, GOLD);
                 }
 
-                VisualEffectContent::Projectile(target) => {
+                VisualEffectContent::Projectile(target, color) => {
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
 
@@ -701,7 +730,7 @@ impl GameGrid {
                     let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
                     let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
 
-                    draw_circle(x, y, self.cell_w * 0.2, RED);
+                    draw_circle(x, y, self.cell_w * 0.2, *color);
                 }
             }
         }
@@ -1263,7 +1292,7 @@ impl UserInterface {
             });
 
             let tabs = Tabs::new(
-                2,
+                0,
                 vec![
                     ("Actions", actions_section),
                     ("Secondary", secondary_actions_section),
@@ -1621,14 +1650,20 @@ impl UserInterface {
                 let pos = self.characters.get(target).position_i32();
                 self.game_grid.add_text_effect(pos, "Miss");
             }
-            GameEvent::CastSpell {
+            GameEvent::SpellWasCast {
                 caster,
                 target,
                 success,
+                spell_type,
             } => {
                 let caster_pos = self.characters.get(caster).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
-                self.game_grid.add_projectile_effect(caster_pos, target_pos);
+                let color = match spell_type {
+                    rpg::core::SpellType::Mental => BLUE,
+                    rpg::core::SpellType::Projectile => RED,
+                };
+                self.game_grid
+                    .add_projectile_effect(caster_pos, target_pos, color);
 
                 if !success {
                     let target_pos = self.characters.get(target).position_i32();
@@ -1726,19 +1761,19 @@ impl UserInterface {
                             explanation
                                 .push_str(&target_char.explain_incoming_attack_circumstances());
                             self.activity_popup.target_line = Some(format!(
-                                "target: {}, hit chance: {} {}",
+                                "[{}] hit chance: {} {}",
                                 target_char.name, chance, explanation
                             ));
                             popup_enabled = true;
                         } else {
-                            self.activity_popup.target_line = Some("CAN NOT ATTACK".to_string());
+                            self.activity_popup.target_line = Some("Can not attack!".to_string());
                         }
                     } else {
                         let range = self.active_character().weapon(hand).unwrap().range;
                         self.game_grid.range_indicator = Some(range);
 
                         self.activity_popup.target_line =
-                            Some(format!("target: {}, OUT OF RANGE", target_char.name));
+                            Some(format!("[{}] Out of range!", target_char.name));
                     }
                 } else {
                     self.activity_popup.target_line = Some("Select a target".to_string());
@@ -1758,16 +1793,14 @@ impl UserInterface {
                             spell.spell_type,
                             &target_char,
                         ));
-                        self.activity_popup.target_line = Some(format!(
-                            "target: {}, success chance: {}",
-                            target_char.name, chance
-                        ));
+                        self.activity_popup.target_line =
+                            Some(format!("[{}] success chance: {}", target_char.name, chance));
                         popup_enabled = true;
                     } else {
                         let range = spell.range;
                         self.game_grid.range_indicator = Some(range);
                         self.activity_popup.target_line =
-                            Some(format!("target: {}, OUT OF RANGE", target_char.name));
+                            Some(format!("[{}] Out of range!", target_char.name));
                     }
                 } else {
                     self.activity_popup.target_line = Some("Select a target".to_string());

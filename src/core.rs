@@ -3,10 +3,10 @@ use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
-use crate::data::BOW;
 use crate::data::BRACE;
 use crate::data::KILL;
 use crate::data::WAR_HAMMER;
+use crate::data::{BOW, SIDE_STEP};
 use crate::data::{
     CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SMALL_SHIELD, SWORD,
 };
@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (15, 7));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (2, 5));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -33,9 +33,11 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Gremlin", TextureId::Character2, 1, 1, 1, (2, 4));
+        let mut alice = Character::new(false, "Gremlin", TextureId::Character2, 5, 5, 5, (2, 4));
         alice.main_hand.weapon = Some(BOW);
+        alice.off_hand.shield = Some(SMALL_SHIELD);
         alice.armor = Some(LEATHER_ARMOR);
+        alice.known_attacked_reactions.push(SIDE_STEP);
 
         let mut charlie = Character::new(false, "Gremlin", TextureId::Character2, 1, 2, 1, (3, 4));
         charlie.main_hand.weapon = Some(SWORD);
@@ -54,20 +56,18 @@ impl CoreGame {
     }
 
     pub fn begin(self) -> GameState {
-        if self.active_character().player_controlled {
-            GameState::AwaitingPlayerAction(StateChooseAction { game: self })
-        } else {
-            GameState::AwaitingBotChooseAction(StateAwaitingBotChooseAction { game: self })
-        }
+        GameState::AwaitingChooseAction(StateChooseAction { game: self })
     }
 
     pub fn active_character(&self) -> RefMut<Character> {
         self.characters.get_mut(self.active_character_id)
     }
 
-    fn enter_state_action(self, action: Action) -> GameState {
-        let players_turn = self.active_character().player_controlled;
+    pub fn is_players_turn(&self) -> bool {
+        self.active_character().player_controlled
+    }
 
+    fn enter_state_action(self, action: Action) -> GameState {
         let mut character = self.active_character();
         let action_points_before_action = character.action_points;
 
@@ -110,11 +110,13 @@ impl CoreGame {
                 );
                 self.log(attacks_str.clone());
 
+                let is_within_melee = within_meele(attacker.position, defender.position);
+
                 drop(attacker);
                 drop(defender);
-                return if !players_turn {
+                return if is_within_melee {
                     let attacking_character_i = self.active_character_id;
-                    transition_to(GameState::AwaitingPlayerAttackReaction(
+                    transition_to(GameState::AwaitingChooseAttackReaction(
                         StateReactToAttack {
                             game: self,
                             action_points_before_action,
@@ -293,10 +295,11 @@ impl CoreGame {
 
             let success = res >= target;
 
-            self.event_handler.handle(GameEvent::CastSpell {
+            self.event_handler.handle(GameEvent::SpellWasCast {
                 caster: caster.id(),
                 target: defender.id(),
                 success,
+                spell_type: spell.spell_type,
             });
 
             if success {
@@ -554,16 +557,14 @@ impl CoreGame {
             // You recover from 1 stack of Dazed each time you're hit by an attack
             self.perform_recover_from_dazed(&mut self.characters.get_mut(attacked_id), 1);
 
-            if !players_turn {
-                drop(character);
-                let attacking_id = self.active_character_id;
-                return transition_to(GameState::AwaitingPlayerHitReaction(StateReactToHit {
-                    game: self,
-                    damage,
-                    attacker: attacking_id,
-                    reactor: attacked_id,
-                }));
-            }
+            drop(character);
+            let attacking_id = self.active_character_id;
+            return transition_to(GameState::AwaitingChooseHitReaction(StateReactToHit {
+                game: self,
+                damage,
+                attacker: attacking_id,
+                reactor: attacked_id,
+            }));
         }
 
         drop(character);
@@ -652,15 +653,9 @@ impl CoreGame {
             }
         }
 
-        if self.active_character().player_controlled {
-            transition_to(GameState::AwaitingPlayerAction(StateChooseAction {
-                game: self,
-            }))
-        } else {
-            transition_to(GameState::AwaitingBotChooseAction(
-                StateAwaitingBotChooseAction { game: self },
-            ))
-        }
+        transition_to(GameState::AwaitingChooseAction(StateChooseAction {
+            game: self,
+        }))
     }
 
     fn perform_end_of_turn_character(&self, character: &mut Character) {
@@ -706,51 +701,48 @@ fn transition_to(mut game_state: GameState) -> GameState {
 }
 
 pub enum GameState {
-    AwaitingPlayerAction(StateChooseAction),
-    AwaitingPlayerAttackReaction(StateReactToAttack),
-    AwaitingPlayerHitReaction(StateReactToHit),
-    AwaitingBotChooseAction(StateAwaitingBotChooseAction),
+    AwaitingChooseAction(StateChooseAction),
+    AwaitingChooseAttackReaction(StateReactToAttack),
+    AwaitingChooseHitReaction(StateReactToHit),
     PerformingMovement(StatePerformingMovement),
 }
 
 impl GameState {
     pub fn game(&self) -> &CoreGame {
         match self {
-            GameState::AwaitingPlayerAction(this) => &this.game,
-            GameState::AwaitingPlayerAttackReaction(this) => &this.game,
-            GameState::AwaitingPlayerHitReaction(this) => &this.game,
-            GameState::AwaitingBotChooseAction(this) => &this.game,
+            GameState::AwaitingChooseAction(this) => &this.game,
+            GameState::AwaitingChooseAttackReaction(this) => &this.game,
+            GameState::AwaitingChooseHitReaction(this) => &this.game,
             GameState::PerformingMovement(this) => &this.game,
         }
     }
 
     pub fn game_mut(&mut self) -> &mut CoreGame {
         match self {
-            GameState::AwaitingPlayerAction(this) => &mut this.game,
-            GameState::AwaitingPlayerAttackReaction(this) => &mut this.game,
-            GameState::AwaitingPlayerHitReaction(this) => &mut this.game,
-            GameState::AwaitingBotChooseAction(this) => &mut this.game,
+            GameState::AwaitingChooseAction(this) => &mut this.game,
+            GameState::AwaitingChooseAttackReaction(this) => &mut this.game,
+            GameState::AwaitingChooseHitReaction(this) => &mut this.game,
             GameState::PerformingMovement(this) => &mut this.game,
         }
     }
 
     pub fn unwrap_choose_action(self) -> StateChooseAction {
         match self {
-            GameState::AwaitingPlayerAction(inner) => inner,
+            GameState::AwaitingChooseAction(inner) => inner,
             _ => panic!(),
         }
     }
 
     pub fn unwrap_react_to_attack(self) -> StateReactToAttack {
         match self {
-            GameState::AwaitingPlayerAttackReaction(inner) => inner,
+            GameState::AwaitingChooseAttackReaction(inner) => inner,
             _ => panic!(),
         }
     }
 
     pub fn unwrap_react_to_hit(self) -> StateReactToHit {
         match self {
-            GameState::AwaitingPlayerHitReaction(inner) => inner,
+            GameState::AwaitingChooseHitReaction(inner) => inner,
             _ => panic!(),
         }
     }
@@ -770,10 +762,11 @@ pub enum GameEvent {
     AttackMissed {
         target: CharacterId,
     },
-    CastSpell {
+    SpellWasCast {
         caster: CharacterId,
         target: CharacterId,
         success: bool,
+        spell_type: SpellType,
     },
     CharacterReceivedSelfEffect {
         character: CharacterId,
@@ -785,7 +778,7 @@ pub enum GameEvent {
 }
 
 pub struct StateChooseAction {
-    game: CoreGame,
+    pub game: CoreGame,
 }
 
 impl StateChooseAction {
@@ -807,7 +800,7 @@ impl StatePerformingMovement {
 }
 
 pub struct StateReactToAttack {
-    game: CoreGame,
+    pub game: CoreGame,
     pub attacker: CharacterId,
     pub victim: CharacterId,
     action_points_before_action: u32,
@@ -828,7 +821,7 @@ impl StateReactToAttack {
 }
 
 pub struct StateReactToHit {
-    game: CoreGame,
+    pub game: CoreGame,
     pub attacker: CharacterId,
     pub reactor: CharacterId,
     pub damage: u32,
@@ -838,16 +831,6 @@ impl StateReactToHit {
     pub fn proceed(self, reaction: Option<OnHitReaction>) -> GameState {
         self.game
             .enter_state_react_after_being_hit(self.reactor, reaction)
-    }
-}
-
-pub struct StateAwaitingBotChooseAction {
-    pub game: CoreGame,
-}
-
-impl StateAwaitingBotChooseAction {
-    pub fn proceed(self, action: Action) -> GameState {
-        self.game.enter_state_action(action)
     }
 }
 
@@ -1571,6 +1554,10 @@ fn within_range(range_squared: f32, source: (u32, u32), destination: (u32, u32))
     let distance_squared = (destination.0 as i32 - source.0 as i32).pow(2)
         + (destination.1 as i32 - source.1 as i32).pow(2);
     distance_squared as f32 <= range_squared
+}
+
+fn within_meele(source: (u32, u32), destination: (u32, u32)) -> bool {
+    within_range(2.0, source, destination)
 }
 
 #[derive(Debug, Copy, Clone)]
