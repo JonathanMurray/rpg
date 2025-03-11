@@ -23,7 +23,8 @@ impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
         let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (15, 7));
         bob.main_hand.weapon = Some(SWORD);
-        bob.off_hand.shield = None;
+        bob.off_hand.shield = Some(SMALL_SHIELD);
+        bob.armor = Some(LEATHER_ARMOR);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         //bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_on_hit_reactions.push(RAGE);
@@ -1166,7 +1167,7 @@ pub struct Character {
     pub health: NumberedResource,
     pub mana: NumberedResource,
     pub move_range: f32,
-    armor: Option<ArmorPiece>,
+    pub armor: Option<ArmorPiece>,
     main_hand: Hand,
     off_hand: Hand,
     conditions: Conditions,
@@ -1599,8 +1600,9 @@ impl NumberedResource {
 
 #[derive(Debug, Copy, Clone)]
 pub struct ArmorPiece {
-    pub(crate) protection: u32,
-    pub(crate) limit_defense_from_dex: Option<u32>,
+    pub name: &'static str,
+    pub protection: u32,
+    pub limit_defense_from_dex: Option<u32>,
 }
 
 #[derive(Debug, Copy, Clone)]

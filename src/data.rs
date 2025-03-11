@@ -6,11 +6,13 @@ use crate::core::{
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
+    name: "Leather armor",
     protection: 3,
     limit_defense_from_dex: None,
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
+    name: "Chain mail",
     protection: 5,
     limit_defense_from_dex: Some(4),
 };

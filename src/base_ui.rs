@@ -1,7 +1,7 @@
 use macroquad::{
-    color::{Color, DARKGREEN, MAGENTA, WHITE},
+    color::{Color, DARKGREEN, GRAY, MAGENTA, WHITE},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text, measure_text},
 };
 use std::{
@@ -161,19 +161,33 @@ pub struct TextLine {
     offset_y: f32,
     font_size: u16,
     color: Color,
+    min_height: f32,
+    padding: f32,
 }
 
 impl TextLine {
     pub fn new(string: impl Into<String>, font_size: u16, color: Color) -> Self {
         let mut this = Self {
             size: (0.0, 0.0),
-            string: "".to_string(),
+            string: string.into(),
             offset_y: 0.0,
             font_size,
             color,
+            min_height: 0.0,
+            padding: 0.0,
         };
-        this.set_string(string);
+        this.measure();
         this
+    }
+
+    pub fn set_min_height(&mut self, min_height: f32) {
+        self.min_height = min_height;
+        self.size.1 = self.size.1.max(min_height);
+    }
+
+    pub fn set_padding(&mut self, padding: f32) {
+        self.padding = padding;
+        self.measure();
     }
 
     pub fn set_string(&mut self, string: impl Into<String>) {
@@ -181,12 +195,17 @@ impl TextLine {
         if string.is_empty() {
             string.push_str("~~~");
         }
-        let text_dimensions = measure_text(&string, None, self.font_size, 1.0);
         self.string = string;
+        self.measure();
+    }
+
+    fn measure(&mut self) {
+        let text_dimensions = measure_text(&self.string, None, self.font_size, 1.0);
         self.size = (
-            text_dimensions.width.max(0.0),
-            text_dimensions.height.max(0.0),
+            text_dimensions.width.max(0.0) + self.padding * 2.0,
+            text_dimensions.height.max(0.0) + self.padding * 2.0,
         );
+        self.size.1 = self.size.1.max(self.min_height);
         assert!(self.size.0.is_finite() && self.size.1.is_finite());
         self.offset_y = text_dimensions.offset_y;
     }
@@ -196,8 +215,8 @@ impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
         draw_text(
             &self.string,
-            x,
-            y + self.offset_y,
+            self.padding + x,
+            self.padding + y + self.offset_y,
             self.font_size as f32,
             self.color,
         );
@@ -264,6 +283,7 @@ impl Default for LayoutDirection {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 pub enum Align {
     Start,
     Center,
@@ -285,6 +305,7 @@ pub struct Container {
     pub style: Style,
     pub min_width: Option<f32>,
     pub children: Vec<Element>,
+    pub border_between_children: Option<Color>,
 }
 
 impl Container {
@@ -341,7 +362,7 @@ impl Container {
 
         let mut x0 = x + self.padding;
         let mut y0 = y + self.padding;
-        for element in &self.children {
+        for (i, element) in self.children.iter().enumerate() {
             let (element_w, element_h) = element.size();
 
             let offset = match (&self.align, &self.layout_dir) {
@@ -370,10 +391,78 @@ impl Container {
                 LayoutDirection::Horizontal => x0 += element_w + self.margin,
                 LayoutDirection::Vertical => y0 += element_h + self.margin,
             }
+
+            if i < self.children.len() - 1 {
+                if let Some(border_color) = self.border_between_children {
+                    let thickness = 1.0;
+                    match self.layout_dir {
+                        LayoutDirection::Horizontal => {
+                            draw_line(x0, y0, x0, y0 + size.1, thickness, border_color)
+                        }
+                        LayoutDirection::Vertical => {
+                            draw_line(x0, y0, x0 + size.0, y0, thickness, border_color)
+                        }
+                    }
+                }
+            }
         }
 
         draw_debug(x, y, size.0, size.1);
     }
+}
+
+pub fn table(cells: Vec<impl Into<String>>, column_alignments: Vec<Align>) -> Element {
+    let num_cols = column_alignments.len();
+    let mut columns: Vec<Vec<TextLine>> = vec![];
+    for _ in 0..num_cols {
+        columns.push(vec![]);
+    }
+
+    let mut col_i = 0;
+    let mut row_i = 0;
+    let mut max_height_in_row: f32 = 0.0;
+    for cell in cells {
+        let mut text = TextLine::new(cell, 18, WHITE);
+        text.set_padding(8.0);
+        max_height_in_row = max_height_in_row.max(text.size().1);
+        columns[col_i].push(text);
+        col_i = (col_i + 1) % num_cols;
+        if col_i == 0 {
+            for col in columns.iter_mut() {
+                // align cells vertically
+                col[row_i].set_min_height(max_height_in_row);
+            }
+            row_i += 1;
+            max_height_in_row = 0.0;
+        }
+    }
+
+    let border_color = GRAY;
+
+    let columns = columns
+        .into_iter()
+        .enumerate()
+        .map(|(i, col)| {
+            Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                border_between_children: Some(border_color),
+                align: column_alignments[i],
+                children: col.into_iter().map(Element::Text).collect(),
+                ..Default::default()
+            })
+        })
+        .collect();
+
+    Element::Container(Container {
+        layout_dir: LayoutDirection::Horizontal,
+        style: Style {
+            border_color: Some(border_color),
+            ..Default::default()
+        },
+        border_between_children: Some(border_color),
+        children: columns,
+        ..Default::default()
+    })
 }
 
 pub fn draw_debug(x: f32, y: f32, w: f32, h: f32) {

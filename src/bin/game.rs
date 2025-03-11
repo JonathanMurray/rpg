@@ -25,8 +25,8 @@ use macroquad::{
 };
 
 use rpg::base_ui::{
-    draw_debug, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, Tabs,
-    TextLine,
+    draw_debug, table, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
+    Tabs, TextLine,
 };
 use rpg::bot::bot_choose_action;
 use rpg::core::{
@@ -1185,7 +1185,7 @@ impl UserInterface {
                     .collect(),
             );
 
-            let stats_section = Element::Container(Container {
+            let stats_table = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 children: vec![
                     Element::Container(attribute_row(
@@ -1213,6 +1213,34 @@ impl UserInterface {
                         ],
                     )),
                 ],
+                border_between_children: Some(GRAY),
+                style: Style {
+                    background_color: None,
+                    border_color: Some(GRAY),
+                },
+                ..Default::default()
+            });
+
+            let mut equipment_cells = vec![];
+            for hand in [HandType::MainHand, HandType::OffHand] {
+                if let Some(weapon) = character_ref.weapon(hand) {
+                    equipment_cells.push(format!("{}:", weapon.name));
+                    equipment_cells.push(format!("{} dmg", weapon.damage));
+                }
+            }
+            if let Some(shield) = character_ref.shield() {
+                equipment_cells.push(format!("{}:", shield.name));
+                equipment_cells.push(format!("{} def", shield.defense));
+            }
+            if let Some(armor) = character_ref.armor {
+                equipment_cells.push(format!("{}:", armor.name));
+                equipment_cells.push(format!("{} armor", armor.protection));
+            }
+            let equipment_table = table(equipment_cells, vec![Align::End, Align::Start]);
+            let stats_section = Element::Container(Container {
+                layout_dir: LayoutDirection::Horizontal,
+                children: vec![stats_table, equipment_table],
+                margin: 10.0,
                 ..Default::default()
             });
 
@@ -1235,7 +1263,7 @@ impl UserInterface {
             });
 
             let tabs = Tabs::new(
-                0,
+                2,
                 vec![
                     ("Actions", actions_section),
                     ("Secondary", secondary_actions_section),
@@ -1376,8 +1404,8 @@ impl UserInterface {
             .draw(20.0, y + 70.0);
         self.character_uis[&self.player_portraits.selected_i.get()]
             .resource_bars
-            .draw(500.0, y + 80.0);
-        self.log.draw(670.0, y);
+            .draw(620.0, y + 60.0);
+        self.log.draw(800.0, y);
 
         self.character_portraits
             .set_hovered_character_id(hovered_character_id);
@@ -2515,10 +2543,6 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
         padding: 5.0,
         margin: 20.0,
         align: Align::Center,
-        style: Style {
-            border_color: Some(GRAY),
-            ..Default::default()
-        },
         children: vec![attribute_element, stats_list],
         ..Default::default()
     }
