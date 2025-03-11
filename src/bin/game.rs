@@ -29,7 +29,7 @@ use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
     Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
     MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
-    StateReactToAttack, StateReactToHit, TextureId, ACTION_POINTS_PER_TURN,
+    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -144,15 +144,23 @@ async fn main() {
 
         if is_players_turn {
             match game_state {
-                GameState::AwaitingChooseAttackReaction(state) => {
-                    let reaction = bot_choose_attack_reaction(&state.game, state.victim);
-                    game_state = state.proceed(reaction);
-                    catching_up = true;
-                    change_state(&game_state, catching_up, &mut user_interface);
-                }
-                GameState::AwaitingChooseHitReaction(state) => {
-                    let reaction = bot_choose_hit_reaction(&state.game, state.reactor);
-                    game_state = state.proceed(reaction);
+                GameState::AwaitingChooseReaction(state) => {
+                    match state {
+                        StateChooseReaction::Attack(choose_reaction) => {
+                            let reaction = bot_choose_attack_reaction(
+                                &choose_reaction.game,
+                                choose_reaction.reactor,
+                            );
+                            game_state = choose_reaction.proceed(reaction);
+                        }
+                        StateChooseReaction::Hit(choose_reaction) => {
+                            let reaction = bot_choose_hit_reaction(
+                                &choose_reaction.game,
+                                choose_reaction.reactor,
+                            );
+                            game_state = choose_reaction.proceed(reaction);
+                        }
+                    }
                     catching_up = true;
                     change_state(&game_state, catching_up, &mut user_interface);
                 }
@@ -160,8 +168,7 @@ async fn main() {
             }
         } else {
             match game_state {
-                GameState::AwaitingChooseAttackReaction(..)
-                | GameState::AwaitingChooseHitReaction(..) => {
+                GameState::AwaitingChooseReaction(..) => {
                     if catching_up {
                         // The reaction popup should show up immediately
                         catching_up = false;
@@ -192,32 +199,25 @@ fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut 
                     user_interface.set_state(UiState::Idle);
                 }
             }
-            GameState::AwaitingChooseAttackReaction(StateReactToAttack {
-                attacker,
-                hand,
-                victim,
-                ..
-            }) => {
-                println!("awaiting player attack reaction");
-                user_interface.set_state(UiState::ReactingToAttack {
-                    attacker: *attacker,
-                    hand: *hand,
-                    reactor: *victim,
-                });
-            }
-            GameState::AwaitingChooseHitReaction(StateReactToHit {
-                attacker,
-                damage,
-                reactor,
-                ..
-            }) => {
-                println!("awaiting player hit reaction");
-                user_interface.set_state(UiState::ReactingToHit {
-                    attacker: *attacker,
-                    damage: *damage,
-                    victim: *reactor,
-                });
-            }
+            GameState::AwaitingChooseReaction(state) => match state {
+                StateChooseReaction::Attack(inner) => {
+                    println!("awaiting player attack reaction");
+                    user_interface.set_state(UiState::ReactingToAttack {
+                        attacker: inner.attacker,
+                        hand: inner.hand,
+                        reactor: inner.reactor,
+                    });
+                }
+                StateChooseReaction::Hit(inner) => {
+                    println!("awaiting player hit reaction");
+                    user_interface.set_state(UiState::ReactingToHit {
+                        attacker: inner.attacker,
+                        victim: inner.reactor,
+                        damage: inner.damage,
+                    });
+                }
+            },
+
             GameState::PerformingMovement(..) => {
                 println!("performing movement");
                 user_interface.set_state(UiState::Idle);

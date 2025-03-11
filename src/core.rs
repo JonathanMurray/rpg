@@ -116,15 +116,15 @@ impl CoreGame {
                 drop(defender);
                 return if is_within_melee {
                     let attacking_character_i = self.active_character_id;
-                    transition_to(GameState::AwaitingChooseAttackReaction(
-                        StateReactToAttack {
+                    transition_to(GameState::AwaitingChooseReaction(
+                        StateChooseReaction::Attack(StateChooseAttackReaction {
                             game: self,
-                            action_points_before_action,
-                            hand,
-                            enhancements,
+                            reactor: target,
                             attacker: attacking_character_i,
-                            victim: target,
-                        },
+                            action_points_before_action,
+                            enhancements,
+                            hand,
+                        }),
                     ))
                 } else {
                     self.enter_state_attack(
@@ -559,12 +559,14 @@ impl CoreGame {
 
             drop(character);
             let attacking_id = self.active_character_id;
-            return transition_to(GameState::AwaitingChooseHitReaction(StateReactToHit {
-                game: self,
-                damage,
-                attacker: attacking_id,
-                reactor: attacked_id,
-            }));
+            return transition_to(GameState::AwaitingChooseReaction(StateChooseReaction::Hit(
+                StateChooseHitReaction {
+                    game: self,
+                    reactor: attacked_id,
+                    attacker: attacking_id,
+                    damage,
+                },
+            )));
         }
 
         drop(character);
@@ -702,8 +704,7 @@ fn transition_to(mut game_state: GameState) -> GameState {
 
 pub enum GameState {
     AwaitingChooseAction(StateChooseAction),
-    AwaitingChooseAttackReaction(StateReactToAttack),
-    AwaitingChooseHitReaction(StateReactToHit),
+    AwaitingChooseReaction(StateChooseReaction),
     PerformingMovement(StatePerformingMovement),
 }
 
@@ -711,8 +712,8 @@ impl GameState {
     pub fn game(&self) -> &CoreGame {
         match self {
             GameState::AwaitingChooseAction(this) => &this.game,
-            GameState::AwaitingChooseAttackReaction(this) => &this.game,
-            GameState::AwaitingChooseHitReaction(this) => &this.game,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Attack(this)) => &this.game,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Hit(this)) => &this.game,
             GameState::PerformingMovement(this) => &this.game,
         }
     }
@@ -720,8 +721,8 @@ impl GameState {
     pub fn game_mut(&mut self) -> &mut CoreGame {
         match self {
             GameState::AwaitingChooseAction(this) => &mut this.game,
-            GameState::AwaitingChooseAttackReaction(this) => &mut this.game,
-            GameState::AwaitingChooseHitReaction(this) => &mut this.game,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Attack(this)) => &mut this.game,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Hit(this)) => &mut this.game,
             GameState::PerformingMovement(this) => &mut this.game,
         }
     }
@@ -733,16 +734,16 @@ impl GameState {
         }
     }
 
-    pub fn unwrap_react_to_attack(self) -> StateReactToAttack {
+    pub fn unwrap_react_to_attack(self) -> StateChooseAttackReaction {
         match self {
-            GameState::AwaitingChooseAttackReaction(inner) => inner,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Attack(inner)) => inner,
             _ => panic!(),
         }
     }
 
-    pub fn unwrap_react_to_hit(self) -> StateReactToHit {
+    pub fn unwrap_react_to_hit(self) -> StateChooseHitReaction {
         match self {
-            GameState::AwaitingChooseHitReaction(inner) => inner,
+            GameState::AwaitingChooseReaction(StateChooseReaction::Hit(inner)) => inner,
             _ => panic!(),
         }
     }
@@ -799,35 +800,40 @@ impl StatePerformingMovement {
     }
 }
 
-pub struct StateReactToAttack {
+pub enum StateChooseReaction {
+    Attack(StateChooseAttackReaction),
+    Hit(StateChooseHitReaction),
+}
+
+pub struct StateChooseAttackReaction {
     pub game: CoreGame,
+    pub reactor: CharacterId,
     pub attacker: CharacterId,
-    pub victim: CharacterId,
     action_points_before_action: u32,
     pub enhancements: Vec<AttackEnhancement>,
     pub hand: HandType,
 }
 
-impl StateReactToAttack {
+impl StateChooseAttackReaction {
     pub fn proceed(self, reaction: Option<OnAttackedReaction>) -> GameState {
         self.game.enter_state_attack(
             self.action_points_before_action,
             self.hand,
             self.enhancements,
-            self.victim,
+            self.reactor,
             reaction,
         )
     }
 }
 
-pub struct StateReactToHit {
+pub struct StateChooseHitReaction {
     pub game: CoreGame,
-    pub attacker: CharacterId,
     pub reactor: CharacterId,
+    pub attacker: CharacterId,
     pub damage: u32,
 }
 
-impl StateReactToHit {
+impl StateChooseHitReaction {
     pub fn proceed(self, reaction: Option<OnHitReaction>) -> GameState {
         self.game
             .enter_state_react_after_being_hit(self.reactor, reaction)
