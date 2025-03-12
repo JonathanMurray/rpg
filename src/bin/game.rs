@@ -28,7 +28,7 @@ use rpg::core::{
     as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
     Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
     MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
-    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN,
+    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -848,7 +848,7 @@ impl UserInterface {
         if grid_outcome.switched_to_move {
             let move_range = self.active_character().move_range;
             self.set_state(UiState::ConfiguringAction(BaseAction::Move {
-                action_point_cost: 1,
+                action_point_cost: MOVE_ACTION_COST,
                 range: move_range,
             }));
         }

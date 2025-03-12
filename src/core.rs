@@ -1218,7 +1218,7 @@ pub struct Character {
     known_on_hit_reactions: Vec<OnHitReaction>,
 }
 
-const MOVE_ACTION_COST: u32 = 1;
+pub const MOVE_ACTION_COST: u32 = 1;
 
 impl Character {
     fn new(
