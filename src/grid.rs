@@ -28,6 +28,15 @@ use crate::{
     drawing::{draw_arrow, draw_dashed_line},
 };
 
+#[derive(Debug, Copy, Clone)]
+struct CharacterMotion {
+    character_id: CharacterId,
+    from: (i32, i32),
+    to: (i32, i32),
+    remaining_duration: f32,
+    duration: f32,
+}
+
 pub struct GameGrid {
     textures: HashMap<TextureId, Texture2D>,
     pathfind_grid: PathfindGrid,
@@ -44,10 +53,12 @@ pub struct GameGrid {
     pub range_indicator: Option<Range>,
 
     pub receptive_to_input: bool,
-    cell_w: f32,
     pub grid_dimensions: (i32, i32),
-
     pub position_on_screen: (f32, f32),
+
+    character_motion: Option<CharacterMotion>,
+
+    cell_w: f32,
     size: (f32, f32),
 }
 
@@ -76,8 +87,26 @@ impl GameGrid {
             cell_w: 64.0,
             grid_dimensions,
             position_on_screen: (0.0, 0.0), // is set later
+            character_motion: None,
             size,
         }
+    }
+
+    pub fn set_character_motion(
+        &mut self,
+        character_id: CharacterId,
+        from: (u32, u32),
+        to: (u32, u32),
+        duration: f32,
+    ) {
+        assert!(self.character_motion.is_none());
+        self.character_motion = Some(CharacterMotion {
+            character_id,
+            from: (from.0 as i32, from.1 as i32),
+            to: (to.0 as i32, to.1 as i32),
+            remaining_duration: duration,
+            duration,
+        });
     }
 
     pub fn update(
@@ -123,6 +152,13 @@ impl GameGrid {
                 VisualEffectContent::Circle(color),
                 0.1,
             ));
+        }
+
+        if let Some(motion) = &mut self.character_motion {
+            motion.remaining_duration -= elapsed;
+            if motion.remaining_duration <= 0.0 {
+                self.character_motion = None;
+            }
         }
 
         let camera_speed = 5.0;
@@ -202,6 +238,34 @@ impl GameGrid {
 
     fn grid_y_to_screen(&self, grid_y: i32) -> f32 {
         self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get()
+    }
+
+    fn character_screen_pos(
+        &self,
+        character_id: CharacterId,
+        character_pos: (i32, i32),
+    ) -> (f32, f32) {
+        if let Some(motion) = self.character_motion {
+            if motion.character_id == character_id {
+                let from = (
+                    self.grid_x_to_screen(motion.from.0),
+                    self.grid_y_to_screen(motion.from.1),
+                );
+                let to = (
+                    self.grid_x_to_screen(motion.to.0),
+                    self.grid_y_to_screen(motion.to.1),
+                );
+                let remaining = motion.remaining_duration / motion.duration;
+                return (
+                    to.0 - (to.0 - from.0) * remaining,
+                    to.1 - (to.1 - from.1) * remaining,
+                );
+            }
+        }
+        (
+            self.grid_x_to_screen(character_pos.0),
+            self.grid_x_to_screen(character_pos.1),
+        )
     }
 
     fn draw_square(&self, (grid_x, grid_y): (i32, i32), color: Color) {
@@ -285,35 +349,19 @@ impl GameGrid {
                 ..Default::default()
             };
 
-            draw_texture_ex(
-                &self.textures[&ch.texture],
-                self.grid_x_to_screen(position.0),
-                self.grid_y_to_screen(position.1),
-                WHITE,
-                params.clone(),
-            );
+            let (x, y) = self.character_screen_pos(ch.id(), position);
+
+            draw_texture_ex(&self.textures[&ch.texture], x, y, WHITE, params.clone());
 
             if let Some(weapon) = ch.weapon(HandType::MainHand) {
                 if let Some(texture) = weapon.texture_id {
-                    draw_texture_ex(
-                        &self.textures[&texture],
-                        self.grid_x_to_screen(position.0),
-                        self.grid_y_to_screen(position.1),
-                        WHITE,
-                        params.clone(),
-                    );
+                    draw_texture_ex(&self.textures[&texture], x, y, WHITE, params.clone());
                 }
             }
 
             if let Some(shield) = ch.shield() {
                 if let Some(texture) = shield.texture_id {
-                    draw_texture_ex(
-                        &self.textures[&texture],
-                        self.grid_x_to_screen(position.0),
-                        self.grid_y_to_screen(position.1),
-                        WHITE,
-                        params,
-                    );
+                    draw_texture_ex(&self.textures[&texture], x, y, WHITE, params);
                 }
             }
         }
@@ -502,10 +550,11 @@ impl GameGrid {
         }
 
         {
+            let (x, y) = self.character_screen_pos(self.active_character_id, active_character_pos);
             let margin = 2.0;
             draw_rectangle_lines(
-                self.grid_x_to_screen(active_character_pos.0) - margin,
-                self.grid_y_to_screen(active_character_pos.1) - margin,
+                x - margin,
+                y - margin,
                 self.cell_w + margin * 2.0,
                 self.cell_w + margin * 2.0,
                 2.0,

@@ -441,21 +441,28 @@ impl CoreGame {
 
         let hit = res >= defense;
 
+        let outcome = if hit {
+            AttackOutcome::Hit
+        } else {
+            if defender_reacted_with_parry {
+                self.log("  Parried!");
+                AttackOutcome::Parry
+            } else if defender_reacted_with_sidestep {
+                self.log("  Side stepped!");
+                AttackOutcome::Dodge
+            } else {
+                self.log("  Missed!");
+                AttackOutcome::Miss
+            }
+        };
+
         self.event_handler.handle(GameEvent::Attacked {
             attacker: attacker.id(),
             target: defender_id,
-            hit,
+            outcome,
         });
 
-        if !hit {
-            if defender_reacted_with_parry {
-                self.log("  Parried!");
-            } else if defender_reacted_with_sidestep {
-                self.log("  Side stepped!");
-            } else {
-                self.log("  Missed!")
-            }
-        } else {
+        if hit {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
             let mut damage = weapon.damage;
@@ -792,7 +799,7 @@ pub enum GameEvent {
     Attacked {
         attacker: CharacterId,
         target: CharacterId,
-        hit: bool,
+        outcome: AttackOutcome,
     },
     SpellWasCast {
         caster: CharacterId,
@@ -807,6 +814,14 @@ pub enum GameEvent {
     CharacterDied {
         character: CharacterId,
     },
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum AttackOutcome {
+    Hit,
+    Dodge,
+    Parry,
+    Miss,
 }
 
 pub struct StateChooseAction {

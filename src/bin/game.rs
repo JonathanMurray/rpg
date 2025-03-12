@@ -1088,14 +1088,19 @@ impl UserInterface {
             GameEvent::Attacked {
                 attacker,
                 target,
-                hit,
+                outcome,
             } => {
                 let attacker_pos = self.characters.get(attacker).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
 
-                let duration = 0.2;
+                let duration = 0.15;
                 self.stopwatch.set_to_at_least(duration + 0.4);
-                let impact_text = if hit { "" } else { "Miss" };
+                let impact_text = match outcome {
+                    rpg::core::AttackOutcome::Hit => "",
+                    rpg::core::AttackOutcome::Dodge => "Dodge",
+                    rpg::core::AttackOutcome::Parry => "Parry",
+                    rpg::core::AttackOutcome::Miss => "Miss",
+                };
                 self.game_grid.add_projectile_effect(
                     attacker_pos,
                     target_pos,
@@ -1118,8 +1123,8 @@ impl UserInterface {
                     rpg::core::SpellType::Projectile => RED,
                 };
 
-                let duration = 0.5;
-                self.stopwatch.set_to_at_least(duration + 0.2);
+                let duration = 0.2;
+                self.stopwatch.set_to_at_least(duration + 0.3);
                 let impact_text = if success { "" } else { "Resist" };
                 self.game_grid.add_projectile_effect(
                     caster_pos,
@@ -1163,9 +1168,10 @@ impl UserInterface {
                     to
                 ));
 
-                // TODO: interpolate movement in grid
-
-                self.stopwatch.set_to_at_least(0.7);
+                let duration = 0.6;
+                self.game_grid
+                    .set_character_motion(character, from, to, duration);
+                self.stopwatch.set_to_at_least(duration);
             }
         }
     }
