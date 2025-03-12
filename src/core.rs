@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (2, 5));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (0, 6));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -195,10 +195,13 @@ impl CoreGame {
                 assert!(new_position != ch.position)
             }
         }
-        self.log(format!(
-            "{} moved from {:?} to {:?}",
-            character.name, character.position, new_position
-        ));
+
+        self.event_handler.handle(GameEvent::Moved {
+            character: character.id(),
+            from: character.position,
+            to: new_position,
+        });
+
         character.position = new_position;
         drop(character);
 
@@ -222,7 +225,7 @@ impl CoreGame {
         let mut line = String::new();
         match effect {
             ApplyEffect::RemoveActionPoints(n) => {
-                receiver.action_points -= n;
+                receiver.lose_action_points(n);
                 line.push_str(&format!("  {} lost {} AP", receiver.name, n));
             }
             ApplyEffect::Condition(condition) => {
@@ -542,11 +545,10 @@ impl CoreGame {
     }
 
     fn enter_state_right_after_action(
-        self,
+        mut self,
         action_points_before_action: u32,
         attack_hit: Option<(CharacterId, u32)>,
     ) -> GameState {
-        let players_turn = self.active_character().player_controlled;
         let mut character = self.active_character();
 
         // You recover from 1 stack of Dazed for each AP you spend
@@ -563,17 +565,22 @@ impl CoreGame {
 
             drop(character);
             let attacking_id = self.active_character_id;
-            return transition_to(GameState::AwaitingChooseReaction(StateChooseReaction::Hit(
-                StateChooseHitReaction {
-                    game: self,
-                    reactor: attacked_id,
-                    attacker: attacking_id,
-                    damage,
-                },
-            )));
+
+            // If the defender died, we cannot ask for a reaction
+            if !self.characters.get(attacked_id).has_died {
+                return transition_to(GameState::AwaitingChooseReaction(StateChooseReaction::Hit(
+                    StateChooseHitReaction {
+                        game: self,
+                        reactor: attacked_id,
+                        attacker: attacking_id,
+                        damage,
+                    },
+                )));
+            }
+        } else {
+            drop(character);
         }
 
-        drop(character);
         self.enter_state_longer_after_action()
     }
 
@@ -657,6 +664,19 @@ impl CoreGame {
                 self.perform_end_of_turn_character(&mut character);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
             }
+        }
+
+        transition_to(GameState::AwaitingChooseAction(StateChooseAction {
+            game: self,
+        }))
+    }
+
+    fn enter_state_deliberately_end_turn(mut self) -> GameState {
+        {
+            let mut character = self.characters.get_mut(self.active_character_id);
+            self.log(format!("{} ended their turn", character.name));
+            self.perform_end_of_turn_character(&mut character);
+            self.active_character_id = self.characters.next_id(self.active_character_id);
         }
 
         transition_to(GameState::AwaitingChooseAction(StateChooseAction {
@@ -760,6 +780,11 @@ pub trait GameEventHandler {
 #[derive(Debug)]
 pub enum GameEvent {
     LogLine(String),
+    Moved {
+        character: CharacterId,
+        from: (u32, u32),
+        to: (u32, u32),
+    },
     CharacterTookDamage {
         character: CharacterId,
         amount: u32,
@@ -789,8 +814,12 @@ pub struct StateChooseAction {
 }
 
 impl StateChooseAction {
-    pub fn proceed(self, action: Action) -> GameState {
-        self.game.enter_state_action(action)
+    pub fn proceed(self, action: Option<Action>) -> GameState {
+        if let Some(action) = action {
+            self.game.enter_state_action(action)
+        } else {
+            self.game.enter_state_deliberately_end_turn()
+        }
     }
 }
 pub struct StatePerformingMovement {
@@ -1226,6 +1255,10 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
         }
+    }
+
+    fn lose_action_points(&mut self, amount: u32) {
+        self.action_points = self.action_points.saturating_sub(amount);
     }
 
     pub fn position_i32(&self) -> (i32, i32) {

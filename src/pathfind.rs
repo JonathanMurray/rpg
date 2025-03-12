@@ -1,14 +1,9 @@
 use std::collections::{HashMap, HashSet};
 
 pub struct PathfindGrid {
+    dimensions: (i32, i32),
     pub blocked_positions: HashSet<(i32, i32)>,
     pub routes: HashMap<(i32, i32), Route>,
-}
-
-impl Default for PathfindGrid {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -18,8 +13,9 @@ pub struct Route {
 }
 
 impl PathfindGrid {
-    pub fn new() -> Self {
+    pub fn new(dimensions: (i32, i32)) -> Self {
         Self {
+            dimensions,
             blocked_positions: Default::default(),
             routes: Default::default(),
         }
@@ -46,6 +42,7 @@ impl PathfindGrid {
                 }
             }
 
+            assert!(node.0 >= 0 && node.1 >= 0);
             self.routes.insert(node, route);
             let (x, y) = node;
 
@@ -63,7 +60,12 @@ impl PathfindGrid {
             ];
 
             for (neighbor_node, neighbor_dist) in neighbors {
-                if neighbor_dist <= range && (!self.blocked_positions.contains(&neighbor_node)) {
+                let within_grid = (0..self.dimensions.0).contains(&neighbor_node.0)
+                    && (0..self.dimensions.1).contains(&neighbor_node.1);
+                if neighbor_dist <= range
+                    && within_grid
+                    && !self.blocked_positions.contains(&neighbor_node)
+                {
                     next.push((
                         neighbor_node,
                         Route {

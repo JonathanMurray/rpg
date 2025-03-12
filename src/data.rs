@@ -111,6 +111,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     texture_id: Some(TextureId::Shield),
     defense: 2,
     on_hit_reaction: Some(OnHitReaction {
+        // TODO only in melee!
         name: "Shield bash",
         description: "Possibly daze attacker",
         action_point_cost: 1,
@@ -180,7 +181,8 @@ pub const MIND_BLAST: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     damage: 1,
-    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
+    // TODO
+    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(99)),
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
         name: "Dualcast",

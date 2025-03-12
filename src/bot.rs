@@ -4,9 +4,12 @@ use crate::{
 };
 use macroquad::rand;
 
-pub fn bot_choose_action(game: &CoreGame) -> Action {
-    // TODO make sure to only pick an action that the character can actually do (afford, in range, etc)
+pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option<Action> {
     let character = game.active_character();
+
+    dbg!(character.action_points);
+
+    assert!(!character.player_controlled);
 
     let mut actions = character.usable_actions();
     let mut chosen_action = None;
@@ -55,7 +58,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
                     action_point_cost,
                     range: _,
                 } => {
-                    let mut pathfind_grid = PathfindGrid::new();
+                    let mut pathfind_grid = PathfindGrid::new(grid_dimensions);
                     for (id, character) in game.characters.iter_with_ids() {
                         if *id == game.active_character_id {
                             continue; // Avoid borrowing already borrowed active character
@@ -86,7 +89,8 @@ pub fn bot_choose_action(game: &CoreGame) -> Action {
         }
     }
 
-    chosen_action.unwrap()
+    // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
+    chosen_action
 }
 
 pub fn bot_choose_attack_reaction(

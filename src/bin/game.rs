@@ -76,16 +76,10 @@ async fn main() {
     let mut user_interface = UserInterface::new(&game, textures);
 
     let mut game_state = game.begin();
-    let mut catching_up = true;
-    let mut timer = 0.0;
 
-    change_state(&game_state, catching_up, &mut user_interface);
+    let mut waiting_for_ui_after_game_state_change = true;
 
     loop {
-        for event in event_handler.events.borrow_mut().drain(..) {
-            user_interface.handle_game_event(event);
-        }
-
         let elapsed = get_frame_time();
 
         let ui_events = user_interface.update(game_state.game(), elapsed);
@@ -94,11 +88,9 @@ async fn main() {
 
         user_interface.draw(670.0);
 
-        user_interface.update_character_resources(&game_state.game().characters);
-
         if !ui_events.is_empty() {
-            for event in ui_events {
-                match event {
+            for player_choice in ui_events {
+                match player_choice {
                     PlayerChose::AttackedReaction(reaction) => {
                         game_state = game_state.unwrap_react_to_attack().proceed(reaction);
                     }
@@ -106,124 +98,91 @@ async fn main() {
                         game_state = game_state.unwrap_react_to_hit().proceed(reaction);
                     }
                     PlayerChose::Action(action) => {
-                        game_state = game_state.unwrap_choose_action().proceed(action);
+                        dbg!(&action);
+                        // TODO: Add option in UI to deliberately end turn
+                        game_state = game_state.unwrap_choose_action().proceed(Some(action));
                     }
                 }
             }
+            waiting_for_ui_after_game_state_change = true;
+            user_interface.set_state(UiState::Idle);
 
-            catching_up = true;
-            timer = 0.0;
-            change_state(&game_state, catching_up, &mut user_interface);
-        }
-
-        if catching_up {
-            timer += elapsed;
-            if timer > 0.5 {
-                timer = 0.0;
-                match game_state {
-                    GameState::AwaitingChooseAction(state) if !state.game.is_players_turn() => {
-                        let action = bot_choose_action(&state.game);
-                        game_state = state.proceed(action);
-                        catching_up = true;
-                        change_state(&game_state, catching_up, &mut user_interface);
-                    }
-                    GameState::PerformingMovement(performing_movement) => {
-                        game_state = performing_movement.proceed();
-                        catching_up = true;
-                        change_state(&game_state, catching_up, &mut user_interface);
-                    }
-                    _ => {
-                        catching_up = false;
-                        change_state(&game_state, catching_up, &mut user_interface);
-                    }
-                }
+            // Handle any game events that might have resulted from the above state change
+            for event in event_handler.events.borrow_mut().drain(..) {
+                user_interface.handle_game_event(event);
             }
         }
 
-        let is_players_turn = game_state.game().is_players_turn();
-
-        if is_players_turn {
-            match game_state {
-                GameState::AwaitingChooseReaction(state) => {
-                    match state {
+        if user_interface.ready_for_more() && waiting_for_ui_after_game_state_change {
+            println!("No longer waiting for UI!");
+            waiting_for_ui_after_game_state_change = false;
+            let players_turn = game_state.game().is_players_turn();
+            game_state = match game_state {
+                GameState::AwaitingChooseAction(..) if players_turn => {
+                    user_interface.set_state(UiState::ChoosingAction);
+                    game_state
+                }
+                GameState::AwaitingChooseAction(state) => {
+                    assert!(!players_turn);
+                    let action =
+                        bot_choose_action(&state.game, user_interface.game_grid.grid_dimensions);
+                    waiting_for_ui_after_game_state_change = true;
+                    state.proceed(action)
+                }
+                GameState::AwaitingChooseReaction(state) if players_turn => {
+                    let new_game_state = match state {
                         StateChooseReaction::Attack(choose_reaction) => {
                             let reaction = bot_choose_attack_reaction(
                                 &choose_reaction.game,
                                 choose_reaction.reactor,
                             );
-                            game_state = choose_reaction.proceed(reaction);
+                            choose_reaction.proceed(reaction)
                         }
                         StateChooseReaction::Hit(choose_reaction) => {
                             let reaction = bot_choose_hit_reaction(
                                 &choose_reaction.game,
                                 choose_reaction.reactor,
                             );
-                            game_state = choose_reaction.proceed(reaction);
+                            choose_reaction.proceed(reaction)
+                        }
+                    };
+                    waiting_for_ui_after_game_state_change = true;
+                    new_game_state
+                }
+                GameState::AwaitingChooseReaction(ref state) => {
+                    assert!(!players_turn);
+                    match state {
+                        StateChooseReaction::Attack(inner) => {
+                            println!("awaiting player attack reaction");
+                            user_interface.set_state(UiState::ReactingToAttack {
+                                attacker: inner.attacker,
+                                hand: inner.hand,
+                                reactor: inner.reactor,
+                            });
+                        }
+                        StateChooseReaction::Hit(inner) => {
+                            println!("awaiting player hit reaction");
+                            user_interface.set_state(UiState::ReactingToHit {
+                                attacker: inner.attacker,
+                                victim: inner.reactor,
+                                damage: inner.damage,
+                            });
                         }
                     }
-                    catching_up = true;
-                    change_state(&game_state, catching_up, &mut user_interface);
+                    game_state
                 }
-                _ => {}
-            }
-        } else {
-            match game_state {
-                GameState::AwaitingChooseReaction(..) => {
-                    if catching_up {
-                        // The reaction popup should show up immediately
-                        catching_up = false;
-                        change_state(&game_state, catching_up, &mut user_interface);
-                    }
-                    game_state = game_state
+                GameState::PerformingMovement(performing_movement) => {
+                    waiting_for_ui_after_game_state_change = true;
+                    performing_movement.proceed()
                 }
-                _ => {}
             }
+        }
+
+        for event in event_handler.events.borrow_mut().drain(..) {
+            user_interface.handle_game_event(event);
         }
 
         next_frame().await
-    }
-}
-
-fn change_state(game_state: &GameState, catching_up: bool, user_interface: &mut UserInterface) {
-    if catching_up {
-        println!("catching up");
-        user_interface.set_state(UiState::Idle);
-    } else {
-        match game_state {
-            GameState::AwaitingChooseAction(..) => {
-                if game_state.game().is_players_turn() {
-                    println!("awaiting player action");
-                    user_interface.set_state(UiState::ChoosingAction);
-                } else {
-                    println!("awaiting bot");
-                    user_interface.set_state(UiState::Idle);
-                }
-            }
-
-            GameState::AwaitingChooseReaction(state) => match state {
-                StateChooseReaction::Attack(inner) => {
-                    println!("awaiting player attack reaction");
-                    user_interface.set_state(UiState::ReactingToAttack {
-                        attacker: inner.attacker,
-                        hand: inner.hand,
-                        reactor: inner.reactor,
-                    });
-                }
-                StateChooseReaction::Hit(inner) => {
-                    println!("awaiting player hit reaction");
-                    user_interface.set_state(UiState::ReactingToHit {
-                        attacker: inner.attacker,
-                        victim: inner.reactor,
-                        damage: inner.damage,
-                    });
-                }
-            },
-
-            GameState::PerformingMovement(..) => {
-                println!("performing movement");
-                user_interface.set_state(UiState::Idle);
-            }
-        }
     }
 }
 
@@ -236,8 +195,13 @@ struct VisualEffect {
 
 enum VisualEffectContent {
     Text(String),
-    Circle,
-    Projectile((i32, i32), Color),
+    Circle(Color),
+    Projectile {
+        destination: (i32, i32),
+        color: Color,
+        impact_text: String,
+        radius: f32,
+    },
 }
 
 impl<T> From<T> for VisualEffectContent
@@ -293,9 +257,10 @@ impl GameGrid {
     ) -> Self {
         let characters = characters.clone();
 
+        let grid_dimensions = (16, 12);
         Self {
             textures,
-            pathfind_grid: PathfindGrid::new(),
+            pathfind_grid: PathfindGrid::new(grid_dimensions),
             dragging_camera_from: None,
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
@@ -305,18 +270,16 @@ impl GameGrid {
             movement_preview: Default::default(),
             target_character_id: None,
             event_sender,
-            receptive_to_input: false,
             range_indicator: None,
+            receptive_to_input: true,
             cell_w: 64.0,
-            grid_dimensions: (16, 12),
+            grid_dimensions,
             position_on_screen: (0.0, 0.0), // is set later
             size,
         }
     }
 
     fn update(&mut self, active_character_id: CharacterId, characters: &Characters, elapsed: f32) {
-        self.receptive_to_input = characters.get(active_character_id).player_controlled;
-
         self.pathfind_grid.blocked_positions.clear();
 
         self.active_character_id = active_character_id;
@@ -330,10 +293,31 @@ impl GameGrid {
         let pos = self.characters.get(self.active_character_id).position_i32();
         self.pathfind_grid.run(pos, self.movement_range);
 
+        let mut projectile_impacts = vec![];
         for effect in &mut self.effects {
             effect.remaining_duration -= elapsed;
+            if effect.remaining_duration <= 0.0 {
+                if let VisualEffectContent::Projectile {
+                    destination,
+                    color,
+                    impact_text,
+                    radius: _,
+                } = &effect.content
+                {
+                    projectile_impacts.push((*destination, *color, impact_text.clone()));
+                }
+            }
         }
         self.effects.retain(|e| e.remaining_duration > 0.0);
+        for (position, color, text) in projectile_impacts {
+            self.effects.push(VisualEffect::new(position, text, 1.0));
+
+            self.effects.push(VisualEffect::new(
+                position,
+                VisualEffectContent::Circle(color),
+                0.1,
+            ));
+        }
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
@@ -350,21 +334,29 @@ impl GameGrid {
         }
     }
 
-    fn add_text_effect(&mut self, position: (i32, i32), text: impl Into<String>) {
-        self.effects.push(VisualEffect::new(position, text, 2.0));
-        // TODO
-        self.effects.push(VisualEffect::new(
-            position,
-            VisualEffectContent::Circle,
-            0.2,
-        ));
+    fn add_text_effect(&mut self, position: (i32, i32), text: impl Into<String>, duration: f32) {
+        self.effects
+            .push(VisualEffect::new(position, text, duration));
     }
 
-    fn add_projectile_effect(&mut self, position: (i32, i32), target: (i32, i32), color: Color) {
+    fn add_projectile_effect(
+        &mut self,
+        source: (i32, i32),
+        destination: (i32, i32),
+        color: Color,
+        duration: f32,
+        impact_text: impl Into<String>,
+        radius: f32,
+    ) {
         self.effects.push(VisualEffect::new(
-            position,
-            VisualEffectContent::Projectile(target, color),
-            0.15,
+            source,
+            VisualEffectContent::Projectile {
+                destination,
+                color,
+                impact_text: impact_text.into(),
+                radius,
+            },
+            duration,
         ));
     }
 
@@ -381,9 +373,12 @@ impl GameGrid {
     }
 
     fn take_movement_path(&mut self) -> Vec<(u32, u32)> {
-        self.movement_preview
-            .take()
-            .unwrap()
+        let mut reversed_path = self.movement_preview.take().unwrap();
+
+        // Remove the character's current position; it should not be part of the movement path
+        reversed_path.remove(reversed_path.len() - 1);
+
+        reversed_path
             .into_iter()
             .rev()
             .map(|(_dist, (x, y))| (x as u32, y as u32))
@@ -528,7 +523,13 @@ impl GameGrid {
             && (0..self.grid_dimensions.1).contains(&mouse_grid_y);
         let is_mouse_blocked = blocked_screen_area.contains((mouse_x, mouse_y).into());
 
-        if is_mouse_within_grid && self.receptive_to_input {
+        let receptive_to_input = self.receptive_to_input
+            && self
+                .characters
+                .get(self.active_character_id)
+                .player_controlled;
+
+        if is_mouse_within_grid && receptive_to_input {
             if let Some(dragging_from) = self.dragging_camera_from {
                 if is_mouse_button_down(MouseButton::Right) {
                     let (dx, dy) = (
@@ -549,7 +550,7 @@ impl GameGrid {
 
         let mut hovered_character_id = None;
 
-        if is_mouse_within_grid && !is_mouse_blocked && self.receptive_to_input {
+        if is_mouse_within_grid && !is_mouse_blocked && receptive_to_input {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
             let valid_move_destination =
@@ -713,25 +714,30 @@ impl GameGrid {
                     draw_text(text, x0, y0, font_size as f32, YELLOW);
                 }
 
-                VisualEffectContent::Circle => {
+                VisualEffectContent::Circle(color) => {
                     let r = self.cell_w
-                        * (0.2 + 0.2 * (1.0 - effect.remaining_duration / effect.duration));
+                        * (0.2 + 0.3 * (1.0 - effect.remaining_duration / effect.duration));
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
-                    draw_circle(x0, y0, r, GOLD);
+                    draw_circle(x0, y0, r, *color);
                 }
 
-                VisualEffectContent::Projectile(target, color) => {
+                VisualEffectContent::Projectile {
+                    destination,
+                    color,
+                    impact_text: _,
+                    radius,
+                } => {
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
 
-                    let x1 = self.grid_x_to_screen(target.0) + self.cell_w / 2.0;
-                    let y1 = self.grid_y_to_screen(target.1) + self.cell_w / 2.0;
+                    let x1 = self.grid_x_to_screen(destination.0) + self.cell_w / 2.0;
+                    let y1 = self.grid_y_to_screen(destination.1) + self.cell_w / 2.0;
 
                     let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
                     let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
 
-                    draw_circle(x, y, self.cell_w * 0.2, *color);
+                    draw_circle(x, y, self.cell_w * radius, *color);
                 }
             }
         }
@@ -1076,10 +1082,37 @@ impl ActivityPopup {
     }
 }
 
+#[derive(Debug, Copy, Clone, Default)]
+struct StopWatch {
+    remaining: Option<f32>,
+}
+
+impl StopWatch {
+    fn set_to_at_least(&mut self, value: f32) {
+        if let Some(remaining) = self.remaining {
+            self.remaining = Some(remaining.max(value));
+        } else {
+            self.remaining = Some(value);
+        }
+    }
+
+    fn update(&mut self, elapsed: f32) -> bool {
+        if let Some(remaining) = &mut self.remaining {
+            *remaining = (*remaining - elapsed).max(0.0);
+            if *remaining <= 0.0 {
+                self.remaining = None;
+                return true;
+            }
+        }
+        false
+    }
+}
+
 struct UserInterface {
     characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: UiState,
+    stopwatch: StopWatch,
 
     hovered_button: Option<(u32, ButtonAction)>,
     next_available_button_id: u32,
@@ -1359,7 +1392,7 @@ impl UserInterface {
             },
         );
 
-        let state = UiState::ChoosingAction;
+        let state = UiState::Idle;
 
         let game_grid = GameGrid::new(
             &game.characters,
@@ -1372,7 +1405,9 @@ impl UserInterface {
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
 
-        let player_portraits = PlayerPortraits::new(&game.characters, game.active_character_id);
+        let first_player_character_id = *character_uis.keys().next().unwrap();
+
+        let player_portraits = PlayerPortraits::new(&game.characters, first_player_character_id);
 
         let character_portraits =
             CharacterPortraits::new(&game.characters, game.active_character_id);
@@ -1383,6 +1418,7 @@ impl UserInterface {
             character_portraits,
             player_portraits,
             active_character_id,
+            stopwatch: StopWatch::default(),
 
             next_available_button_id: next_button_id,
             hovered_button: None,
@@ -1457,6 +1493,11 @@ impl UserInterface {
     }
 
     fn set_state(&mut self, state: UiState) {
+        if self.state == state {
+            return;
+        }
+
+        println!("Setting UI state to {:?}", state);
         self.state = state;
 
         let mut popup_lines = vec![];
@@ -1466,6 +1507,7 @@ impl UserInterface {
 
         match state {
             UiState::ConfiguringAction(base_action) => {
+                self.game_grid.receptive_to_input = true;
                 self.set_action_buttons_enabled(true);
 
                 match base_action {
@@ -1599,11 +1641,14 @@ impl UserInterface {
             }
 
             UiState::ChoosingAction => {
+                self.game_grid.receptive_to_input = true;
                 self.set_action_buttons_enabled(true);
             }
 
             UiState::Idle => {
                 self.set_action_buttons_enabled(false);
+                // TODO make sure this is set correctly everywhere where applicable
+                self.game_grid.receptive_to_input = false;
             }
         }
 
@@ -1637,6 +1682,10 @@ impl UserInterface {
         }
     }
 
+    fn ready_for_more(&self) -> bool {
+        self.stopwatch.remaining.is_none()
+    }
+
     fn handle_game_event(&mut self, event: GameEvent) {
         dbg!(&event);
         match event {
@@ -1645,16 +1694,28 @@ impl UserInterface {
             }
             GameEvent::CharacterTookDamage { character, amount } => {
                 let pos = self.characters.get(character).position_i32();
-                self.game_grid.add_text_effect(pos, format!("{}", amount));
+                self.game_grid
+                    .add_text_effect(pos, format!("{}", amount), 2.0);
             }
-            GameEvent::Attacked { attacker, target, hit } => {
+            GameEvent::Attacked {
+                attacker,
+                target,
+                hit,
+            } => {
                 let attacker_pos = self.characters.get(attacker).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
-                self.game_grid
-                    .add_projectile_effect(attacker_pos, target_pos, DARKGRAY);
-                if !hit {
-                    self.game_grid.add_text_effect(target_pos, "Miss");
-                }
+
+                let duration = 0.2;
+                self.stopwatch.set_to_at_least(duration + 0.4);
+                let impact_text = if hit { "" } else { "Miss" };
+                self.game_grid.add_projectile_effect(
+                    attacker_pos,
+                    target_pos,
+                    DARKGRAY,
+                    duration,
+                    impact_text,
+                    0.1,
+                );
             }
             GameEvent::SpellWasCast {
                 caster,
@@ -1668,21 +1729,31 @@ impl UserInterface {
                     rpg::core::SpellType::Mental => BLUE,
                     rpg::core::SpellType::Projectile => RED,
                 };
-                self.game_grid
-                    .add_projectile_effect(caster_pos, target_pos, color);
 
-                if !success {
-                    let target_pos = self.characters.get(target).position_i32();
-                    self.game_grid.add_text_effect(target_pos, "Resist");
-                }
+                let duration = 0.5;
+                self.stopwatch.set_to_at_least(duration + 0.2);
+                let impact_text = if success { "" } else { "Resist" };
+                self.game_grid.add_projectile_effect(
+                    caster_pos,
+                    target_pos,
+                    color,
+                    duration,
+                    impact_text,
+                    0.2,
+                );
             }
             GameEvent::CharacterReceivedSelfEffect {
                 character,
                 condition,
             } => {
                 let pos = self.characters.get(character).position;
-                self.game_grid
-                    .add_text_effect((pos.0 as i32, pos.1 as i32), format!("{:?}", condition));
+                let duration = 1.0;
+                self.game_grid.add_text_effect(
+                    (pos.0 as i32, pos.1 as i32),
+                    format!("{:?}", condition),
+                    duration,
+                );
+                self.stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharacterDied { character } => {
                 self.log
@@ -1691,6 +1762,22 @@ impl UserInterface {
                 self.characters.remove_dead();
                 self.game_grid.characters.remove_dead();
                 self.character_portraits.remove_dead();
+            }
+            GameEvent::Moved {
+                character,
+                from,
+                to,
+            } => {
+                self.log.add(format!(
+                    "{} moved from {:?} to {:?}",
+                    self.characters.get(character).name,
+                    from,
+                    to
+                ));
+
+                // TODO: interpolate movement in grid
+
+                self.stopwatch.set_to_at_least(0.7);
             }
         }
     }
@@ -1723,7 +1810,7 @@ impl UserInterface {
             self.game_grid.set_movement_range(move_range);
         }
 
-        let public_events = self
+        let public_events: Vec<PlayerChose> = self
             .event_queue
             .take()
             .into_iter()
@@ -1826,6 +1913,12 @@ impl UserInterface {
         self.activity_popup.set_enabled(popup_enabled);
 
         self.character_portraits.update(game);
+
+        self.update_character_resources(&game.characters);
+
+        if self.stopwatch.update(elapsed) {
+            println!("UI is now ready...");
+        }
 
         public_events
     }
