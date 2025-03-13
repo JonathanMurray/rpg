@@ -37,10 +37,17 @@ struct CharacterMotion {
     duration: f32,
 }
 
+#[derive(Copy, Clone, Debug)]
+enum Target {
+    Some(CharacterId),
+    Memorized(CharacterId),
+    None,
+}
+
 pub struct GameGrid {
     textures: HashMap<TextureId, Texture2D>,
     pathfind_grid: PathfindGrid,
-    pub characters: Characters,
+    characters: Characters,
     camera_position: (Cell<f32>, Cell<f32>),
     dragging_camera_from: Option<(f32, f32)>,
 
@@ -48,9 +55,10 @@ pub struct GameGrid {
 
     active_character_id: CharacterId,
     movement_range: f32,
-    pub movement_preview: Option<Vec<(f32, (i32, i32))>>,
-    pub target_character_id: Option<CharacterId>,
     pub range_indicator: Option<Range>,
+
+    movement_preview: Option<Vec<(f32, (i32, i32))>>,
+    target: Target,
 
     pub receptive_to_input: bool,
     pub grid_dimensions: (i32, i32),
@@ -81,7 +89,7 @@ impl GameGrid {
             active_character_id: 0,
             movement_range: 0.0,
             movement_preview: Default::default(),
-            target_character_id: None,
+            target: Target::None,
             range_indicator: None,
             receptive_to_input: true,
             cell_w: 64.0,
@@ -107,6 +115,10 @@ impl GameGrid {
             remaining_duration: duration,
             duration,
         });
+    }
+
+    pub fn remove_dead(&mut self) {
+        self.characters.remove_dead();
     }
 
     pub fn update(
@@ -207,6 +219,23 @@ impl GameGrid {
         ));
     }
 
+    pub fn ensure_has_some_movement_preview(&mut self) {
+        if self.movement_preview.is_none() {
+            self.movement_preview = Some(vec![]);
+        }
+    }
+
+    pub fn remove_movement_preview(&mut self) {
+        self.movement_preview = None;
+    }
+
+    pub fn has_non_empty_movement_preview(&self) -> bool {
+        self.movement_preview
+            .as_ref()
+            .map(|m| !m.is_empty())
+            .unwrap_or(false)
+    }
+
     pub fn set_movement_range(&mut self, range: f32) {
         self.movement_range = range;
         if let Some(movement_preview) = &mut self.movement_preview {
@@ -278,6 +307,35 @@ impl GameGrid {
             2.0,
             color,
         )
+    }
+
+    pub fn remove_target(&mut self) {
+        if let Target::Some(id) = self.target {
+            self.target = Target::Memorized(id);
+        }
+    }
+
+    pub fn target(&self) -> Option<CharacterId> {
+        match self.target {
+            Target::Some(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    pub fn ensure_has_npc_target(&mut self) {
+        match self.target {
+            Target::Some(_) => {}
+            Target::Memorized(id) => self.target = Target::Some(id),
+            Target::None => {
+                // pick an arbitrary enemy
+                for (id, character) in self.characters.iter_with_ids() {
+                    if *id != self.active_character_id && !character.borrow().player_controlled {
+                        self.target = Target::Some(*id);
+                        break;
+                    }
+                }
+            }
+        }
     }
 
     pub fn draw(&mut self, blocked_screen_area: Rect) -> GridOutcome {
@@ -459,10 +517,11 @@ impl GameGrid {
             } else if let Some(id) = hovered_npc_id {
                 self.draw_square((mouse_grid_x, mouse_grid_y), MAGENTA);
                 if is_mouse_button_pressed(MouseButton::Left) {
-                    if self.target_character_id.is_none() {
-                        outcome.switched_to_attack = true;
+                    match self.target {
+                        Target::Some(_) => {}
+                        Target::Memorized(_) | Target::None => outcome.switched_to_attack = true,
                     }
-                    self.target_character_id = Some(id);
+                    self.target = Target::Some(id);
                     self.movement_preview = None;
                 }
             } else if self.movement_preview.is_none() && self.dragging_camera_from.is_none() {
@@ -505,7 +564,7 @@ impl GameGrid {
             }
         }
 
-        if let Some(target_character_i) = self.target_character_id {
+        if let Target::Some(target_character_i) = self.target {
             let actor_pos = self.characters.get(self.active_character_id).position_i32();
             let target_pos = self.characters.get(target_character_i).position_i32();
             self.draw_square(target_pos, MAGENTA);

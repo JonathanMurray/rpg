@@ -772,7 +772,13 @@ impl UserInterface {
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
 
-        let first_player_character_id = *character_uis.keys().next().unwrap();
+        let first_player_character_id = game
+            .characters
+            .iter_with_ids()
+            .filter(|(_id, ch)| ch.borrow().player_controlled)
+            .next()
+            .unwrap()
+            .0;
 
         let player_portraits = PlayerPortraits::new(&game.characters, first_player_character_id);
 
@@ -1047,26 +1053,16 @@ impl UserInterface {
         self.game_grid.set_movement_range(move_range);
 
         if movement {
-            if self.game_grid.movement_preview.is_none() {
-                self.game_grid.movement_preview = Some(vec![]);
-            }
+            self.game_grid.ensure_has_some_movement_preview();
         } else {
-            self.game_grid.movement_preview = None;
+            self.game_grid.remove_movement_preview();
         }
 
         if wants_target {
-            if self.game_grid.target_character_id.is_none() {
-                // We pick an arbitrary enemy if none is picked already
-
-                for (id, character) in self.characters.iter_with_ids() {
-                    if *id != self.active_character_id && !character.borrow().player_controlled {
-                        self.game_grid.target_character_id = Some(*id);
-                        break;
-                    }
-                }
-            }
+            // We pick an arbitrary enemy if none is picked already
+            self.game_grid.ensure_has_npc_target();
         } else {
-            self.game_grid.target_character_id = None;
+            self.game_grid.remove_target();
         }
     }
 
@@ -1153,7 +1149,7 @@ impl UserInterface {
                     .add(format!("{} died", self.characters.get(character).name));
 
                 self.characters.remove_dead();
-                self.game_grid.characters.remove_dead();
+                self.game_grid.remove_dead();
                 self.character_portraits.remove_dead();
             }
             GameEvent::Moved {
@@ -1231,7 +1227,7 @@ impl UserInterface {
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.target_character_id {
+                if let Some(i) = self.game_grid.target() {
                     let target_char = self.characters.get(i);
                     if self
                         .active_character()
@@ -1268,7 +1264,7 @@ impl UserInterface {
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.target_character_id {
+                if let Some(i) = self.game_grid.target() {
                     let target_char = self.characters.get(i);
 
                     if self
@@ -1294,12 +1290,7 @@ impl UserInterface {
                 }
             }
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
-                popup_enabled = self
-                    .game_grid
-                    .movement_preview
-                    .as_ref()
-                    .map(|m| !m.is_empty())
-                    .unwrap_or(false);
+                popup_enabled = self.game_grid.has_non_empty_movement_preview();
             }
             _ => {}
         }
@@ -1350,7 +1341,7 @@ impl UserInterface {
 
                         let event = match self.state {
                             UiState::ConfiguringAction(base_action) => {
-                                let target_char_i = self.game_grid.target_character_id;
+                                let target = self.game_grid.target();
                                 let action = match base_action {
                                     BaseAction::Attack { hand, .. } => {
                                         let enhancements = self
@@ -1366,7 +1357,7 @@ impl UserInterface {
                                         Action::Attack {
                                             hand,
                                             enhancements,
-                                            target: target_char_i.unwrap(),
+                                            target: target.unwrap(),
                                         }
                                     }
                                     BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
@@ -1386,7 +1377,7 @@ impl UserInterface {
                                         Action::CastSpell {
                                             spell,
                                             enhanced,
-                                            target: target_char_i.unwrap(),
+                                            target: target.unwrap(),
                                         }
                                     }
                                     BaseAction::Move {
