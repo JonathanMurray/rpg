@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (0, 6));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 4, 2, 10, (0, 6));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -1072,6 +1072,29 @@ struct Conditions {
     weakened: u32,
 }
 
+impl Conditions {
+    pub fn strings(&self) -> Vec<String> {
+        let mut result = vec![];
+        if self.dazed > 0 {
+            result.push("Dazed".to_string());
+        }
+        if self.bleeding > 0 {
+            result.push("Bleeding".to_string());
+        }
+        if self.braced {
+            result.push("Braced".to_string());
+        }
+        if self.raging {
+            result.push("Raging".to_string());
+        }
+        if self.weakened > 0 {
+            result.push("Weakened".to_string());
+        }
+
+        result
+    }
+}
+
 #[derive(Debug)]
 pub enum Action {
     Attack {
@@ -1270,6 +1293,10 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
         }
+    }
+
+    pub fn condition_strings(&self) -> Vec<String> {
+        self.conditions.strings()
     }
 
     fn lose_action_points(&mut self, amount: u32) {

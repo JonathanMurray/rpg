@@ -243,6 +243,7 @@ impl Rectangle {
 pub struct Style {
     pub background_color: Option<Color>,
     pub border_color: Option<Color>,
+    pub padding: f32,
 }
 
 impl Style {
@@ -300,7 +301,6 @@ impl Default for Align {
 pub struct Container {
     pub layout_dir: LayoutDirection,
     pub align: Align,
-    pub padding: f32,
     pub margin: f32,
     pub style: Style,
     pub min_width: Option<f32>,
@@ -331,8 +331,8 @@ impl Container {
             }
         }
 
-        w += self.padding * 2.0;
-        h += self.padding * 2.0;
+        w += self.style.padding * 2.0;
+        h += self.style.padding * 2.0;
 
         if !self.children.is_empty() {
             let total_margin = (self.children.len() - 1) as f32 * self.margin;
@@ -360,8 +360,8 @@ impl Container {
         let size = self.size();
         self.style.draw(x, y, size);
 
-        let mut x0 = x + self.padding;
-        let mut y0 = y + self.padding;
+        let mut x0 = x + self.style.padding;
+        let mut y0 = y + self.style.padding;
         for (i, element) in self.children.iter().enumerate() {
             let (element_w, element_h) = element.size();
 
@@ -369,19 +369,19 @@ impl Container {
                 (Align::Start, _) => (0.0, 0.0),
                 (Align::Center, LayoutDirection::Horizontal) => {
                     // Place it in the middle, i.e. empty space above and below
-                    (0.0, (size.1 - 2.0 * self.padding - element_h) / 2.0)
+                    (0.0, (size.1 - 2.0 * self.style.padding - element_h) / 2.0)
                 }
                 (Align::Center, LayoutDirection::Vertical) => {
                     // Place it in the middle, i.e. empty space to the left and right
-                    ((size.0 - 2.0 * self.padding - element_w) / 2.0, 0.0)
+                    ((size.0 - 2.0 * self.style.padding - element_w) / 2.0, 0.0)
                 }
                 (Align::End, LayoutDirection::Horizontal) => {
                     // Push it down so that it touches the bottom
-                    (0.0, size.1 - 2.0 * self.padding - element_h)
+                    (0.0, size.1 - 2.0 * self.style.padding - element_h)
                 }
                 (Align::End, LayoutDirection::Vertical) => {
                     // Push it to the right, so that it touches the right side
-                    (size.0 - 2.0 * self.padding - element_w, 0.0)
+                    (size.0 - 2.0 * self.style.padding - element_w, 0.0)
                 }
             };
 

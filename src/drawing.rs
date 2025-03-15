@@ -43,7 +43,7 @@ pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: 
             draw_line(mid.0, s - space / 1.4, mid.0, mid.1, thickness, color);
             draw_line(w + space / 1.4, mid.1, mid.0, mid.1, thickness, color);
         }
-        _ => unreachable!(),
+        unhandled => panic!("Unhandled: {:?}", unhandled),
     }
 }
 

@@ -300,7 +300,7 @@ impl ActivityPopup {
                                 .map(|action| action.unwrap_movement_enhancement().add_percentage)
                                 .sum();
                             let range = range * (1.0 + percentage as f32 / 100.0);
-                            let text = format!("range: {range}");
+                            let text = format!("range: {range:.2}");
                             draw_text(&text, x0, y0, 20.0, WHITE);
                             y0 += 20.0;
                         }
@@ -393,6 +393,24 @@ impl ActivityPopup {
         self.selected_button_ids
             .iter()
             .map(|id| &self.choice_buttons[id].action)
+    }
+
+    fn select_movement_option(&mut self, selected_enhancement: Option<usize>) {
+        assert!(matches!(
+            self.state,
+            UiState::ConfiguringAction(BaseAction::Move { .. })
+        ));
+
+        for (i, (_id, btn)) in self.choice_buttons.iter().enumerate() {
+            btn.highlighted.set(selected_enhancement == Some(i));
+        }
+
+        self.selected_button_ids.clear();
+        for btn in self.choice_buttons.values() {
+            if btn.highlighted.get() {
+                self.selected_button_ids.push(btn.id);
+            }
+        }
     }
 
     fn action_points(&self) -> u32 {
@@ -509,6 +527,7 @@ struct CharacterUi {
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     resource_bars: Container,
+    conditions: Vec<String>,
 }
 
 impl UserInterface {
@@ -652,8 +671,8 @@ impl UserInterface {
                 ],
                 border_between_children: Some(GRAY),
                 style: Style {
-                    background_color: None,
                     border_color: Some(GRAY),
+                    ..Default::default()
                 },
                 ..Default::default()
             });
@@ -734,13 +753,18 @@ impl UserInterface {
 
             let resource_bars = Container {
                 layout_dir: LayoutDirection::Horizontal,
-                margin: 15.0,
+                margin: 9.0,
                 align: Align::End,
                 children: vec![
                     Element::RcRefCell(cloned_health_bar),
                     Element::RcRefCell(cloned_mana_bar),
                     Element::RcRefCell(cloned_stamina_bar),
                 ],
+                style: Style {
+                    border_color: Some(GRAY),
+                    padding: 10.0,
+                    ..Default::default()
+                },
                 ..Default::default()
             };
 
@@ -751,6 +775,7 @@ impl UserInterface {
                 mana_bar,
                 stamina_bar,
                 resource_bars,
+                conditions: vec![],
             };
 
             character_uis.insert(character.borrow().id(), character_ui);
@@ -761,8 +786,8 @@ impl UserInterface {
             (20.0, 20.0),
             0.3,
             Style {
-                background_color: None,
                 border_color: Some(WHITE),
+                ..Default::default()
             },
         );
 
@@ -835,15 +860,24 @@ impl UserInterface {
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
 
-        // TODO when switching to an inactive character, the UI must be disabled, so you can't pick invalid actions
         self.character_uis
             .get_mut(&self.player_portraits.selected_i.get())
             .unwrap()
             .tabs
             .draw(20.0, y + 70.0);
+
+        for (i, s) in self.character_uis[&self.player_portraits.selected_i.get()]
+            .conditions
+            .iter()
+            .enumerate()
+        {
+            draw_text(s, 630.0, y + 30.0 + 20.0 * i as f32, 18.0, WHITE);
+        }
+
         self.character_uis[&self.player_portraits.selected_i.get()]
             .resource_bars
-            .draw(620.0, y + 60.0);
+            .draw(620.0, y + 120.0);
+
         self.log.draw(800.0, y);
 
         self.character_portraits
@@ -851,12 +885,21 @@ impl UserInterface {
 
         self.character_portraits.draw(10.0, 10.0);
 
-        if grid_outcome.switched_to_move {
+        if let Some(selected_move_option) = grid_outcome.switched_to_move_i {
+            dbg!(selected_move_option); //TODO
             let move_range = self.active_character().move_range;
             self.set_state(UiState::ConfiguringAction(BaseAction::Move {
                 action_point_cost: MOVE_ACTION_COST,
                 range: move_range,
             }));
+
+            let selected_enhancement = if selected_move_option == 0 {
+                None
+            } else {
+                Some(selected_move_option - 1)
+            };
+            self.activity_popup
+                .select_movement_option(selected_enhancement);
         }
 
         if grid_outcome.switched_to_attack {
@@ -1050,7 +1093,16 @@ impl UserInterface {
             .set_state(state, popup_lines, popup_buttons);
 
         let move_range = self.active_character().move_range;
-        self.game_grid.set_movement_range(move_range);
+
+        let move_enhancements: Vec<MovementEnhancement> = self
+            .active_character()
+            .usable_movement_enhancements()
+            .into_iter()
+            .map(|(_, enhancement)| enhancement)
+            .collect();
+
+        self.game_grid
+            .set_movement_range_options(move_range, move_enhancements);
 
         if movement {
             self.game_grid.ensure_has_some_movement_preview();
@@ -1195,9 +1247,8 @@ impl UserInterface {
         let maybe_updated_movement_range = self.activity_popup.update();
 
         if let Some(added_percentage) = maybe_updated_movement_range {
-            let move_range =
-                self.active_character().move_range * (1.0 + added_percentage as f32 / 100.0);
-            self.game_grid.set_movement_range(move_range);
+            self.game_grid
+                .set_selected_movement_percentage(added_percentage);
         }
 
         let public_events: Vec<PlayerChose> = self
@@ -1299,7 +1350,7 @@ impl UserInterface {
 
         self.character_portraits.update(game);
 
-        self.update_character_resources(&game.characters);
+        self.update_character_status(&game.characters);
 
         if self.stopwatch.update(elapsed) {
             println!("UI is now ready...");
@@ -1454,11 +1505,10 @@ impl UserInterface {
         }
     }
 
-    fn update_character_resources(&mut self, characters: &Characters) {
+    fn update_character_status(&mut self, characters: &Characters) {
         for (id, character) in characters.iter_with_ids() {
             let character = character.borrow();
-            if self.character_uis.contains_key(id) {
-                let ui = &self.character_uis[id];
+            if let Some(ui) = self.character_uis.get_mut(&id) {
                 ui.health_bar
                     .borrow_mut()
                     .set_current(character.health.current);
@@ -1466,9 +1516,12 @@ impl UserInterface {
                 ui.stamina_bar
                     .borrow_mut()
                     .set_current(character.stamina.current);
+
+                ui.conditions = character.condition_strings();
             }
         }
 
+        // TODO: Don't crash on player death
         self.action_points_row.current = self
             .characters
             .get(self.player_portraits.selected_i.get())
@@ -1512,7 +1565,7 @@ impl CharacterPortraits {
             children: elements,
             style: Style {
                 background_color: Some(BLACK),
-                border_color: None,
+                ..Default::default()
             },
             ..Default::default()
         };
@@ -1947,8 +2000,13 @@ impl LabelledResourceBar {
     fn new(current: u32, max: u32, label: &'static str, color: Color) -> Self {
         assert!(current <= max);
 
-        let cell_w = 20.0;
-        let cell_h = if max <= 10 { 15.0 } else { 150.0 / max as f32 };
+        let cell_w = 15.0;
+        let max_h = 100.0;
+        let cell_h = if max <= 7 {
+            max_h / 7.0
+        } else {
+            max_h / max as f32
+        };
         let bar = Rc::new(RefCell::new(ResourceBar {
             current,
             max,
@@ -1959,7 +2017,7 @@ impl LabelledResourceBar {
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
             format!("{}/{}", current, max),
-            18,
+            17,
             WHITE,
         )));
         let cloned_value_text = Rc::clone(&value_text);
@@ -2036,10 +2094,13 @@ fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>
     });
     Container {
         layout_dir: LayoutDirection::Horizontal,
-        padding: 5.0,
         margin: 20.0,
         align: Align::Center,
         children: vec![attribute_element, stats_list],
+        style: Style {
+            padding: 5.0,
+            ..Default::default()
+        },
         ..Default::default()
     }
 }
@@ -2160,6 +2221,7 @@ impl ActionButton {
         let style = Style {
             background_color: Some(DARKGRAY),
             border_color: Some(LIGHTGRAY),
+            ..Default::default()
         };
         let hover_border_color = YELLOW;
 
@@ -2171,6 +2233,7 @@ impl ActionButton {
                 style: Style {
                     background_color: Some(color::GOLD),
                     border_color: Some(BLACK),
+                    ..Default::default()
                 },
             }))
         }
@@ -2180,6 +2243,7 @@ impl ActionButton {
                 style: Style {
                     background_color: Some(BLUE),
                     border_color: Some(BLACK),
+                    ..Default::default()
                 },
             }))
         }
@@ -2189,6 +2253,7 @@ impl ActionButton {
                 style: Style {
                     background_color: Some(GREEN),
                     border_color: Some(BLACK),
+                    ..Default::default()
                 },
             }))
         }

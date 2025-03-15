@@ -22,7 +22,10 @@ use macroquad::{
     text::{draw_text, measure_text},
 };
 
-use crate::pathfind::PathfindGrid;
+use crate::{
+    core::MovementEnhancement,
+    pathfind::{PathfindGrid, Route},
+};
 use crate::{
     core::{CharacterId, Characters, HandType, Range, TextureId},
     drawing::{draw_arrow, draw_dashed_line},
@@ -44,6 +47,53 @@ enum Target {
     None,
 }
 
+struct MovementRange {
+    options: Vec<(u32, f32)>,
+    selected_i: usize,
+}
+
+impl MovementRange {
+    fn max(&self) -> f32 {
+        self.options[self.options.len() - 1].1
+    }
+
+    fn set(&mut self, range: f32, enhancements: Vec<MovementEnhancement>) {
+        self.options = vec![(0, range)];
+        for enhancement in enhancements {
+            let enhanced_range = range * (1.0 + enhancement.add_percentage as f32 / 100.0);
+            self.options
+                .push((enhancement.add_percentage, enhanced_range));
+        }
+
+        self.selected_i = self.selected_i.min(self.options.len() - 1);
+    }
+
+    fn selected(&self) -> f32 {
+        self.options[self.selected_i].1
+    }
+
+    fn set_selected_percentage(&mut self, enhancement_added_percentage: u32) {
+        self.selected_i = self
+            .options
+            .iter()
+            .position(|(add_percentage, range)| *add_percentage == enhancement_added_percentage)
+            .unwrap();
+    }
+
+    fn shortest_encompassing(&self, range: f32) -> usize {
+        self.options.iter().position(|(_, r)| range <= *r).unwrap()
+    }
+}
+
+impl Default for MovementRange {
+    fn default() -> Self {
+        Self {
+            options: vec![(0, 0.0)],
+            selected_i: 0,
+        }
+    }
+}
+
 pub struct GameGrid {
     textures: HashMap<TextureId, Texture2D>,
     pathfind_grid: PathfindGrid,
@@ -54,9 +104,9 @@ pub struct GameGrid {
     effects: Vec<VisualEffect>,
 
     active_character_id: CharacterId,
-    movement_range: f32,
     pub range_indicator: Option<Range>,
 
+    movement_range: MovementRange,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
     target: Target,
 
@@ -87,7 +137,7 @@ impl GameGrid {
             characters,
             effects: vec![],
             active_character_id: 0,
-            movement_range: 0.0,
+            movement_range: MovementRange::default(),
             movement_preview: Default::default(),
             target: Target::None,
             range_indicator: None,
@@ -138,7 +188,7 @@ impl GameGrid {
         }
 
         let pos = self.characters.get(self.active_character_id).position_i32();
-        self.pathfind_grid.run(pos, self.movement_range);
+        self.pathfind_grid.run(pos, self.movement_range.max());
 
         let mut projectile_impacts = vec![];
         for effect in &mut self.effects {
@@ -221,7 +271,16 @@ impl GameGrid {
 
     pub fn ensure_has_some_movement_preview(&mut self) {
         if self.movement_preview.is_none() {
-            self.movement_preview = Some(vec![]);
+            let pos = self.characters.get(self.active_character_id).position_i32();
+            let mut movement_preview = vec![];
+            for (destination, route) in &self.pathfind_grid.routes {
+                if route.came_from == pos {
+                    movement_preview.push((route.distance_from_start, *destination));
+                    movement_preview.push((0.0, pos));
+                    break;
+                }
+            }
+            self.movement_preview = Some(movement_preview);
         }
     }
 
@@ -236,16 +295,32 @@ impl GameGrid {
             .unwrap_or(false)
     }
 
-    pub fn set_movement_range(&mut self, range: f32) {
-        self.movement_range = range;
+    pub fn set_selected_movement_percentage(&mut self, enhancement_added_percentage: u32) {
+        println!("set selected move perc: {}", enhancement_added_percentage);
+        self.movement_range
+            .set_selected_percentage(enhancement_added_percentage);
+        self.ensure_movement_preview_is_within_selected_move_range();
+    }
+
+    pub fn set_movement_range_options(
+        &mut self,
+        range: f32,
+        enhancements: Vec<MovementEnhancement>,
+    ) {
+        self.movement_range.set(range, enhancements);
+        self.ensure_movement_preview_is_within_selected_move_range();
+        let pos = self.characters.get(self.active_character_id).position_i32();
+        self.pathfind_grid.run(pos, self.movement_range.max());
+    }
+
+    fn ensure_movement_preview_is_within_selected_move_range(&mut self) {
         if let Some(movement_preview) = &mut self.movement_preview {
-            while !movement_preview.is_empty() && movement_preview[0].0 > range {
+            while !movement_preview.is_empty()
+                && movement_preview[0].0 > self.movement_range.selected()
+            {
                 movement_preview.remove(0);
             }
         }
-
-        let pos = self.characters.get(self.active_character_id).position_i32();
-        self.pathfind_grid.run(pos, self.movement_range);
     }
 
     pub fn take_movement_path(&mut self) -> Vec<(u32, u32)> {
@@ -293,7 +368,7 @@ impl GameGrid {
         }
         (
             self.grid_x_to_screen(character_pos.0),
-            self.grid_x_to_screen(character_pos.1),
+            self.grid_y_to_screen(character_pos.1),
         )
     }
 
@@ -381,12 +456,15 @@ impl GameGrid {
         }
 
         if self.movement_preview.is_some() {
-            for pos in self.pathfind_grid.routes.keys() {
+            self.draw_move_range_indicator(active_character_pos);
+
+            for (pos, _route) in &self.pathfind_grid.routes {
                 if (0..self.grid_dimensions.0).contains(&pos.0)
                     && (0..self.grid_dimensions.1).contains(&pos.1)
                     && *pos != active_character_pos
                 {
-                    self.draw_square(*pos, LIGHTGRAY);
+                    let color = LIGHTGRAY;
+                    self.draw_square(*pos, color);
                 }
             }
         }
@@ -394,7 +472,7 @@ impl GameGrid {
         let active_char_pos = self.characters.get(self.active_character_id).position_i32();
 
         if let Some(range) = self.range_indicator {
-            self.draw_range_indicator(active_char_pos, range);
+            self.draw_red_range_indicator(active_char_pos, range);
         }
 
         for ch in self.characters.iter() {
@@ -466,7 +544,7 @@ impl GameGrid {
         }
 
         let mut outcome = GridOutcome {
-            switched_to_move: false,
+            switched_to_move_i: None,
             switched_to_attack: false,
             hovered_character_id: None,
         };
@@ -476,7 +554,7 @@ impl GameGrid {
 
             let valid_move_destination =
                 match self.pathfind_grid.routes.get(&(mouse_grid_x, mouse_grid_y)) {
-                    Some(route) => route.distance_from_start <= self.movement_range,
+                    Some(route) => route.distance_from_start <= self.movement_range.max(),
                     _ => false,
                 } && !collision;
 
@@ -494,12 +572,13 @@ impl GameGrid {
                 let destination = (mouse_grid_x, mouse_grid_y);
                 self.draw_square(destination, YELLOW);
                 if is_mouse_button_pressed(MouseButton::Left) {
-                    if self.movement_preview.is_none() {
-                        outcome.switched_to_move = true;
-                    }
-
                     let route = self.pathfind_grid.routes.get(&destination).unwrap();
                     let mut dist = route.distance_from_start;
+
+                    self.movement_range.selected_i =
+                        self.movement_range.shortest_encompassing(dist);
+                    outcome.switched_to_move_i = Some(self.movement_range.selected_i);
+
                     let mut movement_preview = vec![(dist, destination)];
                     let mut pos = route.came_from;
 
@@ -666,7 +745,43 @@ impl GameGrid {
         outcome
     }
 
-    fn draw_range_indicator(&self, origin: (i32, i32), range: Range) {
+    fn draw_move_range_indicator(&self, origin: (i32, i32)) {
+        let range = self.movement_range.selected();
+        let range_ceil = (f32::from(range)).ceil() as i32;
+
+        let within = |x: i32, y: i32| {
+            self.pathfind_grid
+                .routes
+                .get(&(x, y))
+                .map(|route| route.distance_from_start <= range)
+                .unwrap_or(false)
+        };
+
+        for x in
+            (origin.0 - range_ceil).max(0)..=(origin.0 + range_ceil).min(self.grid_dimensions.0 - 1)
+        {
+            for y in (origin.1 - range_ceil).max(0)
+                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
+            {
+                let thickness = 2.0;
+
+                if within(x, y) {
+                    self.draw_dashed_borders(
+                        x,
+                        y,
+                        !within(x - 1, y),
+                        !within(x + 1, y),
+                        !within(x, y - 1),
+                        !within(x, y + 1),
+                        thickness,
+                        GREEN,
+                    );
+                }
+            }
+        }
+    }
+
+    fn draw_red_range_indicator(&self, origin: (i32, i32), range: Range) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
         let within =
@@ -677,47 +792,69 @@ impl GameGrid {
             for y in (origin.1 - range_ceil).max(0)
                 ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
             {
+                let thickness = 2.0;
                 if within(x, y) {
-                    let color = RED;
-                    let thickness = 2.0;
-                    if !within(x - 1, y) {
-                        // Left border
-                        draw_dashed_line(
-                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
-                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
-                            thickness,
-                            color,
-                        );
-                    }
-                    if !within(x + 1, y) {
-                        // Right border
-                        draw_dashed_line(
-                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
-                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
-                            thickness,
-                            color,
-                        );
-                    }
-                    if !within(x, y - 1) {
-                        // Top border
-                        draw_dashed_line(
-                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
-                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
-                            thickness,
-                            color,
-                        );
-                    }
-                    if !within(x, y + 1) {
-                        // Bottom border
-                        draw_dashed_line(
-                            (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
-                            (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
-                            thickness,
-                            color,
-                        );
-                    }
+                    self.draw_dashed_borders(
+                        x,
+                        y,
+                        !within(x - 1, y),
+                        !within(x + 1, y),
+                        !within(x, y - 1),
+                        !within(x, y + 1),
+                        thickness,
+                        RED,
+                    );
                 }
             }
+        }
+    }
+
+    fn draw_dashed_borders(
+        &self,
+        x: i32,
+        y: i32,
+        left: bool,
+        right: bool,
+        top: bool,
+        bottom: bool,
+        thickness: f32,
+        color: Color,
+    ) {
+        if left {
+            // Left border
+            draw_dashed_line(
+                (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
+                (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
+                thickness,
+                color,
+            );
+        }
+        if right {
+            // Right border
+            draw_dashed_line(
+                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
+                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
+                thickness,
+                color,
+            );
+        }
+        if top {
+            // Top border
+            draw_dashed_line(
+                (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
+                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
+                thickness,
+                color,
+            );
+        }
+        if bottom {
+            // Bottom border
+            draw_dashed_line(
+                (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
+                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
+                thickness,
+                color,
+            );
         }
     }
 
@@ -771,7 +908,7 @@ impl VisualEffect {
 }
 
 pub struct GridOutcome {
-    pub switched_to_move: bool,
+    pub switched_to_move_i: Option<usize>,
     pub switched_to_attack: bool,
     pub hovered_character_id: Option<CharacterId>,
 }
