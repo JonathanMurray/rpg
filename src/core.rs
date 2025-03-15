@@ -1119,6 +1119,7 @@ pub enum Action {
 pub struct SelfEffectAction {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub action_point_cost: u32,
     pub effect: ApplyEffect,
 }
@@ -1163,6 +1164,7 @@ pub enum HandType {
 pub struct Spell {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub damage: u32,
@@ -1751,4 +1753,16 @@ pub enum TextureId {
     Bow,
     Sword,
     Shield,
+}
+
+
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum IconId {
+    Fireball,
+    Attack,
+    Brace,
+    Move,
+    Scream,
+    Mindblast
 }

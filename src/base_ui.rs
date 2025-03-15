@@ -243,6 +243,7 @@ impl Rectangle {
 pub struct Style {
     pub background_color: Option<Color>,
     pub border_color: Option<Color>,
+    pub border_width: Option<f32>,
     pub padding: f32,
 }
 
@@ -252,7 +253,8 @@ impl Style {
             draw_rectangle(x, y, size.0, size.1, color);
         }
         if let Some(color) = self.border_color {
-            draw_rectangle_lines(x, y, size.0, size.1, 1.0, color);
+            let thickness = self.border_width.unwrap_or(1.0);
+            draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
         }
     }
 }

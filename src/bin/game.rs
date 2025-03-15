@@ -25,10 +25,7 @@ use macroquad::{
 };
 
 use rpg::core::{
-    as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
-    MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
-    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
+    as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType, IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement, StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -55,6 +52,15 @@ async fn load_textures(paths: Vec<(TextureId, &str)>) -> HashMap<TextureId, Text
     textures
 }
 
+async fn load_icons(paths: Vec<(IconId, &str)>) -> HashMap<IconId, Texture2D> {
+    let mut textures: HashMap<IconId, Texture2D> = Default::default();
+    for (id, path) in paths {
+        textures.insert(id, texture(path).await);
+    }
+    textures
+}
+
+
 #[macroquad::main(window_conf)]
 async fn main() {
     // Seed the random numbers
@@ -73,7 +79,17 @@ async fn main() {
     ])
     .await;
 
-    let mut user_interface = UserInterface::new(&game, textures);
+    let icons = load_icons(vec![
+        (IconId::Fireball, "fireball_icon.png"),
+        (IconId::Attack, "attack_icon.png"),
+        (IconId::Brace, "brace_icon.png"),
+        (IconId::Move, "move_icon.png"),
+        (IconId::Scream, "scream_icon.png"),
+        (IconId::Mindblast, "mindblast_icon.png"),
+    ])
+    .await;
+
+    let mut user_interface = UserInterface::new(&game, textures, icons);
 
     let mut game_state = game.begin();
 
@@ -86,7 +102,7 @@ async fn main() {
 
         clear_background(BLACK);
 
-        user_interface.draw(670.0);
+        user_interface.draw(640.0);
 
         if !ui_events.is_empty() {
             for player_choice in ui_events {
@@ -506,6 +522,8 @@ struct UserInterface {
     state: UiState,
     stopwatch: StopWatch,
 
+    icons: HashMap<IconId, Texture2D>,
+
     hovered_button: Option<(u32, ButtonAction)>,
     next_available_button_id: u32,
     active_character_id: CharacterId,
@@ -531,7 +549,8 @@ struct CharacterUi {
 }
 
 impl UserInterface {
-    fn new(game: &CoreGame, textures: HashMap<TextureId, Texture2D>) -> Self {
+    fn new(game: &CoreGame, textures: HashMap<TextureId, Texture2D>,
+    icons: HashMap<IconId, Texture2D>) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
 
@@ -539,7 +558,7 @@ impl UserInterface {
         let mut next_button_id = 1;
 
         let mut new_button = |subtext, btn_action| {
-            let btn = ActionButton::new(subtext, btn_action, &event_queue, next_button_id);
+            let btn = ActionButton::new(subtext, btn_action, &event_queue, next_button_id, &icons);
             next_button_id += 1;
             btn
         };
@@ -818,6 +837,8 @@ impl UserInterface {
             active_character_id,
             stopwatch: StopWatch::default(),
 
+            icons,
+
             next_available_button_id: next_button_id,
             hovered_button: None,
             log: Log::new(),
@@ -836,6 +857,7 @@ impl UserInterface {
             btn_action,
             &self.event_queue,
             self.next_available_button_id,
+            &self.icons
         );
         self.next_available_button_id += 1;
         btn
@@ -2150,6 +2172,7 @@ struct ActionButton {
     enabled: Cell<bool>,
     highlighted: Cell<bool>,
     event_sender: Option<EventSender>,
+    icon: Texture2D
 }
 
 impl ActionButton {
@@ -2158,11 +2181,14 @@ impl ActionButton {
         action: ButtonAction,
         event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
         id: u32,
+        icons: &HashMap<IconId, Texture2D>
     ) -> Self {
         let text;
         let mut mana_points = 0;
         let mut stamina_points = 0;
         let mut action_points = 0;
+
+        let mut icon = icons[&IconId::Fireball].clone();
 
         match action {
             ButtonAction::Action(base_action) => match base_action {
@@ -2171,15 +2197,18 @@ impl ActionButton {
                 } => {
                     text = "Attack";
                     action_points = action_point_cost;
+                    icon = icons[&IconId::Attack].clone();
                 }
                 BaseAction::SelfEffect(self_effect_action) => {
                     text = self_effect_action.name;
                     action_points = self_effect_action.action_point_cost;
+                    icon = icons[&self_effect_action.icon].clone();
                 }
                 BaseAction::CastSpell(spell) => {
                     text = spell.name;
                     action_points = spell.action_point_cost;
                     mana_points = spell.mana_cost;
+                    icon = icons[&spell.icon].clone();
                 }
                 BaseAction::Move {
                     action_point_cost,
@@ -2187,6 +2216,7 @@ impl ActionButton {
                 } => {
                     action_points = action_point_cost;
                     text = "Move";
+                    icon = icons[&IconId::Move].clone();
                 }
             },
             ButtonAction::AttackEnhancement(enhancement) => {
@@ -2217,7 +2247,7 @@ impl ActionButton {
             }
         }
 
-        let size = (90.0, 50.0);
+        let size = (64.0, 64.0);
         let style = Style {
             background_color: Some(DARKGRAY),
             border_color: Some(LIGHTGRAY),
@@ -2227,12 +2257,14 @@ impl ActionButton {
 
         let r = 4.0;
         let mut point_icons = vec![];
+        let border_width = Some(3.0);
         for _ in 0..action_points {
             point_icons.push(Element::Rect(Rectangle {
                 size: (r * 2.0, r * 2.0),
                 style: Style {
                     background_color: Some(color::GOLD),
                     border_color: Some(BLACK),
+                    border_width,
                     ..Default::default()
                 },
             }))
@@ -2243,6 +2275,7 @@ impl ActionButton {
                 style: Style {
                     background_color: Some(BLUE),
                     border_color: Some(BLACK),
+                    border_width,
                     ..Default::default()
                 },
             }))
@@ -2253,13 +2286,14 @@ impl ActionButton {
                 style: Style {
                     background_color: Some(GREEN),
                     border_color: Some(BLACK),
+                    border_width,
                     ..Default::default()
                 },
             }))
         }
         let points_row = Container {
             children: point_icons,
-            margin: 2.0,
+            margin: 1.0,
             layout_dir: LayoutDirection::Horizontal,
             ..Default::default()
         };
@@ -2277,6 +2311,8 @@ impl ActionButton {
             Box::new(text)
         };
 
+
+
         Self {
             id,
             action,
@@ -2292,6 +2328,7 @@ impl ActionButton {
             event_sender: Some(EventSender {
                 queue: Rc::clone(event_queue),
             }),
+            icon
         }
     }
 
@@ -2340,13 +2377,22 @@ impl Drawable for ActionButton {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
 
-        if self.highlighted.get() {
-            draw_rectangle_lines(x, y, w, h, 2.0, GREEN);
-        }
+     
 
         let margin_x = (w - self.content.size().0) / 2.0;
         let margin_y = (h - self.point_radius * 2.0 - self.content.size().1) / 2.0;
-        self.content.draw(x + margin_x, y + margin_y);
+        
+        //self.content.draw(x + margin_x, y + margin_y);
+
+        let params = DrawTextureParams {
+            dest_size: Some((60.0, 48.0).into()),
+            ..Default::default()
+        };
+        draw_texture_ex(&self.icon, x + 2.0, y + 2.0, WHITE, params);
+
+        if self.highlighted.get() {
+            draw_rectangle_lines(x, y, w, h, 2.0, GREEN);
+        }
 
         let margin = 4.0;
         let row_size = self.points_row.size();

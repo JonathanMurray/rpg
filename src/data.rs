@@ -1,8 +1,5 @@
 use crate::core::{
-    ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-    OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range,
-    SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
-    TextureId, Weapon, WeaponGrip,
+    ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition, IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, TextureId, Weapon, WeaponGrip
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -155,6 +152,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
 pub const BRACE: SelfEffectAction = SelfEffectAction {
     name: "Brace",
     description: "+def next attack",
+    icon: IconId::Brace,
     action_point_cost: 1,
     effect: ApplyEffect::Condition(Condition::Braced),
 };
@@ -162,6 +160,7 @@ pub const BRACE: SelfEffectAction = SelfEffectAction {
 pub const SCREAM: Spell = Spell {
     name: "Scream",
     description: "Daze the enemy",
+    icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
     damage: 0,
@@ -178,6 +177,7 @@ pub const SCREAM: Spell = Spell {
 pub const MIND_BLAST: Spell = Spell {
     name: "Mind blast",
     description: "Damage and stagger the enemy",
+    icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
     damage: 1,
@@ -195,6 +195,7 @@ pub const MIND_BLAST: Spell = Spell {
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
     description: "Damage the enemy",
+    icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
     damage: 2,
@@ -207,6 +208,7 @@ pub const FIREBALL: Spell = Spell {
 pub const KILL: Spell = Spell {
     name: "Kill",
     description: "Kill the enemy",
+    icon: IconId::Fireball,
     action_point_cost: 5,
     mana_cost: 0,
     damage: 99,
