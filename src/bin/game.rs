@@ -5,8 +5,8 @@ use std::{
 };
 
 use indexmap::IndexMap;
-use macroquad::math::Rect;
-use macroquad::{color::PURPLE, input::is_key_down};
+use macroquad::{color::PURPLE, input::is_key_down, text};
+use macroquad::{math::Rect, miniquad::window::set_window_position};
 
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D};
@@ -25,7 +25,10 @@ use macroquad::{
 };
 
 use rpg::core::{
-    as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType, IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement, StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST
+    as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
+    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
+    IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
+    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -60,11 +63,13 @@ async fn load_icons(paths: Vec<(IconId, &str)>) -> HashMap<IconId, Texture2D> {
     textures
 }
 
-
 #[macroquad::main(window_conf)]
 async fn main() {
     // Seed the random numbers
     rand::srand(miniquad::date::now() as u64);
+
+    // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
+    set_window_position(100, 100);
 
     let event_handler = Rc::new(UiGameEventHandler::new());
     let game = CoreGame::new(event_handler.clone());
@@ -86,6 +91,7 @@ async fn main() {
         (IconId::Move, "move_icon.png"),
         (IconId::Scream, "scream_icon.png"),
         (IconId::Mindblast, "mindblast_icon.png"),
+        (IconId::Go, "go_icon.png"),
     ])
     .await;
 
@@ -221,33 +227,42 @@ enum UiState {
 
 struct ActivityPopup {
     state: UiState,
+
     initial_lines: Vec<String>,
     target_line: Option<String>,
+
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
     enabled: bool,
+    proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     base_action_points: u32,
-    selected_button_ids: Vec<u32>,
-    hovered_button_id: Option<u32>,
+    selected_choice_button_ids: Vec<u32>,
+    hovered_choice_button_id: Option<u32>,
 
     last_drawn_size: (f32, f32),
 }
 
 impl ActivityPopup {
-    fn new(state: UiState, proceed_button: ActionButton) -> Self {
+    fn new(state: UiState, mut proceed_button: ActionButton) -> Self {
+        let proceed_button_events = Rc::new(RefCell::new(vec![]));
+        proceed_button.event_sender = Some(EventSender {
+            queue: Rc::clone(&proceed_button_events),
+        });
+
         Self {
             state,
             initial_lines: vec![],
             target_line: None,
-            selected_button_ids: Default::default(),
+            selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
             enabled: true,
+            proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
             base_action_points: 0,
-            hovered_button_id: None,
+            hovered_choice_button_id: None,
             last_drawn_size: (0.0, 0.0),
         }
     }
@@ -306,10 +321,7 @@ impl ActivityPopup {
             match &self.state {
                 UiState::ConfiguringAction(base_action) => {
                     match base_action {
-                        BaseAction::SelfEffect(..) => {
-                            draw_text("Proceed?", x0, y0, 20.0, WHITE);
-                            y0 += 20.0;
-                        }
+                        BaseAction::SelfEffect(..) => {}
                         BaseAction::Move { range, .. } => {
                             let percentage: u32 = self
                                 .selected_actions()
@@ -337,21 +349,26 @@ impl ActivityPopup {
 
         for btn in self.choice_buttons.values() {
             btn.draw(x0, y0);
+
+            if self.hovered_choice_button_id == Some(btn.id) {
+                draw_button_tooltip((x0, y0), &btn.tooltip_lines[..]);
+            }
+
             x0 += btn.size.0 + 10.0;
         }
 
         self.proceed_button.draw(x0, y0);
     }
 
-    fn update(&mut self) -> Option<u32> {
+    fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_movement_range = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(id, _button_action, hovered) => {
-                    if hovered {
-                        self.hovered_button_id = Some(id);
-                    } else if self.hovered_button_id == Some(id) {
-                        self.hovered_button_id = None;
+                InternalUiEvent::ButtonHovered(id, _button_action, hovered_pos) => {
+                    if hovered_pos.is_some() {
+                        self.hovered_choice_button_id = Some(id);
+                    } else if self.hovered_choice_button_id == Some(id) {
+                        self.hovered_choice_button_id = None;
                     }
                 }
 
@@ -375,14 +392,20 @@ impl ActivityPopup {
                         }
                     }
 
-                    self.selected_button_ids.clear();
+                    self.selected_choice_button_ids.clear();
                     for btn in self.choice_buttons.values() {
                         if btn.highlighted.get() {
-                            self.selected_button_ids.push(btn.id);
+                            self.selected_choice_button_ids.push(btn.id);
                         }
                     }
                 }
             };
+        }
+
+        for event in self.proceed_button_events.borrow_mut().drain(..) {
+            if matches!(event, InternalUiEvent::ButtonClicked(..)) {
+                return Some(ActivityPopupOutcome::ClickedProceed);
+            }
         }
 
         if changed_movement_range {
@@ -392,21 +415,23 @@ impl ActivityPopup {
                     added_percentage += enhancement.add_percentage;
                 }
             }
-            Some(added_percentage)
-        } else {
-            None
+            return Some(ActivityPopupOutcome::ChangedMovementRangePercentage(
+                added_percentage,
+            ));
         }
+
+        None
     }
 
     fn take_selected_actions(&mut self) -> Vec<ButtonAction> {
-        self.selected_button_ids
+        self.selected_choice_button_ids
             .drain(..)
             .map(|id| self.choice_buttons[&id].action)
             .collect()
     }
 
     fn selected_actions(&self) -> impl Iterator<Item = &ButtonAction> {
-        self.selected_button_ids
+        self.selected_choice_button_ids
             .iter()
             .map(|id| &self.choice_buttons[id].action)
     }
@@ -421,10 +446,10 @@ impl ActivityPopup {
             btn.highlighted.set(selected_enhancement == Some(i));
         }
 
-        self.selected_button_ids.clear();
+        self.selected_choice_button_ids.clear();
         for btn in self.choice_buttons.values() {
             if btn.highlighted.get() {
-                self.selected_button_ids.push(btn.id);
+                self.selected_choice_button_ids.push(btn.id);
             }
         }
     }
@@ -434,8 +459,8 @@ impl ActivityPopup {
         for action in self.selected_actions() {
             ap += self.action_point_cost(*action);
         }
-        if let Some(id) = self.hovered_button_id {
-            if !self.selected_button_ids.contains(&id) {
+        if let Some(id) = self.hovered_choice_button_id {
+            if !self.selected_choice_button_ids.contains(&id) {
                 ap += self.action_point_cost(self.choice_buttons[&id].action);
             }
         }
@@ -463,6 +488,7 @@ impl ActivityPopup {
 
     fn set_state(&mut self, state: UiState, lines: Vec<String>, buttons: Vec<ActionButton>) {
         if self.state != state {
+            // Assume that a change in the layout caused all buttons to no longer be hovered
             for btn in self.choice_buttons.values() {
                 btn.notify_hidden();
             }
@@ -480,7 +506,7 @@ impl ActivityPopup {
         self.state = state;
         self.initial_lines = lines;
         self.choice_buttons = choice_buttons;
-        self.selected_button_ids.clear();
+        self.selected_choice_button_ids.clear();
 
         self.base_action_points = if let UiState::ConfiguringAction(base_action) = state {
             base_action.action_point_cost()
@@ -488,6 +514,11 @@ impl ActivityPopup {
             0
         };
     }
+}
+
+enum ActivityPopupOutcome {
+    ChangedMovementRangePercentage(u32),
+    ClickedProceed,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -524,7 +555,7 @@ struct UserInterface {
 
     icons: HashMap<IconId, Texture2D>,
 
-    hovered_button: Option<(u32, ButtonAction)>,
+    hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
     next_available_button_id: u32,
     active_character_id: CharacterId,
 
@@ -540,6 +571,7 @@ struct UserInterface {
 
 struct CharacterUi {
     tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
+    buttons: Vec<Rc<ActionButton>>,
     tabs: Tabs,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -549,16 +581,26 @@ struct CharacterUi {
 }
 
 impl UserInterface {
-    fn new(game: &CoreGame, textures: HashMap<TextureId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>) -> Self {
+    fn new(
+        game: &CoreGame,
+        textures: HashMap<TextureId, Texture2D>,
+        icons: HashMap<IconId, Texture2D>,
+    ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
 
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
-        let mut new_button = |subtext, btn_action| {
-            let btn = ActionButton::new(subtext, btn_action, &event_queue, next_button_id, &icons);
+        let mut new_button = |subtext, btn_action, character: Option<&Character>| {
+            let btn = ActionButton::new(
+                subtext,
+                btn_action,
+                &event_queue,
+                next_button_id,
+                &icons,
+                character,
+            );
             next_button_id += 1;
             btn
         };
@@ -572,23 +614,27 @@ impl UserInterface {
             }
 
             let mut tracked_action_buttons = HashMap::new();
+            let mut buttons = vec![];
             let mut combat_buttons = vec![];
             let mut skill_buttons = vec![];
             let mut spell_buttons = vec![];
 
             let mut spell_enhancement_buttons = vec![];
             for (name, action) in character_ref.known_actions() {
-                let btn = Rc::new(new_button(name, ButtonAction::Action(action)));
-                let cloned_btn = Rc::clone(&btn);
+                let btn_action = ButtonAction::Action(action);
+                let btn = Rc::new(new_button(name, btn_action, Some(&character_ref)));
+                tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
+                buttons.push(Rc::clone(&btn));
                 match action {
                     BaseAction::Attack { .. } => combat_buttons.push(btn),
                     BaseAction::SelfEffect(..) => skill_buttons.push(btn),
                     BaseAction::CastSpell(spell) => {
                         if let Some(enhancement) = spell.possible_enhancement {
                             let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                            let btn = new_button(spell.name.to_string(), btn_action);
+                            let btn = Rc::new(new_button(spell.name.to_string(), btn_action, None));
+                            buttons.push(Rc::clone(&btn));
                             btn.enabled.set(false);
-                            spell_enhancement_buttons.push(Box::new(btn));
+                            spell_enhancement_buttons.push(btn);
                         }
                         spell_buttons.push(btn);
                     }
@@ -596,7 +642,6 @@ impl UserInterface {
                         skill_buttons.push(btn);
                     }
                 }
-                tracked_action_buttons.insert(base_action_id(action), cloned_btn);
             }
 
             let combat_row = buttons_row(
@@ -621,20 +666,22 @@ impl UserInterface {
             let mut reaction_buttons = vec![];
             for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
                 let btn_action = ButtonAction::OnAttackedReaction(reaction);
-                let btn = new_button(subtext.clone(), btn_action);
+                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
+                buttons.push(Rc::clone(&btn));
                 btn.enabled.set(false);
-                reaction_buttons.push(Box::new(btn));
+                reaction_buttons.push(btn);
             }
             for (subtext, reaction) in character_ref.known_on_hit_reactions() {
                 let btn_action = ButtonAction::OnHitReaction(reaction);
-                let btn = new_button(subtext.clone(), btn_action);
+                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
+                buttons.push(Rc::clone(&btn));
                 btn.enabled.set(false);
-                reaction_buttons.push(Box::new(btn));
+                reaction_buttons.push(btn);
             }
             let reactions_row = buttons_row(
                 reaction_buttons
                     .into_iter()
-                    .map(|btn| Element::Box(btn))
+                    .map(|btn| Element::Rc(btn))
                     .collect(),
             );
 
@@ -643,20 +690,21 @@ impl UserInterface {
                 character_ref.known_attack_enhancements(HandType::MainHand)
             {
                 let btn_action = ButtonAction::AttackEnhancement(enhancement);
-                let btn = new_button(subtext.clone(), btn_action);
+                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
+                buttons.push(Rc::clone(&btn));
                 btn.enabled.set(false);
-                attack_enhancement_buttons.push(Box::new(btn));
+                attack_enhancement_buttons.push(btn);
             }
             let attack_enhancements_row = buttons_row(
                 attack_enhancement_buttons
                     .into_iter()
-                    .map(|btn| Element::Box(btn))
+                    .map(|btn| Element::Rc(btn))
                     .collect(),
             );
             let spell_enhancements_row = buttons_row(
                 spell_enhancement_buttons
                     .into_iter()
-                    .map(|btn| Element::Box(btn))
+                    .map(|btn| Element::Rc(btn))
                     .collect(),
             );
 
@@ -795,6 +843,7 @@ impl UserInterface {
                 stamina_bar,
                 resource_bars,
                 conditions: vec![],
+                buttons,
             };
 
             character_uis.insert(character.borrow().id(), character_ui);
@@ -814,7 +863,7 @@ impl UserInterface {
 
         let game_grid = GameGrid::new(&game.characters, textures, (screen_width(), 670.0));
 
-        let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed);
+        let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
 
         let first_player_character_id = game
             .characters
@@ -857,7 +906,8 @@ impl UserInterface {
             btn_action,
             &self.event_queue,
             self.next_available_button_id,
-            &self.icons
+            &self.icons,
+            None,
         );
         self.next_available_button_id += 1;
         btn
@@ -900,6 +950,16 @@ impl UserInterface {
             .resource_bars
             .draw(620.0, y + 120.0);
 
+        if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
+            let btn = &self.character_uis[&self.player_portraits.selected_i.get()]
+                .buttons
+                .iter()
+                .find(|btn| btn.id == btn_id)
+                .unwrap();
+
+            draw_button_tooltip(btn_pos, &btn.tooltip_lines[..]);
+        }
+
         self.log.draw(800.0, y);
 
         self.character_portraits
@@ -908,7 +968,6 @@ impl UserInterface {
         self.character_portraits.draw(10.0, 10.0);
 
         if let Some(selected_move_option) = grid_outcome.switched_to_move_i {
-            dbg!(selected_move_option); //TODO
             let move_range = self.active_character().move_range;
             self.set_state(UiState::ConfiguringAction(BaseAction::Move {
                 action_point_cost: MOVE_ACTION_COST,
@@ -938,12 +997,19 @@ impl UserInterface {
         }
     }
 
-    fn set_action_buttons_enabled(&self, enabled: bool) {
+    fn set_allowed_to_use_action_buttons(&self, allowed: bool) {
         for btn in self.character_uis[&self.player_portraits.selected_i.get()]
             .tracked_action_buttons
             .values()
         {
-            btn.enabled.set(enabled);
+            let able = match btn.action {
+                ButtonAction::Action(base_action) => {
+                    self.active_character().can_use_action(base_action)
+                }
+                _ => todo!(),
+            };
+
+            btn.enabled.set(allowed && able);
         }
     }
 
@@ -959,7 +1025,7 @@ impl UserInterface {
         println!("Setting UI state to {:?}", state);
         self.state = state;
 
-        let mut popup_lines = vec![];
+        let mut popup_initial_lines = vec![];
         let mut popup_buttons = vec![];
         let mut movement = false;
         let mut wants_target = false;
@@ -967,21 +1033,22 @@ impl UserInterface {
         match state {
             UiState::ConfiguringAction(base_action) => {
                 self.game_grid.receptive_to_input = true;
-                self.set_action_buttons_enabled(true);
+                self.set_allowed_to_use_action_buttons(true);
+
+                popup_initial_lines = self.character_uis[&self.active_character_id]
+                    .tracked_action_buttons[&button_action_id(ButtonAction::Action(base_action))]
+                    .tooltip_lines
+                    .iter()
+                    .map(|s| s.to_string())
+                    .collect();
+
+                self.set_highlighted_action(Some(ButtonAction::Action(base_action)));
 
                 match base_action {
                     BaseAction::Attack {
                         hand,
                         action_point_cost: _,
                     } => {
-                        self.set_highlighted_button(Some(base_action_id(base_action)));
-
-                        let weapon = self.active_character().weapon(hand).unwrap();
-                        popup_lines.push(format!(
-                            "{} attack ({} AP)",
-                            weapon.name, weapon.action_point_cost
-                        ));
-                        popup_lines.push(format!("{} damage", weapon.damage));
                         let enhancements = self.active_character().usable_attack_enhancements(hand);
                         for (subtext, enhancement) in enhancements {
                             let btn = self
@@ -990,24 +1057,8 @@ impl UserInterface {
                         }
                         wants_target = true;
                     }
-                    BaseAction::SelfEffect(sea) => {
-                        self.set_highlighted_button(Some(base_action_id(base_action)));
-
-                        popup_lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
-                        popup_lines.push(sea.description.to_string());
-                    }
+                    BaseAction::SelfEffect(..) => {}
                     BaseAction::CastSpell(spell) => {
-                        self.set_highlighted_button(Some(base_action_id(base_action)));
-
-                        popup_lines.push(format!(
-                            "{} ({} AP, {} mana)",
-                            spell.name, spell.action_point_cost, spell.mana_cost
-                        ));
-                        let mut description = spell.description.to_string();
-                        if spell.damage > 0 {
-                            description.push_str(&format!(" ({} damage)", spell.damage));
-                        }
-                        popup_lines.push(description);
                         if let Some(enhancement) = spell.possible_enhancement {
                             if self.active_character().can_use_spell_enhancement(spell) {
                                 let btn_action = ButtonAction::SpellEnhancement(enhancement);
@@ -1017,12 +1068,7 @@ impl UserInterface {
                         }
                         wants_target = true;
                     }
-                    BaseAction::Move {
-                        action_point_cost, ..
-                    } => {
-                        self.set_highlighted_button(Some(base_action_id(base_action)));
-                        popup_lines.push(format!("Movement ({} AP)", action_point_cost));
-
+                    BaseAction::Move { .. } => {
                         let enhancements = self.active_character().usable_movement_enhancements();
                         for (subtext, enhancement) in enhancements {
                             let btn = self.new_button(
@@ -1041,7 +1087,7 @@ impl UserInterface {
                 hand,
                 reactor: reactor_id,
             } => {
-                self.set_action_buttons_enabled(false);
+                self.set_allowed_to_use_action_buttons(false);
 
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
@@ -1053,16 +1099,16 @@ impl UserInterface {
                     attacker.attack_modifier(hand),
                     defender.defense(),
                 );
-                popup_lines.push(attacks_str);
+                popup_initial_lines.push(attacks_str);
                 let explanation = format!(
                     "{}{}",
                     attacker.explain_attack_circumstances(hand),
                     defender.explain_incoming_attack_circumstances()
                 );
                 if !explanation.is_empty() {
-                    popup_lines.push(format!("  {explanation}"));
+                    popup_initial_lines.push(format!("  {explanation}"));
                 }
-                popup_lines.push(format!(
+                popup_initial_lines.push(format!(
                     "  Chance to hit: {}",
                     as_percentage(prob_attack_hit(&attacker, hand, &defender))
                 ));
@@ -1081,10 +1127,10 @@ impl UserInterface {
                 damage,
                 victim: victim_id,
             } => {
-                self.set_action_buttons_enabled(false);
+                self.set_allowed_to_use_action_buttons(false);
 
                 let victim = self.characters.get(victim_id);
-                popup_lines.push(format!(
+                popup_initial_lines.push(format!(
                     "{} took {} damage from an attack by {}",
                     victim.name,
                     damage,
@@ -1101,18 +1147,17 @@ impl UserInterface {
 
             UiState::ChoosingAction => {
                 self.game_grid.receptive_to_input = true;
-                self.set_action_buttons_enabled(true);
+                self.set_allowed_to_use_action_buttons(true);
             }
 
             UiState::Idle => {
-                self.set_action_buttons_enabled(false);
-                // TODO make sure this is set correctly everywhere where applicable
+                self.set_allowed_to_use_action_buttons(false);
                 self.game_grid.receptive_to_input = false;
             }
         }
 
         self.activity_popup
-            .set_state(state, popup_lines, popup_buttons);
+            .set_state(state, popup_initial_lines, popup_buttons);
 
         let move_range = self.active_character().move_range;
 
@@ -1257,7 +1302,7 @@ impl UserInterface {
             }
         }
 
-        self.set_action_buttons_enabled(
+        self.set_allowed_to_use_action_buttons(
             self.player_portraits.selected_i.get() == active_character_id,
         );
 
@@ -1266,19 +1311,28 @@ impl UserInterface {
         self.game_grid
             .update(active_character_id, &self.characters, elapsed);
 
-        let maybe_updated_movement_range = self.activity_popup.update();
+        let popup_outcome = self.activity_popup.update();
 
-        if let Some(added_percentage) = maybe_updated_movement_range {
-            self.game_grid
-                .set_selected_movement_percentage(added_percentage);
+        if let Some(ActivityPopupOutcome::ChangedMovementRangePercentage(added_percentage)) =
+            popup_outcome
+        {}
+
+        let mut player_choice = None;
+        match popup_outcome {
+            Some(ActivityPopupOutcome::ChangedMovementRangePercentage(added_percentage)) => {
+                self.game_grid
+                    .set_selected_movement_percentage(added_percentage);
+            }
+            Some(ActivityPopupOutcome::ClickedProceed) => {
+                player_choice = Some(self.handle_popup_proceed());
+            }
+            None => {}
         }
 
-        let public_events: Vec<PlayerChose> = self
-            .event_queue
+        self.event_queue
             .take()
             .into_iter()
-            .filter_map(|event| self.handle_event(event))
-            .collect();
+            .for_each(|event| self.handle_internal_ui_event(event));
 
         // TODO: Also show reserved mana and stamina
         self.action_points_row.reserved_and_hovered = if let Some(hovered_btn) = self.hovered_button
@@ -1378,14 +1432,109 @@ impl UserInterface {
             println!("UI is now ready...");
         }
 
-        public_events
+        if let Some(choice) = player_choice {
+            vec![choice]
+        } else {
+            vec![]
+        }
     }
 
-    fn handle_event(&mut self, event: InternalUiEvent) -> Option<PlayerChose> {
+    fn handle_popup_proceed(&mut self) -> PlayerChose {
+        match self.state {
+            UiState::ConfiguringAction(base_action) => {
+                let target = self.game_grid.target();
+                let action = match base_action {
+                    BaseAction::Attack { hand, .. } => {
+                        let enhancements = self
+                            .activity_popup
+                            .take_selected_actions()
+                            .into_iter()
+                            .map(|action| match action {
+                                ButtonAction::AttackEnhancement(e) => e,
+                                _ => unreachable!(),
+                            })
+                            .collect();
+
+                        Action::Attack {
+                            hand,
+                            enhancements,
+                            target: target.unwrap(),
+                        }
+                    }
+                    BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
+                    BaseAction::CastSpell(spell) => {
+                        // TODO multiple spell enhancements
+                        let enhanced: bool = self
+                            .activity_popup
+                            .take_selected_actions()
+                            .into_iter()
+                            .map(|action| match action {
+                                ButtonAction::SpellEnhancement(e) => e,
+                                _ => unreachable!(),
+                            })
+                            .count()
+                            > 0;
+
+                        Action::CastSpell {
+                            spell,
+                            enhanced,
+                            target: target.unwrap(),
+                        }
+                    }
+                    BaseAction::Move {
+                        action_point_cost,
+                        range: _,
+                    } => {
+                        let enhancements = self
+                            .activity_popup
+                            .take_selected_actions()
+                            .into_iter()
+                            .map(|action| match action {
+                                ButtonAction::MovementEnhancement(e) => e,
+                                _ => unreachable!(),
+                            })
+                            .collect();
+
+                        Action::Move {
+                            action_point_cost,
+                            enhancements,
+                            positions: self.game_grid.take_movement_path(),
+                        }
+                    }
+                };
+                PlayerChose::Action(action)
+            }
+            UiState::ReactingToAttack { .. } => {
+                let reaction =
+                    self.activity_popup.take_selected_actions().first().map(
+                        |action| match action {
+                            ButtonAction::OnAttackedReaction(reaction) => *reaction,
+                            _ => unreachable!(),
+                        },
+                    );
+                PlayerChose::AttackedReaction(reaction)
+            }
+            UiState::ReactingToHit { .. } => {
+                let reaction =
+                    self.activity_popup.take_selected_actions().first().map(
+                        |action| match action {
+                            ButtonAction::OnHitReaction(reaction) => *reaction,
+                            _ => unreachable!(),
+                        },
+                    );
+
+                PlayerChose::HitReaction(reaction)
+            }
+            UiState::ChoosingAction => unreachable!(),
+            UiState::Idle => unreachable!(),
+        }
+    }
+
+    fn handle_internal_ui_event(&mut self, event: InternalUiEvent) {
         match event {
             InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
-                if hovered {
-                    self.hovered_button = Some((button_id, button_action));
+                if let Some(pos) = hovered {
+                    self.hovered_button = Some((button_id, button_action, pos));
                 } else if let Some(previously_hovered_button) = self.hovered_button {
                     if button_id == previously_hovered_button.0 {
                         self.hovered_button = None
@@ -1393,136 +1542,43 @@ impl UserInterface {
                 }
             }
 
-            InternalUiEvent::ButtonClicked(_button_id, btn_action) => {
-                match btn_action {
-                    ButtonAction::Action(base_action) => {
-                        let may_choose_action = matches!(
-                            self.state,
-                            UiState::ChoosingAction | UiState::ConfiguringAction(..)
-                        );
+            InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
+                ButtonAction::Action(base_action) => {
+                    let may_choose_action = matches!(
+                        self.state,
+                        UiState::ChoosingAction | UiState::ConfiguringAction(..)
+                    );
 
-                        if may_choose_action && self.active_character().can_use_action(base_action)
-                        {
-                            self.set_state(UiState::ConfiguringAction(base_action));
-                        } else {
-                            println!("Cannot choose this action at this time");
-                        }
+                    if may_choose_action && self.active_character().can_use_action(base_action) {
+                        self.set_state(UiState::ConfiguringAction(base_action));
+                    } else {
+                        println!("Cannot choose this action at this time");
                     }
-
-                    ButtonAction::Proceed => {
-                        self.set_highlighted_button(None);
-
-                        let event = match self.state {
-                            UiState::ConfiguringAction(base_action) => {
-                                let target = self.game_grid.target();
-                                let action = match base_action {
-                                    BaseAction::Attack { hand, .. } => {
-                                        let enhancements = self
-                                            .activity_popup
-                                            .take_selected_actions()
-                                            .into_iter()
-                                            .map(|action| match action {
-                                                ButtonAction::AttackEnhancement(e) => e,
-                                                _ => unreachable!(),
-                                            })
-                                            .collect();
-
-                                        Action::Attack {
-                                            hand,
-                                            enhancements,
-                                            target: target.unwrap(),
-                                        }
-                                    }
-                                    BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
-                                    BaseAction::CastSpell(spell) => {
-                                        // TODO multiple spell enhancements
-                                        let enhanced: bool = self
-                                            .activity_popup
-                                            .take_selected_actions()
-                                            .into_iter()
-                                            .map(|action| match action {
-                                                ButtonAction::SpellEnhancement(e) => e,
-                                                _ => unreachable!(),
-                                            })
-                                            .count()
-                                            > 0;
-
-                                        Action::CastSpell {
-                                            spell,
-                                            enhanced,
-                                            target: target.unwrap(),
-                                        }
-                                    }
-                                    BaseAction::Move {
-                                        action_point_cost,
-                                        range: _,
-                                    } => {
-                                        let enhancements = self
-                                            .activity_popup
-                                            .take_selected_actions()
-                                            .into_iter()
-                                            .map(|action| match action {
-                                                ButtonAction::MovementEnhancement(e) => e,
-                                                _ => unreachable!(),
-                                            })
-                                            .collect();
-
-                                        Action::Move {
-                                            action_point_cost,
-                                            enhancements,
-                                            positions: self.game_grid.take_movement_path(),
-                                        }
-                                    }
-                                };
-                                PlayerChose::Action(action)
-                            }
-                            UiState::ReactingToAttack { .. } => {
-                                let reaction =
-                                    self.activity_popup.take_selected_actions().first().map(
-                                        |action| match action {
-                                            ButtonAction::OnAttackedReaction(reaction) => *reaction,
-                                            _ => unreachable!(),
-                                        },
-                                    );
-                                PlayerChose::AttackedReaction(reaction)
-                            }
-                            UiState::ReactingToHit { .. } => {
-                                let reaction =
-                                    self.activity_popup.take_selected_actions().first().map(
-                                        |action| match action {
-                                            ButtonAction::OnHitReaction(reaction) => *reaction,
-                                            _ => unreachable!(),
-                                        },
-                                    );
-
-                                PlayerChose::HitReaction(reaction)
-                            }
-                            UiState::ChoosingAction => unreachable!(),
-                            UiState::Idle => unreachable!(),
-                        };
-                        return Some(event);
-                    }
-
-                    _ => unreachable!(),
                 }
-            }
-        }
 
-        None
+                ButtonAction::Proceed => {
+                    self.set_highlighted_action(None);
+                }
+
+                _ => unreachable!(),
+            },
+        }
     }
 
-    fn set_highlighted_button(&self, highlighted_button_action: Option<String>) {
+    fn set_highlighted_action(&self, highlighted_action: Option<ButtonAction>) {
+        let highlighted_id = highlighted_action.map(|action| button_action_id(action));
+
         if self.active_character().player_controlled {
             if self.player_portraits.selected_i.get() != self.active_character_id {
                 self.player_portraits
                     .set_selected_character(self.active_character_id);
             }
 
-            for (base_action_id, btn) in
+            for (btn_action_id, btn) in
                 &self.character_uis[&self.active_character_id].tracked_action_buttons
             {
                 btn.highlighted
-                    .set(highlighted_button_action.as_ref() == Some(base_action_id));
+                    .set(highlighted_id.as_ref() == Some(btn_action_id));
             }
         }
     }
@@ -1551,12 +1607,71 @@ impl UserInterface {
     }
 }
 
-fn base_action_id(base_action: BaseAction) -> String {
-    match base_action {
-        BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
-        BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
-        BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
-        BaseAction::Move { .. } => "MOVE".to_string(),
+fn draw_button_tooltip(button_position: (f32, f32), lines: &[String]) {
+    let font_size = 18;
+    let mut max_line_w = 0.0;
+    let text_margin = 8.0;
+    for line in lines {
+        let dimensions = measure_text(line, None, font_size, 1.0);
+        if dimensions.width > max_line_w {
+            max_line_w = dimensions.width;
+        }
+    }
+
+    let tooltip_w = max_line_w + text_margin * 2.0;
+
+    let line_h = 22.0;
+    let tooltip_h = lines.len() as f32 * line_h + text_margin * 2.0;
+
+    let tooltip_rect = (
+        button_position.0,
+        button_position.1 - 3.0 - tooltip_h,
+        tooltip_w,
+        tooltip_h,
+    );
+    draw_rectangle(
+        tooltip_rect.0,
+        tooltip_rect.1,
+        tooltip_rect.2,
+        tooltip_rect.3,
+        Color::new(0.0, 0.0, 0.0, 0.9),
+    );
+    draw_rectangle_lines(
+        tooltip_rect.0,
+        tooltip_rect.1,
+        tooltip_rect.2,
+        tooltip_rect.3,
+        1.0,
+        GRAY,
+    );
+
+    let mut line_y = button_position.1 - lines.len() as f32 * line_h + text_margin - 5.0;
+    for line in lines {
+        draw_text(
+            line,
+            button_position.0 + text_margin,
+            line_y,
+            font_size as f32,
+            WHITE,
+        );
+        line_y += line_h;
+    }
+}
+
+fn button_action_id(btn_action: ButtonAction) -> String {
+    match btn_action {
+        ButtonAction::Action(base_action) => match base_action {
+            BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
+            BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
+            BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
+            BaseAction::Move { .. } => "MOVE".to_string(),
+        },
+        ButtonAction::OnAttackedReaction(on_attacked_reaction) => todo!(),
+        ButtonAction::OnHitReaction(on_hit_reaction) => todo!(),
+        ButtonAction::AttackEnhancement(attack_enhancement) => todo!(),
+        ButtonAction::SpellEnhancement(spell_enhancement) => todo!(),
+        ButtonAction::MovementEnhancement(movement_enhancement) => todo!(),
+        ButtonAction::Proceed => todo!(),
     }
 }
 
@@ -2161,6 +2276,8 @@ impl ButtonAction {
 
 struct ActionButton {
     id: u32,
+    title: &'static str,
+    tooltip_lines: Vec<String>,
     action: ButtonAction,
     size: (f32, f32),
     style: Style,
@@ -2172,7 +2289,7 @@ struct ActionButton {
     enabled: Cell<bool>,
     highlighted: Cell<bool>,
     event_sender: Option<EventSender>,
-    icon: Texture2D
+    icon: Texture2D,
 }
 
 impl ActionButton {
@@ -2181,69 +2298,128 @@ impl ActionButton {
         action: ButtonAction,
         event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
         id: u32,
-        icons: &HashMap<IconId, Texture2D>
+        icons: &HashMap<IconId, Texture2D>,
+        character: Option<&Character>,
     ) -> Self {
-        let text;
+        let title;
         let mut mana_points = 0;
         let mut stamina_points = 0;
         let mut action_points = 0;
 
         let mut icon = icons[&IconId::Fireball].clone();
+        let mut tooltip_lines = vec![];
 
         match action {
             ButtonAction::Action(base_action) => match base_action {
                 BaseAction::Attack {
-                    action_point_cost, ..
+                    action_point_cost,
+                    hand,
                 } => {
-                    text = "Attack";
+                    title = "Attack";
                     action_points = action_point_cost;
                     icon = icons[&IconId::Attack].clone();
+
+                    let char = character.unwrap();
+                    let weapon = char.weapon(hand).unwrap();
+                    tooltip_lines.push(format!(
+                        "{} attack ({} AP)",
+                        weapon.name, weapon.action_point_cost
+                    ));
+                    tooltip_lines.push(format!("{} damage", weapon.damage));
                 }
-                BaseAction::SelfEffect(self_effect_action) => {
-                    text = self_effect_action.name;
-                    action_points = self_effect_action.action_point_cost;
-                    icon = icons[&self_effect_action.icon].clone();
+                BaseAction::SelfEffect(sea) => {
+                    title = sea.name;
+                    action_points = sea.action_point_cost;
+                    icon = icons[&sea.icon].clone();
+
+                    tooltip_lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
+                    tooltip_lines.push(sea.description.to_string());
                 }
                 BaseAction::CastSpell(spell) => {
-                    text = spell.name;
+                    title = spell.name;
                     action_points = spell.action_point_cost;
                     mana_points = spell.mana_cost;
                     icon = icons[&spell.icon].clone();
+
+                    tooltip_lines.push(format!(
+                        "{} ({} AP, {} mana)",
+                        spell.name, spell.action_point_cost, spell.mana_cost
+                    ));
+                    let mut description = spell.description.to_string();
+                    if spell.damage > 0 {
+                        description.push_str(&format!(" ({} damage)", spell.damage));
+                    }
+                    tooltip_lines.push(description);
                 }
                 BaseAction::Move {
                     action_point_cost,
                     range: _,
                 } => {
                     action_points = action_point_cost;
-                    text = "Move";
+                    title = "Move";
                     icon = icons[&IconId::Move].clone();
+
+                    tooltip_lines.push(format!("Movement ({} AP)", action_point_cost));
                 }
             },
             ButtonAction::AttackEnhancement(enhancement) => {
-                text = enhancement.name;
+                title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
+
+                tooltip_lines.push(format!(
+                    "{} ({} AP, {} stamina)",
+                    enhancement.name, enhancement.action_point_cost, enhancement.stamina_cost
+                ));
+                tooltip_lines.push(enhancement.description.to_string());
             }
-            ButtonAction::Proceed => {
-                text = "Proceed";
-            }
+
             ButtonAction::SpellEnhancement(enhancement) => {
-                text = enhancement.name;
+                title = enhancement.name;
                 mana_points = enhancement.mana_cost;
+
+                tooltip_lines.push(format!(
+                    "{} ({} mana)",
+                    enhancement.name, enhancement.mana_cost
+                ));
+                tooltip_lines.push(enhancement.description.to_string());
             }
             ButtonAction::OnAttackedReaction(reaction) => {
-                text = reaction.name;
+                title = reaction.name;
                 action_points = reaction.action_point_cost;
                 stamina_points = reaction.stamina_cost;
+
+                tooltip_lines.push(format!(
+                    "{} ({} AP, {} stamina)",
+                    reaction.name, reaction.action_point_cost, reaction.stamina_cost
+                ));
+                tooltip_lines.push(reaction.description.to_string());
             }
             ButtonAction::OnHitReaction(reaction) => {
-                text = reaction.name;
+                title = reaction.name;
                 action_points = reaction.action_point_cost;
+
+                tooltip_lines.push(format!(
+                    "{} ({} AP)",
+                    reaction.name, reaction.action_point_cost
+                ));
+                tooltip_lines.push(reaction.description.to_string());
             }
             ButtonAction::MovementEnhancement(enhancement) => {
-                text = enhancement.name;
+                title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
+
+                tooltip_lines.push(format!(
+                    "{} ({} AP, {} stamina)",
+                    enhancement.name, enhancement.action_point_cost, enhancement.stamina_cost
+                ));
+                tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
+            }
+            ButtonAction::Proceed => {
+                title = "Proceed";
+                icon = icons[&IconId::Go].clone();
+                tooltip_lines.push("Proceed".to_string());
             }
         }
 
@@ -2298,23 +2474,24 @@ impl ActionButton {
             ..Default::default()
         };
 
-        let text = Element::Text(TextLine::new(text, 20, WHITE));
+        let text_line = Element::Text(TextLine::new(title, 20, WHITE));
         let content = if !subtext.is_empty() {
             Box::new(Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 8.0,
                 align: Align::Center,
-                children: vec![text, Element::Text(TextLine::new(subtext, 15, WHITE))],
+                children: vec![text_line, Element::Text(TextLine::new(subtext, 15, WHITE))],
                 ..Default::default()
             }))
         } else {
-            Box::new(text)
+            Box::new(text_line)
         };
 
-
+        assert!(!tooltip_lines.is_empty());
 
         Self {
             id,
+            title,
             action,
             size,
             style,
@@ -2328,7 +2505,8 @@ impl ActionButton {
             event_sender: Some(EventSender {
                 queue: Rc::clone(event_queue),
             }),
-            icon
+            icon,
+            tooltip_lines,
         }
     }
 
@@ -2340,7 +2518,7 @@ impl ActionButton {
         if self.hovered.get() {
             if let Some(event_sender) = &self.event_sender {
                 // Since this button has become hidden, it's no longer hovered
-                event_sender.send(InternalUiEvent::ButtonHovered(self.id, self.action, false));
+                event_sender.send(InternalUiEvent::ButtonHovered(self.id, self.action, None));
             }
         }
     }
@@ -2353,18 +2531,19 @@ impl Drawable for ActionButton {
 
         let (mouse_x, mouse_y) = mouse_position();
 
-        if self.enabled.get() {
-            let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
-            if hovered != self.hovered.get() {
-                self.hovered.set(hovered);
-                if let Some(event_sender) = &self.event_sender {
-                    event_sender.send(InternalUiEvent::ButtonHovered(
-                        self.id,
-                        self.action,
-                        hovered,
-                    ));
-                }
+        let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
+        if hovered != self.hovered.get() {
+            self.hovered.set(hovered);
+            if let Some(event_sender) = &self.event_sender {
+                event_sender.send(InternalUiEvent::ButtonHovered(
+                    self.id,
+                    self.action,
+                    if hovered { Some((x, y)) } else { None },
+                ));
             }
+        }
+
+        if self.enabled.get() {
             if hovered {
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if let Some(event_sender) = &self.event_sender {
@@ -2374,14 +2553,13 @@ impl Drawable for ActionButton {
                 draw_rectangle_lines(x, y, w, h, 1.0, self.hover_border_color);
             }
         } else {
-            draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
+            draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.3));
+            //draw_rectangle_lines(x, y, w, h, 1.0, RED);
         }
-
-     
 
         let margin_x = (w - self.content.size().0) / 2.0;
         let margin_y = (h - self.point_radius * 2.0 - self.content.size().1) / 2.0;
-        
+
         //self.content.draw(x + margin_x, y + margin_y);
 
         let params = DrawTextureParams {
@@ -2408,7 +2586,7 @@ impl Drawable for ActionButton {
 }
 
 enum InternalUiEvent {
-    ButtonHovered(u32, ButtonAction, bool),
+    ButtonHovered(u32, ButtonAction, Option<(f32, f32)>),
     ButtonClicked(u32, ButtonAction),
 }
 

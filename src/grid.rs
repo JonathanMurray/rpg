@@ -274,7 +274,7 @@ impl GameGrid {
             let pos = self.characters.get(self.active_character_id).position_i32();
             let mut movement_preview = vec![];
             for (destination, route) in &self.pathfind_grid.routes {
-                if route.came_from == pos {
+                if route.came_from == pos && route.distance_from_start > 0.0 {
                     movement_preview.push((route.distance_from_start, *destination));
                     movement_preview.push((0.0, pos));
                     break;

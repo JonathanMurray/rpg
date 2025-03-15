@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 4, 2, 10, (0, 6));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 4, 2, 5, (0, 6));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -1177,6 +1177,7 @@ pub struct Spell {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellEnhancement {
     pub name: &'static str,
+    pub description: &'static str,
     pub mana_cost: u32,
     pub effect: SpellEnhancementEffect,
 }
@@ -1755,8 +1756,6 @@ pub enum TextureId {
     Shield,
 }
 
-
-
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,
@@ -1764,5 +1763,6 @@ pub enum IconId {
     Brace,
     Move,
     Scream,
-    Mindblast
+    Mindblast,
+    Go,
 }

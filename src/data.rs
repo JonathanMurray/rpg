@@ -1,5 +1,8 @@
 use crate::core::{
-    ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition, IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, TextureId, Weapon, WeaponGrip
+    ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
+    IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect,
+    Range, SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
+    TextureId, Weapon, WeaponGrip,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -89,7 +92,7 @@ pub const BOW: Weapon = Weapon {
     attack_attribute: AttackAttribute::Dexterity,
     attack_enhancement: Some(AttackEnhancement {
         name: "Careful aim",
-        description: "Advantage",
+        description: "Bonus advantage",
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 0,
@@ -118,7 +121,7 @@ pub const SMALL_SHIELD: Shield = Shield {
 
 pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
     name: "Crushing",
-    description: "Stagger",
+    description: "Target loses 1 AP",
     action_point_cost: 0,
     stamina_cost: 1,
     bonus_damage: 0,
@@ -128,7 +131,7 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
-    description: "+def",
+    description: "Bonus defense",
     action_point_cost: 1,
     stamina_cost: 0,
     effect: OnAttackedReactionEffect::Parry,
@@ -136,7 +139,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
-    description: "+def",
+    description: "Bonus defense",
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect::SideStep,
@@ -144,14 +147,14 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
 
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
-    description: "Advantage on attacks",
+    description: "Bonus advantange on your next attack",
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
 };
 
 pub const BRACE: SelfEffectAction = SelfEffectAction {
     name: "Brace",
-    description: "+def next attack",
+    description: "Bonus defense the next time you're attacked",
     icon: IconId::Brace,
     action_point_cost: 1,
     effect: ApplyEffect::Condition(Condition::Braced),
@@ -168,6 +171,7 @@ pub const SCREAM: Spell = Spell {
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
         name: "Stagger",
+        description: "Target loses 2 AP",
         mana_cost: 1,
         effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
     }),
@@ -186,6 +190,7 @@ pub const MIND_BLAST: Spell = Spell {
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
         name: "Dualcast",
+        description: "Spell is cast twice",
         mana_cost: 1,
         effect: SpellEnhancementEffect::CastTwice,
     }),
@@ -194,7 +199,7 @@ pub const MIND_BLAST: Spell = Spell {
 
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
-    description: "Damage the enemy",
+    description: "Hurl a fireball that damages the target",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
