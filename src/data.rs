@@ -1,3 +1,5 @@
+use macroquad::miniquad::conf::Icon;
+
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
     IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect,
@@ -70,6 +72,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     attack_enhancement: Some(AttackEnhancement {
         name: "All-in",
         description: "+1 damage",
+        icon: IconId::AllIn,
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 1,
@@ -93,6 +96,7 @@ pub const BOW: Weapon = Weapon {
     attack_enhancement: Some(AttackEnhancement {
         name: "Careful aim",
         description: "Bonus advantage",
+        icon: IconId::CarefulAim,
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 0,
@@ -114,14 +118,16 @@ pub const SMALL_SHIELD: Shield = Shield {
         // TODO only in melee!
         name: "Shield bash",
         description: "Possibly daze attacker",
+        icon: IconId::ShieldBash,
         action_point_cost: 1,
         effect: OnHitReactionEffect::ShieldBash,
     }),
 };
 
 pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
-    name: "Crushing",
+    name: "Crushing strike",
     description: "Target loses 1 AP",
+    icon: IconId::CrushingStrike,
     action_point_cost: 0,
     stamina_cost: 1,
     bonus_damage: 0,
@@ -132,6 +138,7 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
     description: "Bonus defense",
+    icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 0,
     effect: OnAttackedReactionEffect::Parry,
@@ -140,6 +147,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
     description: "Bonus defense",
+    icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect::SideStep,
@@ -148,6 +156,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
     description: "Bonus advantange on your next attack",
+    icon: IconId::Rage,
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
 };
@@ -170,8 +179,9 @@ pub const SCREAM: Spell = Spell {
     on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
-        name: "Stagger",
+        name: "Shriek",
         description: "Target loses 2 AP",
+        icon: IconId::Banshee,
         mana_cost: 1,
         effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
     }),
@@ -191,6 +201,7 @@ pub const MIND_BLAST: Spell = Spell {
     possible_enhancement: Some(SpellEnhancement {
         name: "Dualcast",
         description: "Spell is cast twice",
+        icon: IconId::Dualcast,
         mana_cost: 1,
         effect: SpellEnhancementEffect::CastTwice,
     }),

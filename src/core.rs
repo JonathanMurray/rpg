@@ -22,7 +22,7 @@ pub struct CoreGame {
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
         let mut bob = Character::new(true, "Bob", TextureId::Character, 4, 2, 5, (0, 6));
-        bob.main_hand.weapon = Some(SWORD);
+        bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -1004,6 +1004,7 @@ impl Clone for Characters {
 pub struct AttackEnhancement {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub bonus_damage: u32,
@@ -1021,6 +1022,7 @@ pub enum ApplyEffect {
 pub struct OnAttackedReaction {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
@@ -1036,6 +1038,7 @@ pub enum OnAttackedReactionEffect {
 pub struct OnHitReaction {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub action_point_cost: u32,
     pub effect: OnHitReactionEffect,
 }
@@ -1178,6 +1181,7 @@ pub struct Spell {
 pub struct SpellEnhancement {
     pub name: &'static str,
     pub description: &'static str,
+    pub icon: IconId,
     pub mana_cost: u32,
     pub effect: SpellEnhancementEffect,
 }
@@ -1198,6 +1202,7 @@ pub enum SpellType {
 pub struct MovementEnhancement {
     pub name: &'static str,
     pub action_point_cost: u32,
+    pub icon: IconId,
     pub stamina_cost: u32,
     pub add_percentage: u32,
 }
@@ -1433,6 +1438,7 @@ impl Character {
                 MovementEnhancement {
                     name: "Extend",
                     action_point_cost: 1,
+                    icon: IconId::Plus,
                     stamina_cost: 0,
                     add_percentage: 100,
                 },
@@ -1442,6 +1448,7 @@ impl Character {
                 MovementEnhancement {
                     name: "Sprint",
                     action_point_cost: 1,
+                    icon: IconId::PlusPlus,
                     stamina_cost: 1,
                     add_percentage: 150,
                 },
@@ -1764,5 +1771,15 @@ pub enum IconId {
     Move,
     Scream,
     Mindblast,
+    Parry,
+    ShieldBash,
+    Rage,
+    CrushingStrike,
+    CarefulAim,
+    Banshee,
+    Dualcast,
+    AllIn,
+    Plus,
+    PlusPlus,
     Go,
 }

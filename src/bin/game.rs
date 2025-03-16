@@ -92,6 +92,16 @@ async fn main() {
         (IconId::Scream, "scream_icon.png"),
         (IconId::Mindblast, "mindblast_icon.png"),
         (IconId::Go, "go_icon.png"),
+        (IconId::Parry, "parry_icon.png"),
+        (IconId::ShieldBash, "shieldbash_icon.png"),
+        (IconId::Rage, "rage_icon.png"),
+        (IconId::CrushingStrike, "crushing_strike_icon.png"),
+        (IconId::Banshee, "banshee_icon.png"),
+        (IconId::Dualcast, "dualcast_icon.png"),
+        (IconId::AllIn, "all_in_icon.png"),
+        (IconId::CarefulAim, "careful_aim_icon.png"),
+        (IconId::Plus, "plus_icon.png"),
+        (IconId::PlusPlus, "plus_plus_icon.png"),
     ])
     .await;
 
@@ -2306,7 +2316,7 @@ impl ActionButton {
         let mut stamina_points = 0;
         let mut action_points = 0;
 
-        let mut icon = icons[&IconId::Fireball].clone();
+        let icon: IconId;
         let mut tooltip_lines = vec![];
 
         match action {
@@ -2317,7 +2327,7 @@ impl ActionButton {
                 } => {
                     title = "Attack";
                     action_points = action_point_cost;
-                    icon = icons[&IconId::Attack].clone();
+                    icon = IconId::Attack;
 
                     let char = character.unwrap();
                     let weapon = char.weapon(hand).unwrap();
@@ -2330,7 +2340,7 @@ impl ActionButton {
                 BaseAction::SelfEffect(sea) => {
                     title = sea.name;
                     action_points = sea.action_point_cost;
-                    icon = icons[&sea.icon].clone();
+                    icon = sea.icon;
 
                     tooltip_lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
                     tooltip_lines.push(sea.description.to_string());
@@ -2339,7 +2349,7 @@ impl ActionButton {
                     title = spell.name;
                     action_points = spell.action_point_cost;
                     mana_points = spell.mana_cost;
-                    icon = icons[&spell.icon].clone();
+                    icon = spell.icon;
 
                     tooltip_lines.push(format!(
                         "{} ({} AP, {} mana)",
@@ -2357,7 +2367,7 @@ impl ActionButton {
                 } => {
                     action_points = action_point_cost;
                     title = "Move";
-                    icon = icons[&IconId::Move].clone();
+                    icon = IconId::Move;
 
                     tooltip_lines.push(format!("Movement ({} AP)", action_point_cost));
                 }
@@ -2366,6 +2376,7 @@ impl ActionButton {
                 title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
+                icon = enhancement.icon;
 
                 tooltip_lines.push(format!(
                     "{} ({} AP, {} stamina)",
@@ -2377,6 +2388,7 @@ impl ActionButton {
             ButtonAction::SpellEnhancement(enhancement) => {
                 title = enhancement.name;
                 mana_points = enhancement.mana_cost;
+                icon = enhancement.icon;
 
                 tooltip_lines.push(format!(
                     "{} ({} mana)",
@@ -2388,6 +2400,7 @@ impl ActionButton {
                 title = reaction.name;
                 action_points = reaction.action_point_cost;
                 stamina_points = reaction.stamina_cost;
+                icon = reaction.icon;
 
                 tooltip_lines.push(format!(
                     "{} ({} AP, {} stamina)",
@@ -2398,6 +2411,7 @@ impl ActionButton {
             ButtonAction::OnHitReaction(reaction) => {
                 title = reaction.name;
                 action_points = reaction.action_point_cost;
+                icon = reaction.icon;
 
                 tooltip_lines.push(format!(
                     "{} ({} AP)",
@@ -2409,6 +2423,7 @@ impl ActionButton {
                 title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
+                icon = enhancement.icon;
 
                 tooltip_lines.push(format!(
                     "{} ({} AP, {} stamina)",
@@ -2418,7 +2433,7 @@ impl ActionButton {
             }
             ButtonAction::Proceed => {
                 title = "Proceed";
-                icon = icons[&IconId::Go].clone();
+                icon = IconId::Go;
                 tooltip_lines.push("Proceed".to_string());
             }
         }
@@ -2489,6 +2504,7 @@ impl ActionButton {
 
         assert!(!tooltip_lines.is_empty());
 
+        let icon = icons[&icon].clone();
         Self {
             id,
             title,
