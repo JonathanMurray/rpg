@@ -25,10 +25,10 @@ use macroquad::{
 };
 
 use rpg::core::{
-    as_percentage, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement, BaseAction,
-    Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler, GameState, HandType,
-    IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range, SpellEnhancement,
-    StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
+    as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement,
+    BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler,
+    GameState, HandType, IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range,
+    SpellEnhancement, StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
 };
 use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
@@ -1208,7 +1208,7 @@ impl UserInterface {
             GameEvent::CharacterTookDamage { character, amount } => {
                 let pos = self.characters.get(character).position_i32();
                 self.game_grid
-                    .add_text_effect(pos, format!("{}", amount), 2.0);
+                    .add_text_effect(pos, 2.0, format!("{}", amount));
             }
             GameEvent::Attacked {
                 attacker,
@@ -1218,7 +1218,9 @@ impl UserInterface {
                 let attacker_pos = self.characters.get(attacker).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
 
-                let duration = 0.15;
+                let dist = distance_between(attacker_pos, target_pos);
+                let duration = 0.15 * dist;
+
                 self.stopwatch.set_to_at_least(duration + 0.4);
                 let impact_text = match outcome {
                     rpg::core::AttackOutcome::Hit => "",
@@ -1232,7 +1234,7 @@ impl UserInterface {
                     DARKGRAY,
                     duration,
                     impact_text,
-                    0.1,
+                    10.0,
                 );
             }
             GameEvent::SpellWasCast {
@@ -1248,7 +1250,9 @@ impl UserInterface {
                     rpg::core::SpellType::Projectile => RED,
                 };
 
-                let duration = 0.2;
+                let dist = distance_between(caster_pos, target_pos);
+                let duration = 0.15 * dist;
+
                 self.stopwatch.set_to_at_least(duration + 0.3);
                 let impact_text = if success { "" } else { "Resist" };
                 self.game_grid.add_projectile_effect(
@@ -1257,7 +1261,7 @@ impl UserInterface {
                     color,
                     duration,
                     impact_text,
-                    0.2,
+                    20.0,
                 );
             }
             GameEvent::CharacterReceivedSelfEffect {
@@ -1268,8 +1272,8 @@ impl UserInterface {
                 let duration = 1.0;
                 self.game_grid.add_text_effect(
                     (pos.0 as i32, pos.1 as i32),
-                    format!("{:?}", condition),
                     duration,
+                    format!("{:?}", condition),
                 );
                 self.stopwatch.set_to_at_least(duration);
             }
@@ -1322,10 +1326,6 @@ impl UserInterface {
             .update(active_character_id, &self.characters, elapsed);
 
         let popup_outcome = self.activity_popup.update();
-
-        if let Some(ActivityPopupOutcome::ChangedMovementRangePercentage(added_percentage)) =
-            popup_outcome
-        {}
 
         let mut player_choice = None;
         match popup_outcome {

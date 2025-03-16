@@ -1657,6 +1657,10 @@ fn within_meele(source: (u32, u32), destination: (u32, u32)) -> bool {
     within_range(2.0, source, destination)
 }
 
+pub fn distance_between(source: (i32, i32), destination: (i32, i32)) -> f32 {
+    (((destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2)) as f32).sqrt()
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct NumberedResource {
     pub current: u32,

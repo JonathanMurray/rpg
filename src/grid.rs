@@ -1,6 +1,10 @@
 use std::collections::HashMap;
 
-use macroquad::color::Color;
+use macroquad::{
+    color::Color,
+    math::Vec2,
+    shapes::{draw_rectangle_ex, DrawRectangleParams},
+};
 
 use std::{
     cell::{Cell, Ref, RefCell},
@@ -194,25 +198,27 @@ impl GameGrid {
         for effect in &mut self.effects {
             effect.remaining_duration -= elapsed;
             if effect.remaining_duration <= 0.0 {
-                if let VisualEffectContent::Projectile {
+                if let VisualEffectVariant::Projectile {
                     destination,
-                    color,
                     impact_text,
-                    radius: _,
-                } = &effect.content
+                    ..
+                } = &effect.variant
                 {
-                    projectile_impacts.push((*destination, *color, impact_text.clone()));
+                    projectile_impacts.push((*destination, RED, impact_text.clone()));
                 }
             }
         }
         self.effects.retain(|e| e.remaining_duration > 0.0);
         for (position, color, text) in projectile_impacts {
-            self.effects.push(VisualEffect::new(position, text, 1.0));
-
+            self.effects.push(VisualEffect::new(position, 1.0, text));
             self.effects.push(VisualEffect::new(
                 position,
-                VisualEffectContent::Circle(color),
                 0.1,
+                VisualEffectVariant::Static(Graphics::Circle {
+                    color,
+                    radius: 0.2 * self.cell_w,
+                    end_radius: Some(0.5 * self.cell_w),
+                }),
             ));
         }
 
@@ -241,11 +247,11 @@ impl GameGrid {
     pub fn add_text_effect(
         &mut self,
         position: (i32, i32),
-        text: impl Into<String>,
         duration: f32,
+        text: impl Into<String>,
     ) {
         self.effects
-            .push(VisualEffect::new(position, text, duration));
+            .push(VisualEffect::new(position, duration, text));
     }
 
     pub fn add_projectile_effect(
@@ -257,15 +263,51 @@ impl GameGrid {
         impact_text: impl Into<String>,
         radius: f32,
     ) {
+        /*
         self.effects.push(VisualEffect::new(
             source,
-            VisualEffectContent::Projectile {
+            VisualEffectVariant::Projectile {
                 destination,
-                color,
                 impact_text: impact_text.into(),
-                radius,
+                graphics: Graphics::Circle {
+                    color,
+                    radius,
+                    end_radius: None,
+                },
             },
             duration,
+        ));
+        */
+
+        self.effects.push(VisualEffect::new(
+            source,
+            duration,
+            VisualEffectVariant::Projectile {
+                destination,
+                impact_text: impact_text.into(),
+                graphics: vec![
+                    Graphics::Rectangle {
+                        color: RED,
+                        width: 15.0,
+                        rotation_per_s: 4.0,
+                    },
+                    Graphics::Circle {
+                        color,
+                        radius: 5.0,
+                        end_radius: Some(15.0),
+                    },
+                    Graphics::Rectangle {
+                        color: ORANGE,
+                        width: 11.0,
+                        rotation_per_s: 6.0,
+                    },
+                    Graphics::Rectangle {
+                        color: WHITE,
+                        width: 7.0,
+                        rotation_per_s: 9.0,
+                    },
+                ],
+            },
         ));
     }
 
@@ -701,8 +743,8 @@ impl GameGrid {
         }
 
         for effect in &self.effects {
-            match &effect.content {
-                VisualEffectContent::Text(text) => {
+            match &effect.variant {
+                VisualEffectVariant::Text(text) => {
                     let font_size = 24;
                     let text_dimensions = measure_text(text, None, font_size, 1.0);
 
@@ -714,19 +756,17 @@ impl GameGrid {
                     draw_text(text, x0, y0, font_size as f32, YELLOW);
                 }
 
-                VisualEffectContent::Circle(color) => {
-                    let r = self.cell_w
-                        * (0.2 + 0.3 * (1.0 - effect.remaining_duration / effect.duration));
+                VisualEffectVariant::Static(graphics) => {
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
-                    draw_circle(x0, y0, r, *color);
+
+                    graphics.draw(x0, y0, effect);
                 }
 
-                VisualEffectContent::Projectile {
+                VisualEffectVariant::Projectile {
                     destination,
-                    color,
                     impact_text: _,
-                    radius,
+                    graphics,
                 } => {
                     let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
                     let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
@@ -737,7 +777,9 @@ impl GameGrid {
                     let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
                     let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
 
-                    draw_circle(x, y, self.cell_w * radius, *color);
+                    for gfx in graphics {
+                        gfx.draw(x, y, effect);
+                    }
                 }
             }
         }
@@ -871,23 +913,73 @@ impl GameGrid {
 
 struct VisualEffect {
     position: (i32, i32),
-    content: VisualEffectContent,
     remaining_duration: f32,
     duration: f32,
+    variant: VisualEffectVariant,
 }
 
-enum VisualEffectContent {
+enum VisualEffectVariant {
     Text(String),
-    Circle(Color),
+    Static(Graphics),
     Projectile {
         destination: (i32, i32),
-        color: Color,
         impact_text: String,
-        radius: f32,
+        graphics: Vec<Graphics>,
     },
 }
 
-impl<T> From<T> for VisualEffectContent
+enum Graphics {
+    Circle {
+        color: Color,
+        radius: f32,
+        end_radius: Option<f32>,
+    },
+    Rectangle {
+        color: Color,
+        width: f32,
+        rotation_per_s: f32,
+    },
+}
+
+impl Graphics {
+    fn draw(&self, x: f32, y: f32, effect: &VisualEffect) {
+        let remaining = effect.remaining_duration / effect.duration;
+        match self {
+            Graphics::Circle {
+                color,
+                radius,
+                end_radius,
+            } => {
+                let r = match end_radius {
+                    None => *radius,
+                    Some(end_radius) => *radius + (end_radius - radius) * (1.0 - remaining),
+                };
+
+                draw_circle(x, y, r, *color);
+            }
+            Graphics::Rectangle {
+                color,
+                width,
+                rotation_per_s,
+            } => {
+                let rotation = *rotation_per_s * effect.remaining_duration;
+                draw_rectangle_ex(
+                    x,
+                    y,
+                    *width,
+                    *width,
+                    DrawRectangleParams {
+                        offset: Vec2::splat(0.5),
+                        rotation,
+                        color: *color,
+                    },
+                );
+            }
+        }
+    }
+}
+
+impl<T> From<T> for VisualEffectVariant
 where
     T: Into<String>,
 {
@@ -897,12 +989,12 @@ where
 }
 
 impl VisualEffect {
-    fn new(position: (i32, i32), content: impl Into<VisualEffectContent>, duration: f32) -> Self {
+    fn new(position: (i32, i32), duration: f32, variant: impl Into<VisualEffectVariant>) -> Self {
         Self {
             position,
-            content: content.into(),
-            remaining_duration: duration,
             duration,
+            remaining_duration: duration,
+            variant: variant.into(),
         }
     }
 }
