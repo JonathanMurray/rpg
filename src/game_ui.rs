@@ -66,7 +66,7 @@ struct ActivityPopup {
     enabled: bool,
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
-    base_action_points: u32,
+    base_action: Option<BaseAction>,
     selected_choice_button_ids: Vec<u32>,
     hovered_choice_button_id: Option<u32>,
 
@@ -91,7 +91,7 @@ impl ActivityPopup {
             enabled: true,
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
-            base_action_points: 0,
+            base_action: None,
             hovered_choice_button_id: None,
             last_drawn_size: (0.0, 0.0),
         }
@@ -288,27 +288,48 @@ impl ActivityPopup {
     }
 
     fn action_points(&self) -> u32 {
-        let mut ap = self.base_action_points;
+        let mut ap = self
+            .base_action
+            .map(|action| action.action_point_cost())
+            .unwrap_or(0);
         for action in self.selected_actions() {
-            ap += self.action_point_cost(*action);
+            ap += action.action_point_cost();
         }
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                ap += self.action_point_cost(self.choice_buttons[&id].action);
+                ap += self.choice_buttons[&id].action.action_point_cost();
             }
         }
         ap
     }
 
-    fn action_point_cost(&self, button_action: ButtonAction) -> u32 {
-        match button_action {
-            ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
-            ButtonAction::SpellEnhancement(_enhancement) => 0,
-            ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost,
-            ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
-            ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
-            ButtonAction::Action(..) | ButtonAction::Proceed => unreachable!(),
+    fn mana_points(&self) -> u32 {
+        let mut mana = self
+            .base_action
+            .map(|action| action.mana_cost())
+            .unwrap_or(0);
+        for action in self.selected_actions() {
+            mana += action.mana_cost();
         }
+        if let Some(id) = self.hovered_choice_button_id {
+            if !self.selected_choice_button_ids.contains(&id) {
+                mana += self.choice_buttons[&id].action.mana_cost()
+            }
+        }
+        mana
+    }
+
+    fn stamina_points(&self) -> u32 {
+        let mut sta = 0;
+        for action in self.selected_actions() {
+            sta += action.stamina_cost();
+        }
+        if let Some(id) = self.hovered_choice_button_id {
+            if !self.selected_choice_button_ids.contains(&id) {
+                sta += self.choice_buttons[&id].action.stamina_cost();
+            }
+        }
+        sta
     }
 
     fn set_enabled(&mut self, enabled: bool) {
@@ -341,10 +362,10 @@ impl ActivityPopup {
         self.choice_buttons = choice_buttons;
         self.selected_choice_button_ids.clear();
 
-        self.base_action_points = if let UiState::ConfiguringAction(base_action) = state {
-            base_action.action_point_cost()
+        self.base_action = if let UiState::ConfiguringAction(base_action) = state {
+            Some(base_action)
         } else {
-            0
+            None
         };
     }
 }
@@ -380,6 +401,17 @@ impl StopWatch {
     }
 }
 
+struct CharacterUi {
+    tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
+    buttons: Vec<Rc<ActionButton>>,
+    tabs: Tabs,
+    health_bar: Rc<RefCell<LabelledResourceBar>>,
+    mana_bar: Rc<RefCell<LabelledResourceBar>>,
+    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
+    resource_bars: Container,
+    conditions: Vec<String>,
+}
+
 pub struct UserInterface {
     characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -402,17 +434,6 @@ pub struct UserInterface {
     action_points_row: ActionPointsRow,
     character_uis: HashMap<CharacterId, CharacterUi>,
     log: Log,
-}
-
-struct CharacterUi {
-    tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
-    buttons: Vec<Rc<ActionButton>>,
-    tabs: Tabs,
-    health_bar: Rc<RefCell<LabelledResourceBar>>,
-    mana_bar: Rc<RefCell<LabelledResourceBar>>,
-    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
-    resource_bars: Container,
-    conditions: Vec<String>,
 }
 
 impl UserInterface {
@@ -1222,18 +1243,6 @@ impl UserInterface {
             .into_iter()
             .for_each(|event| self.handle_internal_ui_event(event));
 
-        // TODO: Also show reserved mana and stamina
-        self.action_points_row.reserved_and_hovered = if let Some(hovered_btn) = self.hovered_button
-        {
-            if matches!(hovered_btn.1, ButtonAction::Proceed) {
-                self.activity_popup.action_points()
-            } else {
-                hovered_btn.1.action_point_cost()
-            }
-        } else {
-            self.activity_popup.action_points()
-        };
-
         let mut popup_enabled = true;
 
         self.activity_popup.target_line = None;
@@ -1316,6 +1325,28 @@ impl UserInterface {
 
         self.update_character_status(&game.characters);
 
+        if let Some(hovered_btn) = self.hovered_button {
+            self.action_points_row.reserved_and_hovered = hovered_btn.1.action_point_cost();
+            self.character_uis[&self.player_portraits.selected_i.get()]
+                .mana_bar
+                .borrow_mut()
+                .set_reserved(hovered_btn.1.mana_cost());
+            self.character_uis[&self.player_portraits.selected_i.get()]
+                .stamina_bar
+                .borrow_mut()
+                .set_reserved(hovered_btn.1.stamina_cost());
+        } else {
+            self.action_points_row.reserved_and_hovered = self.activity_popup.action_points();
+            self.character_uis[&self.player_portraits.selected_i.get()]
+                .mana_bar
+                .borrow_mut()
+                .set_reserved(self.activity_popup.mana_points());
+            self.character_uis[&self.player_portraits.selected_i.get()]
+                .stamina_bar
+                .borrow_mut()
+                .set_reserved(self.activity_popup.stamina_points());
+        };
+
         if self.stopwatch.update(elapsed) {
             println!("UI is now ready...");
         }
@@ -1328,6 +1359,9 @@ impl UserInterface {
     }
 
     fn handle_popup_proceed(&mut self) -> PlayerChose {
+        // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
+        self.set_highlighted_action(None);
+
         match self.state {
             UiState::ConfiguringAction(base_action) => {
                 let target = self.game_grid.target();
@@ -1442,10 +1476,6 @@ impl UserInterface {
                     } else {
                         println!("Cannot choose this action at this time");
                     }
-                }
-
-                ButtonAction::Proceed => {
-                    self.set_highlighted_action(None);
                 }
 
                 _ => unreachable!(),
@@ -2015,6 +2045,7 @@ impl Drawable for ActionPointsRow {
 
 struct ResourceBar {
     current: u32,
+    reserved: u32,
     max: u32,
     color: Color,
     cell_size: (f32, f32),
@@ -2023,12 +2054,18 @@ struct ResourceBar {
 impl Drawable for ResourceBar {
     fn draw(&self, x: f32, y: f32) {
         assert!(self.current <= self.max);
+
         let cell_size = self.cell_size;
         let mut y0 = y;
         for i in 0..self.max {
             if i >= self.max - self.current {
-                draw_rectangle(x, y0, cell_size.0, cell_size.1, self.color);
+                if i < self.max - self.current + self.reserved {
+                    draw_rectangle(x, y0, cell_size.0, cell_size.1, WHITE);
+                } else {
+                    draw_rectangle(x, y0, cell_size.0, cell_size.1, self.color);
+                }
             }
+
             if i > 0 {
                 let space = 4.0;
                 draw_line(x + space, y0, x + cell_size.0 - space, y0, 1.0, DARKGRAY);
@@ -2065,6 +2102,7 @@ impl LabelledResourceBar {
         };
         let bar = Rc::new(RefCell::new(ResourceBar {
             current,
+            reserved: 0,
             max,
             color,
             cell_size: (cell_w, cell_h),
@@ -2107,6 +2145,10 @@ impl LabelledResourceBar {
         self.value_text
             .borrow_mut()
             .set_string(format!("{}/{}", value, self.max_value));
+    }
+
+    fn set_reserved(&mut self, value: u32) {
+        self.bar.borrow_mut().reserved = value;
     }
 }
 
@@ -2193,6 +2235,30 @@ impl ButtonAction {
             ButtonAction::SpellEnhancement(..) => 0,
             ButtonAction::Proceed => 0,
             ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
+        }
+    }
+
+    fn mana_cost(&self) -> u32 {
+        match self {
+            ButtonAction::Action(base_action) => base_action.mana_cost(),
+            ButtonAction::OnAttackedReaction(..) => 0,
+            ButtonAction::OnHitReaction(..) => 0,
+            ButtonAction::AttackEnhancement(..) => 0,
+            ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
+            ButtonAction::Proceed => 0,
+            ButtonAction::MovementEnhancement(..) => 0,
+        }
+    }
+
+    fn stamina_cost(&self) -> u32 {
+        match self {
+            ButtonAction::Action(base_action) => 0,
+            ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
+            ButtonAction::OnHitReaction(reaction) => 0,
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
+            ButtonAction::SpellEnhancement(enhancement) => 0,
+            ButtonAction::Proceed => 0,
+            ButtonAction::MovementEnhancement(enhancement) => enhancement.stamina_cost,
         }
     }
 

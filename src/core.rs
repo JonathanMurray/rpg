@@ -1153,6 +1153,15 @@ impl BaseAction {
             } => *action_point_cost,
         }
     }
+
+    pub fn mana_cost(&self) -> u32 {
+        match self {
+            BaseAction::Attack { .. } => 0,
+            BaseAction::SelfEffect(..) => 0,
+            BaseAction::CastSpell(spell) => spell.mana_cost,
+            BaseAction::Move { .. } => 0,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
