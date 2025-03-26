@@ -24,13 +24,6 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width, Conf},
 };
 
-use rpg::core::{
-    as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, AttackEnhancement,
-    BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler,
-    GameState, HandType, IconId, MovementEnhancement, OnAttackedReaction, OnHitReaction, Range,
-    SpellEnhancement, StateChooseReaction, TextureId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
-};
-use rpg::drawing::{draw_arrow, draw_dashed_line};
 use rpg::pathfind::PathfindGrid;
 use rpg::{
     base_ui::{
@@ -40,6 +33,20 @@ use rpg::{
     bot::{bot_choose_attack_reaction, bot_choose_hit_reaction},
 };
 use rpg::{bot::bot_choose_action, grid::GameGrid};
+use rpg::{
+    core::{
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
+        AttackEnhancement, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
+        GameEventHandler, GameState, HandType, IconId, MovementEnhancement, OnAttackedReaction,
+        OnHitReaction, Range, SpellEnhancement, StateChooseReaction, TextureId,
+        ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
+    },
+    grid::Effect,
+};
+use rpg::{
+    drawing::{draw_arrow, draw_dashed_line},
+    grid::{EffectGraphics, EffectPosition, EffectVariant},
+};
 
 async fn texture(path: &str) -> Texture2D {
     let texture = load_texture(path).await.unwrap();
@@ -1223,18 +1230,53 @@ impl UserInterface {
 
                 self.stopwatch.set_to_at_least(duration + 0.4);
                 let impact_text = match outcome {
-                    rpg::core::AttackOutcome::Hit => "",
+                    rpg::core::AttackOutcome::Hit => "Boom",
                     rpg::core::AttackOutcome::Dodge => "Dodge",
                     rpg::core::AttackOutcome::Parry => "Parry",
                     rpg::core::AttackOutcome::Miss => "Miss",
                 };
-                self.game_grid.add_projectile_effect(
+
+                self.game_grid.add_effect(
                     attacker_pos,
                     target_pos,
-                    DARKGRAY,
-                    duration,
-                    impact_text,
-                    10.0,
+                    Effect {
+                        start_time: 0.0,
+                        end_time: duration,
+                        variant: EffectVariant::Line {
+                            thickness: 1.0,
+                            end_thickness: Some(10.0),
+                            color: RED,
+                        },
+                    },
+                );
+                self.game_grid.add_effect(
+                    attacker_pos,
+                    target_pos,
+                    Effect {
+                        start_time: duration,
+                        end_time: duration + 0.2,
+                        variant: EffectVariant::At(
+                            EffectPosition::Destination,
+                            EffectGraphics::Circle {
+                                radius: 25.0,
+                                end_radius: Some(5.0),
+                                fill: None,
+                                stroke: Some((MAGENTA, 2.0)),
+                            },
+                        ),
+                    },
+                );
+                self.game_grid.add_effect(
+                    attacker_pos,
+                    target_pos,
+                    Effect {
+                        start_time: duration,
+                        end_time: duration + 0.5,
+                        variant: EffectVariant::At(
+                            EffectPosition::Destination,
+                            EffectGraphics::Text(impact_text.into()),
+                        ),
+                    },
                 );
             }
             GameEvent::SpellWasCast {
@@ -1253,16 +1295,38 @@ impl UserInterface {
                 let dist = distance_between(caster_pos, target_pos);
                 let duration = 0.15 * dist;
 
-                self.stopwatch.set_to_at_least(duration + 0.3);
-                let impact_text = if success { "" } else { "Resist" };
-                self.game_grid.add_projectile_effect(
+                self.game_grid.add_effect(
                     caster_pos,
                     target_pos,
-                    color,
-                    duration,
-                    impact_text,
-                    20.0,
+                    Effect {
+                        start_time: 0.0,
+                        end_time: duration,
+                        variant: EffectVariant::At(
+                            EffectPosition::Projectile,
+                            EffectGraphics::Circle {
+                                radius: 10.0,
+                                end_radius: Some(25.0),
+                                fill: Some(color),
+                                stroke: None,
+                            },
+                        ),
+                    },
                 );
+                let impact_text = if success { "Boom" } else { "Resist" };
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: duration,
+                        end_time: duration + 0.5,
+                        variant: EffectVariant::At(
+                            EffectPosition::Destination,
+                            EffectGraphics::Text(impact_text.into()),
+                        ),
+                    },
+                );
+
+                self.stopwatch.set_to_at_least(duration + 0.3);
             }
             GameEvent::CharacterReceivedSelfEffect {
                 character,

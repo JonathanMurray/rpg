@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use macroquad::{
     color::Color,
     math::Vec2,
-    shapes::{draw_rectangle_ex, DrawRectangleParams},
+    shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
 };
 
 use std::{
@@ -105,7 +105,7 @@ pub struct GameGrid {
     camera_position: (Cell<f32>, Cell<f32>),
     dragging_camera_from: Option<(f32, f32)>,
 
-    effects: Vec<VisualEffect>,
+    effects: Vec<ConcreteEffect>,
 
     active_character_id: CharacterId,
     pub range_indicator: Option<Range>,
@@ -194,33 +194,10 @@ impl GameGrid {
         let pos = self.characters.get(self.active_character_id).position_i32();
         self.pathfind_grid.run(pos, self.movement_range.max());
 
-        let mut projectile_impacts = vec![];
         for effect in &mut self.effects {
-            effect.remaining_duration -= elapsed;
-            if effect.remaining_duration <= 0.0 {
-                if let VisualEffectVariant::Projectile {
-                    destination,
-                    impact_text,
-                    ..
-                } = &effect.variant
-                {
-                    projectile_impacts.push((*destination, RED, impact_text.clone()));
-                }
-            }
+            effect.age += elapsed;
         }
-        self.effects.retain(|e| e.remaining_duration > 0.0);
-        for (position, color, text) in projectile_impacts {
-            self.effects.push(VisualEffect::new(position, 1.0, text));
-            self.effects.push(VisualEffect::new(
-                position,
-                0.1,
-                VisualEffectVariant::Static(Graphics::Circle {
-                    color,
-                    radius: 0.2 * self.cell_w,
-                    end_radius: Some(0.5 * self.cell_w),
-                }),
-            ));
-        }
+        self.effects.retain(|e| e.age <= e.end_time);
 
         if let Some(motion) = &mut self.character_motion {
             motion.remaining_duration -= elapsed;
@@ -244,71 +221,50 @@ impl GameGrid {
         }
     }
 
+    // TODO
     pub fn add_text_effect(
         &mut self,
         position: (i32, i32),
         duration: f32,
         text: impl Into<String>,
     ) {
-        self.effects
-            .push(VisualEffect::new(position, duration, text));
+        let pos = (
+            self.grid_x_to_screen(position.0),
+            self.grid_y_to_screen(position.1),
+        );
+
+        let effect = ConcreteEffect {
+            age: 0.0,
+            start_time: 0.0,
+            end_time: duration,
+            variant: EffectVariant::At(EffectPosition::Source, EffectGraphics::Text(text.into())),
+            source_pos: pos,
+            destination_pos: pos,
+        };
+
+        self.effects.push(effect);
     }
 
-    pub fn add_projectile_effect(
-        &mut self,
-        source: (i32, i32),
-        destination: (i32, i32),
-        color: Color,
-        duration: f32,
-        impact_text: impl Into<String>,
-        radius: f32,
-    ) {
-        /*
-        self.effects.push(VisualEffect::new(
-            source,
-            VisualEffectVariant::Projectile {
-                destination,
-                impact_text: impact_text.into(),
-                graphics: Graphics::Circle {
-                    color,
-                    radius,
-                    end_radius: None,
-                },
-            },
-            duration,
-        ));
-        */
+    pub fn add_effect(&mut self, source: (i32, i32), destination: (i32, i32), effect: Effect) {
+        let source_pos = (
+            self.grid_x_to_screen(source.0),
+            self.grid_y_to_screen(source.1),
+        );
+        let destination_pos = (
+            self.grid_x_to_screen(destination.0),
+            self.grid_y_to_screen(destination.1),
+        );
 
-        self.effects.push(VisualEffect::new(
-            source,
-            duration,
-            VisualEffectVariant::Projectile {
-                destination,
-                impact_text: impact_text.into(),
-                graphics: vec![
-                    Graphics::Rectangle {
-                        color: RED,
-                        width: 15.0,
-                        rotation_per_s: 4.0,
-                    },
-                    Graphics::Circle {
-                        color,
-                        radius: 5.0,
-                        end_radius: Some(15.0),
-                    },
-                    Graphics::Rectangle {
-                        color: ORANGE,
-                        width: 11.0,
-                        rotation_per_s: 6.0,
-                    },
-                    Graphics::Rectangle {
-                        color: WHITE,
-                        width: 7.0,
-                        rotation_per_s: 9.0,
-                    },
-                ],
-            },
-        ));
+        let concrete_effect = ConcreteEffect {
+            age: 0.0,
+            start_time: effect.start_time,
+            end_time: effect.end_time,
+            source_pos,
+            destination_pos,
+            variant: effect.variant,
+        };
+
+        self.effects.push(concrete_effect);
     }
 
     pub fn ensure_has_some_movement_preview(&mut self) {
@@ -743,43 +699,43 @@ impl GameGrid {
         }
 
         for effect in &self.effects {
+            let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
             match &effect.variant {
-                VisualEffectVariant::Text(text) => {
-                    let font_size = 24;
-                    let text_dimensions = measure_text(text, None, font_size, 1.0);
-
-                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0
-                        - text_dimensions.width / 2.0;
-                    let y0 = self.grid_y_to_screen(effect.position.1)
-                        - self.cell_w * 0.3 * (1.0 - effect.remaining_duration / effect.duration);
-
-                    draw_text(text, x0, y0, font_size as f32, YELLOW);
+                EffectVariant::At(position, graphics) => {
+                    let (x, y) = match position {
+                        EffectPosition::Source => effect.source_pos,
+                        EffectPosition::Destination => effect.destination_pos,
+                        EffectPosition::Projectile => {
+                            let x = effect.source_pos.0
+                                + (effect.destination_pos.0 - effect.source_pos.0) * t;
+                            let y = effect.source_pos.1
+                                + (effect.destination_pos.1 - effect.source_pos.1) * t;
+                            (x, y)
+                        }
+                    };
+                    graphics.draw(x, y, effect, self.cell_w);
                 }
-
-                VisualEffectVariant::Static(graphics) => {
-                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
-                    let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
-
-                    graphics.draw(x0, y0, effect);
-                }
-
-                VisualEffectVariant::Projectile {
-                    destination,
-                    impact_text: _,
-                    graphics,
+                EffectVariant::Line {
+                    thickness,
+                    end_thickness,
+                    color,
                 } => {
-                    let x0 = self.grid_x_to_screen(effect.position.0) + self.cell_w / 2.0;
-                    let y0 = self.grid_y_to_screen(effect.position.1) + self.cell_w / 2.0;
+                    let from = (
+                        effect.source_pos.0 + self.cell_w / 2.0,
+                        effect.source_pos.1 + self.cell_w / 2.0,
+                    );
+                    let to = (
+                        effect.destination_pos.0 + self.cell_w / 2.0,
+                        effect.destination_pos.1 + self.cell_w / 2.0,
+                    );
 
-                    let x1 = self.grid_x_to_screen(destination.0) + self.cell_w / 2.0;
-                    let y1 = self.grid_y_to_screen(destination.1) + self.cell_w / 2.0;
+                    let to = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
 
-                    let x = x1 - (x1 - x0) * effect.remaining_duration / effect.duration;
-                    let y = y1 - (y1 - y0) * effect.remaining_duration / effect.duration;
-
-                    for gfx in graphics {
-                        gfx.draw(x, y, effect);
-                    }
+                    let thickness = match end_thickness {
+                        Some(end_thickness) => thickness + (end_thickness - thickness) * t,
+                        None => *thickness,
+                    };
+                    draw_line(from.0, from.1, to.0, to.1, thickness, *color);
                 }
             }
         }
@@ -911,96 +867,132 @@ impl GameGrid {
     }
 }
 
-struct VisualEffect {
-    position: (i32, i32),
-    remaining_duration: f32,
-    duration: f32,
-    variant: VisualEffectVariant,
-}
-
-enum VisualEffectVariant {
-    Text(String),
-    Static(Graphics),
-    Projectile {
-        destination: (i32, i32),
-        impact_text: String,
-        graphics: Vec<Graphics>,
-    },
-}
-
-enum Graphics {
-    Circle {
-        color: Color,
-        radius: f32,
-        end_radius: Option<f32>,
-    },
-    Rectangle {
-        color: Color,
-        width: f32,
-        rotation_per_s: f32,
-    },
-}
-
-impl Graphics {
-    fn draw(&self, x: f32, y: f32, effect: &VisualEffect) {
-        let remaining = effect.remaining_duration / effect.duration;
-        match self {
-            Graphics::Circle {
-                color,
-                radius,
-                end_radius,
-            } => {
-                let r = match end_radius {
-                    None => *radius,
-                    Some(end_radius) => *radius + (end_radius - radius) * (1.0 - remaining),
-                };
-
-                draw_circle(x, y, r, *color);
-            }
-            Graphics::Rectangle {
-                color,
-                width,
-                rotation_per_s,
-            } => {
-                let rotation = *rotation_per_s * effect.remaining_duration;
-                draw_rectangle_ex(
-                    x,
-                    y,
-                    *width,
-                    *width,
-                    DrawRectangleParams {
-                        offset: Vec2::splat(0.5),
-                        rotation,
-                        color: *color,
-                    },
-                );
-            }
-        }
-    }
-}
-
-impl<T> From<T> for VisualEffectVariant
-where
-    T: Into<String>,
-{
-    fn from(t: T) -> Self {
-        Self::Text(t.into())
-    }
-}
-
-impl VisualEffect {
-    fn new(position: (i32, i32), duration: f32, variant: impl Into<VisualEffectVariant>) -> Self {
-        Self {
-            position,
-            duration,
-            remaining_duration: duration,
-            variant: variant.into(),
-        }
-    }
-}
-
 pub struct GridOutcome {
     pub switched_to_move_i: Option<usize>,
     pub switched_to_attack: bool,
     pub hovered_character_id: Option<CharacterId>,
+}
+
+struct ConcreteEffect {
+    age: f32,
+    start_time: f32,
+    end_time: f32,
+    source_pos: (f32, f32),
+    destination_pos: (f32, f32),
+    variant: EffectVariant,
+}
+
+pub struct Effect {
+    pub start_time: f32,
+    pub end_time: f32,
+    pub variant: EffectVariant,
+}
+
+pub enum EffectVariant {
+    At(EffectPosition, EffectGraphics),
+    Line {
+        color: Color,
+        thickness: f32,
+        end_thickness: Option<f32>,
+    },
+}
+
+pub enum EffectPosition {
+    Source,
+    Destination,
+    Projectile,
+}
+
+pub enum EffectGraphics {
+    Circle {
+        radius: f32,
+        end_radius: Option<f32>,
+        fill: Option<Color>,
+        stroke: Option<(Color, f32)>,
+    },
+    Rectangle {
+        width: f32,
+        end_width: Option<f32>,
+        rotation_per_s: f32,
+        fill: Option<Color>,
+        stroke: Option<(Color, f32)>,
+    },
+    Text(String),
+}
+
+impl EffectGraphics {
+    fn draw(&self, mut x: f32, mut y: f32, effect: &ConcreteEffect, cell_w: f32) {
+        if effect.age < effect.start_time {
+            return;
+        }
+        let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
+        match self {
+            EffectGraphics::Circle {
+                radius,
+                end_radius,
+                fill,
+                stroke,
+            } => {
+                x += cell_w / 2.0;
+                y += cell_w / 2.0;
+                let r = match end_radius {
+                    None => *radius,
+                    Some(end_radius) => *radius + (end_radius - radius) * t,
+                };
+                if let Some(color) = fill {
+                    draw_circle(x, y, r, *color);
+                }
+                if let Some((color, thickness)) = stroke {
+                    draw_circle_lines(x, y, r, *thickness, *color);
+                }
+            }
+            EffectGraphics::Rectangle {
+                width,
+                end_width,
+                rotation_per_s,
+                fill,
+                stroke,
+            } => {
+                x += cell_w / 2.0;
+                y += cell_w / 2.0;
+                let rotation = *rotation_per_s * effect.age;
+                if let Some(color) = fill {
+                    draw_rectangle_ex(
+                        x,
+                        y,
+                        *width,
+                        *width,
+                        DrawRectangleParams {
+                            offset: Vec2::splat(0.5),
+                            rotation,
+                            color: *color,
+                        },
+                    );
+                }
+                if let Some((color, thickness)) = stroke {
+                    draw_rectangle_lines_ex(
+                        x,
+                        y,
+                        *width,
+                        *width,
+                        *thickness,
+                        DrawRectangleParams {
+                            offset: Vec2::splat(0.5),
+                            rotation,
+                            color: *color,
+                        },
+                    );
+                }
+            }
+            EffectGraphics::Text(text) => {
+                let font_size = 24;
+                let text_dimensions = measure_text(text, None, font_size, 1.0);
+
+                let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
+                let y0 = y - cell_w * 0.3 * t;
+
+                draw_text(text, x0, y0, font_size as f32, YELLOW);
+            }
+        }
+    }
 }
