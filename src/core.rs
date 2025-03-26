@@ -443,17 +443,15 @@ impl CoreGame {
 
         let outcome = if hit {
             AttackOutcome::Hit
+        } else if defender_reacted_with_parry {
+            self.log("  Parried!");
+            AttackOutcome::Parry
+        } else if defender_reacted_with_sidestep {
+            self.log("  Side stepped!");
+            AttackOutcome::Dodge
         } else {
-            if defender_reacted_with_parry {
-                self.log("  Parried!");
-                AttackOutcome::Parry
-            } else if defender_reacted_with_sidestep {
-                self.log("  Side stepped!");
-                AttackOutcome::Dodge
-            } else {
-                self.log("  Missed!");
-                AttackOutcome::Miss
-            }
+            self.log("  Missed!");
+            AttackOutcome::Miss
         };
 
         self.event_handler.handle(GameEvent::Attacked {
@@ -552,7 +550,7 @@ impl CoreGame {
     }
 
     fn enter_state_right_after_action(
-        mut self,
+        self,
         action_points_before_action: u32,
         attack_hit: Option<(CharacterId, u32)>,
     ) -> GameState {

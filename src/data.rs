@@ -1,5 +1,3 @@
-use macroquad::miniquad::conf::Icon;
-
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
     IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect,

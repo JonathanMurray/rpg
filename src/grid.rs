@@ -6,30 +6,21 @@ use macroquad::{
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
 };
 
-use std::{
-    cell::{Cell, Ref, RefCell},
-    rc::Rc,
-};
+use std::cell::Cell;
 
+use macroquad::input::is_key_down;
 use macroquad::math::Rect;
-use macroquad::{color::PURPLE, input::is_key_down};
 
 use macroquad::miniquad::KeyCode;
-use macroquad::texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D};
+use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
-    color::{
-        self, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED,
-        WHITE, YELLOW,
-    },
+    color::{GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text, measure_text},
 };
 
-use crate::{
-    core::MovementEnhancement,
-    pathfind::{PathfindGrid, Route},
-};
+use crate::{core::MovementEnhancement, pathfind::PathfindGrid};
 use crate::{
     core::{CharacterId, Characters, HandType, Range, TextureId},
     drawing::{draw_arrow, draw_dashed_line},
@@ -80,7 +71,7 @@ impl MovementRange {
         self.selected_i = self
             .options
             .iter()
-            .position(|(add_percentage, range)| *add_percentage == enhancement_added_percentage)
+            .position(|(add_percentage, _range)| *add_percentage == enhancement_added_percentage)
             .unwrap();
     }
 
@@ -745,7 +736,7 @@ impl GameGrid {
 
     fn draw_move_range_indicator(&self, origin: (i32, i32)) {
         let range = self.movement_range.selected();
-        let range_ceil = (f32::from(range)).ceil() as i32;
+        let range_ceil = range.ceil() as i32;
 
         let within = |x: i32, y: i32| {
             self.pathfind_grid
@@ -948,7 +939,7 @@ impl EffectGraphics {
             }
             EffectGraphics::Rectangle {
                 width,
-                end_width,
+                end_width: _,
                 rotation_per_s,
                 fill,
                 stroke,
