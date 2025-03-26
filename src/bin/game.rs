@@ -2,6 +2,7 @@ use std::{collections::HashMap, rc::Rc};
 
 use macroquad::miniquad::window::set_window_position;
 
+use macroquad::text::{load_ttf_font, Font};
 use macroquad::texture::{load_texture, FilterMode, Texture2D};
 use macroquad::{
     color::BLACK,
@@ -37,6 +38,13 @@ async fn load_icons(paths: Vec<(IconId, &str)>) -> HashMap<IconId, Texture2D> {
         textures.insert(id, texture(path).await);
     }
     textures
+}
+
+async fn load_font(path: &str) -> Font {
+    let path = format!("fonts/{path}");
+    let mut font = load_ttf_font(&path).await.unwrap();
+    font.set_filter(FilterMode::Nearest);
+    font
 }
 
 #[macroquad::main(window_conf)]
@@ -81,7 +89,21 @@ async fn main() {
     ])
     .await;
 
-    let mut user_interface = UserInterface::new(&game, textures, icons);
+    //let font_path = "manaspace/manaspc.ttf";
+    //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
+    //let font_path = "pixy/PIXY.ttf"; // <-- only uppercase, looks a bit too sci-fi?
+    //let font_path = "dpcomic/dpcomic.ttf"; // <-- beautiful but big/bold, could be used for titles and stuff?
+    //let font_path = "return-of-ganon/retganon.ttf";
+    //let font_path = "press-start/prstart.ttf";
+    //let font_path = "lunchtime-doubly-so/lunchds.ttf";
+    //let font_path = "chonkypixels/ChonkyPixels.ttf";
+    let font_path = "pixelon/Pixelon.ttf";
+    let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
+    let font = load_font(font_path).await;
+
+    let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
+
+    let mut user_interface = UserInterface::new(&game, textures, icons, font, decorative_font);
 
     let mut game_state = game.begin();
 

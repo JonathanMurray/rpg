@@ -13,7 +13,7 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, measure_text},
+    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     window::{screen_height, screen_width},
 };
@@ -55,6 +55,8 @@ pub enum UiState {
 struct ActivityPopup {
     state: UiState,
 
+    font: Font,
+
     initial_lines: Vec<String>,
     target_line: Option<String>,
 
@@ -72,7 +74,7 @@ struct ActivityPopup {
 }
 
 impl ActivityPopup {
-    fn new(state: UiState, mut proceed_button: ActionButton) -> Self {
+    fn new(font: Font, state: UiState, mut proceed_button: ActionButton) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
         proceed_button.event_sender = Some(EventSender {
             queue: Rc::clone(&proceed_button_events),
@@ -80,6 +82,7 @@ impl ActivityPopup {
 
         Self {
             state,
+            font,
             initial_lines: vec![],
             target_line: None,
             selected_choice_button_ids: Default::default(),
@@ -111,13 +114,20 @@ impl ActivityPopup {
         draw_rectangle_lines(x, y, size.0, size.1, 1.0, border_color);
         self.last_drawn_size = size;
 
+        let text_params = TextParams {
+            font: Some(&self.font),
+            font_size: 16,
+            color: WHITE,
+            ..Default::default()
+        };
+
         for line in &self.initial_lines {
-            draw_text(line, x0, y0, 20.0, WHITE);
+            draw_text_ex(line, x0, y0, text_params.clone());
             y0 += 20.0;
         }
 
         if let Some(line) = &self.target_line {
-            draw_text(line, x0, y0, 20.0, WHITE);
+            draw_text_ex(line, x0, y0, text_params.clone());
             y0 += 20.0;
         }
 
@@ -135,7 +145,7 @@ impl ActivityPopup {
             choice_description_line.push_str(s);
             choice_description_line.push(']');
         }
-        draw_text(&choice_description_line, x0, y0, 20.0, WHITE);
+        draw_text_ex(&choice_description_line, x0, y0, text_params.clone());
         y0 += 20.0;
 
         if self.enabled {
@@ -150,18 +160,18 @@ impl ActivityPopup {
                                 .sum();
                             let range = range * (1.0 + percentage as f32 / 100.0);
                             let text = format!("range: {range:.2}");
-                            draw_text(&text, x0, y0, 20.0, WHITE);
+                            draw_text_ex(&text, x0, y0, text_params.clone());
                             y0 += 20.0;
                         }
                         BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
                     };
                 }
                 UiState::ReactingToAttack { .. } => {
-                    draw_text("Reaction:", x0, y0, 20.0, WHITE);
+                    draw_text_ex("Reaction:", x0, y0, text_params.clone());
                     y0 += 20.0;
                 }
                 UiState::ReactingToHit { .. } => {
-                    draw_text("Reaction:", x0, y0, 20.0, WHITE);
+                    draw_text_ex("Reaction:", x0, y0, text_params.clone());
                     y0 += 20.0;
                 }
                 UiState::Idle | UiState::ChoosingAction => unreachable!(),
@@ -174,7 +184,7 @@ impl ActivityPopup {
             btn.draw(x0, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip((x0, y_btn), &btn.tooltip_lines[..]);
+                draw_button_tooltip(&self.font, (x0, y_btn), &btn.tooltip_lines[..]);
             }
 
             x0 += btn.size.0 + 10.0;
@@ -376,6 +386,8 @@ pub struct UserInterface {
     state: UiState,
     stopwatch: StopWatch,
 
+    font: Font,
+
     icons: HashMap<IconId, Texture2D>,
 
     hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
@@ -408,6 +420,8 @@ impl UserInterface {
         game: &CoreGame,
         textures: HashMap<TextureId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
+        simple_font: Font,
+        decorative_font: Font,
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -416,14 +430,8 @@ impl UserInterface {
         let mut next_button_id = 1;
 
         let mut new_button = |subtext, btn_action, character: Option<&Character>| {
-            let btn = ActionButton::new(
-                subtext,
-                btn_action,
-                &event_queue,
-                next_button_id,
-                &icons,
-                character,
-            );
+            let btn =
+                ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
             next_button_id += 1;
             btn
         };
@@ -529,6 +537,7 @@ impl UserInterface {
                                 character_ref.physical_resistence() as f32,
                             ),
                         ],
+                        simple_font.clone(),
                     )),
                     Element::Container(attribute_row(
                         ("DEX", character_ref.base_dexterity),
@@ -536,6 +545,7 @@ impl UserInterface {
                             ("Defense", character_ref.defense() as f32),
                             ("Movement", character_ref.move_range),
                         ],
+                        simple_font.clone(),
                     )),
                     Element::Container(attribute_row(
                         ("INT", character_ref.base_intellect),
@@ -543,6 +553,7 @@ impl UserInterface {
                             ("Mana", character_ref.mana.max as f32),
                             ("Mental resist", character_ref.mental_resistence() as f32),
                         ],
+                        simple_font.clone(),
                     )),
                 ],
                 border_between_children: Some(GRAY),
@@ -568,7 +579,11 @@ impl UserInterface {
                 equipment_cells.push(format!("{}:", armor.name));
                 equipment_cells.push(format!("{} armor", armor.protection));
             }
-            let equipment_table = table(equipment_cells, vec![Align::End, Align::Start]);
+            let equipment_table = table(
+                equipment_cells,
+                vec![Align::End, Align::Start],
+                simple_font.clone(),
+            );
             let stats_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Horizontal,
                 children: vec![stats_table, equipment_table],
@@ -597,29 +612,33 @@ impl UserInterface {
                     ("Secondary", secondary_actions_section),
                     ("Stats", stats_section),
                 ],
+                simple_font.clone(),
             );
 
             let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
                 character_ref.health.current,
                 character_ref.health.max,
-                "HP",
+                "Health",
                 RED,
+                simple_font.clone(),
             )));
             let cloned_health_bar = Rc::clone(&health_bar);
 
             let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
                 character_ref.mana.current,
                 character_ref.mana.max,
-                "MANA",
+                "Mana",
                 BLUE,
+                simple_font.clone(),
             )));
             let cloned_mana_bar = Rc::clone(&mana_bar);
 
             let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
                 character_ref.stamina.current,
                 character_ref.stamina.max,
-                "STA",
+                "Stamina",
                 GREEN,
+                simple_font.clone(),
             )));
             let cloned_stamina_bar = Rc::clone(&stamina_bar);
 
@@ -654,7 +673,8 @@ impl UserInterface {
             character_uis.insert(character.borrow().id(), character_ui);
         }
 
-        let action_points_label = TextLine::new("Action points", 18, WHITE);
+        let action_points_label =
+            TextLine::new("Action points", 18, WHITE, Some(simple_font.clone()));
         let action_points_row = ActionPointsRow::new(
             (20.0, 20.0),
             0.3,
@@ -670,6 +690,7 @@ impl UserInterface {
             &game.characters,
             textures,
             (screen_width(), Y_USER_INTERFACE),
+            simple_font.clone(),
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
@@ -681,10 +702,17 @@ impl UserInterface {
             .unwrap()
             .0;
 
-        let player_portraits = PlayerPortraits::new(&game.characters, first_player_character_id);
+        let player_portraits = PlayerPortraits::new(
+            &game.characters,
+            first_player_character_id,
+            simple_font.clone(),
+        );
 
-        let character_portraits =
-            CharacterPortraits::new(&game.characters, game.active_character_id);
+        let character_portraits = CharacterPortraits::new(
+            &game.characters,
+            game.active_character_id,
+            decorative_font.clone(),
+        );
 
         Self {
             game_grid,
@@ -695,22 +723,22 @@ impl UserInterface {
             stopwatch: StopWatch::default(),
 
             icons,
+            font: simple_font.clone(),
 
             next_available_button_id: next_button_id,
             hovered_button: None,
-            log: Log::new(),
+            log: Log::new(simple_font.clone()),
             character_uis,
             action_points_label,
             action_points_row,
             event_queue: Rc::clone(&event_queue),
-            activity_popup: ActivityPopup::new(state, popup_proceed_btn),
+            activity_popup: ActivityPopup::new(simple_font, state, popup_proceed_btn),
             state,
         }
     }
 
     fn new_button(&mut self, subtext: String, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
-            subtext,
             btn_action,
             &self.event_queue,
             self.next_available_button_id,
@@ -750,12 +778,18 @@ impl UserInterface {
             .tabs
             .draw(20.0, y + 70.0);
 
+        let text_params = TextParams {
+            font: Some(&self.font),
+            font_size: 18,
+            color: WHITE,
+            ..Default::default()
+        };
         for (i, s) in self.character_uis[&self.player_portraits.selected_i.get()]
             .conditions
             .iter()
             .enumerate()
         {
-            draw_text(s, 630.0, y + 30.0 + 20.0 * i as f32, 18.0, WHITE);
+            draw_text_ex(s, 630.0, y + 30.0 + 20.0 * i as f32, text_params.clone());
         }
 
         self.character_uis[&self.player_portraits.selected_i.get()]
@@ -769,7 +803,7 @@ impl UserInterface {
                 .find(|btn| btn.id == btn_id)
                 .unwrap();
 
-            draw_button_tooltip(btn_pos, &btn.tooltip_lines[..]);
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
         }
 
         self.log.draw(800.0, y);
@@ -1064,18 +1098,9 @@ impl UserInterface {
                         ),
                     },
                 );
-                self.game_grid.add_effect(
-                    attacker_pos,
-                    target_pos,
-                    Effect {
-                        start_time: duration,
-                        end_time: duration + 0.5,
-                        variant: EffectVariant::At(
-                            EffectPosition::Destination,
-                            EffectGraphics::Text(impact_text.into()),
-                        ),
-                    },
-                );
+
+                self.game_grid
+                    .add_text_effect(target_pos, duration + 0.5, impact_text);
             }
             GameEvent::SpellWasCast {
                 caster,
@@ -1111,18 +1136,9 @@ impl UserInterface {
                     },
                 );
                 let impact_text = if success { "Boom" } else { "Resist" };
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: duration,
-                        end_time: duration + 0.5,
-                        variant: EffectVariant::At(
-                            EffectPosition::Destination,
-                            EffectGraphics::Text(impact_text.into()),
-                        ),
-                    },
-                );
+
+                self.game_grid
+                    .add_text_effect(target_pos, duration + 0.5, impact_text);
 
                 self.stopwatch.set_to_at_least(duration + 0.3);
             }
@@ -1479,7 +1495,7 @@ impl UserInterface {
     }
 }
 
-fn draw_button_tooltip(button_position: (f32, f32), lines: &[String]) {
+fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[String]) {
     let font_size = 18;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
@@ -1517,14 +1533,20 @@ fn draw_button_tooltip(button_position: (f32, f32), lines: &[String]) {
         GRAY,
     );
 
+    let text_params = TextParams {
+        font: Some(font),
+        font_size,
+        color: WHITE,
+        ..Default::default()
+    };
+
     let mut line_y = button_position.1 - lines.len() as f32 * line_h + text_margin - 5.0;
     for line in lines {
-        draw_text(
+        draw_text_ex(
             line,
             button_position.0 + text_margin,
             line_y,
-            font_size as f32,
-            WHITE,
+            text_params.clone(),
         );
         line_y += line_h;
     }
@@ -1555,14 +1577,17 @@ struct CharacterPortraits {
 }
 
 impl CharacterPortraits {
-    fn new(characters: &Characters, active_id: CharacterId) -> Self {
+    fn new(characters: &Characters, active_id: CharacterId, font: Font) -> Self {
         let mut portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>> =
             Default::default();
 
         let mut elements = vec![];
 
         for (id, character) in characters.iter_with_ids() {
-            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(character)));
+            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(
+                character,
+                font.clone(),
+            )));
             let cloned = Rc::downgrade(&portrait);
             portraits.insert(*id, portrait);
             elements.push(Element::WeakRefCell(cloned));
@@ -1649,7 +1674,7 @@ struct TopCharacterPortrait {
 }
 
 impl TopCharacterPortrait {
-    fn new(character: &Rc<RefCell<Character>>) -> Self {
+    fn new(character: &Rc<RefCell<Character>>, font: Font) -> Self {
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
             (10.0, 10.0),
             0.15,
@@ -1657,20 +1682,30 @@ impl TopCharacterPortrait {
         )));
         let cloned_row = Rc::clone(&action_points_row);
 
-        let hp_text = Rc::new(RefCell::new(TextLine::new("0/0", 16, WHITE)));
+        let hp_text = Rc::new(RefCell::new(TextLine::new(
+            "0/0",
+            16,
+            WHITE,
+            Some(font.clone()),
+        )));
         let cloned_text = Rc::clone(&hp_text);
 
         let name_color = if character.borrow().player_controlled {
             WHITE
         } else {
-            MAGENTA
+            Color::new(1.0, 0.7, 0.7, 1.0)
         };
 
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
             children: vec![
-                Element::Text(TextLine::new(character.borrow().name, 20, name_color)),
+                Element::Text(TextLine::new(
+                    character.borrow().name,
+                    16,
+                    name_color,
+                    Some(font.clone()),
+                )),
                 Element::RcRefCell(cloned_row),
                 Element::RcRefCell(cloned_text),
             ],
@@ -1716,7 +1751,7 @@ struct PlayerPortraits {
 }
 
 impl PlayerPortraits {
-    fn new(characters: &Characters, selected_id: CharacterId) -> Self {
+    fn new(characters: &Characters, selected_id: CharacterId, font: Font) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
@@ -1726,6 +1761,7 @@ impl PlayerPortraits {
                     *id,
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         &character.borrow(),
+                        font.clone(),
                     ))),
                 );
             }
@@ -1787,9 +1823,9 @@ struct PlayerCharacterPortrait {
 }
 
 impl PlayerCharacterPortrait {
-    fn new(character: &Character) -> Self {
+    fn new(character: &Character, font: Font) -> Self {
         Self {
-            text: TextLine::new(character.name, 20, WHITE),
+            text: TextLine::new(character.name, 20, WHITE, Some(font)),
             selected: Cell::new(false),
             padding: 15.0,
             clicked: Cell::new(false),
@@ -1861,10 +1897,11 @@ impl GameEventHandler for UiGameEventHandler {
 
 struct Log {
     lines: Container,
+    font: Font,
 }
 
 impl Log {
-    fn new() -> Self {
+    fn new(font: Font) -> Self {
         Self {
             lines: Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -1872,6 +1909,7 @@ impl Log {
                 margin: 5.0,
                 ..Default::default()
             },
+            font,
         }
     }
 
@@ -1879,9 +1917,12 @@ impl Log {
         if self.lines.children.len() == 15 {
             self.lines.children.remove(0);
         }
-        self.lines
-            .children
-            .push(Element::Text(TextLine::new(text, 18, WHITE)));
+        self.lines.children.push(Element::Text(TextLine::new(
+            text,
+            18,
+            WHITE,
+            Some(self.font.clone()),
+        )));
     }
 
     fn draw(&self, x: f32, y: f32) {
@@ -2012,7 +2053,7 @@ struct LabelledResourceBar {
 }
 
 impl LabelledResourceBar {
-    fn new(current: u32, max: u32, label: &'static str, color: Color) -> Self {
+    fn new(current: u32, max: u32, label: &'static str, color: Color, font: Font) -> Self {
         assert!(current <= max);
 
         let cell_w = 15.0;
@@ -2034,9 +2075,10 @@ impl LabelledResourceBar {
             format!("{}/{}", current, max),
             17,
             WHITE,
+            Some(font.clone()),
         )));
         let cloned_value_text = Rc::clone(&value_text);
-        let label_text = TextLine::new(label, 18, WHITE);
+        let label_text = TextLine::new(label, 16, WHITE, Some(font.clone()));
 
         let list = Container {
             layout_dir: LayoutDirection::Vertical,
@@ -2087,17 +2129,27 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
     })
 }
 
-fn attribute_row(attribute: (&'static str, u32), stats: Vec<(&'static str, f32)>) -> Container {
+fn attribute_row(
+    attribute: (&'static str, u32),
+    stats: Vec<(&'static str, f32)>,
+    font: Font,
+) -> Container {
     let attribute_element = Element::Text(TextLine::new(
         format!("{}: {}", attribute.0, attribute.1),
         22,
         WHITE,
+        Some(font.clone()),
     ));
 
     let stat_rows: Vec<Element> = stats
         .iter()
         .map(|(name, value)| {
-            Element::Text(TextLine::new(format!("{} = {}", name, value), 18, WHITE))
+            Element::Text(TextLine::new(
+                format!("{} = {}", name, value),
+                18,
+                WHITE,
+                Some(font.clone()),
+            ))
         })
         .collect();
 
@@ -2154,15 +2206,12 @@ impl ButtonAction {
 
 struct ActionButton {
     id: u32,
-    title: &'static str,
     tooltip_lines: Vec<String>,
     action: ButtonAction,
     size: (f32, f32),
     style: Style,
-    content: Box<Element>,
     hover_border_color: Color,
     points_row: Container,
-    point_radius: f32,
     hovered: Cell<bool>,
     enabled: Cell<bool>,
     highlighted: Cell<bool>,
@@ -2172,14 +2221,12 @@ struct ActionButton {
 
 impl ActionButton {
     fn new(
-        subtext: String,
         action: ButtonAction,
         event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
         id: u32,
         icons: &HashMap<IconId, Texture2D>,
         character: Option<&Character>,
     ) -> Self {
-        let title;
         let mut mana_points = 0;
         let mut stamina_points = 0;
         let mut action_points = 0;
@@ -2193,7 +2240,6 @@ impl ActionButton {
                     action_point_cost,
                     hand,
                 } => {
-                    title = "Attack";
                     action_points = action_point_cost;
                     icon = IconId::Attack;
 
@@ -2206,7 +2252,6 @@ impl ActionButton {
                     tooltip_lines.push(format!("{} damage", weapon.damage));
                 }
                 BaseAction::SelfEffect(sea) => {
-                    title = sea.name;
                     action_points = sea.action_point_cost;
                     icon = sea.icon;
 
@@ -2214,7 +2259,6 @@ impl ActionButton {
                     tooltip_lines.push(sea.description.to_string());
                 }
                 BaseAction::CastSpell(spell) => {
-                    title = spell.name;
                     action_points = spell.action_point_cost;
                     mana_points = spell.mana_cost;
                     icon = spell.icon;
@@ -2234,14 +2278,12 @@ impl ActionButton {
                     range: _,
                 } => {
                     action_points = action_point_cost;
-                    title = "Move";
                     icon = IconId::Move;
 
                     tooltip_lines.push(format!("Movement ({} AP)", action_point_cost));
                 }
             },
             ButtonAction::AttackEnhancement(enhancement) => {
-                title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
                 icon = enhancement.icon;
@@ -2254,7 +2296,6 @@ impl ActionButton {
             }
 
             ButtonAction::SpellEnhancement(enhancement) => {
-                title = enhancement.name;
                 mana_points = enhancement.mana_cost;
                 icon = enhancement.icon;
 
@@ -2265,7 +2306,6 @@ impl ActionButton {
                 tooltip_lines.push(enhancement.description.to_string());
             }
             ButtonAction::OnAttackedReaction(reaction) => {
-                title = reaction.name;
                 action_points = reaction.action_point_cost;
                 stamina_points = reaction.stamina_cost;
                 icon = reaction.icon;
@@ -2277,7 +2317,6 @@ impl ActionButton {
                 tooltip_lines.push(reaction.description.to_string());
             }
             ButtonAction::OnHitReaction(reaction) => {
-                title = reaction.name;
                 action_points = reaction.action_point_cost;
                 icon = reaction.icon;
 
@@ -2288,7 +2327,6 @@ impl ActionButton {
                 tooltip_lines.push(reaction.description.to_string());
             }
             ButtonAction::MovementEnhancement(enhancement) => {
-                title = enhancement.name;
                 action_points = enhancement.action_point_cost;
                 stamina_points = enhancement.stamina_cost;
                 icon = enhancement.icon;
@@ -2300,7 +2338,6 @@ impl ActionButton {
                 tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
             }
             ButtonAction::Proceed => {
-                title = "Proceed";
                 icon = IconId::Go;
                 tooltip_lines.push("Proceed".to_string());
             }
@@ -2357,32 +2394,16 @@ impl ActionButton {
             ..Default::default()
         };
 
-        let text_line = Element::Text(TextLine::new(title, 20, WHITE));
-        let content = if !subtext.is_empty() {
-            Box::new(Element::Container(Container {
-                layout_dir: LayoutDirection::Vertical,
-                margin: 8.0,
-                align: Align::Center,
-                children: vec![text_line, Element::Text(TextLine::new(subtext, 15, WHITE))],
-                ..Default::default()
-            }))
-        } else {
-            Box::new(text_line)
-        };
-
         assert!(!tooltip_lines.is_empty());
 
         let icon = icons[&icon].clone();
         Self {
             id,
-            title,
             action,
             size,
             style,
-            content,
             hover_border_color,
             points_row,
-            point_radius: r,
             hovered: Cell::new(false),
             enabled: Cell::new(true),
             highlighted: Cell::new(false),
@@ -2440,11 +2461,6 @@ impl Drawable for ActionButton {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.3));
             //draw_rectangle_lines(x, y, w, h, 1.0, RED);
         }
-
-        let _margin_x = (w - self.content.size().0) / 2.0;
-        let _margin_y = (h - self.point_radius * 2.0 - self.content.size().1) / 2.0;
-
-        //self.content.draw(x + margin_x, y + margin_y);
 
         let params = DrawTextureParams {
             dest_size: Some((60.0, 48.0).into()),

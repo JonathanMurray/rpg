@@ -2,7 +2,7 @@ use macroquad::{
     color::{Color, DARKGREEN, GRAY, MAGENTA, WHITE},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, measure_text},
+    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -74,8 +74,11 @@ pub struct Tabs {
 }
 
 impl Tabs {
-    pub fn new(active_i: usize, links_and_tabs: Vec<(&'static str, Element)>) -> Self {
-        let mut links: Vec<TabLink> = links_and_tabs.iter().map(|t| TabLink::new(t.0)).collect();
+    pub fn new(active_i: usize, links_and_tabs: Vec<(&'static str, Element)>, font: Font) -> Self {
+        let mut links: Vec<TabLink> = links_and_tabs
+            .iter()
+            .map(|t| TabLink::new(t.0, font.clone()))
+            .collect();
 
         links[active_i].active = true;
         let links_row = Container {
@@ -125,8 +128,8 @@ pub struct TabLink {
 }
 
 impl TabLink {
-    pub fn new(text: impl Into<String>) -> Self {
-        let text = TextLine::new(text, 20, WHITE);
+    pub fn new(text: impl Into<String>, font: Font) -> Self {
+        let text = TextLine::new(text, 20, WHITE, Some(font));
         let padding = 5.0;
         let text_size = text.size();
         Self {
@@ -163,10 +166,16 @@ pub struct TextLine {
     color: Color,
     min_height: f32,
     padding: f32,
+    font: Option<Font>,
 }
 
 impl TextLine {
-    pub fn new(string: impl Into<String>, font_size: u16, color: Color) -> Self {
+    pub fn new(
+        string: impl Into<String>,
+        font_size: u16,
+        color: Color,
+        font: Option<Font>,
+    ) -> Self {
         let mut this = Self {
             size: (0.0, 0.0),
             string: string.into(),
@@ -175,6 +184,7 @@ impl TextLine {
             color,
             min_height: 0.0,
             padding: 0.0,
+            font,
         };
         this.measure();
         this
@@ -200,7 +210,7 @@ impl TextLine {
     }
 
     fn measure(&mut self) {
-        let text_dimensions = measure_text(&self.string, None, self.font_size, 1.0);
+        let text_dimensions = measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
         self.size = (
             text_dimensions.width.max(0.0) + self.padding * 2.0,
             text_dimensions.height.max(0.0) + self.padding * 2.0,
@@ -213,12 +223,17 @@ impl TextLine {
 
 impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
-        draw_text(
+        let params = TextParams {
+            font_size: self.font_size,
+            color: self.color,
+            font: self.font.as_ref(),
+            ..Default::default()
+        };
+        draw_text_ex(
             &self.string,
             self.padding + x,
             self.padding + y + self.offset_y,
-            self.font_size as f32,
-            self.color,
+            params,
         );
         draw_debug(x, y, self.size.0, self.size.1);
     }
@@ -413,7 +428,7 @@ impl Container {
     }
 }
 
-pub fn table(cells: Vec<impl Into<String>>, column_alignments: Vec<Align>) -> Element {
+pub fn table(cells: Vec<impl Into<String>>, column_alignments: Vec<Align>, font: Font) -> Element {
     let num_cols = column_alignments.len();
     let mut columns: Vec<Vec<TextLine>> = vec![];
     for _ in 0..num_cols {
@@ -424,7 +439,7 @@ pub fn table(cells: Vec<impl Into<String>>, column_alignments: Vec<Align>) -> El
     let mut row_i = 0;
     let mut max_height_in_row: f32 = 0.0;
     for cell in cells {
-        let mut text = TextLine::new(cell, 18, WHITE);
+        let mut text = TextLine::new(cell, 18, WHITE, Some(font.clone()));
         text.set_padding(8.0);
         max_height_in_row = max_height_in_row.max(text.size().1);
         columns[col_i].push(text);

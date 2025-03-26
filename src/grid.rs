@@ -4,6 +4,7 @@ use macroquad::{
     color::Color,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
+    text::{draw_text_ex, Font, TextParams},
 };
 
 use std::cell::Cell;
@@ -111,6 +112,8 @@ pub struct GameGrid {
 
     character_motion: Option<CharacterMotion>,
 
+    font: Font,
+
     cell_w: f32,
     size: (f32, f32),
 }
@@ -120,6 +123,7 @@ impl GameGrid {
         characters: &Characters,
         textures: HashMap<TextureId, Texture2D>,
         size: (f32, f32),
+        font: Font,
     ) -> Self {
         let characters = characters.clone();
 
@@ -142,6 +146,7 @@ impl GameGrid {
             position_on_screen: (0.0, 0.0), // is set later
             character_motion: None,
             size,
+            font,
         }
     }
 
@@ -212,7 +217,6 @@ impl GameGrid {
         }
     }
 
-    // TODO
     pub fn add_text_effect(
         &mut self,
         position: (i32, i32),
@@ -228,7 +232,10 @@ impl GameGrid {
             age: 0.0,
             start_time: 0.0,
             end_time: duration,
-            variant: EffectVariant::At(EffectPosition::Source, EffectGraphics::Text(text.into())),
+            variant: EffectVariant::At(
+                EffectPosition::Source,
+                EffectGraphics::Text(text.into(), self.font.clone()),
+            ),
             source_pos: pos,
             destination_pos: pos,
         };
@@ -918,7 +925,7 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(String),
+    Text(String, Font),
 }
 
 impl EffectGraphics {
@@ -985,14 +992,20 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(text) => {
+            EffectGraphics::Text(text, font) => {
                 let font_size = 24;
                 let text_dimensions = measure_text(text, None, font_size, 1.0);
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
                 let y0 = y - cell_w * 0.3 * t;
 
-                draw_text(text, x0, y0, font_size as f32, YELLOW);
+                let text_params = TextParams {
+                    font: Some(font),
+                    font_size,
+                    color: YELLOW,
+                    ..Default::default()
+                };
+                draw_text_ex(text, x0, y0, text_params);
             }
         }
     }
