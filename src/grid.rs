@@ -535,6 +535,7 @@ impl GameGrid {
         let mut outcome = GridOutcome {
             switched_to_move_i: None,
             switched_to_attack: false,
+            switched_to_idle: false,
             hovered_character_id: None,
         };
 
@@ -548,11 +549,15 @@ impl GameGrid {
                 } && !collision;
 
             let mut hovered_npc_id = None;
+            let mut hovering_active_player_controlled = false;
             for character in self.characters.iter() {
                 if character.borrow().position_i32() == (mouse_grid_x, mouse_grid_y) {
-                    outcome.hovered_character_id = Some(character.borrow().id());
+                    let id = character.borrow().id();
+                    outcome.hovered_character_id = Some(id);
                     if !character.borrow().player_controlled {
-                        hovered_npc_id = Some(character.borrow().id());
+                        hovered_npc_id = Some(id);
+                    } else if id == self.active_character_id {
+                        hovering_active_player_controlled = true
                     }
                 }
             }
@@ -592,7 +597,11 @@ impl GameGrid {
                     self.target = Target::Some(id);
                     self.movement_preview = None;
                 }
-            } else if self.movement_preview.is_none() && self.dragging_camera_from.is_none() {
+            } else if hovering_active_player_controlled {
+                if is_mouse_button_pressed(MouseButton::Left) {
+                    outcome.switched_to_idle = true;
+                }
+            } else if self.movement_preview.is_some() && self.dragging_camera_from.is_none() {
                 self.draw_square((mouse_grid_x, mouse_grid_y), RED);
             }
         }
@@ -861,6 +870,7 @@ impl GameGrid {
 pub struct GridOutcome {
     pub switched_to_move_i: Option<usize>,
     pub switched_to_attack: bool,
+    pub switched_to_idle: bool,
     pub hovered_character_id: Option<CharacterId>,
 }
 

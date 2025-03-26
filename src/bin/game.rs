@@ -94,7 +94,7 @@ async fn main() {
 
         clear_background(BLACK);
 
-        user_interface.draw(640.0);
+        user_interface.draw();
 
         if !ui_events.is_empty() {
             for player_choice in ui_events {

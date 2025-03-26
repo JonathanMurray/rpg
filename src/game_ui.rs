@@ -7,8 +7,8 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{
-        Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, RED, WHITE,
-        YELLOW,
+        Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE,
+        RED, WHITE, YELLOW,
     },
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
@@ -32,6 +32,8 @@ use crate::{
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
 };
+
+const Y_USER_INTERFACE: f32 = 700.0;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UiState {
@@ -93,7 +95,7 @@ impl ActivityPopup {
     }
 
     fn draw(&mut self, x: f32, y: f32) {
-        if matches!(self.state, UiState::Idle) {
+        if matches!(self.state, UiState::Idle | UiState::ChoosingAction) {
             self.last_drawn_size = (0.0, 0.0);
             return;
         }
@@ -101,18 +103,12 @@ impl ActivityPopup {
         let mut x0 = x + 10.0;
         let mut y0 = y + 20.0;
 
-        let bg_color = DARKBROWN;
-
-        if matches!(self.state, UiState::ChoosingAction) {
-            let size = (500.0, 30.0);
-            draw_rectangle(x, y, size.0, size.1, bg_color);
-            draw_text("Choose an action!", x0, y0, 20.0, WHITE);
-            self.last_drawn_size = size;
-            return;
-        }
+        let bg_color = DARKGRAY;
+        let border_color = LIGHTGRAY;
 
         let size = (500.0, 160.0);
         draw_rectangle(x, y, size.0, size.1, bg_color);
+        draw_rectangle_lines(x, y, size.0, size.1, 1.0, border_color);
         self.last_drawn_size = size;
 
         for line in &self.initial_lines {
@@ -172,17 +168,19 @@ impl ActivityPopup {
             }
         }
 
+        let y_btn = y + 90.0;
+
         for btn in self.choice_buttons.values() {
-            btn.draw(x0, y0);
+            btn.draw(x0, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip((x0, y0), &btn.tooltip_lines[..]);
+                draw_button_tooltip((x0, y_btn), &btn.tooltip_lines[..]);
             }
 
             x0 += btn.size.0 + 10.0;
         }
 
-        self.proceed_button.draw(x0, y0);
+        self.proceed_button.draw(x0, y_btn);
     }
 
     fn update(&mut self) -> Option<ActivityPopupOutcome> {
@@ -440,43 +438,36 @@ impl UserInterface {
 
             let mut tracked_action_buttons = HashMap::new();
             let mut buttons = vec![];
-            let mut combat_buttons = vec![];
-            let mut skill_buttons = vec![];
+            let mut basic_buttons = vec![];
             let mut spell_buttons = vec![];
 
-            let mut spell_enhancement_buttons = vec![];
+            let mut enhancement_buttons = vec![];
             for (name, action) in character_ref.known_actions() {
                 let btn_action = ButtonAction::Action(action);
                 let btn = Rc::new(new_button(name, btn_action, Some(&character_ref)));
                 tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
                 buttons.push(Rc::clone(&btn));
                 match action {
-                    BaseAction::Attack { .. } => combat_buttons.push(btn),
-                    BaseAction::SelfEffect(..) => skill_buttons.push(btn),
+                    BaseAction::Attack { .. } => basic_buttons.push(btn),
+                    BaseAction::SelfEffect(..) => basic_buttons.push(btn),
                     BaseAction::CastSpell(spell) => {
                         if let Some(enhancement) = spell.possible_enhancement {
                             let btn_action = ButtonAction::SpellEnhancement(enhancement);
                             let btn = Rc::new(new_button(spell.name.to_string(), btn_action, None));
                             buttons.push(Rc::clone(&btn));
                             btn.enabled.set(false);
-                            spell_enhancement_buttons.push(btn);
+                            enhancement_buttons.push(btn);
                         }
                         spell_buttons.push(btn);
                     }
                     BaseAction::Move { .. } => {
-                        skill_buttons.push(btn);
+                        basic_buttons.push(btn);
                     }
                 }
             }
 
-            let combat_row = buttons_row(
-                combat_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-            let skill_row = buttons_row(
-                skill_buttons
+            let basic_row = buttons_row(
+                basic_buttons
                     .into_iter()
                     .map(|btn| Element::Rc(btn))
                     .collect(),
@@ -510,7 +501,6 @@ impl UserInterface {
                     .collect(),
             );
 
-            let mut attack_enhancement_buttons = vec![];
             for (subtext, enhancement) in
                 character_ref.known_attack_enhancements(HandType::MainHand)
             {
@@ -518,16 +508,10 @@ impl UserInterface {
                 let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
                 buttons.push(Rc::clone(&btn));
                 btn.enabled.set(false);
-                attack_enhancement_buttons.push(btn);
+                enhancement_buttons.push(btn);
             }
-            let attack_enhancements_row = buttons_row(
-                attack_enhancement_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-            let spell_enhancements_row = buttons_row(
-                spell_enhancement_buttons
+            let enhancements_row = buttons_row(
+                enhancement_buttons
                     .into_iter()
                     .map(|btn| Element::Rc(btn))
                     .collect(),
@@ -595,18 +579,14 @@ impl UserInterface {
             let actions_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                children: vec![combat_row, skill_row, spell_row],
+                children: vec![basic_row, spell_row],
                 ..Default::default()
             });
 
             let secondary_actions_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                children: vec![
-                    reactions_row,
-                    attack_enhancements_row,
-                    spell_enhancements_row,
-                ],
+                children: vec![reactions_row, enhancements_row],
                 ..Default::default()
             });
 
@@ -686,7 +666,11 @@ impl UserInterface {
 
         let state = UiState::Idle;
 
-        let game_grid = GameGrid::new(&game.characters, textures, (screen_width(), 670.0));
+        let game_grid = GameGrid::new(
+            &game.characters,
+            textures,
+            (screen_width(), Y_USER_INTERFACE),
+        );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
 
@@ -737,7 +721,9 @@ impl UserInterface {
         btn
     }
 
-    pub fn draw(&mut self, y: f32) {
+    pub fn draw(&mut self) {
+        let y = Y_USER_INTERFACE;
+
         let popup_rectangle = Rect {
             x: 100.0,
             y: y - 170.0,
@@ -748,10 +734,12 @@ impl UserInterface {
         self.game_grid.position_on_screen = (0.0, 0.0);
         let grid_outcome = self.game_grid.draw(popup_rectangle);
 
-        self.activity_popup.draw(100.0, y - 170.0);
+        self.activity_popup
+            .draw(popup_rectangle.x, popup_rectangle.y);
 
         draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
-        draw_line(0.0, y, screen_width(), y, 2.0, DARKGRAY);
+        draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
+
         self.player_portraits.draw(270.0, y + 10.0);
         self.action_points_label.draw(20.0, y + 10.0);
         self.action_points_row.draw(20.0, y + 30.0);
@@ -772,7 +760,7 @@ impl UserInterface {
 
         self.character_uis[&self.player_portraits.selected_i.get()]
             .resource_bars
-            .draw(620.0, y + 120.0);
+            .draw(620.0, y + 100.0);
 
         if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
             let btn = &self.character_uis[&self.player_portraits.selected_i.get()]
@@ -805,6 +793,10 @@ impl UserInterface {
             };
             self.activity_popup
                 .select_movement_option(selected_enhancement);
+        }
+
+        if grid_outcome.switched_to_idle {
+            self.set_state(UiState::ChoosingAction);
         }
 
         if grid_outcome.switched_to_attack {
@@ -846,7 +838,6 @@ impl UserInterface {
             return;
         }
 
-        println!("Setting UI state to {:?}", state);
         self.state = state;
 
         let mut popup_initial_lines = vec![];
