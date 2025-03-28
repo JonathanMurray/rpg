@@ -220,6 +220,7 @@ impl GameGrid {
     pub fn add_text_effect(
         &mut self,
         position: (i32, i32),
+        start_time: f32,
         duration: f32,
         text: impl Into<String>,
     ) {
@@ -230,8 +231,8 @@ impl GameGrid {
 
         let effect = ConcreteEffect {
             age: 0.0,
-            start_time: 0.0,
-            end_time: duration,
+            start_time,
+            end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
                 EffectGraphics::Text(text.into(), self.font.clone()),
@@ -706,6 +707,9 @@ impl GameGrid {
         }
 
         for effect in &self.effects {
+            if effect.age < effect.start_time {
+                continue;
+            }
             let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
             match &effect.variant {
                 EffectVariant::At(position, graphics) => {
@@ -726,17 +730,20 @@ impl GameGrid {
                     thickness,
                     end_thickness,
                     color,
+                    extend_gradually,
                 } => {
                     let from = (
                         effect.source_pos.0 + self.cell_w / 2.0,
                         effect.source_pos.1 + self.cell_w / 2.0,
                     );
-                    let to = (
+                    let mut to = (
                         effect.destination_pos.0 + self.cell_w / 2.0,
                         effect.destination_pos.1 + self.cell_w / 2.0,
                     );
 
-                    let to = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
+                    if *extend_gradually {
+                        to = (from.0 + (to.0 - from.0) * t, from.1 + (to.1 - from.1) * t);
+                    }
 
                     let thickness = match end_thickness {
                         Some(end_thickness) => thickness + (end_thickness - thickness) * t,
@@ -902,6 +909,7 @@ pub enum EffectVariant {
         color: Color,
         thickness: f32,
         end_thickness: Option<f32>,
+        extend_gradually: bool,
     },
 }
 
@@ -921,6 +929,7 @@ pub enum EffectGraphics {
     Rectangle {
         width: f32,
         end_width: Option<f32>,
+        start_rotation: f32,
         rotation_per_s: f32,
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
@@ -956,20 +965,27 @@ impl EffectGraphics {
             }
             EffectGraphics::Rectangle {
                 width,
-                end_width: _,
+                end_width,
+                start_rotation,
                 rotation_per_s,
                 fill,
                 stroke,
             } => {
                 x += cell_w / 2.0;
                 y += cell_w / 2.0;
-                let rotation = *rotation_per_s * effect.age;
+                let rotation = *start_rotation + *rotation_per_s * effect.age;
+
+                let width = match end_width {
+                    None => *width,
+                    Some(end_width) => *width + (end_width - width) * t,
+                };
+
                 if let Some(color) = fill {
                     draw_rectangle_ex(
                         x,
                         y,
-                        *width,
-                        *width,
+                        width,
+                        width,
                         DrawRectangleParams {
                             offset: Vec2::splat(0.5),
                             rotation,
@@ -981,8 +997,8 @@ impl EffectGraphics {
                     draw_rectangle_lines_ex(
                         x,
                         y,
-                        *width,
-                        *width,
+                        width,
+                        width,
                         *thickness,
                         DrawRectangleParams {
                             offset: Vec2::splat(0.5),

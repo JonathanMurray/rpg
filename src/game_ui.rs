@@ -1066,9 +1066,12 @@ impl UserInterface {
                 self.log.add(line);
             }
             GameEvent::CharacterTookDamage { character, amount } => {
+                // TODO: We show this as part of Attacked, SpellWasCast, etc, instead
+                /*
                 let pos = self.characters.get(character).position_i32();
                 self.game_grid
-                    .add_text_effect(pos, 2.0, format!("{}", amount));
+                    .add_text_effect(pos, 0.0, 2.0, format!("{}", amount));
+                 */
             }
             GameEvent::Attacked {
                 attacker,
@@ -1083,10 +1086,10 @@ impl UserInterface {
 
                 self.stopwatch.set_to_at_least(duration + 0.4);
                 let impact_text = match outcome {
-                    AttackOutcome::Hit => "Boom",
-                    AttackOutcome::Dodge => "Dodge",
-                    AttackOutcome::Parry => "Parry",
-                    AttackOutcome::Miss => "Miss",
+                    AttackOutcome::Hit(damage) => format!("{}", damage),
+                    AttackOutcome::Dodge => "Dodge".to_string(),
+                    AttackOutcome::Parry => "Parry".to_string(),
+                    AttackOutcome::Miss => "Miss".to_string(),
                 };
 
                 self.game_grid.add_effect(
@@ -1099,6 +1102,7 @@ impl UserInterface {
                             thickness: 1.0,
                             end_thickness: Some(10.0),
                             color: RED,
+                            extend_gradually: true,
                         },
                     },
                 );
@@ -1121,12 +1125,12 @@ impl UserInterface {
                 );
 
                 self.game_grid
-                    .add_text_effect(target_pos, duration + 0.5, impact_text);
+                    .add_text_effect(target_pos, duration, 0.5, impact_text);
             }
             GameEvent::SpellWasCast {
                 caster,
                 target,
-                success,
+                outcome,
                 spell_type,
             } => {
                 let caster_pos = self.characters.get(caster).position_i32();
@@ -1149,17 +1153,91 @@ impl UserInterface {
                             EffectPosition::Projectile,
                             EffectGraphics::Circle {
                                 radius: 10.0,
-                                end_radius: Some(25.0),
+                                end_radius: Some(15.0),
                                 fill: Some(color),
                                 stroke: None,
                             },
                         ),
                     },
                 );
-                let impact_text = if success { "Boom" } else { "Resist" };
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: 0.025,
+                        end_time: duration + 0.025,
+                        variant: EffectVariant::At(
+                            EffectPosition::Projectile,
+                            EffectGraphics::Circle {
+                                radius: 8.0,
+                                end_radius: Some(13.0),
+                                fill: Some(color),
+                                stroke: None,
+                            },
+                        ),
+                    },
+                );
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: 0.05,
+                        end_time: duration + 0.05,
+                        variant: EffectVariant::At(
+                            EffectPosition::Projectile,
+                            EffectGraphics::Circle {
+                                radius: 6.0,
+                                end_radius: Some(11.0),
+                                fill: Some(color),
+                                stroke: None,
+                            },
+                        ),
+                    },
+                );
+
+                /*
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: 0.0,
+                        end_time: duration,
+                        variant: EffectVariant::At(
+                            EffectPosition::Projectile,
+                            EffectGraphics::Rectangle { width: 15.0, end_width: Some(30.0), start_rotation: 2.0, rotation_per_s: 6.0, fill: None, stroke: Some((color, 4.0)) }
+                        ),
+                    },
+                );
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: 0.0,
+                        end_time: duration,
+                        variant: EffectVariant::At(
+                            EffectPosition::Projectile,
+                            EffectGraphics::Rectangle { width: 10.0, end_width: Some(20.0), start_rotation: 0.0, rotation_per_s: 6.0, fill: None, stroke: Some((MAGENTA, 4.0)) }
+                        ),
+                    },
+                );
+                self.game_grid.add_effect(
+                    caster_pos,
+                    target_pos,
+                    Effect {
+                        start_time: 0.0,
+                        end_time: 0.1,
+                        variant: EffectVariant::Line { color:BLACK, thickness: 5.0, end_thickness: Some(0.0), extend_gradually: false },
+                    },
+                );
+                 */
+
+                let impact_text = match outcome {
+                    crate::core::SpellOutcome::Hit(damage) => format!("{}", damage),
+                    crate::core::SpellOutcome::Resist => "Resist".to_string(),
+                };
 
                 self.game_grid
-                    .add_text_effect(target_pos, duration + 0.5, impact_text);
+                    .add_text_effect(target_pos, duration, 0.5, impact_text);
 
                 self.stopwatch.set_to_at_least(duration + 0.3);
             }
@@ -1171,6 +1249,7 @@ impl UserInterface {
                 let duration = 1.0;
                 self.game_grid.add_text_effect(
                     (pos.0 as i32, pos.1 as i32),
+                    0.0,
                     duration,
                     format!("{:?}", condition),
                 );

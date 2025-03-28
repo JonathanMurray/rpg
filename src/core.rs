@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 4, 2, 5, (1, 6));
+        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (1, 8));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -298,10 +298,16 @@ impl CoreGame {
 
             let success = res >= target;
 
+            let outcome = if success {
+                SpellOutcome::Hit(spell.damage)
+            } else {
+                SpellOutcome::Resist
+            };
+
             self.event_handler.handle(GameEvent::SpellWasCast {
                 caster: caster.id(),
                 target: defender.id(),
-                success,
+                outcome,
                 spell_type: spell.spell_type,
             });
 
@@ -442,25 +448,6 @@ impl CoreGame {
         let hit = res >= defense;
 
         let outcome = if hit {
-            AttackOutcome::Hit
-        } else if defender_reacted_with_parry {
-            self.log("  Parried!");
-            AttackOutcome::Parry
-        } else if defender_reacted_with_sidestep {
-            self.log("  Side stepped!");
-            AttackOutcome::Dodge
-        } else {
-            self.log("  Missed!");
-            AttackOutcome::Miss
-        };
-
-        self.event_handler.handle(GameEvent::Attacked {
-            attacker: attacker.id(),
-            target: defender_id,
-            outcome,
-        });
-
-        if hit {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
             let mut damage = weapon.damage;
@@ -520,7 +507,24 @@ impl CoreGame {
                     self.perform_effect_application(effect, &mut defender, enhancement.name);
                 }
             }
-        }
+
+            AttackOutcome::Hit(damage)
+        } else if defender_reacted_with_parry {
+            self.log("  Parried!");
+            AttackOutcome::Parry
+        } else if defender_reacted_with_sidestep {
+            self.log("  Side stepped!");
+            AttackOutcome::Dodge
+        } else {
+            self.log("  Missed!");
+            AttackOutcome::Miss
+        };
+
+        self.event_handler.handle(GameEvent::Attacked {
+            attacker: attacker.id(),
+            target: defender_id,
+            outcome,
+        });
 
         if skip_attack_exertion {
             self.log("  The attack did not lead to exertion (true hit)".to_string());
@@ -802,7 +806,7 @@ pub enum GameEvent {
     SpellWasCast {
         caster: CharacterId,
         target: CharacterId,
-        success: bool,
+        outcome: SpellOutcome,
         spell_type: SpellType,
     },
     CharacterReceivedSelfEffect {
@@ -816,10 +820,16 @@ pub enum GameEvent {
 
 #[derive(Debug, Copy, Clone)]
 pub enum AttackOutcome {
-    Hit,
+    Hit(u32),
     Dodge,
     Parry,
     Miss,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum SpellOutcome {
+    Hit(u32),
+    Resist,
 }
 
 pub struct StateChooseAction {
