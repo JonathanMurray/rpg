@@ -1,5 +1,6 @@
 use std::{
     cell::{Cell, Ref, RefCell},
+    char::MAX,
     collections::HashMap,
     rc::Rc,
 };
@@ -20,8 +21,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, table, Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-        Tabs, TextLine,
+        draw_debug, table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Rectangle, Style, Tabs, TextLine,
     },
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
@@ -2063,17 +2064,29 @@ struct Log {
 
 impl Log {
     fn new(font: Font) -> Self {
-        Self {
+        let this = Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
                 children: vec![],
-                margin: 5.0,
+                margin: 4.0,
+                align: Align::End,
+                scroll: Some(ContainerScroll::default()),
+                min_width: Some(450.0),
+                min_height: Some(250.0),
+                max_height: Some(250.0),
+                style: Style {
+                    border_color: Some(GRAY),
+                    padding: 5.0,
+                    ..Default::default()
+                },
                 ..Default::default()
             },
             text_lines: vec![],
             line_details: vec![],
             font,
-        }
+        };
+
+        this
     }
 
     fn add(&mut self, text: impl Into<String>) {
@@ -2081,7 +2094,8 @@ impl Log {
     }
 
     fn add_with_details(&mut self, text: impl Into<String>, details: Vec<String>) {
-        if self.container.children.len() == 15 {
+        const MAX_LINES: usize = 50;
+        if self.container.children.len() == MAX_LINES {
             self.container.children.remove(0);
             self.text_lines.remove(0);
             self.line_details.remove(0);
@@ -2121,7 +2135,8 @@ impl Log {
         for (i, text_line) in self.text_lines.iter().enumerate() {
             if let Some(line_pos) = text_line.has_been_hovered.take() {
                 if let Some(details) = &self.line_details[i] {
-                    details.draw(line_pos.0 + 5.0, line_pos.1 + text_line.size().1 + 5.0);
+                    let details_x = x + self.container.size().0 - details.size().0;
+                    details.draw(details_x, line_pos.1 + text_line.size().1 + 5.0);
                 }
             }
         }

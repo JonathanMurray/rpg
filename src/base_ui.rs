@@ -1,6 +1,6 @@
 use macroquad::{
-    color::{Color, DARKGREEN, GRAY, MAGENTA, WHITE},
-    input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    color::{Color, DARKGREEN, GOLD, GRAY, MAGENTA, WHITE},
+    input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
 };
@@ -323,18 +323,42 @@ impl Default for Align {
 }
 
 #[derive(Default)]
+pub struct ContainerScroll {
+    offset: Cell<f32>,
+}
+
+#[derive(Default)]
 pub struct Container {
     pub layout_dir: LayoutDirection,
     pub align: Align,
     pub margin: f32,
     pub style: Style,
     pub min_width: Option<f32>,
+    pub min_height: Option<f32>,
+    pub max_height: Option<f32>,
     pub children: Vec<Element>,
     pub border_between_children: Option<Color>,
+    pub scroll: Option<ContainerScroll>,
 }
 
 impl Container {
     pub fn size(&self) -> (f32, f32) {
+        let (mut w, mut h) = self.content_size();
+
+        if let Some(min_w) = self.min_width {
+            w = w.max(min_w);
+        }
+        if let Some(min_h) = self.min_height {
+            h = h.max(min_h);
+        }
+        if let Some(max_h) = self.max_height {
+            h = h.min(max_h);
+        }
+
+        (w, h)
+    }
+
+    pub fn content_size(&self) -> (f32, f32) {
         let mut w = 0.0;
         let mut h = 0.0;
         for element in &self.children {
@@ -367,10 +391,6 @@ impl Container {
             }
         }
 
-        if let Some(min_w) = self.min_width {
-            w = w.max(min_w);
-        }
-
         (w, h)
     }
 
@@ -387,18 +407,26 @@ impl Container {
 
         let mut x0 = x + self.style.padding;
         let mut y0 = y + self.style.padding;
+        let scroll_offset = self
+            .scroll
+            .as_ref()
+            .map(|scroll| -scroll.offset.get())
+            .unwrap_or(0.0);
         for (i, element) in self.children.iter().enumerate() {
             let (element_w, element_h) = element.size();
-
             let offset = match (&self.align, &self.layout_dir) {
-                (Align::Start, _) => (0.0, 0.0),
+                (Align::Start, LayoutDirection::Horizontal) => (0.0, 0.0),
+                (Align::Start, LayoutDirection::Vertical) => (0.0, scroll_offset),
                 (Align::Center, LayoutDirection::Horizontal) => {
                     // Place it in the middle, i.e. empty space above and below
                     (0.0, (size.1 - 2.0 * self.style.padding - element_h) / 2.0)
                 }
                 (Align::Center, LayoutDirection::Vertical) => {
                     // Place it in the middle, i.e. empty space to the left and right
-                    ((size.0 - 2.0 * self.style.padding - element_w) / 2.0, 0.0)
+                    (
+                        (size.0 - 2.0 * self.style.padding - element_w) / 2.0,
+                        scroll_offset,
+                    )
                 }
                 (Align::End, LayoutDirection::Horizontal) => {
                     // Push it down so that it touches the bottom
@@ -406,11 +434,14 @@ impl Container {
                 }
                 (Align::End, LayoutDirection::Vertical) => {
                     // Push it to the right, so that it touches the right side
-                    (size.0 - 2.0 * self.style.padding - element_w, 0.0)
+                    (size.0 - 2.0 * self.style.padding - element_w, scroll_offset)
                 }
             };
 
-            element.draw(x0 + offset.0, y0 + offset.1);
+            let y_element = y0 + offset.1;
+            if y_element >= y && y_element + element.size().1 <= y + size.1 + 5.0 {
+                element.draw(x0 + offset.0, y_element);
+            }
 
             match self.layout_dir {
                 LayoutDirection::Horizontal => x0 += element_w + self.margin,
@@ -433,6 +464,26 @@ impl Container {
         }
 
         draw_debug(x, y, size.0, size.1);
+
+        if let Some(scroll) = &self.scroll {
+            let content_size = self.content_size();
+            let bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+            let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
+            let bar_w = 7.0;
+            draw_rectangle(x + size.0, bar_y, bar_w, bar_h, GRAY);
+
+            let (mouse_x, mouse_y) = mouse_position();
+            if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
+                let (_dx, dy) = mouse_wheel();
+                if dy != 0.0 {
+                    const SCROLL_SPEED: f32 = 15.0;
+                    let new_offset = scroll.offset.get() - dy.signum() * SCROLL_SPEED;
+                    if new_offset >= 0.0 && new_offset <= content_size.1 - size.1 {
+                        scroll.offset.set(new_offset);
+                    }
+                }
+            }
+        }
     }
 }
 
