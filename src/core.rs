@@ -39,7 +39,7 @@ impl CoreGame {
         alice.armor = Some(LEATHER_ARMOR);
         alice.known_attacked_reactions.push(SIDE_STEP);
 
-        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2, 1, 2, 1, (3, 4));
+        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2, 1, 2, 1, (2, 3));
         charlie.main_hand.weapon = Some(SWORD);
         charlie.off_hand.shield = Some(SMALL_SHIELD);
 

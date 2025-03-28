@@ -98,6 +98,7 @@ pub struct GameGrid {
     dragging_camera_from: Option<(f32, f32)>,
 
     effects: Vec<ConcreteEffect>,
+    pub static_text: Option<((i32, i32), Vec<String>)>,
 
     active_character_id: CharacterId,
     pub range_indicator: Option<Range>,
@@ -135,6 +136,7 @@ impl GameGrid {
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
             effects: vec![],
+            static_text: None,
             active_character_id: 0,
             movement_range: MovementRange::default(),
             movement_preview: Default::default(),
@@ -754,7 +756,44 @@ impl GameGrid {
             }
         }
 
+        self.draw_static_text();
+
         outcome
+    }
+
+    fn draw_static_text(&self) {
+        if let Some(((x, y), lines)) = &self.static_text {
+            let (x, mut y) = (self.grid_x_to_screen(*x), self.grid_y_to_screen(*y) - 10.0);
+            let font_size = 20;
+            let params = TextParams {
+                font: Some(&self.font),
+                font_size,
+                color: WHITE,
+                ..Default::default()
+            };
+            let (mut w, mut h) = (0.0, 0.0);
+            for line in lines {
+                let text_dimensions = measure_text(&line, Some(&self.font), font_size, 1.0);
+                if text_dimensions.width > w {
+                    w = text_dimensions.width;
+                }
+                if text_dimensions.height.is_finite() {
+                    h += text_dimensions.height;
+                    y -= text_dimensions.height;
+                }
+            }
+            let pad = 8.0;
+            draw_rectangle(
+                x,
+                y - pad,
+                w + pad * 2.0,
+                h + pad * 2.0,
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
+            for (i, line) in lines.iter().enumerate() {
+                draw_text_ex(&line, x + pad, y + 10.0 + 20.0 * i as f32, params.clone());
+            }
+        }
     }
 
     fn draw_move_range_indicator(&self, origin: (i32, i32)) {

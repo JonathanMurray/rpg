@@ -103,13 +103,13 @@ impl ActivityPopup {
             return;
         }
 
-        let mut x0 = x + 10.0;
+        let x0 = x + 10.0;
         let mut y0 = y + 20.0;
 
         let bg_color = DARKGRAY;
         let border_color = LIGHTGRAY;
 
-        let size = (500.0, 160.0);
+        let size = (500.0, 85.0);
         draw_rectangle(x, y, size.0, size.1, bg_color);
         draw_rectangle_lines(x, y, size.0, size.1, 1.0, border_color);
         self.last_drawn_size = size;
@@ -178,19 +178,20 @@ impl ActivityPopup {
             }
         }
 
-        let y_btn = y + 90.0;
+        let y_btn = y + 10.0;
+        let mut x_btn = x + 280.0;
 
         for btn in self.choice_buttons.values() {
-            btn.draw(x0, y_btn);
+            btn.draw(x_btn, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip(&self.font, (x0, y_btn), &btn.tooltip_lines[..]);
+                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip_lines[..]);
             }
 
-            x0 += btn.size.0 + 10.0;
+            x_btn += btn.size.0 + 10.0;
         }
 
-        self.proceed_button.draw(x0, y_btn);
+        self.proceed_button.draw(x_btn, y_btn);
     }
 
     fn update(&mut self) -> Option<ActivityPopupOutcome> {
@@ -775,7 +776,7 @@ impl UserInterface {
 
         let popup_rectangle = Rect {
             x: 100.0,
-            y: y - 170.0,
+            y: y - 90.0,
             w: self.activity_popup.last_drawn_size.0,
             h: self.activity_popup.last_drawn_size.1,
         };
@@ -1325,6 +1326,7 @@ impl UserInterface {
         let mut popup_enabled = true;
 
         self.activity_popup.target_line = None;
+        self.game_grid.static_text = None;
         self.game_grid.range_indicator = None;
 
         match self.state {
@@ -1332,27 +1334,29 @@ impl UserInterface {
                 popup_enabled = false; // until proven otherwise
                 if let Some(i) = self.game_grid.target() {
                     let target_char = self.characters.get(i);
+
+                    let chance = as_percentage(prob_attack_hit(
+                        &self.active_character(),
+                        hand,
+                        &target_char,
+                    ));
+                    let mut explanation =
+                        self.active_character().explain_attack_circumstances(hand);
+                    explanation.push_str(&target_char.explain_incoming_attack_circumstances());
+
+                    self.game_grid.static_text = Some((
+                        target_char.position_i32(),
+                        vec![format!("Attack: {}", chance), explanation],
+                    ));
+
                     if self
                         .active_character()
                         .can_reach_with_attack(hand, target_char.position)
                     {
                         if self.active_character().can_use_action(base_action) {
-                            let chance = as_percentage(prob_attack_hit(
-                                &self.active_character(),
-                                hand,
-                                &target_char,
-                            ));
-                            let mut explanation =
-                                self.active_character().explain_attack_circumstances(hand);
-                            explanation
-                                .push_str(&target_char.explain_incoming_attack_circumstances());
-                            self.activity_popup.target_line = Some(format!(
-                                "[{}] hit chance: {} {}",
-                                target_char.name, chance, explanation
-                            ));
                             popup_enabled = true;
                         } else {
-                            self.activity_popup.target_line = Some("Can not attack!".to_string());
+                            println!("Can not attack!");
                         }
                     } else {
                         let range = self.active_character().weapon(hand).unwrap().range;
@@ -1369,18 +1373,22 @@ impl UserInterface {
                 popup_enabled = false; // until proven otherwise
                 if let Some(i) = self.game_grid.target() {
                     let target_char = self.characters.get(i);
+                    let chance = as_percentage(prob_spell_hit(
+                        &self.active_character(),
+                        spell.spell_type,
+                        &target_char,
+                    ));
+
+                    self.game_grid.static_text = Some((
+                        target_char.position_i32(),
+                        vec![format!("{}: {}", spell.name, chance)],
+                    ));
+
 
                     if self
                         .active_character()
                         .can_reach_with_spell(spell, target_char.position)
                     {
-                        let chance = as_percentage(prob_spell_hit(
-                            &self.active_character(),
-                            spell.spell_type,
-                            &target_char,
-                        ));
-                        self.activity_popup.target_line =
-                            Some(format!("[{}] success chance: {}", target_char.name, chance));
                         popup_enabled = true;
                     } else {
                         let range = spell.range;
