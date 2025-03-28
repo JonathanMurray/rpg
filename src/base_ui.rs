@@ -167,6 +167,8 @@ pub struct TextLine {
     min_height: f32,
     padding: f32,
     font: Option<Font>,
+
+    pub has_been_hovered: Cell<Option<(f32, f32)>>,
 }
 
 impl TextLine {
@@ -185,6 +187,7 @@ impl TextLine {
             min_height: 0.0,
             padding: 0.0,
             font,
+            has_been_hovered: Cell::new(None),
         };
         this.measure();
         this
@@ -236,6 +239,11 @@ impl Drawable for TextLine {
             params,
         );
         draw_debug(x, y, self.size.0, self.size.1);
+
+        let (mouse_x, mouse_y) = mouse_position();
+        if (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y) {
+            self.has_been_hovered.set(Some((x, y)));
+        }
     }
 
     fn size(&self) -> (f32, f32) {

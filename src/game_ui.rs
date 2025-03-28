@@ -1074,11 +1074,35 @@ impl UserInterface {
                     .add_text_effect(pos, 0.0, 2.0, format!("{}", amount));
                  */
             }
+
+            GameEvent::CharacterReactedToHit {
+                main_line,
+                detail_lines,
+            } => {
+                self.log.add_with_details(main_line, detail_lines);
+            }
+
             GameEvent::Attacked {
                 attacker,
                 target,
                 outcome,
+                detail_lines,
             } => {
+                let mut line = format!(
+                    "{} attacked {}",
+                    self.characters.get(attacker).name,
+                    self.characters.get(target).name
+                );
+
+                match outcome {
+                    AttackOutcome::Hit(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
+                    AttackOutcome::Dodge => line.push_str(" (dodge)"),
+                    AttackOutcome::Parry => line.push_str(" (parry)"),
+                    AttackOutcome::Miss => line.push_str(" (miss)"),
+                }
+
+                self.log.add_with_details(line, detail_lines);
+
                 let attacker_pos = self.characters.get(attacker).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
 
@@ -1132,11 +1156,28 @@ impl UserInterface {
                 caster,
                 target,
                 outcome,
-                spell_type,
+                spell,
+                detail_lines,
             } => {
+                let mut line = format!(
+                    "{} cast {} on {}",
+                    self.characters.get(caster).name,
+                    spell.name,
+                    self.characters.get(target).name
+                );
+
+                match outcome {
+                    crate::core::SpellOutcome::Hit(damage) => {
+                        line.push_str(&format!(" ({} damage)", damage))
+                    }
+                    crate::core::SpellOutcome::Resist => line.push_str("  (miss)"),
+                }
+
+                self.log.add_with_details(line, detail_lines);
+
                 let caster_pos = self.characters.get(caster).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
-                let color = match spell_type {
+                let color = match spell.spell_type {
                     SpellType::Mental => BLUE,
                     SpellType::Projectile => RED,
                 };
@@ -1269,12 +1310,14 @@ impl UserInterface {
                 from,
                 to,
             } => {
+                /*
                 self.log.add(format!(
                     "{} moved from {:?} to {:?}",
                     self.characters.get(character).name,
                     from,
                     to
                 ));
+                 */
 
                 let duration = 0.6;
                 self.game_grid
@@ -1383,7 +1426,6 @@ impl UserInterface {
                         target_char.position_i32(),
                         vec![format!("{}: {}", spell.name, chance)],
                     ));
-
 
                     if self
                         .active_character()
@@ -2013,38 +2055,76 @@ impl GameEventHandler for UiGameEventHandler {
 }
 
 struct Log {
-    lines: Container,
+    container: Container,
+    text_lines: Vec<Rc<TextLine>>,
+    line_details: Vec<Option<Container>>,
     font: Font,
 }
 
 impl Log {
     fn new(font: Font) -> Self {
         Self {
-            lines: Container {
+            container: Container {
                 layout_dir: LayoutDirection::Vertical,
                 children: vec![],
                 margin: 5.0,
                 ..Default::default()
             },
+            text_lines: vec![],
+            line_details: vec![],
             font,
         }
     }
 
     fn add(&mut self, text: impl Into<String>) {
-        if self.lines.children.len() == 15 {
-            self.lines.children.remove(0);
+        self.add_with_details(text, vec![]);
+    }
+
+    fn add_with_details(&mut self, text: impl Into<String>, details: Vec<String>) {
+        if self.container.children.len() == 15 {
+            self.container.children.remove(0);
+            self.text_lines.remove(0);
+            self.line_details.remove(0);
         }
-        self.lines.children.push(Element::Text(TextLine::new(
-            text,
-            18,
-            WHITE,
-            Some(self.font.clone()),
-        )));
+        let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
+        text_line.set_padding(3.0);
+        let text_line = Rc::new(text_line);
+        self.text_lines.push(text_line.clone());
+        self.container.children.push(Element::Rc(text_line));
+
+        if !details.is_empty() {
+            let details_container = Container {
+                layout_dir: LayoutDirection::Vertical,
+                margin: 5.0,
+                style: Style {
+                    background_color: Some(BLACK),
+                    padding: 5.0,
+                    border_color: Some(GOLD),
+                    ..Default::default()
+                },
+                children: details
+                    .iter()
+                    .map(|s| Element::Text(TextLine::new(s, 18, WHITE, Some(self.font.clone()))))
+                    .collect(),
+                ..Default::default()
+            };
+            self.line_details.push(Some(details_container));
+        } else {
+            self.line_details.push(None);
+        }
     }
 
     fn draw(&self, x: f32, y: f32) {
         draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
-        self.lines.draw(x + 10.0, y + 10.0);
+        self.container.draw(x + 10.0, y + 10.0);
+
+        for (i, text_line) in self.text_lines.iter().enumerate() {
+            if let Some(line_pos) = text_line.has_been_hovered.take() {
+                if let Some(details) = &self.line_details[i] {
+                    details.draw(line_pos.0 + 5.0, line_pos.1 + text_line.size().1 + 5.0);
+                }
+            }
+        }
     }
 }
 

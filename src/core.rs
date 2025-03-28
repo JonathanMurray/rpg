@@ -100,16 +100,6 @@ impl CoreGame {
                     "".to_string()
                 };
 
-                let attacks_str = format!(
-                    "{} attacks {} (d20+{} vs {}){}",
-                    attacker.name,
-                    defender.name,
-                    attacker.attack_modifier(hand),
-                    defender.defense(),
-                    enhancements_str
-                );
-                self.log(attacks_str.clone());
-
                 let is_within_melee = within_meele(attacker.position, defender.position);
 
                 drop(attacker);
@@ -154,7 +144,8 @@ impl CoreGame {
                         });
                 }
 
-                self.perform_effect_application(effect, &mut character, "");
+                let log_line = self.perform_effect_application(effect, &mut character);
+                self.log(log_line);
             }
             Action::CastSpell {
                 spell,
@@ -216,26 +207,17 @@ impl CoreGame {
         }
     }
 
-    fn perform_effect_application(
-        &self,
-        effect: ApplyEffect,
-        receiver: &mut Character,
-        context: &'static str,
-    ) {
-        let mut line = String::new();
+    fn perform_effect_application(&self, effect: ApplyEffect, receiver: &mut Character) -> String {
         match effect {
             ApplyEffect::RemoveActionPoints(n) => {
                 receiver.lose_action_points(n);
-                line.push_str(&format!("  {} lost {} AP", receiver.name, n));
+                format!("  {} lost {} AP", receiver.name, n)
             }
             ApplyEffect::Condition(condition) => {
                 receiver.receive_condition(condition);
-
-                line.push_str(&format!("  {} received {:?}", receiver.name, condition));
+                format!("  {} received {:?}", receiver.name, condition)
             }
         }
-        line.push_str(&format!(" ({})", context));
-        self.log(line);
     }
 
     fn perform_spell(
@@ -274,20 +256,11 @@ impl CoreGame {
             1
         };
 
-        self.log(format!(
-            "{} casts {} on {} (d20+{} vs {}){}",
-            caster.name,
-            spell.name,
-            defender.name,
-            caster.intellect(),
-            target,
-            enhancement_str
-        ));
-
         for i in 0..cast_n_times {
+            let mut detail_lines = vec![];
             let roll = roll_d20_with_advantage(0);
             let res = roll + caster.intellect();
-            self.log(format!(
+            detail_lines.push(format!(
                 "Rolled: {} (+{} int) = {}, vs {}={}",
                 roll,
                 caster.intellect(),
@@ -304,22 +277,16 @@ impl CoreGame {
                 SpellOutcome::Resist
             };
 
-            self.event_handler.handle(GameEvent::SpellWasCast {
-                caster: caster.id(),
-                target: defender.id(),
-                outcome,
-                spell_type: spell.spell_type,
-            });
-
             if success {
-                self.log("  The spell was successful!");
+                detail_lines.push("The spell was successful!".to_string());
                 let damage = spell.damage;
                 if damage > 0 {
                     self.perform_losing_health(defender, damage);
                 }
 
                 if let Some(effect) = spell.on_hit_effect {
-                    self.perform_effect_application(effect, defender, spell.name);
+                    let log_line = self.perform_effect_application(effect, defender);
+                    detail_lines.push(format!("{} ({})", log_line, spell.name));
                 }
 
                 match spell.possible_enhancement {
@@ -328,28 +295,37 @@ impl CoreGame {
                         name,
                         ..
                     }) if enhanced => {
-                        self.perform_effect_application(effect, defender, name);
+                        let log_line = self.perform_effect_application(effect, defender);
+                        detail_lines.push(format!("{} ({})", log_line, name));
                     }
                     _ => {}
                 };
             } else {
                 match spell.spell_type {
                     SpellType::Mental => {
-                        self.log(format!("  {} resisted the spell!", defender.name))
+                        detail_lines.push(format!("{} resisted the spell!", defender.name))
                     }
-                    SpellType::Projectile => self.log("  The spell missed!"),
+                    SpellType::Projectile => detail_lines.push("The spell missed!".to_string()),
                 }
             }
 
             if i < cast_n_times - 1 {
-                self.log(format!("{} casts again!", caster.name))
+                detail_lines.push(format!("{} cast again!", caster.name))
             }
+
+            self.event_handler.handle(GameEvent::SpellWasCast {
+                caster: caster.id(),
+                target: defender.id(),
+                outcome,
+                spell,
+                detail_lines,
+            });
         }
     }
 
     fn perform_losing_health(&self, character: &mut Character, amount: u32) {
         character.health.lose(amount);
-        self.log(format!("  {} took {} damage", character.name, amount));
+        //self.log(format!("  {} took {} damage", character.name, amount));
         self.event_handler.handle(GameEvent::CharacterTookDamage {
             character: character.id.unwrap(),
             amount,
@@ -387,18 +363,20 @@ impl CoreGame {
 
         let attack_modifier = attacker.attack_modifier(hand_type);
 
+        let mut log_lines = vec![];
+
         if let Some(reaction) = defender_reaction {
             defender.action_points -= reaction.action_point_cost;
             defender.stamina.spend(reaction.stamina_cost);
 
-            self.log(format!("{} reacts with {}", defender.name, reaction.name));
+            log_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
 
             match reaction.effect {
                 OnAttackedReactionEffect::Parry => {
                     defender_reacted_with_parry = true;
                     let bonus_def = defender.attack_modifier(HandType::MainHand);
 
-                    self.log(format!(
+                    log_lines.push(format!(
                         "  Defense: {} +{} (Parry) = {}",
                         defense,
                         bonus_def,
@@ -406,12 +384,12 @@ impl CoreGame {
                     ));
                     defense += bonus_def;
                     let p_hit = probability_of_d20_reaching(defense - attack_modifier, advantage);
-                    self.log(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
+                    log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
                 OnAttackedReactionEffect::SideStep => {
                     defender_reacted_with_sidestep = true;
                     let bonus_def = defender.defense_bonus_from_dexterity();
-                    self.log(format!(
+                    log_lines.push(format!(
                         "  Defense: {} +{} (Side step) = {}",
                         defense,
                         bonus_def,
@@ -419,7 +397,7 @@ impl CoreGame {
                     ));
                     defense += bonus_def;
                     let p_hit = probability_of_d20_reaching(defense - attack_modifier, advantage);
-                    self.log(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
+                    log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
             }
         }
@@ -427,16 +405,16 @@ impl CoreGame {
         let roll = roll_d20_with_advantage(advantage);
         let res = roll + attack_modifier;
         match advantage.cmp(&0) {
-            std::cmp::Ordering::Less => self.log(format!(
-                "Rolling {} dice with disadvantage...",
+            std::cmp::Ordering::Less => log_lines.push(format!(
+                "Rolled {} dice with disadvantage...",
                 advantage.abs() + 1
             )),
-            std::cmp::Ordering::Equal => self.log("Rolling 1 die..."),
+            std::cmp::Ordering::Equal => log_lines.push("Rolled 1 die...".to_string()),
             std::cmp::Ordering::Greater => {
-                self.log(format!("Rolling {} dice with advantage...", advantage + 1))
+                log_lines.push(format!("Rolled {} dice with advantage...", advantage + 1))
             }
         }
-        self.log(format!(
+        log_lines.push(format!(
             "Rolled: {} (+{}) = {}, vs def={}, armor={}",
             roll,
             attack_modifier,
@@ -461,7 +439,7 @@ impl CoreGame {
             }
 
             if res < defense + defender.protection_from_armor() {
-                self.log("  Hit!".to_string());
+                log_lines.push("  Hit!".to_string());
             } else {
                 on_true_hit_effect = weapon.on_true_hit;
                 let (label, bonus_dmg) = if res < defense + defender.protection_from_armor() + 5 {
@@ -471,7 +449,7 @@ impl CoreGame {
                 } else {
                     ("Critical hit", 3)
                 };
-                self.log(format!("  {label}!"));
+                log_lines.push(format!("  {label}!"));
                 dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
                 damage += bonus_dmg;
             }
@@ -487,7 +465,7 @@ impl CoreGame {
             }
             dmg_str.push_str(&format!(" = {damage}"));
 
-            self.log(dmg_str);
+            log_lines.push(dmg_str);
 
             self.perform_losing_health(&mut defender, damage);
 
@@ -496,7 +474,8 @@ impl CoreGame {
             if let Some(effect) = on_true_hit_effect {
                 match effect {
                     AttackHitEffect::Apply(effect) => {
-                        self.perform_effect_application(effect, &mut defender, "true hit");
+                        let log_line = self.perform_effect_application(effect, &mut defender);
+                        log_lines.push(format!("{} (true hit)", log_line))
                     }
                     AttackHitEffect::SkipExertion => skip_attack_exertion = true,
                 }
@@ -504,48 +483,50 @@ impl CoreGame {
 
             for enhancement in &attack_enhancements {
                 if let Some(effect) = enhancement.on_hit_effect {
-                    self.perform_effect_application(effect, &mut defender, enhancement.name);
+                    let log_line = self.perform_effect_application(effect, &mut defender);
+                    log_lines.push(format!("{} ({})", log_line, enhancement.name))
                 }
             }
 
             AttackOutcome::Hit(damage)
         } else if defender_reacted_with_parry {
-            self.log("  Parried!");
+            log_lines.push("  Parried!".to_string());
             AttackOutcome::Parry
         } else if defender_reacted_with_sidestep {
-            self.log("  Side stepped!");
+            log_lines.push("  Side stepped!".to_string());
             AttackOutcome::Dodge
         } else {
-            self.log("  Missed!");
+            log_lines.push("  Missed!".to_string());
             AttackOutcome::Miss
         };
 
-        self.event_handler.handle(GameEvent::Attacked {
-            attacker: attacker.id(),
-            target: defender_id,
-            outcome,
-        });
-
         if skip_attack_exertion {
-            self.log("  The attack did not lead to exertion (true hit)".to_string());
+            log_lines.push("  The attack did not lead to exertion (true hit)".to_string());
         } else {
             let hand = match hand_type {
                 HandType::MainHand => &mut attacker.main_hand,
                 HandType::OffHand => &mut attacker.off_hand,
             };
             hand.exertion += 1;
-            self.log(format!("  The attack led to exertion ({})", hand.exertion));
+            log_lines.push(format!("  The attack led to exertion ({})", hand.exertion));
         }
 
         if attacker.conditions.careful_aim {
             attacker.conditions.careful_aim = false;
-            self.log(format!("{} lost Careful aim", attacker.name));
+            log_lines.push(format!("{} lost Careful aim", attacker.name));
         }
 
         if defender.conditions.braced {
             defender.conditions.braced = false;
-            self.log(format!("{} lost Braced", defender.name));
+            log_lines.push(format!("{} lost Braced", defender.name));
         }
+
+        self.event_handler.handle(GameEvent::Attacked {
+            attacker: attacker.id(),
+            target: defender_id,
+            outcome,
+            detail_lines: log_lines,
+        });
 
         drop(attacker);
         drop(defender);
@@ -627,16 +608,20 @@ impl CoreGame {
         other_character.action_points -= reaction.action_point_cost;
         match reaction.effect {
             OnHitReactionEffect::Rage => {
-                self.log(format!("  {} started Raging", other_character.name));
+                self.event_handler.handle(GameEvent::CharacterReactedToHit {
+                    main_line: format!("{} reacted with Rage", other_character.name),
+                    detail_lines: vec![],
+                });
+
                 other_character.receive_condition(Condition::Raging);
             }
             OnHitReactionEffect::ShieldBash => {
-                self.log(format!("  {} used Shield bash", other_character.name));
+                let mut lines = vec![];
 
                 let target = character.physical_resistence();
                 let roll = roll_d20_with_advantage(0);
                 let res = roll + other_character.strength();
-                self.log(format!(
+                lines.push(format!(
                     "Rolled: {} (+{} str) = {}, vs physical resist={}",
                     roll,
                     other_character.strength(),
@@ -645,23 +630,28 @@ impl CoreGame {
                 ));
                 if res >= target {
                     let stacks = if res < target + 5 {
-                        self.log("  Hit!");
+                        lines.push("Hit!".to_string());
                         1
                     } else if res < target + 10 {
-                        self.log("  Heavy hit!");
+                        lines.push("Heavy hit!".to_string());
                         2
                     } else {
-                        self.log("  Critical hit!");
+                        lines.push("Critical hit!".to_string());
                         3
                     };
-                    self.perform_effect_application(
+                    let log_line = self.perform_effect_application(
                         ApplyEffect::Condition(Condition::Dazed(stacks)),
                         character,
-                        "Shield bash",
                     );
+                    lines.push(format!("{} (Shield bash)", log_line));
                 } else {
-                    self.log("  Miss!");
+                    lines.push("  Miss!".to_string());
                 }
+
+                self.event_handler.handle(GameEvent::CharacterReactedToHit {
+                    main_line: format!("{} reacted with Shield bash", other_character.name),
+                    detail_lines: lines,
+                });
             }
         }
     }
@@ -798,16 +788,22 @@ pub enum GameEvent {
         character: CharacterId,
         amount: u32,
     },
+    CharacterReactedToHit {
+        main_line: String,
+        detail_lines: Vec<String>,
+    },
     Attacked {
         attacker: CharacterId,
         target: CharacterId,
         outcome: AttackOutcome,
+        detail_lines: Vec<String>,
     },
     SpellWasCast {
         caster: CharacterId,
         target: CharacterId,
         outcome: SpellOutcome,
-        spell_type: SpellType,
+        spell: Spell,
+        detail_lines: Vec<String>,
     },
     CharacterReceivedSelfEffect {
         character: CharacterId,
