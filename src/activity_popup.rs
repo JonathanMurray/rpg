@@ -29,7 +29,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, TextureId, ACTION_POINTS_PER_TURN,
+        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
         MOVE_ACTION_COST,
     },
     game_ui::UiState,
@@ -107,8 +107,18 @@ impl ActivityPopup {
             ..Default::default()
         };
 
-        for line in &self.initial_lines {
-            draw_text_ex(line, x0, y0, text_params.clone());
+        for (i, line) in self.initial_lines.iter().enumerate() {
+            let mut params = text_params.clone();
+            if i == 0 {
+                params.font_size = 20;
+                params.color = BLACK;
+                draw_text_ex(line, x0 + 1.0, y0 + 1.0, params.clone());
+                params.color = YELLOW;
+                draw_text_ex(line, x0, y0, params.clone());
+            } else {
+                draw_text_ex(line, x0, y0, params);
+            }
+            
             y0 += 20.0;
         }
 

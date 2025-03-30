@@ -21,7 +21,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", TextureId::Character, 10, 10, 10, (1, 8));
+        let mut bob = Character::new(true, "Bob", SpriteId::Character, 10, 10, 10, (1, 8));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
@@ -33,17 +33,17 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Gremlin", TextureId::Character2, 5, 5, 5, (2, 4));
+        let mut alice = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.off_hand.shield = Some(SMALL_SHIELD);
         alice.armor = Some(LEATHER_ARMOR);
         alice.known_attacked_reactions.push(SIDE_STEP);
 
-        let mut charlie = Character::new(false, "Gremlin", TextureId::Character2, 1, 2, 1, (2, 3));
+        let mut charlie = Character::new(false, "Gremlin", SpriteId::Character2, 1, 2, 1, (2, 3));
         charlie.main_hand.weapon = Some(SWORD);
         charlie.off_hand.shield = Some(SMALL_SHIELD);
 
-        let mut david = Character::new(true, "David", TextureId::Character, 10, 10, 10, (5, 7));
+        let mut david = Character::new(true, "David", SpriteId::Character, 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
 
         let characters = Characters::new(vec![bob, alice, charlie, david]);
@@ -1238,7 +1238,7 @@ pub type CharacterId = u32;
 #[derive(Debug)]
 pub struct Character {
     id: Option<CharacterId>,
-    pub texture: TextureId,
+    pub sprite: SpriteId,
     pub has_died: bool,
     pub player_controlled: bool,
     // TODO i32 instead?
@@ -1268,7 +1268,7 @@ impl Character {
     fn new(
         player_controlled: bool,
         name: &'static str,
-        texture: TextureId,
+        texture: SpriteId,
         str: u32,
         dex: u32,
         int: u32,
@@ -1278,7 +1278,7 @@ impl Character {
         let move_range = 0.8 + dex as f32 * 0.2;
         Self {
             id: None,
-            texture,
+            sprite: texture,
             has_died: false,
             player_controlled,
             position,
@@ -1709,7 +1709,7 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone)]
 pub struct Weapon {
     pub name: &'static str,
-    pub texture_id: Option<TextureId>,
+    pub sprite: Option<SpriteId>,
     pub range: Range,
     pub action_point_cost: u32,
     pub damage: u32,
@@ -1723,7 +1723,7 @@ pub struct Weapon {
 #[derive(Debug, Copy, Clone)]
 pub struct Shield {
     pub name: &'static str,
-    pub texture_id: Option<TextureId>,
+    pub sprite: Option<SpriteId>,
     pub defense: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
 }
@@ -1771,7 +1771,7 @@ impl From<Range> for f32 {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum TextureId {
+pub enum SpriteId {
     Character,
     Character2,
     Warhammer,

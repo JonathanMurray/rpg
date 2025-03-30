@@ -1,10 +1,10 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, usize};
 
 use macroquad::{
     color::Color,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
-    text::{draw_text_ex, Font, TextParams},
+    text::{draw_text_ex, Font, TextParams}, texture::draw_texture,
 };
 
 use std::cell::Cell;
@@ -23,7 +23,7 @@ use macroquad::{
 
 use crate::{core::MovementEnhancement, pathfind::PathfindGrid};
 use crate::{
-    core::{CharacterId, Characters, HandType, Range, TextureId},
+    core::{CharacterId, Characters, HandType, Range, SpriteId},
     drawing::{draw_arrow, draw_dashed_line},
 };
 
@@ -106,7 +106,7 @@ impl Default for MovementRange {
 }
 
 pub struct GameGrid {
-    textures: HashMap<TextureId, Texture2D>,
+    sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: PathfindGrid,
     characters: Characters,
     camera_position: (Cell<f32>, Cell<f32>),
@@ -132,20 +132,24 @@ pub struct GameGrid {
 
     cell_w: f32,
     size: (f32, f32),
+    background_textures: Vec<Texture2D>,
+    cell_backgrounds: Vec<usize>,
 }
 
 impl GameGrid {
     pub fn new(
         characters: &Characters,
-        textures: HashMap<TextureId, Texture2D>,
+        sprites: HashMap<SpriteId, Texture2D>,
         size: (f32, f32),
         font: Font,
+        background_textures: Vec<Texture2D>,
+        grid_dimensions: (i32, i32),
+        cell_backgrounds: Vec<usize>
     ) -> Self {
         let characters = characters.clone();
 
-        let grid_dimensions = (16, 12);
         Self {
-            textures,
+            sprites,
             pathfind_grid: PathfindGrid::new(grid_dimensions),
             dragging_camera_from: None,
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
@@ -164,6 +168,8 @@ impl GameGrid {
             character_motion: None,
             size,
             font,
+            background_textures,
+            cell_backgrounds
         }
     }
 
@@ -386,25 +392,24 @@ impl GameGrid {
         )
     }
 
-    fn draw_cell_outline(&self, (grid_x, grid_y): (i32, i32), color: Color) {
-        let margin = -1.0;
+    fn draw_cell_outline(&self, (grid_x, grid_y): (i32, i32), color: Color, margin: f32) {
         draw_rectangle_lines(
-            self.grid_x_to_screen(grid_x) - margin,
-            self.grid_y_to_screen(grid_y) - margin,
-            self.cell_w + margin * 2.0,
-            self.cell_w + margin * 2.0,
+            self.grid_x_to_screen(grid_x) + margin,
+            self.grid_y_to_screen(grid_y) + margin,
+            self.cell_w - margin * 2.0,
+            self.cell_w - margin * 2.0,
             2.0,
             color,
         )
     }
 
     fn fill_cell(&self, (grid_x, grid_y): (i32, i32), color: Color) {
-        let margin = -1.0;
+        let margin = 2.0;
         draw_rectangle(
-            self.grid_x_to_screen(grid_x) - margin,
-            self.grid_y_to_screen(grid_y) - margin,
-            self.cell_w + margin * 2.0,
-            self.cell_w + margin * 2.0,
+            self.grid_x_to_screen(grid_x) + margin,
+            self.grid_y_to_screen(grid_y) + margin,
+            self.cell_w - margin * 2.0,
+            self.cell_w - margin * 2.0,
             color,
         )
     }
@@ -472,6 +477,15 @@ impl GameGrid {
                     1.0,
                     GRID_COLOR,
                 );
+
+                if col < self.grid_dimensions.0 && row <self.grid_dimensions.1 {
+                    let params = DrawTextureParams { dest_size: Some(Vec2::new(64.0, 64.0)), ..Default::default() };
+                    let i = self.cell_backgrounds[(row * self.grid_dimensions.0 + col) as usize];
+                    let texture = &self.background_textures[i];
+                    draw_texture_ex(texture, x0, y0, WHITE, params);
+                }
+
+
             }
         }
 
@@ -493,17 +507,17 @@ impl GameGrid {
 
             let (x, y) = self.character_screen_pos(ch.id(), position);
 
-            draw_texture_ex(&self.textures[&ch.texture], x, y, WHITE, params.clone());
+            draw_texture_ex(&self.sprites[&ch.sprite], x, y, WHITE, params.clone());
 
             if let Some(weapon) = ch.weapon(HandType::MainHand) {
-                if let Some(texture) = weapon.texture_id {
-                    draw_texture_ex(&self.textures[&texture], x, y, WHITE, params.clone());
+                if let Some(texture) = weapon.sprite {
+                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params.clone());
                 }
             }
 
             if let Some(shield) = ch.shield() {
-                if let Some(texture) = shield.texture_id {
-                    draw_texture_ex(&self.textures[&texture], x, y, WHITE, params);
+                if let Some(texture) = shield.sprite {
+                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params);
                 }
             }
         }
@@ -532,7 +546,7 @@ impl GameGrid {
 
         if is_mouse_within_grid && receptive_to_input {
             if let Some(dragging_from) = self.dragging_camera_from {
-                if is_mouse_button_down(MouseButton::Right) {
+                if is_mouse_button_down(MouseButton::Right) || is_mouse_button_down(MouseButton::Middle){
                     let (dx, dy) = (
                         mouse_relative.0 - dragging_from.0,
                         mouse_relative.1 - dragging_from.1,
@@ -544,7 +558,9 @@ impl GameGrid {
                 }
             }
 
-            if is_mouse_button_pressed(MouseButton::Right) {
+            
+
+            if is_mouse_button_pressed(MouseButton::Right) || is_mouse_button_down(MouseButton::Middle){
                 self.dragging_camera_from = Some(mouse_relative);
             }
         }
@@ -586,23 +602,26 @@ impl GameGrid {
             }
 
             if let Some(move_route) = valid_move_route {
-                let destination = (mouse_grid_x, mouse_grid_y);
+                if self.dragging_camera_from.is_none() {
+                    let destination = (mouse_grid_x, mouse_grid_y);
 
-                let path = self.build_path_from_route(active_char_pos, destination);
-
-                self.draw_movement_path_arrow(&path, HOVER_MOVEMENT_ARROW_COLOR);
-                self.draw_cell_outline(destination, HOVER_VALID_MOVEMENT_COLOR);
-
-                if is_mouse_button_pressed(MouseButton::Left) {
-                    self.movement_range.selected_i = self
-                        .movement_range
-                        .shortest_encompassing(move_route.distance_from_start);
-                    outcome.switched_to_move_i = Some(self.movement_range.selected_i);
-
-                    self.movement_preview = Some(path);
+                    let path = self.build_path_from_route(active_char_pos, destination);
+    
+                    self.draw_movement_path_arrow(&path, HOVER_MOVEMENT_ARROW_COLOR);
+                    self.draw_cell_outline(destination, HOVER_VALID_MOVEMENT_COLOR, 5.0);
+    
+                    if is_mouse_button_pressed(MouseButton::Left) {
+                        self.movement_range.selected_i = self
+                            .movement_range
+                            .shortest_encompassing(move_route.distance_from_start);
+                        outcome.switched_to_move_i = Some(self.movement_range.selected_i);
+    
+                        self.movement_preview = Some(path);
+                    }
                 }
+                
             } else if let Some(id) = hovered_npc_id {
-                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_NPC_COLOR);
+                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_NPC_COLOR, 1.0);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     match self.target {
                         Target::Some(_) => {}
@@ -616,7 +635,7 @@ impl GameGrid {
                     outcome.switched_to_idle = true;
                 }
             } else if self.movement_preview.is_some() && self.dragging_camera_from.is_none() {
-                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_INVALID_MOVEMENT_COLOR);
+                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_INVALID_MOVEMENT_COLOR, 5.0);
             }
         }
 
@@ -736,7 +755,7 @@ impl GameGrid {
         if let Target::Some(target_character_i) = self.target {
             let actor_pos = self.characters.get(self.active_character_id).position_i32();
             let target_pos = self.characters.get(target_character_i).position_i32();
-            self.draw_cell_outline(target_pos, TARGET_NPC_COLOR);
+            self.draw_cell_outline(target_pos, TARGET_NPC_COLOR, 1.0);
             draw_circle_lines(
                 self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
                 self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,

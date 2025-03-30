@@ -1,3 +1,4 @@
+use std::io::empty;
 use std::{collections::HashMap, rc::Rc};
 
 use macroquad::miniquad::window::set_window_position;
@@ -14,7 +15,7 @@ use macroquad::{
 
 use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
-use rpg::core::{CoreGame, GameState, IconId, StateChooseReaction, TextureId};
+use rpg::core::{CoreGame, GameState, IconId, StateChooseReaction, SpriteId};
 
 use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
 
@@ -24,8 +25,8 @@ async fn texture(path: &str) -> Texture2D {
     texture
 }
 
-async fn load_textures(paths: Vec<(TextureId, &str)>) -> HashMap<TextureId, Texture2D> {
-    let mut textures: HashMap<TextureId, Texture2D> = Default::default();
+async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {
+    let mut textures: HashMap<SpriteId, Texture2D> = Default::default();
     for (id, path) in paths {
         textures.insert(id, texture(path).await);
     }
@@ -58,13 +59,13 @@ async fn main() {
     let event_handler = Rc::new(UiGameEventHandler::new());
     let game = CoreGame::new(event_handler.clone());
 
-    let textures = load_textures(vec![
-        (TextureId::Character, "character.png"),
-        (TextureId::Character2, "character2.png"),
-        (TextureId::Warhammer, "warhammer.png"),
-        (TextureId::Bow, "bow.png"),
-        (TextureId::Sword, "sword.png"),
-        (TextureId::Shield, "shield.png"),
+    let sprites = load_sprites(vec![
+        (SpriteId::Character, "character.png"),
+        (SpriteId::Character2, "character2.png"),
+        (SpriteId::Warhammer, "warhammer.png"),
+        (SpriteId::Bow, "bow.png"),
+        (SpriteId::Sword, "sword.png"),
+        (SpriteId::Shield, "shield.png"),
     ])
     .await;
 
@@ -103,7 +104,16 @@ async fn main() {
 
     let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
 
-    let mut user_interface = UserInterface::new(&game, textures, icons, font, decorative_font);
+    let empty_grass = texture("grass3.png").await;
+    let background_textures = vec![
+        texture("grass1.png").await,
+        texture("grass2.png").await,
+        empty_grass.clone(),
+        empty_grass.clone(),
+        empty_grass.clone(),
+    ];
+
+    let mut user_interface = UserInterface::new(&game, sprites, icons, font, decorative_font, background_textures);
 
     let mut game_state = game.begin();
 

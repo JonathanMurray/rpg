@@ -5,6 +5,8 @@ use std::{
     rc::Rc,
 };
 
+use macroquad::rand;
+
 use indexmap::IndexMap;
 use macroquad::{
     color::{
@@ -30,7 +32,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, TextureId, ACTION_POINTS_PER_TURN,
+        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
         MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
@@ -119,10 +121,11 @@ pub struct UserInterface {
 impl UserInterface {
     pub fn new(
         game: &CoreGame,
-        textures: HashMap<TextureId, Texture2D>,
+        sprites: HashMap<SpriteId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
         simple_font: Font,
         decorative_font: Font,
+        background_textures: Vec<Texture2D>
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -387,11 +390,22 @@ impl UserInterface {
 
         let state = UiState::Idle;
 
+
+
+        let grid_dimensions = (16, 12);
+        let mut cell_backgrounds = vec![];
+        for _ in 0..(grid_dimensions.0 * grid_dimensions.1) {
+            let i = rand::gen_range(0, background_textures.len());
+            cell_backgrounds.push(i);
+        }
         let game_grid = GameGrid::new(
             &game.characters,
-            textures,
+            sprites,
             (screen_width(), Y_USER_INTERFACE),
             simple_font.clone(),
+            background_textures,
+            grid_dimensions,
+            cell_backgrounds
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);

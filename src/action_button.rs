@@ -28,7 +28,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, TextureId, ACTION_POINTS_PER_TURN,
+        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
         MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
@@ -432,12 +432,16 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[St
     };
 
     let mut line_y = button_position.1 - lines.len() as f32 * line_h + text_margin - 5.0;
-    for line in lines {
+    for (i, line) in lines.iter().enumerate() {
+        let mut params = text_params.clone();
+        if i == 0 {
+            params.color = YELLOW;
+        }
         draw_text_ex(
             line,
             button_position.0 + text_margin,
             line_y,
-            text_params.clone(),
+            params,
         );
         line_y += line_h;
     }
