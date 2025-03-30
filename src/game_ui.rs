@@ -1371,7 +1371,7 @@ impl UserInterface {
 
         self.activity_popup.target_line = None;
         self.game_grid.static_text = None;
-        self.game_grid.range_indicator = None;
+        self.game_grid.out_of_range_indicator = None;
 
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
@@ -1404,7 +1404,7 @@ impl UserInterface {
                         }
                     } else {
                         let range = self.active_character().weapon(hand).unwrap().range;
-                        self.game_grid.range_indicator = Some(range);
+                        self.game_grid.out_of_range_indicator = Some(range);
 
                         self.activity_popup.target_line =
                             Some(format!("[{}] Out of range!", target_char.name));
@@ -1435,7 +1435,7 @@ impl UserInterface {
                         popup_enabled = true;
                     } else {
                         let range = spell.range;
-                        self.game_grid.range_indicator = Some(range);
+                        self.game_grid.out_of_range_indicator = Some(range);
                         self.activity_popup.target_line =
                             Some(format!("[{}] Out of range!", target_char.name));
                     }
