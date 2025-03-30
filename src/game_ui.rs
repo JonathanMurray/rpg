@@ -397,7 +397,16 @@ impl UserInterface {
             let i = rand::gen_range(0, background_textures.len());
             cell_backgrounds.push(i);
         }
+
+        let first_player_character_id = game
+            .characters
+            .iter_with_ids()
+            .find(|(_id, ch)| ch.borrow().player_controlled)
+            .unwrap()
+            .0;
+
         let game_grid = GameGrid::new(
+            first_player_character_id,
             &game.characters,
             sprites,
             (screen_width(), Y_USER_INTERFACE),
@@ -408,13 +417,6 @@ impl UserInterface {
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
-
-        let first_player_character_id = game
-            .characters
-            .iter_with_ids()
-            .find(|(_id, ch)| ch.borrow().player_controlled)
-            .unwrap()
-            .0;
 
         let player_portraits = PlayerPortraits::new(
             &game.characters,
@@ -1068,8 +1070,12 @@ impl UserInterface {
 
         self.active_character_id = active_character_id;
 
-        self.game_grid
-            .update(active_character_id, &self.characters, elapsed);
+        self.game_grid.update(
+            active_character_id,
+            self.player_portraits.selected_i.get(),
+            &self.characters,
+            elapsed,
+        );
 
         let popup_outcome = self.activity_popup.update();
 
@@ -1693,7 +1699,7 @@ impl Drawable for PlayerCharacterPortrait {
         let (w, h) = self.size();
         draw_rectangle(x, y, w, h, DARKGRAY);
         if self.shown_character.get() {
-            draw_rectangle_lines(x, y, w, h, 1.0, GOLD);
+            draw_rectangle_lines(x, y, w, h, 1.0, WHITE);
         } else {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }

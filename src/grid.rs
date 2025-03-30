@@ -1,7 +1,7 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::{Color, BLACK},
+    color::{Color, BLACK, PINK},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
@@ -38,7 +38,8 @@ const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
 const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 const HOVER_NPC_COLOR: Color = Color::new(0.8, 0.2, 0.8, 1.0);
 const TARGET_NPC_COLOR: Color = Color::new(1.0, 0.0, 1.0, 1.0);
-const ACTIVE_CHARACTER_COLOR: Color = GOLD;
+const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
+const SELECTED_CHARACTER_COLOR: Color = WHITE;
 const MOVE_RANGE_COLOR: Color = GREEN;
 const OUT_OF_RANGE_COLOR: Color = RED;
 const TARGET_CROSSHAIR_COLOR: Color = WHITE;
@@ -116,6 +117,7 @@ pub struct GameGrid {
     effects: Vec<ConcreteEffect>,
     pub static_text: Option<((i32, i32), Vec<String>)>,
 
+    selected_character_id: CharacterId,
     active_character_id: CharacterId,
     pub out_of_range_indicator: Option<Range>,
 
@@ -139,6 +141,7 @@ pub struct GameGrid {
 
 impl GameGrid {
     pub fn new(
+        selected_character_id: CharacterId,
         characters: &Characters,
         sprites: HashMap<SpriteId, Texture2D>,
         size: (f32, f32),
@@ -157,6 +160,7 @@ impl GameGrid {
             characters,
             effects: vec![],
             static_text: None,
+            selected_character_id,
             active_character_id: 0,
             movement_range: MovementRange::default(),
             movement_preview: Default::default(),
@@ -198,12 +202,15 @@ impl GameGrid {
     pub fn update(
         &mut self,
         active_character_id: CharacterId,
+        selected_character_id: CharacterId,
         characters: &Characters,
         elapsed: f32,
     ) {
         self.pathfind_grid.blocked_positions.clear();
 
         self.active_character_id = active_character_id;
+        self.selected_character_id = selected_character_id;
+
         for character in characters.iter() {
             let character = character.borrow();
             let pos = character.position_i32();
@@ -317,7 +324,6 @@ impl GameGrid {
     }
 
     pub fn set_selected_movement_percentage(&mut self, enhancement_added_percentage: u32) {
-        println!("set selected move perc: {}", enhancement_added_percentage);
         self.movement_range
             .set_selected_percentage(enhancement_added_percentage);
         self.ensure_movement_preview_is_within_selected_move_range();
@@ -497,6 +503,8 @@ impl GameGrid {
             self.draw_out_of_range_indicator(active_char_pos, range);
         }
 
+        self.draw_active_character_outline();
+
         for ch in self.characters.iter() {
             let ch = ch.borrow();
 
@@ -646,6 +654,8 @@ impl GameGrid {
             }
         }
 
+        self.draw_selected_character_outline();
+
         if let Some(movement_preview) = &self.movement_preview {
             if !movement_preview.is_empty() {
                 let destination = movement_preview[0].1;
@@ -662,8 +672,6 @@ impl GameGrid {
 
         self.draw_target_crosshair();
 
-        self.draw_active_character_outline();
-
         self.draw_effects();
 
         self.draw_static_text();
@@ -674,15 +682,39 @@ impl GameGrid {
     fn draw_active_character_outline(&self) {
         let active_char_pos = self.characters.get(self.active_character_id).position_i32();
         let (x, y) = self.character_screen_pos(self.active_character_id, active_char_pos);
-        let margin = 2.0;
-        draw_rectangle_lines(
-            x - margin,
-            y - margin,
-            self.cell_w + margin * 2.0,
-            self.cell_w + margin * 2.0,
-            2.0,
+        let margin = 3.0;
+        draw_rectangle(
+            x + margin,
+            y + margin,
+            self.cell_w - margin * 2.0,
+            self.cell_w - margin * 2.0,
             ACTIVE_CHARACTER_COLOR,
         );
+    }
+
+    fn draw_selected_character_outline(&self) {
+        let selected_char_pos = self
+            .characters
+            .get(self.selected_character_id)
+            .position_i32();
+        let (x, y) = self.character_screen_pos(self.selected_character_id, selected_char_pos);
+        let margin = 1.0;
+
+        let left = x - margin;
+        let top = y - margin;
+        let right = x + self.cell_w + margin;
+        let bot = y + self.cell_w + margin;
+        let len = 15.0;
+        let thickness = 2.0;
+        let color = SELECTED_CHARACTER_COLOR;
+        draw_line(left, top, left, top + len, thickness, color);
+        draw_line(left, top, left + len, top, thickness, color);
+        draw_line(right - len, top, right, top, thickness, color);
+        draw_line(right, top, right, top + len, thickness, color);
+        draw_line(right, bot - len, right, bot, thickness, color);
+        draw_line(right - len, bot, right, bot, thickness, color);
+        draw_line(left, bot, left + len, bot, thickness, color);
+        draw_line(left, bot, left, bot - len, thickness, color);
     }
 
     fn draw_effects(&self) {
