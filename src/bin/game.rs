@@ -15,7 +15,7 @@ use macroquad::{
 
 use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
-use rpg::core::{CoreGame, GameState, IconId, StateChooseReaction, SpriteId};
+use rpg::core::{CoreGame, GameState, IconId, SpriteId, StateChooseReaction};
 
 use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
 
@@ -93,7 +93,6 @@ async fn main() {
     //let font_path = "manaspace/manaspc.ttf";
     //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
     //let font_path = "pixy/PIXY.ttf"; // <-- only uppercase, looks a bit too sci-fi?
-    //let font_path = "dpcomic/dpcomic.ttf"; // <-- beautiful but big/bold, could be used for titles and stuff?
     //let font_path = "return-of-ganon/retganon.ttf";
     //let font_path = "press-start/prstart.ttf";
     //let font_path = "lunchtime-doubly-so/lunchds.ttf";
@@ -101,6 +100,8 @@ async fn main() {
     let font_path = "pixelon/Pixelon.ttf";
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
+
+    let grid_font = load_font("manaspace/manaspc.ttf").await;
 
     let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
 
@@ -113,7 +114,15 @@ async fn main() {
         empty_grass.clone(),
     ];
 
-    let mut user_interface = UserInterface::new(&game, sprites, icons, font, decorative_font, background_textures);
+    let mut user_interface = UserInterface::new(
+        &game,
+        sprites,
+        icons,
+        font,
+        decorative_font,
+        grid_font,
+        background_textures,
+    );
 
     let mut game_state = game.begin();
 

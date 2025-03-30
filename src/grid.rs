@@ -1,10 +1,11 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::Color,
+    color::{Color, BLACK},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
-    text::{draw_text_ex, Font, TextParams}, texture::draw_texture,
+    text::{draw_text_ex, Font, TextParams},
+    texture::draw_texture,
 };
 
 use std::cell::Cell;
@@ -144,7 +145,7 @@ impl GameGrid {
         font: Font,
         background_textures: Vec<Texture2D>,
         grid_dimensions: (i32, i32),
-        cell_backgrounds: Vec<usize>
+        cell_backgrounds: Vec<usize>,
     ) -> Self {
         let characters = characters.clone();
 
@@ -169,7 +170,7 @@ impl GameGrid {
             size,
             font,
             background_textures,
-            cell_backgrounds
+            cell_backgrounds,
         }
     }
 
@@ -478,14 +479,15 @@ impl GameGrid {
                     GRID_COLOR,
                 );
 
-                if col < self.grid_dimensions.0 && row <self.grid_dimensions.1 {
-                    let params = DrawTextureParams { dest_size: Some(Vec2::new(64.0, 64.0)), ..Default::default() };
+                if col < self.grid_dimensions.0 && row < self.grid_dimensions.1 {
+                    let params = DrawTextureParams {
+                        dest_size: Some(Vec2::new(64.0, 64.0)),
+                        ..Default::default()
+                    };
                     let i = self.cell_backgrounds[(row * self.grid_dimensions.0 + col) as usize];
                     let texture = &self.background_textures[i];
                     draw_texture_ex(texture, x0, y0, WHITE, params);
                 }
-
-
             }
         }
 
@@ -546,7 +548,9 @@ impl GameGrid {
 
         if is_mouse_within_grid && receptive_to_input {
             if let Some(dragging_from) = self.dragging_camera_from {
-                if is_mouse_button_down(MouseButton::Right) || is_mouse_button_down(MouseButton::Middle){
+                if is_mouse_button_down(MouseButton::Right)
+                    || is_mouse_button_down(MouseButton::Middle)
+                {
                     let (dx, dy) = (
                         mouse_relative.0 - dragging_from.0,
                         mouse_relative.1 - dragging_from.1,
@@ -558,9 +562,9 @@ impl GameGrid {
                 }
             }
 
-            
-
-            if is_mouse_button_pressed(MouseButton::Right) || is_mouse_button_down(MouseButton::Middle){
+            if is_mouse_button_pressed(MouseButton::Right)
+                || is_mouse_button_down(MouseButton::Middle)
+            {
                 self.dragging_camera_from = Some(mouse_relative);
             }
         }
@@ -606,20 +610,19 @@ impl GameGrid {
                     let destination = (mouse_grid_x, mouse_grid_y);
 
                     let path = self.build_path_from_route(active_char_pos, destination);
-    
+
                     self.draw_movement_path_arrow(&path, HOVER_MOVEMENT_ARROW_COLOR);
                     self.draw_cell_outline(destination, HOVER_VALID_MOVEMENT_COLOR, 5.0);
-    
+
                     if is_mouse_button_pressed(MouseButton::Left) {
                         self.movement_range.selected_i = self
                             .movement_range
                             .shortest_encompassing(move_route.distance_from_start);
                         outcome.switched_to_move_i = Some(self.movement_range.selected_i);
-    
+
                         self.movement_preview = Some(path);
                     }
                 }
-                
             } else if let Some(id) = hovered_npc_id {
                 self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_NPC_COLOR, 1.0);
                 if is_mouse_button_pressed(MouseButton::Left) {
@@ -635,7 +638,11 @@ impl GameGrid {
                     outcome.switched_to_idle = true;
                 }
             } else if self.movement_preview.is_some() && self.dragging_camera_from.is_none() {
-                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_INVALID_MOVEMENT_COLOR, 5.0);
+                self.draw_cell_outline(
+                    (mouse_grid_x, mouse_grid_y),
+                    HOVER_INVALID_MOVEMENT_COLOR,
+                    5.0,
+                );
             }
         }
 
@@ -799,7 +806,7 @@ impl GameGrid {
 
     fn draw_static_text(&self) {
         if let Some((position, lines)) = &self.static_text {
-            self.draw_static_text_lines(*position, lines, 8.0, -10.0);
+            self.draw_static_text_lines(*position, lines, 8.0, 0.0);
         }
     }
 
@@ -814,7 +821,7 @@ impl GameGrid {
             self.grid_x_to_screen(position.0),
             self.grid_y_to_screen(position.1) + y_offset,
         );
-        let font_size = 20;
+        let font_size = 16;
         let params = TextParams {
             font: Some(&self.font),
             font_size,
@@ -822,14 +829,15 @@ impl GameGrid {
             ..Default::default()
         };
         let (mut w, mut h) = (0.0, 0.0);
+        let line_margin = 5.0;
         for line in lines {
             let text_dimensions = measure_text(&line, Some(&self.font), font_size, 1.0);
             if text_dimensions.width > w {
                 w = text_dimensions.width;
             }
             if text_dimensions.height.is_finite() {
-                h += text_dimensions.height;
-                y -= text_dimensions.height;
+                h += text_dimensions.height + line_margin;
+                y -= text_dimensions.height + line_margin;
             }
         }
         draw_rectangle(
@@ -837,10 +845,14 @@ impl GameGrid {
             y - pad,
             w + pad * 2.0,
             h + pad * 2.0,
-            Color::new(0.0, 0.0, 0.0, 0.5),
+            Color::new(0.0, 0.0, 0.0, 0.7),
         );
-        for (i, line) in lines.iter().enumerate() {
-            draw_text_ex(&line, x + pad, y + 10.0 + 20.0 * i as f32, params.clone());
+
+        y += pad;
+        y += 5.0;
+        for line in lines.iter() {
+            let dimensions = draw_text_ex(&line, x + pad, y, params.clone());
+            y += dimensions.height + line_margin;
         }
     }
 
@@ -1142,18 +1154,20 @@ impl EffectGraphics {
                 }
             }
             EffectGraphics::Text(text, font) => {
-                let font_size = 24;
+                let font_size = 20;
                 let text_dimensions = measure_text(text, None, font_size, 1.0);
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
                 let y0 = y - cell_w * 0.3 * t;
 
-                let text_params = TextParams {
+                let mut text_params = TextParams {
                     font: Some(font),
                     font_size,
-                    color: YELLOW,
+                    color: BLACK,
                     ..Default::default()
                 };
+                draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
+                text_params.color = YELLOW;
                 draw_text_ex(text, x0, y0, text_params);
             }
         }

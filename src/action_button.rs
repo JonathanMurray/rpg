@@ -285,7 +285,7 @@ impl Drawable for ActionButton {
                         event_sender.send(InternalUiEvent::ButtonClicked(self.id, self.action));
                     }
                 }
-                draw_rectangle_lines(x, y, w, h, 1.0, self.hover_border_color);
+                draw_rectangle_lines(x, y, w, h, 2.0, self.hover_border_color);
             }
         } else {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.3));
@@ -299,7 +299,7 @@ impl Drawable for ActionButton {
         draw_texture_ex(&self.icon, x + 2.0, y + 2.0, WHITE, params);
 
         if self.highlighted.get() {
-            draw_rectangle_lines(x, y, w, h, 2.0, GREEN);
+            draw_rectangle_lines(x, y, w, h, 3.0, GREEN);
         }
 
         let margin = 4.0;
@@ -437,12 +437,7 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[St
         if i == 0 {
             params.color = YELLOW;
         }
-        draw_text_ex(
-            line,
-            button_position.0 + text_margin,
-            line_y,
-            params,
-        );
+        draw_text_ex(line, button_position.0 + text_margin, line_y, params);
         line_y += line_h;
     }
 }

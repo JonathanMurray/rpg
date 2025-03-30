@@ -90,14 +90,14 @@ impl ActivityPopup {
         }
 
         let x0 = x + 10.0;
-        let mut y0 = y + 20.0;
+        let mut y0 = y + 25.0;
 
-        let bg_color = DARKGRAY;
+        let bg_color = Color::new(0.2, 0.2, 0.2, 1.0);
         let border_color = LIGHTGRAY;
 
         let size = (500.0, 85.0);
         draw_rectangle(x, y, size.0, size.1, bg_color);
-        draw_rectangle_lines(x, y, size.0, size.1, 1.0, border_color);
+        draw_rectangle_lines(x, y, size.0, size.1, 2.0, border_color);
         self.last_drawn_size = size;
 
         let text_params = TextParams {
@@ -110,15 +110,15 @@ impl ActivityPopup {
         for (i, line) in self.initial_lines.iter().enumerate() {
             let mut params = text_params.clone();
             if i == 0 {
-                params.font_size = 20;
+                params.font_size = 22;
                 params.color = BLACK;
-                draw_text_ex(line, x0 + 1.0, y0 + 1.0, params.clone());
+                draw_text_ex(line, x0 + 2.0, y0 + 2.0, params.clone());
                 params.color = YELLOW;
                 draw_text_ex(line, x0, y0, params.clone());
             } else {
                 draw_text_ex(line, x0, y0, params);
             }
-            
+
             y0 += 20.0;
         }
 
@@ -162,14 +162,8 @@ impl ActivityPopup {
                         BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
                     };
                 }
-                UiState::ReactingToAttack { .. } => {
-                    draw_text_ex("Reaction:", x0, y0, text_params.clone());
-                    y0 += 20.0;
-                }
-                UiState::ReactingToHit { .. } => {
-                    draw_text_ex("Reaction:", x0, y0, text_params.clone());
-                    y0 += 20.0;
-                }
+                UiState::ReactingToAttack { .. } => {}
+                UiState::ReactingToHit { .. } => {}
                 UiState::Idle | UiState::ChoosingAction => unreachable!(),
             }
         }

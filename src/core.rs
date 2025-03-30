@@ -21,12 +21,12 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", SpriteId::Character, 10, 10, 10, (1, 8));
+        let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 3, (1, 3));
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
-        //bob.known_attacked_reactions.push(SIDE_STEP);
+        bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -50,7 +50,7 @@ impl CoreGame {
 
         Self {
             characters,
-            active_character_id: 0,
+            active_character_id: 1,
             event_handler,
         }
     }
@@ -90,22 +90,16 @@ impl CoreGame {
                         attacker.receive_condition(condition);
                     }
                 }
-                let enhancements_str = if !enhancements.is_empty() {
-                    let names: Vec<String> = enhancements
-                        .iter()
-                        .map(|enhancement| enhancement.name.to_string())
-                        .collect();
-                    format!(" ({})", names.join(", "))
-                } else {
-                    "".to_string()
-                };
 
                 let is_within_melee = within_meele(attacker.position, defender.position);
+                let defender_can_react_to_attack =
+                    !defender.usable_on_attacked_reactions().is_empty() && is_within_melee;
 
                 drop(attacker);
                 drop(defender);
-                return if is_within_melee {
+                return if defender_can_react_to_attack {
                     let attacking_character_i = self.active_character_id;
+
                     transition_to(GameState::AwaitingChooseReaction(
                         StateChooseReaction::Attack(StateChooseAttackReaction {
                             game: self,
@@ -602,33 +596,39 @@ impl CoreGame {
     fn perform_on_hit_reaction(
         &self,
         character: &mut Character,
-        other_character: &mut Character,
+        reactor: &mut Character,
         reaction: OnHitReaction,
     ) {
-        other_character.action_points -= reaction.action_point_cost;
+        reactor.action_points -= reaction.action_point_cost;
         match reaction.effect {
             OnHitReactionEffect::Rage => {
+                let condition = Condition::Raging;
                 self.event_handler.handle(GameEvent::CharacterReactedToHit {
-                    main_line: format!("{} reacted with Rage", other_character.name),
+                    main_line: format!("{} reacted with Rage", reactor.name),
                     detail_lines: vec![],
+                    reactor: reactor.id(),
+                    outcome: HitReactionOutcome {
+                        received_condition: Some(condition),
+                        offensive: None,
+                    },
                 });
 
-                other_character.receive_condition(Condition::Raging);
+                reactor.receive_condition(condition);
             }
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
 
                 let target = character.physical_resistence();
                 let roll = roll_d20_with_advantage(0);
-                let res = roll + other_character.strength();
+                let res = roll + reactor.strength();
                 lines.push(format!(
                     "Rolled: {} (+{} str) = {}, vs physical resist={}",
                     roll,
-                    other_character.strength(),
+                    reactor.strength(),
                     res,
                     target,
                 ));
-                if res >= target {
+                let condition = if res >= target {
                     let stacks = if res < target + 5 {
                         lines.push("Hit!".to_string());
                         1
@@ -639,18 +639,32 @@ impl CoreGame {
                         lines.push("Critical hit!".to_string());
                         3
                     };
-                    let log_line = self.perform_effect_application(
-                        ApplyEffect::Condition(Condition::Dazed(stacks)),
-                        character,
-                    );
+
+                    Some(Condition::Dazed(stacks))
+                } else {
+                    None
+                };
+
+                if let Some(condition) = condition {
+                    let log_line = self
+                        .perform_effect_application(ApplyEffect::Condition(condition), character);
                     lines.push(format!("{} (Shield bash)", log_line));
                 } else {
                     lines.push("  Miss!".to_string());
                 }
 
+                let offensive = OffensiveHitReactionOutcome {
+                    inflicted_condition: condition,
+                };
+
                 self.event_handler.handle(GameEvent::CharacterReactedToHit {
-                    main_line: format!("{} reacted with Shield bash", other_character.name),
+                    main_line: format!("{} reacted with Shield bash", reactor.name),
                     detail_lines: lines,
+                    reactor: reactor.id(),
+                    outcome: HitReactionOutcome {
+                        received_condition: None,
+                        offensive: Some(offensive),
+                    },
                 });
             }
         }
@@ -791,6 +805,8 @@ pub enum GameEvent {
     CharacterReactedToHit {
         main_line: String,
         detail_lines: Vec<String>,
+        reactor: CharacterId,
+        outcome: HitReactionOutcome,
     },
     Attacked {
         attacker: CharacterId,
@@ -820,6 +836,17 @@ pub enum AttackOutcome {
     Dodge,
     Parry,
     Miss,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct HitReactionOutcome {
+    pub received_condition: Option<Condition>,
+    pub offensive: Option<OffensiveHitReactionOutcome>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct OffensiveHitReactionOutcome {
+    pub inflicted_condition: Option<Condition>,
 }
 
 #[derive(Debug, Copy, Clone)]

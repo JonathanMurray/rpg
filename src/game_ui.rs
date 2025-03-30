@@ -125,7 +125,8 @@ impl UserInterface {
         icons: HashMap<IconId, Texture2D>,
         simple_font: Font,
         decorative_font: Font,
-        background_textures: Vec<Texture2D>
+        grid_font: Font,
+        background_textures: Vec<Texture2D>,
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -390,8 +391,6 @@ impl UserInterface {
 
         let state = UiState::Idle;
 
-
-
         let grid_dimensions = (16, 12);
         let mut cell_backgrounds = vec![];
         for _ in 0..(grid_dimensions.0 * grid_dimensions.1) {
@@ -402,10 +401,10 @@ impl UserInterface {
             &game.characters,
             sprites,
             (screen_width(), Y_USER_INTERFACE),
-            simple_font.clone(),
+            grid_font.clone(),
             background_textures,
             grid_dimensions,
-            cell_backgrounds
+            cell_backgrounds,
         );
 
         let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
@@ -420,7 +419,8 @@ impl UserInterface {
         let player_portraits = PlayerPortraits::new(
             &game.characters,
             first_player_character_id,
-            simple_font.clone(),
+            active_character_id,
+            decorative_font.clone(),
         );
 
         let character_portraits = CharacterPortraits::new(
@@ -656,6 +656,7 @@ impl UserInterface {
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
 
+                popup_initial_lines.push("React".to_string());
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
@@ -694,11 +695,12 @@ impl UserInterface {
                 self.set_allowed_to_use_action_buttons(false);
 
                 let victim = self.characters.get(victim_id);
+                popup_initial_lines.push("React".to_string());
                 popup_initial_lines.push(format!(
-                    "{} took {} damage from an attack by {}",
+                    "{} attacked {} for {} damage",
+                    self.characters.get(attacker_id).name,
                     victim.name,
                     damage,
-                    self.characters.get(attacker_id).name
                 ));
                 let reactions = victim.usable_on_hit_reactions();
                 drop(victim);
@@ -771,8 +773,37 @@ impl UserInterface {
             GameEvent::CharacterReactedToHit {
                 main_line,
                 detail_lines,
+                reactor,
+                outcome,
             } => {
                 self.log.add_with_details(main_line, detail_lines);
+
+                let reactor_pos = self.characters.get(reactor).position_i32();
+
+                if let Some(condition) = outcome.received_condition {
+                    self.game_grid.add_text_effect(
+                        reactor_pos,
+                        0.0,
+                        1.0,
+                        format!("{:?}", condition),
+                    );
+                }
+
+                let attacker_pos = self.active_character().position_i32();
+                if let Some(offensive) = outcome.offensive {
+                    if let Some(condition) = offensive.inflicted_condition {
+                        self.game_grid.add_text_effect(
+                            attacker_pos,
+                            0.0,
+                            1.0,
+                            format!("{:?}", condition),
+                        );
+                    } else {
+                        self.game_grid
+                            .add_text_effect(attacker_pos, 0.0, 1.0, "Miss".to_string());
+                    }
+                }
+                self.stopwatch.set_to_at_least(0.5);
             }
 
             GameEvent::Attacked {
@@ -1138,12 +1169,17 @@ impl UserInterface {
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
                 popup_enabled = self.game_grid.has_non_empty_movement_preview();
             }
+            UiState::ChoosingAction => {
+                let active_char_pos = self.active_character().position_i32();
+                self.game_grid.static_text = Some((active_char_pos, vec!["Your turn".to_string()]));
+            }
             _ => {}
         }
 
         self.activity_popup.set_enabled(popup_enabled);
 
         self.character_portraits.update(game);
+        self.player_portraits.update(game);
 
         self.update_character_status(&game.characters);
 
@@ -1391,10 +1427,9 @@ impl CharacterPortraits {
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            margin: 10.0,
+            margin: 4.0,
             children: elements,
             style: Style {
-                background_color: Some(BLACK),
                 ..Default::default()
             },
             ..Default::default()
@@ -1523,13 +1558,14 @@ impl TopCharacterPortrait {
 
 impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
+        let (w, h) = self.size();
+        draw_rectangle(x, y, w, h, BLACK);
+        draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, DARKGRAY);
         if self.strong_highlight {
-            let (w, h) = self.size();
             draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, GOLD);
         }
         if self.weak_highlight {
-            let (w, h) = self.size();
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, WHITE);
+            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
         }
         self.container.draw(x + self.padding, y + self.padding);
     }
@@ -1543,11 +1579,17 @@ impl Drawable for TopCharacterPortrait {
 struct PlayerPortraits {
     row: Container,
     selected_i: Cell<CharacterId>,
+    active_i: Cell<CharacterId>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
 }
 
 impl PlayerPortraits {
-    fn new(characters: &Characters, selected_id: CharacterId, font: Font) -> Self {
+    fn new(
+        characters: &Characters,
+        selected_id: CharacterId,
+        active_id: CharacterId,
+        font: Font,
+    ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
@@ -1579,6 +1621,7 @@ impl PlayerPortraits {
         let this = Self {
             row,
             selected_i: Cell::new(selected_id),
+            active_i: Cell::new(active_id),
             portraits,
         };
 
@@ -1589,21 +1632,35 @@ impl PlayerPortraits {
     fn set_selected_character(&self, character_id: CharacterId) {
         self.portraits[&self.selected_i.get()]
             .borrow()
-            .selected
+            .shown_character
             .set(false);
         self.selected_i.set(character_id);
         self.portraits[&self.selected_i.get()]
             .borrow()
-            .selected
+            .shown_character
             .set(true);
+    }
+
+    fn set_active_character(&self, character_id: CharacterId) {
+        if let Some(portrait) = self.portraits.get(&self.active_i.get()) {
+            portrait.borrow().active_character.set(false);
+        }
+        self.active_i.set(character_id);
+        if let Some(portrait) = self.portraits.get(&character_id) {
+            portrait.borrow().active_character.set(true);
+        }
+    }
+
+    fn update(&self, game: &CoreGame) {
+        self.set_active_character(game.active_character_id);
     }
 
     fn draw(&self, x: f32, y: f32) {
         self.row.draw(x, y);
 
         for (i, portrait) in &self.portraits {
-            if portrait.borrow().clicked.get() {
-                portrait.borrow().clicked.set(false);
+            if portrait.borrow().has_been_clicked.get() {
+                portrait.borrow().has_been_clicked.set(false);
                 self.set_selected_character(*i);
                 break;
             }
@@ -1613,18 +1670,20 @@ impl PlayerPortraits {
 
 struct PlayerCharacterPortrait {
     text: TextLine,
-    selected: Cell<bool>,
+    shown_character: Cell<bool>,
+    active_character: Cell<bool>,
     padding: f32,
-    clicked: Cell<bool>,
+    has_been_clicked: Cell<bool>,
 }
 
 impl PlayerCharacterPortrait {
     fn new(character: &Character, font: Font) -> Self {
         Self {
             text: TextLine::new(character.name, 20, WHITE, Some(font)),
-            selected: Cell::new(false),
+            shown_character: Cell::new(false),
+            active_character: Cell::new(false),
             padding: 15.0,
-            clicked: Cell::new(false),
+            has_been_clicked: Cell::new(false),
         }
     }
 }
@@ -1633,17 +1692,33 @@ impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size();
         draw_rectangle(x, y, w, h, DARKGRAY);
-        if self.selected.get() {
-            draw_rectangle_lines(x, y, w, h, 2.0, GOLD);
+        if self.shown_character.get() {
+            draw_rectangle_lines(x, y, w, h, 1.0, GOLD);
+        } else {
+            draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
+
         self.text.draw(self.padding + x, self.padding + y);
+
+        if self.active_character.get() {
+            let y_line = y + h - 10.0;
+            let line_margin = 5.0;
+            draw_line(
+                x + self.padding - line_margin,
+                y_line,
+                x + w - self.padding + line_margin,
+                y_line,
+                2.0,
+                GOLD,
+            );
+        }
 
         let (mouse_x, mouse_y) = mouse_position();
         if (x..x + w).contains(&mouse_x)
             && (y..y + h).contains(&mouse_y)
             && is_mouse_button_pressed(MouseButton::Left)
         {
-            self.clicked.set(true);
+            self.has_been_clicked.set(true);
         }
     }
 
@@ -1686,6 +1761,7 @@ struct Log {
     text_lines: Vec<Rc<TextLine>>,
     line_details: Vec<Option<Container>>,
     font: Font,
+    padding: f32,
 }
 
 impl Log {
@@ -1710,6 +1786,7 @@ impl Log {
             text_lines: vec![],
             line_details: vec![],
             font,
+            padding: 10.0,
         };
 
         this
@@ -1756,16 +1833,34 @@ impl Log {
 
     fn draw(&self, x: f32, y: f32) {
         draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
-        self.container.draw(x + 10.0, y + 10.0);
+        self.container.draw(x + self.padding, y + self.padding);
 
+        let size = self.size();
         for (i, text_line) in self.text_lines.iter().enumerate() {
             if let Some(line_pos) = text_line.has_been_hovered.take() {
                 if let Some(details) = &self.line_details[i] {
-                    let details_x = x + self.container.size().0 - details.size().0;
-                    details.draw(details_x, line_pos.1 + text_line.size().1 + 5.0);
+                    let popup_size = details.size();
+                    let details_x = x + size.0 - details.size().0 - 10.0;
+                    let mut details_y = line_pos.1 + text_line.size().1 + 5.0;
+
+                    //dbg!(line_pos, details_y, popup_size, x, size);
+
+                    if details_y + popup_size.1 > y + size.1 {
+                        details_y = line_pos.1 - popup_size.1 - 5.0;
+                    }
+
+                    details.draw(details_x, details_y);
                 }
             }
         }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        let container_size = self.container.size();
+        (
+            container_size.0 + self.padding,
+            container_size.1 + self.padding,
+        )
     }
 }
 
