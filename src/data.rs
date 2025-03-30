@@ -1,8 +1,8 @@
 use crate::core::{
     ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-    IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect,
-    Range, SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
-    SpriteId, Weapon, WeaponGrip,
+    ConditionDescription, IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
+    OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement,
+    SpellEnhancementEffect, SpellType, SpriteId, Weapon, WeaponGrip,
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {

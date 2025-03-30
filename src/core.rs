@@ -3,10 +3,10 @@ use std::cell::{Ref, RefMut};
 use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
-use crate::data::BRACE;
-use crate::data::KILL;
+
 use crate::data::WAR_HAMMER;
 use crate::data::{BOW, SIDE_STEP};
+use crate::data::{BRACE, KILL};
 use crate::data::{
     CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SMALL_SHIELD, SWORD,
 };
@@ -33,6 +33,10 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
+        // TODO
+        bob.receive_condition(Condition::Dazed(2));
+        bob.receive_condition(Condition::Braced);
+
         let mut alice = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.off_hand.shield = Some(SMALL_SHIELD);
@@ -50,7 +54,7 @@ impl CoreGame {
 
         Self {
             characters,
-            active_character_id: 1,
+            active_character_id: 0,
             event_handler,
         }
     }
@@ -1096,6 +1100,12 @@ pub enum Condition {
     Weakened(u32),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct ConditionDescription {
+    pub name: &'static str,
+    pub description: &'static str,
+}
+
 #[derive(Debug, Copy, Clone, Default)]
 struct Conditions {
     dazed: u32,
@@ -1106,23 +1116,54 @@ struct Conditions {
     weakened: u32,
 }
 
+pub const DAZED: ConditionDescription = ConditionDescription {
+    name: "Dazed",
+    description: "Gains no defense bonus from dexterity and attacks with disadvantage",
+};
+
+pub const BLEEDING: ConditionDescription = ConditionDescription {
+    name: "Bleeding",
+    description: "Loses health at end of turn",
+};
+
+const BRACED_DEFENSE_BONUS: u32 = 3;
+pub const BRACED: ConditionDescription = ConditionDescription {
+    name: "Braced",
+    description: "Gains +3 defense against the next incoming attack",
+};
+
+pub const RAGING: ConditionDescription = ConditionDescription {
+    name: "Raging",
+    description: "Gains advantage on the next attack",
+};
+
+pub const CAREFUL_AIM: ConditionDescription = ConditionDescription {
+    name: "Careful aim",
+    description: "...", // short-lived buff
+};
+
+pub const WEAKENED: ConditionDescription = ConditionDescription {
+    name: "Weakened",
+    description: "Has reduced stats",
+};
+
 impl Conditions {
-    pub fn strings(&self) -> Vec<String> {
+    pub fn descriptions(&self) -> Vec<ConditionDescription> {
         let mut result = vec![];
         if self.dazed > 0 {
-            result.push("Dazed".to_string());
+            result.push(DAZED);
         }
         if self.bleeding > 0 {
-            result.push("Bleeding".to_string());
+            result.push(BLEEDING);
         }
         if self.braced {
-            result.push("Braced".to_string());
+            result.push(BRACED);
         }
         if self.raging {
-            result.push("Raging".to_string());
+            result.push(RAGING);
         }
         if self.weakened > 0 {
-            result.push("Weakened".to_string());
+            result.push(WEAKENED);
         }
 
         result
@@ -1343,8 +1384,8 @@ impl Character {
         }
     }
 
-    pub fn condition_strings(&self) -> Vec<String> {
-        self.conditions.strings()
+    pub fn condition_descriptions(&self) -> Vec<ConditionDescription> {
+        self.conditions.descriptions()
     }
 
     fn lose_action_points(&mut self, amount: u32) {
@@ -1583,7 +1624,11 @@ impl Character {
             .shield
             .map(|shield| shield.defense)
             .unwrap_or(0);
-        let from_braced = if self.conditions.braced { 3 } else { 0 };
+        let from_braced = if self.conditions.braced {
+            BRACED_DEFENSE_BONUS
+        } else {
+            0
+        };
         10 + from_dex + from_shield + from_braced
     }
 

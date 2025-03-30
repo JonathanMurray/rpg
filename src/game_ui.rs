@@ -22,7 +22,10 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
+    action_button::{
+        draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction, InternalUiEvent,
+        TooltipPosition,
+    },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
         draw_debug, table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
@@ -30,10 +33,10 @@ use crate::{
     },
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
-        MOVE_ACTION_COST,
+        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters,
+        ConditionDescription, CoreGame, GameEvent, GameEventHandler, HandType, IconId,
+        MovementEnhancement, OnAttackedReaction, OnHitReaction, SpellEnhancement, SpellType,
+        SpriteId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
 };
@@ -91,7 +94,7 @@ struct CharacterUi {
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     resource_bars: Container,
-    conditions: Vec<String>,
+    conditions: Vec<ConditionDescription>,
 }
 
 pub struct UserInterface {
@@ -495,20 +498,6 @@ impl UserInterface {
             .tabs
             .draw(20.0, y + 70.0);
 
-        let text_params = TextParams {
-            font: Some(&self.font),
-            font_size: 18,
-            color: WHITE,
-            ..Default::default()
-        };
-        for (i, s) in self.character_uis[&self.player_portraits.selected_i.get()]
-            .conditions
-            .iter()
-            .enumerate()
-        {
-            draw_text_ex(s, 630.0, y + 30.0 + 20.0 * i as f32, text_params.clone());
-        }
-
         self.character_uis[&self.player_portraits.selected_i.get()]
             .resource_bars
             .draw(620.0, y + 100.0);
@@ -524,6 +513,9 @@ impl UserInterface {
         }
 
         self.log.draw(800.0, y);
+
+        // We draw this late to ensure that any hover popups are shown above other UI elements
+        self.draw_conditions(630.0, y + 30.0);
 
         self.character_portraits
             .set_hovered_character_id(grid_outcome.hovered_character_id);
@@ -561,6 +553,48 @@ impl UserInterface {
                 hand,
                 action_point_cost,
             }));
+        }
+    }
+
+    fn draw_conditions(&self, x: f32, y: f32) {
+        let text_params = TextParams {
+            font: Some(&self.font),
+            font_size: 18,
+            color: WHITE,
+            ..Default::default()
+        };
+        let (mouse_x, mouse_y) = mouse_position();
+
+        let mut tooltip = None;
+
+        for (i, condition) in self.character_uis[&self.player_portraits.selected_i.get()]
+            .conditions
+            .iter()
+            .enumerate()
+        {
+            let y0 = y + 20.0 * i as f32;
+            let dimensions = draw_text_ex(condition.name, x, y0, text_params.clone());
+
+            if (x..x + dimensions.width).contains(&mouse_x)
+                && (y0 - dimensions.height..y0).contains(&mouse_y)
+            {
+                tooltip = Some((
+                    x + dimensions.width + 5.0,
+                    y0 - dimensions.height,
+                    condition,
+                ));
+            }
+        }
+
+        if let Some((x, y, condition)) = tooltip {
+            draw_tooltip(
+                &self.font,
+                TooltipPosition::TopLeft((x, y)),
+                &[
+                    condition.name.to_string(),
+                    condition.description.to_string(),
+                ],
+            );
         }
     }
 
@@ -1378,7 +1412,7 @@ impl UserInterface {
                     .borrow_mut()
                     .set_current(character.stamina.current);
 
-                ui.conditions = character.condition_strings();
+                ui.conditions = character.condition_descriptions();
             }
         }
 

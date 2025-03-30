@@ -477,10 +477,10 @@ impl Container {
                 let (_dx, dy) = mouse_wheel();
                 if dy != 0.0 {
                     const SCROLL_SPEED: f32 = 15.0;
-                    let new_offset = scroll.offset.get() - dy.signum() * SCROLL_SPEED;
-                    if new_offset >= 0.0 && new_offset <= content_size.1 - size.1 {
-                        scroll.offset.set(new_offset);
-                    }
+                    let new_offset = (scroll.offset.get() - dy.signum() * SCROLL_SPEED)
+                        .max(0.0)
+                        .min(content_size.1 - size.1);
+                    scroll.offset.set(new_offset);
                 }
             }
         }

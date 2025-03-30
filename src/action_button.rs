@@ -387,11 +387,24 @@ pub enum InternalUiEvent {
 }
 
 pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[String]) {
+    draw_tooltip(
+        font,
+        TooltipPosition::BottomLeft((button_position.0, button_position.1 - 3.0)),
+        lines,
+    );
+}
+
+pub enum TooltipPosition {
+    TopLeft((f32, f32)),
+    BottomLeft((f32, f32)),
+}
+
+pub fn draw_tooltip(font: &Font, position: TooltipPosition, lines: &[String]) {
     let font_size = 18;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
     for line in lines {
-        let dimensions = measure_text(line, None, font_size, 1.0);
+        let dimensions = measure_text(line, Some(font), font_size, 1.0);
         if dimensions.width > max_line_w {
             max_line_w = dimensions.width;
         }
@@ -402,12 +415,12 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[St
     let line_h = 22.0;
     let tooltip_h = lines.len() as f32 * line_h + text_margin * 2.0;
 
-    let tooltip_rect = (
-        button_position.0,
-        button_position.1 - 3.0 - tooltip_h,
-        tooltip_w,
-        tooltip_h,
-    );
+    let (x, y) = match position {
+        TooltipPosition::TopLeft((x, y)) => (x, y),
+        TooltipPosition::BottomLeft((x, y)) => (x, y - tooltip_h),
+    };
+
+    let tooltip_rect = (x, y, tooltip_w, tooltip_h);
     draw_rectangle(
         tooltip_rect.0,
         tooltip_rect.1,
@@ -431,13 +444,13 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[St
         ..Default::default()
     };
 
-    let mut line_y = button_position.1 - lines.len() as f32 * line_h + text_margin - 5.0;
+    let mut line_y = tooltip_rect.1 + text_margin * 2.0 + 5.0;
     for (i, line) in lines.iter().enumerate() {
         let mut params = text_params.clone();
         if i == 0 {
             params.color = YELLOW;
         }
-        draw_text_ex(line, button_position.0 + text_margin, line_y, params);
+        draw_text_ex(line, tooltip_rect.0 + text_margin, line_y, params);
         line_y += line_h;
     }
 }
