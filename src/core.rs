@@ -1,15 +1,17 @@
 use std::cell::RefCell;
 use std::cell::{Ref, RefMut};
+
 use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 
-use crate::data::WAR_HAMMER;
 use crate::data::{BOW, SIDE_STEP};
 use crate::data::{BRACE, KILL};
 use crate::data::{
-    CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SMALL_SHIELD, SWORD,
+    CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SMALL_SHIELD,
 };
+use crate::data::{RAPIER, WAR_HAMMER};
+use crate::textures::{IconId, SpriteId};
 
 pub const ACTION_POINTS_PER_TURN: u32 = 6;
 
@@ -22,7 +24,7 @@ pub struct CoreGame {
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
         let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 3, (1, 3));
-        bob.main_hand.weapon = Some(BOW);
+        bob.main_hand.weapon = Some(RAPIER);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(LEATHER_ARMOR);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
@@ -33,19 +35,13 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        // TODO
-        bob.receive_condition(Condition::Dazed(2));
-        bob.receive_condition(Condition::Braced);
-
         let mut alice = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
         alice.main_hand.weapon = Some(BOW);
         alice.off_hand.shield = Some(SMALL_SHIELD);
         alice.armor = Some(LEATHER_ARMOR);
         alice.known_attacked_reactions.push(SIDE_STEP);
 
-        let mut charlie = Character::new(false, "Gremlin", SpriteId::Character2, 1, 2, 1, (2, 3));
-        charlie.main_hand.weapon = Some(SWORD);
-        charlie.off_hand.shield = Some(SMALL_SHIELD);
+        let charlie = Character::new(false, "Gremlin", SpriteId::Character3, 1, 2, 1, (2, 3));
 
         let mut david = Character::new(true, "David", SpriteId::Character, 10, 10, 10, (5, 7));
         david.main_hand.weapon = Some(WAR_HAMMER);
@@ -233,12 +229,9 @@ impl CoreGame {
         caster.action_points -= spell.action_point_cost;
         caster.mana.spend(spell.mana_cost);
 
-        let mut enhancement_str = String::new();
         if enhanced {
             let enhancement = spell.possible_enhancement.unwrap();
             caster.mana.spend(enhancement.mana_cost);
-
-            enhancement_str = format!(" ({})", enhancement.name)
         }
 
         let (target_label, target) = match spell.spell_type {
@@ -1840,35 +1833,4 @@ impl From<Range> for f32 {
             Range::Float(f) => f,
         }
     }
-}
-
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum SpriteId {
-    Character,
-    Character2,
-    Warhammer,
-    Bow,
-    Sword,
-    Shield,
-}
-
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum IconId {
-    Fireball,
-    Attack,
-    Brace,
-    Move,
-    Scream,
-    Mindblast,
-    Parry,
-    ShieldBash,
-    Rage,
-    CrushingStrike,
-    CarefulAim,
-    Banshee,
-    Dualcast,
-    AllIn,
-    Plus,
-    PlusPlus,
-    Go,
 }

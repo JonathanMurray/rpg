@@ -1,8 +1,11 @@
-use crate::core::{
-    ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-    ConditionDescription, IconId, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
-    OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement,
-    SpellEnhancementEffect, SpellType, SpriteId, Weapon, WeaponGrip,
+use crate::{
+    core::{
+        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
+        OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range,
+        SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
+        Weapon, WeaponGrip,
+    },
+    textures::{IconId, SpriteId},
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
@@ -29,7 +32,7 @@ pub const DAGGER: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Weakened(1),
     ))),
-    sprite: None,
+    sprite: Some(SpriteId::Dagger),
 };
 
 pub const SWORD: Weapon = Weapon {
@@ -57,7 +60,7 @@ pub const RAPIER: Weapon = Weapon {
     attack_enhancement: None,
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::SkipExertion),
-    sprite: None,
+    sprite: Some(SpriteId::Rapier),
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
@@ -145,7 +148,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
     description: "Bonus defense",
-    icon: IconId::Parry,
+    icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect::SideStep,

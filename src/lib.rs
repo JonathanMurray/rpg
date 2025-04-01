@@ -9,3 +9,4 @@ pub mod drawing;
 pub mod game_ui;
 pub mod grid;
 pub mod pathfind;
+pub mod textures;

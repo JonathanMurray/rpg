@@ -1,10 +1,9 @@
-use std::io::empty;
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use macroquad::miniquad::window::set_window_position;
 
 use macroquad::text::{load_ttf_font, Font};
-use macroquad::texture::{load_texture, FilterMode, Texture2D};
+use macroquad::texture::FilterMode;
 use macroquad::{
     color::BLACK,
     miniquad,
@@ -15,31 +14,10 @@ use macroquad::{
 
 use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
-use rpg::core::{CoreGame, GameState, IconId, SpriteId, StateChooseReaction};
+use rpg::core::{CoreGame, GameState, StateChooseReaction};
 
 use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
-
-async fn texture(path: &str) -> Texture2D {
-    let texture = load_texture(path).await.unwrap();
-    texture.set_filter(FilterMode::Nearest);
-    texture
-}
-
-async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {
-    let mut textures: HashMap<SpriteId, Texture2D> = Default::default();
-    for (id, path) in paths {
-        textures.insert(id, texture(path).await);
-    }
-    textures
-}
-
-async fn load_icons(paths: Vec<(IconId, &str)>) -> HashMap<IconId, Texture2D> {
-    let mut textures: HashMap<IconId, Texture2D> = Default::default();
-    for (id, path) in paths {
-        textures.insert(id, texture(path).await);
-    }
-    textures
-}
+use rpg::textures::{load_all_icons, load_all_sprites, load_and_init_texture};
 
 async fn load_font(path: &str) -> Font {
     let path = format!("fonts/{path}");
@@ -59,36 +37,9 @@ async fn main() {
     let event_handler = Rc::new(UiGameEventHandler::new());
     let game = CoreGame::new(event_handler.clone());
 
-    let sprites = load_sprites(vec![
-        (SpriteId::Character, "character.png"),
-        (SpriteId::Character2, "character2.png"),
-        (SpriteId::Warhammer, "warhammer.png"),
-        (SpriteId::Bow, "bow.png"),
-        (SpriteId::Sword, "sword.png"),
-        (SpriteId::Shield, "shield.png"),
-    ])
-    .await;
+    let sprites = load_all_sprites().await;
 
-    let icons = load_icons(vec![
-        (IconId::Fireball, "fireball_icon.png"),
-        (IconId::Attack, "attack_icon.png"),
-        (IconId::Brace, "brace_icon.png"),
-        (IconId::Move, "move_icon.png"),
-        (IconId::Scream, "scream_icon.png"),
-        (IconId::Mindblast, "mindblast_icon.png"),
-        (IconId::Go, "go_icon.png"),
-        (IconId::Parry, "parry_icon.png"),
-        (IconId::ShieldBash, "shieldbash_icon.png"),
-        (IconId::Rage, "rage_icon.png"),
-        (IconId::CrushingStrike, "crushing_strike_icon.png"),
-        (IconId::Banshee, "banshee_icon.png"),
-        (IconId::Dualcast, "dualcast_icon.png"),
-        (IconId::AllIn, "all_in_icon.png"),
-        (IconId::CarefulAim, "careful_aim_icon.png"),
-        (IconId::Plus, "plus_icon.png"),
-        (IconId::PlusPlus, "plus_plus_icon.png"),
-    ])
-    .await;
+    let icons = load_all_icons().await;
 
     //let font_path = "manaspace/manaspc.ttf";
     //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
@@ -97,7 +48,7 @@ async fn main() {
     //let font_path = "press-start/prstart.ttf";
     //let font_path = "lunchtime-doubly-so/lunchds.ttf";
     //let font_path = "chonkypixels/ChonkyPixels.ttf";
-    let font_path = "pixelon/Pixelon.ttf";
+    let _font_path = "pixelon/Pixelon.ttf";
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
 
@@ -105,10 +56,10 @@ async fn main() {
 
     let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
 
-    let empty_grass = texture("grass3.png").await;
+    let empty_grass = load_and_init_texture("grass3.png").await;
     let background_textures = vec![
-        texture("grass1.png").await,
-        texture("grass2.png").await,
+        load_and_init_texture("grass1.png").await,
+        load_and_init_texture("grass2.png").await,
         empty_grass.clone(),
         empty_grass.clone(),
         empty_grass.clone(),

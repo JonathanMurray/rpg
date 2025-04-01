@@ -1,39 +1,17 @@
-use std::{
-    cell::{Cell, Ref, RefCell},
-    char::MAX,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, rc::Rc};
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{
-        Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE,
-        RED, WHITE, YELLOW,
-    },
-    input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    math::Rect,
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
-    window::{screen_height, screen_width},
+    color::{Color, BLACK, LIGHTGRAY, WHITE, YELLOW},
+    shapes::{draw_rectangle, draw_rectangle_lines},
+    text::{draw_text_ex, Font, TextParams},
 };
 
 use crate::{
     action_button::{draw_button_tooltip, ButtonAction, EventSender, InternalUiEvent},
-    base_ui::{
-        draw_debug, table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, Tabs, TextLine,
-    },
-    core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
-        MOVE_ACTION_COST,
-    },
+    base_ui::Drawable,
+    core::BaseAction,
     game_ui::UiState,
-    grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
 };
 
 use crate::action_button::ActionButton;
@@ -157,7 +135,6 @@ impl ActivityPopup {
                             let range = range * (1.0 + percentage as f32 / 100.0);
                             let text = format!("range: {range:.2}");
                             draw_text_ex(&text, x0, y0, text_params.clone());
-                            y0 += 20.0;
                         }
                         BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
                     };

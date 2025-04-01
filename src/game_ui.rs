@@ -1,7 +1,7 @@
 use std::{
     cell::{Cell, Ref, RefCell},
-    char::MAX,
     collections::HashMap,
+    fmt::{self},
     rc::Rc,
 };
 
@@ -10,14 +10,13 @@ use macroquad::rand;
 use indexmap::IndexMap;
 use macroquad::{
     color::{
-        Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE,
-        RED, WHITE, YELLOW,
+        Color, BLACK, BLUE, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE,
     },
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    text::{draw_text_ex, Font, TextParams},
+    texture::Texture2D,
     window::{screen_height, screen_width},
 };
 
@@ -28,17 +27,17 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
-        draw_debug, table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, Tabs, TextLine,
+        table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, Tabs,
+        TextLine,
     },
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters,
-        ConditionDescription, CoreGame, GameEvent, GameEventHandler, HandType, IconId,
-        MovementEnhancement, OnAttackedReaction, OnHitReaction, SpellEnhancement, SpellType,
-        SpriteId, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, AttackOutcome,
+        BaseAction, Character, CharacterId, Characters, ConditionDescription, CoreGame, GameEvent,
+        GameEventHandler, HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction,
+        SpellType, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
+    textures::{IconId, SpriteId},
 };
 
 const Y_USER_INTERFACE: f32 = 700.0;
@@ -137,7 +136,7 @@ impl UserInterface {
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
-        let mut new_button = |subtext, btn_action, character: Option<&Character>| {
+        let mut new_button = |_subtext, btn_action, character: Option<&Character>| {
             let btn =
                 ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
             next_button_id += 1;
@@ -239,10 +238,10 @@ impl UserInterface {
                     Element::Container(attribute_row(
                         ("STR", character_ref.base_strength),
                         vec![
-                            ("Health", character_ref.health.max as f32),
+                            ("Health", StatValue::U32(character_ref.health.max)),
                             (
                                 "Physical resist",
-                                character_ref.physical_resistence() as f32,
+                                StatValue::U32(character_ref.physical_resistence()),
                             ),
                         ],
                         simple_font.clone(),
@@ -250,16 +249,19 @@ impl UserInterface {
                     Element::Container(attribute_row(
                         ("DEX", character_ref.base_dexterity),
                         vec![
-                            ("Defense", character_ref.defense() as f32),
-                            ("Movement", character_ref.move_range),
+                            ("Defense", StatValue::U32(character_ref.defense())),
+                            ("Movement", StatValue::F32(character_ref.move_range)),
                         ],
                         simple_font.clone(),
                     )),
                     Element::Container(attribute_row(
                         ("INT", character_ref.base_intellect),
                         vec![
-                            ("Mana", character_ref.mana.max as f32),
-                            ("Mental resist", character_ref.mental_resistence() as f32),
+                            ("Mana", StatValue::U32(character_ref.mana.max)),
+                            (
+                                "Mental resist",
+                                StatValue::U32(character_ref.mental_resistence()),
+                            ),
                         ],
                         simple_font.clone(),
                     )),
@@ -457,7 +459,7 @@ impl UserInterface {
         }
     }
 
-    fn new_button(&mut self, subtext: String, btn_action: ButtonAction) -> ActionButton {
+    fn new_button(&mut self, _subtext: String, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
             &self.event_queue,
@@ -797,7 +799,10 @@ impl UserInterface {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
-            GameEvent::CharacterTookDamage { character, amount } => {
+            GameEvent::CharacterTookDamage {
+                character: _,
+                amount: _,
+            } => {
                 // TODO: We show this as part of Attacked, SpellWasCast, etc, instead
                 /*
                 let pos = self.characters.get(character).position_i32();
@@ -1211,7 +1216,14 @@ impl UserInterface {
             }
             UiState::ChoosingAction => {
                 let active_char_pos = self.active_character().position_i32();
-                self.game_grid.static_text = Some((active_char_pos, vec!["Your turn".to_string()]));
+
+                self.game_grid.static_text = Some((
+                    active_char_pos,
+                    vec![
+                        "Your turn".to_string(),
+                        format!("[{} AP]", self.active_character().action_points),
+                    ],
+                ));
             }
             _ => {}
         }
@@ -1806,7 +1818,7 @@ struct Log {
 
 impl Log {
     fn new(font: Font) -> Self {
-        let this = Self {
+        Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
                 children: vec![],
@@ -1827,9 +1839,7 @@ impl Log {
             line_details: vec![],
             font,
             padding: 10.0,
-        };
-
-        this
+        }
     }
 
     fn add(&mut self, text: impl Into<String>) {
@@ -2114,9 +2124,23 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
     })
 }
 
+enum StatValue {
+    U32(u32),
+    F32(f32),
+}
+
+impl fmt::Display for StatValue {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            StatValue::U32(x) => f.write_fmt(format_args!("{}", x)),
+            StatValue::F32(x) => f.write_fmt(format_args!("{:.2}", x)),
+        }
+    }
+}
+
 fn attribute_row(
     attribute: (&'static str, u32),
-    stats: Vec<(&'static str, f32)>,
+    stats: Vec<(&'static str, StatValue)>,
     font: Font,
 ) -> Container {
     let attribute_element = Element::Text(TextLine::new(

@@ -1,8 +1,8 @@
 use macroquad::{
-    color::{Color, DARKGREEN, GOLD, GRAY, MAGENTA, WHITE},
+    color::{Color, DARKGREEN, GRAY, MAGENTA, WHITE},
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text_ex, measure_text, Font, TextParams},
 };
 use std::{
     cell::{Cell, RefCell},

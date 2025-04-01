@@ -1,11 +1,10 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::{Color, BLACK, PINK},
+    color::{Color, BLACK},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
-    texture::draw_texture,
 };
 
 use std::cell::Cell;
@@ -16,15 +15,15 @@ use macroquad::math::Rect;
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
-    color::{GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE, YELLOW},
+    color::{GRAY, GREEN, RED, WHITE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, measure_text},
+    text::measure_text,
 };
 
-use crate::{core::MovementEnhancement, pathfind::PathfindGrid};
+use crate::{core::MovementEnhancement, pathfind::PathfindGrid, textures::SpriteId};
 use crate::{
-    core::{CharacterId, Characters, HandType, Range, SpriteId},
+    core::{CharacterId, Characters, HandType, Range},
     drawing::{draw_arrow, draw_dashed_line},
 };
 
@@ -660,13 +659,15 @@ impl GameGrid {
             if !movement_preview.is_empty() {
                 let destination = movement_preview[0].1;
                 let distance = movement_preview[0].0;
+
+                self.draw_movement_path_arrow(movement_preview, MOVEMENT_ARROW_COLOR);
+
                 self.draw_static_text_lines(
                     destination,
                     &[format!("Move {:.3}", distance.to_string())],
                     4.0,
                     14.0,
                 );
-                self.draw_movement_path_arrow(movement_preview, MOVEMENT_ARROW_COLOR);
             }
         }
 
@@ -863,7 +864,7 @@ impl GameGrid {
         let (mut w, mut h) = (0.0, 0.0);
         let line_margin = 5.0;
         for line in lines {
-            let text_dimensions = measure_text(&line, Some(&self.font), font_size, 1.0);
+            let text_dimensions = measure_text(line, Some(&self.font), font_size, 1.0);
             if text_dimensions.width > w {
                 w = text_dimensions.width;
             }
@@ -883,18 +884,18 @@ impl GameGrid {
         y += pad;
         y += 5.0;
         for line in lines.iter() {
-            let dimensions = draw_text_ex(&line, x + pad, y, params.clone());
+            let dimensions = draw_text_ex(line, x + pad, y, params.clone());
             y += dimensions.height + line_margin;
         }
     }
 
     fn draw_movement_preview_background(&self) {
-        if let Some(movement_preview) = &self.movement_preview {
+        if let Some(_movement_preview) = &self.movement_preview {
             let active_char_pos = self.characters.get(self.active_character_id).position_i32();
 
             self.draw_move_range_indicator(active_char_pos);
 
-            for (pos, _route) in &self.pathfind_grid.routes {
+            for pos in self.pathfind_grid.routes.keys() {
                 if (0..self.grid_dimensions.0).contains(&pos.0)
                     && (0..self.grid_dimensions.1).contains(&pos.1)
                     && *pos != active_char_pos

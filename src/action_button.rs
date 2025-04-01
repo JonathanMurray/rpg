@@ -1,37 +1,24 @@
 use std::{
-    cell::{Cell, Ref, RefCell},
-    char::MAX,
+    cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
 };
 
-use indexmap::IndexMap;
 use macroquad::{
-    color::{
-        Color, BLACK, BLUE, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE,
-        RED, WHITE, YELLOW,
-    },
+    color::{Color, BLACK, BLUE, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    math::Rect,
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    shapes::{draw_rectangle, draw_rectangle_lines},
+    text::{draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
-    window::{screen_height, screen_width},
 };
 
 use crate::{
-    base_ui::{
-        draw_debug, table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, Tabs, TextLine,
-    },
+    base_ui::{draw_debug, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, HandType, IconId, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement, SpellType, SpriteId, ACTION_POINTS_PER_TURN,
-        MOVE_ACTION_COST,
+        AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
+        OnHitReaction, SpellEnhancement,
     },
-    grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
+    textures::IconId,
 };
 
 pub struct ActionButton {
@@ -119,8 +106,9 @@ impl ActionButton {
                 icon = enhancement.icon;
 
                 tooltip_lines.push(format!(
-                    "{} ({} AP, {} stamina)",
-                    enhancement.name, enhancement.action_point_cost, enhancement.stamina_cost
+                    "{} ({})",
+                    enhancement.name,
+                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
                 ));
                 tooltip_lines.push(enhancement.description.to_string());
             }
@@ -141,8 +129,9 @@ impl ActionButton {
                 icon = reaction.icon;
 
                 tooltip_lines.push(format!(
-                    "{} ({} AP, {} stamina)",
-                    reaction.name, reaction.action_point_cost, reaction.stamina_cost
+                    "{} ({})",
+                    reaction.name,
+                    cost_string(reaction.action_point_cost, reaction.stamina_cost)
                 ));
                 tooltip_lines.push(reaction.description.to_string());
             }
@@ -162,8 +151,9 @@ impl ActionButton {
                 icon = enhancement.icon;
 
                 tooltip_lines.push(format!(
-                    "{} ({} AP, {} stamina)",
-                    enhancement.name, enhancement.action_point_cost, enhancement.stamina_cost
+                    "{} ({})",
+                    enhancement.name,
+                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
                 ));
                 tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
             }
@@ -256,6 +246,14 @@ impl ActionButton {
                 event_sender.send(InternalUiEvent::ButtonHovered(self.id, self.action, None));
             }
         }
+    }
+}
+
+fn cost_string(action_points: u32, stamina: u32) -> String {
+    match (action_points, stamina) {
+        (0, sta) => format!("{} stamina", sta),
+        (ap, 0) => format!("{} AP", ap),
+        (ap, sta) => format!("{} AP, {} stamina", ap, sta),
     }
 }
 
@@ -353,11 +351,11 @@ impl ButtonAction {
 
     pub fn stamina_cost(&self) -> u32 {
         match self {
-            ButtonAction::Action(base_action) => 0,
+            ButtonAction::Action(_base_action) => 0,
             ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
-            ButtonAction::OnHitReaction(reaction) => 0,
+            ButtonAction::OnHitReaction(_reaction) => 0,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
-            ButtonAction::SpellEnhancement(enhancement) => 0,
+            ButtonAction::SpellEnhancement(_enhancement) => 0,
             ButtonAction::Proceed => 0,
             ButtonAction::MovementEnhancement(enhancement) => enhancement.stamina_cost,
         }
