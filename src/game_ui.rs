@@ -5,9 +5,7 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{
-    rand,
-};
+use macroquad::rand;
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -304,7 +302,7 @@ impl UserInterface {
             });
 
             let tabs = Tabs::new(
-                2,
+                0,
                 vec![
                     ("Actions", actions_section),
                     ("Secondary", secondary_actions_section),

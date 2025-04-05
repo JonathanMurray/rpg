@@ -5,7 +5,10 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, WHITE, YELLOW},
+    color::{
+        Color, BEIGE, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, PINK,
+        SKYBLUE, WHITE, YELLOW,
+    },
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -110,6 +113,8 @@ impl ActionButton {
                     enhancement.name,
                     cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
                 ));
+
+                tooltip_lines.push("Attack enhancement:".to_string());
                 tooltip_lines.push(enhancement.description.to_string());
             }
 
@@ -121,7 +126,21 @@ impl ActionButton {
                     "{} ({} mana)",
                     enhancement.name, enhancement.mana_cost
                 ));
+                tooltip_lines.push("Spell enhancement:".to_string());
                 tooltip_lines.push(enhancement.description.to_string());
+            }
+            ButtonAction::MovementEnhancement(enhancement) => {
+                action_points = enhancement.action_point_cost;
+                stamina_points = enhancement.stamina_cost;
+                icon = enhancement.icon;
+
+                tooltip_lines.push(format!(
+                    "{} ({})",
+                    enhancement.name,
+                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
+                ));
+                tooltip_lines.push("Enhancement:".to_string());
+                tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
             }
             ButtonAction::OnAttackedReaction(reaction) => {
                 action_points = reaction.action_point_cost;
@@ -145,27 +164,20 @@ impl ActionButton {
                 ));
                 tooltip_lines.push(reaction.description.to_string());
             }
-            ButtonAction::MovementEnhancement(enhancement) => {
-                action_points = enhancement.action_point_cost;
-                stamina_points = enhancement.stamina_cost;
-                icon = enhancement.icon;
 
-                tooltip_lines.push(format!(
-                    "{} ({})",
-                    enhancement.name,
-                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
-                ));
-                tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
-            }
             ButtonAction::Proceed => {
                 icon = IconId::Go;
                 tooltip_lines.push("Proceed".to_string());
             }
         }
 
-        let size = (64.0, 64.0);
+        let size = match action {
+            ButtonAction::Proceed => (64.0, 52.0),
+            _ => (64.0, 64.0),
+        };
+
         let style = Style {
-            background_color: Some(DARKGRAY),
+            background_color: Some(Color::new(0.4, 0.32, 0.21, 1.0)),
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
@@ -173,7 +185,7 @@ impl ActionButton {
 
         let r = 4.0;
         let mut point_icons = vec![];
-        let border_width = Some(3.0);
+        let border_width = Some(4.0);
         for _ in 0..action_points {
             point_icons.push(Element::Rect(Rectangle {
                 size: (r * 2.0, r * 2.0),
@@ -189,7 +201,7 @@ impl ActionButton {
             point_icons.push(Element::Rect(Rectangle {
                 size: (r * 2.0, r * 2.0),
                 style: Style {
-                    background_color: Some(BLUE),
+                    background_color: Some(SKYBLUE),
                     border_color: Some(BLACK),
                     border_width,
                     ..Default::default()
@@ -260,7 +272,21 @@ fn cost_string(action_points: u32, stamina: u32) -> String {
 impl Drawable for ActionButton {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size;
+
         self.style.draw(x, y, self.size);
+
+        let margin_bot = 2.0;
+        let points_row_size = self.points_row.size();
+
+        if points_row_size.1 > 0.0 {
+            draw_rectangle(
+                x + 2.0,
+                y + h - margin_bot * 2.0 - points_row_size.1,
+                w - 4.0,
+                points_row_size.1 + margin_bot * 2.0 - 1.0,
+                GRAY,
+            );
+        }
 
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -286,7 +312,7 @@ impl Drawable for ActionButton {
                 draw_rectangle_lines(x, y, w, h, 2.0, self.hover_border_color);
             }
         } else {
-            draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.3));
+            draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.5));
             //draw_rectangle_lines(x, y, w, h, 1.0, RED);
         }
 
@@ -300,10 +326,10 @@ impl Drawable for ActionButton {
             draw_rectangle_lines(x, y, w, h, 3.0, GREEN);
         }
 
-        let margin = 4.0;
-        let row_size = self.points_row.size();
-        self.points_row
-            .draw(x + w - row_size.0 - margin, y + h - margin - row_size.1);
+        self.points_row.draw(
+            x + w - points_row_size.0 - margin_bot,
+            y + h - margin_bot - points_row_size.1,
+        );
 
         draw_debug(x, y, w, h);
     }

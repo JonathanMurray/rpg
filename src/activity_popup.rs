@@ -148,7 +148,7 @@ impl ActivityPopup {
         let y_btn = y + 10.0;
         let mut x_btn = x + 425.0;
 
-        self.proceed_button.draw(x_btn, y_btn);
+        self.proceed_button.draw(x_btn, y_btn + 6.0);
         x_btn -= self.proceed_button.size.0 + 10.0;
 
         for btn in self.choice_buttons.values().rev() {

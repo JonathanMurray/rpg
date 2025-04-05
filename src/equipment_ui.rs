@@ -1,19 +1,14 @@
-use std::{
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use macroquad::{
     color::SKYBLUE,
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
-
 use macroquad::{
-    color::{
-        GRAY, WHITE,
-    },
-    input::{mouse_position},
-    text::{Font},
+    color::{GRAY, WHITE},
+    input::mouse_position,
+    text::Font,
     texture::Texture2D,
 };
 
@@ -33,7 +28,7 @@ pub fn create_equipment_ui(
     let mut eq_icon_cells = vec![EquipmentIcon::new(None, font.clone(), vec![]); 3];
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
-            eq_text_cells.push("Damage:".to_string());
+            eq_text_cells.push("Weapon dmg:".to_string());
             eq_text_cells.push(format!("{}", weapon.damage));
 
             let texture = Some(equipment_icons[&weapon.icon].clone());

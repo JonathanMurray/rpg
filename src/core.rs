@@ -24,7 +24,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 3, (1, 3));
+        let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 6, (1, 3));
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(CHAIN_MAIL);
