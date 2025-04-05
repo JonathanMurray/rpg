@@ -17,7 +17,9 @@ use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::core::{CoreGame, GameState, StateChooseReaction};
 
 use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
-use rpg::textures::{load_all_icons, load_all_sprites, load_and_init_texture};
+use rpg::textures::{
+    load_all_equipment_icons, load_all_icons, load_all_sprites, load_and_init_texture,
+};
 
 async fn load_font(path: &str) -> Font {
     let path = format!("fonts/{path}");
@@ -40,6 +42,8 @@ async fn main() {
     let sprites = load_all_sprites().await;
 
     let icons = load_all_icons().await;
+
+    let equipment_icons = load_all_equipment_icons().await;
 
     //let font_path = "manaspace/manaspc.ttf";
     //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
@@ -69,6 +73,7 @@ async fn main() {
         &game,
         sprites,
         icons,
+        equipment_icons,
         font,
         decorative_font,
         grid_font,

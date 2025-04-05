@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, hash::Hash};
 
 use macroquad::texture::{load_texture, FilterMode, Texture2D};
 
@@ -76,6 +76,32 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
     .await
 }
 
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum EquipmentIconId {
+    Rapier,
+    Warhammer,
+    Bow,
+    Dagger,
+    Sword,
+    SmallShield,
+    LeatherArmor,
+    ChainMail,
+}
+
+pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
+    load_icons(vec![
+        (EquipmentIconId::Rapier, "eq_rapier.png"),
+        (EquipmentIconId::Warhammer, "eq_warhammer.png"),
+        (EquipmentIconId::Bow, "eq_bow.png"),
+        (EquipmentIconId::Dagger, "eq_dagger.png"),
+        (EquipmentIconId::Sword, "eq_sword.png"),
+        (EquipmentIconId::SmallShield, "eq_small_shield.png"),
+        (EquipmentIconId::LeatherArmor, "eq_leather_armor.png"),
+        (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
+    ])
+    .await
+}
+
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {
     let mut textures: HashMap<SpriteId, Texture2D> = Default::default();
     for (id, path) in paths {
@@ -84,8 +110,11 @@ async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture
     textures
 }
 
-pub async fn load_icons(paths: Vec<(IconId, &str)>) -> HashMap<IconId, Texture2D> {
-    let mut textures: HashMap<IconId, Texture2D> = Default::default();
+pub async fn load_icons<T>(paths: Vec<(T, &str)>) -> HashMap<T, Texture2D>
+where
+    T: Hash + Eq,
+{
+    let mut textures: HashMap<T, Texture2D> = Default::default();
     for (id, path) in paths {
         textures.insert(id, load_and_init_texture(path).await);
     }

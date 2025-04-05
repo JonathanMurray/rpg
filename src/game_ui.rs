@@ -5,7 +5,9 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::rand;
+use macroquad::{
+    rand,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -27,7 +29,7 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
-        table, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, Tabs,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, Tabs,
         TextLine,
     },
     core::{
@@ -36,8 +38,9 @@ use crate::{
         GameEventHandler, HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction,
         SpellType, ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
     },
+    equipment_ui::create_equipment_ui,
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid},
-    textures::{IconId, SpriteId},
+    textures::{EquipmentIconId, IconId, SpriteId},
 };
 
 const Y_USER_INTERFACE: f32 = 700.0;
@@ -105,6 +108,7 @@ pub struct UserInterface {
     font: Font,
 
     icons: HashMap<IconId, Texture2D>,
+    equipment_icons: HashMap<EquipmentIconId, Texture2D>,
 
     hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
     next_available_button_id: u32,
@@ -125,6 +129,7 @@ impl UserInterface {
         game: &CoreGame,
         sprites: HashMap<SpriteId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
+        equipment_icons: HashMap<EquipmentIconId, Texture2D>,
         simple_font: Font,
         decorative_font: Font,
         grid_font: Font,
@@ -274,29 +279,12 @@ impl UserInterface {
                 ..Default::default()
             });
 
-            let mut equipment_cells = vec![];
-            for hand in [HandType::MainHand, HandType::OffHand] {
-                if let Some(weapon) = character_ref.weapon(hand) {
-                    equipment_cells.push(format!("{}:", weapon.name));
-                    equipment_cells.push(format!("{} dmg", weapon.damage));
-                }
-            }
-            if let Some(shield) = character_ref.shield() {
-                equipment_cells.push(format!("{}:", shield.name));
-                equipment_cells.push(format!("{} def", shield.defense));
-            }
-            if let Some(armor) = character_ref.armor {
-                equipment_cells.push(format!("{}:", armor.name));
-                equipment_cells.push(format!("{} armor", armor.protection));
-            }
-            let equipment_table = table(
-                equipment_cells,
-                vec![Align::End, Align::Start],
-                simple_font.clone(),
-            );
+            let equipment_section =
+                create_equipment_ui(&simple_font, &character_ref, &equipment_icons);
+
             let stats_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Horizontal,
-                children: vec![stats_table, equipment_table],
+                children: vec![stats_table, equipment_section],
                 margin: 10.0,
                 ..Default::default()
             });
@@ -316,7 +304,7 @@ impl UserInterface {
             });
 
             let tabs = Tabs::new(
-                0,
+                2,
                 vec![
                     ("Actions", actions_section),
                     ("Secondary", secondary_actions_section),
@@ -445,6 +433,7 @@ impl UserInterface {
             stopwatch: StopWatch::default(),
 
             icons,
+            equipment_icons,
             font: simple_font.clone(),
 
             next_available_button_id: next_button_id,
@@ -802,14 +791,7 @@ impl UserInterface {
             GameEvent::CharacterTookDamage {
                 character: _,
                 amount: _,
-            } => {
-                // TODO: We show this as part of Attacked, SpellWasCast, etc, instead
-                /*
-                let pos = self.characters.get(character).position_i32();
-                self.game_grid
-                    .add_text_effect(pos, 0.0, 2.0, format!("{}", amount));
-                 */
-            }
+            } => {}
 
             GameEvent::CharacterReactedToHit {
                 main_line,

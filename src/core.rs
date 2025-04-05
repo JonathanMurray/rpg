@@ -1,17 +1,18 @@
 use std::cell::RefCell;
 use std::cell::{Ref, RefMut};
 
+use std::fmt::{Display, Write};
 use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage};
 
-use crate::data::{BOW, SIDE_STEP};
 use crate::data::{BRACE, KILL};
+use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP, SWORD};
 use crate::data::{
     CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, RAGE, SCREAM, SMALL_SHIELD,
 };
-use crate::data::{RAPIER, WAR_HAMMER};
-use crate::textures::{IconId, SpriteId};
+
+use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
 pub const ACTION_POINTS_PER_TURN: u32 = 6;
 
@@ -24,9 +25,9 @@ pub struct CoreGame {
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
         let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 3, (1, 3));
-        bob.main_hand.weapon = Some(RAPIER);
+        bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
-        bob.armor = Some(LEATHER_ARMOR);
+        bob.armor = Some(CHAIN_MAIL);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_on_hit_reactions.push(RAGE);
@@ -35,18 +36,18 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut alice = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
-        alice.main_hand.weapon = Some(BOW);
-        alice.off_hand.shield = Some(SMALL_SHIELD);
-        alice.armor = Some(LEATHER_ARMOR);
-        alice.known_attacked_reactions.push(SIDE_STEP);
+        let mut enemy1 = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
+        enemy1.main_hand.weapon = Some(DAGGER);
+        enemy1.off_hand.shield = Some(SMALL_SHIELD);
+        enemy1.armor = Some(LEATHER_ARMOR);
+        enemy1.known_attacked_reactions.push(SIDE_STEP);
 
-        let charlie = Character::new(false, "Gremlin", SpriteId::Character3, 1, 2, 1, (2, 3));
+        let enemy2 = Character::new(false, "Gremlin", SpriteId::Character3, 1, 2, 1, (2, 3));
 
         let mut david = Character::new(true, "David", SpriteId::Character, 10, 10, 10, (5, 7));
-        david.main_hand.weapon = Some(WAR_HAMMER);
+        david.main_hand.weapon = Some(DAGGER);
 
-        let characters = Characters::new(vec![bob, alice, charlie, david]);
+        let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
 
         Self {
             characters,
@@ -1083,6 +1084,22 @@ pub enum AttackHitEffect {
     SkipExertion,
 }
 
+impl Display for AttackHitEffect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttackHitEffect::Apply(apply_effect) => match apply_effect {
+                ApplyEffect::RemoveActionPoints(n) => {
+                    f.write_fmt(format_args!("Target loses {n} AP"))
+                }
+                ApplyEffect::Condition(condition) => {
+                    f.write_fmt(format_args!("Target receives {condition:?}"))
+                }
+            },
+            AttackHitEffect::SkipExertion => f.write_fmt(format_args!("No exertion")),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum Condition {
     Dazed(u32),
@@ -1769,12 +1786,14 @@ pub struct ArmorPiece {
     pub name: &'static str,
     pub protection: u32,
     pub limit_defense_from_dex: Option<u32>,
+    pub icon: EquipmentIconId,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct Weapon {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
+    pub icon: EquipmentIconId,
     pub range: Range,
     pub action_point_cost: u32,
     pub damage: u32,
@@ -1800,6 +1819,16 @@ pub enum AttackAttribute {
     Finesse,
 }
 
+impl Display for AttackAttribute {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AttackAttribute::Strength => f.write_str("str"),
+            AttackAttribute::Dexterity => f.write_str("dex"),
+            AttackAttribute::Finesse => f.write_str("str | dex"),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub enum WeaponGrip {
     Light,
@@ -1813,6 +1842,16 @@ pub enum Range {
     Melee,
     Ranged(u32),
     Float(f32),
+}
+
+impl Display for Range {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Range::Melee => f.write_str("melee"),
+            Range::Ranged(range) => f.write_str(&range.to_string()),
+            Range::Float(range) => f.write_fmt(format_args!("{:.2}", range)),
+        }
+    }
 }
 
 impl Range {

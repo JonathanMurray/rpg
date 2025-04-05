@@ -5,19 +5,21 @@ use crate::{
         SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
         Weapon, WeaponGrip,
     },
-    textures::{IconId, SpriteId},
+    textures::{EquipmentIconId, IconId, SpriteId},
 };
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     name: "Leather armor",
     protection: 3,
     limit_defense_from_dex: None,
+    icon: EquipmentIconId::LeatherArmor,
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     name: "Chain mail",
     protection: 5,
     limit_defense_from_dex: Some(4),
+    icon: EquipmentIconId::ChainMail,
 };
 
 pub const DAGGER: Weapon = Weapon {
@@ -33,6 +35,7 @@ pub const DAGGER: Weapon = Weapon {
         Condition::Weakened(1),
     ))),
     sprite: Some(SpriteId::Dagger),
+    icon: EquipmentIconId::Dagger,
 };
 
 pub const SWORD: Weapon = Weapon {
@@ -48,6 +51,7 @@ pub const SWORD: Weapon = Weapon {
         Condition::Bleeding,
     ))),
     sprite: Some(SpriteId::Sword),
+    icon: EquipmentIconId::Sword,
 };
 
 pub const RAPIER: Weapon = Weapon {
@@ -61,6 +65,7 @@ pub const RAPIER: Weapon = Weapon {
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::SkipExertion),
     sprite: Some(SpriteId::Rapier),
+    icon: EquipmentIconId::Rapier,
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
@@ -85,6 +90,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
         Condition::Dazed(1),
     ))),
     sprite: Some(SpriteId::Warhammer),
+    icon: EquipmentIconId::Warhammer,
 };
 
 pub const BOW: Weapon = Weapon {
@@ -109,6 +115,7 @@ pub const BOW: Weapon = Weapon {
         Condition::Weakened(1),
     ))),
     sprite: Some(SpriteId::Bow),
+    icon: EquipmentIconId::Bow,
 };
 
 pub const SMALL_SHIELD: Shield = Shield {

@@ -6,6 +6,7 @@ pub mod core;
 mod d20;
 mod data;
 pub mod drawing;
+pub mod equipment_ui;
 pub mod game_ui;
 pub mod grid;
 pub mod pathfind;
