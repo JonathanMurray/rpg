@@ -5,10 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{
-        Color, BEIGE, BLACK, BLUE, BROWN, DARKBROWN, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, PINK,
-        SKYBLUE, WHITE, YELLOW,
-    },
+    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},

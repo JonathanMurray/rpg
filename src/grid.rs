@@ -420,7 +420,7 @@ impl GameGrid {
         )
     }
 
-    pub fn remove_target(&mut self) {
+    pub fn clear_target(&mut self) {
         if let Target::Some(id) = self.target {
             self.target = Target::Memorized(id);
         }
@@ -441,6 +441,7 @@ impl GameGrid {
                 // pick an arbitrary enemy
                 for (id, character) in self.characters.iter_with_ids() {
                     if *id != self.active_character_id && !character.borrow().player_controlled {
+                        // TODO react to acquired target in game ui (show the target thingy)
                         self.target = Target::Some(*id);
                         break;
                     }
@@ -576,12 +577,7 @@ impl GameGrid {
             }
         }
 
-        let mut outcome = GridOutcome {
-            switched_to_move_i: None,
-            switched_to_attack: false,
-            switched_to_idle: false,
-            hovered_character_id: None,
-        };
+        let mut outcome = GridOutcome::default();
 
         self.draw_movement_preview_background();
 
@@ -625,7 +621,9 @@ impl GameGrid {
                         self.movement_range.selected_i = self
                             .movement_range
                             .shortest_encompassing(move_route.distance_from_start);
-                        outcome.switched_to_move_i = Some(self.movement_range.selected_i);
+                        outcome.switched_to = Some(GridSwitchedTo::Move {
+                            selected_option: self.movement_range.selected_i,
+                        });
 
                         self.movement_preview = Some(path);
                     }
@@ -635,14 +633,17 @@ impl GameGrid {
                 if is_mouse_button_pressed(MouseButton::Left) {
                     match self.target {
                         Target::Some(_) => {}
-                        Target::Memorized(_) | Target::None => outcome.switched_to_attack = true,
+                        Target::Memorized(_) | Target::None => {
+                            outcome.switched_to = Some(GridSwitchedTo::Attack)
+                        }
                     }
+                    outcome.switched_target = true;
                     self.target = Target::Some(id);
                     self.movement_preview = None;
                 }
             } else if hovering_active_player_controlled {
                 if is_mouse_button_pressed(MouseButton::Left) {
-                    outcome.switched_to_idle = true;
+                    outcome.switched_to = Some(GridSwitchedTo::Idle);
                 }
             } else if self.movement_preview.is_some() && self.dragging_camera_from.is_none() {
                 self.draw_cell_outline(
@@ -1051,7 +1052,7 @@ impl GameGrid {
     fn pan_camera(&self, dx: f32, dy: f32) {
         let new_x = self.camera_position.0.get() + dx;
         let new_y = self.camera_position.1.get() + dy;
-        let max_space = 300.0;
+        let max_space = 250.0;
         let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - self.size.0;
         let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - self.size.1;
         self.camera_position.0.set(new_x.max(-max_space).min(max_x));
@@ -1059,11 +1060,17 @@ impl GameGrid {
     }
 }
 
+#[derive(Default)]
 pub struct GridOutcome {
-    pub switched_to_move_i: Option<usize>,
-    pub switched_to_attack: bool,
-    pub switched_to_idle: bool,
+    pub switched_to: Option<GridSwitchedTo>,
     pub hovered_character_id: Option<CharacterId>,
+    pub switched_target: bool,
+}
+
+pub enum GridSwitchedTo {
+    Move { selected_option: usize },
+    Attack,
+    Idle,
 }
 
 struct ConcreteEffect {

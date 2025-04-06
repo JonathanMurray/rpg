@@ -165,8 +165,10 @@ pub struct TextLine {
     font_size: u16,
     color: Color,
     min_height: f32,
+    min_width: f32,
     padding: f32,
     font: Option<Font>,
+    depth: Option<(Color, f32)>,
 
     pub has_been_hovered: Cell<Option<(f32, f32)>>,
 }
@@ -185,8 +187,10 @@ impl TextLine {
             font_size,
             color,
             min_height: 0.0,
+            min_width: 0.0,
             padding: 0.0,
             font,
+            depth: None,
             has_been_hovered: Cell::new(None),
         };
         this.measure();
@@ -196,6 +200,15 @@ impl TextLine {
     pub fn set_min_height(&mut self, min_height: f32) {
         self.min_height = min_height;
         self.size.1 = self.size.1.max(min_height);
+    }
+
+    pub fn set_min_width(&mut self, min_width: f32) {
+        self.min_width = min_width;
+        self.size.0 = self.size.0.max(min_width);
+    }
+
+    pub fn set_depth(&mut self, color: Color, offset: f32) {
+        self.depth = Some((color, offset));
     }
 
     pub fn set_padding(&mut self, padding: f32) {
@@ -226,6 +239,21 @@ impl TextLine {
 
 impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
+        if let Some((color, offset)) = self.depth {
+            let params = TextParams {
+                font_size: self.font_size,
+                color,
+                font: self.font.as_ref(),
+                ..Default::default()
+            };
+            draw_text_ex(
+                &self.string,
+                self.padding + x + offset,
+                self.padding + y + self.offset_y + offset,
+                params,
+            );
+        }
+
         let params = TextParams {
             font_size: self.font_size,
             color: self.color,
@@ -238,6 +266,7 @@ impl Drawable for TextLine {
             self.padding + y + self.offset_y,
             params,
         );
+
         draw_debug(x, y, self.size.0, self.size.1);
 
         let (mouse_x, mouse_y) = mouse_position();

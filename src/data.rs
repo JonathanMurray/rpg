@@ -203,8 +203,7 @@ pub const MIND_BLAST: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     damage: 1,
-    // TODO
-    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(99)),
+    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
         name: "Dualcast",

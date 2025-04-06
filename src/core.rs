@@ -24,7 +24,13 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(event_handler: Rc<dyn GameEventHandler>) -> Self {
-        let mut bob = Character::new(true, "Bob", SpriteId::Character, 3, 3, 6, (1, 3));
+        let mut bob = Character::new(
+            true,
+            "Bob",
+            SpriteId::Character,
+            Attributes::new(3, 3, 6),
+            (1, 3),
+        );
         bob.main_hand.weapon = Some(SWORD);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(CHAIN_MAIL);
@@ -36,15 +42,35 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
 
-        let mut enemy1 = Character::new(false, "Gremlin", SpriteId::Character2, 5, 5, 5, (2, 4));
+        let mut enemy1 = Character::new(
+            false,
+            "Gremlin",
+            SpriteId::Character2,
+            Attributes::new(5, 5, 5),
+            (2, 4),
+        );
         enemy1.main_hand.weapon = Some(DAGGER);
         enemy1.off_hand.shield = Some(SMALL_SHIELD);
         enemy1.armor = Some(LEATHER_ARMOR);
         enemy1.known_attacked_reactions.push(SIDE_STEP);
+        enemy1.receive_condition(Condition::Bleeding);
+        enemy1.receive_condition(Condition::Dazed(5));
 
-        let enemy2 = Character::new(false, "Gremlin", SpriteId::Character3, 1, 2, 1, (2, 3));
+        let enemy2 = Character::new(
+            false,
+            "Gromp",
+            SpriteId::Character3,
+            Attributes::new(1, 2, 1),
+            (2, 3),
+        );
 
-        let mut david = Character::new(true, "David", SpriteId::Character, 10, 10, 10, (5, 7));
+        let mut david = Character::new(
+            true,
+            "David",
+            SpriteId::Character,
+            Attributes::new(10, 10, 10),
+            (5, 7),
+        );
         david.main_hand.weapon = Some(DAGGER);
 
         let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
@@ -1154,7 +1180,7 @@ pub const CAREFUL_AIM: ConditionDescription = ConditionDescription {
 
 pub const WEAKENED: ConditionDescription = ConditionDescription {
     name: "Weakened",
-    description: "Has reduced stats",
+    description: "Has reduced attributes",
 };
 
 impl Conditions {
@@ -1313,6 +1339,23 @@ impl Hand {
 
 pub type CharacterId = u32;
 
+#[derive(Debug, Copy, Clone)]
+pub struct Attributes {
+    pub strength: u32,
+    pub dexterity: u32,
+    pub intellect: u32,
+}
+
+impl Attributes {
+    fn new(str: u32, dex: u32, intel: u32) -> Self {
+        Self {
+            strength: str,
+            dexterity: dex,
+            intellect: intel,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct Character {
     id: Option<CharacterId>,
@@ -1322,9 +1365,7 @@ pub struct Character {
     // TODO i32 instead?
     pub position: (u32, u32),
     pub name: &'static str,
-    pub base_strength: u32,
-    pub base_dexterity: u32,
-    pub base_intellect: u32,
+    pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
     pub move_range: f32,
@@ -1347,13 +1388,15 @@ impl Character {
         player_controlled: bool,
         name: &'static str,
         texture: SpriteId,
-        str: u32,
-        dex: u32,
-        int: u32,
+        base_attributes: Attributes,
         position: (u32, u32),
     ) -> Self {
-        let mana = if int < 3 { 0 } else { 1 + 2 * (int - 3) };
-        let move_range = 0.8 + dex as f32 * 0.2;
+        let mana = if base_attributes.intellect < 3 {
+            0
+        } else {
+            1 + 2 * (base_attributes.intellect - 3)
+        };
+        let move_range = 0.8 + base_attributes.dexterity as f32 * 0.2;
         Self {
             id: None,
             sprite: texture,
@@ -1361,10 +1404,8 @@ impl Character {
             player_controlled,
             position,
             name,
-            base_strength: str,
-            base_dexterity: dex,
-            base_intellect: int,
-            health: NumberedResource::new(5 + str),
+            base_attributes,
+            health: NumberedResource::new(5 + base_attributes.strength),
             mana: NumberedResource::new(mana),
             move_range,
             armor: None,
@@ -1372,7 +1413,9 @@ impl Character {
             off_hand: Default::default(),
             conditions: Default::default(),
             action_points: ACTION_POINTS_PER_TURN,
-            stamina: NumberedResource::new((str + dex).saturating_sub(5)),
+            stamina: NumberedResource::new(
+                (base_attributes.strength + base_attributes.dexterity).saturating_sub(5),
+            ),
             known_attack_enhancements: Default::default(),
             known_actions: vec![
                 BaseAction::Attack {
@@ -1612,15 +1655,15 @@ impl Character {
     }
 
     fn strength(&self) -> u32 {
-        (self.base_strength as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.strength as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn dexterity(&self) -> u32 {
-        (self.base_dexterity as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.dexterity as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn intellect(&self) -> u32 {
-        (self.base_intellect as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.intellect as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn is_dazed(&self) -> bool {
