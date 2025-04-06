@@ -31,7 +31,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, AttackOutcome,
         BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler,
         HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, SpellType,
-        ACTION_POINTS_PER_TURN, MOVE_ACTION_COST,
+        MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     equipment_ui::create_equipment_ui,
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
@@ -1060,11 +1060,11 @@ impl UserInterface {
             }
         }
 
+        self.active_character_id = active_character_id;
+
         self.set_allowed_to_use_action_buttons(
             self.player_portraits.selected_i.get() == active_character_id,
         );
-
-        self.active_character_id = active_character_id;
 
         self.game_grid.update(
             active_character_id,
@@ -1847,8 +1847,6 @@ impl Log {
                     let details_x = x + size.0 - details.size().0 - 10.0;
                     let mut details_y = line_pos.1 + text_line.size().1 + 5.0;
 
-                    //dbg!(line_pos, details_y, popup_size, x, size);
-
                     if details_y + popup_size.1 > y + size.1 {
                         details_y = line_pos.1 - popup_size.1 - 5.0;
                     }
@@ -1884,7 +1882,7 @@ impl ActionPointsRow {
         Self {
             current: 0,
             reserved_and_hovered: 0,
-            max: ACTION_POINTS_PER_TURN,
+            max: MAX_ACTION_POINTS,
             cell_size,
             radius_factor,
             padding: 3.0,

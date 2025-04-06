@@ -25,7 +25,7 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: Range::Melee,
-    action_point_cost: 1,
+    action_point_cost: 2,
     damage: 1,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,

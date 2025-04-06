@@ -14,7 +14,8 @@ use crate::data::{
 
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
-pub const ACTION_POINTS_PER_TURN: u32 = 6;
+pub const MAX_ACTION_POINTS: u32 = 6;
+pub const ACTION_POINTS_RECOVERY: u32 = 3;
 
 pub struct CoreGame {
     pub characters: Characters,
@@ -700,6 +701,7 @@ impl CoreGame {
             if character.action_points == 0 {
                 self.perform_end_of_turn_character(&mut character);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
+                self.active_character().recover_action_points();
             }
         }
 
@@ -742,7 +744,7 @@ impl CoreGame {
         }
 
         // TODO also give AP at start of turn
-        character.action_points = (character.action_points + 3).min(ACTION_POINTS_PER_TURN);
+        character.recover_action_points();
         character.main_hand.exertion = 0;
         character.off_hand.exertion = 0;
         character.stamina.gain(1);
@@ -1019,12 +1021,12 @@ impl Characters {
     }
 
     pub fn get(&self, character_id: CharacterId) -> Ref<Character> {
-        self.0
-            .iter()
-            .find(|(id, _ch)| *id == character_id)
-            .unwrap()
-            .1
-            .borrow()
+        let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
+
+        match entry {
+            Some((_id, ch)) => ch.borrow(),
+            None => panic!("No character with id: {character_id}"),
+        }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Rc<RefCell<Character>>> {
@@ -1412,7 +1414,7 @@ impl Character {
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
-            action_points: ACTION_POINTS_PER_TURN,
+            action_points: MAX_ACTION_POINTS,
             stamina: NumberedResource::new(
                 (base_attributes.strength + base_attributes.dexterity).saturating_sub(5),
             ),
@@ -1435,6 +1437,10 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
         }
+    }
+
+    pub fn recover_action_points(&mut self) {
+        self.action_points = (self.action_points + ACTION_POINTS_RECOVERY).min(MAX_ACTION_POINTS);
     }
 
     pub fn condition_descriptions(&self) -> Vec<ConditionDescription> {
