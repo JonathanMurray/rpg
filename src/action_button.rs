@@ -16,7 +16,7 @@ use crate::{
     base_ui::{draw_debug, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
     core::{
         AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement,
+        OnHitReaction, Spell, SpellEnhancement, SpellType,
     },
     textures::IconId,
 };
@@ -67,12 +67,19 @@ impl ActionButton {
                         weapon.name, weapon.action_point_cost
                     ));
                     tooltip_lines.push(format!("{} damage", weapon.damage));
+                    tooltip_lines.push(format!("[{}] vs Evasion", weapon.attack_attribute));
                 }
                 BaseAction::SelfEffect(sea) => {
                     action_points = sea.action_point_cost;
+                    stamina_points = sea.stamina_cost;
                     icon = sea.icon;
 
-                    tooltip_lines.push(format!("{} ({} AP)", sea.name, sea.action_point_cost));
+                    tooltip_lines.push(format!(
+                        "{} ({})",
+                        sea.name,
+                        cost_string(sea.action_point_cost, sea.stamina_cost)
+                    ));
+
                     tooltip_lines.push(sea.description.to_string());
                 }
                 BaseAction::CastSpell(spell) => {
@@ -88,7 +95,15 @@ impl ActionButton {
                     if spell.damage > 0 {
                         description.push_str(&format!(" ({} damage)", spell.damage));
                     }
+
                     tooltip_lines.push(description);
+
+                    let attribute_line = match spell.spell_type {
+                        SpellType::Mental => "[int] vs Awareness".to_string(),
+                        SpellType::Projectile => "[int] vs Evasion".to_string(),
+                    };
+
+                    tooltip_lines.push(attribute_line);
                 }
                 BaseAction::Move {
                     action_point_cost,
@@ -374,7 +389,7 @@ impl ButtonAction {
 
     pub fn stamina_cost(&self) -> u32 {
         match self {
-            ButtonAction::Action(_base_action) => 0,
+            ButtonAction::Action(base_action) => base_action.stamina_cost(),
             ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
             ButtonAction::OnHitReaction(_reaction) => 0,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
@@ -387,6 +402,13 @@ impl ButtonAction {
     pub fn unwrap_movement_enhancement(&self) -> MovementEnhancement {
         match self {
             ButtonAction::MovementEnhancement(enhancement) => *enhancement,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_spell(&self) -> Spell {
+        match self {
+            ButtonAction::Action(BaseAction::CastSpell(spell)) => *spell,
             _ => panic!(),
         }
     }

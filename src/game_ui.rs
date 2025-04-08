@@ -4,7 +4,10 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::rand;
+use macroquad::{
+    color::{DARKBLUE, SKYBLUE},
+    rand,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -50,11 +53,13 @@ pub enum UiState {
         hand: HandType,
         attacker: CharacterId,
         reactor: CharacterId,
+        is_within_melee: bool,
     },
     ReactingToHit {
         attacker: CharacterId,
         victim: CharacterId,
         damage: u32,
+        is_within_melee: bool,
     },
     Idle,
 }
@@ -87,8 +92,9 @@ impl StopWatch {
 
 struct CharacterUi {
     tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
-    buttons: Vec<Rc<ActionButton>>,
+    hoverable_buttons: Vec<Rc<ActionButton>>,
     tabs: Tabs,
+    character_sheet: Container,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -114,7 +120,7 @@ pub struct UserInterface {
     activity_popup: ActivityPopup,
     character_portraits: CharacterPortraits,
     player_portraits: PlayerPortraits,
-    action_points_label: TextLine,
+    character_sheet_toggle: CharacterSheetToggle,
     action_points_row: ActionPointsRow,
     character_uis: HashMap<CharacterId, CharacterUi>,
     target_ui: TargetUi,
@@ -138,9 +144,10 @@ impl UserInterface {
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
-        let mut new_button = |_subtext, btn_action, character: Option<&Character>| {
+        let mut new_button = |btn_action, character: Option<&Character>, enabled: bool| {
             let btn =
                 ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
+            btn.enabled.set(enabled);
             next_button_id += 1;
             btn
         };
@@ -154,28 +161,34 @@ impl UserInterface {
             }
 
             let mut tracked_action_buttons = HashMap::new();
-            let mut buttons = vec![];
+            let mut hoverable_buttons = vec![];
             let mut basic_buttons = vec![];
             let mut spell_buttons = vec![];
 
-            let mut enhancement_buttons = vec![];
-            for (name, action) in character_ref.known_actions() {
+            let mut attack_button_for_spell_book = None;
+            let mut spell_buttons_for_spell_book = vec![];
+
+            let mut attack_enhancement_buttons = vec![];
+            for (_subtext, action) in character_ref.known_actions() {
                 let btn_action = ButtonAction::Action(action);
-                let btn = Rc::new(new_button(name, btn_action, Some(&character_ref)));
+                let btn = Rc::new(new_button(btn_action, Some(&character_ref), true));
                 tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
-                buttons.push(Rc::clone(&btn));
+                hoverable_buttons.push(Rc::clone(&btn));
                 match action {
-                    BaseAction::Attack { .. } => basic_buttons.push(btn),
+                    BaseAction::Attack { .. } => {
+                        basic_buttons.push(btn);
+
+                        let btn = Rc::new(new_button(btn_action, Some(&character_ref), false));
+                        attack_button_for_spell_book = Some(btn.clone());
+                        hoverable_buttons.push(btn);
+                    }
                     BaseAction::SelfEffect(..) => basic_buttons.push(btn),
-                    BaseAction::CastSpell(spell) => {
-                        if let Some(enhancement) = spell.possible_enhancement {
-                            let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                            let btn = Rc::new(new_button(spell.name.to_string(), btn_action, None));
-                            buttons.push(Rc::clone(&btn));
-                            btn.enabled.set(false);
-                            enhancement_buttons.push(btn);
-                        }
+                    BaseAction::CastSpell(..) => {
                         spell_buttons.push(btn);
+
+                        let btn = Rc::new(new_button(btn_action, Some(&character_ref), false));
+                        spell_buttons_for_spell_book.push(btn.clone());
+                        hoverable_buttons.push(btn);
                     }
                     BaseAction::Move { .. } => {
                         basic_buttons.push(btn);
@@ -197,42 +210,27 @@ impl UserInterface {
             );
 
             let mut reaction_buttons = vec![];
-            for (subtext, reaction) in character_ref.known_on_attacked_reactions() {
+            for (_subtext, reaction) in character_ref.known_on_attacked_reactions() {
                 let btn_action = ButtonAction::OnAttackedReaction(reaction);
-                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
-                buttons.push(Rc::clone(&btn));
-                btn.enabled.set(false);
+                let btn = Rc::new(new_button(btn_action, None, false));
+                hoverable_buttons.push(Rc::clone(&btn));
                 reaction_buttons.push(btn);
             }
-            for (subtext, reaction) in character_ref.known_on_hit_reactions() {
+            for (_subtext, reaction) in character_ref.known_on_hit_reactions() {
                 let btn_action = ButtonAction::OnHitReaction(reaction);
-                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
-                buttons.push(Rc::clone(&btn));
-                btn.enabled.set(false);
+                let btn = Rc::new(new_button(btn_action, None, false));
+                hoverable_buttons.push(Rc::clone(&btn));
                 reaction_buttons.push(btn);
             }
-            let reactions_row = buttons_row(
-                reaction_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
 
-            for (subtext, enhancement) in
+            for (_subtext, enhancement) in
                 character_ref.known_attack_enhancements(HandType::MainHand)
             {
                 let btn_action = ButtonAction::AttackEnhancement(enhancement);
-                let btn = Rc::new(new_button(subtext.clone(), btn_action, None));
-                buttons.push(Rc::clone(&btn));
-                btn.enabled.set(false);
-                enhancement_buttons.push(btn);
+                let btn = Rc::new(new_button(btn_action, None, false));
+                hoverable_buttons.push(Rc::clone(&btn));
+                attack_enhancement_buttons.push(btn);
             }
-            let enhancements_row = buttons_row(
-                enhancement_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
 
             let stats_table = build_stats_table(
                 &simple_font,
@@ -243,7 +241,7 @@ impl UserInterface {
                         &[
                             ("Health", StatValue::U32(character_ref.health.max)),
                             (
-                                "Physical resist",
+                                "Sturdiness",
                                 StatValue::U32(character_ref.physical_resistence()),
                             ),
                         ],
@@ -251,7 +249,7 @@ impl UserInterface {
                     (
                         ("DEX", character_ref.base_attributes.dexterity),
                         &[
-                            ("Defense", StatValue::U32(character_ref.defense())),
+                            ("Evasion", StatValue::U32(character_ref.defense())),
                             ("Movement", StatValue::F32(character_ref.move_range)),
                         ],
                     ),
@@ -260,7 +258,7 @@ impl UserInterface {
                         &[
                             ("Mana", StatValue::U32(character_ref.mana.max)),
                             (
-                                "Mental resist",
+                                "Awareness",
                                 StatValue::U32(character_ref.mental_resistence()),
                             ),
                         ],
@@ -271,13 +269,6 @@ impl UserInterface {
             let equipment_section =
                 create_equipment_ui(&simple_font, &character_ref, &equipment_icons);
 
-            let stats_section = Element::Container(Container {
-                layout_dir: LayoutDirection::Horizontal,
-                children: vec![stats_table, equipment_section],
-                margin: 10.0,
-                ..Default::default()
-            });
-
             let actions_section = Element::Container(Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
@@ -285,22 +276,170 @@ impl UserInterface {
                 ..Default::default()
             });
 
-            let secondary_actions_section = Element::Container(Container {
+            let mut spell_book_rows = Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                children: vec![reactions_row, enhancements_row],
+                children: vec![],
+                scroll: Some(ContainerScroll::default()),
+                max_height: Some(450.0),
+                style: Style {
+                    padding: 10.0,
+                    ..Default::default()
+                },
                 ..Default::default()
-            });
+            };
 
-            let tabs = Tabs::new(
-                0,
-                vec![
-                    ("Actions", actions_section),
-                    ("Secondary", secondary_actions_section),
-                    ("Stats", stats_section),
+            if !reaction_buttons.is_empty() {
+                let reactions_row = buttons_row(
+                    reaction_buttons
+                        .into_iter()
+                        .map(|btn| Element::Rc(btn))
+                        .collect(),
+                );
+
+                spell_book_rows.children.push(Element::Text(TextLine::new(
+                    "Reactions",
+                    16,
+                    WHITE,
+                    Some(simple_font.clone()),
+                )));
+                spell_book_rows.children.push(reactions_row);
+            }
+
+            if let Some(attack_button) = attack_button_for_spell_book {
+                spell_book_rows.children.push(Element::Text(TextLine::new(
+                    "Attack",
+                    16,
+                    WHITE,
+                    Some(simple_font.clone()),
+                )));
+
+                attack_enhancement_buttons.insert(0, attack_button);
+
+                let attack_enhancements_row = buttons_row(
+                    attack_enhancement_buttons
+                        .into_iter()
+                        .map(|btn| Element::Rc(btn))
+                        .collect(),
+                );
+
+                spell_book_rows.children.push(attack_enhancements_row);
+            }
+
+            for spell_btn in spell_buttons_for_spell_book.into_iter() {
+                let spell = spell_btn.action.unwrap_spell();
+                spell_book_rows.children.push(Element::Text(TextLine::new(
+                    spell.name,
+                    16,
+                    WHITE,
+                    Some(simple_font.clone()),
+                )));
+
+                let mut row_buttons = vec![spell_btn.clone()];
+                if let Some(enhancement) = spell.possible_enhancement {
+                    let btn_action = ButtonAction::SpellEnhancement(enhancement);
+                    let btn = Rc::new(new_button(btn_action, None, false));
+                    row_buttons.push(Rc::clone(&btn));
+                    hoverable_buttons.push(btn);
+                }
+                let spell_row = buttons_row(
+                    row_buttons
+                        .into_iter()
+                        .map(|btn| Element::Rc(btn))
+                        .collect(),
+                );
+                spell_book_rows.children.push(spell_row);
+            }
+
+            let character_sheet = Container {
+                layout_dir: LayoutDirection::Vertical,
+                align: Align::Center,
+                border_between_children: Some(LIGHTGRAY),
+                style: Style {
+                    padding: 3.0,
+                    background_color: Some(BLACK),
+                    ..Default::default()
+                },
+                children: vec![
+                    Element::Text(
+                        TextLine::new(character_ref.name, 28, SKYBLUE, Some(simple_font.clone()))
+                            .with_depth(DARKBLUE, 1.0)
+                            .with_padding(10.0),
+                    ),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        margin: 20.0,
+                        border_between_children: Some(LIGHTGRAY),
+                        style: Style {
+                            background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
+                            padding: 10.0,
+                            ..Default::default()
+                        },
+                        children: vec![
+                            Element::Container(Container {
+                                layout_dir: LayoutDirection::Vertical,
+                                margin: 10.0,
+                                align: Align::Center,
+                                style: Style {
+                                    padding: 10.0,
+                                    ..Default::default()
+                                },
+                                border_between_children: Some(LIGHTGRAY),
+                                children: vec![
+                                    Element::Text(
+                                        TextLine::new(
+                                            "Spell book",
+                                            22,
+                                            WHITE,
+                                            Some(simple_font.clone()),
+                                        )
+                                        .with_depth(BLACK, 2.0),
+                                    ),
+                                    Element::Container(spell_book_rows),
+                                ],
+                                ..Default::default()
+                            }),
+                            Element::Container(Container {
+                                layout_dir: LayoutDirection::Vertical,
+                                margin: 15.0,
+                                align: Align::Center,
+                                style: Style {
+                                    padding: 10.0,
+                                    ..Default::default()
+                                },
+                                children: vec![
+                                    Element::Text(
+                                        TextLine::new(
+                                            "Attributes",
+                                            22,
+                                            WHITE,
+                                            Some(simple_font.clone()),
+                                        )
+                                        .with_depth(BLACK, 2.0),
+                                    ),
+                                    stats_table,
+                                    Element::Text(
+                                        TextLine::new(
+                                            "Equipment",
+                                            22,
+                                            WHITE,
+                                            Some(simple_font.clone()),
+                                        )
+                                        .with_depth(BLACK, 2.0),
+                                    ),
+                                    equipment_section,
+                                ],
+
+                                ..Default::default()
+                            }),
+                        ],
+                        ..Default::default()
+                    }),
                 ],
-                simple_font.clone(),
-            );
+                ..Default::default()
+            };
+
+            let tabs = Tabs::new(0, vec![("Actions", actions_section)], simple_font.clone());
 
             let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
                 character_ref.health.current,
@@ -349,19 +488,18 @@ impl UserInterface {
             let character_ui = CharacterUi {
                 tracked_action_buttons,
                 tabs,
+                character_sheet,
                 health_bar,
                 mana_bar,
                 stamina_bar,
                 resource_bars,
                 conditions_list: ConditionsList::new(simple_font.clone(), vec![]),
-                buttons,
+                hoverable_buttons,
             };
 
             character_uis.insert(character.borrow().id(), character_ui);
         }
 
-        let action_points_label =
-            TextLine::new("Action points", 18, WHITE, Some(simple_font.clone()));
         let action_points_row = ActionPointsRow::new(
             (20.0, 20.0),
             0.3,
@@ -398,7 +536,7 @@ impl UserInterface {
             cell_backgrounds,
         );
 
-        let popup_proceed_btn = new_button("".to_string(), ButtonAction::Proceed, None);
+        let popup_proceed_btn = new_button(ButtonAction::Proceed, None, true);
 
         let player_portraits = PlayerPortraits::new(
             &game.characters,
@@ -406,6 +544,12 @@ impl UserInterface {
             active_character_id,
             decorative_font.clone(),
         );
+
+        let character_sheet_toggle = CharacterSheetToggle {
+            shown: Cell::new(true),
+            text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
+            padding: 10.0,
+        };
 
         let character_portraits = CharacterPortraits::new(
             &game.characters,
@@ -420,6 +564,7 @@ impl UserInterface {
             characters,
             character_portraits,
             player_portraits,
+            character_sheet_toggle,
             active_character_id,
             stopwatch: StopWatch::default(),
 
@@ -430,7 +575,6 @@ impl UserInterface {
             hovered_button: None,
             log: Log::new(simple_font.clone()),
             character_uis,
-            action_points_label,
             action_points_row,
             event_queue: Rc::clone(&event_queue),
             activity_popup: ActivityPopup::new(simple_font, state, popup_proceed_btn),
@@ -439,7 +583,7 @@ impl UserInterface {
         }
     }
 
-    fn new_button(&mut self, _subtext: String, btn_action: ButtonAction) -> ActionButton {
+    fn new_button(&mut self, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
             &self.event_queue,
@@ -462,7 +606,13 @@ impl UserInterface {
         };
 
         self.game_grid.position_on_screen = (0.0, 0.0);
-        let grid_outcome = self.game_grid.draw(popup_rectangle);
+
+        let grid_receptive_to_input =
+            !matches!(self.state, UiState::Idle) && !self.character_sheet_toggle.shown.get();
+
+        let grid_outcome = self
+            .game_grid
+            .draw(popup_rectangle, grid_receptive_to_input);
 
         self.activity_popup
             .draw(popup_rectangle.x, popup_rectangle.y);
@@ -471,25 +621,29 @@ impl UserInterface {
         draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
 
         self.player_portraits.draw(270.0, y + 10.0);
-        self.action_points_label.draw(20.0, y + 10.0);
-        self.action_points_row.draw(20.0, y + 30.0);
+        self.character_sheet_toggle.draw(270.0, y + 60.0);
 
-        self.character_uis
+        self.action_points_row.draw(20.0, y + 20.0);
+
+        let character_ui = self
+            .character_uis
             .get_mut(&self.player_portraits.selected_i.get())
-            .unwrap()
-            .tabs
-            .draw(20.0, y + 70.0);
+            .unwrap();
 
-        self.character_uis[&self.player_portraits.selected_i.get()]
-            .resource_bars
-            .draw(620.0, y + 100.0);
+        character_ui.tabs.draw(20.0, y + 70.0);
+
+        if self.character_sheet_toggle.shown.get() {
+            character_ui.character_sheet.draw(100.0, 90.0);
+        }
+
+        character_ui.resource_bars.draw(620.0, y + 100.0);
 
         if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
-            let btn = &self.character_uis[&self.player_portraits.selected_i.get()]
-                .buttons
+            let btn = character_ui
+                .hoverable_buttons
                 .iter()
                 .find(|btn| btn.id == btn_id)
-                .unwrap();
+                .expect("hovered button");
 
             draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
         }
@@ -497,7 +651,7 @@ impl UserInterface {
         self.log.draw(800.0, y);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
-        self.draw_player_conditions(630.0, y + 30.0);
+        self.draw_player_conditions(610.0, y + 30.0);
 
         self.character_portraits
             .set_hovered_character_id(grid_outcome.hovered_character_id);
@@ -595,7 +749,6 @@ impl UserInterface {
 
         match state {
             UiState::ConfiguringAction(base_action) => {
-                self.game_grid.receptive_to_input = true;
                 self.set_allowed_to_use_action_buttons(true);
 
                 popup_initial_lines = self.character_uis[&self.active_character_id]
@@ -614,8 +767,7 @@ impl UserInterface {
                     } => {
                         let enhancements = self.active_character().usable_attack_enhancements(hand);
                         for (subtext, enhancement) in enhancements {
-                            let btn = self
-                                .new_button(subtext, ButtonAction::AttackEnhancement(enhancement));
+                            let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
                         wants_target = true;
@@ -625,7 +777,7 @@ impl UserInterface {
                         if let Some(enhancement) = spell.possible_enhancement {
                             if self.active_character().can_use_spell_enhancement(spell) {
                                 let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                                let btn = self.new_button("".to_string(), btn_action);
+                                let btn = self.new_button(btn_action);
                                 popup_buttons.push(btn);
                             }
                         }
@@ -634,10 +786,8 @@ impl UserInterface {
                     BaseAction::Move { .. } => {
                         let enhancements = self.active_character().usable_movement_enhancements();
                         for (subtext, enhancement) in enhancements {
-                            let btn = self.new_button(
-                                subtext,
-                                ButtonAction::MovementEnhancement(enhancement),
-                            );
+                            let btn =
+                                self.new_button(ButtonAction::MovementEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
                         movement = true;
@@ -649,6 +799,7 @@ impl UserInterface {
                 attacker: attacker_id,
                 hand,
                 reactor: reactor_id,
+                is_within_melee,
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
@@ -660,28 +811,29 @@ impl UserInterface {
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
                     defender.name,
-                    attacker.attack_modifier(hand),
+                    attacker.attack_modifier(hand).0,
                     defender.defense(),
                 );
                 popup_initial_lines.push(attacks_str);
                 let explanation = format!(
                     "{}{}",
-                    attacker.explain_attack_circumstances(hand),
+                    attacker.explain_attack_bonus(hand),
                     defender.explain_incoming_attack_circumstances()
                 );
-                if !explanation.is_empty() {
-                    popup_initial_lines.push(format!("  {explanation}"));
-                }
-                popup_initial_lines.push(format!(
-                    "  Chance to hit: {}",
+                let mut line = format!(
+                    "Hit chance: {}",
                     as_percentage(prob_attack_hit(&attacker, hand, &defender))
-                ));
-                let reactions = defender.usable_on_attacked_reactions();
+                );
+                if !explanation.is_empty() {
+                    line.push_str(&format!("  {explanation}"));
+                }
+                popup_initial_lines.push(line);
+                let reactions = defender.usable_on_attacked_reactions(is_within_melee);
                 drop(attacker);
                 drop(defender);
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
-                    let btn = self.new_button(subtext, btn_action);
+                    let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
                 }
             }
@@ -690,6 +842,7 @@ impl UserInterface {
                 attacker: attacker_id,
                 damage,
                 victim: victim_id,
+                is_within_melee,
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
@@ -701,24 +854,22 @@ impl UserInterface {
                     victim.name,
                     damage,
                 ));
-                let reactions = victim.usable_on_hit_reactions();
+                let reactions = victim.usable_on_hit_reactions(is_within_melee);
                 drop(victim);
                 for (subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
-                    let btn = self.new_button(subtext, btn_action);
+                    let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
                 }
             }
 
             UiState::ChoosingAction => {
-                self.game_grid.receptive_to_input = true;
                 self.set_allowed_to_use_action_buttons(true);
                 self.set_highlighted_action(None);
             }
 
             UiState::Idle => {
                 self.set_allowed_to_use_action_buttons(false);
-                self.game_grid.receptive_to_input = false;
             }
         }
 
@@ -1109,8 +1260,7 @@ impl UserInterface {
                         hand,
                         &target_char,
                     ));
-                    let mut explanation =
-                        self.active_character().explain_attack_circumstances(hand);
+                    let mut explanation = self.active_character().explain_attack_bonus(hand);
                     explanation.push_str(&target_char.explain_incoming_attack_circumstances());
 
                     self.game_grid.static_text = Some((
@@ -1399,12 +1549,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
             BaseAction::Move { .. } => "MOVE".to_string(),
         },
-        ButtonAction::OnAttackedReaction(_on_attacked_reaction) => todo!(),
-        ButtonAction::OnHitReaction(_on_hit_reaction) => todo!(),
-        ButtonAction::AttackEnhancement(_attack_enhancement) => todo!(),
-        ButtonAction::SpellEnhancement(_spell_enhancement) => todo!(),
-        ButtonAction::MovementEnhancement(_movement_enhancement) => todo!(),
-        ButtonAction::Proceed => todo!(),
+        _ => unreachable!(),
     }
 }
 
@@ -1580,6 +1725,41 @@ impl Drawable for TopCharacterPortrait {
     }
 }
 
+struct CharacterSheetToggle {
+    shown: Cell<bool>,
+    text_line: TextLine,
+    padding: f32,
+}
+
+impl Drawable for CharacterSheetToggle {
+    fn draw(&self, x: f32, y: f32) {
+        self.text_line.draw(x + self.padding, y + self.padding);
+
+        let size = self.size();
+
+        let (mouse_x, mouse_y) = mouse_position();
+        let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
+        if hovered && is_mouse_button_pressed(MouseButton::Left) {
+            self.shown.set(!self.shown.get());
+        }
+
+        if self.shown.get() {
+            draw_rectangle_lines(x, y, size.0, size.1, 2.0, GOLD);
+        } else {
+            draw_rectangle_lines(x, y, size.0, size.1, 1.0, LIGHTGRAY);
+        }
+
+        if hovered {
+            draw_rectangle_lines(x + 2.0, y + 2.0, size.0 - 4.0, size.1 - 4.0, 1.0, WHITE);
+        }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        let (w, h) = self.text_line.size();
+        (w + self.padding * 2.0, h + self.padding * 2.0)
+    }
+}
+
 struct PlayerPortraits {
     row: Container,
     selected_i: Cell<CharacterId>,
@@ -1699,7 +1879,7 @@ impl Drawable for PlayerCharacterPortrait {
         let (w, h) = self.size();
         draw_rectangle(x, y, w, h, DARKGRAY);
         if self.shown_character.get() {
-            draw_rectangle_lines(x, y, w, h, 1.0, WHITE);
+            draw_rectangle_lines(x, y, w, h, 2.0, WHITE);
         } else {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
@@ -1720,11 +1900,13 @@ impl Drawable for PlayerCharacterPortrait {
         }
 
         let (mouse_x, mouse_y) = mouse_position();
-        if (x..x + w).contains(&mouse_x)
-            && (y..y + h).contains(&mouse_y)
-            && is_mouse_button_pressed(MouseButton::Left)
-        {
-            self.has_been_clicked.set(true);
+        let hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
+
+        if hovered {
+            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
+            if is_mouse_button_pressed(MouseButton::Left) {
+                self.has_been_clicked.set(true);
+            }
         }
     }
 

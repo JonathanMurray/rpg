@@ -15,7 +15,7 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPosition},
     base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style},
-    core::{Character, HandType},
+    core::{Character, HandType, Range},
     textures::EquipmentIconId,
 };
 
@@ -44,8 +44,13 @@ pub fn create_equipment_ui(
                     "{} dmg ({} AP) [{}]",
                     weapon.damage, weapon.action_point_cost, weapon.attack_attribute
                 ),
-                format!("Range: {}", weapon.range),
             ];
+
+            if weapon.range != Range::Melee {
+                icon_cell
+                    .tooltip_lines
+                    .push(format!("Range: {}", weapon.range));
+            }
 
             if let Some(effect) = weapon.on_true_hit {
                 icon_cell.tooltip_lines.push(format!("[true hit] {effect}"));

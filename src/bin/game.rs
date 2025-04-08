@@ -140,6 +140,7 @@ async fn main() {
                             let reaction = bot_choose_attack_reaction(
                                 &choose_reaction.game,
                                 choose_reaction.reactor,
+                                choose_reaction.is_within_melee,
                             );
                             choose_reaction.proceed(reaction)
                         }
@@ -147,6 +148,7 @@ async fn main() {
                             let reaction = bot_choose_hit_reaction(
                                 &choose_reaction.game,
                                 choose_reaction.reactor,
+                                choose_reaction.is_within_melee,
                             );
                             choose_reaction.proceed(reaction)
                         }
@@ -163,6 +165,7 @@ async fn main() {
                                 attacker: inner.attacker,
                                 hand: inner.hand,
                                 reactor: inner.reactor,
+                                is_within_melee: inner.is_within_melee,
                             });
                         }
                         StateChooseReaction::Hit(inner) => {
@@ -171,6 +174,7 @@ async fn main() {
                                 attacker: inner.attacker,
                                 victim: inner.reactor,
                                 damage: inner.damage,
+                                is_within_melee: inner.is_within_melee,
                             });
                         }
                     }

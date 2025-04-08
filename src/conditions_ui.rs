@@ -14,12 +14,12 @@ use crate::{
 
 pub struct ConditionsList {
     pub font: Font,
-    pub descriptions: Vec<ConditionDescription>,
+    pub descriptions: Vec<(ConditionDescription, Option<u32>)>,
     size: Cell<(f32, f32)>,
 }
 
 impl ConditionsList {
-    pub fn new(font: Font, descriptions: Vec<ConditionDescription>) -> Self {
+    pub fn new(font: Font, descriptions: Vec<(ConditionDescription, Option<u32>)>) -> Self {
         Self {
             font,
             descriptions,
@@ -43,7 +43,7 @@ fn draw_conditions(
     x: f32,
     y: f32,
     font: &Font,
-    condition_descriptions: &[ConditionDescription],
+    condition_descriptions: &[(ConditionDescription, Option<u32>)],
 ) -> (f32, f32) {
     let text_params = TextParams {
         font: Some(font),
@@ -61,10 +61,19 @@ fn draw_conditions(
 
     let mut y_offset = 0.0;
 
-    for condition in condition_descriptions {
+    for (condition, stacks) in condition_descriptions {
         y_offset += line_height;
         let y0 = y + y_offset;
-        let dimensions = draw_text_ex(condition.name, x, y0, text_params.clone());
+        let dimensions = if let Some(stacks) = stacks {
+            draw_text_ex(
+                &format!("{} ({})", condition.name, stacks),
+                x,
+                y0,
+                text_params.clone(),
+            )
+        } else {
+            draw_text_ex(condition.name, x, y0, text_params.clone())
+        };
 
         if (x..x + dimensions.width).contains(&mouse_x)
             && (y0 - dimensions.height..y0).contains(&mouse_y)

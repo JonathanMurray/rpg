@@ -211,9 +211,19 @@ impl TextLine {
         self.depth = Some((color, offset));
     }
 
+    pub fn with_depth(mut self, color: Color, offset: f32) -> Self {
+        self.set_depth(color, offset);
+        self
+    }
+
     pub fn set_padding(&mut self, padding: f32) {
         self.padding = padding;
         self.measure();
+    }
+
+    pub fn with_padding(mut self, padding: f32) -> Self {
+        self.set_padding(padding);
+        self
     }
 
     pub fn set_string(&mut self, string: impl Into<String>) {
@@ -354,6 +364,16 @@ impl Default for Align {
 #[derive(Default)]
 pub struct ContainerScroll {
     offset: Cell<f32>,
+    draw_overflow: bool,
+}
+
+impl ContainerScroll {
+    pub fn with_draw_overflow() -> Self {
+        Self {
+            draw_overflow: true,
+            ..Default::default()
+        }
+    }
 }
 
 #[derive(Default)]
@@ -441,6 +461,13 @@ impl Container {
             .as_ref()
             .map(|scroll| -scroll.offset.get())
             .unwrap_or(0.0);
+
+        let draw_overflow = self
+            .scroll
+            .as_ref()
+            .map(|scroll| scroll.draw_overflow)
+            .unwrap_or(false);
+
         for (i, element) in self.children.iter().enumerate() {
             let (element_w, element_h) = element.size();
             let offset = match (&self.align, &self.layout_dir) {
@@ -468,7 +495,10 @@ impl Container {
             };
 
             let y_element = y0 + offset.1;
-            if y_element >= y && y_element + element.size().1 <= y + size.1 + 5.0 {
+
+            if (draw_overflow || y_element >= y)
+                && (draw_overflow || y_element + element.size().1 <= y + size.1 + 5.0)
+            {
                 element.draw(x0 + offset.0, y_element);
             }
 
@@ -481,12 +511,22 @@ impl Container {
                 if let Some(border_color) = self.border_between_children {
                     let thickness = 1.0;
                     match self.layout_dir {
-                        LayoutDirection::Horizontal => {
-                            draw_line(x0, y0, x0, y0 + size.1, thickness, border_color)
-                        }
-                        LayoutDirection::Vertical => {
-                            draw_line(x0, y0, x0 + size.0, y0, thickness, border_color)
-                        }
+                        LayoutDirection::Horizontal => draw_line(
+                            x0 - self.margin * 0.5,
+                            y0,
+                            x0 - self.margin * 0.5,
+                            y0 + size.1 - self.style.padding * 2.0,
+                            thickness,
+                            border_color,
+                        ),
+                        LayoutDirection::Vertical => draw_line(
+                            x0,
+                            y0 - self.margin * 0.5,
+                            x0 + size.0 - self.style.padding * 2.0,
+                            y0 - self.margin * 0.5,
+                            thickness,
+                            border_color,
+                        ),
                     }
                 }
             }

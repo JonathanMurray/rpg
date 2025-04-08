@@ -96,11 +96,12 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
 pub fn bot_choose_attack_reaction(
     game: &CoreGame,
     reactor_id: CharacterId,
+    is_within_melee: bool,
 ) -> Option<OnAttackedReaction> {
     let reactions = game
         .characters
         .get(reactor_id)
-        .usable_on_attacked_reactions();
+        .usable_on_attacked_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)
     } else {
@@ -108,8 +109,15 @@ pub fn bot_choose_attack_reaction(
     }
 }
 
-pub fn bot_choose_hit_reaction(game: &CoreGame, reactor_id: CharacterId) -> Option<OnHitReaction> {
-    let reactions = game.characters.get(reactor_id).usable_on_hit_reactions();
+pub fn bot_choose_hit_reaction(
+    game: &CoreGame,
+    reactor_id: CharacterId,
+    is_within_melee: bool,
+) -> Option<OnHitReaction> {
+    let reactions = game
+        .characters
+        .get(reactor_id)
+        .usable_on_hit_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)
     } else {

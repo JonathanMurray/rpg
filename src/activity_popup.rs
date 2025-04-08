@@ -78,6 +78,8 @@ impl ActivityPopup {
         draw_rectangle_lines(x, y, size.0, size.1, 2.0, border_color);
         self.last_drawn_size = size;
 
+        let line_height = 18.0;
+
         let text_params = TextParams {
             font: Some(&self.font),
             font_size: 16,
@@ -97,12 +99,12 @@ impl ActivityPopup {
                 draw_text_ex(line, x0, y0, params);
             }
 
-            y0 += 20.0;
+            y0 += line_height;
         }
 
         if let Some(line) = &self.target_line {
             draw_text_ex(line, x0, y0, text_params.clone());
-            y0 += 20.0;
+            y0 += line_height;
         }
 
         let mut choice_description_line = "".to_string();
@@ -112,15 +114,15 @@ impl ActivityPopup {
                 ButtonAction::AttackEnhancement(enhancement) => enhancement.description,
                 ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
                 ButtonAction::MovementEnhancement(enhancement) => enhancement.name,
-                ButtonAction::OnAttackedReaction(reaction) => reaction.description,
-                ButtonAction::OnHitReaction(reaction) => reaction.description,
+                ButtonAction::OnAttackedReaction(reaction) => reaction.name,
+                ButtonAction::OnHitReaction(reaction) => reaction.name,
                 ButtonAction::Action(..) | ButtonAction::Proceed => unreachable!(),
             };
             choice_description_line.push_str(s);
             choice_description_line.push(']');
         }
         draw_text_ex(&choice_description_line, x0, y0, text_params.clone());
-        y0 += 20.0;
+        y0 += line_height;
 
         if self.enabled {
             match &self.state {
@@ -289,7 +291,10 @@ impl ActivityPopup {
     }
 
     pub fn stamina_points(&self) -> u32 {
-        let mut sta = 0;
+        let mut sta = self
+            .base_action
+            .map(|action| action.stamina_cost())
+            .unwrap_or(0);
         for action in self.selected_actions() {
             sta += action.stamina_cost();
         }

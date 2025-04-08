@@ -52,18 +52,15 @@ impl TargetUi {
                 &[
                     (
                         ("STR", char.base_attributes.strength),
-                        &[(
-                            "Physical resist",
-                            StatValue::U32(char.physical_resistence()),
-                        )],
+                        &[("Sturdiness", StatValue::U32(char.physical_resistence()))],
                     ),
                     (
                         ("DEX", char.base_attributes.dexterity),
-                        &[("Defense", StatValue::U32(char.defense()))],
+                        &[("Evasion", StatValue::U32(char.defense()))],
                     ),
                     (
                         ("INT", char.base_attributes.intellect),
-                        &[("Mental resist", StatValue::U32(char.mental_resistence()))],
+                        &[("Awareness", StatValue::U32(char.mental_resistence()))],
                     ),
                 ],
             );

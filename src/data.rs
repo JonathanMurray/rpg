@@ -1,9 +1,9 @@
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-        OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range,
-        SelfEffectAction, Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType,
-        Weapon, WeaponGrip,
+        ConditionDescription, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
+        OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement,
+        SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -26,7 +26,7 @@ pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: Range::Melee,
     action_point_cost: 2,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: None,
@@ -42,7 +42,7 @@ pub const SWORD: Weapon = Weapon {
     name: "Sword",
     range: Range::Melee,
     action_point_cost: 2,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: None,
@@ -58,7 +58,7 @@ pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
     range: Range::Melee,
     action_point_cost: 2,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: None,
@@ -72,7 +72,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: Range::Melee,
     action_point_cost: 2,
-    damage: 2,
+    damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(AttackEnhancement {
@@ -97,19 +97,10 @@ pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: Range::Ranged(5),
     action_point_cost: 2,
-    damage: 2,
+    damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Dexterity,
-    attack_enhancement: Some(AttackEnhancement {
-        name: "Careful aim",
-        description: "Bonus advantage",
-        icon: IconId::CarefulAim,
-        action_point_cost: 1,
-        stamina_cost: 0,
-        bonus_damage: 0,
-        apply_on_self_before: Some(Condition::CarefulAim),
-        on_hit_effect: None,
-    }),
+    attack_enhancement: Some(CAREFUL_AIM),
     on_attacked_reaction: None,
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Weakened(1),
@@ -123,12 +114,12 @@ pub const SMALL_SHIELD: Shield = Shield {
     sprite: Some(SpriteId::Shield),
     defense: 2,
     on_hit_reaction: Some(OnHitReaction {
-        // TODO only in melee!
         name: "Shield bash",
         description: "Possibly daze attacker",
         icon: IconId::ShieldBash,
         action_point_cost: 1,
         effect: OnHitReactionEffect::ShieldBash,
+        must_be_melee: true,
     }),
 };
 
@@ -145,36 +136,66 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
-    description: "Bonus defense",
+    description: "Gain bonus defense equal to your attack modifier",
     icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 0,
     effect: OnAttackedReactionEffect::Parry,
+    must_be_melee: true,
+};
+
+pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
+    name: "Careful aim",
+    description: CAREFUL_AIM_DESCRIPTION.description,
+    icon: IconId::CarefulAim,
+    action_point_cost: 1,
+    stamina_cost: 0,
+    bonus_damage: 0,
+    apply_on_self_before: Some(Condition::CarefulAim),
+    on_hit_effect: None,
+};
+
+pub const CAREFUL_AIM_DESCRIPTION: ConditionDescription = ConditionDescription {
+    name: "Careful aim",
+    description: "Bonus advantage",
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
-    description: "Bonus defense",
+    description: "Double your defense gained from dexterity",
     icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect::SideStep,
+    must_be_melee: false,
 };
 
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
-    description: "Bonus advantange on your next attack",
+    description: RAGING_DESCRIPTION.description,
     icon: IconId::Rage,
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
+    must_be_melee: false,
 };
 
+pub const RAGING_DESCRIPTION: ConditionDescription = ConditionDescription {
+    name: "Raging",
+    description: "Gains advantage on the next attack",
+};
+
+pub const BRACED_DEFENSE_BONUS: u32 = 3;
 pub const BRACE: SelfEffectAction = SelfEffectAction {
     name: "Brace",
-    description: "Bonus defense the next time you're attacked",
+    description: "Gain +3 defense against the next incoming attack",
     icon: IconId::Brace,
     action_point_cost: 1,
+    stamina_cost: 1,
     effect: ApplyEffect::Condition(Condition::Braced),
+};
+pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
+    name: "Braced",
+    description: "Has +3 defense against the next incoming attack",
 };
 
 pub const SCREAM: Spell = Spell {
@@ -188,10 +209,10 @@ pub const SCREAM: Spell = Spell {
     spell_type: SpellType::Mental,
     possible_enhancement: Some(SpellEnhancement {
         name: "Shriek",
-        description: "Target loses 2 AP",
+        description: "Target loses 1 AP",
         icon: IconId::Banshee,
         mana_cost: 1,
-        effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(2)),
+        effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(1)),
     }),
     range: Range::Ranged(4),
 };

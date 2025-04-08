@@ -124,7 +124,6 @@ pub struct GameGrid {
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
     target: Target,
 
-    pub receptive_to_input: bool,
     pub grid_dimensions: (i32, i32),
     pub position_on_screen: (f32, f32),
 
@@ -165,7 +164,6 @@ impl GameGrid {
             movement_preview: Default::default(),
             target: Target::None,
             out_of_range_indicator: None,
-            receptive_to_input: true,
             cell_w: 64.0,
             grid_dimensions,
             position_on_screen: (0.0, 0.0), // is set later
@@ -441,7 +439,6 @@ impl GameGrid {
                 // pick an arbitrary enemy
                 for (id, character) in self.characters.iter_with_ids() {
                     if *id != self.active_character_id && !character.borrow().player_controlled {
-                        // TODO react to acquired target in game ui (show the target thingy)
                         self.target = Target::Some(*id);
                         break;
                     }
@@ -450,7 +447,7 @@ impl GameGrid {
         }
     }
 
-    pub fn draw(&mut self, blocked_screen_area: Rect) -> GridOutcome {
+    pub fn draw(&mut self, blocked_screen_area: Rect, receptive_to_input: bool) -> GridOutcome {
         let (w, h) = self.size;
 
         let (x, y) = self.position_on_screen;
@@ -548,7 +545,7 @@ impl GameGrid {
             && (0..self.grid_dimensions.1).contains(&mouse_grid_y);
         let is_mouse_blocked = blocked_screen_area.contains((mouse_x, mouse_y).into());
 
-        let receptive_to_input = self.receptive_to_input
+        let receptive_to_input = receptive_to_input
             && self
                 .characters
                 .get(self.active_character_id)
