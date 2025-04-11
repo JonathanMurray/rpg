@@ -12,7 +12,7 @@ type AttributeCell = (&'static str, u32);
 pub fn build_stats_table(
     font: &Font,
     attribute_font_size: u16,
-    rows: &[(AttributeCell, &[(&'static str, StatValue)])],
+    rows: &[(Option<AttributeCell>, &[(&'static str, StatValue)])],
 ) -> Element {
     let mut attribute_rows = vec![];
 
@@ -20,13 +20,15 @@ pub fn build_stats_table(
     let mut attribute_text_lines = vec![];
 
     for row in rows {
-        let attribute = row.0;
-        let attribute_text_line = TextLine::new(
-            format!("{}: {}", attribute.0, attribute.1),
-            attribute_font_size,
-            WHITE,
-            Some(font.clone()),
-        );
+        let text = if let Some(attribute) = row.0 {
+            format!("{}: {}", attribute.0, attribute.1)
+        } else {
+            " ".to_string()
+        };
+
+        let attribute_text_line =
+            TextLine::new(text, attribute_font_size, WHITE, Some(font.clone()));
+
         if attribute_text_line.size().0 > attribute_text_width {
             attribute_text_width = attribute_text_line.size().0;
         }
@@ -35,7 +37,7 @@ pub fn build_stats_table(
 
     // Make the rows of the right colum aligned with eachother
     for line in &mut attribute_text_lines {
-        line.set_min_width(attribute_text_width);
+        line.set_min_width(attribute_text_width, true);
     }
 
     for row in rows {
@@ -49,9 +51,11 @@ pub fn build_stats_table(
     Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         children: attribute_rows,
-        border_between_children: Some(GRAY),
+        //border_between_children: Some(DARKGRAY),
+        margin: 5.0,
         style: Style {
             border_color: Some(GRAY),
+            padding: 5.0,
             ..Default::default()
         },
         ..Default::default()
@@ -82,7 +86,7 @@ fn attribute_row(
         .map(|(name, value)| {
             Element::Text(TextLine::new(
                 format!("{} = {}", name, value),
-                18,
+                16,
                 WHITE,
                 Some(font.clone()),
             ))
@@ -91,7 +95,7 @@ fn attribute_row(
 
     let stats_list = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
-        margin: 4.0,
+        margin: 8.0,
         children: stat_rows,
         ..Default::default()
     });

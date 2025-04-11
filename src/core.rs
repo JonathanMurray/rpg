@@ -8,9 +8,7 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::{BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, RAGING_DESCRIPTION};
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP, SWORD};
-use crate::data::{
-    CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, SCREAM, SMALL_SHIELD,
-};
+use crate::data::{CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, SCREAM, SMALL_SHIELD};
 
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
@@ -29,11 +27,11 @@ impl CoreGame {
             true,
             "Bob",
             SpriteId::Character,
-            Attributes::new(3, 3, 6),
+            Attributes::new(3, 3, 6, 5),
             (1, 3),
         );
         bob.main_hand.weapon = Some(SWORD);
-        //bob.off_hand.shield = Some(SMALL_SHIELD);
+        bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(CHAIN_MAIL);
         bob.known_attack_enhancements.push(CRUSHING_STRIKE);
         bob.known_attacked_reactions.push(SIDE_STEP);
@@ -47,7 +45,7 @@ impl CoreGame {
             false,
             "Gremlin",
             SpriteId::Character2,
-            Attributes::new(5, 10, 5),
+            Attributes::new(5, 10, 5, 5),
             (2, 4),
         );
         enemy1.main_hand.weapon = Some(BOW);
@@ -61,7 +59,7 @@ impl CoreGame {
             false,
             "Gromp",
             SpriteId::Character3,
-            Attributes::new(1, 10, 1),
+            Attributes::new(1, 10, 1, 5),
             (2, 3),
         );
         enemy2.main_hand.weapon = Some(BOW);
@@ -70,7 +68,7 @@ impl CoreGame {
             true,
             "David",
             SpriteId::Character,
-            Attributes::new(10, 10, 10),
+            Attributes::new(10, 10, 10, 5),
             (5, 7),
         );
         david.main_hand.weapon = Some(DAGGER);
@@ -268,8 +266,8 @@ impl CoreGame {
         }
 
         let (target_label, target) = match spell.spell_type {
-            SpellType::Mental => ("mental resist", defender.mental_resistence()),
-            SpellType::Projectile => ("defense", defender.defense()),
+            SpellType::Mental => ("will", defender.will()),
+            SpellType::Projectile => ("evasion", defender.evasion()),
         };
 
         let cast_n_times = if enhanced
@@ -283,11 +281,11 @@ impl CoreGame {
         for i in 0..cast_n_times {
             let mut detail_lines = vec![];
             let roll = roll_d20_with_advantage(0);
-            let res = roll + caster.intellect();
+            let res = roll + caster.spell_modifier();
             detail_lines.push(format!(
-                "Rolled: {} (+{} int) = {}, vs {}={}",
+                "Rolled: {} (+{} spell mod) = {}, vs {}={}",
                 roll,
-                caster.intellect(),
+                caster.spell_modifier(),
                 res,
                 target_label,
                 target,
@@ -379,7 +377,7 @@ impl CoreGame {
 
         let advantage = attack_bonus.advantage + defender.incoming_attack_advantage();
 
-        let mut defense = defender.defense();
+        let mut evasion = defender.evasion();
 
         let mut defender_reacted_with_parry = false;
         let mut defender_reacted_with_sidestep = false;
@@ -387,7 +385,7 @@ impl CoreGame {
 
         let mut attack_hit = None;
 
-        let (attack_modifier, attack_modifier_attribute) = attacker.attack_modifier(hand_type);
+        let attack_modifier = attacker.attack_modifier(hand_type);
 
         let mut log_lines = vec![];
 
@@ -400,31 +398,31 @@ impl CoreGame {
             match reaction.effect {
                 OnAttackedReactionEffect::Parry => {
                     defender_reacted_with_parry = true;
-                    let bonus_def = defender.attack_modifier(HandType::MainHand).0;
+                    let bonus_def = defender.attack_modifier(HandType::MainHand);
 
                     log_lines.push(format!(
                         "  Defense: {} +{} (Parry) = {}",
-                        defense,
+                        evasion,
                         bonus_def,
-                        defense + bonus_def
+                        evasion + bonus_def
                     ));
-                    defense += bonus_def;
+                    evasion += bonus_def;
                     let p_hit =
-                        probability_of_d20_reaching(defense - attack_modifier, attack_bonus);
+                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
                     log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
                 OnAttackedReactionEffect::SideStep => {
                     defender_reacted_with_sidestep = true;
-                    let bonus_def = defender.defense_bonus_from_dexterity();
+                    let bonus_def = defender.evasion_from_agility();
                     log_lines.push(format!(
                         "  Defense: {} +{} (Side step) = {}",
-                        defense,
+                        evasion,
                         bonus_def,
-                        defense + bonus_def
+                        evasion + bonus_def
                     ));
-                    defense += bonus_def;
+                    evasion += bonus_def;
                     let p_hit =
-                        probability_of_d20_reaching(defense - attack_modifier, attack_bonus);
+                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
                     log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
             }
@@ -443,10 +441,9 @@ impl CoreGame {
             }
         }
         log_lines.push(format!(
-            "Rolled: {} (+{} {}) {}= {}, vs def={}, armor={}",
+            "Rolled: {} (+{} atk mod) {}= {}, vs def={}, armor={}",
             roll,
             attack_modifier,
-            attack_modifier_attribute,
             if attack_bonus.flat_amount > 0 {
                 format!("(+{}) ", attack_bonus.flat_amount)
             } else if attack_bonus.flat_amount < 0 {
@@ -455,11 +452,11 @@ impl CoreGame {
                 "".to_string()
             },
             attack_result,
-            defense,
+            evasion,
             defender.protection_from_armor()
         ));
 
-        let hit = attack_result >= defense;
+        let hit = attack_result >= evasion;
 
         let outcome = if hit {
             let mut on_true_hit_effect = None;
@@ -474,7 +471,7 @@ impl CoreGame {
                 dmg_calculation += bonus_dmg;
             }
 
-            let armored_defense = defense + defender.protection_from_armor();
+            let armored_defense = evasion + defender.protection_from_armor();
             if attack_result < armored_defense {
                 let mitigated = armored_defense - attack_result;
 
@@ -684,7 +681,7 @@ impl CoreGame {
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
 
-                let target = character.physical_resistence();
+                let target = character.toughness();
                 let roll = roll_d20_with_advantage(0);
                 let res = roll + reactor.strength();
                 lines.push(format!(
@@ -1000,18 +997,20 @@ pub fn prob_attack_hit(attacker: &Character, hand: HandType, defender: &Characte
     let mut bonus = attacker.attack_bonus(hand);
     bonus.advantage += defender.incoming_attack_advantage();
     let target = defender
-        .defense()
-        .saturating_sub(attacker.attack_modifier(hand).0)
+        .evasion()
+        .saturating_sub(attacker.attack_modifier(hand))
         .max(1);
     probability_of_d20_reaching(target, bonus)
 }
 
 pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Character) -> f32 {
     let defender_value = match spell_type {
-        SpellType::Mental => defender.mental_resistence(),
-        SpellType::Projectile => defender.defense(),
+        SpellType::Mental => defender.will(),
+        SpellType::Projectile => defender.evasion(),
     };
-    let target = defender_value.saturating_sub(caster.intellect()).max(1);
+    let target = defender_value
+        .saturating_sub(caster.spell_modifier())
+        .max(1);
     probability_of_d20_reaching(target, DiceRollBonus::default())
 }
 
@@ -1205,7 +1204,7 @@ struct Conditions {
 
 pub const DAZED_DESCRIPTION: ConditionDescription = ConditionDescription {
     name: "Dazed",
-    description: "Gains no defense bonus from dexterity and attacks with disadvantage",
+    description: "Gains no evasion from agility and attacks with disadvantage",
 };
 
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
@@ -1402,16 +1401,18 @@ pub type CharacterId = u32;
 #[derive(Debug, Copy, Clone)]
 pub struct Attributes {
     pub strength: u32,
-    pub dexterity: u32,
+    pub agility: u32,
     pub intellect: u32,
+    pub spirit: u32,
 }
 
 impl Attributes {
-    fn new(str: u32, dex: u32, intel: u32) -> Self {
+    fn new(str: u32, agi: u32, intel: u32, spi: u32) -> Self {
         Self {
             strength: str,
-            dexterity: dex,
+            agility: agi,
             intellect: intel,
+            spirit: spi,
         }
     }
 }
@@ -1434,6 +1435,7 @@ pub struct Character {
     off_hand: Hand,
     conditions: Conditions,
     pub action_points: u32,
+    pub reactive_action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
     known_actions: Vec<BaseAction>,
@@ -1451,12 +1453,14 @@ impl Character {
         base_attributes: Attributes,
         position: (u32, u32),
     ) -> Self {
-        let mana = if base_attributes.intellect < 3 {
+        let max_mana = if base_attributes.spirit < 3 {
             0
         } else {
-            1 + 2 * (base_attributes.intellect - 3)
+            1 + 2 * (base_attributes.spirit - 3)
         };
-        let move_range = 0.8 + base_attributes.dexterity as f32 * 0.2;
+        let move_range = 0.8 + base_attributes.agility as f32 * 0.2;
+        let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
+        let reaction_points = base_attributes.intellect / 2;
         Self {
             id: None,
             sprite: texture,
@@ -1466,16 +1470,15 @@ impl Character {
             name,
             base_attributes,
             health: NumberedResource::new(7 + base_attributes.strength),
-            mana: NumberedResource::new(mana),
+            mana: NumberedResource::new(max_mana),
             move_range,
             armor: None,
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
             action_points: MAX_ACTION_POINTS,
-            stamina: NumberedResource::new(
-                (base_attributes.strength + base_attributes.dexterity).saturating_sub(5),
-            ),
+            reactive_action_points: reaction_points,
+            stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
             known_actions: vec![
                 BaseAction::Attack {
@@ -1731,48 +1734,61 @@ impl Character {
         (self.base_attributes.strength as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
-    fn dexterity(&self) -> u32 {
-        (self.base_attributes.dexterity as i32 - self.conditions.weakened as i32).max(1) as u32
+    fn agility(&self) -> u32 {
+        (self.base_attributes.agility as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
     fn intellect(&self) -> u32 {
         (self.base_attributes.intellect as i32 - self.conditions.weakened as i32).max(1) as u32
     }
 
+    fn spirit(&self) -> u32 {
+        (self.base_attributes.spirit as i32 - self.conditions.weakened as i32).max(1) as u32
+    }
+
+    pub fn spell_modifier(&self) -> u32 {
+        self.intellect() + self.spirit()
+    }
+
     fn is_dazed(&self) -> bool {
         self.conditions.dazed > 0
     }
 
-    pub fn defense(&self) -> u32 {
-        let from_dex = self.defense_bonus_from_dexterity();
+    pub fn evasion(&self) -> u32 {
+        let from_agi = self.evasion_from_agility();
+        let from_int = self.evasion_from_intellect();
         let from_shield = self
             .off_hand
             .shield
-            .map(|shield| shield.defense)
+            .map(|shield| shield.evasion)
             .unwrap_or(0);
         let from_braced = if self.conditions.braced {
             BRACED_DEFENSE_BONUS
         } else {
             0
         };
-        10 + from_dex + from_shield + from_braced
+        10 + from_agi + from_int + from_shield + from_braced
     }
 
-    fn defense_bonus_from_dexterity(&self) -> u32 {
-        let mut bonus = if self.is_dazed() { 0 } else { self.dexterity() };
+    fn evasion_from_agility(&self) -> u32 {
+        let mut bonus = if self.is_dazed() { 0 } else { self.agility() };
         if let Some(armor) = self.armor {
-            if let Some(limit) = armor.limit_defense_from_dex {
+            if let Some(limit) = armor.limit_evasion_from_agi {
                 bonus = bonus.min(limit);
             }
         }
         bonus
     }
 
-    pub fn mental_resistence(&self) -> u32 {
+    fn evasion_from_intellect(&self) -> u32 {
+        self.intellect() / 2
+    }
+
+    pub fn will(&self) -> u32 {
         10 + self.intellect()
     }
 
-    pub fn physical_resistence(&self) -> u32 {
+    pub fn toughness(&self) -> u32 {
         10 + self.strength()
     }
 
@@ -1780,22 +1796,19 @@ impl Character {
         self.armor.map(|armor| armor.protection).unwrap_or(0)
     }
 
-    pub fn attack_modifier(&self, hand: HandType) -> (u32, &'static str) {
+    pub fn attack_modifier(&self, hand: HandType) -> u32 {
         let str = self.strength();
-        let dex = self.dexterity();
+        let agi = self.agility();
         let weapon = self.weapon(hand).unwrap();
 
         let use_str = match weapon.attack_attribute {
             AttackAttribute::Strength => true,
-            AttackAttribute::Dexterity => false,
-            AttackAttribute::Finesse => str >= dex,
+            AttackAttribute::Agility => false,
+            AttackAttribute::Finesse => str >= agi,
         };
 
-        if use_str {
-            (str, "str")
-        } else {
-            (dex, "dex")
-        }
+        let physical_attr = if use_str { str } else { agi };
+        physical_attr + self.intellect()
     }
 
     fn hand_exertion(&self, hand_type: HandType) -> u32 {
@@ -1917,7 +1930,7 @@ impl NumberedResource {
 pub struct ArmorPiece {
     pub name: &'static str,
     pub protection: u32,
-    pub limit_defense_from_dex: Option<u32>,
+    pub limit_evasion_from_agi: Option<u32>,
     pub icon: EquipmentIconId,
 }
 
@@ -1940,14 +1953,14 @@ pub struct Weapon {
 pub struct Shield {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
-    pub defense: u32,
+    pub evasion: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
 }
 
 #[derive(Debug, Copy, Clone)]
 pub enum AttackAttribute {
     Strength,
-    Dexterity,
+    Agility,
     Finesse,
 }
 
@@ -1955,8 +1968,8 @@ impl Display for AttackAttribute {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AttackAttribute::Strength => f.write_str("str"),
-            AttackAttribute::Dexterity => f.write_str("dex"),
-            AttackAttribute::Finesse => f.write_str("str | dex"),
+            AttackAttribute::Agility => f.write_str("agi"),
+            AttackAttribute::Finesse => f.write_str("str | agi"),
         }
     }
 }

@@ -67,7 +67,7 @@ impl ActionButton {
                         weapon.name, weapon.action_point_cost
                     ));
                     tooltip_lines.push(format!("{} damage", weapon.damage));
-                    tooltip_lines.push(format!("[{}] vs Evasion", weapon.attack_attribute));
+                    tooltip_lines.push("Targets [evasion]".to_string());
                 }
                 BaseAction::SelfEffect(sea) => {
                     action_points = sea.action_point_cost;
@@ -99,8 +99,8 @@ impl ActionButton {
                     tooltip_lines.push(description);
 
                     let attribute_line = match spell.spell_type {
-                        SpellType::Mental => "[int] vs Awareness".to_string(),
-                        SpellType::Projectile => "[int] vs Evasion".to_string(),
+                        SpellType::Mental => "Targets [will]".to_string(),
+                        SpellType::Projectile => "Targets [evasion]".to_string(),
                     };
 
                     tooltip_lines.push(attribute_line);

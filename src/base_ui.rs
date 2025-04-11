@@ -166,6 +166,7 @@ pub struct TextLine {
     color: Color,
     min_height: f32,
     min_width: f32,
+    right_align: bool,
     padding: f32,
     font: Option<Font>,
     depth: Option<(Color, f32)>,
@@ -188,6 +189,7 @@ impl TextLine {
             color,
             min_height: 0.0,
             min_width: 0.0,
+            right_align: false,
             padding: 0.0,
             font,
             depth: None,
@@ -202,8 +204,9 @@ impl TextLine {
         self.size.1 = self.size.1.max(min_height);
     }
 
-    pub fn set_min_width(&mut self, min_width: f32) {
+    pub fn set_min_width(&mut self, min_width: f32, right_align: bool) {
         self.min_width = min_width;
+        self.right_align = right_align;
         self.size.0 = self.size.0.max(min_width);
     }
 
@@ -249,6 +252,16 @@ impl TextLine {
 
 impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
+        let y0 = y + self.padding;
+
+        let x0 = if self.right_align {
+            let text_dimensions =
+                measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
+            x + self.size.0 - text_dimensions.width - self.padding
+        } else {
+            x + self.padding
+        };
+
         if let Some((color, offset)) = self.depth {
             let params = TextParams {
                 font_size: self.font_size,
@@ -258,8 +271,8 @@ impl Drawable for TextLine {
             };
             draw_text_ex(
                 &self.string,
-                self.padding + x + offset,
-                self.padding + y + self.offset_y + offset,
+                x0 + offset,
+                y0 + self.offset_y + offset,
                 params,
             );
         }
@@ -270,12 +283,7 @@ impl Drawable for TextLine {
             font: self.font.as_ref(),
             ..Default::default()
         };
-        draw_text_ex(
-            &self.string,
-            self.padding + x,
-            self.padding + y + self.offset_y,
-            params,
-        );
+        draw_text_ex(&self.string, x0, y0 + self.offset_y, params);
 
         draw_debug(x, y, self.size.0, self.size.1);
 

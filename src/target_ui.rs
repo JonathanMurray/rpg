@@ -51,17 +51,18 @@ impl TargetUi {
                 20,
                 &[
                     (
-                        ("STR", char.base_attributes.strength),
-                        &[("Sturdiness", StatValue::U32(char.physical_resistence()))],
+                        Some(("STR", char.base_attributes.strength)),
+                        &[("Toughness", StatValue::U32(char.toughness()))],
                     ),
                     (
-                        ("DEX", char.base_attributes.dexterity),
-                        &[("Evasion", StatValue::U32(char.defense()))],
+                        Some(("AGI", char.base_attributes.agility)),
+                        &[("Evasion", StatValue::U32(char.evasion()))],
                     ),
                     (
-                        ("INT", char.base_attributes.intellect),
-                        &[("Awareness", StatValue::U32(char.mental_resistence()))],
+                        Some(("INT", char.base_attributes.intellect)),
+                        &[("Will", StatValue::U32(char.will()))],
                     ),
+                    (Some(("SPI", char.base_attributes.spirit)), &[]),
                 ],
             );
 
@@ -73,7 +74,7 @@ impl TargetUi {
                     ..Default::default()
                 },
             );
-            action_points_row.current = char.action_points;
+            action_points_row.current_ap = char.action_points;
             let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (96.0, 12.0));
             health_bar.current = char.health.current;
 

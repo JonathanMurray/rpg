@@ -296,17 +296,25 @@ impl GameGrid {
 
     pub fn ensure_has_some_movement_preview(&mut self) {
         if self.movement_preview.is_none() {
-            let pos = self.characters.get(self.active_character_id).position_i32();
-            let mut movement_preview = vec![];
-            for (destination, route) in &self.pathfind_grid.routes {
-                if route.came_from == pos && route.distance_from_start > 0.0 {
-                    movement_preview.push((route.distance_from_start, *destination));
-                    movement_preview.push((0.0, pos));
-                    break;
-                }
-            }
-            self.movement_preview = Some(movement_preview);
+            self.set_an_arbitrary_valid_movement_preview();
         }
+    }
+
+    fn set_an_arbitrary_valid_movement_preview(&mut self) {
+        let pos = self.characters.get(self.active_character_id).position_i32();
+        let mut movement_preview = vec![];
+        for (destination, route) in &self.pathfind_grid.routes {
+            if route.came_from == pos
+                && route.distance_from_start > 0.0
+                && route.distance_from_start <= self.movement_range.selected()
+            {
+                movement_preview.push((route.distance_from_start, *destination));
+                movement_preview.push((0.0, pos));
+                break;
+            }
+        }
+        assert!(movement_preview.len() > 1);
+        self.movement_preview = Some(movement_preview);
     }
 
     pub fn remove_movement_preview(&mut self) {
@@ -343,6 +351,11 @@ impl GameGrid {
                 && movement_preview[0].0 > self.movement_range.selected()
             {
                 movement_preview.remove(0);
+            }
+
+            if movement_preview.len() == 1 {
+                // A path consisting only of one node is not valid.
+                self.set_an_arbitrary_valid_movement_preview();
             }
         }
     }
@@ -786,6 +799,7 @@ impl GameGrid {
             }
             pos = route.came_from;
         }
+        assert!(movement_preview.len() > 1);
         movement_preview
     }
 
@@ -923,6 +937,9 @@ impl GameGrid {
         }
 
         let end = path[0].1;
+        if path.len() < 2 {
+            panic!("Expected at least two nodes in path, but got: {:?}", path);
+        }
         let last_direction = (end.0 - path[1].1 .0, end.1 - path[1].1 .1);
 
         draw_arrow(

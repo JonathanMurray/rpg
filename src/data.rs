@@ -11,14 +11,14 @@ use crate::{
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     name: "Leather armor",
     protection: 3,
-    limit_defense_from_dex: None,
+    limit_evasion_from_agi: None,
     icon: EquipmentIconId::LeatherArmor,
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     name: "Chain mail",
     protection: 5,
-    limit_defense_from_dex: Some(4),
+    limit_evasion_from_agi: Some(4),
     icon: EquipmentIconId::ChainMail,
 };
 
@@ -99,7 +99,7 @@ pub const BOW: Weapon = Weapon {
     action_point_cost: 2,
     damage: 3,
     grip: WeaponGrip::TwoHanded,
-    attack_attribute: AttackAttribute::Dexterity,
+    attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFUL_AIM),
     on_attacked_reaction: None,
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
@@ -112,7 +112,7 @@ pub const BOW: Weapon = Weapon {
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),
-    defense: 2,
+    evasion: 2,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
         description: "Possibly daze attacker",
@@ -136,7 +136,7 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
-    description: "Gain bonus defense equal to your attack modifier",
+    description: "Gain bonus evasion equal to your attack modifier",
     icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 0,
@@ -162,7 +162,7 @@ pub const CAREFUL_AIM_DESCRIPTION: ConditionDescription = ConditionDescription {
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
-    description: "Double your defense gained from dexterity",
+    description: "Double your evasion gained from agility",
     icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 1,
@@ -187,7 +187,7 @@ pub const RAGING_DESCRIPTION: ConditionDescription = ConditionDescription {
 pub const BRACED_DEFENSE_BONUS: u32 = 3;
 pub const BRACE: SelfEffectAction = SelfEffectAction {
     name: "Brace",
-    description: "Gain +3 defense against the next incoming attack",
+    description: "Gain +3 evasion against the next incoming attack",
     icon: IconId::Brace,
     action_point_cost: 1,
     stamina_cost: 1,
@@ -195,7 +195,7 @@ pub const BRACE: SelfEffectAction = SelfEffectAction {
 };
 pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
     name: "Braced",
-    description: "Has +3 defense against the next incoming attack",
+    description: "Has +3 evasion against the next incoming attack",
 };
 
 pub const SCREAM: Spell = Spell {

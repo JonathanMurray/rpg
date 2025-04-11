@@ -108,7 +108,7 @@ impl ActivityPopup {
         }
 
         let mut choice_description_line = "".to_string();
-        for action in self.selected_actions() {
+        for action in self.selected_choices() {
             choice_description_line.push('[');
             let s = match action {
                 ButtonAction::AttackEnhancement(enhancement) => enhancement.description,
@@ -131,7 +131,7 @@ impl ActivityPopup {
                         BaseAction::SelfEffect(..) => {}
                         BaseAction::Move { range, .. } => {
                             let percentage: u32 = self
-                                .selected_actions()
+                                .selected_choices()
                                 .map(|action| action.unwrap_movement_enhancement().add_percentage)
                                 .sum();
                             let range = range * (1.0 + percentage as f32 / 100.0);
@@ -164,6 +164,15 @@ impl ActivityPopup {
         }
     }
 
+    fn are_choice_buttons_mutually_exclusive(&self) -> bool {
+        matches!(self.state, UiState::ReactingToAttack { .. })
+            || matches!(self.state, UiState::ReactingToHit { .. })
+            || matches!(
+                self.state,
+                UiState::ConfiguringAction(BaseAction::Move { .. })
+            )
+    }
+
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_movement_range = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
@@ -185,10 +194,7 @@ impl ActivityPopup {
                     }
 
                     // Some choices work like radio boxes
-                    if matches!(self.state, UiState::ReactingToAttack { .. })
-                        || matches!(self.state, UiState::ReactingToHit { .. })
-                        || matches!(clicked_btn.action, ButtonAction::MovementEnhancement { .. })
-                    {
+                    if self.are_choice_buttons_mutually_exclusive() {
                         for btn in self.choice_buttons.values() {
                             if btn.id != id {
                                 btn.highlighted.set(false);
@@ -214,7 +220,7 @@ impl ActivityPopup {
 
         if changed_movement_range {
             let mut added_percentage = 0;
-            for action in self.selected_actions() {
+            for action in self.selected_choices() {
                 if let ButtonAction::MovementEnhancement(enhancement) = action {
                     added_percentage += enhancement.add_percentage;
                 }
@@ -234,7 +240,7 @@ impl ActivityPopup {
             .collect()
     }
 
-    fn selected_actions(&self) -> impl Iterator<Item = &ButtonAction> {
+    fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
             .map(|id| &self.choice_buttons[id].action)
@@ -258,20 +264,33 @@ impl ActivityPopup {
         }
     }
 
-    pub fn action_points(&self) -> u32 {
-        let mut ap = self
+    pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
+        let reserved_from_action = self
             .base_action
             .map(|action| action.action_point_cost())
             .unwrap_or(0);
-        for action in self.selected_actions() {
-            ap += action.action_point_cost();
+        let mut reserved_from_choices = 0;
+        for action in self.selected_choices() {
+            reserved_from_choices += action.action_point_cost();
         }
+        let mut additional_hovered_from_choices = 0;
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                ap += self.choice_buttons[&id].action.action_point_cost();
+                additional_hovered_from_choices +=
+                    self.choice_buttons[&id].action.action_point_cost();
+
+                if self.are_choice_buttons_mutually_exclusive() {
+                    reserved_from_choices = 0;
+                }
             }
         }
-        ap
+        let reserved_ap = reserved_from_action + reserved_from_choices;
+        let hovered_ap = if additional_hovered_from_choices > 0 {
+            reserved_ap + additional_hovered_from_choices
+        } else {
+            0
+        };
+        (reserved_ap, hovered_ap)
     }
 
     pub fn mana_points(&self) -> u32 {
@@ -279,7 +298,7 @@ impl ActivityPopup {
             .base_action
             .map(|action| action.mana_cost())
             .unwrap_or(0);
-        for action in self.selected_actions() {
+        for action in self.selected_choices() {
             mana += action.mana_cost();
         }
         if let Some(id) = self.hovered_choice_button_id {
@@ -295,7 +314,7 @@ impl ActivityPopup {
             .base_action
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
-        for action in self.selected_actions() {
+        for action in self.selected_choices() {
             sta += action.stamina_cost();
         }
         if let Some(id) = self.hovered_choice_button_id {

@@ -28,8 +28,11 @@ pub fn create_equipment_ui(
     let mut eq_icon_cells = vec![EquipmentIcon::new(None, font.clone(), vec![]); 3];
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
-            eq_text_cells.push("Weapon dmg:".to_string());
+            eq_text_cells.push("Weapon dmg".to_string());
             eq_text_cells.push(format!("{}", weapon.damage));
+
+            eq_text_cells.push("Attack mod".to_string());
+            eq_text_cells.push(format!("{}", character.attack_modifier(hand)));
 
             let texture = Some(equipment_icons[&weapon.icon].clone());
             let icon_cell = match hand {
@@ -68,11 +71,11 @@ pub fn create_equipment_ui(
         }
     }
     if let Some(shield) = character.shield() {
-        eq_text_cells.push("+ Defense:".to_string());
-        eq_text_cells.push(format!("{}", shield.defense));
+        eq_text_cells.push("+ Evasion".to_string());
+        eq_text_cells.push(format!("{}", shield.evasion));
         let icon_cell = &mut eq_icon_cells[2];
         icon_cell.texture = Some(equipment_icons[&EquipmentIconId::SmallShield].clone());
-        icon_cell.tooltip_lines = vec![shield.name.to_string(), format!("{} def", shield.defense)];
+        icon_cell.tooltip_lines = vec![shield.name.to_string(), format!("{} def", shield.evasion)];
         if let Some(reaction) = shield.on_hit_reaction {
             icon_cell
                 .tooltip_lines
@@ -80,7 +83,7 @@ pub fn create_equipment_ui(
         }
     }
     if let Some(armor) = character.armor {
-        eq_text_cells.push("Armor:".to_string());
+        eq_text_cells.push("Armor".to_string());
         eq_text_cells.push(format!("{}", armor.protection));
         let icon_cell = &mut eq_icon_cells[1];
         icon_cell.texture = Some(equipment_icons[&armor.icon].clone());
@@ -88,10 +91,10 @@ pub fn create_equipment_ui(
             armor.name.to_string(),
             format!("{} armor", armor.protection),
         ];
-        if let Some(limit) = armor.limit_defense_from_dex {
+        if let Some(limit) = armor.limit_evasion_from_agi {
             icon_cell
                 .tooltip_lines
-                .push(format!("Max {} defense from dex", limit));
+                .push(format!("Max {} evasion from agi", limit));
         }
     }
 

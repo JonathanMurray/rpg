@@ -2,6 +2,7 @@ mod action_button;
 mod activity_popup;
 pub mod base_ui;
 pub mod bot;
+mod character_sheet;
 pub mod conditions_ui;
 pub mod core;
 mod d20;
