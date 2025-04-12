@@ -24,7 +24,7 @@ pub fn build_character_sheet(
     attack_button: Option<Rc<ActionButton>>,
     reaction_buttons: Vec<Rc<ActionButton>>,
     attack_enhancement_buttons: Vec<Rc<ActionButton>>,
-    spell_buttons: Vec<(Rc<ActionButton>, Option<Rc<ActionButton>>)>,
+    spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
 ) -> Container {
     let stats_table = build_stats_table(
         font,
@@ -115,7 +115,7 @@ pub fn build_character_sheet(
         spell_book_rows.children.push(row);
     }
 
-    for (spell_btn, enhancement_btn) in spell_buttons.into_iter() {
+    for (spell_btn, enhancement_buttons) in spell_buttons.into_iter() {
         let spell = spell_btn.action.unwrap_spell();
         spell_book_rows.children.push(Element::Text(TextLine::new(
             spell.name,
@@ -125,7 +125,7 @@ pub fn build_character_sheet(
         )));
 
         let mut row_buttons = vec![spell_btn.clone()];
-        if let Some(enhancement_btn) = enhancement_btn {
+        for enhancement_btn in enhancement_buttons {
             row_buttons.push(Rc::clone(&enhancement_btn));
         }
         let spell_row = buttons_row(

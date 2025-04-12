@@ -47,7 +47,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                         if other_character.borrow().player_controlled {
                             chosen_action = Some(Action::CastSpell {
                                 spell,
-                                enhanced: false,
+                                enhancements: vec![],
                                 target: *id,
                             });
                             break;

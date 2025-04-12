@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{DARKPURPLE, LIME, MAROON, PINK, PURPLE, SKYBLUE, YELLOW},
+    color::SKYBLUE,
     rand,
 };
 
@@ -34,8 +34,8 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, AttackOutcome,
         BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, GameEventHandler,
-        HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, SpellType,
-        MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        HandType, MovementEnhancement, OnAttackedReaction, OnHitReaction, SpellEnhancement,
+        SpellType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
     target_ui::TargetUi,
@@ -187,17 +187,21 @@ impl UserInterface {
 
                         let btn = Rc::new(new_button(btn_action, Some(&character_ref), false));
 
-                        let maybe_enhancement_btn = spell.possible_enhancement.map(|enhancement| {
-                            let enhancement_btn = Rc::new(new_button(
-                                ButtonAction::SpellEnhancement(enhancement),
-                                None,
-                                false,
-                            ));
-                            hoverable_buttons.push(enhancement_btn.clone());
-                            enhancement_btn
-                        });
-                        spell_buttons_for_character_sheet
-                            .push((btn.clone(), maybe_enhancement_btn));
+                        let enhancement_buttons: Vec<Rc<ActionButton>> = spell
+                            .possible_enhancements
+                            .iter()
+                            .filter_map(|maybe_enhancement| *maybe_enhancement)
+                            .map(|enhancement| {
+                                let enhancement_btn = Rc::new(new_button(
+                                    ButtonAction::SpellEnhancement(enhancement),
+                                    None,
+                                    false,
+                                ));
+                                hoverable_buttons.push(enhancement_btn.clone());
+                                enhancement_btn
+                            })
+                            .collect();
+                        spell_buttons_for_character_sheet.push((btn.clone(), enhancement_buttons));
 
                         hoverable_buttons.push(btn);
                     }
@@ -596,8 +600,10 @@ impl UserInterface {
                     }
                     BaseAction::SelfEffect(..) => {}
                     BaseAction::CastSpell(spell) => {
-                        if let Some(enhancement) = spell.possible_enhancement {
-                            if self.active_character().can_use_spell_enhancement(spell) {
+                        // TODO multiple
+                        if let Some(Some(enhancement)) = spell.possible_enhancements.first().copied()
+                        {
+                            if self.active_character().can_use_spell_enhancement(spell, 0) {
                                 let btn_action = ButtonAction::SpellEnhancement(enhancement);
                                 let btn = self.new_button(btn_action);
                                 popup_buttons.push(btn);
@@ -1233,21 +1239,16 @@ impl UserInterface {
                     }
                     BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
                     BaseAction::CastSpell(spell) => {
-                        // TODO multiple spell enhancements
-                        let enhanced: bool = self
+                        let enhancements: Vec<SpellEnhancement> = self
                             .activity_popup
                             .take_selected_actions()
                             .into_iter()
-                            .map(|action| match action {
-                                ButtonAction::SpellEnhancement(e) => e,
-                                _ => unreachable!(),
-                            })
-                            .count()
-                            > 0;
+                            .map(|action| action.unwrap_spell_enhancement())
+                            .collect();
 
                         Action::CastSpell {
                             spell,
-                            enhanced,
+                            enhancements,
                             target: target.unwrap(),
                         }
                     }

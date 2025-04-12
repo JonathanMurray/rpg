@@ -267,6 +267,7 @@ impl ActivityPopup {
     pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
         let reserved_from_action = self
             .base_action
+            .as_ref()
             .map(|action| action.action_point_cost())
             .unwrap_or(0);
         let mut reserved_from_choices = 0;
@@ -296,6 +297,7 @@ impl ActivityPopup {
     pub fn mana_points(&self) -> u32 {
         let mut mana = self
             .base_action
+            .as_ref()
             .map(|action| action.mana_cost())
             .unwrap_or(0);
         for action in self.selected_choices() {
@@ -312,6 +314,7 @@ impl ActivityPopup {
     pub fn stamina_points(&self) -> u32 {
         let mut sta = self
             .base_action
+            .as_ref()
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
         for action in self.selected_choices() {

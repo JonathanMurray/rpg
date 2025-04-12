@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, PARRY_EVASION_BONUS,
+    SpellId, BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, PARRY_EVASION_BONUS,
     RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP, SWORD};
@@ -177,10 +177,10 @@ impl CoreGame {
             }
             Action::CastSpell {
                 spell,
-                enhanced,
+                enhancements,
                 target,
             } => {
-                self.perform_spell(&mut character, spell, enhanced, target);
+                self.perform_spell(&mut character, spell, enhancements, target);
             }
             Action::Move {
                 action_point_cost,
@@ -252,7 +252,7 @@ impl CoreGame {
         &self,
         caster: &mut Character,
         spell: Spell,
-        enhanced: bool,
+        enhancements: Vec<SpellEnhancement>,
         target: CharacterId,
     ) {
         let defender = &mut self.characters.get_mut(target);
@@ -263,8 +263,7 @@ impl CoreGame {
         caster.action_points -= spell.action_point_cost;
         caster.mana.spend(spell.mana_cost);
 
-        if enhanced {
-            let enhancement = spell.possible_enhancement.unwrap();
+        for enhancement in &enhancements {
             caster.mana.spend(enhancement.mana_cost);
         }
 
@@ -273,13 +272,12 @@ impl CoreGame {
             SpellType::Projectile => ("evasion", defender.evasion()),
         };
 
-        let cast_n_times = if enhanced
-            && spell.possible_enhancement.unwrap().effect == Some(SpellEnhancementEffect::CastTwice)
-        {
-            2
-        } else {
-            1
-        };
+        let mut cast_n_times = 1;
+        for enhancement in &enhancements {
+            if enhancement.effect == Some(SpellEnhancementEffect::CastTwice) {
+                cast_n_times = 2;
+            }
+        }
 
         for i in 0..cast_n_times {
             let mut detail_lines = vec![];
@@ -315,7 +313,7 @@ impl CoreGame {
                     dmg_calculation += bonus_dmg;
                 }
 
-                if let Some(enhancement) = spell.possible_enhancement {
+                for enhancement in &enhancements {
                     if enhancement.bonus_damage > 0 {
                         dmg_str.push_str(&format!(
                             " +{} ({})",
@@ -338,17 +336,13 @@ impl CoreGame {
                     detail_lines.push(format!("{} ({})", log_line, spell.name));
                 }
 
-                match spell.possible_enhancement {
-                    Some(SpellEnhancement {
-                        effect: Some(SpellEnhancementEffect::OnHitEffect(effect)),
-                        name,
-                        ..
-                    }) if enhanced => {
+                for enhancement in &enhancements {
+                    if let Some(SpellEnhancementEffect::OnHitEffect(effect)) = enhancement.effect {
                         let log_line = self.perform_effect_application(effect, defender);
-                        detail_lines.push(format!("{} ({})", log_line, name));
+                        detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                     }
-                    _ => {}
-                };
+                }
+
                 SpellOutcome::Hit(damage)
             } else {
                 match spell.spell_type {
@@ -368,7 +362,7 @@ impl CoreGame {
                 caster: caster.id(),
                 target: defender.id(),
                 outcome,
-                spell,
+                spell: spell,
                 detail_lines,
             });
         }
@@ -1298,7 +1292,7 @@ pub enum Action {
     SelfEffect(SelfEffectAction),
     CastSpell {
         spell: Spell,
-        enhanced: bool,
+        enhancements: Vec<SpellEnhancement>,
         target: CharacterId,
     },
     Move {
@@ -1374,6 +1368,7 @@ pub enum HandType {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spell {
+    pub id: SpellId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
@@ -1382,7 +1377,7 @@ pub struct Spell {
     pub damage: u32,
     pub on_hit_effect: Option<ApplyEffect>,
     pub spell_type: SpellType,
-    pub possible_enhancement: Option<SpellEnhancement>,
+    pub possible_enhancements: [Option<SpellEnhancement>; 2],
     pub range: Range,
 }
 
@@ -1773,8 +1768,8 @@ impl Character {
             && (!reaction.must_be_melee || is_within_melee)
     }
 
-    pub fn can_use_spell_enhancement(&self, spell: Spell) -> bool {
-        let enhancement = spell.possible_enhancement.unwrap();
+    pub fn can_use_spell_enhancement(&self, spell: Spell, enhancement_index: usize) -> bool {
+        let enhancement = spell.possible_enhancements[enhancement_index].unwrap();
         self.mana.current >= spell.mana_cost + enhancement.mana_cost
     }
 

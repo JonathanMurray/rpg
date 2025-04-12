@@ -1,3 +1,4 @@
+
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
@@ -199,7 +200,16 @@ pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
     description: "Has +3 evasion against the next incoming attack",
 };
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellId {
+    Scream,
+    Mindblast,
+    Fireball,
+    Kill,
+}
+
 pub const SCREAM: Spell = Spell {
+    id: SpellId::Scream,
     name: "Scream",
     description: "Daze the enemy",
     icon: IconId::Scream,
@@ -208,20 +218,24 @@ pub const SCREAM: Spell = Spell {
     damage: 0,
     on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
     spell_type: SpellType::Mental,
-    possible_enhancement: Some(SpellEnhancement {
-        name: "Shriek",
-        description: "Target loses 1 AP",
-        icon: IconId::Banshee,
-        mana_cost: 1,
-        bonus_damage: 0,
-        effect: Some(SpellEnhancementEffect::OnHitEffect(
-            ApplyEffect::RemoveActionPoints(1),
-        )),
-    }),
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Shriek",
+            description: "Target loses 1 AP",
+            icon: IconId::Banshee,
+            mana_cost: 1,
+            bonus_damage: 0,
+            effect: Some(SpellEnhancementEffect::OnHitEffect(
+                ApplyEffect::RemoveActionPoints(1),
+            )),
+        }),
+        None,
+    ],
     range: Range::Ranged(4),
 };
 
 pub const MIND_BLAST: Spell = Spell {
+    id: SpellId::Mindblast,
     name: "Mind blast",
     description: "Damage and stagger the enemy",
     icon: IconId::Mindblast,
@@ -230,18 +244,22 @@ pub const MIND_BLAST: Spell = Spell {
     damage: 1,
     on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
     spell_type: SpellType::Mental,
-    possible_enhancement: Some(SpellEnhancement {
-        name: "Dualcast",
-        description: "Spell is cast twice",
-        icon: IconId::Dualcast,
-        mana_cost: 1,
-        bonus_damage: 0,
-        effect: Some(SpellEnhancementEffect::CastTwice),
-    }),
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Dualcast",
+            description: "Spell is cast twice",
+            icon: IconId::Dualcast,
+            mana_cost: 1,
+            bonus_damage: 0,
+            effect: Some(SpellEnhancementEffect::CastTwice),
+        }),
+        None,
+    ],
     range: Range::Ranged(5),
 };
 
 pub const FIREBALL: Spell = Spell {
+    id: SpellId::Fireball,
     name: "Fireball",
     description: "Hurl a fireball that damages the target",
     icon: IconId::Fireball,
@@ -250,18 +268,22 @@ pub const FIREBALL: Spell = Spell {
     damage: 2,
     on_hit_effect: None,
     spell_type: SpellType::Projectile,
-    possible_enhancement: Some(SpellEnhancement {
-        name: "Greater",
-        description: "+1 damage",
-        icon: IconId::Plus,
-        mana_cost: 1,
-        bonus_damage: 1,
-        effect: None,
-    }),
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Greater",
+            description: "+1 damage",
+            icon: IconId::Plus,
+            mana_cost: 1,
+            bonus_damage: 1,
+            effect: None,
+        }),
+        None,
+    ],
     range: Range::Ranged(5),
 };
 
 pub const KILL: Spell = Spell {
+    id: SpellId::Kill,
     name: "Kill",
     description: "Kill the enemy",
     icon: IconId::Fireball,
@@ -270,6 +292,6 @@ pub const KILL: Spell = Spell {
     damage: 99,
     on_hit_effect: None,
     spell_type: SpellType::Projectile,
-    possible_enhancement: None,
+    possible_enhancements: [None; 2],
     range: Range::Ranged(99),
 };

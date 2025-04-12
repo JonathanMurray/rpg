@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, PURPLE, SKYBLUE, WHITE, YELLOW},
+    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, PURPLE, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -421,6 +421,13 @@ impl ButtonAction {
     pub fn unwrap_spell(&self) -> Spell {
         match self {
             ButtonAction::Action(BaseAction::CastSpell(spell)) => *spell,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_spell_enhancement(&self) -> SpellEnhancement {
+        match self {
+            ButtonAction::SpellEnhancement(enhancement) => *enhancement,
             _ => panic!(),
         }
     }
