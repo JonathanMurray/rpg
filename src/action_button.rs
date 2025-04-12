@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
+    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, PURPLE, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -50,6 +50,8 @@ impl ActionButton {
 
         let icon: IconId;
         let mut tooltip_lines = vec![];
+
+        let mut reactive_action_points = 0;
 
         match action {
             ButtonAction::Action(base_action) => match base_action {
@@ -155,7 +157,7 @@ impl ActionButton {
                 tooltip_lines.push(format!("+{}% range", enhancement.add_percentage));
             }
             ButtonAction::OnAttackedReaction(reaction) => {
-                action_points = reaction.action_point_cost;
+                reactive_action_points = reaction.action_point_cost;
                 stamina_points = reaction.stamina_cost;
                 icon = reaction.icon;
 
@@ -167,7 +169,7 @@ impl ActionButton {
                 tooltip_lines.push(reaction.description.to_string());
             }
             ButtonAction::OnHitReaction(reaction) => {
-                action_points = reaction.action_point_cost;
+                reactive_action_points = reaction.action_point_cost;
                 icon = reaction.icon;
 
                 tooltip_lines.push(format!(
@@ -198,36 +200,46 @@ impl ActionButton {
         let r = 4.0;
         let mut point_icons = vec![];
         let border_width = Some(4.0);
+        let border_color = Some(BLACK);
+        let icon_size = (r * 2.0, r * 2.0);
+        let point_style = Style {
+            border_color,
+            border_width,
+            ..Default::default()
+        };
         for _ in 0..action_points {
             point_icons.push(Element::Rect(Rectangle {
-                size: (r * 2.0, r * 2.0),
+                size: icon_size,
                 style: Style {
                     background_color: Some(GOLD),
-                    border_color: Some(BLACK),
-                    border_width,
-                    ..Default::default()
+                    ..point_style
+                },
+            }))
+        }
+        for _ in 0..reactive_action_points {
+            point_icons.push(Element::Rect(Rectangle {
+                size: icon_size,
+                style: Style {
+                    background_color: Some(PURPLE),
+                    ..point_style
                 },
             }))
         }
         for _ in 0..mana_points {
             point_icons.push(Element::Rect(Rectangle {
-                size: (r * 2.0, r * 2.0),
+                size: icon_size,
                 style: Style {
                     background_color: Some(SKYBLUE),
-                    border_color: Some(BLACK),
-                    border_width,
-                    ..Default::default()
+                    ..point_style
                 },
             }))
         }
         for _ in 0..stamina_points {
             point_icons.push(Element::Rect(Rectangle {
-                size: (r * 2.0, r * 2.0),
+                size: icon_size,
                 style: Style {
                     background_color: Some(GREEN),
-                    border_color: Some(BLACK),
-                    border_width,
-                    ..Default::default()
+                    ..point_style
                 },
             }))
         }

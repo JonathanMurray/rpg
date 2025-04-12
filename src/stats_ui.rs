@@ -65,6 +65,7 @@ pub fn build_stats_table(
 pub enum StatValue {
     U32(u32),
     F32(f32),
+    String(String),
 }
 
 impl fmt::Display for StatValue {
@@ -72,6 +73,7 @@ impl fmt::Display for StatValue {
         match self {
             StatValue::U32(x) => f.write_fmt(format_args!("{}", x)),
             StatValue::F32(x) => f.write_fmt(format_args!("{:.2}", x)),
+            StatValue::String(s) => f.write_str(&s),
         }
     }
 }

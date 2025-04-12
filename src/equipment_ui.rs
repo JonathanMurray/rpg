@@ -32,7 +32,7 @@ pub fn create_equipment_ui(
             eq_text_cells.push(format!("{}", weapon.damage));
 
             eq_text_cells.push("Attack mod".to_string());
-            eq_text_cells.push(format!("{}", character.attack_modifier(hand)));
+            eq_text_cells.push(format!("+{}", character.attack_modifier(hand)));
 
             let texture = Some(equipment_icons[&weapon.icon].clone());
             let icon_cell = match hand {
@@ -71,11 +71,14 @@ pub fn create_equipment_ui(
         }
     }
     if let Some(shield) = character.shield() {
-        eq_text_cells.push("+ Evasion".to_string());
+        eq_text_cells.push("Evasion bonus".to_string());
         eq_text_cells.push(format!("{}", shield.evasion));
         let icon_cell = &mut eq_icon_cells[2];
         icon_cell.texture = Some(equipment_icons[&EquipmentIconId::SmallShield].clone());
-        icon_cell.tooltip_lines = vec![shield.name.to_string(), format!("{} def", shield.evasion)];
+        icon_cell.tooltip_lines = vec![
+            shield.name.to_string(),
+            format!("+{} evasion", shield.evasion),
+        ];
         if let Some(reaction) = shield.on_hit_reaction {
             icon_cell
                 .tooltip_lines

@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::SKYBLUE,
+    color::{DARKPURPLE, LIME, MAROON, PINK, PURPLE, SKYBLUE, YELLOW},
     rand,
 };
 
@@ -91,6 +91,7 @@ impl StopWatch {
 
 struct CharacterUi {
     tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
+    action_points_row: ActionPointsRow,
     hoverable_buttons: Vec<Rc<ActionButton>>,
     tabs: Tabs,
     character_sheet: Container,
@@ -120,7 +121,6 @@ pub struct UserInterface {
     character_portraits: CharacterPortraits,
     player_portraits: PlayerPortraits,
     character_sheet_toggle: CharacterSheetToggle,
-    action_points_row: ActionPointsRow,
     character_uis: HashMap<CharacterId, CharacterUi>,
     target_ui: TargetUi,
     log: Log,
@@ -306,8 +306,19 @@ impl UserInterface {
                 ..Default::default()
             };
 
+            let action_points_row = ActionPointsRow::new(
+                character_ref.max_reactive_action_points,
+                (20.0, 20.0),
+                0.3,
+                Style {
+                    border_color: Some(WHITE),
+                    ..Default::default()
+                },
+            );
+
             let character_ui = CharacterUi {
                 tracked_action_buttons,
+                action_points_row,
                 tabs,
                 character_sheet,
                 health_bar,
@@ -320,15 +331,6 @@ impl UserInterface {
 
             character_uis.insert(character.borrow().id(), character_ui);
         }
-
-        let action_points_row = ActionPointsRow::new(
-            (20.0, 20.0),
-            0.3,
-            Style {
-                border_color: Some(WHITE),
-                ..Default::default()
-            },
-        );
 
         let state = UiState::Idle;
 
@@ -367,7 +369,7 @@ impl UserInterface {
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
-            shown: Cell::new(true),
+            shown: Cell::new(false),
             text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
             padding: 10.0,
         };
@@ -396,7 +398,6 @@ impl UserInterface {
             hovered_button: None,
             log: Log::new(simple_font.clone()),
             character_uis,
-            action_points_row,
             event_queue: Rc::clone(&event_queue),
             activity_popup: ActivityPopup::new(simple_font, state, popup_proceed_btn),
             target_ui,
@@ -444,12 +445,12 @@ impl UserInterface {
         self.player_portraits.draw(270.0, y + 10.0);
         self.character_sheet_toggle.draw(270.0, y + 60.0);
 
-        self.action_points_row.draw(20.0, y + 20.0);
-
         let character_ui = self
             .character_uis
             .get_mut(&self.player_portraits.selected_i.get())
             .unwrap();
+
+        character_ui.action_points_row.draw(20.0, y + 20.0);
 
         character_ui.tabs.draw(20.0, y + 70.0);
 
@@ -1162,7 +1163,11 @@ impl UserInterface {
         self.update_character_status(&game.characters);
 
         if let Some(hovered_btn) = self.hovered_button {
-            self.action_points_row.reserved_and_hovered_ap = (
+            self.character_uis
+                .get_mut(&self.player_portraits.selected_i.get())
+                .unwrap()
+                .action_points_row
+                .reserved_and_hovered_ap = (
                 self.activity_popup.reserved_and_hovered_action_points().0,
                 hovered_btn.1.action_point_cost(),
             );
@@ -1175,8 +1180,11 @@ impl UserInterface {
                 .borrow_mut()
                 .set_reserved(hovered_btn.1.stamina_cost());
         } else {
-            self.action_points_row.reserved_and_hovered_ap =
-                self.activity_popup.reserved_and_hovered_action_points();
+            self.character_uis
+                .get_mut(&self.player_portraits.selected_i.get())
+                .unwrap()
+                .action_points_row
+                .reserved_and_hovered_ap = self.activity_popup.reserved_and_hovered_action_points();
             self.character_uis[&self.player_portraits.selected_i.get()]
                 .mana_bar
                 .borrow_mut()
@@ -1355,14 +1363,14 @@ impl UserInterface {
                     .set_current(character.stamina.current);
 
                 ui.conditions_list.descriptions = character.condition_descriptions();
+
+                ui.action_points_row.current_ap = self
+                    .characters
+                    .get(self.player_portraits.selected_i.get())
+                    .action_points;
+                ui.action_points_row.is_characters_turn = *id == self.active_character_id;
             }
         }
-
-        // TODO: Don't crash on player death
-        self.action_points_row.current_ap = self
-            .characters
-            .get(self.player_portraits.selected_i.get())
-            .action_points;
     }
 }
 
@@ -1440,6 +1448,8 @@ impl CharacterPortraits {
             let portrait = self.portraits[id].borrow_mut();
             let character = character.borrow();
             portrait.action_points_row.borrow_mut().current_ap = character.action_points;
+            portrait.action_points_row.borrow_mut().is_characters_turn =
+                *id == game.active_character_id;
             portrait.health_bar.borrow_mut().current = character.health.current;
         }
     }
@@ -1483,6 +1493,7 @@ impl TopCharacterPortrait {
         let char_ref = character.borrow();
 
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
+            char_ref.max_reactive_action_points,
             (10.0, 10.0),
             0.25,
             Style::default(),
@@ -1875,7 +1886,8 @@ impl Log {
 
 #[derive(Default)]
 pub struct ActionPointsRow {
-    reactive_ap: u32,
+    pub is_characters_turn: bool,
+    max_reactive_ap: u32,
     pub current_ap: u32,
     reserved_and_hovered_ap: (u32, u32),
     max_ap: u32,
@@ -1886,9 +1898,15 @@ pub struct ActionPointsRow {
 }
 
 impl ActionPointsRow {
-    pub fn new(cell_size: (f32, f32), radius_factor: f32, style: Style) -> Self {
+    pub fn new(
+        max_reactive_ap: u32,
+        cell_size: (f32, f32),
+        radius_factor: f32,
+        style: Style,
+    ) -> Self {
         Self {
-            reactive_ap: 0,
+            is_characters_turn: false,
+            max_reactive_ap,
             current_ap: 0,
             reserved_and_hovered_ap: (0, 0),
             max_ap: MAX_ACTION_POINTS,
@@ -1908,18 +1926,37 @@ impl Drawable for ActionPointsRow {
         let y0 = y + self.padding;
         let r = self.cell_size.1 * self.radius_factor;
         let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
+
         for i in 0..self.max_ap {
             let is_point_hovered =
                 (self.current_ap.saturating_sub(hovered_ap)..self.current_ap).contains(&i);
 
+            let blocked_by_lack_of_reactive_ap = !self.is_characters_turn
+                && i < self.max_ap.saturating_sub(self.max_reactive_ap)
+                && i < self.current_ap;
+
+            let mut overcomitted = false;
+
             if i < self.current_ap.saturating_sub(reserved_ap) {
                 // Unreserved point
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    GOLD,
-                );
+
+                if blocked_by_lack_of_reactive_ap {
+                    draw_circle(
+                        x0 + self.cell_size.0 / 2.0,
+                        y0 + self.cell_size.1 / 2.0,
+                        r,
+                        //Color::new(0.65, 0.2, 0.4, 1.0),
+                        GOLD,
+                    );
+                    draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);
+                } else {
+                    draw_circle(
+                        x0 + self.cell_size.0 / 2.0,
+                        y0 + self.cell_size.1 / 2.0,
+                        r,
+                        GOLD,
+                    );
+                }
             } else if i < self.current_ap {
                 // Reserved
                 draw_circle(
@@ -1930,11 +1967,12 @@ impl Drawable for ActionPointsRow {
                 );
             } else if i < reserved_ap.max(hovered_ap) {
                 // Overcomitted
+                overcomitted = true;
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    RED,
+                    GRAY,
                 );
             } else {
                 // Spent / missing
@@ -1946,10 +1984,18 @@ impl Drawable for ActionPointsRow {
                 );
             }
 
-            if is_point_hovered {
+            if overcomitted {
                 draw_circle_lines(
-                    x0 + self.cell_size.0 / 2.0 + 1.0,
-                    y0 + self.cell_size.1 / 2.0 + 1.0,
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    2.0,
+                    RED,
+                );
+            } else if is_point_hovered {
+                draw_circle_lines(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
                     r,
                     2.0,
                     SKYBLUE,

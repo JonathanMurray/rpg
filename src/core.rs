@@ -6,14 +6,17 @@ use std::rc::Rc;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, RAGING_DESCRIPTION};
+use crate::data::{
+    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, PARRY_EVASION_BONUS,
+    RAGING_DESCRIPTION,
+};
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP, SWORD};
 use crate::data::{CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, SCREAM, SMALL_SHIELD};
 
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
-pub const MAX_ACTION_POINTS: u32 = 6;
-pub const ACTION_POINTS_RECOVERY: u32 = 3;
+pub const MAX_ACTION_POINTS: u32 = 5;
+//pub const ACTION_POINTS_RECOVERY: u32 = 3;
 
 pub struct CoreGame {
     pub characters: Characters,
@@ -27,7 +30,7 @@ impl CoreGame {
             true,
             "Bob",
             SpriteId::Character,
-            Attributes::new(3, 3, 6, 5),
+            Attributes::new(5, 4, 2, 5),
             (1, 3),
         );
         bob.main_hand.weapon = Some(SWORD);
@@ -45,7 +48,7 @@ impl CoreGame {
             false,
             "Gremlin",
             SpriteId::Character2,
-            Attributes::new(5, 10, 5, 5),
+            Attributes::new(5, 5, 5, 5),
             (2, 4),
         );
         enemy1.main_hand.weapon = Some(BOW);
@@ -59,7 +62,7 @@ impl CoreGame {
             false,
             "Gromp",
             SpriteId::Character3,
-            Attributes::new(1, 10, 1, 5),
+            Attributes::new(1, 5, 1, 5),
             (2, 3),
         );
         enemy2.main_hand.weapon = Some(BOW);
@@ -265,13 +268,13 @@ impl CoreGame {
             caster.mana.spend(enhancement.mana_cost);
         }
 
-        let (target_label, target) = match spell.spell_type {
+        let (defense_label, defense) = match spell.spell_type {
             SpellType::Mental => ("will", defender.will()),
             SpellType::Projectile => ("evasion", defender.evasion()),
         };
 
         let cast_n_times = if enhanced
-            && spell.possible_enhancement.unwrap().effect == SpellEnhancementEffect::CastTwice
+            && spell.possible_enhancement.unwrap().effect == Some(SpellEnhancementEffect::CastTwice)
         {
             2
         } else {
@@ -281,29 +284,53 @@ impl CoreGame {
         for i in 0..cast_n_times {
             let mut detail_lines = vec![];
             let roll = roll_d20_with_advantage(0);
-            let res = roll + caster.spell_modifier();
+            let spell_result = roll + caster.spell_modifier();
             detail_lines.push(format!(
                 "Rolled: {} (+{} spell mod) = {}, vs {}={}",
                 roll,
                 caster.spell_modifier(),
-                res,
-                target_label,
-                target,
+                spell_result,
+                defense_label,
+                defense,
             ));
 
-            let success = res >= target;
-
-            let outcome = if success {
-                SpellOutcome::Hit(spell.damage)
-            } else {
-                SpellOutcome::Resist
-            };
-
-            if success {
+            let outcome = if spell_result >= defense {
                 detail_lines.push("The spell was successful!".to_string());
-                let damage = spell.damage;
-                if damage > 0 {
+                let mut dmg_calculation = spell.damage as i32;
+                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
+
+                let (label, bonus_dmg) = if spell_result < defense + 5 {
+                    // No such thing as "True hit" for spells
+                    ("", 0)
+                } else if spell_result < defense + 10 {
+                    ("Heavy hit", 1)
+                } else {
+                    ("Critical hit", 2)
+                };
+                if !label.is_empty() {
+                    detail_lines.push(format!("  {label}!"));
+                }
+                if bonus_dmg > 0 {
+                    dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
+                    dmg_calculation += bonus_dmg;
+                }
+
+                if let Some(enhancement) = spell.possible_enhancement {
+                    if enhancement.bonus_damage > 0 {
+                        dmg_str.push_str(&format!(
+                            " +{} ({})",
+                            enhancement.bonus_damage, enhancement.name
+                        ));
+                        dmg_calculation += enhancement.bonus_damage as i32;
+                    }
+                }
+
+                let damage = dmg_calculation.max(0) as u32;
+
+                if dmg_calculation > 0 {
                     self.perform_losing_health(defender, damage);
+                    dmg_str.push_str(&format!(" = {damage}"));
+                    detail_lines.push(dmg_str);
                 }
 
                 if let Some(effect) = spell.on_hit_effect {
@@ -313,7 +340,7 @@ impl CoreGame {
 
                 match spell.possible_enhancement {
                     Some(SpellEnhancement {
-                        effect: SpellEnhancementEffect::OnHitEffect(effect),
+                        effect: Some(SpellEnhancementEffect::OnHitEffect(effect)),
                         name,
                         ..
                     }) if enhanced => {
@@ -322,6 +349,7 @@ impl CoreGame {
                     }
                     _ => {}
                 };
+                SpellOutcome::Hit(damage)
             } else {
                 match spell.spell_type {
                     SpellType::Mental => {
@@ -329,7 +357,8 @@ impl CoreGame {
                     }
                     SpellType::Projectile => detail_lines.push("The spell missed!".to_string()),
                 }
-            }
+                SpellOutcome::Resist
+            };
 
             if i < cast_n_times - 1 {
                 detail_lines.push(format!("{} cast again!", caster.name))
@@ -398,31 +427,34 @@ impl CoreGame {
             match reaction.effect {
                 OnAttackedReactionEffect::Parry => {
                     defender_reacted_with_parry = true;
-                    let bonus_def = defender.attack_modifier(HandType::MainHand);
+                    let bonus_evasion = PARRY_EVASION_BONUS;
 
                     log_lines.push(format!(
-                        "  Defense: {} +{} (Parry) = {}",
+                        "  Evasion: {} +{} (Parry) = {}",
                         evasion,
-                        bonus_def,
-                        evasion + bonus_def
+                        bonus_evasion,
+                        evasion + bonus_evasion
                     ));
-                    evasion += bonus_def;
+                    evasion += bonus_evasion;
                     let p_hit =
                         probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
                     log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
                 OnAttackedReactionEffect::SideStep => {
                     defender_reacted_with_sidestep = true;
-                    let bonus_def = defender.evasion_from_agility();
+                    let bonus_evasion = defender.evasion_from_agility();
                     log_lines.push(format!(
-                        "  Defense: {} +{} (Side step) = {}",
+                        "  Evasion: {} +{} (Side step) = {}",
                         evasion,
-                        bonus_def,
-                        evasion + bonus_def
+                        bonus_evasion,
+                        evasion + bonus_evasion
                     ));
-                    evasion += bonus_def;
-                    let p_hit =
-                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
+                    evasion += bonus_evasion;
+
+                    let p_hit = probability_of_d20_reaching(
+                        evasion.saturating_sub(attack_modifier),
+                        attack_bonus,
+                    );
                     log_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
             }
@@ -441,7 +473,7 @@ impl CoreGame {
             }
         }
         log_lines.push(format!(
-            "Rolled: {} (+{} atk mod) {}= {}, vs def={}, armor={}",
+            "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}, armor={}",
             roll,
             attack_modifier,
             if attack_bonus.flat_amount > 0 {
@@ -490,8 +522,8 @@ impl CoreGame {
                 log_lines.push(format!("  {label}!"));
                 if bonus_dmg > 0 {
                     dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
+                    dmg_calculation += bonus_dmg;
                 }
-                dmg_calculation += bonus_dmg;
             }
 
             for enhancement in &attack_enhancements {
@@ -685,7 +717,7 @@ impl CoreGame {
                 let roll = roll_d20_with_advantage(0);
                 let res = roll + reactor.strength();
                 lines.push(format!(
-                    "Rolled: {} (+{} str) = {}, vs physical resist={}",
+                    "Rolled: {} (+{} str) = {}, vs toughness={}",
                     roll,
                     reactor.strength(),
                     res,
@@ -739,7 +771,7 @@ impl CoreGame {
             if character.action_points == 0 {
                 self.perform_end_of_turn_character(&mut character);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
-                self.active_character().recover_action_points();
+                //self.active_character().recover_action_points();
             }
         }
 
@@ -783,7 +815,7 @@ impl CoreGame {
         character.recover_action_points();
         character.conditions.mainhand_exertion = 0;
         character.conditions.offhand_exertion = 0;
-        character.stamina.gain(1);
+        character.stamina.gain(character.stamina.max / 2);
 
         self.log("End of turn.");
     }
@@ -1360,7 +1392,8 @@ pub struct SpellEnhancement {
     pub description: &'static str,
     pub icon: IconId,
     pub mana_cost: u32,
-    pub effect: SpellEnhancementEffect,
+    pub bonus_damage: u32,
+    pub effect: Option<SpellEnhancementEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1435,7 +1468,7 @@ pub struct Character {
     off_hand: Hand,
     conditions: Conditions,
     pub action_points: u32,
-    pub reactive_action_points: u32,
+    pub max_reactive_action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
     known_actions: Vec<BaseAction>,
@@ -1453,14 +1486,15 @@ impl Character {
         base_attributes: Attributes,
         position: (u32, u32),
     ) -> Self {
+        let max_health = 7 + base_attributes.strength;
         let max_mana = if base_attributes.spirit < 3 {
             0
         } else {
             1 + 2 * (base_attributes.spirit - 3)
         };
-        let move_range = 0.8 + base_attributes.agility as f32 * 0.2;
+        let move_range = 0.9 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
-        let reaction_points = base_attributes.intellect / 2;
+        let max_reactive_action_points = base_attributes.intellect / 2;
         Self {
             id: None,
             sprite: texture,
@@ -1469,7 +1503,7 @@ impl Character {
             position,
             name,
             base_attributes,
-            health: NumberedResource::new(7 + base_attributes.strength),
+            health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
             move_range,
             armor: None,
@@ -1477,7 +1511,7 @@ impl Character {
             off_hand: Default::default(),
             conditions: Default::default(),
             action_points: MAX_ACTION_POINTS,
-            reactive_action_points: reaction_points,
+            max_reactive_action_points,
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
             known_actions: vec![
@@ -1489,7 +1523,7 @@ impl Character {
                     hand: HandType::OffHand,
                     action_point_cost: 0,
                 },
-                BaseAction::SelfEffect(BRACE),
+                //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move {
                     action_point_cost: MOVE_ACTION_COST,
                     range: move_range,
@@ -1501,7 +1535,7 @@ impl Character {
     }
 
     pub fn recover_action_points(&mut self) {
-        self.action_points = (self.action_points + ACTION_POINTS_RECOVERY).min(MAX_ACTION_POINTS);
+        self.action_points = MAX_ACTION_POINTS;
     }
 
     pub fn condition_descriptions(&self) -> Vec<(ConditionDescription, Option<u32>)> {
@@ -1635,23 +1669,33 @@ impl Character {
     pub fn usable_movement_enhancements(&self) -> Vec<(String, MovementEnhancement)> {
         let mut enhancements = vec![
             (
+                "1.5x".to_string(),
+                MovementEnhancement {
+                    name: "Sprint",
+                    action_point_cost: 0,
+                    icon: IconId::X1point5,
+                    stamina_cost: 1,
+                    add_percentage: 50,
+                },
+            ),
+            (
                 "2x".to_string(),
                 MovementEnhancement {
-                    name: "Extend",
+                    name: "Extended",
                     action_point_cost: 1,
-                    icon: IconId::Plus,
+                    icon: IconId::X2,
                     stamina_cost: 0,
                     add_percentage: 100,
                 },
             ),
             (
-                "2.5x".to_string(),
+                "3x".to_string(),
                 MovementEnhancement {
-                    name: "Sprint",
+                    name: "Extended sprint",
                     action_point_cost: 1,
-                    icon: IconId::PlusPlus,
-                    stamina_cost: 1,
-                    add_percentage: 150,
+                    icon: IconId::X3,
+                    stamina_cost: 2,
+                    add_percentage: 200,
                 },
             ),
         ];
@@ -1691,6 +1735,8 @@ impl Character {
         is_within_melee: bool,
     ) -> bool {
         self.action_points >= reaction.action_point_cost
+            && (self.action_points - reaction.action_point_cost)
+                >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && self.stamina.current >= reaction.stamina_cost
             && (!reaction.must_be_melee || is_within_melee)
     }
@@ -1722,6 +1768,8 @@ impl Character {
             }
         }
         self.action_points >= reaction.action_point_cost
+            && (self.action_points - reaction.action_point_cost)
+                >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && (!reaction.must_be_melee || is_within_melee)
     }
 

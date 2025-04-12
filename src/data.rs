@@ -128,15 +128,16 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
     description: "Target loses 1 AP",
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
-    stamina_cost: 1,
+    stamina_cost: 2,
     bonus_damage: 0,
     apply_on_self_before: None,
     on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
 };
 
+pub const PARRY_EVASION_BONUS: u32 = 3;
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
-    description: "Gain bonus evasion equal to your attack modifier",
+    description: "Gain +3 evasion against one melee attack",
     icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 0,
@@ -212,7 +213,10 @@ pub const SCREAM: Spell = Spell {
         description: "Target loses 1 AP",
         icon: IconId::Banshee,
         mana_cost: 1,
-        effect: SpellEnhancementEffect::OnHitEffect(ApplyEffect::RemoveActionPoints(1)),
+        bonus_damage: 0,
+        effect: Some(SpellEnhancementEffect::OnHitEffect(
+            ApplyEffect::RemoveActionPoints(1),
+        )),
     }),
     range: Range::Ranged(4),
 };
@@ -231,7 +235,8 @@ pub const MIND_BLAST: Spell = Spell {
         description: "Spell is cast twice",
         icon: IconId::Dualcast,
         mana_cost: 1,
-        effect: SpellEnhancementEffect::CastTwice,
+        bonus_damage: 0,
+        effect: Some(SpellEnhancementEffect::CastTwice),
     }),
     range: Range::Ranged(5),
 };
@@ -245,7 +250,14 @@ pub const FIREBALL: Spell = Spell {
     damage: 2,
     on_hit_effect: None,
     spell_type: SpellType::Projectile,
-    possible_enhancement: None,
+    possible_enhancement: Some(SpellEnhancement {
+        name: "Greater",
+        description: "+1 damage",
+        icon: IconId::Plus,
+        mana_cost: 1,
+        bonus_damage: 1,
+        effect: None,
+    }),
     range: Range::Ranged(5),
 };
 

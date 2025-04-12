@@ -1,24 +1,16 @@
-use std::{
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use macroquad::color::{DARKBLUE, SKYBLUE};
 
 use macroquad::{
-    color::{
-        Color, BLACK, LIGHTGRAY, WHITE,
-    },
+    color::{Color, BLACK, LIGHTGRAY, WHITE},
     text::Font,
     texture::Texture2D,
 };
 
 use crate::{
     action_button::ActionButton,
-    base_ui::{
-        Align, Container, ContainerScroll, Element, LayoutDirection, Style,
-        TextLine,
-    },
+    base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
     core::Character,
     equipment_ui::create_equipment_ui,
     stats_ui::{build_stats_table, StatValue},
@@ -56,14 +48,17 @@ pub fn build_character_sheet(
                 &[
                     ("Will", StatValue::U32(character.will())),
                     (
-                        "Reactive AP",
-                        StatValue::U32(character.reactive_action_points),
+                        "Reaction AP",
+                        StatValue::String(format!("{}", character.max_reactive_action_points)),
                     ),
                 ],
             ),
             (
                 None,
-                &[("Spell mod", StatValue::U32(character.spell_modifier()))],
+                &[(
+                    "Spell mod",
+                    StatValue::String(format!("+{}", character.spell_modifier())),
+                )],
             ),
             (
                 Some(("Spirit", character.base_attributes.spirit)),
