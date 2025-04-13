@@ -1,4 +1,3 @@
-
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
@@ -83,7 +82,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
         action_point_cost: 1,
         stamina_cost: 0,
         bonus_damage: 1,
-        apply_on_self_before: None,
+        bonus_advantage: 0,
         on_hit_effect: None,
     }),
     on_attacked_reaction: Some(PARRY),
@@ -96,7 +95,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
 
 pub const BOW: Weapon = Weapon {
     name: "Bow",
-    range: Range::Ranged(5),
+    range: Range::ExtendableRanged(5),
     action_point_cost: 2,
     damage: 3,
     grip: WeaponGrip::TwoHanded,
@@ -131,7 +130,7 @@ pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
     action_point_cost: 0,
     stamina_cost: 2,
     bonus_damage: 0,
-    apply_on_self_before: None,
+    bonus_advantage: 0,
     on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
 };
 
@@ -153,7 +152,7 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     action_point_cost: 1,
     stamina_cost: 0,
     bonus_damage: 0,
-    apply_on_self_before: Some(Condition::CarefulAim),
+    bonus_advantage: 1,
     on_hit_effect: None,
 };
 
@@ -270,14 +269,21 @@ pub const FIREBALL: Spell = Spell {
     spell_type: SpellType::Projectile,
     possible_enhancements: [
         Some(SpellEnhancement {
-            name: "Greater",
+            name: "Big",
             description: "+1 damage",
             icon: IconId::Plus,
             mana_cost: 1,
             bonus_damage: 1,
             effect: None,
         }),
-        None,
+        Some(SpellEnhancement {
+            name: "Massive",
+            description: "+2 damage",
+            icon: IconId::PlusPlus,
+            mana_cost: 1,
+            bonus_damage: 2,
+            effect: None,
+        }),
     ],
     range: Range::Ranged(5),
 };

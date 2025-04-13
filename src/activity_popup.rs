@@ -10,7 +10,10 @@ use macroquad::{
 use crate::{
     action_button::{draw_button_tooltip, ButtonAction, EventSender, InternalUiEvent},
     base_ui::Drawable,
-    core::BaseAction,
+    core::{
+        AttackEnhancement, BaseAction, MovementEnhancement, OnAttackedReaction, OnHitReaction,
+        SpellEnhancement,
+    },
     game_ui::UiState,
 };
 
@@ -23,6 +26,7 @@ pub struct ActivityPopup {
 
     initial_lines: Vec<String>,
     pub target_line: Option<String>,
+    pub reaction_probability_line: Option<String>,
 
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
@@ -49,6 +53,7 @@ impl ActivityPopup {
             font,
             initial_lines: vec![],
             target_line: None,
+            reaction_probability_line: None,
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
@@ -102,6 +107,11 @@ impl ActivityPopup {
             y0 += line_height;
         }
 
+        if let Some(line) = &self.reaction_probability_line {
+            draw_text_ex(line, x0, y0, text_params.clone());
+            y0 += line_height;
+        }
+
         if let Some(line) = &self.target_line {
             draw_text_ex(line, x0, y0, text_params.clone());
             y0 += line_height;
@@ -128,7 +138,6 @@ impl ActivityPopup {
             match &self.state {
                 UiState::ConfiguringAction(base_action) => {
                     match base_action {
-                        BaseAction::SelfEffect(..) => {}
                         BaseAction::Move { range, .. } => {
                             let percentage: u32 = self
                                 .selected_choices()
@@ -138,11 +147,12 @@ impl ActivityPopup {
                             let text = format!("range: {range:.2}");
                             draw_text_ex(&text, x0, y0, text_params.clone());
                         }
-                        BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
+                        BaseAction::Attack { .. }
+                        | BaseAction::CastSpell(..)
+                        | BaseAction::SelfEffect(..) => {}
                     };
                 }
-                UiState::ReactingToAttack { .. } => {}
-                UiState::ReactingToHit { .. } => {}
+                UiState::ReactingToAttack { .. } | UiState::ReactingToHit { .. } => {}
                 UiState::Idle | UiState::ChoosingAction => unreachable!(),
             }
         }
@@ -175,6 +185,7 @@ impl ActivityPopup {
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_movement_range = false;
+        let mut changed_on_attacked_reaction = None;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, _button_action, hovered_pos) => {
@@ -208,6 +219,14 @@ impl ActivityPopup {
                             self.selected_choice_button_ids.push(btn.id);
                         }
                     }
+
+                    if let ButtonAction::OnAttackedReaction(..) = clicked_btn.action {
+                        let maybe_reaction = self
+                            .selected_choices()
+                            .map(|action| action.unwrap_on_attacked_reaction())
+                            .next();
+                        changed_on_attacked_reaction = Some(maybe_reaction)
+                    }
                 }
             };
         }
@@ -230,20 +249,49 @@ impl ActivityPopup {
             ));
         }
 
+        if let Some(maybe_reaction) = changed_on_attacked_reaction {
+            return Some(ActivityPopupOutcome::ChangedOnAttackedReaction(
+                maybe_reaction,
+            ));
+        }
+
         None
     }
 
-    pub fn take_selected_actions(&mut self) -> Vec<ButtonAction> {
-        self.selected_choice_button_ids
-            .drain(..)
-            .map(|id| self.choice_buttons[&id].action)
-            .collect()
-    }
-
-    fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
+    pub fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
             .map(|id| &self.choice_buttons[id].action)
+    }
+
+    pub fn selected_attack_enhancements(&self) -> Vec<AttackEnhancement> {
+        self.selected_choices()
+            .map(|action| action.unwrap_attack_enhancement())
+            .collect()
+    }
+
+    pub fn selected_spell_enhancements(&self) -> Vec<SpellEnhancement> {
+        self.selected_choices()
+            .map(|action| action.unwrap_spell_enhancement())
+            .collect()
+    }
+
+    pub fn selected_movement_enhancements(&self) -> Vec<MovementEnhancement> {
+        self.selected_choices()
+            .map(|action| action.unwrap_movement_enhancement())
+            .collect()
+    }
+
+    pub fn selected_on_attacked_reaction(&self) -> Option<OnAttackedReaction> {
+        self.selected_choices()
+            .next()
+            .map(|action| action.unwrap_on_attacked_reaction())
+    }
+
+    pub fn selected_on_hit_reaction(&self) -> Option<OnHitReaction> {
+        self.selected_choices()
+            .next()
+            .map(|action| action.unwrap_on_hit_reaction())
     }
 
     pub fn select_movement_option(&mut self, selected_enhancement: Option<usize>) {
@@ -369,4 +417,5 @@ impl ActivityPopup {
 pub enum ActivityPopupOutcome {
     ChangedMovementRangePercentage(u32),
     ClickedProceed,
+    ChangedOnAttackedReaction(Option<OnAttackedReaction>),
 }

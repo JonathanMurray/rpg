@@ -56,7 +56,7 @@ async fn main() {
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
 
-    let grid_font = load_font("manaspace/manaspc.ttf").await;
+    let grid_big_font = load_font("manaspace/manaspc.ttf").await;
 
     let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
 
@@ -76,7 +76,7 @@ async fn main() {
         equipment_icons,
         font,
         decorative_font,
-        grid_font,
+        grid_big_font,
         background_textures,
     );
 

@@ -431,6 +431,27 @@ impl ButtonAction {
             _ => panic!(),
         }
     }
+
+    pub fn unwrap_attack_enhancement(&self) -> AttackEnhancement {
+        match self {
+            ButtonAction::AttackEnhancement(enhancement) => *enhancement,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_on_attacked_reaction(&self) -> OnAttackedReaction {
+        match self {
+            ButtonAction::OnAttackedReaction(reaction) => *reaction,
+            _ => panic!(),
+        }
+    }
+
+    pub fn unwrap_on_hit_reaction(&self) -> OnHitReaction {
+        match self {
+            ButtonAction::OnHitReaction(reaction) => *reaction,
+            _ => panic!(),
+        }
+    }
 }
 
 pub struct EventSender {

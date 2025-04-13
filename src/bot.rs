@@ -1,5 +1,7 @@
 use crate::{
-    core::{Action, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction},
+    core::{
+        Action, ActionReach, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction,
+    },
     pathfind::PathfindGrid,
 };
 use macroquad::rand;
@@ -27,7 +29,9 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                         }
                         if other_character.borrow().player_controlled
                             && character
-                                .can_reach_with_attack(hand, other_character.borrow().position)
+                                .reaches_with_attack(hand, other_character.borrow().position)
+                                .1
+                                != ActionReach::No
                         {
                             chosen_action = Some(Action::Attack {
                                 hand,

@@ -1,7 +1,7 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::{Color, BLACK},
+    color::{Color, BLACK, ORANGE},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
@@ -21,7 +21,11 @@ use macroquad::{
     text::measure_text,
 };
 
-use crate::{core::MovementEnhancement, pathfind::PathfindGrid, textures::SpriteId};
+use crate::{
+    core::{ActionReach, Goodness, MovementEnhancement},
+    pathfind::PathfindGrid,
+    textures::SpriteId,
+};
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
     drawing::{draw_arrow, draw_dashed_line},
@@ -40,7 +44,9 @@ const TARGET_NPC_COLOR: Color = Color::new(1.0, 0.0, 1.0, 1.0);
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
 const MOVE_RANGE_COLOR: Color = GREEN;
-const OUT_OF_RANGE_COLOR: Color = RED;
+const ACTION_WITHIN_RANGE_COLOR: Color = GREEN;
+const ACTION_WITHIN_EXTENDED_RANGE_COLOR: Color = ORANGE;
+const ACTION_OUT_OF_RANGE_COLOR: Color = RED;
 const TARGET_CROSSHAIR_COLOR: Color = WHITE;
 
 #[derive(Debug, Copy, Clone)]
@@ -106,6 +112,12 @@ impl Default for MovementRange {
     }
 }
 
+pub struct StaticText {
+    position: (i32, i32),
+    header: String,
+    details: Vec<(String, Goodness)>,
+}
+
 pub struct GameGrid {
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: PathfindGrid,
@@ -114,11 +126,11 @@ pub struct GameGrid {
     dragging_camera_from: Option<(f32, f32)>,
 
     effects: Vec<ConcreteEffect>,
-    pub static_text: Option<((i32, i32), Vec<String>)>,
+    static_text: Option<StaticText>,
 
     selected_character_id: CharacterId,
     active_character_id: CharacterId,
-    pub out_of_range_indicator: Option<Range>,
+    pub action_range_indicator: Option<(Range, ActionReach)>,
 
     movement_range: MovementRange,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
@@ -129,7 +141,8 @@ pub struct GameGrid {
 
     character_motion: Option<CharacterMotion>,
 
-    font: Font,
+    big_font: Font,
+    simple_font: Font,
 
     cell_w: f32,
     size: (f32, f32),
@@ -143,7 +156,8 @@ impl GameGrid {
         characters: &Characters,
         sprites: HashMap<SpriteId, Texture2D>,
         size: (f32, f32),
-        font: Font,
+        big_font: Font,
+        simple_font: Font,
         background_textures: Vec<Texture2D>,
         grid_dimensions: (i32, i32),
         cell_backgrounds: Vec<usize>,
@@ -163,16 +177,34 @@ impl GameGrid {
             movement_range: MovementRange::default(),
             movement_preview: Default::default(),
             target: Target::None,
-            out_of_range_indicator: None,
+            action_range_indicator: None,
             cell_w: 64.0,
             grid_dimensions,
             position_on_screen: (0.0, 0.0), // is set later
             character_motion: None,
             size,
-            font,
+            big_font,
+            simple_font,
             background_textures,
             cell_backgrounds,
         }
+    }
+
+    pub fn set_static_text(
+        &mut self,
+        position: (i32, i32),
+        header: String,
+        details: Vec<(String, Goodness)>,
+    ) {
+        self.static_text = Some(StaticText {
+            position,
+            header,
+            details,
+        });
+    }
+
+    pub fn clear_static_text(&mut self) {
+        self.static_text = None;
     }
 
     pub fn set_character_motion(
@@ -263,7 +295,7 @@ impl GameGrid {
             end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(text.into(), self.font.clone()),
+                EffectGraphics::Text(text.into(), self.big_font.clone()),
             ),
             source_pos: pos,
             destination_pos: pos,
@@ -460,6 +492,10 @@ impl GameGrid {
         }
     }
 
+    pub fn set_target(&mut self, target_character_id: CharacterId) {
+        self.target = Target::Some(target_character_id);
+    }
+
     pub fn draw(&mut self, blocked_screen_area: Rect, receptive_to_input: bool) -> GridOutcome {
         let (w, h) = self.size;
 
@@ -509,8 +545,8 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).position_i32();
 
-        if let Some(range) = self.out_of_range_indicator {
-            self.draw_out_of_range_indicator(active_char_pos, range);
+        if let Some((range, reach)) = self.action_range_indicator {
+            self.draw_out_of_range_indicator(active_char_pos, range, reach);
         }
 
         self.draw_active_character_outline();
@@ -675,7 +711,8 @@ impl GameGrid {
 
                 self.draw_static_text_lines(
                     destination,
-                    &[format!("Move {:.3}", distance.to_string())],
+                    &format!("Move {:.3}", distance.to_string()),
+                    &[],
                     4.0,
                     14.0,
                 );
@@ -850,54 +887,93 @@ impl GameGrid {
     }
 
     fn draw_static_text(&self) {
-        if let Some((position, lines)) = &self.static_text {
-            self.draw_static_text_lines(*position, lines, 8.0, 0.0);
+        if let Some(StaticText {
+            position,
+            header,
+            details,
+        }) = &self.static_text
+        {
+            self.draw_static_text_lines(*position, header, details, 6.0, 0.0);
         }
     }
 
     fn draw_static_text_lines(
         &self,
         position: (i32, i32),
-        lines: &[String],
+        header: &str,
+        details: &[(String, Goodness)],
         pad: f32,
         y_offset: f32,
     ) {
-        let (x, mut y) = (
+        let (mut x, mut y) = (
             self.grid_x_to_screen(position.0),
             self.grid_y_to_screen(position.1) + y_offset,
         );
-        let font_size = 16;
+        let header_font_size = 16;
+        let detail_font_size = 18;
         let params = TextParams {
-            font: Some(&self.font),
-            font_size,
+            font: Some(&self.big_font),
+            font_size: header_font_size,
             color: WHITE,
             ..Default::default()
         };
-        let (mut w, mut h) = (0.0, 0.0);
-        let line_margin = 5.0;
-        for line in lines {
-            let text_dimensions = measure_text(line, Some(&self.font), font_size, 1.0);
-            if text_dimensions.width > w {
-                w = text_dimensions.width;
-            }
-            if text_dimensions.height.is_finite() {
-                h += text_dimensions.height + line_margin;
-                y -= text_dimensions.height + line_margin;
+
+        let mut h = 0.0;
+        let line_margin = 8.0;
+
+        let text_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
+        let header_w = text_dimensions.width;
+        if text_dimensions.height.is_finite() {
+            h += text_dimensions.height + line_margin;
+            y -= text_dimensions.height + line_margin;
+        }
+
+        let mut details_w = 0.0;
+        let mut details_h = 0.0;
+
+        let detail_margin = 8.0;
+
+        for (i, (line, goodness)) in details.iter().enumerate() {
+            let text_dimensions =
+                measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
+            details_w += text_dimensions.width + detail_margin;
+            if text_dimensions.height.is_finite() && text_dimensions.height > details_h {
+                details_h = text_dimensions.height;
             }
         }
-        draw_rectangle(
-            x,
-            y - pad,
-            w + pad * 2.0,
-            h + pad * 2.0,
-            Color::new(0.0, 0.0, 0.0, 0.7),
-        );
+        details_w = (details_w - detail_margin).max(0.0);
+        let w = header_w.max(details_w) + 2.0 * pad;
+        h += details_h;
+        h += 2.0 * pad;
+
+        if w > self.cell_w {
+            x -= (w - self.cell_w) / 2.0;
+        }
+
+        y -= details_h;
+
+        draw_rectangle(x, y - pad, w, h, Color::new(0.0, 0.0, 0.0, 0.7));
 
         y += pad;
         y += 5.0;
-        for line in lines.iter() {
-            let dimensions = draw_text_ex(line, x + pad, y, params.clone());
-            y += dimensions.height + line_margin;
+
+        x += pad;
+
+        let dimensions = draw_text_ex(header, x, y, params.clone());
+        y += dimensions.height + line_margin;
+
+        for (i, (line, goodness)) in details.iter().enumerate() {
+            let mut params = params.clone();
+            params.font = Some(&self.simple_font);
+            params.font_size = detail_font_size;
+            match goodness {
+                Goodness::Good => params.color = GREEN,
+                Goodness::Neutral => {}
+                Goodness::Bad => params.color = Color::new(1.0, 0.5, 0.5, 1.0),
+            }
+            let dimensions = draw_text_ex(line, x, y, params);
+            //y += dimensions.height + line_margin;
+            x += dimensions.width + detail_margin;
         }
     }
 
@@ -986,10 +1062,15 @@ impl GameGrid {
         }
     }
 
-    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range) {
+    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range, reach: ActionReach) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
-        let within =
+        let color = match reach {
+            ActionReach::Yes => ACTION_WITHIN_RANGE_COLOR,
+            ActionReach::YesButWithDisadvantage => ACTION_WITHIN_EXTENDED_RANGE_COLOR,
+            ActionReach::No => ACTION_OUT_OF_RANGE_COLOR,
+        };
+        let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;
         for x in
             (origin.0 - range_ceil).max(0)..=(origin.0 + range_ceil).min(self.grid_dimensions.0 - 1)
@@ -998,16 +1079,16 @@ impl GameGrid {
                 ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
             {
                 let thickness = 2.0;
-                if within(x, y) {
+                if is_cell_within(x, y) {
                     self.draw_dashed_borders(
                         x,
                         y,
-                        !within(x - 1, y),
-                        !within(x + 1, y),
-                        !within(x, y - 1),
-                        !within(x, y + 1),
+                        !is_cell_within(x - 1, y),
+                        !is_cell_within(x + 1, y),
+                        !is_cell_within(x, y - 1),
+                        !is_cell_within(x, y + 1),
                         thickness,
-                        OUT_OF_RANGE_COLOR,
+                        color,
                     );
                 }
             }
