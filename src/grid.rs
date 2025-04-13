@@ -22,7 +22,7 @@ use macroquad::{
 };
 
 use crate::{
-    core::{ActionReach, Goodness, MovementEnhancement},
+    core::{AttackReach, Goodness, MovementEnhancement},
     pathfind::PathfindGrid,
     textures::SpriteId,
 };
@@ -45,7 +45,7 @@ const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
 const MOVE_RANGE_COLOR: Color = GREEN;
 const ACTION_WITHIN_RANGE_COLOR: Color = GREEN;
-const ACTION_WITHIN_EXTENDED_RANGE_COLOR: Color = ORANGE;
+const ACTION_WITHIN_RANGE_BUT_DISADV_COLOR: Color = ORANGE;
 const ACTION_OUT_OF_RANGE_COLOR: Color = RED;
 const TARGET_CROSSHAIR_COLOR: Color = WHITE;
 
@@ -130,7 +130,7 @@ pub struct GameGrid {
 
     selected_character_id: CharacterId,
     active_character_id: CharacterId,
-    pub action_range_indicator: Option<(Range, ActionReach)>,
+    pub action_range_indicator: Option<(Range, AttackReach)>,
 
     movement_range: MovementRange,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
@@ -1062,13 +1062,15 @@ impl GameGrid {
         }
     }
 
-    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range, reach: ActionReach) {
+    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range, reach: AttackReach) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
         let color = match reach {
-            ActionReach::Yes => ACTION_WITHIN_RANGE_COLOR,
-            ActionReach::YesButWithDisadvantage => ACTION_WITHIN_EXTENDED_RANGE_COLOR,
-            ActionReach::No => ACTION_OUT_OF_RANGE_COLOR,
+            AttackReach::Yes => ACTION_WITHIN_RANGE_COLOR,
+            AttackReach::YesButFarDisadvantage | AttackReach::YesButMeleeDisadvantage => {
+                ACTION_WITHIN_RANGE_BUT_DISADV_COLOR
+            }
+            AttackReach::No => ACTION_OUT_OF_RANGE_COLOR,
         };
         let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;

@@ -35,6 +35,7 @@ pub fn build_character_sheet(
                 &[
                     ("Health", StatValue::U32(character.health.max)),
                     ("Toughness", StatValue::U32(character.toughness())),
+                    ("Capacity", StatValue::U32(character.capacity)),
                 ],
             ),
             (None, &[("Stamina", StatValue::U32(character.stamina.max))]),
@@ -77,6 +78,7 @@ pub fn build_character_sheet(
         max_height: Some(450.0),
         style: Style {
             padding: 10.0,
+            border_color: Some(LIGHTGRAY),
             ..Default::default()
         },
         ..Default::default()
@@ -154,8 +156,7 @@ pub fn build_character_sheet(
             ),
             Element::Container(Container {
                 layout_dir: LayoutDirection::Horizontal,
-                margin: 20.0,
-                border_between_children: Some(LIGHTGRAY),
+                margin: 3.0,
                 style: Style {
                     background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
                     padding: 10.0,
@@ -168,9 +169,9 @@ pub fn build_character_sheet(
                         align: Align::Center,
                         style: Style {
                             padding: 10.0,
+
                             ..Default::default()
                         },
-                        border_between_children: Some(LIGHTGRAY),
                         children: vec![
                             Element::Text(
                                 TextLine::new("Spell book", 22, WHITE, Some(font.clone()))
@@ -194,6 +195,19 @@ pub fn build_character_sheet(
                                     .with_depth(BLACK, 2.0),
                             ),
                             stats_table,
+                        ],
+
+                        ..Default::default()
+                    }),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Vertical,
+                        margin: 15.0,
+                        align: Align::Center,
+                        style: Style {
+                            padding: 10.0,
+                            ..Default::default()
+                        },
+                        children: vec![
                             Element::Text(
                                 TextLine::new("Equipment", 22, WHITE, Some(font.clone()))
                                     .with_depth(BLACK, 2.0),

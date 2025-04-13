@@ -15,7 +15,7 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPosition},
     base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style},
-    core::{Character, HandType, Range},
+    core::{Character, HandType, WeaponRange},
     textures::EquipmentIconId,
 };
 
@@ -41,7 +41,7 @@ pub fn create_equipment_ui(
             };
 
             icon_cell.texture = texture;
-            icon_cell.tooltip_lines = vec![
+            let mut tooltip_lines = vec![
                 weapon.name.to_string(),
                 format!(
                     "{} dmg ({} AP) [{}]",
@@ -49,25 +49,21 @@ pub fn create_equipment_ui(
                 ),
             ];
 
-            if weapon.range != Range::Melee {
-                icon_cell
-                    .tooltip_lines
-                    .push(format!("Range: {}", weapon.range));
+            if weapon.range != WeaponRange::Melee {
+                tooltip_lines.push(format!("Range: {}", weapon.range));
             }
-
             if let Some(effect) = weapon.on_true_hit {
-                icon_cell.tooltip_lines.push(format!("[true hit] {effect}"));
+                tooltip_lines.push(format!("[true hit] {effect}"));
             }
             if let Some(reaction) = weapon.on_attacked_reaction {
-                icon_cell
-                    .tooltip_lines
-                    .push(format!("[attacked?] {}", reaction.name));
+                tooltip_lines.push(format!("[attacked?] {}", reaction.name));
             }
             if let Some(enhancement) = weapon.attack_enhancement {
-                icon_cell
-                    .tooltip_lines
-                    .push(format!("[+] {}", enhancement.name));
+                tooltip_lines.push(format!("[+] {}", enhancement.name));
             }
+            tooltip_lines.push(format!("Weight: {}", weapon.weight));
+
+            icon_cell.tooltip_lines = tooltip_lines;
         }
     }
     if let Some(shield) = character.shield() {
@@ -75,31 +71,39 @@ pub fn create_equipment_ui(
         eq_text_cells.push(format!("{}", shield.evasion));
         let icon_cell = &mut eq_icon_cells[2];
         icon_cell.texture = Some(equipment_icons[&EquipmentIconId::SmallShield].clone());
-        icon_cell.tooltip_lines = vec![
+        let mut tooltip_lines = vec![
             shield.name.to_string(),
             format!("+{} evasion", shield.evasion),
         ];
+
         if let Some(reaction) = shield.on_hit_reaction {
-            icon_cell
-                .tooltip_lines
-                .push(format!("[hit?] {}", reaction.name));
+            tooltip_lines.push(format!("[hit?] {}", reaction.name));
         }
+        tooltip_lines.push(format!("Weight: {}", shield.weight));
+        icon_cell.tooltip_lines = tooltip_lines;
     }
     if let Some(armor) = character.armor {
         eq_text_cells.push("Armor".to_string());
         eq_text_cells.push(format!("{}", armor.protection));
         let icon_cell = &mut eq_icon_cells[1];
         icon_cell.texture = Some(equipment_icons[&armor.icon].clone());
-        icon_cell.tooltip_lines = vec![
+        let mut tooltip_lines = vec![
             armor.name.to_string(),
             format!("{} armor", armor.protection),
         ];
         if let Some(limit) = armor.limit_evasion_from_agi {
-            icon_cell
-                .tooltip_lines
-                .push(format!("Max {} evasion from agi", limit));
+            tooltip_lines.push(format!("Max {} evasion from agi", limit));
         }
+        tooltip_lines.push(format!("Weight: {}", armor.weight));
+        icon_cell.tooltip_lines = tooltip_lines;
     }
+
+    eq_text_cells.push("Weight".to_string());
+    eq_text_cells.push(format!(
+        "{} / {}",
+        character.equipment_weight(),
+        character.capacity
+    ));
 
     let equipment_icons = Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,

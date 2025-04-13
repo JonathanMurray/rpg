@@ -7,11 +7,11 @@ use std::rc::Rc;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    SpellId, BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, KILL, PARRY_EVASION_BONUS,
+    SpellId, BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, KILL, PARRY_EVASION_BONUS,
     RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
-use crate::data::{CRUSHING_STRIKE, FIREBALL, LEATHER_ARMOR, MIND_BLAST, SCREAM, SMALL_SHIELD};
+use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
@@ -30,14 +30,15 @@ impl CoreGame {
             true,
             "Bob",
             SpriteId::Character,
-            Attributes::new(5, 4, 2, 5),
+            Attributes::new(5, 10, 10, 5),
             (1, 4),
         );
         bob.main_hand.weapon = Some(BOW);
-        //bob.off_hand.shield = Some(SMALL_SHIELD);
+        bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(CHAIN_MAIL);
-        bob.known_attack_enhancements.push(CRUSHING_STRIKE);
+        bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attacked_reactions.push(SIDE_STEP);
+        bob.known_attack_enhancements.push(EFFICIENT);
         //bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -112,7 +113,7 @@ impl CoreGame {
                 let mut attacker = character;
                 let defender = self.characters.get_mut(target);
 
-                assert!(attacker.reaches_with_attack(hand, defender.position).1 != ActionReach::No);
+                assert!(attacker.reaches_with_attack(hand, defender.position).1 != AttackReach::No);
 
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
                 for enhancement in &enhancements {
@@ -397,9 +398,9 @@ impl CoreGame {
 
         let circumstance_advantage =
             match attacker.reaches_with_attack(hand_type, defender.position).1 {
-                ActionReach::Yes => 0,
-                ActionReach::YesButWithDisadvantage => -1,
-                ActionReach::No => unreachable!(),
+                AttackReach::Yes => 0,
+                AttackReach::YesButFarDisadvantage | AttackReach::YesButMeleeDisadvantage => -1,
+                AttackReach::No => unreachable!(),
             };
 
         let attack_bonus = attack_roll_bonus(
@@ -563,7 +564,16 @@ impl CoreGame {
 
             for enhancement in &attack_enhancements {
                 if let Some(effect) = enhancement.on_hit_effect {
-                    let log_line = self.perform_effect_application(effect, &mut defender);
+                    let log_line = match effect {
+                        AttackEnhancementOnHitEffect::RegainActionPoint => {
+                            attacker.action_points += 1;
+                            format!("{} regained 1 AP", attacker.name)
+                        }
+                        AttackEnhancementOnHitEffect::Target(apply_effect) => {
+                            self.perform_effect_application(apply_effect, &mut defender)
+                        }
+                    };
+
                     log_lines.push(format!("{} ({})", log_line, enhancement.name))
                 }
             }
@@ -1172,10 +1182,11 @@ pub struct AttackEnhancement {
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
+    pub regain_action_points: u32,
     pub stamina_cost: u32,
     pub bonus_damage: u32,
     pub bonus_advantage: u32,
-    pub on_hit_effect: Option<ApplyEffect>,
+    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1438,6 +1449,12 @@ pub enum SpellEnhancementEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum AttackEnhancementOnHitEffect {
+    RegainActionPoint,
+    Target(ApplyEffect),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum SpellType {
     Mental,
     Projectile,
@@ -1498,6 +1515,7 @@ pub struct Character {
     pub health: NumberedResource,
     pub mana: NumberedResource,
     pub move_range: f32,
+    pub capacity: u32,
     pub armor: Option<ArmorPiece>,
     main_hand: Hand,
     off_hand: Hand,
@@ -1522,14 +1540,12 @@ impl Character {
         position: (u32, u32),
     ) -> Self {
         let max_health = 6 + base_attributes.strength;
-        let max_mana = if base_attributes.spirit < 3 {
-            0
-        } else {
-            1 + 2 * (base_attributes.spirit - 3)
-        };
+        let max_mana = (base_attributes.spirit * 2).saturating_sub(5);
+
         let move_range = 0.9 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
         let max_reactive_action_points = base_attributes.intellect / 2;
+        let capacity = base_attributes.strength * 2;
         Self {
             id: None,
             sprite: texture,
@@ -1541,6 +1557,7 @@ impl Character {
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
             move_range,
+            capacity,
             armor: None,
             main_hand: Default::default(),
             off_hand: Default::default(),
@@ -1567,6 +1584,22 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
         }
+    }
+
+    pub fn equipment_weight(&self) -> u32 {
+        let mut sum = 0;
+        if let Some(weapon) = self.weapon(HandType::MainHand) {
+            sum += weapon.weight;
+        }
+        if let Some(weapon) = self.weapon(HandType::OffHand) {
+            sum += weapon.weight;
+        } else if let Some(shield) = self.shield() {
+            sum += shield.weight;
+        }
+        if let Some(armor) = self.armor {
+            sum += armor.weight;
+        }
+        sum
     }
 
     pub fn recover_action_points(&mut self) {
@@ -1608,18 +1641,35 @@ impl Character {
         &self,
         hand: HandType,
         target_position: (u32, u32),
-    ) -> (Range, ActionReach) {
+    ) -> (Range, AttackReach) {
         let weapon = self.weapon(hand).unwrap();
-        let range = weapon.range;
-        if within_range_squared(range.squared(), self.position, target_position) {
-            (range, ActionReach::Yes)
-        } else {
-            if let Some(extended) = range.extended() {
-                if within_range_squared(extended.powf(2.0), self.position, target_position) {
-                    return (Range::Float(extended), ActionReach::YesButWithDisadvantage);
+        let weapon_range = weapon.range;
+
+        match weapon_range {
+            WeaponRange::Melee => {
+                if within_range_squared(weapon_range.squared(), self.position, target_position) {
+                    (weapon_range.into_range(), AttackReach::Yes)
+                } else {
+                    (weapon_range.into_range(), AttackReach::No)
                 }
             }
-            (range, ActionReach::No)
+            WeaponRange::Ranged(..) => {
+                if within_range_squared(weapon_range.squared(), self.position, target_position) {
+                    if within_range_squared(Range::Melee.squared(), self.position, target_position)
+                    {
+                        (Range::Melee, AttackReach::YesButMeleeDisadvantage)
+                    } else {
+                        (weapon_range.into_range(), AttackReach::Yes)
+                    }
+                } else {
+                    let extended = weapon_range.extended().unwrap();
+                    if within_range_squared(extended.powf(2.0), self.position, target_position) {
+                        (Range::Float(extended), AttackReach::YesButFarDisadvantage)
+                    } else {
+                        (Range::Float(extended), AttackReach::No)
+                    }
+                }
+            }
         }
     }
 
@@ -2010,9 +2060,10 @@ pub enum Goodness {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum ActionReach {
+pub enum AttackReach {
     Yes,
-    YesButWithDisadvantage,
+    YesButFarDisadvantage,
+    YesButMeleeDisadvantage,
     No,
 }
 
@@ -2061,6 +2112,7 @@ pub struct ArmorPiece {
     pub protection: u32,
     pub limit_evasion_from_agi: Option<u32>,
     pub icon: EquipmentIconId,
+    pub weight: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -2068,7 +2120,7 @@ pub struct Weapon {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
     pub icon: EquipmentIconId,
-    pub range: Range,
+    pub range: WeaponRange,
     pub action_point_cost: u32,
     pub damage: u32,
     pub grip: WeaponGrip,
@@ -2076,6 +2128,7 @@ pub struct Weapon {
     pub attack_enhancement: Option<AttackEnhancement>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
     pub on_true_hit: Option<AttackHitEffect>,
+    pub weight: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -2084,6 +2137,7 @@ pub struct Shield {
     pub sprite: Option<SpriteId>,
     pub evasion: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
+    pub weight: u32,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -2109,6 +2163,44 @@ pub enum WeaponGrip {
     MainHand,
     Versatile,
     TwoHanded,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum WeaponRange {
+    Melee,
+    Ranged(u32),
+}
+
+impl Display for WeaponRange {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Melee => f.write_str("melee"),
+            Self::Ranged(range) => f.write_fmt(format_args!("{} ({})", range, range * 2)),
+        }
+    }
+}
+
+impl WeaponRange {
+    pub fn squared(&self) -> f32 {
+        match self {
+            Self::Melee => 2.0,
+            Self::Ranged(range) => range.pow(2) as f32,
+        }
+    }
+
+    pub fn extended(&self) -> Option<f32> {
+        match self {
+            Self::Ranged(range) => Some((*range as f32) * 1.5),
+            _ => None,
+        }
+    }
+
+    fn into_range(self) -> Range {
+        match self {
+            Self::Melee => Range::Melee,
+            Self::Ranged(r) => Range::Ranged(r),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2139,13 +2231,6 @@ impl Range {
             Range::Ranged(range) => range.pow(2) as f32,
             Range::ExtendableRanged(range) => range.pow(2) as f32,
             Range::Float(range) => range.powf(2.0),
-        }
-    }
-
-    pub fn extended(&self) -> Option<f32> {
-        match self {
-            Range::ExtendableRanged(range) => Some((*range as f32) * 1.5),
-            _ => None,
         }
     }
 }

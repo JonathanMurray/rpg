@@ -29,10 +29,10 @@ use crate::{
     character_sheet::build_character_sheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
+        AttackEnhancement, AttackOutcome, AttackReach, BaseAction, Character, CharacterId,
+        Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
+        OnAttackedReaction, OnHitReaction, SpellType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
     target_ui::TargetUi,
@@ -1140,15 +1140,19 @@ impl UserInterface {
                     let mut circumstance_advantage = None;
 
                     match reach {
-                        ActionReach::Yes | ActionReach::YesButWithDisadvantage => {
+                        AttackReach::Yes
+                        | AttackReach::YesButFarDisadvantage
+                        | AttackReach::YesButMeleeDisadvantage => {
                             if self.active_character().can_use_action(base_action) {
                                 popup_enabled = true;
                             }
-                            if reach == ActionReach::YesButWithDisadvantage {
+                            if reach == AttackReach::YesButFarDisadvantage {
                                 circumstance_advantage = Some((-1, "Far", Goodness::Bad));
+                            } else if reach == AttackReach::YesButMeleeDisadvantage {
+                                circumstance_advantage = Some((-1, "Melee", Goodness::Bad));
                             }
                         }
-                        ActionReach::No => {
+                        AttackReach::No => {
                             self.activity_popup.target_line =
                                 Some(format!("[{}] Out of range!", target_char.name));
                         }
@@ -1218,11 +1222,11 @@ impl UserInterface {
                         .can_reach_with_spell(spell, target_char.position)
                     {
                         popup_enabled = true;
-                        ActionReach::Yes
+                        AttackReach::Yes
                     } else {
                         self.activity_popup.target_line =
                             Some(format!("[{}] Out of range!", target_char.name));
-                        ActionReach::No
+                        AttackReach::No
                     };
                     self.game_grid.action_range_indicator = Some((range, reach));
                 } else {

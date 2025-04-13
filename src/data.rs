@@ -1,9 +1,10 @@
 use crate::{
     core::{
-        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackHitEffect, Condition,
-        ConditionDescription, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
-        OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellEnhancement,
-        SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
+        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
+        AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
+        OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
+        Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
+        WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -13,6 +14,7 @@ pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     protection: 3,
     limit_evasion_from_agi: None,
     icon: EquipmentIconId::LeatherArmor,
+    weight: 1,
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
@@ -20,11 +22,12 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     protection: 5,
     limit_evasion_from_agi: Some(4),
     icon: EquipmentIconId::ChainMail,
+    weight: 3,
 };
 
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
-    range: Range::Melee,
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 2,
     grip: WeaponGrip::Light,
@@ -36,11 +39,12 @@ pub const DAGGER: Weapon = Weapon {
     ))),
     sprite: Some(SpriteId::Dagger),
     icon: EquipmentIconId::Dagger,
+    weight: 1,
 };
 
 pub const SWORD: Weapon = Weapon {
     name: "Sword",
-    range: Range::Melee,
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 2,
     grip: WeaponGrip::Versatile,
@@ -52,11 +56,12 @@ pub const SWORD: Weapon = Weapon {
     ))),
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
+    weight: 2,
 };
 
 pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
-    range: Range::Melee,
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 2,
     grip: WeaponGrip::MainHand,
@@ -66,11 +71,12 @@ pub const RAPIER: Weapon = Weapon {
     on_true_hit: Some(AttackHitEffect::SkipExertion),
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
+    weight: 2,
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
-    range: Range::Melee,
+    range: WeaponRange::Melee,
     action_point_cost: 2,
     damage: 3,
     grip: WeaponGrip::TwoHanded,
@@ -80,6 +86,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
         description: "+1 damage",
         icon: IconId::AllIn,
         action_point_cost: 1,
+        regain_action_points: 0,
         stamina_cost: 0,
         bonus_damage: 1,
         bonus_advantage: 0,
@@ -91,28 +98,30 @@ pub const WAR_HAMMER: Weapon = Weapon {
     ))),
     sprite: Some(SpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
+    weight: 5,
 };
 
 pub const BOW: Weapon = Weapon {
     name: "Bow",
-    range: Range::ExtendableRanged(5),
+    range: WeaponRange::Ranged(5),
     action_point_cost: 2,
     damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
-    attack_enhancement: Some(CAREFUL_AIM),
+    attack_enhancement: Some(CAREFULLY_AIMED),
     on_attacked_reaction: None,
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Weakened(1),
     ))),
     sprite: Some(SpriteId::Bow),
     icon: EquipmentIconId::Bow,
+    weight: 2,
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),
-    evasion: 2,
+    evasion: 3,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
         description: "Possibly daze attacker",
@@ -121,17 +130,33 @@ pub const SMALL_SHIELD: Shield = Shield {
         effect: OnHitReactionEffect::ShieldBash,
         must_be_melee: true,
     }),
+    weight: 2,
 };
 
-pub const CRUSHING_STRIKE: AttackEnhancement = AttackEnhancement {
-    name: "Crushing strike",
+pub const EFFICIENT: AttackEnhancement = AttackEnhancement {
+    name: "Efficient strike",
+    description: "On hit: regain 1 AP",
+    icon: IconId::Plus,
+    action_point_cost: 0,
+    regain_action_points: 1,
+    stamina_cost: 3,
+    bonus_damage: 0,
+    bonus_advantage: 0,
+    on_hit_effect: Some(AttackEnhancementOnHitEffect::RegainActionPoint),
+};
+
+pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
+    name: "Overwhelm",
     description: "Target loses 1 AP",
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
+    regain_action_points: 0,
     stamina_cost: 2,
     bonus_damage: 0,
     bonus_advantage: 0,
-    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
+    on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
+        ApplyEffect::RemoveActionPoints(1),
+    )),
 };
 
 pub const PARRY_EVASION_BONUS: u32 = 3;
@@ -145,20 +170,16 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     must_be_melee: true,
 };
 
-pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
-    name: "Careful aim",
-    description: CAREFUL_AIM_DESCRIPTION.description,
+pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
+    name: "Carefully aimed",
+    description: "Gain advantage",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
+    regain_action_points: 0,
     stamina_cost: 0,
     bonus_damage: 0,
     bonus_advantage: 1,
     on_hit_effect: None,
-};
-
-pub const CAREFUL_AIM_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Careful aim",
-    description: "Bonus advantage",
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
