@@ -117,6 +117,7 @@ impl ActivityPopup {
             y0 += line_height;
         }
 
+        /*
         let mut choice_description_line = "".to_string();
         for action in self.selected_choices() {
             choice_description_line.push('[');
@@ -133,6 +134,7 @@ impl ActivityPopup {
         }
         draw_text_ex(&choice_description_line, x0, y0, text_params.clone());
         y0 += line_height;
+         */
 
         if self.enabled {
             match &self.state {

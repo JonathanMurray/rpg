@@ -29,10 +29,11 @@ use crate::{
     character_sheet::build_character_sheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action,
-        AttackEnhancement, AttackOutcome, AttackReach, BaseAction, Character, CharacterId,
-        Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
+        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
+        GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OffensiveSpellType,
+        OnAttackedReaction, OnHitReaction, SpellOutcome, SpellTargetType, MAX_ACTION_POINTS,
+        MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
     target_ui::TargetUi,
@@ -431,12 +432,23 @@ impl UserInterface {
 
         self.game_grid.position_on_screen = (0.0, 0.0);
 
-        let grid_receptive_to_input =
-            !matches!(self.state, UiState::Idle) && !self.character_sheet_toggle.shown.get();
+        let (mouse_x, mouse_y) = mouse_position();
+        let grid_receptive_to_input = !matches!(self.state, UiState::Idle)
+            && !self.character_sheet_toggle.shown.get()
+            && self.active_character().player_controlled
+            && !popup_rectangle.contains((mouse_x, mouse_y).into());
 
-        let grid_outcome = self
-            .game_grid
-            .draw(popup_rectangle, grid_receptive_to_input);
+        let mut current_player_action_must_target_ally = false;
+        if let UiState::ConfiguringAction(BaseAction::CastSpell(spell)) = self.state {
+            if let SpellTargetType::SingleAlly = spell.target_type {
+                current_player_action_must_target_ally = true;
+            }
+        }
+
+        let grid_outcome = self.game_grid.draw(
+            grid_receptive_to_input,
+            current_player_action_must_target_ally,
+        );
 
         self.activity_popup
             .draw(popup_rectangle.x, popup_rectangle.y);
@@ -487,7 +499,7 @@ impl UserInterface {
         }
 
         self.target_ui
-            .draw(1280.0 - self.target_ui.size().0 - 10.0, 10.0);
+            .draw(1280.0 - self.target_ui.size().0 - 10.0, 70.0);
 
         if let Some(grid_switched_to) = grid_outcome.switched_to {
             match grid_switched_to {
@@ -526,7 +538,10 @@ impl UserInterface {
     }
 
     fn update_shown_target(&mut self) {
-        let target = self.game_grid.target().map(|id| self.characters.get(id));
+        let target = self
+            .game_grid
+            .players_target()
+            .map(|id| self.characters.get(id));
         self.target_ui.set_character(target);
     }
 
@@ -572,8 +587,9 @@ impl UserInterface {
         let mut popup_buttons = vec![];
         let mut movement = false;
 
-        let mut player_action_wants_target = false;
-        let mut np_action_has_target = false;
+        let mut player_wants_enemy_target = false;
+        let mut player_wants_ally_target = false;
+        let mut npc_action_has_target = false;
 
         match state {
             UiState::ConfiguringAction(base_action) => {
@@ -598,7 +614,7 @@ impl UserInterface {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
-                        player_action_wants_target = true;
+                        player_wants_enemy_target = true;
                     }
                     BaseAction::SelfEffect(..) => {}
                     BaseAction::CastSpell(spell) => {
@@ -612,11 +628,15 @@ impl UserInterface {
                                 popup_buttons.push(btn);
                             }
                         }
-                        player_action_wants_target = true;
+
+                        match spell.target_type {
+                            SpellTargetType::SingleEnemy(..) => player_wants_enemy_target = true,
+                            SpellTargetType::SingleAlly => player_wants_ally_target = true,
+                        }
                     }
                     BaseAction::Move { .. } => {
                         let enhancements = self.active_character().usable_movement_enhancements();
-                        for (subtext, enhancement) in enhancements {
+                        for (_subtext, enhancement) in enhancements {
                             let btn =
                                 self.new_button(ButtonAction::MovementEnhancement(enhancement));
                             popup_buttons.push(btn);
@@ -657,7 +677,7 @@ impl UserInterface {
                 }
 
                 self.on_selected_attacked_reaction(None);
-                np_action_has_target = true;
+                npc_action_has_target = true;
             }
 
             UiState::ReactingToHit {
@@ -678,7 +698,7 @@ impl UserInterface {
                 ));
                 let reactions = victim.usable_on_hit_reactions(is_within_melee);
                 drop(victim);
-                for (subtext, reaction) in reactions {
+                for (_subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
@@ -716,11 +736,16 @@ impl UserInterface {
             self.game_grid.remove_movement_preview();
         }
 
-        if player_action_wants_target {
-            // We pick an arbitrary enemy if none is picked already
-            self.game_grid.ensure_has_npc_target();
-        } else if !np_action_has_target {
-            self.game_grid.clear_target();
+        if player_wants_enemy_target {
+            self.game_grid.ensure_player_has_enemy_target();
+        } else if player_wants_ally_target {
+            self.game_grid.ensure_player_has_ally_target();
+        } else {
+            self.game_grid.clear_players_target();
+        }
+
+        if !npc_action_has_target {
+            self.game_grid.clear_enemys_target();
         }
 
         self.update_shown_target();
@@ -769,7 +794,7 @@ impl UserInterface {
             line.push_str(&format!("  {explanation}"));
         }
         self.activity_popup.reaction_probability_line = Some(line);
-        self.game_grid.set_target(reactor);
+        self.game_grid.set_enemys_target(reactor);
     }
 
     pub fn ready_for_more(&self) -> bool {
@@ -803,6 +828,7 @@ impl UserInterface {
                         0.0,
                         1.0,
                         format!("{:?}", condition),
+                        Goodness::Neutral,
                     );
                 }
 
@@ -814,10 +840,16 @@ impl UserInterface {
                             0.0,
                             1.0,
                             format!("{:?}", condition),
+                            Goodness::Neutral,
                         );
                     } else {
-                        self.game_grid
-                            .add_text_effect(attacker_pos, 0.0, 1.0, "Miss".to_string());
+                        self.game_grid.add_text_effect(
+                            attacker_pos,
+                            0.0,
+                            1.0,
+                            "Miss".to_string(),
+                            Goodness::Neutral,
+                        );
                     }
                 }
                 self.stopwatch.set_to_at_least(0.5);
@@ -857,6 +889,11 @@ impl UserInterface {
                     AttackOutcome::Parry => "Parry".to_string(),
                     AttackOutcome::Miss => "Miss".to_string(),
                 };
+                let goodness = if matches!(outcome, AttackOutcome::Hit(..)) {
+                    Goodness::Bad
+                } else {
+                    Goodness::Neutral
+                };
 
                 self.game_grid.add_effect(
                     attacker_pos,
@@ -891,7 +928,7 @@ impl UserInterface {
                 );
 
                 self.game_grid
-                    .add_text_effect(target_pos, duration, 0.5, impact_text);
+                    .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
             }
             GameEvent::SpellWasCast {
                 caster,
@@ -908,19 +945,24 @@ impl UserInterface {
                 );
 
                 match outcome {
-                    crate::core::SpellOutcome::Hit(damage) => {
+                    SpellOutcome::HitEnemy(damage) => {
                         line.push_str(&format!(" ({} damage)", damage))
                     }
-                    crate::core::SpellOutcome::Resist => line.push_str("  (miss)"),
+                    SpellOutcome::Resist => line.push_str("  (miss)"),
+                    SpellOutcome::HealedAlly(healing) => {
+                        line.push_str(&format!(" ({} healing)", healing))
+                    }
                 }
 
                 self.log.add_with_details(line, detail_lines);
 
                 let caster_pos = self.characters.get(caster).position_i32();
                 let target_pos = self.characters.get(target).position_i32();
-                let color = match spell.spell_type {
-                    SpellType::Mental => BLUE,
-                    SpellType::Projectile => RED,
+
+                let color = match spell.target_type {
+                    SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => BLUE,
+                    SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile) => RED,
+                    SpellTargetType::SingleAlly => GREEN,
                 };
 
                 let dist = distance_between(caster_pos, target_pos);
@@ -1014,13 +1056,14 @@ impl UserInterface {
                 );
                  */
 
-                let impact_text = match outcome {
-                    crate::core::SpellOutcome::Hit(damage) => format!("{}", damage),
-                    crate::core::SpellOutcome::Resist => "Resist".to_string(),
+                let (impact_text, goodness) = match outcome {
+                    SpellOutcome::HitEnemy(damage) => (format!("{}", damage), Goodness::Bad),
+                    SpellOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
+                    SpellOutcome::HealedAlly(healing) => (format!("{}", healing), Goodness::Good),
                 };
 
                 self.game_grid
-                    .add_text_effect(target_pos, duration, 0.5, impact_text);
+                    .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
 
                 self.stopwatch.set_to_at_least(duration + 0.3);
             }
@@ -1035,6 +1078,7 @@ impl UserInterface {
                     0.0,
                     duration,
                     format!("{:?}", condition),
+                    Goodness::Neutral,
                 );
                 self.stopwatch.set_to_at_least(duration);
             }
@@ -1119,12 +1163,13 @@ impl UserInterface {
         self.activity_popup.target_line = None;
 
         self.game_grid.clear_static_text();
+        self.game_grid.target_text = None;
         self.game_grid.action_range_indicator = None;
 
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.target() {
+                if let Some(i) = self.game_grid.players_target() {
                     let target_char = self.characters.get(i);
 
                     let enhancements: Vec<AttackEnhancement> = self
@@ -1140,19 +1185,15 @@ impl UserInterface {
                     let mut circumstance_advantage = None;
 
                     match reach {
-                        AttackReach::Yes
-                        | AttackReach::YesButFarDisadvantage
-                        | AttackReach::YesButMeleeDisadvantage => {
+                        ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
                             if self.active_character().can_use_action(base_action) {
                                 popup_enabled = true;
                             }
-                            if reach == AttackReach::YesButFarDisadvantage {
-                                circumstance_advantage = Some((-1, "Far", Goodness::Bad));
-                            } else if reach == AttackReach::YesButMeleeDisadvantage {
-                                circumstance_advantage = Some((-1, "Melee", Goodness::Bad));
+                            if let ActionReach::YesButDisadvantage(reason) = reach {
+                                circumstance_advantage = Some((-1, reason, Goodness::Bad));
                             }
                         }
-                        AttackReach::No => {
+                        ActionReach::No => {
                             self.activity_popup.target_line =
                                 Some(format!("[{}] Out of range!", target_char.name));
                         }
@@ -1188,11 +1229,15 @@ impl UserInterface {
                         details.push((term.to_string(), goodness));
                     }
 
+                    /*
                     self.game_grid.set_static_text(
                         target_char.position_i32(),
                         format!("Attack: {}", chance),
                         details,
                     );
+                     */
+
+                    self.game_grid.target_text = Some((format!("Attack: {}", chance), details));
 
                     self.game_grid.action_range_indicator = Some((range, reach));
                 } else {
@@ -1201,34 +1246,41 @@ impl UserInterface {
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.target() {
+                if let Some(i) = self.game_grid.players_target() {
                     let target_char = self.characters.get(i);
 
-                    let chance = as_percentage(prob_spell_hit(
-                        &self.active_character(),
-                        spell.spell_type,
-                        &target_char,
-                    ));
+                    let static_text = match spell.target_type {
+                        SpellTargetType::SingleEnemy(spell_type) => {
+                            let chance = as_percentage(prob_spell_hit(
+                                &self.active_character(),
+                                spell_type,
+                                &target_char,
+                            ));
 
-                    self.game_grid.set_static_text(
-                        target_char.position_i32(),
-                        format!("{}: {}", spell.name, chance),
-                        vec![],
-                    );
+                            format!("{}: {}", spell.name, chance)
+                        }
+                        SpellTargetType::SingleAlly => spell.name.to_string(),
+                    };
 
-                    let range = spell.range;
+                    /*
+                    self.game_grid
+                        .set_static_text(target_char.position_i32(), static_text, vec![]);
+                     */
+
+                    self.game_grid.target_text = Some((static_text, vec![]));
+
                     let reach = if self
                         .active_character()
                         .can_reach_with_spell(spell, target_char.position)
                     {
                         popup_enabled = true;
-                        AttackReach::Yes
+                        ActionReach::Yes
                     } else {
                         self.activity_popup.target_line =
                             Some(format!("[{}] Out of range!", target_char.name));
-                        AttackReach::No
+                        ActionReach::No
                     };
-                    self.game_grid.action_range_indicator = Some((range, reach));
+                    self.game_grid.action_range_indicator = Some((spell.range, reach));
                 } else {
                     self.activity_popup.target_line = Some("Select a target".to_string());
                 }
@@ -1308,7 +1360,7 @@ impl UserInterface {
 
         match self.state {
             UiState::ConfiguringAction(base_action) => {
-                let target = self.game_grid.target();
+                let target = self.game_grid.players_target();
                 let action = match base_action {
                     BaseAction::Attack { hand, .. } => Action::Attack {
                         hand,

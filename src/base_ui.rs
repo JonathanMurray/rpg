@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, DARKGREEN, GRAY, MAGENTA, WHITE},
+    color::{Color, BLACK, DARKGRAY, DARKGREEN, GRAY, MAGENTA, WHITE},
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -330,14 +330,14 @@ impl Style {
 }
 
 pub struct Circle {
-    r: f32,
-    color: Color,
+    pub r: f32,
+    pub color: Color,
 }
 
 impl Circle {
     pub fn draw(&self, x: f32, y: f32) {
         draw_circle(x + self.r, y + self.r, self.r, self.color);
-        draw_circle_lines(x + self.r, y + self.r, self.r, 1.0, WHITE);
+        draw_circle_lines(x + self.r, y + self.r, self.r, 1.0, DARKGRAY);
     }
 
     pub fn size(&self) -> (f32, f32) {

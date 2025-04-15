@@ -1,7 +1,7 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::{Color, BLACK, ORANGE},
+    color::{Color, BLACK, MAGENTA, ORANGE},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
@@ -22,7 +22,7 @@ use macroquad::{
 };
 
 use crate::{
-    core::{AttackReach, Goodness, MovementEnhancement},
+    core::{ActionReach, Character, Goodness, MovementEnhancement},
     pathfind::PathfindGrid,
     textures::SpriteId,
 };
@@ -40,6 +40,7 @@ const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 1.0);
 const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
 const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 const HOVER_NPC_COLOR: Color = Color::new(0.8, 0.2, 0.8, 1.0);
+const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
 const TARGET_NPC_COLOR: Color = Color::new(1.0, 0.0, 1.0, 1.0);
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
@@ -47,7 +48,8 @@ const MOVE_RANGE_COLOR: Color = GREEN;
 const ACTION_WITHIN_RANGE_COLOR: Color = GREEN;
 const ACTION_WITHIN_RANGE_BUT_DISADV_COLOR: Color = ORANGE;
 const ACTION_OUT_OF_RANGE_COLOR: Color = RED;
-const TARGET_CROSSHAIR_COLOR: Color = WHITE;
+const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = WHITE;
+const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
 #[derive(Debug, Copy, Clone)]
 struct CharacterMotion {
@@ -59,7 +61,7 @@ struct CharacterMotion {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Target {
+enum PlayersTarget {
     Some(CharacterId),
     Memorized(CharacterId),
     None,
@@ -127,14 +129,16 @@ pub struct GameGrid {
 
     effects: Vec<ConcreteEffect>,
     static_text: Option<StaticText>,
-
+    pub target_text: Option<(String, Vec<(String, Goodness)>)>,
     selected_character_id: CharacterId,
     active_character_id: CharacterId,
-    pub action_range_indicator: Option<(Range, AttackReach)>,
+    pub action_range_indicator: Option<(Range, ActionReach)>,
 
     movement_range: MovementRange,
     movement_preview: Option<Vec<(f32, (i32, i32))>>,
-    target: Target,
+
+    players_target: PlayersTarget,
+    enemys_target: Option<CharacterId>,
 
     pub grid_dimensions: (i32, i32),
     pub position_on_screen: (f32, f32),
@@ -172,11 +176,13 @@ impl GameGrid {
             characters,
             effects: vec![],
             static_text: None,
+            target_text: None,
             selected_character_id,
             active_character_id: 0,
             movement_range: MovementRange::default(),
             movement_preview: Default::default(),
-            target: Target::None,
+            players_target: PlayersTarget::None,
+            enemys_target: None,
             action_range_indicator: None,
             cell_w: 64.0,
             grid_dimensions,
@@ -283,11 +289,18 @@ impl GameGrid {
         start_time: f32,
         duration: f32,
         text: impl Into<String>,
+        goodness: Goodness,
     ) {
         let pos = (
             self.grid_x_to_screen(position.0),
             self.grid_y_to_screen(position.1),
         );
+
+        let color = match goodness {
+            Goodness::Good => GREEN,
+            Goodness::Neutral => YELLOW,
+            Goodness::Bad => ORANGE,
+        };
 
         let effect = ConcreteEffect {
             age: 0.0,
@@ -295,7 +308,7 @@ impl GameGrid {
             end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(text.into(), self.big_font.clone()),
+                EffectGraphics::Text(text.into(), self.big_font.clone(), color),
             ),
             source_pos: pos,
             destination_pos: pos,
@@ -463,40 +476,80 @@ impl GameGrid {
         )
     }
 
-    pub fn clear_target(&mut self) {
-        if let Target::Some(id) = self.target {
-            self.target = Target::Memorized(id);
+    pub fn clear_players_target(&mut self) {
+        if let PlayersTarget::Some(id) = self.players_target {
+            self.players_target = PlayersTarget::Memorized(id);
         }
     }
 
-    pub fn target(&self) -> Option<CharacterId> {
-        match self.target {
-            Target::Some(id) => Some(id),
+    pub fn clear_enemys_target(&mut self) {
+        self.enemys_target = None;
+    }
+
+    pub fn players_target(&self) -> Option<CharacterId> {
+        match self.players_target {
+            PlayersTarget::Some(id) => Some(id),
             _ => None,
         }
     }
 
-    pub fn ensure_has_npc_target(&mut self) {
-        match self.target {
-            Target::Some(_) => {}
-            Target::Memorized(id) => self.target = Target::Some(id),
-            Target::None => {
-                // pick an arbitrary enemy
-                for (id, character) in self.characters.iter_with_ids() {
-                    if *id != self.active_character_id && !character.borrow().player_controlled {
-                        self.target = Target::Some(*id);
-                        break;
-                    }
+    pub fn ensure_player_has_enemy_target(&mut self) {
+        let pick_new = match self.players_target {
+            PlayersTarget::Some(id) => self.characters.get(id).player_controlled,
+            PlayersTarget::Memorized(id) => {
+                let target_is_ally = self.characters.get(id).player_controlled;
+                if !target_is_ally {
+                    self.players_target = PlayersTarget::Some(id);
+                }
+                target_is_ally
+            }
+            PlayersTarget::None => true,
+        };
+
+        if pick_new {
+            // pick an arbitrary enemy
+            for (id, character) in self.characters.iter_with_ids() {
+                if *id != self.active_character_id && !character.borrow().player_controlled {
+                    self.players_target = PlayersTarget::Some(*id);
+                    break;
                 }
             }
         }
     }
 
-    pub fn set_target(&mut self, target_character_id: CharacterId) {
-        self.target = Target::Some(target_character_id);
+    pub fn ensure_player_has_ally_target(&mut self) {
+        let pick_new = match self.players_target {
+            PlayersTarget::Some(id) => !self.characters.get(id).player_controlled,
+            PlayersTarget::Memorized(id) => {
+                let target_is_ally = self.characters.get(id).player_controlled;
+                if target_is_ally {
+                    self.players_target = PlayersTarget::Some(id);
+                }
+                target_is_ally
+            }
+            PlayersTarget::None => true,
+        };
+
+        if pick_new {
+            // pick an arbitrary ally
+            for (id, character) in self.characters.iter_with_ids() {
+                if *id != self.active_character_id && character.borrow().player_controlled {
+                    self.players_target = PlayersTarget::Some(*id);
+                    break;
+                }
+            }
+        }
     }
 
-    pub fn draw(&mut self, blocked_screen_area: Rect, receptive_to_input: bool) -> GridOutcome {
+    pub fn set_enemys_target(&mut self, target_character_id: CharacterId) {
+        self.enemys_target = Some(target_character_id);
+    }
+
+    pub fn draw(
+        &mut self,
+        receptive_to_input: bool,
+        current_player_action_targets_allies: bool,
+    ) -> GridOutcome {
         let (w, h) = self.size;
 
         let (x, y) = self.position_on_screen;
@@ -533,7 +586,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 && row < self.grid_dimensions.1 {
                     let params = DrawTextureParams {
-                        dest_size: Some(Vec2::new(64.0, 64.0)),
+                        dest_size: Some(Vec2::new(self.cell_w, self.cell_w)),
                         ..Default::default()
                     };
                     let i = self.cell_backgrounds[(row * self.grid_dimensions.0 + col) as usize];
@@ -592,13 +645,6 @@ impl GameGrid {
             && (0..self.grid_dimensions.0).contains(&mouse_grid_x)
             && (0f32..h).contains(&mouse_relative.1)
             && (0..self.grid_dimensions.1).contains(&mouse_grid_y);
-        let is_mouse_blocked = blocked_screen_area.contains((mouse_x, mouse_y).into());
-
-        let receptive_to_input = receptive_to_input
-            && self
-                .characters
-                .get(self.active_character_id)
-                .player_controlled;
 
         if is_mouse_within_grid && receptive_to_input {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -617,7 +663,7 @@ impl GameGrid {
             }
 
             if is_mouse_button_pressed(MouseButton::Right)
-                || is_mouse_button_down(MouseButton::Middle)
+                || is_mouse_button_pressed(MouseButton::Middle)
             {
                 self.dragging_camera_from = Some(mouse_relative);
             }
@@ -627,7 +673,9 @@ impl GameGrid {
 
         self.draw_movement_preview_background();
 
-        if is_mouse_within_grid && !is_mouse_blocked && receptive_to_input {
+        let mut hovered_character_id = None;
+
+        if is_mouse_within_grid && receptive_to_input {
             let collision = character_positions.contains(&(mouse_grid_x, mouse_grid_y));
 
             let valid_move_route =
@@ -640,17 +688,11 @@ impl GameGrid {
                     _ => None,
                 };
 
-            let mut hovered_npc_id = None;
-            let mut hovering_active_player_controlled = false;
             for character in self.characters.iter() {
                 if character.borrow().position_i32() == (mouse_grid_x, mouse_grid_y) {
                     let id = character.borrow().id();
                     outcome.hovered_character_id = Some(id);
-                    if !character.borrow().player_controlled {
-                        hovered_npc_id = Some(id);
-                    } else if id == self.active_character_id {
-                        hovering_active_player_controlled = true
-                    }
+                    hovered_character_id = Some(id);
                 }
             }
 
@@ -674,22 +716,36 @@ impl GameGrid {
                         self.movement_preview = Some(path);
                     }
                 }
-            } else if let Some(id) = hovered_npc_id {
-                self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_NPC_COLOR, 1.0);
-                if is_mouse_button_pressed(MouseButton::Left) {
-                    match self.target {
-                        Target::Some(_) => {}
-                        Target::Memorized(_) | Target::None => {
-                            outcome.switched_to = Some(GridSwitchedTo::Attack)
+            } else if let Some(id) = hovered_character_id {
+                let player_controlled = self.characters.get(id).player_controlled;
+                if player_controlled {
+                    if current_player_action_targets_allies {
+                        self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_ALLY_COLOR, 1.0);
+                    }
+
+                    if is_mouse_button_pressed(MouseButton::Left) {
+                        if self.active_character_id == id {
+                            outcome.switched_to = Some(GridSwitchedTo::Idle);
+                        } else if current_player_action_targets_allies {
+                            outcome.switched_target = true;
+                            self.players_target = PlayersTarget::Some(id);
+                            self.movement_preview = None;
                         }
                     }
-                    outcome.switched_target = true;
-                    self.target = Target::Some(id);
-                    self.movement_preview = None;
-                }
-            } else if hovering_active_player_controlled {
-                if is_mouse_button_pressed(MouseButton::Left) {
-                    outcome.switched_to = Some(GridSwitchedTo::Idle);
+                } else {
+                    self.draw_cell_outline((mouse_grid_x, mouse_grid_y), HOVER_NPC_COLOR, 1.0);
+                    if is_mouse_button_pressed(MouseButton::Left) {
+                        let switch_to_attack = match self.players_target {
+                            PlayersTarget::Some(..) => current_player_action_targets_allies,
+                            PlayersTarget::Memorized(_) | PlayersTarget::None => true,
+                        };
+                        if switch_to_attack {
+                            outcome.switched_to = Some(GridSwitchedTo::Attack);
+                        }
+                        outcome.switched_target = true;
+                        self.players_target = PlayersTarget::Some(id);
+                        self.movement_preview = None;
+                    }
                 }
             } else if self.movement_preview.is_some() && self.dragging_camera_from.is_none() {
                 self.draw_cell_outline(
@@ -709,23 +765,86 @@ impl GameGrid {
 
                 self.draw_movement_path_arrow(movement_preview, MOVEMENT_ARROW_COLOR);
 
+                let (x, y) = (
+                    self.grid_x_to_screen(destination.0),
+                    self.grid_y_to_screen(destination.1) + 14.0,
+                );
+
                 self.draw_static_text_lines(
-                    destination,
                     &format!("Move {:.3}", distance.to_string()),
                     &[],
                     4.0,
-                    14.0,
+                    x,
+                    y,
                 );
             }
         }
 
-        self.draw_target_crosshair();
+        if let PlayersTarget::Some(target) = self.players_target {
+            self.draw_target_crosshair(target, PLAYERS_TARGET_CROSSHAIR_COLOR);
+        }
+        if let Some(target) = self.enemys_target {
+            self.draw_target_crosshair(target, ENEMYS_TARGET_CROSSHAIR_COLOR);
+        }
 
         self.draw_effects();
 
         self.draw_static_text();
 
+        if let Some(id) = hovered_character_id {
+            let char = self.characters.get(id);
+            self.draw_character_hover(&char);
+        }
+
         outcome
+    }
+
+    fn draw_character_hover(&self, char: &Character) {
+        let y_offset = -5.0;
+
+        let (mut x, y) = (
+            self.grid_x_to_screen(char.position_i32().0),
+            self.grid_y_to_screen(char.position_i32().1) + y_offset,
+        );
+
+        let font_size = 14;
+        let params = TextParams {
+            font: Some(&self.big_font),
+            font_size,
+            color: WHITE,
+            ..Default::default()
+        };
+
+        let margin = 2.0;
+        let healthbar_w = self.cell_w;
+        let healthbar_h = 5.0;
+
+        let header = char.name;
+
+        let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
+
+        let text_pad = 2.0;
+        let box_w = text_dimensions.width + text_pad * 2.0;
+        let box_h = text_dimensions.height + text_pad * 2.0;
+        let box_x = x - (box_w - self.cell_w) / 2.0;
+        let box_y = y - healthbar_h - margin - box_h;
+
+        draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
+        draw_text_ex(
+            header,
+            box_x + text_pad,
+            box_y + text_pad + text_dimensions.offset_y,
+            params,
+        );
+
+        draw_rectangle(x, y - healthbar_h, healthbar_w, healthbar_h, BLACK);
+        draw_rectangle(
+            x,
+            y - healthbar_h,
+            healthbar_w * (char.health.current as f32 / char.health.max as f32),
+            healthbar_h,
+            RED,
+        );
     }
 
     fn draw_active_character_outline(&self) {
@@ -840,50 +959,48 @@ impl GameGrid {
         movement_preview
     }
 
-    fn draw_target_crosshair(&self) {
-        if let Target::Some(target_character_i) = self.target {
-            let actor_pos = self.characters.get(self.active_character_id).position_i32();
-            let target_pos = self.characters.get(target_character_i).position_i32();
-            self.draw_cell_outline(target_pos, TARGET_NPC_COLOR, 1.0);
-            draw_circle_lines(
+    fn draw_target_crosshair(&self, target: CharacterId, color: Color) {
+        let actor_pos = self.characters.get(self.active_character_id).position_i32();
+        let target_pos = self.characters.get(target).position_i32();
+        self.draw_cell_outline(target_pos, TARGET_NPC_COLOR, 1.0);
+        draw_circle_lines(
+            self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
+            self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
+            self.cell_w * 0.2,
+            2.0,
+            color,
+        );
+        draw_arrow(
+            (
+                self.grid_x_to_screen(target_pos.0),
+                self.grid_y_to_screen(target_pos.1),
+            ),
+            self.cell_w,
+            (1, 1),
+            color,
+        );
+        draw_arrow(
+            (
+                self.grid_x_to_screen(target_pos.0),
+                self.grid_y_to_screen(target_pos.1),
+            ),
+            self.cell_w,
+            (-1, -1),
+            color,
+        );
+
+        draw_dashed_line(
+            (
+                self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0,
+                self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0,
+            ),
+            (
                 self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
                 self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
-                self.cell_w * 0.2,
-                2.0,
-                TARGET_CROSSHAIR_COLOR,
-            );
-            draw_arrow(
-                (
-                    self.grid_x_to_screen(target_pos.0),
-                    self.grid_y_to_screen(target_pos.1),
-                ),
-                self.cell_w,
-                (1, 1),
-                TARGET_CROSSHAIR_COLOR,
-            );
-            draw_arrow(
-                (
-                    self.grid_x_to_screen(target_pos.0),
-                    self.grid_y_to_screen(target_pos.1),
-                ),
-                self.cell_w,
-                (-1, -1),
-                TARGET_CROSSHAIR_COLOR,
-            );
-
-            draw_dashed_line(
-                (
-                    self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0,
-                    self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0,
-                ),
-                (
-                    self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0,
-                    self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0,
-                ),
-                2.0,
-                TARGET_CROSSHAIR_COLOR,
-            );
-        }
+            ),
+            2.0,
+            color,
+        );
     }
 
     fn draw_static_text(&self) {
@@ -893,22 +1010,26 @@ impl GameGrid {
             details,
         }) = &self.static_text
         {
-            self.draw_static_text_lines(*position, header, details, 6.0, 0.0);
+            let (x, y) = (
+                self.grid_x_to_screen(position.0),
+                self.grid_y_to_screen(position.1),
+            );
+            self.draw_static_text_lines(header, details, 6.0, x, y);
+        }
+
+        if let Some((header, details)) = &self.target_text {
+            self.draw_static_text_lines(header, details, 6.0, 1100.0, 60.0);
         }
     }
 
     fn draw_static_text_lines(
         &self,
-        position: (i32, i32),
         header: &str,
         details: &[(String, Goodness)],
         pad: f32,
-        y_offset: f32,
+        mut x: f32,
+        y: f32,
     ) {
-        let (mut x, mut y) = (
-            self.grid_x_to_screen(position.0),
-            self.grid_y_to_screen(position.1) + y_offset,
-        );
         let header_font_size = 16;
         let detail_font_size = 18;
         let params = TextParams {
@@ -918,49 +1039,62 @@ impl GameGrid {
             ..Default::default()
         };
 
-        let mut h = 0.0;
         let line_margin = 8.0;
 
-        let text_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
-        let header_w = text_dimensions.width;
-        if text_dimensions.height.is_finite() {
-            h += text_dimensions.height + line_margin;
-            y -= text_dimensions.height + line_margin;
+        let header_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
+        let header_w = header_dimensions.width;
+        let mut header_h = 0.0;
+        if header_dimensions.height.is_finite() {
+            header_h = header_dimensions.height;
         }
-
-        let mut details_w = 0.0;
-        let mut details_h = 0.0;
 
         let detail_margin = 8.0;
 
-        for (i, (line, goodness)) in details.iter().enumerate() {
-            let text_dimensions =
-                measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
-            details_w += text_dimensions.width + detail_margin;
-            if text_dimensions.height.is_finite() && text_dimensions.height > details_h {
-                details_h = text_dimensions.height;
+        let mut details_w = 0.0;
+        let mut details_h = 0.0;
+        let mut details_max_offset = 0.0;
+        if !details.is_empty() {
+            let mut details_relative_y_interval = [f32::MAX, f32::MIN];
+
+            for (i, (line, goodness)) in details.iter().enumerate() {
+                let dim = measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
+                details_w += dim.width;
+                if dim.height.is_finite() {
+                    if dim.offset_y > details_max_offset {
+                        details_max_offset = dim.offset_y;
+                    }
+                    let top = -dim.offset_y;
+                    let bot = -dim.offset_y + dim.height;
+                    if top < details_relative_y_interval[0] {
+                        details_relative_y_interval[0] = top;
+                    }
+                    if bot > details_relative_y_interval[1] {
+                        details_relative_y_interval[1] = bot;
+                    }
+                }
             }
+            details_w += (details.len() - 1) as f32 * detail_margin;
+            details_h = details_relative_y_interval[1] - details_relative_y_interval[0];
         }
-        details_w = (details_w - detail_margin).max(0.0);
+
         let w = header_w.max(details_w) + 2.0 * pad;
-        h += details_h;
-        h += 2.0 * pad;
+        let h = if details.is_empty() {
+            header_h
+        } else {
+            header_h + line_margin + details_h
+        } + 2.0 * pad;
 
         if w > self.cell_w {
             x -= (w - self.cell_w) / 2.0;
         }
 
-        y -= details_h;
+        draw_rectangle(x, y - h, w, h, Color::new(0.0, 0.0, 0.0, 0.7));
 
-        draw_rectangle(x, y - pad, w, h, Color::new(0.0, 0.0, 0.0, 0.7));
+        let mut x0 = x + pad;
+        let mut y0 = y - h + pad;
 
-        y += pad;
-        y += 5.0;
-
-        x += pad;
-
-        let dimensions = draw_text_ex(header, x, y, params.clone());
-        y += dimensions.height + line_margin;
+        draw_text_ex(header, x0, y0 + header_dimensions.offset_y, params.clone());
+        y0 += header_h + line_margin;
 
         for (i, (line, goodness)) in details.iter().enumerate() {
             let mut params = params.clone();
@@ -971,9 +1105,9 @@ impl GameGrid {
                 Goodness::Neutral => {}
                 Goodness::Bad => params.color = Color::new(1.0, 0.5, 0.5, 1.0),
             }
-            let dimensions = draw_text_ex(line, x, y, params);
+            let dimensions = draw_text_ex(line, x0, y0 + details_max_offset, params);
             //y += dimensions.height + line_margin;
-            x += dimensions.width + detail_margin;
+            x0 += dimensions.width + detail_margin;
         }
     }
 
@@ -1062,15 +1196,13 @@ impl GameGrid {
         }
     }
 
-    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range, reach: AttackReach) {
+    fn draw_out_of_range_indicator(&self, origin: (i32, i32), range: Range, reach: ActionReach) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
         let color = match reach {
-            AttackReach::Yes => ACTION_WITHIN_RANGE_COLOR,
-            AttackReach::YesButFarDisadvantage | AttackReach::YesButMeleeDisadvantage => {
-                ACTION_WITHIN_RANGE_BUT_DISADV_COLOR
-            }
-            AttackReach::No => ACTION_OUT_OF_RANGE_COLOR,
+            ActionReach::Yes => ACTION_WITHIN_RANGE_COLOR,
+            ActionReach::YesButDisadvantage(..) => ACTION_WITHIN_RANGE_BUT_DISADV_COLOR,
+            ActionReach::No => ACTION_OUT_OF_RANGE_COLOR,
         };
         let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;
@@ -1216,7 +1348,7 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(String, Font),
+    Text(String, Font, Color),
 }
 
 impl EffectGraphics {
@@ -1290,7 +1422,7 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(text, font) => {
+            EffectGraphics::Text(text, font, color) => {
                 let font_size = 20;
                 let text_dimensions = measure_text(text, None, font_size, 1.0);
 
@@ -1304,7 +1436,7 @@ impl EffectGraphics {
                     ..Default::default()
                 };
                 draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
-                text_params.color = YELLOW;
+                text_params.color = *color;
                 draw_text_ex(text, x0, y0, text_params);
             }
         }

@@ -34,7 +34,7 @@ impl TargetUi {
             self.shown = true;
             let mut name_text_line = TextLine::new(char.name, 22, WHITE, Some(self.font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
-            name_text_line.set_min_height(22.0);
+            name_text_line.set_min_height(20.0);
 
             let conditions_list =
                 ConditionsList::new(self.font.clone(), char.condition_descriptions());
@@ -83,8 +83,8 @@ impl TargetUi {
                 layout_dir: LayoutDirection::Vertical,
                 children: vec![
                     Element::Text(name_text_line),
-                    Element::Box(Box::new(action_points_row)),
                     Element::Box(Box::new(health_bar)),
+                    Element::Box(Box::new(action_points_row)),
                     stats_table,
                     Element::Text(armor_text_line),
                     Element::Box(Box::new(conditions_list)),

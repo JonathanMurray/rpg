@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
-use macroquad::miniquad::window::set_window_position;
+use macroquad::color::MAGENTA;
+use macroquad::miniquad::window::{self, set_window_position, set_window_size};
 
+use macroquad::shapes::draw_rectangle;
 use macroquad::text::{load_ttf_font, Font};
 use macroquad::texture::FilterMode;
 use macroquad::{
@@ -35,6 +37,12 @@ async fn main() {
 
     // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
     set_window_position(100, 100);
+
+    dbg!(
+        window::screen_size(),
+        window::dpi_scale(),
+        window::high_dpi()
+    );
 
     let event_handler = Rc::new(UiGameEventHandler::new());
     let game = CoreGame::new(event_handler.clone());
@@ -198,9 +206,9 @@ async fn main() {
 fn window_conf() -> Conf {
     Conf {
         window_title: "UI test".to_owned(),
-        window_width: 1600,
-        window_height: 1200,
-        high_dpi: true,
+        window_width: 1280,
+        window_height: 960,
+        high_dpi: false,
         ..Default::default()
     }
 }

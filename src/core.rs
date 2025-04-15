@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    SpellId, BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, KILL, PARRY_EVASION_BONUS,
+    BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL, PARRY_EVASION_BONUS,
     RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
@@ -43,13 +43,11 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
-        bob.known_actions.push(BaseAction::CastSpell(KILL));
-        bob.receive_condition(Condition::Braced);
-        bob.receive_condition(Condition::Dazed(5));
+        bob.known_actions.push(BaseAction::CastSpell(HEAL));
 
         let mut enemy1 = Character::new(
             false,
-            "Gremlin",
+            "Gremlin Nob",
             SpriteId::Character2,
             Attributes::new(5, 5, 5, 5),
             (2, 4),
@@ -74,9 +72,10 @@ impl CoreGame {
             true,
             "David",
             SpriteId::Character,
-            Attributes::new(10, 10, 10, 5),
+            Attributes::new(2, 10, 10, 5),
             (5, 7),
         );
+        david.health.lose(6);
         david.main_hand.weapon = Some(DAGGER);
 
         let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
@@ -113,7 +112,7 @@ impl CoreGame {
                 let mut attacker = character;
                 let defender = self.characters.get_mut(target);
 
-                assert!(attacker.reaches_with_attack(hand, defender.position).1 != AttackReach::No);
+                assert!(attacker.reaches_with_attack(hand, defender.position).1 != ActionReach::No);
 
                 attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
                 for enhancement in &enhancements {
@@ -253,11 +252,11 @@ impl CoreGame {
         caster: &mut Character,
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
-        target: CharacterId,
+        target_id: CharacterId,
     ) {
-        let defender = &mut self.characters.get_mut(target);
+        let target = &mut self.characters.get_mut(target_id);
 
-        assert!(caster.can_reach_with_spell(spell, defender.position));
+        assert!(caster.can_reach_with_spell(spell, target.position));
         assert!(caster.action_points >= spell.action_point_cost);
 
         caster.action_points -= spell.action_point_cost;
@@ -266,11 +265,6 @@ impl CoreGame {
         for enhancement in &enhancements {
             caster.mana.spend(enhancement.mana_cost);
         }
-
-        let (defense_label, defense) = match spell.spell_type {
-            SpellType::Mental => ("will", defender.will()),
-            SpellType::Projectile => ("evasion", defender.evasion()),
-        };
 
         let mut cast_n_times = 1;
         for enhancement in &enhancements {
@@ -281,77 +275,116 @@ impl CoreGame {
 
         for i in 0..cast_n_times {
             let mut detail_lines = vec![];
+
             let roll = roll_d20_with_advantage(0);
             let spell_result = roll + caster.spell_modifier();
-            detail_lines.push(format!(
-                "Rolled: {} (+{} spell mod) = {}, vs {}={}",
-                roll,
-                caster.spell_modifier(),
-                spell_result,
-                defense_label,
-                defense,
-            ));
 
-            let outcome = if spell_result >= defense {
-                detail_lines.push("The spell was successful!".to_string());
-                let mut dmg_calculation = spell.damage as i32;
-                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
-
-                let (label, bonus_dmg) = if spell_result < defense + 5 {
-                    // No such thing as "True hit" for spells
-                    ("", 0)
-                } else if spell_result < defense + 10 {
-                    ("Heavy hit", 1)
-                } else {
-                    ("Critical hit", 2)
+            let outcome = if let SpellTargetType::SingleEnemy(spell_type) = spell.target_type {
+                let (defense_label, defense) = match spell_type {
+                    OffensiveSpellType::Mental => ("will", target.will()),
+                    OffensiveSpellType::Projectile => ("evasion", target.evasion()),
                 };
-                if !label.is_empty() {
-                    detail_lines.push(format!("  {label}!"));
-                }
-                if bonus_dmg > 0 {
-                    dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
-                    dmg_calculation += bonus_dmg;
-                }
 
-                for enhancement in &enhancements {
-                    if enhancement.bonus_damage > 0 {
-                        dmg_str.push_str(&format!(
-                            " +{} ({})",
-                            enhancement.bonus_damage, enhancement.name
-                        ));
-                        dmg_calculation += enhancement.bonus_damage as i32;
+                detail_lines.push(format!(
+                    "Rolled: {} (+{} spell mod) = {}, vs {}={}",
+                    roll,
+                    caster.spell_modifier(),
+                    spell_result,
+                    defense_label,
+                    defense,
+                ));
+
+                if spell_result >= defense {
+                    detail_lines.push("The spell was successful!".to_string());
+                    let mut dmg_calculation = spell.damage as i32;
+                    let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
+
+                    let degree_of_success = (spell_result - defense) / 5;
+                    let (label, bonus_dmg) = match degree_of_success {
+                        0 => ("".to_string(), 0),
+                        1 => ("Heavy hit".to_string(), 1),
+                        n => (format!("Heavy hit ({n})"), n as i32),
+                    };
+
+                    if !label.is_empty() {
+                        detail_lines.push(format!("  {label}!"));
                     }
-                }
-
-                let damage = dmg_calculation.max(0) as u32;
-
-                if dmg_calculation > 0 {
-                    self.perform_losing_health(defender, damage);
-                    dmg_str.push_str(&format!(" = {damage}"));
-                    detail_lines.push(dmg_str);
-                }
-
-                if let Some(effect) = spell.on_hit_effect {
-                    let log_line = self.perform_effect_application(effect, defender);
-                    detail_lines.push(format!("{} ({})", log_line, spell.name));
-                }
-
-                for enhancement in &enhancements {
-                    if let Some(SpellEnhancementEffect::OnHitEffect(effect)) = enhancement.effect {
-                        let log_line = self.perform_effect_application(effect, defender);
-                        detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                    if bonus_dmg > 0 {
+                        dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
+                        dmg_calculation += bonus_dmg;
                     }
-                }
 
-                SpellOutcome::Hit(damage)
+                    for enhancement in &enhancements {
+                        if enhancement.bonus_damage > 0 {
+                            dmg_str.push_str(&format!(
+                                " +{} ({})",
+                                enhancement.bonus_damage, enhancement.name
+                            ));
+                            dmg_calculation += enhancement.bonus_damage as i32;
+                        }
+                    }
+
+                    let damage = dmg_calculation.max(0) as u32;
+
+                    if dmg_calculation > 0 {
+                        self.perform_losing_health(target, damage);
+                        dmg_str.push_str(&format!(" = {damage}"));
+                        detail_lines.push(dmg_str);
+                    }
+
+                    if let Some(effect) = spell.on_hit_effect {
+                        let log_line = self.perform_effect_application(effect, target);
+                        detail_lines.push(format!("{} ({})", log_line, spell.name));
+                    }
+
+                    for enhancement in &enhancements {
+                        if let Some(SpellEnhancementEffect::OnHitEffect(effect)) =
+                            enhancement.effect
+                        {
+                            let log_line = self.perform_effect_application(effect, target);
+                            detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                        }
+                    }
+
+                    SpellOutcome::HitEnemy(damage)
+                } else {
+                    match spell_type {
+                        OffensiveSpellType::Mental => {
+                            detail_lines.push(format!("{} resisted the spell!", target.name))
+                        }
+                        OffensiveSpellType::Projectile => {
+                            detail_lines.push("The spell missed!".to_string())
+                        }
+                    }
+                    SpellOutcome::Resist
+                }
             } else {
-                match spell.spell_type {
-                    SpellType::Mental => {
-                        detail_lines.push(format!("{} resisted the spell!", defender.name))
+                detail_lines.push(format!(
+                    "Rolled: {} (+{} spell mod) = {}",
+                    roll,
+                    caster.spell_modifier(),
+                    spell_result,
+                ));
+
+                let mut health_gained = 0;
+                if spell.healing > 0 {
+                    let mut healing = spell.healing;
+
+                    let mut line = format!("Healing: {} ({})", spell.healing, spell.name);
+
+                    let effectiveness = spell_result / 10;
+                    if effectiveness > 0 {
+                        detail_lines.push(format!("Fortune: {}", effectiveness));
+                        line.push_str(&format!(" +{} (fortune)", effectiveness));
+                        healing += effectiveness;
                     }
-                    SpellType::Projectile => detail_lines.push("The spell missed!".to_string()),
-                }
-                SpellOutcome::Resist
+                    line.push_str(&format!(" = {}", healing));
+                    detail_lines.push(line);
+
+                    health_gained = target.health.gain(healing);
+                    detail_lines.push(format!("{} was healed for {}", target.name, health_gained));
+                };
+                SpellOutcome::HealedAlly(health_gained)
             };
 
             if i < cast_n_times - 1 {
@@ -360,7 +393,7 @@ impl CoreGame {
 
             self.event_handler.handle(GameEvent::SpellWasCast {
                 caster: caster.id(),
-                target: defender.id(),
+                target: target.id(),
                 outcome,
                 spell,
                 detail_lines,
@@ -398,9 +431,9 @@ impl CoreGame {
 
         let circumstance_advantage =
             match attacker.reaches_with_attack(hand_type, defender.position).1 {
-                AttackReach::Yes => 0,
-                AttackReach::YesButFarDisadvantage | AttackReach::YesButMeleeDisadvantage => -1,
-                AttackReach::No => unreachable!(),
+                ActionReach::Yes => 0,
+                ActionReach::YesButDisadvantage(..) => -1,
+                ActionReach::No => unreachable!(),
             };
 
         let attack_bonus = attack_roll_bonus(
@@ -518,13 +551,14 @@ impl CoreGame {
                 dmg_calculation -= mitigated as i32;
             } else {
                 on_true_hit_effect = weapon.on_true_hit;
-                let (label, bonus_dmg) = if attack_result < armored_defense + 5 {
-                    ("True hit", 0)
-                } else if attack_result < armored_defense + 10 {
-                    ("Heavy hit", 1)
-                } else {
-                    ("Critical hit", 2)
+
+                let degree_of_success = (attack_result - armored_defense) / 5;
+                let (label, bonus_dmg) = match degree_of_success {
+                    0 => ("True hit".to_string(), 0),
+                    1 => ("Heavy hit".to_string(), 1),
+                    n => (format!("Heavy hit ({n})"), n as i32),
                 };
+
                 log_lines.push(format!("  {label}!"));
                 if bonus_dmg > 0 {
                     dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
@@ -734,16 +768,15 @@ impl CoreGame {
                     target,
                 ));
                 let condition = if res >= target {
-                    let stacks = if res < target + 5 {
-                        lines.push("Hit!".to_string());
-                        1
-                    } else if res < target + 10 {
-                        lines.push("Heavy hit!".to_string());
-                        2
-                    } else {
-                        lines.push("Critical hit!".to_string());
-                        3
+                    let degree_of_success = (res - target) / 5;
+                    let (label, bonus) = match degree_of_success {
+                        0 => ("Hit".to_string(), 0),
+                        1 => ("Heavy hit".to_string(), 1),
+                        n => (format!("Heavy hit ({n})"), n),
                     };
+
+                    let stacks = 1 + bonus;
+                    lines.push(label);
 
                     Some(Condition::Dazed(stacks))
                 } else {
@@ -955,8 +988,9 @@ pub struct OffensiveHitReactionOutcome {
 
 #[derive(Debug, Copy, Clone)]
 pub enum SpellOutcome {
-    Hit(u32),
+    HitEnemy(u32),
     Resist,
+    HealedAlly(u32),
 }
 
 pub struct StateChooseAction {
@@ -1081,10 +1115,14 @@ pub fn prob_attack_hit(
     probability_of_d20_reaching(dice_target, bonus)
 }
 
-pub fn prob_spell_hit(caster: &Character, spell_type: SpellType, defender: &Character) -> f32 {
+pub fn prob_spell_hit(
+    caster: &Character,
+    spell_type: OffensiveSpellType,
+    defender: &Character,
+) -> f32 {
     let defender_value = match spell_type {
-        SpellType::Mental => defender.will(),
-        SpellType::Projectile => defender.evasion(),
+        OffensiveSpellType::Mental => defender.will(),
+        OffensiveSpellType::Projectile => defender.evasion(),
     };
     let target = defender_value
         .saturating_sub(caster.spell_modifier())
@@ -1419,17 +1457,23 @@ pub enum HandType {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spell {
-    pub id: SpellId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub damage: u32,
+    pub healing: u32,
     pub on_hit_effect: Option<ApplyEffect>,
-    pub spell_type: SpellType,
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
     pub range: Range,
+    pub target_type: SpellTargetType,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellTargetType {
+    SingleEnemy(OffensiveSpellType),
+    SingleAlly,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1455,7 +1499,7 @@ pub enum AttackEnhancementOnHitEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum SpellType {
+pub enum OffensiveSpellType {
     Mental,
     Projectile,
 }
@@ -1641,32 +1685,35 @@ impl Character {
         &self,
         hand: HandType,
         target_position: (u32, u32),
-    ) -> (Range, AttackReach) {
+    ) -> (Range, ActionReach) {
         let weapon = self.weapon(hand).unwrap();
         let weapon_range = weapon.range;
 
         match weapon_range {
             WeaponRange::Melee => {
                 if within_range_squared(weapon_range.squared(), self.position, target_position) {
-                    (weapon_range.into_range(), AttackReach::Yes)
+                    (weapon_range.into_range(), ActionReach::Yes)
                 } else {
-                    (weapon_range.into_range(), AttackReach::No)
+                    (weapon_range.into_range(), ActionReach::No)
                 }
             }
             WeaponRange::Ranged(..) => {
                 if within_range_squared(weapon_range.squared(), self.position, target_position) {
                     if within_range_squared(Range::Melee.squared(), self.position, target_position)
                     {
-                        (Range::Melee, AttackReach::YesButMeleeDisadvantage)
+                        (Range::Melee, ActionReach::YesButDisadvantage("melee"))
                     } else {
-                        (weapon_range.into_range(), AttackReach::Yes)
+                        (weapon_range.into_range(), ActionReach::Yes)
                     }
                 } else {
                     let extended = weapon_range.extended().unwrap();
                     if within_range_squared(extended.powf(2.0), self.position, target_position) {
-                        (Range::Float(extended), AttackReach::YesButFarDisadvantage)
+                        (
+                            weapon_range.into_range(),
+                            ActionReach::YesButDisadvantage("far"),
+                        )
                     } else {
-                        (Range::Float(extended), AttackReach::No)
+                        (Range::Float(extended), ActionReach::No)
                     }
                 }
             }
@@ -1932,11 +1979,11 @@ impl Character {
     }
 
     pub fn will(&self) -> u32 {
-        10 + self.intellect()
+        10 + self.intellect() * 2
     }
 
     pub fn toughness(&self) -> u32 {
-        10 + self.strength()
+        10 + self.strength() * 2
     }
 
     pub fn protection_from_armor(&self) -> u32 {
@@ -2060,10 +2107,9 @@ pub enum Goodness {
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum AttackReach {
+pub enum ActionReach {
     Yes,
-    YesButFarDisadvantage,
-    YesButMeleeDisadvantage,
+    YesButDisadvantage(&'static str),
     No,
 }
 
@@ -2101,8 +2147,10 @@ impl NumberedResource {
         self.current -= amount;
     }
 
-    fn gain(&mut self, amount: u32) {
+    fn gain(&mut self, amount: u32) -> u32 {
+        let prev = self.current;
         self.current = (self.current + amount).min(self.max);
+        self.current - prev
     }
 }
 

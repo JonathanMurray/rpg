@@ -1,6 +1,6 @@
 use crate::{
     core::{
-        Action, AttackReach, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction,
+        Action, ActionReach, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction,
     },
     pathfind::PathfindGrid,
 };
@@ -31,7 +31,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                             && character
                                 .reaches_with_attack(hand, other_character.borrow().position)
                                 .1
-                                != AttackReach::No
+                                != ActionReach::No
                         {
                             chosen_action = Some(Action::Attack {
                                 hand,

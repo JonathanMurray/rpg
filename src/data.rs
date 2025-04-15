@@ -1,10 +1,10 @@
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
+        AttackHitEffect, Condition, ConditionDescription, OffensiveSpellType, OnAttackedReaction,
         OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
-        Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellType, Weapon, WeaponGrip,
-        WeaponRange,
+        Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellTargetType, Weapon,
+        WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -124,7 +124,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
-        description: "Possibly daze attacker",
+        description: "Possibly daze attacker (str vs [toughness])",
         icon: IconId::ShieldBash,
         action_point_cost: 1,
         effect: OnHitReactionEffect::ShieldBash,
@@ -159,17 +159,6 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     )),
 };
 
-pub const PARRY_EVASION_BONUS: u32 = 3;
-pub const PARRY: OnAttackedReaction = OnAttackedReaction {
-    name: "Parry",
-    description: "Gain +3 evasion against one melee attack",
-    icon: IconId::Parry,
-    action_point_cost: 1,
-    stamina_cost: 0,
-    effect: OnAttackedReactionEffect::Parry,
-    must_be_melee: true,
-};
-
 pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     name: "Carefully aimed",
     description: "Gain advantage",
@@ -180,6 +169,17 @@ pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     bonus_damage: 0,
     bonus_advantage: 1,
     on_hit_effect: None,
+};
+
+pub const PARRY_EVASION_BONUS: u32 = 3;
+pub const PARRY: OnAttackedReaction = OnAttackedReaction {
+    name: "Parry",
+    description: "Gain +3 evasion against one melee attack",
+    icon: IconId::Parry,
+    action_point_cost: 1,
+    stamina_cost: 0,
+    effect: OnAttackedReactionEffect::Parry,
+    must_be_melee: true,
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
@@ -220,24 +220,15 @@ pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
     description: "Has +3 evasion against the next incoming attack",
 };
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum SpellId {
-    Scream,
-    Mindblast,
-    Fireball,
-    Kill,
-}
-
 pub const SCREAM: Spell = Spell {
-    id: SpellId::Scream,
     name: "Scream",
     description: "Daze the enemy",
     icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
     damage: 0,
+    healing: 0,
     on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
-    spell_type: SpellType::Mental,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
@@ -251,19 +242,20 @@ pub const SCREAM: Spell = Spell {
         }),
         None,
     ],
-    range: Range::Ranged(4),
+    range: Range::Ranged(3),
+    // TODO
+    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
 };
 
 pub const MIND_BLAST: Spell = Spell {
-    id: SpellId::Mindblast,
     name: "Mind blast",
     description: "Damage and stagger the enemy",
     icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
     damage: 1,
+    healing: 0,
     on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
-    spell_type: SpellType::Mental,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Dualcast",
@@ -276,18 +268,32 @@ pub const MIND_BLAST: Spell = Spell {
         None,
     ],
     range: Range::Ranged(5),
+    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+};
+
+pub const HEAL: Spell = Spell {
+    name: "Heal",
+    description: "Heal an ally",
+    icon: IconId::Plus,
+    action_point_cost: 2,
+    mana_cost: 1,
+    damage: 0,
+    healing: 1,
+    on_hit_effect: None,
+    possible_enhancements: [None, None],
+    range: Range::Ranged(5),
+    target_type: SpellTargetType::SingleAlly,
 };
 
 pub const FIREBALL: Spell = Spell {
-    id: SpellId::Fireball,
     name: "Fireball",
     description: "Hurl a fireball that damages the target",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
     damage: 2,
+    healing: 0,
     on_hit_effect: None,
-    spell_type: SpellType::Projectile,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Big",
@@ -307,18 +313,19 @@ pub const FIREBALL: Spell = Spell {
         }),
     ],
     range: Range::Ranged(5),
+    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
 };
 
 pub const KILL: Spell = Spell {
-    id: SpellId::Kill,
     name: "Kill",
     description: "Kill the enemy",
     icon: IconId::Fireball,
     action_point_cost: 5,
     mana_cost: 0,
     damage: 99,
+    healing: 0,
     on_hit_effect: None,
-    spell_type: SpellType::Projectile,
     possible_enhancements: [None; 2],
     range: Range::Ranged(99),
+    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
 };

@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, PURPLE, SKYBLUE, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, PURPLE, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -13,10 +13,12 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_debug, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
+    base_ui::{
+        draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
+    },
     core::{
-        AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, Spell, SpellEnhancement, SpellType,
+        AttackEnhancement, BaseAction, Character, MovementEnhancement, OffensiveSpellType,
+        OnAttackedReaction, OnHitReaction, Spell, SpellEnhancement, SpellTargetType,
     },
     textures::IconId,
 };
@@ -100,12 +102,19 @@ impl ActionButton {
 
                     tooltip_lines.push(description);
 
-                    let attribute_line = match spell.spell_type {
-                        SpellType::Mental => "Targets [will]".to_string(),
-                        SpellType::Projectile => "Targets [evasion]".to_string(),
+                    let attribute_line = match spell.target_type {
+                        SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => {
+                            "Targets [will]".to_string()
+                        }
+                        SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile) => {
+                            "Targets [evasion]".to_string()
+                        }
+                        SpellTargetType::SingleAlly => "".to_string(),
                     };
 
-                    tooltip_lines.push(attribute_line);
+                    if !attribute_line.is_empty() {
+                        tooltip_lines.push(attribute_line);
+                    }
                 }
                 BaseAction::Move {
                     action_point_cost,
@@ -197,9 +206,11 @@ impl ActionButton {
         };
         let hover_border_color = YELLOW;
 
-        let r = 4.0;
+        let r = 3.0;
         let mut point_icons = vec![];
-        let border_width = Some(4.0);
+
+        let border_width = Some(3.0);
+
         let border_color = Some(BLACK);
         let icon_size = (r * 2.0, r * 2.0);
         let point_style = Style {
@@ -207,46 +218,27 @@ impl ActionButton {
             border_width,
             ..Default::default()
         };
+
         for _ in 0..action_points {
-            point_icons.push(Element::Rect(Rectangle {
-                size: icon_size,
-                style: Style {
-                    background_color: Some(GOLD),
-                    ..point_style
-                },
-            }))
+            point_icons.push(Element::Circle(Circle { r, color: GOLD }))
         }
         for _ in 0..reactive_action_points {
-            point_icons.push(Element::Rect(Rectangle {
-                size: icon_size,
-                style: Style {
-                    background_color: Some(PURPLE),
-                    ..point_style
-                },
-            }))
+            point_icons.push(Element::Circle(Circle { r, color: GOLD }))
         }
         for _ in 0..mana_points {
-            point_icons.push(Element::Rect(Rectangle {
-                size: icon_size,
-                style: Style {
-                    background_color: Some(SKYBLUE),
-                    ..point_style
-                },
-            }))
+            point_icons.push(Element::Circle(Circle { r, color: SKYBLUE }))
         }
         for _ in 0..stamina_points {
-            point_icons.push(Element::Rect(Rectangle {
-                size: icon_size,
-                style: Style {
-                    background_color: Some(GREEN),
-                    ..point_style
-                },
-            }))
+            point_icons.push(Element::Circle(Circle { r, color: GREEN }))
         }
         let points_row = Container {
             children: point_icons,
-            margin: 1.0,
+            margin: 4.0,
             layout_dir: LayoutDirection::Horizontal,
+            style: Style {
+                padding: 1.0,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
@@ -299,16 +291,16 @@ impl Drawable for ActionButton {
 
         self.style.draw(x, y, self.size);
 
-        let margin_bot = 2.0;
         let points_row_size = self.points_row.size();
+        let points_row_h_pad = 3.0;
 
         if points_row_size.1 > 0.0 {
             draw_rectangle(
-                x + 2.0,
-                y + h - margin_bot * 2.0 - points_row_size.1,
-                w - 4.0,
-                points_row_size.1 + margin_bot * 2.0 - 1.0,
-                GRAY,
+                x + 1.0,
+                y + h - points_row_size.1 - points_row_h_pad * 2.0,
+                w - 2.0,
+                points_row_size.1 + points_row_h_pad * 2.0 - 1.0,
+                Color::new(0.1, 0.1, 0.1, 1.0),
             );
         }
 
@@ -342,6 +334,8 @@ impl Drawable for ActionButton {
 
         let params = DrawTextureParams {
             dest_size: Some((60.0, 48.0).into()),
+            //dest_size: Some((48.0, 38.4).into()),
+            //dest_size: Some((24.0, 19.2).into()),
             ..Default::default()
         };
         draw_texture_ex(&self.icon, x + 2.0, y + 2.0, WHITE, params);
@@ -351,8 +345,8 @@ impl Drawable for ActionButton {
         }
 
         self.points_row.draw(
-            x + w - points_row_size.0 - margin_bot,
-            y + h - margin_bot - points_row_size.1,
+            x + w - points_row_size.0 - 4.0,
+            y + h - points_row_h_pad - points_row_size.1 - 1.0,
         );
 
         draw_debug(x, y, w, h);
