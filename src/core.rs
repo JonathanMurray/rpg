@@ -1818,8 +1818,8 @@ impl Character {
                 "1.5x".to_string(),
                 MovementEnhancement {
                     name: "Sprint",
-                    action_point_cost: 0,
                     icon: IconId::X1point5,
+                    action_point_cost: 0,
                     stamina_cost: 1,
                     add_percentage: 50,
                 },
@@ -1828,18 +1828,28 @@ impl Character {
                 "2x".to_string(),
                 MovementEnhancement {
                     name: "Extended",
-                    action_point_cost: 1,
                     icon: IconId::X2,
+                    action_point_cost: 1,
                     stamina_cost: 0,
                     add_percentage: 100,
                 },
             ),
             (
+                "2.5x".to_string(),
+                MovementEnhancement {
+                    name: "Extended + sprint",
+                    icon: IconId::X3,
+                    action_point_cost: 1,
+                    stamina_cost: 1,
+                    add_percentage: 150,
+                },
+            ),
+            (
                 "3x".to_string(),
                 MovementEnhancement {
-                    name: "Extended sprint",
-                    action_point_cost: 1,
+                    name: "Extended + 2 sprint",
                     icon: IconId::X3,
+                    action_point_cost: 1,
                     stamina_cost: 2,
                     add_percentage: 200,
                 },

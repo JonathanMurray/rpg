@@ -791,15 +791,19 @@ impl GameGrid {
 
         self.draw_static_text();
 
+        self.draw_character_label(&self.characters.get(self.active_character_id));
+
         if let Some(id) = hovered_character_id {
-            let char = self.characters.get(id);
-            self.draw_character_hover(&char);
+            if id != self.active_character_id {
+                let char = self.characters.get(id);
+                self.draw_character_label(&char);
+            }
         }
 
         outcome
     }
 
-    fn draw_character_hover(&self, char: &Character) {
+    fn draw_character_label(&self, char: &Character) {
         let y_offset = -5.0;
 
         let (mut x, y) = (

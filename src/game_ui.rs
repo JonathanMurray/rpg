@@ -26,7 +26,7 @@ use crate::{
         Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, Tabs,
         TextLine,
     },
-    character_sheet::build_character_sheet,
+    character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
@@ -92,7 +92,7 @@ struct CharacterUi {
     action_points_row: ActionPointsRow,
     hoverable_buttons: Vec<Rc<ActionButton>>,
     tabs: Tabs,
-    character_sheet: Container,
+    character_sheet: CharacterSheet,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -245,7 +245,7 @@ impl UserInterface {
                 attack_enhancement_buttons_for_character_sheet.push(btn);
             }
 
-            let character_sheet = build_character_sheet(
+            let character_sheet = CharacterSheet::new(
                 &simple_font,
                 &character_ref,
                 &equipment_icons,
@@ -468,21 +468,7 @@ impl UserInterface {
 
         character_ui.tabs.draw(20.0, y + 70.0);
 
-        if self.character_sheet_toggle.shown.get() {
-            character_ui.character_sheet.draw(100.0, 90.0);
-        }
-
         character_ui.resource_bars.draw(620.0, y + 100.0);
-
-        if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
-            let btn = character_ui
-                .hoverable_buttons
-                .iter()
-                .find(|btn| btn.id == btn_id)
-                .expect("hovered button");
-
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
-        }
 
         self.log.draw(800.0, y);
 
@@ -500,6 +486,25 @@ impl UserInterface {
 
         self.target_ui
             .draw(1280.0 - self.target_ui.size().0 - 10.0, 70.0);
+
+        let character_ui = self
+            .character_uis
+            .get_mut(&self.player_portraits.selected_i.get())
+            .unwrap();
+        if self.character_sheet_toggle.shown.get() {
+            let clicked_close = character_ui.character_sheet.draw();
+            self.character_sheet_toggle.shown.set(!clicked_close);
+        }
+
+        if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
+            let btn = character_ui
+                .hoverable_buttons
+                .iter()
+                .find(|btn| btn.id == btn_id)
+                .expect("hovered button");
+
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
+        }
 
         if let Some(grid_switched_to) = grid_outcome.switched_to {
             match grid_switched_to {
@@ -1289,6 +1294,7 @@ impl UserInterface {
                 popup_enabled = self.game_grid.has_non_empty_movement_preview();
             }
             UiState::ChoosingAction => {
+                /*
                 let active_char_pos = self.active_character().position_i32();
 
                 self.game_grid.set_static_text(
@@ -1299,6 +1305,7 @@ impl UserInterface {
                         Goodness::Neutral,
                     )],
                 );
+                 */
             }
             _ => {}
         }
@@ -2270,7 +2277,7 @@ impl LabelledResourceBar {
 
 impl Drawable for LabelledResourceBar {
     fn draw(&self, x: f32, y: f32) {
-        self.list.draw(x, y)
+        self.list.draw(x, y);
     }
 
     fn size(&self) -> (f32, f32) {

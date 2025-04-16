@@ -13,6 +13,8 @@ use std::{
 pub trait Drawable {
     fn draw(&self, x: f32, y: f32);
     fn size(&self) -> (f32, f32);
+
+    fn draw_tooltips(&self, _x: f32, _y: f32) {}
 }
 
 pub enum Element {
@@ -47,7 +49,9 @@ impl Element {
 
     pub fn draw(&self, x: f32, y: f32) {
         match self {
-            Element::Container(container) => container.draw(x, y),
+            Element::Container(container) => {
+                container.draw(x, y);
+            }
             Element::Text(text) => text.draw(x, y),
             Element::Circle(circle) => circle.draw(x, y),
             Element::Rect(rect) => rect.draw(x, y),
@@ -56,6 +60,19 @@ impl Element {
             Element::RcRefCell(drawable) => drawable.borrow_mut().draw(x, y),
             Element::Rc(drawable) => drawable.draw(x, y),
             Element::WeakRefCell(drawable) => drawable.upgrade().unwrap().borrow_mut().draw(x, y),
+        }
+    }
+
+    pub fn draw_tooltips(&self, x: f32, y: f32) {
+        match self {
+            Element::Container(container) => container.draw_tooltips(x, y),
+            Element::Box(drawable) => drawable.draw_tooltips(x, y),
+            Element::RcRefCell(drawable) => drawable.borrow_mut().draw_tooltips(x, y),
+            Element::Rc(drawable) => drawable.draw_tooltips(x, y),
+            Element::WeakRefCell(drawable) => {
+                drawable.upgrade().unwrap().borrow_mut().draw_tooltips(x, y)
+            }
+            _ => {}
         }
     }
 
@@ -458,9 +475,19 @@ impl Container {
         })
     }
 
-    pub fn draw(&self, x: f32, y: f32) {
+    pub fn draw(&self, x: f32, y: f32) -> (f32, f32) {
+        self._draw(x, y, false)
+    }
+
+    pub fn draw_tooltips(&self, x: f32, y: f32) {
+        self._draw(x, y, true);
+    }
+
+    fn _draw(&self, x: f32, y: f32, only_tooltips: bool) -> (f32, f32) {
         let size = self.size();
-        self.style.draw(x, y, size);
+        if !only_tooltips {
+            self.style.draw(x, y, size);
+        }
 
         let mut x0 = x + self.style.padding;
         let mut y0 = y + self.style.padding;
@@ -507,7 +534,11 @@ impl Container {
             if (draw_overflow || y_element >= y)
                 && (draw_overflow || y_element + element.size().1 <= y + size.1 + 5.0)
             {
-                element.draw(x0 + offset.0, y_element);
+                if only_tooltips {
+                    element.draw_tooltips(x0 + offset.0, y_element);
+                } else {
+                    element.draw(x0 + offset.0, y_element);
+                }
             }
 
             match self.layout_dir {
@@ -515,26 +546,28 @@ impl Container {
                 LayoutDirection::Vertical => y0 += element_h + self.margin,
             }
 
-            if i < self.children.len() - 1 {
-                if let Some(border_color) = self.border_between_children {
-                    let thickness = 1.0;
-                    match self.layout_dir {
-                        LayoutDirection::Horizontal => draw_line(
-                            x0 - self.margin * 0.5,
-                            y0,
-                            x0 - self.margin * 0.5,
-                            y0 + size.1 - self.style.padding * 2.0,
-                            thickness,
-                            border_color,
-                        ),
-                        LayoutDirection::Vertical => draw_line(
-                            x0,
-                            y0 - self.margin * 0.5,
-                            x0 + size.0 - self.style.padding * 2.0,
-                            y0 - self.margin * 0.5,
-                            thickness,
-                            border_color,
-                        ),
+            if !(only_tooltips) {
+                if i < self.children.len() - 1 {
+                    if let Some(border_color) = self.border_between_children {
+                        let thickness = 1.0;
+                        match self.layout_dir {
+                            LayoutDirection::Horizontal => draw_line(
+                                x0 - self.margin * 0.5,
+                                y0,
+                                x0 - self.margin * 0.5,
+                                y0 + size.1 - self.style.padding * 2.0,
+                                thickness,
+                                border_color,
+                            ),
+                            LayoutDirection::Vertical => draw_line(
+                                x0,
+                                y0 - self.margin * 0.5,
+                                x0 + size.0 - self.style.padding * 2.0,
+                                y0 - self.margin * 0.5,
+                                thickness,
+                                border_color,
+                            ),
+                        }
                     }
                 }
             }
@@ -542,25 +575,29 @@ impl Container {
 
         draw_debug(x, y, size.0, size.1);
 
-        if let Some(scroll) = &self.scroll {
-            let content_size = self.content_size();
-            let bar_y = y + scroll.offset.get() / content_size.1 * size.1;
-            let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
-            let bar_w = 7.0;
-            draw_rectangle(x + size.0, bar_y, bar_w, bar_h, GRAY);
+        if !only_tooltips {
+            if let Some(scroll) = &self.scroll {
+                let content_size = self.content_size();
+                let bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+                let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
+                let bar_w = 7.0;
+                draw_rectangle(x + size.0, bar_y, bar_w, bar_h, GRAY);
 
-            let (mouse_x, mouse_y) = mouse_position();
-            if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
-                let (_dx, dy) = mouse_wheel();
-                if dy != 0.0 {
-                    const SCROLL_SPEED: f32 = 15.0;
-                    let new_offset = (scroll.offset.get() - dy.signum() * SCROLL_SPEED)
-                        .max(0.0)
-                        .min(content_size.1 - size.1);
-                    scroll.offset.set(new_offset);
+                let (mouse_x, mouse_y) = mouse_position();
+                if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
+                    let (_dx, dy) = mouse_wheel();
+                    if dy != 0.0 {
+                        const SCROLL_SPEED: f32 = 15.0;
+                        let new_offset = (scroll.offset.get() - dy.signum() * SCROLL_SPEED)
+                            .max(0.0)
+                            .min(content_size.1 - size.1);
+                        scroll.offset.set(new_offset);
+                    }
                 }
             }
         }
+
+        size
     }
 }
 
