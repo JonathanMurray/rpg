@@ -1,7 +1,7 @@
 use std::{collections::HashMap, usize};
 
 use macroquad::{
-    color::{Color, BLACK, MAGENTA, ORANGE},
+    color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
@@ -10,7 +10,6 @@ use macroquad::{
 use std::cell::Cell;
 
 use macroquad::input::is_key_down;
-use macroquad::math::Rect;
 
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
@@ -36,7 +35,7 @@ const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.5, 0.6, 0.5, 0.5);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
-const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 1.0);
+const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
 const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
 const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 const HOVER_NPC_COLOR: Color = Color::new(0.8, 0.2, 0.8, 1.0);
@@ -128,8 +127,6 @@ pub struct GameGrid {
     dragging_camera_from: Option<(f32, f32)>,
 
     effects: Vec<ConcreteEffect>,
-    static_text: Option<StaticText>,
-    pub target_text: Option<(String, Vec<(String, Goodness)>)>,
     selected_character_id: CharacterId,
     active_character_id: CharacterId,
     pub action_range_indicator: Option<(Range, ActionReach)>,
@@ -175,8 +172,6 @@ impl GameGrid {
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
             effects: vec![],
-            static_text: None,
-            target_text: None,
             selected_character_id,
             active_character_id: 0,
             movement_range: MovementRange::default(),
@@ -194,23 +189,6 @@ impl GameGrid {
             background_textures,
             cell_backgrounds,
         }
-    }
-
-    pub fn set_static_text(
-        &mut self,
-        position: (i32, i32),
-        header: String,
-        details: Vec<(String, Goodness)>,
-    ) {
-        self.static_text = Some(StaticText {
-            position,
-            header,
-            details,
-        });
-    }
-
-    pub fn clear_static_text(&mut self) {
-        self.static_text = None;
     }
 
     pub fn set_character_motion(
@@ -426,13 +404,9 @@ impl GameGrid {
         self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get()
     }
 
-    fn character_screen_pos(
-        &self,
-        character_id: CharacterId,
-        character_pos: (i32, i32),
-    ) -> (f32, f32) {
+    fn character_screen_pos(&self, character: &Character) -> (f32, f32) {
         if let Some(motion) = self.character_motion {
-            if motion.character_id == character_id {
+            if motion.character_id == character.id() {
                 let from = (
                     self.grid_x_to_screen(motion.from.0),
                     self.grid_y_to_screen(motion.from.1),
@@ -449,8 +423,8 @@ impl GameGrid {
             }
         }
         (
-            self.grid_x_to_screen(character_pos.0),
-            self.grid_y_to_screen(character_pos.1),
+            self.grid_x_to_screen(character.position_i32().0),
+            self.grid_y_to_screen(character.position_i32().1),
         )
     }
 
@@ -607,14 +581,12 @@ impl GameGrid {
         for ch in self.characters.iter() {
             let ch = ch.borrow();
 
-            let position = ch.position_i32();
-
             let params = DrawTextureParams {
                 dest_size: Some((self.cell_w, self.cell_w).into()),
                 ..Default::default()
             };
 
-            let (x, y) = self.character_screen_pos(ch.id(), position);
+            let (x, y) = self.character_screen_pos(&ch);
 
             draw_texture_ex(&self.sprites[&ch.sprite], x, y, WHITE, params.clone());
 
@@ -702,8 +674,7 @@ impl GameGrid {
 
                     let path = self.build_path_from_route(active_char_pos, destination);
 
-                    self.draw_movement_path_arrow(&path, HOVER_MOVEMENT_ARROW_COLOR);
-                    self.draw_cell_outline(destination, HOVER_VALID_MOVEMENT_COLOR, 5.0);
+                    self.draw_movement_path(&path, true);
 
                     if is_mouse_button_pressed(MouseButton::Left) {
                         self.movement_range.selected_i = self
@@ -760,23 +731,7 @@ impl GameGrid {
 
         if let Some(movement_preview) = &self.movement_preview {
             if !movement_preview.is_empty() {
-                let destination = movement_preview[0].1;
-                let distance = movement_preview[0].0;
-
-                self.draw_movement_path_arrow(movement_preview, MOVEMENT_ARROW_COLOR);
-
-                let (x, y) = (
-                    self.grid_x_to_screen(destination.0),
-                    self.grid_y_to_screen(destination.1) + 14.0,
-                );
-
-                self.draw_static_text_lines(
-                    &format!("Move {:.3}", distance.to_string()),
-                    &[],
-                    4.0,
-                    x,
-                    y,
-                );
+                self.draw_movement_path(movement_preview, false);
             }
         }
 
@@ -788,8 +743,6 @@ impl GameGrid {
         }
 
         self.draw_effects();
-
-        self.draw_static_text();
 
         self.draw_character_label(&self.characters.get(self.active_character_id));
 
@@ -804,12 +757,8 @@ impl GameGrid {
     }
 
     fn draw_character_label(&self, char: &Character) {
-        let y_offset = -5.0;
-
-        let (mut x, y) = (
-            self.grid_x_to_screen(char.position_i32().0),
-            self.grid_y_to_screen(char.position_i32().1) + y_offset,
-        );
+        let (x, y) = self.character_screen_pos(char);
+        let y = y - 5.0;
 
         let font_size = 14;
         let params = TextParams {
@@ -833,7 +782,7 @@ impl GameGrid {
         let box_x = x - (box_w - self.cell_w) / 2.0;
         let box_y = y - healthbar_h - margin - box_h;
 
-        draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
+        draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
         draw_text_ex(
             header,
             box_x + text_pad,
@@ -852,8 +801,7 @@ impl GameGrid {
     }
 
     fn draw_active_character_outline(&self) {
-        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
-        let (x, y) = self.character_screen_pos(self.active_character_id, active_char_pos);
+        let (x, y) = self.character_screen_pos(&self.characters.get(self.active_character_id));
         let margin = 3.0;
         draw_rectangle(
             x + margin,
@@ -865,11 +813,7 @@ impl GameGrid {
     }
 
     fn draw_selected_character_outline(&self) {
-        let selected_char_pos = self
-            .characters
-            .get(self.selected_character_id)
-            .position_i32();
-        let (x, y) = self.character_screen_pos(self.selected_character_id, selected_char_pos);
+        let (x, y) = self.character_screen_pos(&self.characters.get(self.selected_character_id));
         let margin = 1.0;
 
         let left = x - margin;
@@ -1007,43 +951,22 @@ impl GameGrid {
         );
     }
 
-    fn draw_static_text(&self) {
-        if let Some(StaticText {
-            position,
-            header,
-            details,
-        }) = &self.static_text
-        {
-            let (x, y) = (
-                self.grid_x_to_screen(position.0),
-                self.grid_y_to_screen(position.1),
-            );
-            self.draw_static_text_lines(header, details, 6.0, x, y);
-        }
-
-        if let Some((header, details)) = &self.target_text {
-            self.draw_static_text_lines(header, details, 6.0, 1100.0, 60.0);
-        }
-    }
-
-    fn draw_static_text_lines(
+    fn draw_static_text(
         &self,
         header: &str,
-        details: &[(String, Goodness)],
+        text_color: Color,
+        bg_color: Color,
         pad: f32,
         mut x: f32,
         y: f32,
     ) {
-        let header_font_size = 16;
-        let detail_font_size = 18;
+        let header_font_size = 14;
         let params = TextParams {
             font: Some(&self.big_font),
             font_size: header_font_size,
-            color: WHITE,
+            color: text_color,
             ..Default::default()
         };
-
-        let line_margin = 8.0;
 
         let header_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
         let header_w = header_dimensions.width;
@@ -1052,67 +975,20 @@ impl GameGrid {
             header_h = header_dimensions.height;
         }
 
-        let detail_margin = 8.0;
-
-        let mut details_w = 0.0;
-        let mut details_h = 0.0;
-        let mut details_max_offset = 0.0;
-        if !details.is_empty() {
-            let mut details_relative_y_interval = [f32::MAX, f32::MIN];
-
-            for (i, (line, goodness)) in details.iter().enumerate() {
-                let dim = measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
-                details_w += dim.width;
-                if dim.height.is_finite() {
-                    if dim.offset_y > details_max_offset {
-                        details_max_offset = dim.offset_y;
-                    }
-                    let top = -dim.offset_y;
-                    let bot = -dim.offset_y + dim.height;
-                    if top < details_relative_y_interval[0] {
-                        details_relative_y_interval[0] = top;
-                    }
-                    if bot > details_relative_y_interval[1] {
-                        details_relative_y_interval[1] = bot;
-                    }
-                }
-            }
-            details_w += (details.len() - 1) as f32 * detail_margin;
-            details_h = details_relative_y_interval[1] - details_relative_y_interval[0];
-        }
-
-        let w = header_w.max(details_w) + 2.0 * pad;
-        let h = if details.is_empty() {
-            header_h
-        } else {
-            header_h + line_margin + details_h
-        } + 2.0 * pad;
+        let w = header_w + 2.0 * pad;
+        let h = header_h + 2.0 * pad;
 
         if w > self.cell_w {
             x -= (w - self.cell_w) / 2.0;
         }
 
-        draw_rectangle(x, y - h, w, h, Color::new(0.0, 0.0, 0.0, 0.7));
-
-        let mut x0 = x + pad;
-        let mut y0 = y - h + pad;
-
-        draw_text_ex(header, x0, y0 + header_dimensions.offset_y, params.clone());
-        y0 += header_h + line_margin;
-
-        for (i, (line, goodness)) in details.iter().enumerate() {
-            let mut params = params.clone();
-            params.font = Some(&self.simple_font);
-            params.font_size = detail_font_size;
-            match goodness {
-                Goodness::Good => params.color = GREEN,
-                Goodness::Neutral => {}
-                Goodness::Bad => params.color = Color::new(1.0, 0.5, 0.5, 1.0),
-            }
-            let dimensions = draw_text_ex(line, x0, y0 + details_max_offset, params);
-            //y += dimensions.height + line_margin;
-            x0 += dimensions.width + detail_margin;
-        }
+        draw_rectangle(x, y - h, w, h, bg_color);
+        draw_text_ex(
+            header,
+            x + pad,
+            y - h + pad + header_dimensions.offset_y,
+            params.clone(),
+        );
     }
 
     fn draw_movement_preview_background(&self) {
@@ -1130,6 +1006,37 @@ impl GameGrid {
                 }
             }
         }
+    }
+
+    fn draw_movement_path(&self, path: &[(f32, (i32, i32))], hover: bool) {
+        let arrow_color = if hover {
+            HOVER_MOVEMENT_ARROW_COLOR
+        } else {
+            MOVEMENT_ARROW_COLOR
+        };
+        self.draw_movement_path_arrow(path, arrow_color);
+
+        let distance = path[0].0;
+        let destination = path[0].1;
+        let (x, y) = (
+            self.grid_x_to_screen(destination.0),
+            self.grid_y_to_screen(destination.1) + 14.0,
+        );
+
+        let text_color = if hover { LIGHTGRAY } else { WHITE };
+        let bg_color = if hover {
+            Color::new(0.0, 0.0, 0.0, 0.5)
+        } else {
+            Color::new(0.0, 0.0, 0.0, 0.7)
+        };
+        self.draw_static_text(
+            &format!("{:.4}", distance.to_string()),
+            text_color,
+            bg_color,
+            4.0,
+            x,
+            y,
+        );
     }
 
     fn draw_movement_path_arrow(&self, path: &[(f32, (i32, i32))], color: Color) {

@@ -7,7 +7,7 @@ use std::rc::Rc;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL, PARRY_EVASION_BONUS,
+    BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, PARRY_EVASION_BONUS,
     RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};

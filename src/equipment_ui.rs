@@ -14,10 +14,10 @@ use macroquad::{
 
 use crate::{
     action_button::{draw_tooltip, TooltipPosition},
-    base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style},
+    base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle},
     core::{ArmorPiece, Character, HandType, Shield, Weapon, WeaponRange},
     data::{BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER},
-    textures::{EquipmentIconId, IconId},
+    textures::EquipmentIconId,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -201,11 +201,16 @@ pub fn build_equipped_section(
         ..Default::default()
     });
 
-    let equipment_table = table(eq_text_cells, vec![Align::End, Align::Start], font.clone());
+    let equipment_table = table(
+        eq_text_cells,
+        vec![Align::End, Align::Start],
+        font.clone(),
+        TableStyle::default(),
+    );
 
     Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
-        children: vec![equipment_icons, equipment_table],
+        children: vec![equipment_icons, Element::Container(equipment_table)],
         align: Align::Center,
         margin: 15.0,
         ..Default::default()

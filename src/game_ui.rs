@@ -23,7 +23,7 @@ use crate::{
     action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, Tabs,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style,
         TextLine,
     },
     character_sheet::CharacterSheet,
@@ -40,7 +40,7 @@ use crate::{
     textures::{EquipmentIconId, IconId, SpriteId},
 };
 
-const Y_USER_INTERFACE: f32 = 700.0;
+const Y_USER_INTERFACE: f32 = 740.0;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UiState {
@@ -91,7 +91,7 @@ struct CharacterUi {
     tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
     action_points_row: ActionPointsRow,
     hoverable_buttons: Vec<Rc<ActionButton>>,
-    tabs: Tabs,
+    actions_section: Container,
     character_sheet: CharacterSheet,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -132,7 +132,7 @@ impl UserInterface {
         equipment_icons: HashMap<EquipmentIconId, Texture2D>,
         simple_font: Font,
         decorative_font: Font,
-        grid_big_font: Font,
+        big_font: Font,
         background_textures: Vec<Texture2D>,
     ) -> Self {
         let characters = game.characters.clone();
@@ -255,14 +255,12 @@ impl UserInterface {
                 spell_buttons_for_character_sheet,
             );
 
-            let actions_section = Element::Container(Container {
+            let actions_section = Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
                 children: vec![basic_row, spell_row],
                 ..Default::default()
-            });
-
-            let tabs = Tabs::new(0, vec![("Actions", actions_section)], simple_font.clone());
+            };
 
             let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
                 character_ref.health.current,
@@ -321,7 +319,7 @@ impl UserInterface {
             let character_ui = CharacterUi {
                 tracked_action_buttons,
                 action_points_row,
-                tabs,
+                actions_section,
                 character_sheet,
                 health_bar,
                 mana_bar,
@@ -355,7 +353,7 @@ impl UserInterface {
             &game.characters,
             sprites,
             (screen_width(), Y_USER_INTERFACE),
-            grid_big_font.clone(),
+            big_font.clone(),
             simple_font.clone(),
             background_textures,
             grid_dimensions,
@@ -383,7 +381,7 @@ impl UserInterface {
             decorative_font.clone(),
         );
 
-        let target_ui = TargetUi::new(simple_font.clone());
+        let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
 
         Self {
             game_grid,
@@ -466,9 +464,9 @@ impl UserInterface {
 
         character_ui.action_points_row.draw(20.0, y + 20.0);
 
-        character_ui.tabs.draw(20.0, y + 70.0);
+        character_ui.actions_section.draw(20.0, y + 70.0);
 
-        character_ui.resource_bars.draw(620.0, y + 100.0);
+        character_ui.resource_bars.draw(620.0, y + 60.0);
 
         self.log.draw(800.0, y);
 
@@ -485,7 +483,7 @@ impl UserInterface {
         }
 
         self.target_ui
-            .draw(1280.0 - self.target_ui.size().0 - 10.0, 70.0);
+            .draw(1280.0 - self.target_ui.size().0 - 10.0, 10.0);
 
         let character_ui = self
             .character_uis
@@ -1167,15 +1165,13 @@ impl UserInterface {
 
         self.activity_popup.target_line = None;
 
-        self.game_grid.clear_static_text();
-        self.game_grid.target_text = None;
         self.game_grid.action_range_indicator = None;
 
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.players_target() {
-                    let target_char = self.characters.get(i);
+                if let Some(target_id) = self.game_grid.players_target() {
+                    let target_char = self.characters.get(target_id);
 
                     let enhancements: Vec<AttackEnhancement> = self
                         .activity_popup
@@ -1230,19 +1226,14 @@ impl UserInterface {
                         details.push((term, goodness));
                     }
 
-                    if let Some((advantage, term, goodness)) = circumstance_advantage {
+                    if let Some((_advantage, term, goodness)) = circumstance_advantage {
                         details.push((term.to_string(), goodness));
                     }
 
-                    /*
-                    self.game_grid.set_static_text(
-                        target_char.position_i32(),
-                        format!("Attack: {}", chance),
-                        details,
-                    );
-                     */
+                    self.target_ui
+                        .set_action(format!("Attack: {}", chance), details);
 
-                    self.game_grid.target_text = Some((format!("Attack: {}", chance), details));
+                    //self.game_grid.target_text = Some((format!("Attack: {}", chance), details));
 
                     self.game_grid.action_range_indicator = Some((range, reach));
                 } else {
@@ -1267,12 +1258,9 @@ impl UserInterface {
                         SpellTargetType::SingleAlly => spell.name.to_string(),
                     };
 
-                    /*
-                    self.game_grid
-                        .set_static_text(target_char.position_i32(), static_text, vec![]);
-                     */
+                    self.target_ui.set_action(static_text, vec![]);
 
-                    self.game_grid.target_text = Some((static_text, vec![]));
+                    //self.game_grid.target_text = Some((static_text, vec![]));
 
                     let reach = if self
                         .active_character()
@@ -1890,6 +1878,7 @@ struct Log {
 
 impl Log {
     fn new(font: Font) -> Self {
+        let h = 210.0;
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -1898,8 +1887,8 @@ impl Log {
                 align: Align::End,
                 scroll: Some(ContainerScroll::default()),
                 min_width: Some(450.0),
-                min_height: Some(250.0),
-                max_height: Some(250.0),
+                min_height: Some(h),
+                max_height: Some(h),
                 style: Style {
                     border_color: Some(GRAY),
                     padding: 5.0,
@@ -1926,7 +1915,7 @@ impl Log {
             self.line_details.remove(0);
         }
         let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
-        text_line.set_padding(3.0);
+        text_line.set_padding(3.0, 3.0);
         let text_line = Rc::new(text_line);
         self.text_lines.push(text_line.clone());
         self.container.children.push(Element::Rc(text_line));
@@ -2022,6 +2011,9 @@ impl Drawable for ActionPointsRow {
     fn draw(&self, x: f32, y: f32) {
         assert!(self.current_ap <= self.max_ap);
 
+        let size = self.size();
+        draw_rectangle(x, y, size.0, size.1, BLACK);
+
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
         let r = self.cell_size.1 * self.radius_factor;
@@ -2045,7 +2037,6 @@ impl Drawable for ActionPointsRow {
                         x0 + self.cell_size.0 / 2.0,
                         y0 + self.cell_size.1 / 2.0,
                         r,
-                        //Color::new(0.65, 0.2, 0.4, 1.0),
                         GOLD,
                     );
                     draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);

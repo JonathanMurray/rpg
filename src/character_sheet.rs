@@ -1,7 +1,7 @@
 use std::cell::Cell;
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, MAGENTA, SKYBLUE};
+use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
@@ -170,7 +170,7 @@ impl CharacterSheet {
                 Element::Text(
                     TextLine::new(character.name, 28, SKYBLUE, Some(font.clone()))
                         .with_depth(DARKBLUE, 1.0)
-                        .with_padding(10.0),
+                        .with_padding(10.0, 10.0),
                 ),
                 Element::Container(Container {
                     layout_dir: LayoutDirection::Horizontal,

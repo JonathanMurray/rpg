@@ -313,7 +313,7 @@ pub const FIREBALL: Spell = Spell {
         }),
     ],
     range: Range::Ranged(5),
-    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile),
 };
 
 pub const KILL: Spell = Spell {

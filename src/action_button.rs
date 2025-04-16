@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, PURPLE, SKYBLUE, WHITE, YELLOW},
+    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -13,9 +13,7 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{
-        draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-    },
+    base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
         AttackEnhancement, BaseAction, Character, MovementEnhancement, OffensiveSpellType,
         OnAttackedReaction, OnHitReaction, Spell, SpellEnhancement, SpellTargetType,
@@ -25,7 +23,7 @@ use crate::{
 
 fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -> Vec<String> {
     match action {
-        ButtonAction::Action(base_action) => base_action_tooltip(&base_action, character),
+        ButtonAction::Action(base_action) => base_action_tooltip(base_action, character),
         ButtonAction::AttackEnhancement(enhancement) => {
             vec![
                 format!(
@@ -142,6 +140,7 @@ pub struct ActionButton {
     pub tooltip_lines: Vec<String>,
     pub action: ButtonAction,
     pub size: (f32, f32),
+    texture_draw_size: (f32, f32),
     style: Style,
     hover_border_color: Color,
     points_row: Container,
@@ -163,52 +162,15 @@ impl ActionButton {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
-
+        let icon = action.icon();
         let tooltip_lines = button_action_tooltip(&action, character);
 
-        let icon: IconId;
-        match action {
-            ButtonAction::Action(base_action) => match base_action {
-                BaseAction::Attack { .. } => {
-                    icon = IconId::Attack;
-                }
-                BaseAction::SelfEffect(sea) => {
-                    icon = sea.icon;
-                }
-                BaseAction::CastSpell(spell) => {
-                    icon = spell.icon;
-                }
-                BaseAction::Move { .. } => {
-                    icon = IconId::Move;
-                }
-            },
-            ButtonAction::AttackEnhancement(enhancement) => {
-                icon = enhancement.icon;
-            }
-            ButtonAction::SpellEnhancement(enhancement) => {
-                icon = enhancement.icon;
-            }
-            ButtonAction::MovementEnhancement(enhancement) => {
-                icon = enhancement.icon;
-            }
-            ButtonAction::OnAttackedReaction(reaction) => {
-                icon = reaction.icon;
-            }
-            ButtonAction::OnHitReaction(reaction) => {
-                icon = reaction.icon;
-            }
-
-            ButtonAction::Proceed => {
-                icon = IconId::Go;
-            }
-        }
-
-        let size = match action {
+        let (size, texture_draw_size) = match action {
             // TODO
             //ButtonAction::Proceed => (64.0, 52.0),
-            ButtonAction::Proceed => (64.0, 52.0),
-            ButtonAction::MovementEnhancement(..) => (36.0, 64.0),
-            _ => (64.0, 64.0),
+            ButtonAction::Proceed => ((64.0, 52.0), (60.0, 48.0)),
+            ButtonAction::MovementEnhancement(..) => ((36.0, 64.0), (36.0, 48.0)),
+            _ => ((64.0, 64.0), (60.0, 48.0)),
         };
 
         let style = Style {
@@ -246,6 +208,7 @@ impl ActionButton {
             id,
             action,
             size,
+            texture_draw_size,
             style,
             hover_border_color,
             points_row,
@@ -326,11 +289,10 @@ impl Drawable for ActionButton {
             }
         } else {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.5));
-            //draw_rectangle_lines(x, y, w, h, 1.0, RED);
         }
 
         let params = DrawTextureParams {
-            dest_size: Some((60.0, 48.0).into()),
+            dest_size: Some(self.texture_draw_size.into()),
             //dest_size: Some((48.0, 38.4).into()),
             //dest_size: Some((24.0, 19.2).into()),
             ..Default::default()
@@ -366,6 +328,23 @@ pub enum ButtonAction {
 }
 
 impl ButtonAction {
+    fn icon(&self) -> IconId {
+        match self {
+            ButtonAction::Action(base_action) => match base_action {
+                BaseAction::Attack { .. } => IconId::Attack,
+                BaseAction::SelfEffect(sea) => sea.icon,
+                BaseAction::CastSpell(spell) => spell.icon,
+                BaseAction::Move { .. } => IconId::Move,
+            },
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
+            ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,
+            ButtonAction::MovementEnhancement(enhancement) => enhancement.icon,
+            ButtonAction::OnAttackedReaction(reaction) => reaction.icon,
+            ButtonAction::OnHitReaction(reaction) => reaction.icon,
+            ButtonAction::Proceed => IconId::Go,
+        }
+    }
+
     pub fn action_point_cost(&self) -> u32 {
         match self {
             ButtonAction::Action(base_action) => base_action.action_point_cost(),

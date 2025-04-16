@@ -1,69 +1,81 @@
 use std::{ops::Deref, vec};
 
 use macroquad::{
-    color::{Color, BLACK, LIGHTGRAY, RED, WHITE},
-    text::Font,
+    color::{
+        Color, BLACK, GRAY, LIGHTGRAY, RED,
+        WHITE,
+    },
+    shapes::{draw_rectangle, draw_rectangle_lines},
+    text::{draw_text_ex, measure_text, Font, TextParams},
+    window::screen_width,
 };
 
 use crate::{
-    base_ui::{Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    base_ui::{
+        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
+    },
     conditions_ui::ConditionsList,
-    core::Character,
+    core::{Character, Goodness},
     game_ui::{ActionPointsRow, ResourceBar},
-    stats_ui::{build_stats_table, StatValue},
 };
 
 pub struct TargetUi {
     shown: bool,
-    font: Font,
+    big_font: Font,
+    simple_font: Font,
 
     container: Container,
+
+    action: Option<(String, Vec<(String, Goodness)>)>,
 }
 
 impl TargetUi {
-    pub fn new(font: Font) -> Self {
+    pub fn new(big_font: Font, simple_font: Font) -> Self {
         Self {
             shown: true,
-            font: font.clone(),
+            big_font,
+            simple_font,
             container: Container::default(),
+            action: None,
         }
     }
 
     pub fn set_character(&mut self, character: Option<impl Deref<Target = Character>>) {
         if let Some(char) = character.as_deref() {
             self.shown = true;
-            let mut name_text_line = TextLine::new(char.name, 22, WHITE, Some(self.font.clone()));
+            let mut name_text_line =
+                TextLine::new(char.name, 16, WHITE, Some(self.big_font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
             let conditions_list =
-                ConditionsList::new(self.font.clone(), char.condition_descriptions());
+                ConditionsList::new(self.simple_font.clone(), char.condition_descriptions());
 
             let armor_text_line = TextLine::new(
                 format!("Armor: {}", char.protection_from_armor()),
-                18,
+                22,
                 WHITE,
-                Some(self.font.clone()),
+                Some(self.simple_font.clone()),
             );
 
-            let stats_table = build_stats_table(
-                &self.font,
-                20,
-                &[
-                    (
-                        Some(("STR", char.base_attributes.strength)),
-                        &[("Toughness", StatValue::U32(char.toughness()))],
-                    ),
-                    (
-                        Some(("AGI", char.base_attributes.agility)),
-                        &[("Evasion", StatValue::U32(char.evasion()))],
-                    ),
-                    (
-                        Some(("INT", char.base_attributes.intellect)),
-                        &[("Will", StatValue::U32(char.will()))],
-                    ),
-                    (Some(("SPI", char.base_attributes.spirit)), &[]),
+            let def_table = table(
+                vec![
+                    "Toughness".to_string(),
+                    "Evasion".to_string(),
+                    "Will".to_string(),
+                    char.toughness().to_string(),
+                    char.evasion().to_string(),
+                    char.will().to_string(),
                 ],
+                vec![Align::Center, Align::Center, Align::Center],
+                self.simple_font.clone(),
+                TableStyle {
+                    outer_border_color: None,
+                    inner_border_color: None,
+                    all_columns_same_width: true,
+                    row_font_sizes: &[16, 24],
+                    cell_padding: (3.0, 5.0),
+                },
             );
 
             let mut action_points_row = ActionPointsRow::new(
@@ -76,31 +88,177 @@ impl TargetUi {
                 },
             );
             action_points_row.current_ap = char.action_points;
-            let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (96.0, 12.0));
+            let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (80.0, 10.0));
             health_bar.current = char.health.current;
 
-            self.container = Container {
+            let centered_list = Container {
                 layout_dir: LayoutDirection::Vertical,
+                align: Align::Center,
                 children: vec![
                     Element::Text(name_text_line),
                     Element::Box(Box::new(health_bar)),
                     Element::Box(Box::new(action_points_row)),
-                    stats_table,
+                    Element::Empty(1.0, 4.0),
+                    Element::Container(def_table),
+                    Element::Empty(1.0, 4.0),
                     Element::Text(armor_text_line),
+                    Element::Empty(1.0, 4.0),
+                ],
+                margin: 3.0,
+
+                ..Default::default()
+            };
+
+            self.container = Container {
+                layout_dir: LayoutDirection::Vertical,
+                align: Align::Start,
+                children: vec![
+                    Element::Container(centered_list),
                     Element::Box(Box::new(conditions_list)),
                 ],
                 margin: 10.0,
                 style: Style {
-                    background_color: Some(Color::new(0.2, 0.2, 0.2, 1.0)),
+                    background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
                     border_color: Some(LIGHTGRAY),
-                    padding: 12.0,
+                    padding: 10.0,
                     ..Default::default()
                 },
+                border_between_children: Some(GRAY),
 
                 ..Default::default()
-            };
+            }
         } else {
             self.shown = false;
+        }
+    }
+
+    pub fn set_action(&mut self, header: String, details: Vec<(String, Goodness)>) {
+        self.action = Some((header, details));
+    }
+
+    fn draw_action(&self, container_pos: (f32, f32)) {
+        let Some((header, details)) = &self.action else {
+            return;
+        };
+
+        let (mut x, y) = container_pos;
+
+        let header_font_size = 16;
+        let detail_font_size = 18;
+        let params = TextParams {
+            font: Some(&self.big_font),
+            font_size: header_font_size,
+            color: WHITE,
+            ..Default::default()
+        };
+
+        let vert_margin = 3.0;
+        let detail_hor_margin = 5.0;
+        let header_pad = 8.0;
+        let detail_pad = 5.0;
+
+        let header_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
+        let header_w = header_dimensions.width + header_pad * 2.0;
+        let mut header_h = 0.0;
+        if header_dimensions.height.is_finite() {
+            header_h = header_dimensions.height + header_pad * 2.0;
+        }
+
+        let mut details_w = 0.0;
+        let mut details_h = 0.0;
+        let mut details_max_offset = 0.0;
+        if !details.is_empty() {
+            let mut details_relative_y_interval = [f32::MAX, f32::MIN];
+
+            for (line, _goodness) in details.iter() {
+                let dim = measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
+                details_w += dim.width;
+                if dim.height.is_finite() {
+                    if dim.offset_y > details_max_offset {
+                        details_max_offset = dim.offset_y;
+                    }
+                    let top = -dim.offset_y;
+                    let bot = -dim.offset_y + dim.height;
+                    if top < details_relative_y_interval[0] {
+                        details_relative_y_interval[0] = top;
+                    }
+                    if bot > details_relative_y_interval[1] {
+                        details_relative_y_interval[1] = bot;
+                    }
+                }
+            }
+            details_w += details.len() as f32 * detail_pad * 2.0
+                + (details.len() - 1) as f32 * detail_hor_margin;
+            details_h =
+                details_relative_y_interval[1] - details_relative_y_interval[0] + detail_pad * 2.0;
+        }
+
+        let h = if details.is_empty() {
+            header_h
+        } else {
+            header_h + vert_margin + details_h
+        };
+
+        x -= header_w / 2.0;
+
+        let mut x0 = x;
+        let mut y0 = y - h;
+        draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
+
+        let dim = draw_text_ex(
+            header,
+            x0 + header_pad,
+            y0 + header_pad + header_dimensions.offset_y,
+            params.clone(),
+        );
+        y0 += dim.height + header_pad * 2.0 + vert_margin;
+
+        x0 += (header_w - details_w) / 2.0;
+
+        for (line, goodness) in details {
+            let mut params = params.clone();
+            params.font = Some(&self.simple_font);
+            params.font_size = detail_font_size;
+
+            let dim = measure_text(line, Some(&self.simple_font), params.font_size, 1.0);
+
+            let bg_color = match goodness {
+                Goodness::Good => Color::new(0.0, 0.4, 0.0, 1.0),
+                Goodness::Neutral => BLACK,
+                Goodness::Bad => Color::new(0.5, 0.0, 0.0, 1.0),
+            };
+            draw_rectangle(
+                x0,
+                y0,
+                dim.width + 2.0 * detail_pad,
+                dim.height + 2.0 * detail_pad,
+                bg_color,
+            );
+            draw_rectangle_lines(
+                x0,
+                y0,
+                dim.width + 2.0 * detail_pad,
+                dim.height + 2.0 * detail_pad,
+                1.0,
+                BLACK,
+            );
+
+            params.color = BLACK;
+            draw_text_ex(
+                line,
+                x0 + detail_pad,
+                y0 + detail_pad + details_max_offset,
+                params.clone(),
+            );
+            params.color = WHITE;
+            draw_text_ex(
+                line,
+                x0 + detail_pad - 1.0,
+                y0 + detail_pad + details_max_offset - 1.0,
+                params,
+            );
+
+            x0 += dim.width + detail_pad * 2.0 + detail_hor_margin;
         }
     }
 }
@@ -112,6 +270,8 @@ impl Drawable for TargetUi {
         }
 
         self.container.draw(x, y);
+
+        self.draw_action((screen_width() / 2.0, 60.0));
     }
 
     fn size(&self) -> (f32, f32) {
