@@ -2253,7 +2253,7 @@ impl WeaponRange {
         }
     }
 
-    fn into_range(self) -> Range {
+    pub fn into_range(self) -> Range {
         match self {
             Self::Melee => Range::Melee,
             Self::Ranged(r) => Range::Ranged(r),

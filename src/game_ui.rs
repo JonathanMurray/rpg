@@ -1235,6 +1235,14 @@ impl UserInterface {
                 } else {
                     self.target_ui
                         .set_action("Select a target".to_string(), vec![], false);
+
+                    let range = self
+                        .active_character()
+                        .weapon(hand)
+                        .unwrap()
+                        .range
+                        .into_range();
+                    self.game_grid.action_range_indicator = Some((range, ActionReach::Yes));
                 }
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
@@ -1276,6 +1284,9 @@ impl UserInterface {
                 } else {
                     self.target_ui
                         .set_action("Select a target".to_string(), vec![], false);
+
+                    let range = spell.range;
+                    self.game_grid.action_range_indicator = Some((range, ActionReach::Yes));
                 }
             }
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
@@ -1413,6 +1424,9 @@ impl UserInterface {
                     );
 
                     if may_choose_action && self.active_character().can_use_action(base_action) {
+                        self.target_ui.set_character(Option::<&Character>::None);
+                        self.game_grid.clear_players_target();
+
                         self.set_state(UiState::ConfiguringAction(base_action));
                     } else {
                         println!("Cannot choose this action at this time");
