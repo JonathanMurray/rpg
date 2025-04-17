@@ -2,8 +2,8 @@ use std::{cell::RefCell, rc::Rc};
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, LIGHTGRAY, WHITE, YELLOW},
-    shapes::{draw_rectangle, draw_rectangle_lines},
+    color::{BLACK, GRAY, ORANGE, WHITE, YELLOW},
+    shapes::{draw_line, draw_rectangle},
     text::{draw_text_ex, Font, TextParams},
 };
 
@@ -14,6 +14,7 @@ use crate::{
         AttackEnhancement, BaseAction, MovementEnhancement, OnAttackedReaction, OnHitReaction,
         SpellEnhancement,
     },
+    drawing::draw_dashed_line,
     game_ui::UiState,
 };
 
@@ -25,7 +26,6 @@ pub struct ActivityPopup {
     font: Font,
 
     initial_lines: Vec<String>,
-    pub target_line: Option<String>,
     pub reaction_probability_line: Option<String>,
 
     choice_buttons: IndexMap<u32, ActionButton>,
@@ -52,7 +52,6 @@ impl ActivityPopup {
             state,
             font,
             initial_lines: vec![],
-            target_line: None,
             reaction_probability_line: None,
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
@@ -73,14 +72,31 @@ impl ActivityPopup {
         }
 
         let x0 = x + 10.0;
-        let mut y0 = y + 25.0;
+        let mut y0 = y + 20.0;
 
-        let bg_color = Color::new(0.2, 0.2, 0.2, 1.0);
-        let border_color = LIGHTGRAY;
+        //let bg_color = Color::new(0.2, 0.2, 0.2, 1.0);
+        let bg_color = BLACK;
 
-        let size = (500.0, 85.0);
+        let size = (500.0, 75.0);
         draw_rectangle(x, y, size.0, size.1, bg_color);
-        draw_rectangle_lines(x, y, size.0, size.1, 2.0, border_color);
+        //draw_rectangle_lines(x, y, size.0, size.1, 2.0, border_color);
+
+        let upper_border_color = ORANGE;
+        draw_line(x, y, x, y + size.1, 1.0, upper_border_color);
+        draw_line(
+            x + size.0,
+            y,
+            x + size.0,
+            y + size.1,
+            1.0,
+            upper_border_color,
+        );
+        draw_line(x, y, x + size.0, y, 1.0, upper_border_color);
+
+        //draw_line(x, y+size.1   , x+size.0, y+size.1, 1.0, LIGHTGRAY);
+
+        draw_dashed_line((x, y + size.1), (x + size.0, y + size.1), 1.0, GRAY);
+
         self.last_drawn_size = size;
 
         let line_height = 18.0;
@@ -112,10 +128,12 @@ impl ActivityPopup {
             y0 += line_height;
         }
 
+        /*
         if let Some(line) = &self.target_line {
             draw_text_ex(line, x0, y0, text_params.clone());
             y0 += line_height;
         }
+         */
 
         /*
         let mut choice_description_line = "".to_string();
@@ -159,7 +177,7 @@ impl ActivityPopup {
             }
         }
 
-        let y_btn = y + 10.0;
+        let y_btn = y + 5.0;
         let mut x_btn = x + 425.0;
 
         self.proceed_button.draw(x_btn, y_btn + 6.0);

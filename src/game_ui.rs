@@ -23,8 +23,7 @@ use crate::{
     action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style,
-        TextLine,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
@@ -40,7 +39,7 @@ use crate::{
     textures::{EquipmentIconId, IconId, SpriteId},
 };
 
-const Y_USER_INTERFACE: f32 = 740.0;
+const Y_USER_INTERFACE: f32 = 800.0;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UiState {
@@ -299,8 +298,8 @@ impl UserInterface {
                     Element::RcRefCell(cloned_stamina_bar),
                 ],
                 style: Style {
-                    border_color: Some(GRAY),
-                    padding: 10.0,
+                    border_color: Some(DARKGRAY),
+                    padding: 5.0,
                     ..Default::default()
                 },
                 ..Default::default()
@@ -419,11 +418,11 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) {
-        let y = Y_USER_INTERFACE;
+        let mut y = Y_USER_INTERFACE;
 
         let popup_rectangle = Rect {
-            x: 100.0,
-            y: y - 90.0,
+            x: 20.0,
+            y: y - 74.0,
             w: self.activity_popup.last_drawn_size.0,
             h: self.activity_popup.last_drawn_size.1,
         };
@@ -436,42 +435,33 @@ impl UserInterface {
             && self.active_character().player_controlled
             && !popup_rectangle.contains((mouse_x, mouse_y).into());
 
-        let mut current_player_action_must_target_ally = false;
-        if let UiState::ConfiguringAction(BaseAction::CastSpell(spell)) = self.state {
-            if let SpellTargetType::SingleAlly = spell.target_type {
-                current_player_action_must_target_ally = true;
-            }
-        }
-
-        let grid_outcome = self.game_grid.draw(
-            grid_receptive_to_input,
-            current_player_action_must_target_ally,
-        );
-
-        self.activity_popup
-            .draw(popup_rectangle.x, popup_rectangle.y);
+        let grid_outcome = self.game_grid.draw(grid_receptive_to_input, &self.state);
 
         draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
         draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
 
-        self.player_portraits.draw(270.0, y + 10.0);
-        self.character_sheet_toggle.draw(270.0, y + 60.0);
+        self.activity_popup
+            .draw(popup_rectangle.x, popup_rectangle.y);
+
+        y -= 60.0;
+
+        self.player_portraits.draw(620.0, y + 70.0);
+        self.character_sheet_toggle.draw(620.0, y + 120.0);
 
         let character_ui = self
             .character_uis
             .get_mut(&self.player_portraits.selected_i.get())
             .unwrap();
 
-        character_ui.action_points_row.draw(20.0, y + 20.0);
-
         character_ui.actions_section.draw(20.0, y + 70.0);
 
-        character_ui.resource_bars.draw(620.0, y + 60.0);
+        character_ui.action_points_row.draw(430.0, y + 70.0);
+        character_ui.resource_bars.draw(400.0, y + 100.0);
 
-        self.log.draw(800.0, y);
+        self.log.draw(800.0, y + 60.0);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
-        self.draw_player_conditions(610.0, y + 30.0);
+        self.draw_player_conditions(620.0, y + 160.0);
 
         self.character_portraits
             .set_hovered_character_id(grid_outcome.hovered_character_id);
@@ -582,6 +572,8 @@ impl UserInterface {
             return;
         }
 
+        dbg!(&state);
+
         self.state = state;
 
         self.activity_popup.reaction_probability_line = None;
@@ -613,7 +605,7 @@ impl UserInterface {
                         action_point_cost: _,
                     } => {
                         let enhancements = self.active_character().usable_attack_enhancements(hand);
-                        for (subtext, enhancement) in enhancements {
+                        for (_subtext, enhancement) in enhancements {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
@@ -660,7 +652,7 @@ impl UserInterface {
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
 
-                popup_initial_lines.push("React".to_string());
+                popup_initial_lines.push("Reaction".to_string());
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
@@ -734,15 +726,17 @@ impl UserInterface {
             .set_movement_range_options(move_range, move_enhancements);
 
         if movement {
-            self.game_grid.ensure_has_some_movement_preview();
+            //self.game_grid.ensure_has_some_movement_preview();
         } else {
             self.game_grid.remove_movement_preview();
         }
 
         if player_wants_enemy_target {
-            self.game_grid.ensure_player_has_enemy_target();
+            self.game_grid.clear_players_target_if_allied();
+            //self.game_grid.ensure_player_has_enemy_target();
         } else if player_wants_ally_target {
-            self.game_grid.ensure_player_has_ally_target();
+            self.game_grid.clear_players_target_if_enemy();
+            //self.game_grid.ensure_player_has_ally_target();
         } else {
             self.game_grid.clear_players_target();
         }
@@ -1107,7 +1101,12 @@ impl UserInterface {
                 ));
                  */
 
-                let duration = 0.6;
+                let mut duration = 0.4;
+                if from.0 != to.0 || from.1 != to.1 {
+                    // diagonal takes longer
+                    duration *= 1.41;
+                }
+
                 self.game_grid
                     .set_character_motion(character, from, to, duration);
                 self.stopwatch.set_to_at_least(duration);
@@ -1163,8 +1162,6 @@ impl UserInterface {
 
         let mut popup_enabled = true;
 
-        self.activity_popup.target_line = None;
-
         self.game_grid.action_range_indicator = None;
 
         match self.state {
@@ -1195,8 +1192,9 @@ impl UserInterface {
                             }
                         }
                         ActionReach::No => {
-                            self.activity_popup.target_line =
-                                Some(format!("[{}] Out of range!", target_char.name));
+                            /* self.activity_popup.target_line =
+                            Some(format!("[{}] Out of range!", target_char.name));
+                             */
                         }
                     }
 
@@ -1231,13 +1229,12 @@ impl UserInterface {
                     }
 
                     self.target_ui
-                        .set_action(format!("Attack: {}", chance), details);
-
-                    //self.game_grid.target_text = Some((format!("Attack: {}", chance), details));
+                        .set_action(format!("Attack: {}", chance), details, true);
 
                     self.game_grid.action_range_indicator = Some((range, reach));
                 } else {
-                    self.activity_popup.target_line = Some("Select a target".to_string());
+                    self.target_ui
+                        .set_action("Select a target".to_string(), vec![], false);
                 }
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
@@ -1258,7 +1255,7 @@ impl UserInterface {
                         SpellTargetType::SingleAlly => spell.name.to_string(),
                     };
 
-                    self.target_ui.set_action(static_text, vec![]);
+                    self.target_ui.set_action(static_text, vec![], true);
 
                     //self.game_grid.target_text = Some((static_text, vec![]));
 
@@ -1269,31 +1266,38 @@ impl UserInterface {
                         popup_enabled = true;
                         ActionReach::Yes
                     } else {
+                        /*
                         self.activity_popup.target_line =
                             Some(format!("[{}] Out of range!", target_char.name));
+                             */
                         ActionReach::No
                     };
                     self.game_grid.action_range_indicator = Some((spell.range, reach));
                 } else {
-                    self.activity_popup.target_line = Some("Select a target".to_string());
+                    self.target_ui
+                        .set_action("Select a target".to_string(), vec![], false);
                 }
             }
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
-                popup_enabled = self.game_grid.has_non_empty_movement_preview();
+                if self.game_grid.has_non_empty_movement_preview() {
+                    popup_enabled = true;
+                    self.target_ui.clear_action();
+                } else {
+                    popup_enabled = false;
+                    self.target_ui
+                        .set_action("Select a destination".to_string(), vec![], false);
+                }
             }
             UiState::ChoosingAction => {
-                /*
-                let active_char_pos = self.active_character().position_i32();
-
-                self.game_grid.set_static_text(
-                    active_char_pos,
-                    "Your turn".to_string(),
-                    vec![(
-                        format!("[{} AP]", self.active_character().action_points),
-                        Goodness::Neutral,
-                    )],
-                );
-                 */
+                self.target_ui
+                    .set_action("Select an action".to_string(), vec![], false);
+            }
+            UiState::Idle => {
+                self.target_ui.clear_action();
+            }
+            UiState::ReactingToAttack { .. } | UiState::ReactingToHit { .. } => {
+                self.target_ui
+                    .set_action("Select a reaction".to_string(), vec![], false);
             }
             _ => {}
         }
@@ -1635,10 +1639,10 @@ impl Drawable for TopCharacterPortrait {
         draw_rectangle(x, y, w, h, BLACK);
         draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, DARKGRAY);
         if self.strong_highlight {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, GOLD);
+            draw_rectangle_lines(x, y, w, h, 5.0, GOLD);
         }
         if self.weak_highlight {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
+            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 2.0, LIGHTGRAY);
         }
         self.container.draw(x + self.padding, y + self.padding);
     }
@@ -1803,7 +1807,7 @@ impl Drawable for PlayerCharacterPortrait {
         let (w, h) = self.size();
         draw_rectangle(x, y, w, h, DARKGRAY);
         if self.shown_character.get() {
-            draw_rectangle_lines(x, y, w, h, 2.0, WHITE);
+            draw_rectangle_lines(x, y, w, h, 3.0, WHITE);
         } else {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
@@ -1878,7 +1882,7 @@ struct Log {
 
 impl Log {
     fn new(font: Font) -> Self {
-        let h = 210.0;
+        let h = 150.0;
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -2207,7 +2211,7 @@ impl LabelledResourceBar {
         assert!(current <= max);
 
         let cell_w = 15.0;
-        let max_h = 100.0;
+        let max_h = 70.0;
         let cell_h = if max <= 7 {
             max_h / 7.0
         } else {

@@ -31,7 +31,7 @@ fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -
                     enhancement.name,
                     cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
                 ),
-                "Attack enhancement:".to_string(),
+                //"Attack enhancement:".to_string(),
                 enhancement.description.to_string(),
             ]
         }
@@ -72,7 +72,10 @@ fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -
         }
 
         ButtonAction::Proceed => {
-            vec!["Proceed".to_string()]
+            vec![
+                "Proceed".to_string(),
+                "Spend the required resources and perform the action".to_string(),
+            ]
         }
     }
 }
@@ -87,7 +90,7 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
                 weapon.name, weapon.action_point_cost
             ));
             tooltip_lines.push(format!("{} damage", weapon.damage));
-            tooltip_lines.push("Targets [evasion]".to_string());
+            tooltip_lines.push("vs Evasion".to_string());
         }
         BaseAction::SelfEffect(sea) => {
             tooltip_lines.push(format!(

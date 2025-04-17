@@ -1701,7 +1701,7 @@ impl Character {
                 if within_range_squared(weapon_range.squared(), self.position, target_position) {
                     if within_range_squared(Range::Melee.squared(), self.position, target_position)
                     {
-                        (Range::Melee, ActionReach::YesButDisadvantage("melee"))
+                        (Range::Melee, ActionReach::YesButDisadvantage("Too close"))
                     } else {
                         (weapon_range.into_range(), ActionReach::Yes)
                     }

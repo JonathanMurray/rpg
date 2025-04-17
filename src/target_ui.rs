@@ -1,10 +1,7 @@
 use std::{ops::Deref, vec};
 
 use macroquad::{
-    color::{
-        Color, BLACK, GRAY, LIGHTGRAY, RED,
-        WHITE,
-    },
+    color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
     window::screen_width,
@@ -20,19 +17,19 @@ use crate::{
 };
 
 pub struct TargetUi {
-    shown: bool,
+    has_target: bool,
     big_font: Font,
     simple_font: Font,
 
     container: Container,
 
-    action: Option<(String, Vec<(String, Goodness)>)>,
+    action: Option<(String, Vec<(String, Goodness)>, bool)>,
 }
 
 impl TargetUi {
     pub fn new(big_font: Font, simple_font: Font) -> Self {
         Self {
-            shown: true,
+            has_target: true,
             big_font,
             simple_font,
             container: Container::default(),
@@ -42,7 +39,7 @@ impl TargetUi {
 
     pub fn set_character(&mut self, character: Option<impl Deref<Target = Character>>) {
         if let Some(char) = character.as_deref() {
-            self.shown = true;
+            self.has_target = true;
             let mut name_text_line =
                 TextLine::new(char.name, 16, WHITE, Some(self.big_font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
@@ -128,18 +125,31 @@ impl TargetUi {
                 ..Default::default()
             }
         } else {
-            self.shown = false;
+            self.has_target = false;
         }
     }
 
-    pub fn set_action(&mut self, header: String, details: Vec<(String, Goodness)>) {
-        self.action = Some((header, details));
+    pub fn clear_action(&mut self) {
+        self.action = None;
+    }
+
+    pub fn set_action(
+        &mut self,
+        header: String,
+        details: Vec<(String, Goodness)>,
+        only_show_with_target: bool,
+    ) {
+        self.action = Some((header, details, only_show_with_target));
     }
 
     fn draw_action(&self, container_pos: (f32, f32)) {
-        let Some((header, details)) = &self.action else {
+        let Some((header, details, only_show_with_target)) = &self.action else {
             return;
         };
+
+        if *only_show_with_target && !self.has_target {
+            return;
+        }
 
         let (mut x, y) = container_pos;
 
@@ -265,11 +275,9 @@ impl TargetUi {
 
 impl Drawable for TargetUi {
     fn draw(&self, x: f32, y: f32) {
-        if !self.shown {
-            return;
+        if self.has_target {
+            self.container.draw(x, y);
         }
-
-        self.container.draw(x, y);
 
         self.draw_action((screen_width() / 2.0, 60.0));
     }

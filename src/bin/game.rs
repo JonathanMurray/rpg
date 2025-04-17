@@ -1,10 +1,11 @@
 use std::rc::Rc;
 
 use macroquad::color::MAGENTA;
+use macroquad::input::mouse_position;
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
 
 use macroquad::shapes::draw_rectangle;
-use macroquad::text::{load_ttf_font, Font};
+use macroquad::text::{draw_text, load_ttf_font, Font};
 use macroquad::texture::FilterMode;
 use macroquad::{
     color::BLACK,
