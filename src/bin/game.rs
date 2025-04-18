@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use macroquad::color::MAGENTA;
@@ -17,9 +18,10 @@ use macroquad::{
 
 use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
-use rpg::core::{CoreGame, GameState, StateChooseReaction};
+use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
-use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
+use rpg::game_ui::{GraphicalUserInterface, PlayerChose, UiGameEventHandler, UiState};
+use rpg::game_ui_orchestration::GameUserInterface;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_sprites, load_and_init_texture,
 };
@@ -45,8 +47,9 @@ async fn main() {
         window::high_dpi()
     );
 
-    let event_handler = Rc::new(UiGameEventHandler::new());
-    let game = CoreGame::new(event_handler.clone());
+    let mut game_ui = GameUserInterface::uninitialized();
+
+    let core_game = CoreGame::new(game_ui.clone());
 
     let sprites = load_all_sprites().await;
 
@@ -78,8 +81,8 @@ async fn main() {
         empty_grass.clone(),
     ];
 
-    let mut user_interface = UserInterface::new(
-        &game,
+    let gfx_user_interface = GraphicalUserInterface::new(
+        &core_game,
         sprites,
         icons,
         equipment_icons,
@@ -89,119 +92,9 @@ async fn main() {
         background_textures,
     );
 
-    let mut game_state = game.begin();
+    game_ui.init(gfx_user_interface);
 
-    let mut waiting_for_ui_after_game_state_change = true;
-
-    loop {
-        let elapsed = get_frame_time();
-
-        let ui_events = user_interface.update(game_state.game(), elapsed);
-
-        clear_background(BLACK);
-
-        user_interface.draw();
-
-        if !ui_events.is_empty() {
-            for player_choice in ui_events {
-                match player_choice {
-                    PlayerChose::AttackedReaction(reaction) => {
-                        game_state = game_state.unwrap_react_to_attack().proceed(reaction);
-                    }
-                    PlayerChose::HitReaction(reaction) => {
-                        game_state = game_state.unwrap_react_to_hit().proceed(reaction);
-                    }
-                    PlayerChose::Action(action) => {
-                        dbg!(&action);
-                        // TODO: Add option in UI to deliberately end turn
-                        game_state = game_state.unwrap_choose_action().proceed(Some(action));
-                    }
-                }
-            }
-            waiting_for_ui_after_game_state_change = true;
-            user_interface.set_state(UiState::Idle);
-
-            // Handle any game events that might have resulted from the above state change
-            for event in event_handler.events.borrow_mut().drain(..) {
-                user_interface.handle_game_event(event);
-            }
-        }
-
-        if user_interface.ready_for_more() && waiting_for_ui_after_game_state_change {
-            println!("No longer waiting for UI!");
-            waiting_for_ui_after_game_state_change = false;
-            let players_turn = game_state.game().is_players_turn();
-            game_state = match game_state {
-                GameState::AwaitingChooseAction(..) if players_turn => {
-                    user_interface.set_state(UiState::ChoosingAction);
-                    game_state
-                }
-                GameState::AwaitingChooseAction(state) => {
-                    assert!(!players_turn);
-                    let action =
-                        bot_choose_action(&state.game, user_interface.game_grid.grid_dimensions);
-                    waiting_for_ui_after_game_state_change = true;
-                    state.proceed(action)
-                }
-                GameState::AwaitingChooseReaction(state) if players_turn => {
-                    let new_game_state = match state {
-                        StateChooseReaction::Attack(choose_reaction) => {
-                            let reaction = bot_choose_attack_reaction(
-                                &choose_reaction.game,
-                                choose_reaction.reactor,
-                                choose_reaction.is_within_melee,
-                            );
-                            choose_reaction.proceed(reaction)
-                        }
-                        StateChooseReaction::Hit(choose_reaction) => {
-                            let reaction = bot_choose_hit_reaction(
-                                &choose_reaction.game,
-                                choose_reaction.reactor,
-                                choose_reaction.is_within_melee,
-                            );
-                            choose_reaction.proceed(reaction)
-                        }
-                    };
-                    waiting_for_ui_after_game_state_change = true;
-                    new_game_state
-                }
-                GameState::AwaitingChooseReaction(ref state) => {
-                    assert!(!players_turn);
-                    match state {
-                        StateChooseReaction::Attack(inner) => {
-                            println!("awaiting player attack reaction");
-                            user_interface.set_state(UiState::ReactingToAttack {
-                                attacker: inner.attacker,
-                                hand: inner.hand,
-                                reactor: inner.reactor,
-                                is_within_melee: inner.is_within_melee,
-                            });
-                        }
-                        StateChooseReaction::Hit(inner) => {
-                            println!("awaiting player hit reaction");
-                            user_interface.set_state(UiState::ReactingToHit {
-                                attacker: inner.attacker,
-                                victim: inner.reactor,
-                                damage: inner.damage,
-                                is_within_melee: inner.is_within_melee,
-                            });
-                        }
-                    }
-                    game_state
-                }
-                GameState::PerformingMovement(performing_movement) => {
-                    waiting_for_ui_after_game_state_change = true;
-                    performing_movement.proceed()
-                }
-            }
-        }
-
-        for event in event_handler.events.borrow_mut().drain(..) {
-            user_interface.handle_game_event(event);
-        }
-
-        next_frame().await
-    }
+    core_game.run().await;
 }
 
 fn window_conf() -> Conf {

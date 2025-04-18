@@ -76,10 +76,14 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                     pathfind_grid.run((pos.0 as i32, pos.1 as i32), character.move_range);
 
                     for (destination, route) in pathfind_grid.routes {
-                        if route.came_from == (pos.0 as i32, pos.1 as i32) {
+                        if route.came_from == (pos.0 as i32, pos.1 as i32)
+                            && route.distance_from_start > 0.0
+                        {
+                            let destination = (destination.0 as u32, destination.1 as u32);
+                            assert!(destination != pos);
                             chosen_action = Some(Action::Move {
                                 action_point_cost,
-                                positions: vec![(destination.0 as u32, destination.1 as u32)],
+                                positions: vec![destination],
                                 enhancements: vec![],
                             });
                             break;
@@ -104,7 +108,7 @@ pub fn bot_choose_attack_reaction(
 ) -> Option<OnAttackedReaction> {
     let reactions = game
         .characters
-        .get(reactor_id)
+        .borrow(reactor_id)
         .usable_on_attacked_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)
@@ -120,7 +124,7 @@ pub fn bot_choose_hit_reaction(
 ) -> Option<OnHitReaction> {
     let reactions = game
         .characters
-        .get(reactor_id)
+        .borrow(reactor_id)
         .usable_on_hit_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)

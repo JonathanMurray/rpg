@@ -99,11 +99,11 @@ struct CharacterUi {
     conditions_list: ConditionsList,
 }
 
-pub struct UserInterface {
+pub struct GraphicalUserInterface {
     characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: UiState,
-    stopwatch: StopWatch,
+    animation_stopwatch: StopWatch,
 
     font: Font,
 
@@ -123,7 +123,7 @@ pub struct UserInterface {
     log: Log,
 }
 
-impl UserInterface {
+impl GraphicalUserInterface {
     pub fn new(
         game: &CoreGame,
         sprites: HashMap<SpriteId, Texture2D>,
@@ -389,7 +389,7 @@ impl UserInterface {
             player_portraits,
             character_sheet_toggle,
             active_character_id,
-            stopwatch: StopWatch::default(),
+            animation_stopwatch: StopWatch::default(),
 
             icons,
             font: simple_font.clone(),
@@ -534,7 +534,7 @@ impl UserInterface {
         let target = self
             .game_grid
             .players_target()
-            .map(|id| self.characters.get(id));
+            .map(|id| self.characters.borrow(id));
         self.target_ui.set_character(target);
     }
 
@@ -564,7 +564,7 @@ impl UserInterface {
     }
 
     fn active_character(&self) -> Ref<Character> {
-        self.characters.get(self.active_character_id)
+        self.characters.borrow(self.active_character_id)
     }
 
     pub fn set_state(&mut self, state: UiState) {
@@ -649,8 +649,8 @@ impl UserInterface {
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
-                let attacker = self.characters.get(attacker_id);
-                let defender = self.characters.get(reactor_id);
+                let attacker = self.characters.borrow(attacker_id);
+                let defender = self.characters.borrow(reactor_id);
 
                 popup_initial_lines.push("Reaction".to_string());
                 let attacks_str = format!(
@@ -683,11 +683,11 @@ impl UserInterface {
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
-                let victim = self.characters.get(victim_id);
+                let victim = self.characters.borrow(victim_id);
                 popup_initial_lines.push("React".to_string());
                 popup_initial_lines.push(format!(
                     "{} attacked {} for {} damage",
-                    self.characters.get(attacker_id).name,
+                    self.characters.borrow(attacker_id).name,
                     victim.name,
                     damage,
                 ));
@@ -759,8 +759,8 @@ impl UserInterface {
             unreachable!()
         };
 
-        let attacker = self.characters.get(attacker);
-        let defender = self.characters.get(reactor);
+        let attacker = self.characters.borrow(attacker);
+        let defender = self.characters.borrow(reactor);
 
         // TODO
         let attack_enhancements = &[];
@@ -794,8 +794,8 @@ impl UserInterface {
         self.game_grid.set_enemys_target(reactor);
     }
 
-    pub fn ready_for_more(&self) -> bool {
-        self.stopwatch.remaining.is_none()
+    pub fn has_ongoing_animation(&self) -> bool {
+        self.animation_stopwatch.remaining.is_some()
     }
 
     pub fn handle_game_event(&mut self, event: GameEvent) {
@@ -804,10 +804,6 @@ impl UserInterface {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
-            GameEvent::CharacterTookDamage {
-                character: _,
-                amount: _,
-            } => {}
 
             GameEvent::CharacterReactedToHit {
                 main_line,
@@ -817,7 +813,7 @@ impl UserInterface {
             } => {
                 self.log.add_with_details(main_line, detail_lines);
 
-                let reactor_pos = self.characters.get(reactor).position_i32();
+                let reactor_pos = self.characters.borrow(reactor).position_i32();
 
                 if let Some(condition) = outcome.received_condition {
                     self.game_grid.add_text_effect(
@@ -849,7 +845,7 @@ impl UserInterface {
                         );
                     }
                 }
-                self.stopwatch.set_to_at_least(0.5);
+                self.animation_stopwatch.set_to_at_least(0.5);
             }
 
             GameEvent::Attacked {
@@ -860,8 +856,8 @@ impl UserInterface {
             } => {
                 let mut line = format!(
                     "{} attacked {}",
-                    self.characters.get(attacker).name,
-                    self.characters.get(target).name
+                    self.characters.borrow(attacker).name,
+                    self.characters.borrow(target).name
                 );
 
                 match outcome {
@@ -873,13 +869,13 @@ impl UserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                let attacker_pos = self.characters.get(attacker).position_i32();
-                let target_pos = self.characters.get(target).position_i32();
+                let attacker_pos = self.characters.borrow(attacker).position_i32();
+                let target_pos = self.characters.borrow(target).position_i32();
 
                 let dist = distance_between(attacker_pos, target_pos);
                 let duration = 0.15 * dist;
 
-                self.stopwatch.set_to_at_least(duration + 0.4);
+                self.animation_stopwatch.set_to_at_least(duration + 0.4);
                 let impact_text = match outcome {
                     AttackOutcome::Hit(damage) => format!("{}", damage),
                     AttackOutcome::Dodge => "Dodge".to_string(),
@@ -936,9 +932,9 @@ impl UserInterface {
             } => {
                 let mut line = format!(
                     "{} cast {} on {}",
-                    self.characters.get(caster).name,
+                    self.characters.borrow(caster).name,
                     spell.name,
-                    self.characters.get(target).name
+                    self.characters.borrow(target).name
                 );
 
                 match outcome {
@@ -953,8 +949,8 @@ impl UserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                let caster_pos = self.characters.get(caster).position_i32();
-                let target_pos = self.characters.get(target).position_i32();
+                let caster_pos = self.characters.borrow(caster).position_i32();
+                let target_pos = self.characters.borrow(target).position_i32();
 
                 let color = match spell.target_type {
                     SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => BLUE,
@@ -1062,13 +1058,13 @@ impl UserInterface {
                 self.game_grid
                     .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
 
-                self.stopwatch.set_to_at_least(duration + 0.3);
+                self.animation_stopwatch.set_to_at_least(duration + 0.3);
             }
             GameEvent::CharacterReceivedSelfEffect {
                 character,
                 condition,
             } => {
-                let pos = self.characters.get(character).position;
+                let pos = self.characters.borrow(character).position;
                 let duration = 1.0;
                 self.game_grid.add_text_effect(
                     (pos.0 as i32, pos.1 as i32),
@@ -1077,11 +1073,11 @@ impl UserInterface {
                     format!("{:?}", condition),
                     Goodness::Neutral,
                 );
-                self.stopwatch.set_to_at_least(duration);
+                self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharacterDied { character } => {
                 self.log
-                    .add(format!("{} died", self.characters.get(character).name));
+                    .add(format!("{} died", self.characters.borrow(character).name));
 
                 self.characters.remove_dead();
                 self.game_grid.remove_dead();
@@ -1109,17 +1105,21 @@ impl UserInterface {
 
                 self.game_grid
                     .set_character_motion(character, from, to, duration);
-                self.stopwatch.set_to_at_least(duration);
+                self.animation_stopwatch.set_to_at_least(duration);
             }
         }
     }
 
-    pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Vec<PlayerChose> {
+    pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
         let active_character_id = game.active_character_id;
 
         if active_character_id != self.active_character_id {
             // When control switches to a new player controlled character, make the UI show that character
-            if self.characters.get(active_character_id).player_controlled {
+            if self
+                .characters
+                .borrow(active_character_id)
+                .player_controlled
+            {
                 self.player_portraits
                     .set_selected_character(active_character_id);
             }
@@ -1168,7 +1168,7 @@ impl UserInterface {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
                 if let Some(target_id) = self.game_grid.players_target() {
-                    let target_char = self.characters.get(target_id);
+                    let target_char = self.characters.borrow(target_id);
 
                     let enhancements: Vec<AttackEnhancement> = self
                         .activity_popup
@@ -1248,7 +1248,7 @@ impl UserInterface {
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
                 if let Some(i) = self.game_grid.players_target() {
-                    let target_char = self.characters.get(i);
+                    let target_char = self.characters.borrow(i);
 
                     let static_text = match spell.target_type {
                         SpellTargetType::SingleEnemy(spell_type) => {
@@ -1353,15 +1353,11 @@ impl UserInterface {
                 .set_reserved(self.activity_popup.stamina_points());
         };
 
-        if self.stopwatch.update(elapsed) {
+        if self.animation_stopwatch.update(elapsed) {
             println!("UI is now ready...");
         }
 
-        if let Some(choice) = player_choice {
-            vec![choice]
-        } else {
-            vec![]
-        }
+        player_choice
     }
 
     fn handle_popup_proceed(&mut self) -> PlayerChose {
@@ -1472,7 +1468,7 @@ impl UserInterface {
 
                 ui.action_points_row.current_ap = self
                     .characters
-                    .get(self.player_portraits.selected_i.get())
+                    .borrow(self.player_portraits.selected_i.get())
                     .action_points;
                 ui.action_points_row.is_characters_turn = *id == self.active_character_id;
             }

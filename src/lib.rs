@@ -10,6 +10,7 @@ mod data;
 pub mod drawing;
 pub mod equipment_ui;
 pub mod game_ui;
+pub mod game_ui_orchestration;
 pub mod grid;
 pub mod pathfind;
 pub mod stats_ui;

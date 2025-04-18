@@ -1,4 +1,4 @@
-use std::{collections::HashMap, usize};
+use std::collections::HashMap;
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -231,7 +231,10 @@ impl GameGrid {
             self.pathfind_grid.blocked_positions.insert(pos);
         }
 
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
         self.pathfind_grid.run(pos, self.movement_range.max());
 
         for effect in &mut self.effects {
@@ -318,7 +321,10 @@ impl GameGrid {
     }
 
     fn set_an_arbitrary_valid_movement_path(&mut self) {
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
         let mut movement_preview = vec![];
         for (destination, route) in &self.pathfind_grid.routes {
             if route.came_from == pos
@@ -358,7 +364,10 @@ impl GameGrid {
     ) {
         self.movement_range.set(range, enhancements);
         self.ensure_movement_preview_is_within_selected_move_range();
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
         self.pathfind_grid.run(pos, self.movement_range.max());
     }
 
@@ -473,7 +482,7 @@ impl GameGrid {
 
     pub fn clear_players_target_if_allied(&mut self) {
         if let PlayersTarget::Some(id) = self.players_target {
-            if self.characters.get(id).player_controlled {
+            if self.characters.borrow(id).player_controlled {
                 self.players_target = PlayersTarget::None
             }
         }
@@ -481,7 +490,7 @@ impl GameGrid {
 
     pub fn clear_players_target_if_enemy(&mut self) {
         if let PlayersTarget::Some(id) = self.players_target {
-            if !self.characters.get(id).player_controlled {
+            if !self.characters.borrow(id).player_controlled {
                 self.players_target = PlayersTarget::None
             }
         }
@@ -602,7 +611,10 @@ impl GameGrid {
 
         self.draw_background();
 
-        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
+        let active_char_pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
 
         if let Some((range, reach)) = self.action_range_indicator {
             self.draw_action_range_indicator(active_char_pos, range, reach);
@@ -713,7 +725,7 @@ impl GameGrid {
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
-                let player_controlled = self.characters.get(hovered_id).player_controlled;
+                let player_controlled = self.characters.borrow(hovered_id).player_controlled;
                 if player_controlled {
                     if players_action_requires_ally_target {
                         self.draw_cornered_outline(
@@ -780,7 +792,8 @@ impl GameGrid {
         }
 
         {
-            let pos = self.character_screen_pos(&self.characters.get(self.selected_character_id));
+            let pos =
+                self.character_screen_pos(&self.characters.borrow(self.selected_character_id));
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
 
@@ -791,7 +804,7 @@ impl GameGrid {
         }
 
         if let PlayersTarget::Some(target) = self.players_target {
-            let outline_color = if self.characters.get(target).player_controlled {
+            let outline_color = if self.characters.borrow(target).player_controlled {
                 HOVER_ALLY_COLOR
             } else {
                 TARGET_NPC_COLOR
@@ -804,11 +817,11 @@ impl GameGrid {
 
         self.draw_effects();
 
-        self.draw_character_label(&self.characters.get(self.active_character_id));
+        self.draw_character_label(&self.characters.borrow(self.active_character_id));
 
         if let Some(id) = hovered_character_id {
             if id != self.active_character_id {
-                let char = self.characters.get(id);
+                let char = self.characters.borrow(id);
                 self.draw_character_label(&char);
             }
         }
@@ -861,7 +874,7 @@ impl GameGrid {
     }
 
     fn draw_active_character_highlight(&self) {
-        let (x, y) = self.character_screen_pos(&self.characters.get(self.active_character_id));
+        let (x, y) = self.character_screen_pos(&self.characters.borrow(self.active_character_id));
         let margin = 3.0;
         draw_rectangle(
             x + margin,
@@ -977,8 +990,11 @@ impl GameGrid {
         crosshair_color: Color,
         outline_color: Color,
     ) {
-        let actor_pos = self.characters.get(self.active_character_id).position_i32();
-        let target_pos = self.characters.get(target).position_i32();
+        let actor_pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
+        let target_pos = self.characters.borrow(target).position_i32();
         self.draw_cell_outline(target_pos, outline_color, 1.0, 5.0);
 
         let actor_x = self.grid_x_to_screen(actor_pos.0);
@@ -1046,7 +1062,10 @@ impl GameGrid {
     }
 
     fn draw_movement_path_background(&self) {
-        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
+        let active_char_pos = self
+            .characters
+            .borrow(self.active_character_id)
+            .position_i32();
 
         self.draw_move_range_indicator(active_char_pos);
 
