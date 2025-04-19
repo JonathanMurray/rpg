@@ -1,5 +1,4 @@
 use std::cell::{Cell, RefCell};
-use std::cell::{Ref, RefMut};
 
 use std::fmt::Display;
 use std::rc::Rc;
@@ -13,7 +12,7 @@ use crate::data::{
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
-use crate::game_ui_orchestration::GameUserInterface;
+use crate::game_ui_orchestration::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
 pub const MAX_ACTION_POINTS: u32 = 5;
@@ -21,11 +20,11 @@ pub const MAX_ACTION_POINTS: u32 = 5;
 pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
-    user_interface: GameUserInterface,
+    user_interface: GameUserInterfaceConnection,
 }
 
 impl CoreGame {
-    pub fn new(user_interface: GameUserInterface) -> Self {
+    pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
         let active_character_id = 0;
 
         let mut bob = Character::new(
@@ -221,7 +220,7 @@ impl CoreGame {
                     .await;
                 }
 
-                let log_line = self.perform_effect_application(effect, &self.active_character());
+                let log_line = self.perform_effect_application(effect, self.active_character());
                 self.log(log_line).await;
                 None
             }
@@ -408,13 +407,13 @@ impl CoreGame {
                     let damage = dmg_calculation.max(0) as u32;
 
                     if dmg_calculation > 0 {
-                        self.perform_losing_health(&target_ref, damage);
+                        self.perform_losing_health(target_ref, damage);
                         dmg_str.push_str(&format!(" = {damage}"));
                         detail_lines.push(dmg_str);
                     }
 
                     if let Some(effect) = spell.on_hit_effect {
-                        let log_line = self.perform_effect_application(effect, &target_ref);
+                        let log_line = self.perform_effect_application(effect, target_ref);
                         detail_lines.push(format!("{} ({})", log_line, spell.name));
                     }
 
@@ -422,7 +421,7 @@ impl CoreGame {
                         if let Some(SpellEnhancementEffect::OnHitEffect(effect)) =
                             enhancement.effect
                         {
-                            let log_line = self.perform_effect_application(effect, &target_ref);
+                            let log_line = self.perform_effect_application(effect, target_ref);
                             detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                         }
                     }
@@ -522,9 +521,9 @@ impl CoreGame {
         };
 
         let attack_bonus = attack_roll_bonus(
-            &attacker,
+            attacker,
             hand_type,
-            &defender,
+            defender,
             circumstance_advantage,
             &attack_enhancements,
         );
@@ -667,14 +666,14 @@ impl CoreGame {
 
             detail_lines.push(dmg_str);
 
-            self.perform_losing_health(&defender, damage);
+            self.perform_losing_health(defender, damage);
 
             attack_hit = Some((defender_id, damage));
 
             if let Some(effect) = on_true_hit_effect {
                 match effect {
                     AttackHitEffect::Apply(effect) => {
-                        let log_line = self.perform_effect_application(effect, &defender);
+                        let log_line = self.perform_effect_application(effect, defender);
                         detail_lines.push(format!("{} (true hit)", log_line))
                     }
                     AttackHitEffect::SkipExertion => skip_attack_exertion = true,
@@ -689,7 +688,7 @@ impl CoreGame {
                             format!("{} regained 1 AP", attacker.name)
                         }
                         AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                            self.perform_effect_application(apply_effect, &defender)
+                            self.perform_effect_application(apply_effect, defender)
                         }
                     };
 
@@ -808,7 +807,7 @@ impl CoreGame {
                     if let Some(condition) = condition {
                         let log_line = self.perform_effect_application(
                             ApplyEffect::Condition(condition),
-                            &attacker,
+                            attacker,
                         );
                         lines.push(format!("{} (Shield bash)", log_line));
                     } else {
@@ -838,7 +837,7 @@ impl CoreGame {
         let name = character.name;
 
         if character.conditions.borrow().bleeding > 0 {
-            self.perform_losing_health(&character, BLEEDING_DAMAGE_AMOUNT);
+            self.perform_losing_health(character, BLEEDING_DAMAGE_AMOUNT);
             character.conditions.borrow_mut().bleeding -= 1;
             if character.conditions.borrow().bleeding == 0 {
                 self.log(format!("{} stopped Bleeding", name)).await;

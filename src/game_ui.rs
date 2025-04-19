@@ -1,5 +1,5 @@
 use std::{
-    cell::{Cell, Ref, RefCell},
+    cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
 };
@@ -99,7 +99,7 @@ struct CharacterUi {
     conditions_list: ConditionsList,
 }
 
-pub struct GraphicalUserInterface {
+pub struct UserInterface {
     characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     state: UiState,
@@ -123,7 +123,7 @@ pub struct GraphicalUserInterface {
     log: Log,
 }
 
-impl GraphicalUserInterface {
+impl UserInterface {
     pub fn new(
         game: &CoreGame,
         sprites: HashMap<SpriteId, Texture2D>,
@@ -166,14 +166,14 @@ impl GraphicalUserInterface {
 
             for (_subtext, action) in character.known_actions() {
                 let btn_action = ButtonAction::Action(action);
-                let btn = Rc::new(new_button(btn_action, Some(&character), true));
+                let btn = Rc::new(new_button(btn_action, Some(character), true));
                 tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
                 hoverable_buttons.push(Rc::clone(&btn));
                 match action {
                     BaseAction::Attack { .. } => {
                         basic_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(&character), false));
+                        let btn = Rc::new(new_button(btn_action, Some(character), false));
                         attack_button_for_character_sheet = Some(btn.clone());
                         hoverable_buttons.push(btn);
                     }
@@ -181,7 +181,7 @@ impl GraphicalUserInterface {
                     BaseAction::CastSpell(spell) => {
                         spell_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(&character), false));
+                        let btn = Rc::new(new_button(btn_action, Some(character), false));
 
                         let enhancement_buttons: Vec<Rc<ActionButton>> = spell
                             .possible_enhancements
@@ -243,7 +243,7 @@ impl GraphicalUserInterface {
 
             let character_sheet = CharacterSheet::new(
                 &simple_font,
-                &character,
+                character,
                 &equipment_icons,
                 attack_button_for_character_sheet,
                 reaction_buttons_for_character_sheet,
@@ -773,9 +773,9 @@ impl GraphicalUserInterface {
         let mut line = format!(
             "Hit chance: {}",
             as_percentage(prob_attack_hit(
-                &attacker,
+                attacker,
                 hand,
-                &defender,
+                defender,
                 0,
                 attack_enhancements,
                 reaction
@@ -1192,9 +1192,9 @@ impl GraphicalUserInterface {
                     let defender_reaction = None;
 
                     let chance = as_percentage(prob_attack_hit(
-                        &self.active_character(),
+                        self.active_character(),
                         hand,
-                        &target_char,
+                        target_char,
                         circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
                         &enhancements,
                         defender_reaction,
@@ -1243,9 +1243,9 @@ impl GraphicalUserInterface {
                     let static_text = match spell.target_type {
                         SpellTargetType::SingleEnemy(spell_type) => {
                             let chance = as_percentage(prob_spell_hit(
-                                &self.active_character(),
+                                self.active_character(),
                                 spell_type,
-                                &target_char,
+                                target_char,
                             ));
 
                             format!("{}: {}", spell.name, chance)
@@ -1709,7 +1709,7 @@ impl PlayerPortraits {
                 portraits.insert(
                     *id,
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
-                        &character,
+                        character,
                         font.clone(),
                     ))),
                 );

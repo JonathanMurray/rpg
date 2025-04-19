@@ -13,7 +13,7 @@ use super::bot::bot_choose_action;
 use super::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
-use super::game_ui::{GraphicalUserInterface, PlayerChose, UiState};
+use super::game_ui::{UserInterface, PlayerChose, UiState};
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -42,30 +42,30 @@ enum MessageFromGame {
 }
 
 #[derive(Clone)]
-pub struct GameUserInterface {
-    inner: Rc<RefCell<Option<_GameUserInterface>>>,
+pub struct GameUserInterfaceConnection {
+    inner: Rc<RefCell<Option<_GameUserInterfaceConnection>>>,
 }
 
-impl GameUserInterface {
+impl GameUserInterfaceConnection {
     pub fn uninitialized() -> Self {
         Self {
             inner: Rc::new(RefCell::new(None)),
         }
     }
 
-    pub fn init(&mut self, gfx_user_interface: GraphicalUserInterface) {
-        *self.inner.borrow_mut() = Some(_GameUserInterface {
+    pub fn init(&mut self, gfx_user_interface: UserInterface) {
+        *self.inner.borrow_mut() = Some(_GameUserInterfaceConnection {
             user_interface: RefCell::new(gfx_user_interface),
         });
     }
 
-    async fn run(&self, game: &CoreGame, message: MessageFromGame) -> UiOutcome {
+    async fn run_ui(&self, game: &CoreGame, message: MessageFromGame) -> UiOutcome {
         let inner_ref = self.inner.borrow_mut();
-        inner_ref.as_ref().unwrap().run(game, message).await
+        inner_ref.as_ref().unwrap().run_ui(game, message).await
     }
 
     pub async fn select_action(&self, game: &CoreGame) -> Option<Action> {
-        match self.run(game, MessageFromGame::AwaitingChooseAction).await {
+        match self.run_ui(game, MessageFromGame::AwaitingChooseAction).await {
             UiOutcome::ChoseAction(action) => action,
             unexpected => panic!("Expected action but got: {:?}", unexpected),
         }
@@ -80,7 +80,7 @@ impl GameUserInterface {
         within_melee: bool,
     ) -> Option<OnAttackedReaction> {
         match self
-            .run(
+            .run_ui(
                 game,
                 MessageFromGame::AwaitingChooseOnAttackedReaction {
                     attacker,
@@ -105,7 +105,7 @@ impl GameUserInterface {
         within_melee: bool,
     ) -> Option<OnHitReaction> {
         match self
-            .run(
+            .run_ui(
                 game,
                 MessageFromGame::AwaitingChooseOnHitReaction {
                     attacker,
@@ -123,19 +123,19 @@ impl GameUserInterface {
 
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
         let msg = MessageFromGame::Event(event);
-        match self.run(game, msg).await {
+        match self.run_ui(game, msg).await {
             UiOutcome::None => {}
             _ => unreachable!(),
         }
     }
 }
 
-struct _GameUserInterface {
-    user_interface: RefCell<GraphicalUserInterface>,
+struct _GameUserInterfaceConnection {
+    user_interface: RefCell<UserInterface>,
 }
 
-impl _GameUserInterface {
-    async fn run(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
+impl _GameUserInterfaceConnection {
+    async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();

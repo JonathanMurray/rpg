@@ -610,7 +610,7 @@ impl GameGrid {
         self.draw_active_character_highlight();
 
         for character in self.characters.iter() {
-            self.draw_character(&character);
+            self.draw_character(character);
         }
 
         let mut outcome = GridOutcome::default();
@@ -779,7 +779,7 @@ impl GameGrid {
         }
 
         {
-            let pos = self.character_screen_pos(&self.characters.get(self.selected_character_id));
+            let pos = self.character_screen_pos(self.characters.get(self.selected_character_id));
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
 
@@ -803,12 +803,12 @@ impl GameGrid {
 
         self.draw_effects();
 
-        self.draw_character_label(&self.characters.get(self.active_character_id));
+        self.draw_character_label(self.characters.get(self.active_character_id));
 
         if let Some(id) = hovered_character_id {
             if id != self.active_character_id {
                 let char = self.characters.get(id);
-                self.draw_character_label(&char);
+                self.draw_character_label(char);
             }
         }
 
@@ -860,7 +860,7 @@ impl GameGrid {
     }
 
     fn draw_active_character_highlight(&self) {
-        let (x, y) = self.character_screen_pos(&self.characters.get(self.active_character_id));
+        let (x, y) = self.character_screen_pos(self.characters.get(self.active_character_id));
         let margin = 3.0;
         draw_rectangle(
             x + margin,

@@ -20,8 +20,8 @@ use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
-use rpg::game_ui::{GraphicalUserInterface, PlayerChose, UiGameEventHandler, UiState};
-use rpg::game_ui_orchestration::GameUserInterface;
+use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
+use rpg::game_ui_orchestration::GameUserInterfaceConnection;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_sprites, load_and_init_texture,
 };
@@ -47,7 +47,7 @@ async fn main() {
         window::high_dpi()
     );
 
-    let mut game_ui = GameUserInterface::uninitialized();
+    let mut game_ui = GameUserInterfaceConnection::uninitialized();
 
     let core_game = CoreGame::new(game_ui.clone());
 
@@ -81,7 +81,7 @@ async fn main() {
         empty_grass.clone(),
     ];
 
-    let gfx_user_interface = GraphicalUserInterface::new(
+    let gfx_user_interface = UserInterface::new(
         &core_game,
         sprites,
         icons,
