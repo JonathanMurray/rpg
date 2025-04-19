@@ -13,7 +13,7 @@ use super::bot::bot_choose_action;
 use super::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
-use super::game_ui::{UserInterface, PlayerChose, UiState};
+use super::game_ui::{PlayerChose, UiState, UserInterface};
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -65,7 +65,10 @@ impl GameUserInterfaceConnection {
     }
 
     pub async fn select_action(&self, game: &CoreGame) -> Option<Action> {
-        match self.run_ui(game, MessageFromGame::AwaitingChooseAction).await {
+        match self
+            .run_ui(game, MessageFromGame::AwaitingChooseAction)
+            .await
+        {
             UiOutcome::ChoseAction(action) => action,
             unexpected => panic!("Expected action but got: {:?}", unexpected),
         }

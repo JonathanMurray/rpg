@@ -31,7 +31,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OffensiveSpellType,
-        OnAttackedReaction, OnHitReaction, SpellOutcome, SpellTargetType, MAX_ACTION_POINTS,
+        OnAttackedReaction, OnHitReaction, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
         MOVE_ACTION_COST,
     },
     grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
@@ -622,6 +622,7 @@ impl UserInterface {
                         }
 
                         match spell.target_type {
+                            SpellTargetType::SelfAreaEnemy(..) => player_wants_enemy_target = true,
                             SpellTargetType::SingleEnemy(..) => player_wants_enemy_target = true,
                             SpellTargetType::SingleAlly => player_wants_ally_target = true,
                         }
@@ -919,140 +920,124 @@ impl UserInterface {
             }
             GameEvent::SpellWasCast {
                 caster,
-                target,
-                outcome,
+                target_outcomes,
                 spell,
                 detail_lines,
             } => {
-                let mut line = format!(
-                    "{} cast {} on {}",
-                    self.characters.get(caster).name,
-                    spell.name,
-                    self.characters.get(target).name
-                );
+                let mut line = if spell.target_type.single_target() {
+                    format!(
+                        "{} cast {} on {}",
+                        self.characters.get(caster).name,
+                        spell.name,
+                        self.characters.get(target_outcomes[0].0).name
+                    )
+                } else {
+                    format!("{} cast {}", self.characters.get(caster).name, spell.name,)
+                };
 
-                match outcome {
-                    SpellOutcome::HitEnemy(damage) => {
-                        line.push_str(&format!(" ({} damage)", damage))
-                    }
-                    SpellOutcome::Resist => line.push_str("  (miss)"),
-                    SpellOutcome::HealedAlly(healing) => {
-                        line.push_str(&format!(" ({} healing)", healing))
+                for (_target, outcome) in &target_outcomes {
+                    match outcome {
+                        SpellTargetOutcome::HitEnemy { damage } => {
+                            if let Some(dmg) = damage {
+                                line.push_str(&format!(" ({} damage)", dmg))
+                            } else {
+                                line.push_str(" (hit)");
+                            }
+                        }
+                        SpellTargetOutcome::Resist => line.push_str(" (miss)"),
+                        SpellTargetOutcome::HealedAlly(healing) => {
+                            line.push_str(&format!(" ({} healing)", healing))
+                        }
                     }
                 }
 
                 self.log.add_with_details(line, detail_lines);
 
-                let caster_pos = self.characters.get(caster).position_i32();
-                let target_pos = self.characters.get(target).position_i32();
+                for (target, outcome) in target_outcomes {
+                    let caster_pos = self.characters.get(caster).position_i32();
+                    let target_pos = self.characters.get(target).position_i32();
 
-                let color = match spell.target_type {
-                    SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => BLUE,
-                    SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile) => RED,
-                    SpellTargetType::SingleAlly => GREEN,
-                };
+                    let color = spell.animation_color;
 
-                let dist = distance_between(caster_pos, target_pos);
-                let duration = 0.15 * dist;
+                    let dist = distance_between(caster_pos, target_pos);
+                    let duration = 0.15 * dist;
 
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.0,
-                        end_time: duration,
-                        variant: EffectVariant::At(
-                            EffectPosition::Projectile,
-                            EffectGraphics::Circle {
-                                radius: 10.0,
-                                end_radius: Some(15.0),
-                                fill: Some(color),
-                                stroke: None,
-                            },
-                        ),
-                    },
-                );
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.025,
-                        end_time: duration + 0.025,
-                        variant: EffectVariant::At(
-                            EffectPosition::Projectile,
-                            EffectGraphics::Circle {
-                                radius: 8.0,
-                                end_radius: Some(13.0),
-                                fill: Some(color),
-                                stroke: None,
-                            },
-                        ),
-                    },
-                );
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.05,
-                        end_time: duration + 0.05,
-                        variant: EffectVariant::At(
-                            EffectPosition::Projectile,
-                            EffectGraphics::Circle {
-                                radius: 6.0,
-                                end_radius: Some(11.0),
-                                fill: Some(color),
-                                stroke: None,
-                            },
-                        ),
-                    },
-                );
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.0,
+                            end_time: duration,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 10.0,
+                                    end_radius: Some(15.0),
+                                    fill: Some(color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.025,
+                            end_time: duration + 0.025,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 8.0,
+                                    end_radius: Some(13.0),
+                                    fill: Some(color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.05,
+                            end_time: duration + 0.05,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 6.0,
+                                    end_radius: Some(11.0),
+                                    fill: Some(color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
 
-                /*
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.0,
-                        end_time: duration,
-                        variant: EffectVariant::At(
-                            EffectPosition::Projectile,
-                            EffectGraphics::Rectangle { width: 15.0, end_width: Some(30.0), start_rotation: 2.0, rotation_per_s: 6.0, fill: None, stroke: Some((color, 4.0)) }
-                        ),
-                    },
-                );
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.0,
-                        end_time: duration,
-                        variant: EffectVariant::At(
-                            EffectPosition::Projectile,
-                            EffectGraphics::Rectangle { width: 10.0, end_width: Some(20.0), start_rotation: 0.0, rotation_per_s: 6.0, fill: None, stroke: Some((MAGENTA, 4.0)) }
-                        ),
-                    },
-                );
-                self.game_grid.add_effect(
-                    caster_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.0,
-                        end_time: 0.1,
-                        variant: EffectVariant::Line { color:BLACK, thickness: 5.0, end_thickness: Some(0.0), extend_gradually: false },
-                    },
-                );
-                 */
+                    let (target_text, goodness) = match outcome {
+                        SpellTargetOutcome::HitEnemy { damage } => {
+                            if let Some(dmg) = damage {
+                                (format!("{}", dmg), Goodness::Bad)
+                            } else {
+                                ("Hit".to_string(), Goodness::Bad)
+                            }
+                        }
+                        SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
+                        SpellTargetOutcome::HealedAlly(healing) => {
+                            (format!("{}", healing), Goodness::Good)
+                        }
+                    };
 
-                let (impact_text, goodness) = match outcome {
-                    SpellOutcome::HitEnemy(damage) => (format!("{}", damage), Goodness::Bad),
-                    SpellOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
-                    SpellOutcome::HealedAlly(healing) => (format!("{}", healing), Goodness::Good),
-                };
+                    self.game_grid.add_text_effect(
+                        target_pos,
+                        duration,
+                        0.5,
+                        target_text,
+                        goodness,
+                    );
 
-                self.game_grid
-                    .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
-
-                self.animation_stopwatch.set_to_at_least(duration + 0.3);
+                    self.animation_stopwatch.set_to_at_least(duration + 0.3);
+                }
             }
             GameEvent::CharacterReceivedSelfEffect {
                 character,
@@ -1240,7 +1225,10 @@ impl UserInterface {
                 if let Some(i) = self.game_grid.players_target() {
                     let target_char = self.characters.get(i);
 
-                    let static_text = match spell.target_type {
+                    let action_text = match spell.target_type {
+                        SpellTargetType::SelfAreaEnemy(..) => {
+                            format!("{} (AoE)", spell.name.to_string())
+                        }
                         SpellTargetType::SingleEnemy(spell_type) => {
                             let chance = as_percentage(prob_spell_hit(
                                 self.active_character(),
@@ -1253,7 +1241,7 @@ impl UserInterface {
                         SpellTargetType::SingleAlly => spell.name.to_string(),
                     };
 
-                    self.target_ui.set_action(static_text, vec![], true);
+                    self.target_ui.set_action(action_text, vec![], true);
 
                     //self.game_grid.target_text = Some((static_text, vec![]));
 
@@ -1272,8 +1260,20 @@ impl UserInterface {
                     };
                     self.game_grid.action_range_indicator = Some((spell.range, reach));
                 } else {
-                    self.target_ui
-                        .set_action("Select a target".to_string(), vec![], false);
+                    match spell.target_type {
+                        SpellTargetType::SelfAreaEnemy(..) => {
+                            self.target_ui.set_action(
+                                format!("{} (AoE)", spell.name.to_string()),
+                                vec![],
+                                false,
+                            );
+                            popup_enabled = true;
+                        }
+                        SpellTargetType::SingleEnemy(..) | SpellTargetType::SingleAlly => {
+                            self.target_ui
+                                .set_action("Select a target".to_string(), vec![], false);
+                        }
+                    };
 
                     let range = spell.range;
                     self.game_grid.action_range_indicator = Some((range, ActionReach::Yes));
@@ -1367,7 +1367,7 @@ impl UserInterface {
                     BaseAction::CastSpell(spell) => Action::CastSpell {
                         spell,
                         enhancements: self.activity_popup.selected_spell_enhancements(),
-                        target: target.unwrap(),
+                        target,
                     },
                     BaseAction::Move {
                         action_point_cost,

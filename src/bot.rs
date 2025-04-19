@@ -43,14 +43,11 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                 BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
                 BaseAction::CastSpell(spell) => {
                     for (id, other_character) in game.characters.iter_with_ids() {
-                        if *id == game.active_character_id {
-                            continue; //Avoid borrowing already borrowed
-                        }
                         if other_character.player_controlled {
                             chosen_action = Some(Action::CastSpell {
                                 spell,
                                 enhancements: vec![],
-                                target: *id,
+                                target: Some(*id),
                             });
                             break;
                         }

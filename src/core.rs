@@ -3,6 +3,8 @@ use std::cell::{Cell, RefCell};
 use std::fmt::Display;
 use std::rc::Rc;
 
+use macroquad::color::Color;
+
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
@@ -32,7 +34,7 @@ impl CoreGame {
             "Bob",
             SpriteId::Character,
             Attributes::new(5, 2, 7, 7),
-            (1, 9),
+            (1, 3),
         );
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
@@ -316,9 +318,13 @@ impl CoreGame {
                 receiver.action_points.lose(n);
                 format!("  {} lost {} AP", receiver.name, n)
             }
-            ApplyEffect::Condition(condition) => {
+            ApplyEffect::Condition(mut condition) => {
                 receiver.receive_condition(condition);
-                format!("  {} received {:?}", receiver.name, condition)
+                let mut line = format!("  {} received {}", receiver.name, condition.name());
+                if let Some(stacks) = condition.stacks() {
+                    line.push_str(&format!(" ({})", stacks));
+                }
+                line
             }
         }
     }
@@ -328,19 +334,16 @@ impl CoreGame {
 
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
-        target_id: CharacterId,
+        target_id: Option<CharacterId>,
     ) {
-        let caster_ref_mut = self.active_character();
-        let caster_id = caster_ref_mut.id();
-        let target_ref = self.characters.get(target_id);
+        let caster = self.active_character();
+        let caster_id = caster.id();
 
-        assert!(caster_ref_mut.can_reach_with_spell(spell, target_ref.position.get()));
-
-        caster_ref_mut.action_points.spend(spell.action_point_cost);
-        caster_ref_mut.mana.spend(spell.mana_cost);
+        caster.action_points.spend(spell.action_point_cost);
+        caster.mana.spend(spell.mana_cost);
 
         for enhancement in &enhancements {
-            caster_ref_mut.mana.spend(enhancement.mana_cost);
+            caster.mana.spend(enhancement.mana_cost);
         }
 
         let mut cast_n_times = 1;
@@ -352,122 +355,119 @@ impl CoreGame {
 
         for i in 0..cast_n_times {
             let caster_ref = self.characters.get(caster_id);
-            let target_ref = self.characters.get(target_id);
 
             let mut detail_lines = vec![];
 
             let roll = roll_d20_with_advantage(0);
             let spell_result = roll + caster_ref.spell_modifier();
 
-            let outcome = if let SpellTargetType::SingleEnemy(spell_type) = spell.target_type {
-                let (defense_label, defense) = match spell_type {
-                    OffensiveSpellType::Mental => ("will", target_ref.will()),
-                    OffensiveSpellType::Projectile => ("evasion", target_ref.evasion()),
-                };
+            let target_outcomes = match spell.target_type {
+                SpellTargetType::SelfAreaEnemy(spell_type) => {
+                    detail_lines.push(format!(
+                        "Rolled: {} (+{} spell mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        spell_result,
+                    ));
 
-                detail_lines.push(format!(
-                    "Rolled: {} (+{} spell mod) = {}, vs {}={}",
-                    roll,
-                    caster_ref.spell_modifier(),
-                    spell_result,
-                    defense_label,
-                    defense,
-                ));
+                    let mut target_outcomes = vec![];
 
-                if spell_result >= defense {
-                    detail_lines.push("The spell was successful!".to_string());
-                    let mut dmg_calculation = spell.damage as i32;
-                    let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
+                    for other_char in self.characters.iter().filter(|ch| ch.id() != caster_id) {
+                        if within_range_squared(
+                            spell.range.squared(),
+                            caster.position.get(),
+                            other_char.position.get(),
+                        ) {
+                            let (defense_label, defense) = match spell_type {
+                                OffensiveSpellType::Mental => ("will", other_char.will()),
+                                OffensiveSpellType::Projectile => ("evasion", other_char.evasion()),
+                            };
 
-                    let degree_of_success = (spell_result - defense) / 5;
-                    let (label, bonus_dmg) = match degree_of_success {
-                        0 => ("".to_string(), 0),
-                        1 => ("Heavy hit".to_string(), 1),
-                        n => (format!("Heavy hit ({n})"), n as i32),
+                            detail_lines
+                                .push(
+                                    format!("{} {}={}", other_char.name, defense_label, defense,),
+                                );
+
+                            let outcome = self.perform_offensive_spell_on_target(
+                                spell,
+                                &enhancements,
+                                spell_type,
+                                spell_result,
+                                &other_char,
+                                &mut detail_lines,
+                            );
+
+                            target_outcomes.push((other_char.id(), outcome));
+                        }
+                    }
+
+                    target_outcomes
+                }
+                SpellTargetType::SingleEnemy(spell_type) => {
+                    let target_ref = self.characters.get(target_id.unwrap());
+                    assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
+
+                    let (defense_label, defense) = match spell_type {
+                        OffensiveSpellType::Mental => ("will", target_ref.will()),
+                        OffensiveSpellType::Projectile => ("evasion", target_ref.evasion()),
                     };
 
-                    if !label.is_empty() {
-                        detail_lines.push(format!("  {label}!"));
-                    }
-                    if bonus_dmg > 0 {
-                        dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
-                        dmg_calculation += bonus_dmg;
-                    }
-
-                    for enhancement in &enhancements {
-                        if enhancement.bonus_damage > 0 {
-                            dmg_str.push_str(&format!(
-                                " +{} ({})",
-                                enhancement.bonus_damage, enhancement.name
-                            ));
-                            dmg_calculation += enhancement.bonus_damage as i32;
-                        }
-                    }
-
-                    let damage = dmg_calculation.max(0) as u32;
-
-                    if dmg_calculation > 0 {
-                        self.perform_losing_health(target_ref, damage);
-                        dmg_str.push_str(&format!(" = {damage}"));
-                        detail_lines.push(dmg_str);
-                    }
-
-                    if let Some(effect) = spell.on_hit_effect {
-                        let log_line = self.perform_effect_application(effect, target_ref);
-                        detail_lines.push(format!("{} ({})", log_line, spell.name));
-                    }
-
-                    for enhancement in &enhancements {
-                        if let Some(SpellEnhancementEffect::OnHitEffect(effect)) =
-                            enhancement.effect
-                        {
-                            let log_line = self.perform_effect_application(effect, target_ref);
-                            detail_lines.push(format!("{} ({})", log_line, enhancement.name));
-                        }
-                    }
-
-                    SpellOutcome::HitEnemy(damage)
-                } else {
-                    match spell_type {
-                        OffensiveSpellType::Mental => {
-                            detail_lines.push(format!("{} resisted the spell!", target_ref.name))
-                        }
-                        OffensiveSpellType::Projectile => {
-                            detail_lines.push("The spell missed!".to_string())
-                        }
-                    }
-                    SpellOutcome::Resist
-                }
-            } else {
-                detail_lines.push(format!(
-                    "Rolled: {} (+{} spell mod) = {}",
-                    roll,
-                    caster_ref.spell_modifier(),
-                    spell_result,
-                ));
-
-                let mut health_gained = 0;
-                if spell.healing > 0 {
-                    let mut healing = spell.healing;
-
-                    let mut line = format!("Healing: {} ({})", spell.healing, spell.name);
-
-                    let effectiveness = spell_result / 10;
-                    if effectiveness > 0 {
-                        detail_lines.push(format!("Fortune: {}", effectiveness));
-                        line.push_str(&format!(" +{} (fortune)", effectiveness));
-                        healing += effectiveness;
-                    }
-                    line.push_str(&format!(" = {}", healing));
-                    detail_lines.push(line);
-
-                    health_gained = target_ref.health.gain(healing);
                     detail_lines.push(format!(
-                        "{} was healed for {}",
-                        target_ref.name, health_gained
+                        "Rolled: {} (+{} spell mod) = {}, vs {}={}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        spell_result,
+                        defense_label,
+                        defense,
                     ));
-                };
-                SpellOutcome::HealedAlly(health_gained)
+
+                    let outcome = self.perform_offensive_spell_on_target(
+                        spell,
+                        &enhancements,
+                        spell_type,
+                        spell_result,
+                        target_ref,
+                        &mut detail_lines,
+                    );
+                    vec![(target_id.unwrap(), outcome)]
+                }
+                SpellTargetType::SingleAlly => {
+                    let target_ref = self.characters.get(target_id.unwrap());
+                    assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
+
+                    detail_lines.push(format!(
+                        "Rolled: {} (+{} spell mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        spell_result,
+                    ));
+
+                    let mut health_gained = 0;
+                    if spell.healing > 0 {
+                        let mut healing = spell.healing;
+
+                        let mut line = format!("Healing: {} ({})", spell.healing, spell.name);
+
+                        let effectiveness = spell_result / 10;
+                        if effectiveness > 0 {
+                            detail_lines.push(format!("Fortune: {}", effectiveness));
+                            line.push_str(&format!(" +{} (fortune)", effectiveness));
+                            healing += effectiveness;
+                        }
+                        line.push_str(&format!(" = {}", healing));
+                        detail_lines.push(line);
+
+                        health_gained = target_ref.health.gain(healing);
+                        detail_lines.push(format!(
+                            "{} was healed for {}",
+                            target_ref.name, health_gained
+                        ));
+                    };
+                    vec![(
+                        target_ref.id(),
+                        SpellTargetOutcome::HealedAlly(health_gained),
+                    )]
+                }
             };
 
             if i < cast_n_times - 1 {
@@ -475,16 +475,105 @@ impl CoreGame {
             }
 
             let caster_id = caster_ref.id();
-            let target_id = target_ref.id();
 
             self.ui_handle_event(GameEvent::SpellWasCast {
                 caster: caster_id,
-                target: target_id,
-                outcome,
+                target_outcomes,
                 spell,
                 detail_lines,
             })
             .await;
+        }
+    }
+
+    fn perform_offensive_spell_on_target(
+        &self,
+        spell: Spell,
+        enhancements: &[SpellEnhancement],
+        spell_type: OffensiveSpellType,
+        spell_result: u32,
+        target: &Character,
+        detail_lines: &mut Vec<String>,
+    ) -> SpellTargetOutcome {
+        let defense = match spell_type {
+            OffensiveSpellType::Mental => target.will(),
+            OffensiveSpellType::Projectile => target.evasion(),
+        };
+
+        if spell_result >= defense {
+            let degree_of_success = (spell_result - defense) / 5;
+
+            let label = match degree_of_success {
+                0 => "".to_string(),
+                1 => "Heavy hit".to_string(),
+                n => format!("Heavy hit ({n})"),
+            };
+
+            if !label.is_empty() {
+                detail_lines.push(format!("  {label}"));
+            }
+
+            let damage = if spell.damage > 0 {
+                let mut dmg_calculation = spell.damage as i32;
+                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
+
+                let bonus_dmg = degree_of_success;
+                if bonus_dmg > 0 {
+                    dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
+                    dmg_calculation += bonus_dmg as i32;
+                }
+
+                for enhancement in enhancements {
+                    if enhancement.bonus_damage > 0 {
+                        dmg_str.push_str(&format!(
+                            " +{} ({})",
+                            enhancement.bonus_damage, enhancement.name
+                        ));
+                        dmg_calculation += enhancement.bonus_damage as i32;
+                    }
+                }
+
+                let damage = dmg_calculation.max(0) as u32;
+
+                if dmg_calculation > 0 {
+                    self.perform_losing_health(target, damage);
+                    dmg_str.push_str(&format!(" = {damage}"));
+                    detail_lines.push(dmg_str);
+                }
+                Some(damage)
+            } else {
+                None
+            };
+
+            if let Some(mut effect) = spell.on_hit_effect {
+                if let ApplyEffect::Condition(ref mut condition) = effect {
+                    if let Some(stacks) = condition.stacks() {
+                        *stacks += degree_of_success;
+                    }
+                }
+
+                let log_line = self.perform_effect_application(effect, target);
+                detail_lines.push(log_line);
+            }
+
+            for enhancement in enhancements {
+                if let Some(SpellEnhancementEffect::OnHitEffect(effect)) = enhancement.effect {
+                    let log_line = self.perform_effect_application(effect, target);
+                    detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                }
+            }
+
+            SpellTargetOutcome::HitEnemy { damage }
+        } else {
+            match spell_type {
+                OffensiveSpellType::Mental => {
+                    detail_lines.push(format!("  {} resisted the spell", target.name))
+                }
+                OffensiveSpellType::Projectile => {
+                    detail_lines.push(format!("  The spell missed {}", target.name))
+                }
+            }
+            SpellTargetOutcome::Resist
         }
     }
 
@@ -637,16 +726,17 @@ impl CoreGame {
                 on_true_hit_effect = weapon.on_true_hit;
 
                 let degree_of_success = (attack_result - armored_defense) / 5;
-                let (label, bonus_dmg) = match degree_of_success {
-                    0 => ("True hit".to_string(), 0),
-                    1 => ("Heavy hit".to_string(), 1),
-                    n => (format!("Heavy hit ({n})"), n as i32),
-                };
 
-                detail_lines.push(format!("  {label}!"));
-                if bonus_dmg > 0 {
-                    dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
-                    dmg_calculation += bonus_dmg;
+                if degree_of_success > 1 {
+                    detail_lines.push(format!("  Heavy hit ({})", degree_of_success));
+                    dmg_str.push_str(&format!(" +{degree_of_success} (Heavy hit)"));
+                    dmg_calculation += degree_of_success as i32;
+                } else if degree_of_success == 1 {
+                    detail_lines.push("  Heavy hit".to_string());
+                    dmg_str.push_str(" +1 (Heavy hit)");
+                    dmg_calculation += 1;
+                } else {
+                    detail_lines.push("  True hit".to_string());
                 }
             }
 
@@ -895,8 +985,7 @@ pub enum GameEvent {
     },
     SpellWasCast {
         caster: CharacterId,
-        target: CharacterId,
-        outcome: SpellOutcome,
+        target_outcomes: Vec<(CharacterId, SpellTargetOutcome)>,
         spell: Spell,
         detail_lines: Vec<String>,
     },
@@ -929,8 +1018,8 @@ pub struct OffensiveHitReactionOutcome {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum SpellOutcome {
-    HitEnemy(u32),
+pub enum SpellTargetOutcome {
+    HitEnemy { damage: Option<u32> },
     Resist,
     HealedAlly(u32),
 }
@@ -1165,6 +1254,32 @@ pub enum Condition {
     OffHandExertion(u32),
 }
 
+impl Condition {
+    fn stacks(&mut self) -> Option<&mut u32> {
+        match self {
+            Condition::Dazed(n) => Some(n),
+            Condition::Bleeding => None,
+            Condition::Braced => None,
+            Condition::Raging => None,
+            Condition::Weakened(n) => Some(n),
+            Condition::MainHandExertion(n) => Some(n),
+            Condition::OffHandExertion(n) => Some(n),
+        }
+    }
+
+    const fn name(&self) -> &'static str {
+        match self {
+            Condition::Dazed(_) => "Dazed",
+            Condition::Bleeding => "Bleeding",
+            Condition::Braced => "Braced",
+            Condition::Raging => "Raging",
+            Condition::Weakened(_) => "Weakened",
+            Condition::MainHandExertion(_) => "Exerted (main-hand)",
+            Condition::OffHandExertion(_) => "Exerted (off-hand)",
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionDescription {
     pub name: &'static str,
@@ -1247,7 +1362,7 @@ pub enum Action {
     CastSpell {
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
-        target: CharacterId,
+        target: Option<CharacterId>,
     },
     Move {
         positions: Vec<(u32, u32)>,
@@ -1333,12 +1448,24 @@ pub struct Spell {
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
     pub range: Range,
     pub target_type: SpellTargetType,
+    pub animation_color: Color,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellTargetType {
+    SelfAreaEnemy(OffensiveSpellType),
     SingleEnemy(OffensiveSpellType),
     SingleAlly,
+}
+
+impl SpellTargetType {
+    pub fn single_target(&self) -> bool {
+        match self {
+            SpellTargetType::SelfAreaEnemy(..) => false,
+            SpellTargetType::SingleEnemy(..) => true,
+            SpellTargetType::SingleAlly => true,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

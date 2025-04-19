@@ -114,6 +114,12 @@ fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) 
             tooltip_lines.push(description);
 
             let attribute_line = match spell.target_type {
+                SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Mental) => {
+                    "Targets AoE [will]".to_string()
+                }
+                SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Projectile) => {
+                    "Targets AoE [evasion]".to_string()
+                }
                 SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => {
                     "Targets [will]".to_string()
                 }

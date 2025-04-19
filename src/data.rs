@@ -1,3 +1,5 @@
+use macroquad::color::{BLACK, BLUE, GREEN, PURPLE, RED};
+
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
@@ -222,7 +224,7 @@ pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
 
 pub const SCREAM: Spell = Spell {
     name: "Scream",
-    description: "Daze the enemy",
+    description: "Causes nearby enemies to become Dazed",
     icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
@@ -232,7 +234,7 @@ pub const SCREAM: Spell = Spell {
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
-            description: "Target loses 1 AP",
+            description: "Targets also lose 1 AP",
             icon: IconId::Banshee,
             mana_cost: 1,
             bonus_damage: 0,
@@ -243,13 +245,13 @@ pub const SCREAM: Spell = Spell {
         None,
     ],
     range: Range::Ranged(3),
-    // TODO
-    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    target_type: SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Mental),
+    animation_color: BLUE,
 };
 
 pub const MIND_BLAST: Spell = Spell {
     name: "Mind blast",
-    description: "Damage and stagger the enemy",
+    description: "Damage and stagger an enemy",
     icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
@@ -269,6 +271,7 @@ pub const MIND_BLAST: Spell = Spell {
     ],
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    animation_color: PURPLE,
 };
 
 pub const HEAL: Spell = Spell {
@@ -283,11 +286,12 @@ pub const HEAL: Spell = Spell {
     possible_enhancements: [None, None],
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleAlly,
+    animation_color: GREEN,
 };
 
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
-    description: "Hurl a fireball that damages the target",
+    description: "Damage an enemy",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
@@ -314,11 +318,12 @@ pub const FIREBALL: Spell = Spell {
     ],
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile),
+    animation_color: RED,
 };
 
 pub const KILL: Spell = Spell {
     name: "Kill",
-    description: "Kill the enemy",
+    description: "Kill an enemy",
     icon: IconId::Fireball,
     action_point_cost: 5,
     mana_cost: 0,
@@ -328,4 +333,5 @@ pub const KILL: Spell = Spell {
     possible_enhancements: [None; 2],
     range: Range::Ranged(99),
     target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    animation_color: BLACK,
 };
