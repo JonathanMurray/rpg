@@ -78,11 +78,11 @@ fn draw_conditions(
         if (x..x + dimensions.width).contains(&mouse_x)
             && (y0 - dimensions.height..y0).contains(&mouse_y)
         {
-            tooltip = Some((
-                x + dimensions.width + 5.0,
-                y0 - dimensions.height,
-                condition,
-            ));
+            // TODO Pick corner dynamically based on whether the tooltip exceeds out of the screen
+            // Maybe draw_tooltip should accept the rectangle of the item, rather than a prescribed
+            // corner position
+            let pos = TooltipPosition::TopRight((x - 5.0, y0 - dimensions.height));
+            tooltip = Some((pos, condition));
         }
 
         if dimensions.width > max_w {
@@ -90,10 +90,10 @@ fn draw_conditions(
         }
     }
 
-    if let Some((x, y, condition)) = tooltip {
+    if let Some((pos, condition)) = tooltip {
         draw_tooltip(
             font,
-            TooltipPosition::TopLeft((x, y)),
+            pos,
             &[
                 condition.name.to_string(),
                 condition.description.to_string(),

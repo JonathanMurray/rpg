@@ -8,8 +8,8 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL, PARRY_EVASION_BONUS,
-    RAGE, RAGING_DESCRIPTION,
+    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL,
+    PARRY_EVASION_BONUS, RAGE, RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -34,7 +34,7 @@ impl CoreGame {
             "Bob",
             SpriteId::Character,
             Attributes::new(5, 2, 7, 7),
-            (1, 3),
+            (0, 10),
         );
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
@@ -48,6 +48,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
         bob.known_actions.push(BaseAction::CastSpell(KILL));
+        bob.known_actions.push(BaseAction::SelfEffect(BRACE));
 
         let mut enemy1 = Character::new(
             false,
@@ -68,7 +69,7 @@ impl CoreGame {
             "Gromp",
             SpriteId::Character3,
             Attributes::new(1, 4, 1, 5),
-            (2, 3),
+            (6, 3),
         );
         enemy2.main_hand.weapon = Some(BOW);
 
@@ -372,7 +373,11 @@ impl CoreGame {
 
                     let mut target_outcomes = vec![];
 
-                    for other_char in self.characters.iter().filter(|ch| ch.id() != caster_id) {
+                    for other_char in self.characters.iter() {
+                        if other_char.player_controlled == caster.player_controlled {
+                            continue;
+                        }
+
                         if within_range_squared(
                             spell.range.squared(),
                             caster.position.get(),
@@ -505,13 +510,15 @@ impl CoreGame {
 
             let label = match degree_of_success {
                 0 => "".to_string(),
-                1 => "Heavy hit".to_string(),
-                n => format!("Heavy hit ({n})"),
+                1 => {
+                    detail_lines.push("  Heavy hit".to_string());
+                    "Heavy hit".to_string()
+                }
+                n => {
+                    detail_lines.push(format!("  Heavy hit ({})", n));
+                    "Heavy hit".to_string()
+                }
             };
-
-            if !label.is_empty() {
-                detail_lines.push(format!("  {label}"));
-            }
 
             let damage = if spell.damage > 0 {
                 let mut dmg_calculation = spell.damage as i32;
@@ -2276,7 +2283,9 @@ impl Display for WeaponRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Melee => f.write_str("melee"),
-            Self::Ranged(range) => f.write_fmt(format_args!("{} ({})", range, range * 2)),
+            Self::Ranged(range) => {
+                f.write_fmt(format_args!("{} ({})", range, self.extended().unwrap()))
+            }
         }
     }
 }

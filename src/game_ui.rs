@@ -34,7 +34,10 @@ use crate::{
         OnAttackedReaction, OnHitReaction, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
         MOVE_ACTION_COST,
     },
-    grid::{Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo},
+    grid::{
+        Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
+        RangeIndicator,
+    },
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -465,8 +468,9 @@ impl UserInterface {
 
         self.character_portraits.draw(10.0, 10.0);
 
-        if grid_outcome.switched_target {
-            self.update_shown_target();
+        if let Some(new_inspect_target) = grid_outcome.switched_inspect_target {
+            dbg!(new_inspect_target);
+            self.update_shown_target(new_inspect_target);
         }
 
         self.target_ui
@@ -491,7 +495,7 @@ impl UserInterface {
             draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
         }
 
-        if let Some(grid_switched_to) = grid_outcome.switched_to {
+        if let Some(grid_switched_to) = grid_outcome.switched_action {
             match grid_switched_to {
                 GridSwitchedTo::Move { selected_option } => {
                     let move_range = self.active_character().move_range;
@@ -527,11 +531,8 @@ impl UserInterface {
         }
     }
 
-    fn update_shown_target(&mut self) {
-        let target = self
-            .game_grid
-            .players_target()
-            .map(|id| self.characters.get(id));
+    fn update_shown_target(&mut self, shown_target_id: Option<CharacterId>) {
+        let target = shown_target_id.map(|id| self.characters.get(id));
         self.target_ui.set_character(target);
     }
 
@@ -730,17 +731,17 @@ impl UserInterface {
             self.game_grid.clear_players_target_if_allied();
             //self.game_grid.ensure_player_has_enemy_target();
         } else if player_wants_ally_target {
-            self.game_grid.clear_players_target_if_enemy();
+            self.game_grid.clear_players_action_target_if_enemy();
             //self.game_grid.ensure_player_has_ally_target();
         } else {
-            self.game_grid.clear_players_target();
+            self.game_grid.clear_players_action_target();
         }
 
         if !npc_action_has_target {
             self.game_grid.clear_enemys_target();
         }
 
-        self.update_shown_target();
+        //self.update_shown_target();
     }
 
     fn on_selected_attacked_reaction(&mut self, reaction: Option<OnAttackedReaction>) {
@@ -1061,21 +1062,15 @@ impl UserInterface {
                 self.characters.remove_dead();
                 self.game_grid.remove_dead();
                 self.character_portraits.remove_dead();
+
+                // TODO If player was inspecting this target, clear it (or we panic on the next draw)
+                //self.target_ui. ...
             }
             GameEvent::Moved {
                 character,
                 from,
                 to,
             } => {
-                /*
-                self.log.add(format!(
-                    "{} moved from {:?} to {:?}",
-                    self.characters.get(character).name,
-                    from,
-                    to
-                ));
-                 */
-
                 let mut duration = 0.4;
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
@@ -1137,12 +1132,12 @@ impl UserInterface {
 
         let mut popup_enabled = true;
 
-        self.game_grid.action_range_indicator = None;
+        self.game_grid.range_indicator = None;
 
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(target_id) = self.game_grid.players_target() {
+                if let Some(target_id) = self.game_grid.players_action_target() {
                     let target_char = self.characters.get(target_id);
 
                     let enhancements: Vec<AttackEnhancement> = self
@@ -1157,6 +1152,7 @@ impl UserInterface {
 
                     let mut circumstance_advantage = None;
 
+                    let maybe_indicator;
                     match reach {
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
                             if self.active_character().can_use_action(base_action) {
@@ -1164,12 +1160,13 @@ impl UserInterface {
                             }
                             if let ActionReach::YesButDisadvantage(reason) = reach {
                                 circumstance_advantage = Some((-1, reason, Goodness::Bad));
+                                maybe_indicator = Some(RangeIndicator::SemiBad);
+                            } else {
+                                maybe_indicator = None;
                             }
                         }
                         ActionReach::No => {
-                            /* self.activity_popup.target_line =
-                            Some(format!("[{}] Out of range!", target_char.name));
-                             */
+                            maybe_indicator = Some(RangeIndicator::Bad);
                         }
                     }
 
@@ -1206,7 +1203,8 @@ impl UserInterface {
                     self.target_ui
                         .set_action(format!("Attack: {}", chance), details, true);
 
-                    self.game_grid.action_range_indicator = Some((range, reach));
+                    self.game_grid.range_indicator =
+                        maybe_indicator.map(|indicator| (range, indicator));
                 } else {
                     self.target_ui
                         .set_action("Select a target".to_string(), vec![], false);
@@ -1217,12 +1215,13 @@ impl UserInterface {
                         .unwrap()
                         .range
                         .into_range();
-                    self.game_grid.action_range_indicator = Some((range, ActionReach::Yes));
+                    self.game_grid.range_indicator =
+                        Some((range, RangeIndicator::GoodWithBackground));
                 }
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.players_target() {
+                if let Some(i) = self.game_grid.players_action_target() {
                     let target_char = self.characters.get(i);
 
                     let action_text = match spell.target_type {
@@ -1243,24 +1242,19 @@ impl UserInterface {
 
                     self.target_ui.set_action(action_text, vec![], true);
 
-                    //self.game_grid.target_text = Some((static_text, vec![]));
-
-                    let reach = if self
+                    let maybe_indicator = if self
                         .active_character()
                         .can_reach_with_spell(spell, target_char.position.get())
                     {
                         popup_enabled = true;
-                        ActionReach::Yes
+                        None
                     } else {
-                        /*
-                        self.activity_popup.target_line =
-                            Some(format!("[{}] Out of range!", target_char.name));
-                             */
-                        ActionReach::No
+                        Some(RangeIndicator::Bad)
                     };
-                    self.game_grid.action_range_indicator = Some((spell.range, reach));
+                    self.game_grid.range_indicator =
+                        maybe_indicator.map(|indicator| (spell.range, indicator));
                 } else {
-                    match spell.target_type {
+                    let range_indicator = match spell.target_type {
                         SpellTargetType::SelfAreaEnemy(..) => {
                             self.target_ui.set_action(
                                 format!("{} (AoE)", spell.name.to_string()),
@@ -1268,15 +1262,16 @@ impl UserInterface {
                                 false,
                             );
                             popup_enabled = true;
+                            RangeIndicator::GoodWithBackground
                         }
                         SpellTargetType::SingleEnemy(..) | SpellTargetType::SingleAlly => {
                             self.target_ui
                                 .set_action("Select a target".to_string(), vec![], false);
+                            RangeIndicator::GoodWithBackground
                         }
                     };
 
-                    let range = spell.range;
-                    self.game_grid.action_range_indicator = Some((range, ActionReach::Yes));
+                    self.game_grid.range_indicator = Some((spell.range, range_indicator));
                 }
             }
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
@@ -1289,6 +1284,10 @@ impl UserInterface {
                         .set_action("Select a destination".to_string(), vec![], false);
                 }
             }
+            UiState::ConfiguringAction(BaseAction::SelfEffect(..)) => {
+                popup_enabled = true;
+                self.target_ui.clear_action();
+            }
             UiState::ChoosingAction => {
                 self.target_ui
                     .set_action("Select an action".to_string(), vec![], false);
@@ -1300,13 +1299,14 @@ impl UserInterface {
                 self.target_ui
                     .set_action("Select a reaction".to_string(), vec![], false);
             }
-            _ => {}
         }
 
         self.activity_popup.set_enabled(popup_enabled);
 
         self.character_portraits.update(game);
         self.player_portraits.update(game);
+
+        // TODO Update the stats / condition of shown character in target UI (so that it doesn't only refresh when changing inspection target)
 
         self.update_character_status(&game.characters);
 
@@ -1356,7 +1356,7 @@ impl UserInterface {
 
         match self.state {
             UiState::ConfiguringAction(base_action) => {
-                let target = self.game_grid.players_target();
+                let target = self.game_grid.players_action_target();
                 let action = match base_action {
                     BaseAction::Attack { hand, .. } => Action::Attack {
                         hand,
@@ -1410,8 +1410,8 @@ impl UserInterface {
                     );
 
                     if may_choose_action && self.active_character().can_use_action(base_action) {
-                        self.target_ui.set_character(Option::<&Character>::None);
-                        self.game_grid.clear_players_target();
+                        //self.target_ui.set_character(Option::<&Character>::None);
+                        self.game_grid.clear_players_action_target();
 
                         self.set_state(UiState::ConfiguringAction(base_action));
                     } else {

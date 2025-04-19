@@ -95,7 +95,7 @@ impl ActivityPopup {
 
         //draw_line(x, y+size.1   , x+size.0, y+size.1, 1.0, LIGHTGRAY);
 
-        draw_dashed_line((x, y + size.1), (x + size.0, y + size.1), 1.0, GRAY);
+        draw_dashed_line((x, y + size.1), (x + size.0, y + size.1), 1.0, GRAY, 5.0);
 
         self.last_drawn_size = size;
 

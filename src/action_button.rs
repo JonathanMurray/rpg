@@ -459,6 +459,7 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[St
 pub enum TooltipPosition {
     TopLeft((f32, f32)),
     BottomLeft((f32, f32)),
+    TopRight((f32, f32)),
 }
 
 pub fn draw_tooltip(font: &Font, position: TooltipPosition, lines: &[String]) {
@@ -480,6 +481,7 @@ pub fn draw_tooltip(font: &Font, position: TooltipPosition, lines: &[String]) {
     let (x, y) = match position {
         TooltipPosition::TopLeft((x, y)) => (x, y),
         TooltipPosition::BottomLeft((x, y)) => (x, y - tooltip_h),
+        TooltipPosition::TopRight((x, y)) => (x - tooltip_w, y),
     };
 
     let tooltip_rect = (x, y, tooltip_w, tooltip_h);
