@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::cell::{Ref, RefMut};
 
 use std::fmt::Display;
@@ -95,13 +95,13 @@ impl CoreGame {
             let action = self.ui_select_action().await;
 
             if let Some(action) = action {
-                let action_points_before_action = self.active_character().action_points;
+                let ap_before_action = self.active_character().action_points.current();
                 let attack_hit = self.perform_action(action).await;
 
                 // You recover from 1 stack of Dazed for each AP you spend
                 // This must happen before "on attacked and hit" reactions because those might
                 // inflict new Dazed stacks, which should not be covered here.
-                let spent = action_points_before_action - self.active_character().action_points;
+                let spent = ap_before_action - self.active_character().action_points.current();
                 self.perform_recover_from_dazed(self.active_character_id, spent)
                     .await;
 
@@ -113,16 +113,14 @@ impl CoreGame {
 
                     let character = self.active_character();
 
-                    let victim = self.characters.borrow(victim_id);
+                    let victim = self.characters.get(victim_id);
 
-                    let is_within_melee = within_meele(character.position, victim.position);
-                    let can_react = !victim.has_died
+                    let is_within_melee =
+                        within_meele(character.position.get(), victim.position.get());
+                    let can_react = !victim.has_died.get()
                         && !victim.usable_on_hit_reactions(is_within_melee).is_empty();
 
-                    drop(victim);
-
                     if can_react {
-                        drop(character);
                         if let Some(reaction) = self
                             .ui_choose_hit_reaction(victim_id, damage, is_within_melee)
                             .await
@@ -133,18 +131,16 @@ impl CoreGame {
                 }
 
                 {
-                    let character = self.characters.borrow_mut(self.active_character_id);
-                    if character.action_points == 0 {
-                        drop(character);
+                    let character = self.characters.get(self.active_character_id);
+                    if character.action_points.current() == 0 {
                         self.perform_end_of_turn_character().await;
                         self.active_character_id =
                             self.characters.next_id(self.active_character_id);
                     }
                 }
             } else {
-                let character = self.characters.borrow_mut(self.active_character_id);
+                let character = self.characters.get(self.active_character_id);
                 let name = character.name;
-                drop(character);
                 self.log(format!("{} ended their turn", name)).await;
                 self.perform_end_of_turn_character().await;
                 self.active_character_id = self.characters.next_id(self.active_character_id);
@@ -154,12 +150,8 @@ impl CoreGame {
         }
     }
 
-    pub fn active_character_mut(&self) -> RefMut<Character> {
-        self.characters.borrow_mut(self.active_character_id)
-    }
-
-    pub fn active_character(&self) -> Ref<Character> {
-        self.characters.borrow(self.active_character_id)
+    pub fn active_character(&self) -> &Character {
+        self.characters.get(self.active_character_id)
     }
 
     pub fn is_players_turn(&self) -> bool {
@@ -173,24 +165,30 @@ impl CoreGame {
                 enhancements,
                 target,
             } => {
-                let mut attacker = self.active_character_mut();
-                let defender = self.characters.borrow_mut(target);
+                let attacker = self.active_character();
+                let defender = self.characters.get(target);
 
-                assert!(attacker.reaches_with_attack(hand, defender.position).1 != ActionReach::No);
+                assert!(
+                    attacker
+                        .reaches_with_attack(hand, defender.position.get())
+                        .1
+                        != ActionReach::No
+                );
 
-                attacker.action_points -= attacker.weapon(hand).unwrap().action_point_cost;
+                attacker
+                    .action_points
+                    .spend(attacker.weapon(hand).unwrap().action_point_cost);
                 for enhancement in &enhancements {
-                    attacker.action_points -= enhancement.action_point_cost;
+                    attacker.action_points.spend(enhancement.action_point_cost);
                     attacker.stamina.spend(enhancement.stamina_cost);
                 }
 
-                let is_within_melee = within_meele(attacker.position, defender.position);
+                let is_within_melee =
+                    within_meele(attacker.position.get(), defender.position.get());
                 let defender_can_react_to_attack = !defender
                     .usable_on_attacked_reactions(is_within_melee)
                     .is_empty();
 
-                drop(attacker);
-                drop(defender);
                 let reaction = if defender_can_react_to_attack {
                     self.ui_choose_attack_reaction(hand, target, is_within_melee)
                         .await
@@ -208,11 +206,10 @@ impl CoreGame {
                 effect,
                 ..
             }) => {
-                let mut character = self.active_character_mut();
-                character.action_points -= action_point_cost;
+                let character = self.active_character();
+                character.action_points.spend(action_point_cost);
                 character.stamina.spend(stamina_cost);
                 let character_name = character.name;
-                drop(character);
 
                 self.log(format!("{} uses {}", character_name, name)).await;
 
@@ -224,8 +221,7 @@ impl CoreGame {
                     .await;
                 }
 
-                let log_line =
-                    self.perform_effect_application(effect, &mut self.active_character_mut());
+                let log_line = self.perform_effect_application(effect, &self.active_character());
                 self.log(log_line).await;
                 None
             }
@@ -242,35 +238,29 @@ impl CoreGame {
                 positions,
                 enhancements,
             } => {
-                let mut character = self.active_character_mut();
-                character.action_points -= action_point_cost;
+                let character = self.active_character();
+                character.action_points.spend(action_point_cost);
                 for enhancement in &enhancements {
-                    character.action_points -= enhancement.action_point_cost;
+                    character.action_points.spend(enhancement.action_point_cost);
                     character.stamina.spend(enhancement.stamina_cost);
                 }
 
-                drop(character);
                 self.perform_movement(positions).await;
                 None
             }
         }
     }
 
-    // NOTE: The ui functions take self as a mutable reference to guarantee
-    //       that the call-site isn't holding any mutable reference to
-    //       characters, which could cause run-time panics in case the UI
-    //       tries to access one of them.
-    //
-    async fn ui_handle_event(&mut self, event: GameEvent) {
+    async fn ui_handle_event(&self, event: GameEvent) {
         self.user_interface.handle_event(self, event).await;
     }
 
-    async fn ui_select_action(&mut self) -> Option<Action> {
+    async fn ui_select_action(&self) -> Option<Action> {
         self.user_interface.select_action(self).await
     }
 
     async fn ui_choose_attack_reaction(
-        &mut self,
+        &self,
         hand: HandType,
         target: CharacterId,
         is_within_melee: bool,
@@ -282,7 +272,7 @@ impl CoreGame {
     }
 
     async fn ui_choose_hit_reaction(
-        &mut self,
+        &self,
         victim_id: CharacterId,
         damage: u32,
         is_within_melee: bool,
@@ -293,25 +283,22 @@ impl CoreGame {
             .await
     }
 
-    async fn perform_movement(&mut self, mut positions: Vec<(u32, u32)>) {
+    async fn perform_movement(&self, mut positions: Vec<(u32, u32)>) {
         while !positions.is_empty() {
             let character = self.active_character();
             let new_position = positions.remove(0);
-            for character in self.characters.iter() {
-                if let Ok(ch) = character.try_borrow() {
-                    if new_position == ch.position {
-                        panic!(
-                            "Character {} tried to move 0 distance from {:?}",
-                            ch.id(),
-                            ch.position
-                        );
-                    }
+            for ch in self.characters.iter() {
+                if new_position == ch.position.get() {
+                    panic!(
+                        "Character {} tried to move 0 distance from {:?}",
+                        ch.id(),
+                        ch.position.get()
+                    );
                 }
             }
 
-            let prev_position = character.position;
+            let prev_position = character.position.get();
             let id = character.id();
-            drop(character);
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
@@ -320,14 +307,14 @@ impl CoreGame {
             })
             .await;
 
-            self.active_character_mut().position = new_position;
+            self.active_character().position.set(new_position);
         }
     }
 
-    fn perform_effect_application(&self, effect: ApplyEffect, receiver: &mut Character) -> String {
+    fn perform_effect_application(&self, effect: ApplyEffect, receiver: &Character) -> String {
         match effect {
             ApplyEffect::RemoveActionPoints(n) => {
-                receiver.lose_action_points(n);
+                receiver.action_points.lose(n);
                 format!("  {} lost {} AP", receiver.name, n)
             }
             ApplyEffect::Condition(condition) => {
@@ -344,22 +331,18 @@ impl CoreGame {
         enhancements: Vec<SpellEnhancement>,
         target_id: CharacterId,
     ) {
-        let mut caster_ref_mut = self.active_character_mut();
+        let caster_ref_mut = self.active_character();
         let caster_id = caster_ref_mut.id();
-        let target_ref = self.characters.borrow(target_id);
+        let target_ref = self.characters.get(target_id);
 
-        assert!(caster_ref_mut.can_reach_with_spell(spell, target_ref.position));
-        assert!(caster_ref_mut.action_points >= spell.action_point_cost);
+        assert!(caster_ref_mut.can_reach_with_spell(spell, target_ref.position.get()));
 
-        caster_ref_mut.action_points -= spell.action_point_cost;
+        caster_ref_mut.action_points.spend(spell.action_point_cost);
         caster_ref_mut.mana.spend(spell.mana_cost);
 
         for enhancement in &enhancements {
             caster_ref_mut.mana.spend(enhancement.mana_cost);
         }
-
-        drop(target_ref);
-        drop(caster_ref_mut);
 
         let mut cast_n_times = 1;
         for enhancement in &enhancements {
@@ -369,8 +352,8 @@ impl CoreGame {
         }
 
         for i in 0..cast_n_times {
-            let caster_ref = self.characters.borrow(caster_id);
-            let mut target_ref_mut = self.characters.borrow_mut(target_id);
+            let caster_ref = self.characters.get(caster_id);
+            let target_ref = self.characters.get(target_id);
 
             let mut detail_lines = vec![];
 
@@ -379,8 +362,8 @@ impl CoreGame {
 
             let outcome = if let SpellTargetType::SingleEnemy(spell_type) = spell.target_type {
                 let (defense_label, defense) = match spell_type {
-                    OffensiveSpellType::Mental => ("will", target_ref_mut.will()),
-                    OffensiveSpellType::Projectile => ("evasion", target_ref_mut.evasion()),
+                    OffensiveSpellType::Mental => ("will", target_ref.will()),
+                    OffensiveSpellType::Projectile => ("evasion", target_ref.evasion()),
                 };
 
                 detail_lines.push(format!(
@@ -425,14 +408,13 @@ impl CoreGame {
                     let damage = dmg_calculation.max(0) as u32;
 
                     if dmg_calculation > 0 {
-                        self.perform_losing_health(&mut target_ref_mut, damage)
-                            .await;
+                        self.perform_losing_health(&target_ref, damage);
                         dmg_str.push_str(&format!(" = {damage}"));
                         detail_lines.push(dmg_str);
                     }
 
                     if let Some(effect) = spell.on_hit_effect {
-                        let log_line = self.perform_effect_application(effect, &mut target_ref_mut);
+                        let log_line = self.perform_effect_application(effect, &target_ref);
                         detail_lines.push(format!("{} ({})", log_line, spell.name));
                     }
 
@@ -440,8 +422,7 @@ impl CoreGame {
                         if let Some(SpellEnhancementEffect::OnHitEffect(effect)) =
                             enhancement.effect
                         {
-                            let log_line =
-                                self.perform_effect_application(effect, &mut target_ref_mut);
+                            let log_line = self.perform_effect_application(effect, &target_ref);
                             detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                         }
                     }
@@ -449,8 +430,9 @@ impl CoreGame {
                     SpellOutcome::HitEnemy(damage)
                 } else {
                     match spell_type {
-                        OffensiveSpellType::Mental => detail_lines
-                            .push(format!("{} resisted the spell!", target_ref_mut.name)),
+                        OffensiveSpellType::Mental => {
+                            detail_lines.push(format!("{} resisted the spell!", target_ref.name))
+                        }
                         OffensiveSpellType::Projectile => {
                             detail_lines.push("The spell missed!".to_string())
                         }
@@ -480,10 +462,10 @@ impl CoreGame {
                     line.push_str(&format!(" = {}", healing));
                     detail_lines.push(line);
 
-                    health_gained = target_ref_mut.health.gain(healing);
+                    health_gained = target_ref.health.gain(healing);
                     detail_lines.push(format!(
                         "{} was healed for {}",
-                        target_ref_mut.name, health_gained
+                        target_ref.name, health_gained
                     ));
                 };
                 SpellOutcome::HealedAlly(health_gained)
@@ -494,10 +476,7 @@ impl CoreGame {
             }
 
             let caster_id = caster_ref.id();
-            let target_id = target_ref_mut.id();
-
-            drop(caster_ref);
-            drop(target_ref_mut);
+            let target_id = target_ref.id();
 
             self.ui_handle_event(GameEvent::SpellWasCast {
                 caster: caster_id,
@@ -510,16 +489,16 @@ impl CoreGame {
         }
     }
 
-    async fn perform_losing_health(&self, character: &mut Character, amount: u32) {
+    fn perform_losing_health(&self, character: &Character, amount: u32) {
         character.health.lose(amount);
         //self.log(format!("  {} took {} damage", character.name, amount));
 
-        if character.health.current == 0 {
-            character.has_died = true;
+        if character.health.current() == 0 {
+            character.has_died.set(true);
         }
     }
 
-    async fn log(&mut self, line: impl Into<String>) {
+    async fn log(&self, line: impl Into<String>) {
         self.ui_handle_event(GameEvent::LogLine(line.into())).await;
     }
 
@@ -530,15 +509,17 @@ impl CoreGame {
         defender_id: CharacterId,
         defender_reaction: Option<OnAttackedReaction>,
     ) -> Option<(CharacterId, u32)> {
-        let mut attacker = self.active_character_mut();
-        let mut defender = self.characters.borrow_mut(defender_id);
+        let attacker = self.active_character();
+        let defender = self.characters.get(defender_id);
 
-        let circumstance_advantage =
-            match attacker.reaches_with_attack(hand_type, defender.position).1 {
-                ActionReach::Yes => 0,
-                ActionReach::YesButDisadvantage(..) => -1,
-                ActionReach::No => unreachable!(),
-            };
+        let circumstance_advantage = match attacker
+            .reaches_with_attack(hand_type, defender.position.get())
+            .1
+        {
+            ActionReach::Yes => 0,
+            ActionReach::YesButDisadvantage(..) => -1,
+            ActionReach::No => unreachable!(),
+        };
 
         let attack_bonus = attack_roll_bonus(
             &attacker,
@@ -561,7 +542,7 @@ impl CoreGame {
         let mut detail_lines = vec![];
 
         if let Some(reaction) = defender_reaction {
-            defender.action_points -= reaction.action_point_cost;
+            defender.action_points.spend(reaction.action_point_cost);
             defender.stamina.spend(reaction.stamina_cost);
 
             detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
@@ -686,14 +667,14 @@ impl CoreGame {
 
             detail_lines.push(dmg_str);
 
-            self.perform_losing_health(&mut defender, damage).await;
+            self.perform_losing_health(&defender, damage);
 
             attack_hit = Some((defender_id, damage));
 
             if let Some(effect) = on_true_hit_effect {
                 match effect {
                     AttackHitEffect::Apply(effect) => {
-                        let log_line = self.perform_effect_application(effect, &mut defender);
+                        let log_line = self.perform_effect_application(effect, &defender);
                         detail_lines.push(format!("{} (true hit)", log_line))
                     }
                     AttackHitEffect::SkipExertion => skip_attack_exertion = true,
@@ -704,11 +685,11 @@ impl CoreGame {
                 if let Some(effect) = enhancement.on_hit_effect {
                     let log_line = match effect {
                         AttackEnhancementOnHitEffect::RegainActionPoint => {
-                            attacker.action_points += 1;
+                            attacker.action_points.gain(1);
                             format!("{} regained 1 AP", attacker.name)
                         }
                         AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                            self.perform_effect_application(apply_effect, &mut defender)
+                            self.perform_effect_application(apply_effect, &defender)
                         }
                     };
 
@@ -734,23 +715,19 @@ impl CoreGame {
             let exertion = match hand_type {
                 HandType::MainHand => {
                     attacker.receive_condition(Condition::MainHandExertion(1));
-                    attacker.conditions.mainhand_exertion
+                    attacker.hand_exertion(HandType::MainHand)
                 }
                 HandType::OffHand => {
                     attacker.receive_condition(Condition::OffHandExertion(1));
-                    attacker.conditions.offhand_exertion
+                    attacker.hand_exertion(HandType::OffHand)
                 }
             };
             detail_lines.push(format!("  The attack led to exertion ({})", exertion));
         }
 
-        if defender.conditions.braced {
-            defender.conditions.braced = false;
+        if defender.lose_braced() {
             detail_lines.push(format!("{} lost Braced", defender.name));
         }
-
-        drop(attacker);
-        drop(defender);
 
         self.ui_handle_event(GameEvent::Attacked {
             attacker: self.active_character_id,
@@ -765,23 +742,18 @@ impl CoreGame {
 
     #[allow(clippy::await_holding_refcell_ref)]
     async fn perform_recover_from_dazed(&mut self, character_id: CharacterId, stacks: u32) {
-        let mut character = self.characters.borrow_mut(character_id);
+        let character = self.characters.get(character_id);
 
-        if character.conditions.dazed > 0 {
-            character.conditions.dazed = character.conditions.dazed.saturating_sub(stacks);
-            if character.conditions.dazed == 0 {
-                let name = character.name;
-                drop(character);
-                self.log(format!("{} recovered from Dazed", name)).await;
-            }
+        if character.lose_dazed(stacks) {
+            let name = character.name;
+            self.log(format!("{} recovered from Dazed", name)).await;
         }
     }
 
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
-        let mut reactor = self.characters.borrow_mut(reactor_id);
-        reactor.action_points -= reaction.action_point_cost;
+        let reactor = self.characters.get(reactor_id);
+        reactor.action_points.spend(reaction.action_point_cost);
         let reactor_name = reactor.name;
-        drop(reactor);
 
         match reaction.effect {
             OnHitReactionEffect::Rage => {
@@ -798,15 +770,15 @@ impl CoreGame {
                 })
                 .await;
 
-                let mut reactor = self.characters.borrow_mut(reactor_id);
+                let reactor = self.characters.get(reactor_id);
                 reactor.receive_condition(condition);
             }
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
 
                 let offensive = {
-                    let mut attacker = self.characters.borrow_mut(self.active_character_id);
-                    let reactor = self.characters.borrow_mut(reactor_id);
+                    let attacker = self.characters.get(self.active_character_id);
+                    let reactor = self.characters.get(reactor_id);
                     let target = attacker.toughness();
                     let roll = roll_d20_with_advantage(0);
                     let res = roll + reactor.strength();
@@ -836,7 +808,7 @@ impl CoreGame {
                     if let Some(condition) = condition {
                         let log_line = self.perform_effect_application(
                             ApplyEffect::Condition(condition),
-                            &mut attacker,
+                            &attacker,
                         );
                         lines.push(format!("{} (Shield bash)", log_line));
                     } else {
@@ -861,63 +833,38 @@ impl CoreGame {
         }
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
-    // Reports false positive for explicitly dropped values
     async fn perform_end_of_turn_character(&mut self) {
-        let character = self.active_character_mut();
+        let character = self.active_character();
         let name = character.name;
-        drop(character);
 
-        {
-            let mut character = self.active_character_mut();
-            if character.conditions.bleeding > 0 {
-                self.perform_losing_health(&mut character, BLEEDING_DAMAGE_AMOUNT)
-                    .await;
-                character.conditions.bleeding -= 1;
-                if character.conditions.bleeding == 0 {
-                    drop(character);
-
-                    self.log(format!("{} stopped Bleeding", name)).await;
-                }
+        if character.conditions.borrow().bleeding > 0 {
+            self.perform_losing_health(&character, BLEEDING_DAMAGE_AMOUNT);
+            character.conditions.borrow_mut().bleeding -= 1;
+            if character.conditions.borrow().bleeding == 0 {
+                self.log(format!("{} stopped Bleeding", name)).await;
             }
         }
-
-        {
-            let mut character = self.active_character_mut();
-            if character.conditions.weakened > 0 {
-                character.conditions.weakened = 0;
-                drop(character);
-                self.log(format!("{} recovered from Weakened", name)).await;
-            }
+        if character.conditions.borrow().weakened > 0 {
+            character.conditions.borrow_mut().weakened = 0;
+            self.log(format!("{} recovered from Weakened", name)).await;
         }
-
-        {
-            let mut character = self.active_character_mut();
-            if character.conditions.raging {
-                character.conditions.raging = false;
-                drop(character);
-                self.log(format!("{} stopped Raging", name)).await;
-            }
+        if character.conditions.borrow().raging {
+            character.conditions.borrow_mut().raging = false;
+            self.log(format!("{} stopped Raging", name)).await;
         }
-
-        {
-            let mut character = self.active_character_mut();
-            character.recover_action_points();
-            character.conditions.mainhand_exertion = 0;
-            character.conditions.offhand_exertion = 0;
-            let max_stamina = character.stamina.max;
-            character.stamina.gain(max_stamina / 2);
-        }
+        character.action_points.set_to_max();
+        character.conditions.borrow_mut().mainhand_exertion = 0;
+        character.conditions.borrow_mut().offhand_exertion = 0;
+        let max_stamina = character.stamina.max;
+        character.stamina.gain(max_stamina / 2);
 
         self.log("End of turn.").await;
     }
 
-    // TODO
-
     async fn remove_dead(&mut self) {
         for id in self.characters.remove_dead() {
             self.user_interface
-                .handle_event(&self, GameEvent::CharacterDied { character: id })
+                .handle_event(self, GameEvent::CharacterDied { character: id })
                 .await;
         }
     }
@@ -1058,7 +1005,7 @@ pub fn prob_spell_hit(
     probability_of_d20_reaching(target, DiceRollBonus::default())
 }
 
-pub struct Characters(Vec<(CharacterId, Rc<RefCell<Character>>)>);
+pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
 
 impl Characters {
     fn new(characters: Vec<Character>) -> Self {
@@ -1069,7 +1016,7 @@ impl Characters {
                 .map(|(i, mut ch)| {
                     let id = i as CharacterId;
                     ch.id = Some(id);
-                    (id, Rc::new(RefCell::new(ch)))
+                    (id, Rc::new(ch))
                 })
                 .collect(),
         )
@@ -1081,7 +1028,7 @@ impl Characters {
         loop {
             let (id, ch) = &self.0[i];
 
-            if passed_current && !ch.borrow().has_died {
+            if passed_current && !ch.has_died.get() {
                 return *id;
             }
 
@@ -1096,37 +1043,28 @@ impl Characters {
         }
     }
 
-    pub fn borrow_mut(&self, character_id: CharacterId) -> RefMut<Character> {
-        self.0
-            .iter()
-            .find(|(id, _ch)| *id == character_id)
-            .unwrap()
-            .1
-            .borrow_mut()
-    }
-
-    pub fn borrow(&self, character_id: CharacterId) -> Ref<Character> {
+    pub fn get(&self, character_id: CharacterId) -> &Character {
         let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
 
         match entry {
-            Some((_id, ch)) => ch.borrow(),
+            Some((_id, ch)) => ch,
             None => panic!("No character with id: {character_id}"),
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &Rc<RefCell<Character>>> {
+    pub fn iter(&self) -> impl Iterator<Item = &Rc<Character>> {
         self.0.iter().map(|(_id, ch)| ch)
     }
 
-    pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<RefCell<Character>>)> {
+    pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<Character>)> {
         self.0.iter()
     }
 
     pub fn remove_dead(&mut self) -> Vec<CharacterId> {
         let mut removed = vec![];
         self.0.retain(|(_id, ch)| {
-            if ch.borrow().has_died {
-                removed.push(ch.borrow().id());
+            if ch.has_died.get() {
+                removed.push(ch.id());
                 false
             } else {
                 true
@@ -1482,10 +1420,10 @@ impl Attributes {
 pub struct Character {
     id: Option<CharacterId>,
     pub sprite: SpriteId,
-    pub has_died: bool,
+    pub has_died: Cell<bool>,
     pub player_controlled: bool,
     // TODO i32 instead?
-    pub position: (u32, u32),
+    pub position: Cell<(u32, u32)>,
     pub name: &'static str,
     pub base_attributes: Attributes,
     pub health: NumberedResource,
@@ -1495,8 +1433,8 @@ pub struct Character {
     pub armor: Option<ArmorPiece>,
     main_hand: Hand,
     off_hand: Hand,
-    conditions: Conditions,
-    pub action_points: u32,
+    conditions: RefCell<Conditions>,
+    pub action_points: NumberedResource,
     pub max_reactive_action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
@@ -1525,9 +1463,9 @@ impl Character {
         Self {
             id: None,
             sprite: texture,
-            has_died: false,
+            has_died: Cell::new(false),
             player_controlled,
-            position,
+            position: Cell::new(position),
             name,
             base_attributes,
             health: NumberedResource::new(max_health),
@@ -1538,7 +1476,7 @@ impl Character {
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
-            action_points: MAX_ACTION_POINTS,
+            action_points: NumberedResource::new(MAX_ACTION_POINTS),
             max_reactive_action_points,
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
@@ -1562,6 +1500,27 @@ impl Character {
         }
     }
 
+    fn lose_braced(&self) -> bool {
+        let mut conditions = self.conditions.borrow_mut();
+        if conditions.braced {
+            conditions.braced = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn lose_dazed(&self, stacks: u32) -> bool {
+        let mut conditions = self.conditions.borrow_mut();
+        if conditions.dazed > 0 {
+            conditions.dazed = conditions.dazed.saturating_sub(stacks);
+            if conditions.dazed == 0 {
+                return true;
+            }
+        }
+        false
+    }
+
     pub fn equipment_weight(&self) -> u32 {
         let mut sum = 0;
         if let Some(weapon) = self.weapon(HandType::MainHand) {
@@ -1578,20 +1537,13 @@ impl Character {
         sum
     }
 
-    pub fn recover_action_points(&mut self) {
-        self.action_points = MAX_ACTION_POINTS;
-    }
-
     pub fn condition_descriptions(&self) -> Vec<(ConditionDescription, Option<u32>)> {
-        self.conditions.descriptions()
-    }
-
-    fn lose_action_points(&mut self, amount: u32) {
-        self.action_points = self.action_points.saturating_sub(amount);
+        self.conditions.borrow().descriptions()
     }
 
     pub fn position_i32(&self) -> (i32, i32) {
-        (self.position.0 as i32, self.position.1 as i32)
+        let pos = self.position.get();
+        (pos.0 as i32, pos.1 as i32)
     }
 
     pub fn id(&self) -> CharacterId {
@@ -1623,23 +1575,38 @@ impl Character {
 
         match weapon_range {
             WeaponRange::Melee => {
-                if within_range_squared(weapon_range.squared(), self.position, target_position) {
+                if within_range_squared(
+                    weapon_range.squared(),
+                    self.position.get(),
+                    target_position,
+                ) {
                     (weapon_range.into_range(), ActionReach::Yes)
                 } else {
                     (weapon_range.into_range(), ActionReach::No)
                 }
             }
             WeaponRange::Ranged(..) => {
-                if within_range_squared(weapon_range.squared(), self.position, target_position) {
-                    if within_range_squared(Range::Melee.squared(), self.position, target_position)
-                    {
+                if within_range_squared(
+                    weapon_range.squared(),
+                    self.position.get(),
+                    target_position,
+                ) {
+                    if within_range_squared(
+                        Range::Melee.squared(),
+                        self.position.get(),
+                        target_position,
+                    ) {
                         (Range::Melee, ActionReach::YesButDisadvantage("Too close"))
                     } else {
                         (weapon_range.into_range(), ActionReach::Yes)
                     }
                 } else {
                     let extended = weapon_range.extended().unwrap();
-                    if within_range_squared(extended.powf(2.0), self.position, target_position) {
+                    if within_range_squared(
+                        extended.powf(2.0),
+                        self.position.get(),
+                        target_position,
+                    ) {
                         (
                             weapon_range.into_range(),
                             ActionReach::YesButDisadvantage("far"),
@@ -1653,7 +1620,7 @@ impl Character {
     }
 
     pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
-        within_range_squared(spell.range.squared(), self.position, target_position)
+        within_range_squared(spell.range.squared(), self.position.get(), target_position)
     }
 
     pub fn known_actions(&self) -> Vec<(&'static str, BaseAction)> {
@@ -1690,17 +1657,17 @@ impl Character {
     }
 
     pub fn can_use_action(&self, action: BaseAction) -> bool {
-        let ap = self.action_points;
+        let ap = self.action_points.current();
         match action {
             BaseAction::Attack {
                 hand,
                 action_point_cost: _,
             } => matches!(self.weapon(hand), Some(weapon) if ap >= weapon.action_point_cost),
             BaseAction::SelfEffect(sea) => {
-                ap >= sea.action_point_cost && self.stamina.current >= sea.stamina_cost
+                ap >= sea.action_point_cost && self.stamina.current() >= sea.stamina_cost
             }
             BaseAction::CastSpell(spell) => {
-                ap >= spell.action_point_cost && self.mana.current >= spell.mana_cost
+                ap >= spell.action_point_cost && self.mana.current() >= spell.mana_cost
             }
             BaseAction::Move {
                 action_point_cost, ..
@@ -1740,8 +1707,8 @@ impl Character {
         enhancement: &AttackEnhancement,
     ) -> bool {
         let weapon = self.weapon(attack_hand).unwrap();
-        self.action_points >= weapon.action_point_cost + enhancement.action_point_cost
-            && self.stamina.current >= enhancement.stamina_cost
+        self.action_points.current() >= weapon.action_point_cost + enhancement.action_point_cost
+            && self.stamina.current() >= enhancement.stamina_cost
     }
 
     pub fn usable_movement_enhancements(&self) -> Vec<(String, MovementEnhancement)> {
@@ -1788,8 +1755,8 @@ impl Character {
             ),
         ];
         enhancements.retain(|(_, enhancement)| {
-            self.action_points >= MOVE_ACTION_COST + enhancement.action_point_cost
-                && self.stamina.current >= enhancement.stamina_cost
+            self.action_points.current() >= MOVE_ACTION_COST + enhancement.action_point_cost
+                && self.stamina.current() >= enhancement.stamina_cost
         });
         enhancements
     }
@@ -1822,10 +1789,11 @@ impl Character {
         reaction: OnAttackedReaction,
         is_within_melee: bool,
     ) -> bool {
-        self.action_points >= reaction.action_point_cost
-            && (self.action_points - reaction.action_point_cost)
+        let ap = self.action_points.current();
+        ap >= reaction.action_point_cost
+            && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
-            && self.stamina.current >= reaction.stamina_cost
+            && self.stamina.current() >= reaction.stamina_cost
             && (!reaction.must_be_melee || is_within_melee)
     }
 
@@ -1850,36 +1818,41 @@ impl Character {
 
     pub fn can_use_on_hit_reaction(&self, reaction: OnHitReaction, is_within_melee: bool) -> bool {
         if let OnHitReactionEffect::Rage = reaction.effect {
-            if self.conditions.raging {
+            if self.conditions.borrow().raging {
                 // Can't use this reaction while already raging
                 return false;
             }
         }
-        self.action_points >= reaction.action_point_cost
-            && (self.action_points - reaction.action_point_cost)
+        let ap = self.action_points.current();
+        ap >= reaction.action_point_cost
+            && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && (!reaction.must_be_melee || is_within_melee)
     }
 
     pub fn can_use_spell_enhancement(&self, spell: Spell, enhancement: SpellEnhancement) -> bool {
         //let enhancement = spell.possible_enhancements[enhancement_index].unwrap();
-        self.mana.current >= spell.mana_cost + enhancement.mana_cost
+        self.mana.current() >= spell.mana_cost + enhancement.mana_cost
     }
 
     fn strength(&self) -> u32 {
-        (self.base_attributes.strength as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.strength as i32 - self.conditions.borrow().weakened as i32).max(1)
+            as u32
     }
 
     fn agility(&self) -> u32 {
-        (self.base_attributes.agility as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.agility as i32 - self.conditions.borrow().weakened as i32).max(1)
+            as u32
     }
 
     fn intellect(&self) -> u32 {
-        (self.base_attributes.intellect as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.intellect as i32 - self.conditions.borrow().weakened as i32).max(1)
+            as u32
     }
 
     fn spirit(&self) -> u32 {
-        (self.base_attributes.spirit as i32 - self.conditions.weakened as i32).max(1) as u32
+        (self.base_attributes.spirit as i32 - self.conditions.borrow().weakened as i32).max(1)
+            as u32
     }
 
     pub fn spell_modifier(&self) -> u32 {
@@ -1887,7 +1860,7 @@ impl Character {
     }
 
     fn is_dazed(&self) -> bool {
-        self.conditions.dazed > 0
+        self.conditions.borrow().dazed > 0
     }
 
     pub fn evasion(&self) -> u32 {
@@ -1898,7 +1871,7 @@ impl Character {
             .shield
             .map(|shield| shield.evasion)
             .unwrap_or(0);
-        let from_braced = if self.conditions.braced {
+        let from_braced = if self.conditions.borrow().braced {
             BRACED_DEFENSE_BONUS
         } else {
             0
@@ -1949,8 +1922,8 @@ impl Character {
 
     fn hand_exertion(&self, hand_type: HandType) -> u32 {
         match hand_type {
-            HandType::MainHand => self.conditions.mainhand_exertion,
-            HandType::OffHand => self.conditions.offhand_exertion,
+            HandType::MainHand => self.conditions.borrow().mainhand_exertion,
+            HandType::OffHand => self.conditions.borrow().offhand_exertion,
         }
     }
 
@@ -1961,7 +1934,7 @@ impl Character {
         if self.is_dazed() {
             advantage -= 1;
         }
-        if self.conditions.raging {
+        if self.conditions.borrow().raging {
             advantage += 1;
         }
 
@@ -1988,10 +1961,10 @@ impl Character {
         if self.is_dazed() {
             terms.push(("Dazed".to_string(), Goodness::Bad));
         }
-        if self.conditions.raging {
+        if self.conditions.borrow().raging {
             terms.push(("Raging".to_string(), Goodness::Good));
         }
-        if self.conditions.weakened > 0 {
+        if self.conditions.borrow().weakened > 0 {
             terms.push(("Weakened".to_string(), Goodness::Bad));
         }
         terms
@@ -2009,10 +1982,10 @@ impl Character {
         if self.is_dazed() {
             terms.push(("Dazed".to_string(), Goodness::Good));
         }
-        if self.conditions.weakened > 0 {
+        if self.conditions.borrow().weakened > 0 {
             terms.push(("Weakened".to_string(), Goodness::Good));
         }
-        if self.conditions.braced {
+        if self.conditions.borrow().braced {
             terms.push(("Braced".to_string(), Goodness::Bad));
         }
 
@@ -2028,15 +2001,16 @@ impl Character {
         terms
     }
 
-    fn receive_condition(&mut self, condition: Condition) {
+    fn receive_condition(&self, condition: Condition) {
+        let mut conditions = self.conditions.borrow_mut();
         match condition {
-            Condition::Dazed(n) => self.conditions.dazed += n,
-            Condition::Bleeding => self.conditions.bleeding += 1,
-            Condition::Braced => self.conditions.braced = true,
-            Condition::Raging => self.conditions.raging = true,
-            Condition::Weakened(n) => self.conditions.weakened += n,
-            Condition::MainHandExertion(n) => self.conditions.mainhand_exertion += n,
-            Condition::OffHandExertion(n) => self.conditions.offhand_exertion += n,
+            Condition::Dazed(n) => conditions.dazed += n,
+            Condition::Bleeding => conditions.bleeding += 1,
+            Condition::Braced => conditions.braced = true,
+            Condition::Raging => conditions.raging = true,
+            Condition::Weakened(n) => conditions.weakened += n,
+            Condition::MainHandExertion(n) => conditions.mainhand_exertion += n,
+            Condition::OffHandExertion(n) => conditions.offhand_exertion += n,
         }
     }
 }
@@ -2069,30 +2043,41 @@ pub fn distance_between(source: (i32, i32), destination: (i32, i32)) -> f32 {
     (((destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2)) as f32).sqrt()
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct NumberedResource {
-    pub current: u32,
+    current: Cell<u32>,
     pub max: u32,
 }
 
 impl NumberedResource {
     fn new(max: u32) -> Self {
-        Self { current: max, max }
+        Self {
+            current: Cell::new(max),
+            max,
+        }
     }
 
-    fn lose(&mut self, amount: u32) {
-        self.current = self.current.saturating_sub(amount); // cannot go below 0
+    pub fn current(&self) -> u32 {
+        self.current.get()
     }
 
-    fn spend(&mut self, amount: u32) {
-        assert!(self.current >= amount);
-        self.current -= amount;
+    fn lose(&self, amount: u32) {
+        self.current.set(self.current.get().saturating_sub(amount));
     }
 
-    fn gain(&mut self, amount: u32) -> u32 {
-        let prev = self.current;
-        self.current = (self.current + amount).min(self.max);
-        self.current - prev
+    fn spend(&self, amount: u32) {
+        self.current.set(self.current.get() - amount);
+    }
+
+    fn gain(&self, amount: u32) -> u32 {
+        let prev = self.current.get();
+        let new = (prev + amount).min(self.max);
+        self.current.set(new);
+        new - prev
+    }
+
+    fn set_to_max(&self) {
+        self.current.set(self.max);
     }
 }
 

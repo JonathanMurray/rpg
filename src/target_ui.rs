@@ -84,9 +84,9 @@ impl TargetUi {
                     ..Default::default()
                 },
             );
-            action_points_row.current_ap = char.action_points;
+            action_points_row.current_ap = char.action_points.current();
             let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (80.0, 10.0));
-            health_bar.current = char.health.current;
+            health_bar.current = char.health.current();
 
             let centered_list = Container {
                 layout_dir: LayoutDirection::Vertical,

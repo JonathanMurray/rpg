@@ -151,8 +151,7 @@ impl GraphicalUserInterface {
         let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
         for character in game.characters.iter() {
-            let character_ref = character.borrow();
-            if !character_ref.player_controlled {
+            if !character.player_controlled {
                 continue;
             }
 
@@ -165,16 +164,16 @@ impl GraphicalUserInterface {
             let mut spell_buttons_for_character_sheet = vec![];
             let mut attack_enhancement_buttons_for_character_sheet = vec![];
 
-            for (_subtext, action) in character_ref.known_actions() {
+            for (_subtext, action) in character.known_actions() {
                 let btn_action = ButtonAction::Action(action);
-                let btn = Rc::new(new_button(btn_action, Some(&character_ref), true));
+                let btn = Rc::new(new_button(btn_action, Some(&character), true));
                 tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
                 hoverable_buttons.push(Rc::clone(&btn));
                 match action {
                     BaseAction::Attack { .. } => {
                         basic_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(&character_ref), false));
+                        let btn = Rc::new(new_button(btn_action, Some(&character), false));
                         attack_button_for_character_sheet = Some(btn.clone());
                         hoverable_buttons.push(btn);
                     }
@@ -182,7 +181,7 @@ impl GraphicalUserInterface {
                     BaseAction::CastSpell(spell) => {
                         spell_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(&character_ref), false));
+                        let btn = Rc::new(new_button(btn_action, Some(&character), false));
 
                         let enhancement_buttons: Vec<Rc<ActionButton>> = spell
                             .possible_enhancements
@@ -222,22 +221,20 @@ impl GraphicalUserInterface {
             );
 
             let mut reaction_buttons_for_character_sheet = vec![];
-            for (_subtext, reaction) in character_ref.known_on_attacked_reactions() {
+            for (_subtext, reaction) in character.known_on_attacked_reactions() {
                 let btn_action = ButtonAction::OnAttackedReaction(reaction);
                 let btn = Rc::new(new_button(btn_action, None, false));
                 hoverable_buttons.push(Rc::clone(&btn));
                 reaction_buttons_for_character_sheet.push(btn);
             }
-            for (_subtext, reaction) in character_ref.known_on_hit_reactions() {
+            for (_subtext, reaction) in character.known_on_hit_reactions() {
                 let btn_action = ButtonAction::OnHitReaction(reaction);
                 let btn = Rc::new(new_button(btn_action, None, false));
                 hoverable_buttons.push(Rc::clone(&btn));
                 reaction_buttons_for_character_sheet.push(btn);
             }
 
-            for (_subtext, enhancement) in
-                character_ref.known_attack_enhancements(HandType::MainHand)
-            {
+            for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
                 let btn_action = ButtonAction::AttackEnhancement(enhancement);
                 let btn = Rc::new(new_button(btn_action, None, false));
                 hoverable_buttons.push(Rc::clone(&btn));
@@ -246,7 +243,7 @@ impl GraphicalUserInterface {
 
             let character_sheet = CharacterSheet::new(
                 &simple_font,
-                &character_ref,
+                &character,
                 &equipment_icons,
                 attack_button_for_character_sheet,
                 reaction_buttons_for_character_sheet,
@@ -262,8 +259,8 @@ impl GraphicalUserInterface {
             };
 
             let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character_ref.health.current,
-                character_ref.health.max,
+                character.health.current(),
+                character.health.max,
                 "Health",
                 RED,
                 simple_font.clone(),
@@ -271,8 +268,8 @@ impl GraphicalUserInterface {
             let cloned_health_bar = Rc::clone(&health_bar);
 
             let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character_ref.mana.current,
-                character_ref.mana.max,
+                character.mana.current(),
+                character.mana.max,
                 "Mana",
                 BLUE,
                 simple_font.clone(),
@@ -280,8 +277,8 @@ impl GraphicalUserInterface {
             let cloned_mana_bar = Rc::clone(&mana_bar);
 
             let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character_ref.stamina.current,
-                character_ref.stamina.max,
+                character.stamina.current(),
+                character.stamina.max,
                 "Stamina",
                 GREEN,
                 simple_font.clone(),
@@ -306,7 +303,7 @@ impl GraphicalUserInterface {
             };
 
             let action_points_row = ActionPointsRow::new(
-                character_ref.max_reactive_action_points,
+                character.max_reactive_action_points,
                 (20.0, 20.0),
                 0.3,
                 Style {
@@ -328,7 +325,7 @@ impl GraphicalUserInterface {
                 hoverable_buttons,
             };
 
-            character_uis.insert(character.borrow().id(), character_ui);
+            character_uis.insert(character.id(), character_ui);
         }
 
         let state = UiState::Idle;
@@ -343,7 +340,7 @@ impl GraphicalUserInterface {
         let first_player_character_id = game
             .characters
             .iter_with_ids()
-            .find(|(_id, ch)| ch.borrow().player_controlled)
+            .find(|(_id, ch)| ch.player_controlled)
             .unwrap()
             .0;
 
@@ -534,7 +531,7 @@ impl GraphicalUserInterface {
         let target = self
             .game_grid
             .players_target()
-            .map(|id| self.characters.borrow(id));
+            .map(|id| self.characters.get(id));
         self.target_ui.set_character(target);
     }
 
@@ -563,8 +560,8 @@ impl GraphicalUserInterface {
         }
     }
 
-    fn active_character(&self) -> Ref<Character> {
-        self.characters.borrow(self.active_character_id)
+    fn active_character(&self) -> &Character {
+        self.characters.get(self.active_character_id)
     }
 
     pub fn set_state(&mut self, state: UiState) {
@@ -649,8 +646,8 @@ impl GraphicalUserInterface {
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
-                let attacker = self.characters.borrow(attacker_id);
-                let defender = self.characters.borrow(reactor_id);
+                let attacker = self.characters.get(attacker_id);
+                let defender = self.characters.get(reactor_id);
 
                 popup_initial_lines.push("Reaction".to_string());
                 let attacks_str = format!(
@@ -663,8 +660,6 @@ impl GraphicalUserInterface {
                 popup_initial_lines.push(attacks_str);
 
                 let reactions = defender.usable_on_attacked_reactions(is_within_melee);
-                drop(attacker);
-                drop(defender);
                 for (_subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(btn_action);
@@ -683,16 +678,15 @@ impl GraphicalUserInterface {
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
-                let victim = self.characters.borrow(victim_id);
+                let victim = self.characters.get(victim_id);
                 popup_initial_lines.push("React".to_string());
                 popup_initial_lines.push(format!(
                     "{} attacked {} for {} damage",
-                    self.characters.borrow(attacker_id).name,
+                    self.characters.get(attacker_id).name,
                     victim.name,
                     damage,
                 ));
                 let reactions = victim.usable_on_hit_reactions(is_within_melee);
-                drop(victim);
                 for (_subtext, reaction) in reactions {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(btn_action);
@@ -759,8 +753,8 @@ impl GraphicalUserInterface {
             unreachable!()
         };
 
-        let attacker = self.characters.borrow(attacker);
-        let defender = self.characters.borrow(reactor);
+        let attacker = self.characters.get(attacker);
+        let defender = self.characters.get(reactor);
 
         // TODO
         let attack_enhancements = &[];
@@ -813,7 +807,7 @@ impl GraphicalUserInterface {
             } => {
                 self.log.add_with_details(main_line, detail_lines);
 
-                let reactor_pos = self.characters.borrow(reactor).position_i32();
+                let reactor_pos = self.characters.get(reactor).position_i32();
 
                 if let Some(condition) = outcome.received_condition {
                     self.game_grid.add_text_effect(
@@ -856,8 +850,8 @@ impl GraphicalUserInterface {
             } => {
                 let mut line = format!(
                     "{} attacked {}",
-                    self.characters.borrow(attacker).name,
-                    self.characters.borrow(target).name
+                    self.characters.get(attacker).name,
+                    self.characters.get(target).name
                 );
 
                 match outcome {
@@ -869,8 +863,8 @@ impl GraphicalUserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                let attacker_pos = self.characters.borrow(attacker).position_i32();
-                let target_pos = self.characters.borrow(target).position_i32();
+                let attacker_pos = self.characters.get(attacker).position_i32();
+                let target_pos = self.characters.get(target).position_i32();
 
                 let dist = distance_between(attacker_pos, target_pos);
                 let duration = 0.15 * dist;
@@ -932,9 +926,9 @@ impl GraphicalUserInterface {
             } => {
                 let mut line = format!(
                     "{} cast {} on {}",
-                    self.characters.borrow(caster).name,
+                    self.characters.get(caster).name,
                     spell.name,
-                    self.characters.borrow(target).name
+                    self.characters.get(target).name
                 );
 
                 match outcome {
@@ -949,8 +943,8 @@ impl GraphicalUserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                let caster_pos = self.characters.borrow(caster).position_i32();
-                let target_pos = self.characters.borrow(target).position_i32();
+                let caster_pos = self.characters.get(caster).position_i32();
+                let target_pos = self.characters.get(target).position_i32();
 
                 let color = match spell.target_type {
                     SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => BLUE,
@@ -1064,7 +1058,7 @@ impl GraphicalUserInterface {
                 character,
                 condition,
             } => {
-                let pos = self.characters.borrow(character).position;
+                let pos = self.characters.get(character).position.get();
                 let duration = 1.0;
                 self.game_grid.add_text_effect(
                     (pos.0 as i32, pos.1 as i32),
@@ -1077,7 +1071,7 @@ impl GraphicalUserInterface {
             }
             GameEvent::CharacterDied { character } => {
                 self.log
-                    .add(format!("{} died", self.characters.borrow(character).name));
+                    .add(format!("{} died", self.characters.get(character).name));
 
                 self.characters.remove_dead();
                 self.game_grid.remove_dead();
@@ -1115,11 +1109,7 @@ impl GraphicalUserInterface {
 
         if active_character_id != self.active_character_id {
             // When control switches to a new player controlled character, make the UI show that character
-            if self
-                .characters
-                .borrow(active_character_id)
-                .player_controlled
-            {
+            if self.characters.get(active_character_id).player_controlled {
                 self.player_portraits
                     .set_selected_character(active_character_id);
             }
@@ -1168,7 +1158,7 @@ impl GraphicalUserInterface {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
                 if let Some(target_id) = self.game_grid.players_target() {
-                    let target_char = self.characters.borrow(target_id);
+                    let target_char = self.characters.get(target_id);
 
                     let enhancements: Vec<AttackEnhancement> = self
                         .activity_popup
@@ -1178,7 +1168,7 @@ impl GraphicalUserInterface {
 
                     let (range, reach) = self
                         .active_character()
-                        .reaches_with_attack(hand, target_char.position);
+                        .reaches_with_attack(hand, target_char.position.get());
 
                     let mut circumstance_advantage = None;
 
@@ -1248,7 +1238,7 @@ impl GraphicalUserInterface {
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
                 if let Some(i) = self.game_grid.players_target() {
-                    let target_char = self.characters.borrow(i);
+                    let target_char = self.characters.get(i);
 
                     let static_text = match spell.target_type {
                         SpellTargetType::SingleEnemy(spell_type) => {
@@ -1269,7 +1259,7 @@ impl GraphicalUserInterface {
 
                     let reach = if self
                         .active_character()
-                        .can_reach_with_spell(spell, target_char.position)
+                        .can_reach_with_spell(spell, target_char.position.get())
                     {
                         popup_enabled = true;
                         ActionReach::Yes
@@ -1454,22 +1444,24 @@ impl GraphicalUserInterface {
 
     fn update_character_status(&mut self, characters: &Characters) {
         for (id, character) in characters.iter_with_ids() {
-            let character = character.borrow();
             if let Some(ui) = self.character_uis.get_mut(id) {
                 ui.health_bar
                     .borrow_mut()
-                    .set_current(character.health.current);
-                ui.mana_bar.borrow_mut().set_current(character.mana.current);
+                    .set_current(character.health.current());
+                ui.mana_bar
+                    .borrow_mut()
+                    .set_current(character.mana.current());
                 ui.stamina_bar
                     .borrow_mut()
-                    .set_current(character.stamina.current);
+                    .set_current(character.stamina.current());
 
                 ui.conditions_list.descriptions = character.condition_descriptions();
 
                 ui.action_points_row.current_ap = self
                     .characters
-                    .borrow(self.player_portraits.selected_i.get())
-                    .action_points;
+                    .get(self.player_portraits.selected_i.get())
+                    .action_points
+                    .current();
                 ui.action_points_row.is_characters_turn = *id == self.active_character_id;
             }
         }
@@ -1548,11 +1540,10 @@ impl CharacterPortraits {
         self.set_active_character(game.active_character_id);
         for (id, character) in game.characters.iter_with_ids() {
             let portrait = self.portraits[id].borrow_mut();
-            let character = character.borrow();
-            portrait.action_points_row.borrow_mut().current_ap = character.action_points;
+            portrait.action_points_row.borrow_mut().current_ap = character.action_points.current();
             portrait.action_points_row.borrow_mut().is_characters_turn =
                 *id == game.active_character_id;
-            portrait.health_bar.borrow_mut().current = character.health.current;
+            portrait.health_bar.borrow_mut().current = character.health.current();
         }
     }
 
@@ -1575,7 +1566,7 @@ impl CharacterPortraits {
 
     fn remove_dead(&mut self) {
         self.portraits
-            .retain(|_id, portrait| !portrait.borrow().character.borrow().has_died);
+            .retain(|_id, portrait| !portrait.borrow().character.has_died.get());
         self.row.remove_dropped_children();
     }
 }
@@ -1587,28 +1578,26 @@ struct TopCharacterPortrait {
     health_bar: Rc<RefCell<ResourceBar>>,
     padding: f32,
     container: Container,
-    character: Rc<RefCell<Character>>,
+    character: Rc<Character>,
 }
 
 impl TopCharacterPortrait {
-    fn new(character: &Rc<RefCell<Character>>, font: Font) -> Self {
-        let char_ref = character.borrow();
-
+    fn new(character: &Rc<Character>, font: Font) -> Self {
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
-            char_ref.max_reactive_action_points,
+            character.max_reactive_action_points,
             (10.0, 10.0),
             0.25,
             Style::default(),
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
 
-        let name_color = if char_ref.player_controlled {
+        let name_color = if character.player_controlled {
             WHITE
         } else {
             Color::new(1.0, 0.7, 0.7, 1.0)
         };
 
-        let mut name_text_line = TextLine::new(char_ref.name, 16, name_color, Some(font.clone()));
+        let mut name_text_line = TextLine::new(character.name, 16, name_color, Some(font.clone()));
         name_text_line.set_min_height(13.0);
         let mut container = Container {
             layout_dir: LayoutDirection::Vertical,
@@ -1622,7 +1611,7 @@ impl TopCharacterPortrait {
         };
 
         let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
-            char_ref.health.max,
+            character.health.max,
             RED,
             (container.content_size().0, 6.0),
         )));
@@ -1716,11 +1705,11 @@ impl PlayerPortraits {
             Default::default();
 
         for (id, character) in characters.iter_with_ids() {
-            if character.borrow().player_controlled {
+            if character.player_controlled {
                 portraits.insert(
                     *id,
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
-                        &character.borrow(),
+                        &character,
                         font.clone(),
                     ))),
                 );

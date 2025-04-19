@@ -9,8 +9,6 @@ use macroquad::rand;
 pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option<Action> {
     let character = game.active_character();
 
-    dbg!(character.action_points);
-
     assert!(!character.player_controlled);
 
     let mut actions = character.usable_actions();
@@ -27,9 +25,9 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                         if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed
                         }
-                        if other_character.borrow().player_controlled
+                        if other_character.player_controlled
                             && character
-                                .reaches_with_attack(hand, other_character.borrow().position)
+                                .reaches_with_attack(hand, other_character.position.get())
                                 .1
                                 != ActionReach::No
                         {
@@ -48,7 +46,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                         if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed
                         }
-                        if other_character.borrow().player_controlled {
+                        if other_character.player_controlled {
                             chosen_action = Some(Action::CastSpell {
                                 spell,
                                 enhancements: vec![],
@@ -67,12 +65,12 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                         if *id == game.active_character_id {
                             continue; // Avoid borrowing already borrowed active character
                         }
-                        let pos = character.borrow().position;
+                        let pos = character.position.get();
                         pathfind_grid
                             .blocked_positions
                             .insert((pos.0 as i32, pos.1 as i32));
                     }
-                    let pos = character.position;
+                    let pos = character.position.get();
                     pathfind_grid.run((pos.0 as i32, pos.1 as i32), character.move_range);
 
                     for (destination, route) in pathfind_grid.routes {
@@ -108,7 +106,7 @@ pub fn bot_choose_attack_reaction(
 ) -> Option<OnAttackedReaction> {
     let reactions = game
         .characters
-        .borrow(reactor_id)
+        .get(reactor_id)
         .usable_on_attacked_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)
@@ -124,7 +122,7 @@ pub fn bot_choose_hit_reaction(
 ) -> Option<OnHitReaction> {
     let reactions = game
         .characters
-        .borrow(reactor_id)
+        .get(reactor_id)
         .usable_on_hit_reactions(is_within_melee);
     if let Some((_, reaction)) = reactions.first() {
         Some(*reaction)
