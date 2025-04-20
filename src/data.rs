@@ -229,6 +229,7 @@ pub const SCREAM: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     possible_enhancements: [
+        // TODO Let this increase the range of the spell
         Some(SpellEnhancement {
             name: "Shriek",
             description: "Targets also lose 1 AP",
@@ -246,7 +247,7 @@ pub const SCREAM: Spell = Spell {
     target_type: SpellTargetType::NoTarget {
         enemy_area: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Mental),
-            damage: 0,
+            damage: None,
             on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
         },
     },
@@ -275,7 +276,7 @@ pub const MIND_BLAST: Spell = Spell {
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Mental),
-            damage: 1,
+            damage: Some((1, false)),
             on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
         },
         area: None,
@@ -325,14 +326,14 @@ pub const FIREBALL: Spell = Spell {
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Projectile),
-            damage: 2,
+            damage: Some((2, true)),
             on_hit_effect: None,
         },
         area: Some((
             Range::Melee,
             SpellEnemyEffect {
                 contest_type: None,
-                damage: 1,
+                damage: Some((1, false)),
                 on_hit_effect: None,
             },
         )),
@@ -351,7 +352,7 @@ pub const KILL: Spell = Spell {
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
             contest_type: None,
-            damage: 99,
+            damage: Some((99, false)),
             on_hit_effect: None,
         },
         area: None,

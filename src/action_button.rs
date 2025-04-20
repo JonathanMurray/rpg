@@ -110,7 +110,7 @@ fn base_action_tooltip(
             let mut technical_line = "Self: ".to_string();
             match sea.effect {
                 crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                    technical_line.push_str(&format!("Loses {} AP", n))
+                    technical_line.push_str(&format!("Loses {}^ AP", n))
                 }
                 crate::core::ApplyEffect::Condition(condition) => {
                     technical_line.push_str(&format!("{}", condition.name()))
@@ -137,18 +137,22 @@ fn base_action_tooltip(
 
             match spell.target_type {
                 SpellTargetType::SingleEnemy { effect, area } => {
-                    technical_description.push("Target enemy: ".to_string());
-                    if effect.damage > 0 {
-                        if effect.contest_type.is_some() {
-                            technical_description.push(format!("  {}+ damage ", effect.damage));
-                        } else {
-                            technical_description.push(format!("  {} damage ", effect.damage));
+                    technical_description.push(format!("Target enemy (range {})", spell.range));
+
+                    match effect.damage {
+                        Some((dmg, true)) => {
+                            technical_description.push(format!("  {}^ damage", dmg))
                         }
+                        Some((dmg, false)) => {
+                            technical_description.push(format!("  {} damage", dmg))
+                        }
+                        None => {}
                     }
+
                     if let Some(apply_effect) = effect.on_hit_effect {
                         match apply_effect {
                             crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                technical_description.push(format!("  loses {} AP", n));
+                                technical_description.push(format!("  Loses {}^ AP", n));
                             }
                             crate::core::ApplyEffect::Condition(condition) => {
                                 technical_description.push(format!("  {}", condition.name()));
@@ -165,20 +169,22 @@ fn base_action_tooltip(
                         None => {}
                     };
 
-                    if let Some((_range, effect)) = area {
-                        technical_description.push("Impact area".to_string());
+                    if let Some((range, effect)) = area {
+                        technical_description.push(format!("Impact area (range {})", range));
 
-                        if effect.damage > 0 {
-                            if effect.contest_type.is_some() {
-                                technical_description.push(format!("  {}+ damage ", effect.damage));
-                            } else {
-                                technical_description.push(format!("  {} damage ", effect.damage));
+                        match effect.damage {
+                            Some((dmg, true)) => {
+                                technical_description.push(format!("  {}^ damage", dmg))
                             }
+                            Some((dmg, false)) => {
+                                technical_description.push(format!("  {} damage", dmg))
+                            }
+                            None => {}
                         }
                         if let Some(apply_effect) = effect.on_hit_effect {
                             match apply_effect {
                                 crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                    technical_description.push(format!("  loses {} AP", n));
+                                    technical_description.push(format!("  Loses {}^ AP", n));
                                 }
                                 crate::core::ApplyEffect::Condition(condition) => {
                                     technical_description.push(format!("  {}", condition.name()));
@@ -196,33 +202,36 @@ fn base_action_tooltip(
                         };
                     }
                 }
+
                 SpellTargetType::SingleAlly(effect) => {
-                    let mut line = "Target ally: ".to_string();
+                    technical_description.push(format!("Target ally (range {})", spell.range));
                     if effect.healing > 0 {
-                        line.push_str(&format!("{}+ healing", effect.healing));
+                        technical_description.push(format!("  {}^ healing", effect.healing));
                     }
-                    technical_description.push(line);
                 }
+
                 SpellTargetType::NoTarget { enemy_area: effect } => {
-                    let mut line = "Self area (enemies): ".to_string();
-                    if effect.damage > 0 {
-                        if effect.contest_type.is_some() {
-                            technical_description.push(format!("  {}+ damage ", effect.damage));
-                        } else {
-                            technical_description.push(format!("  {} damage ", effect.damage));
+                    technical_description.push(format!("Self area (range {})", spell.range));
+                    match effect.damage {
+                        Some((dmg, true)) => {
+                            technical_description.push(format!("  {}^ damage", dmg))
                         }
+                        Some((dmg, false)) => {
+                            technical_description.push(format!("  {} damage", dmg))
+                        }
+                        None => {}
                     }
                     if let Some(apply_effect) = effect.on_hit_effect {
                         match apply_effect {
                             crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                line.push_str(&format!("lose {} AP", n))
+                                technical_description.push(format!("  Loses {}^ AP", n))
                             }
                             crate::core::ApplyEffect::Condition(condition) => {
-                                line.push_str(condition.name())
+                                technical_description.push(format!("  {}", condition.name()))
                             }
                         }
                     }
-                    technical_description.push(line);
+
                     match effect.contest_type {
                         Some(SpellContestType::Mental) => {
                             technical_description.push(format!("  [Will] defense"))

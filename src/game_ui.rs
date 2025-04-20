@@ -1,10 +1,14 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    default,
     rc::Rc,
 };
 
-use macroquad::{color::SKYBLUE, rand};
+use macroquad::{
+    color::{PURPLE, SKYBLUE},
+    rand,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -645,7 +649,7 @@ impl UserInterface {
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
 
-                popup_initial_lines.push("Reaction".to_string());
+                popup_initial_lines.push("React (on attacked)".to_string());
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
@@ -675,7 +679,7 @@ impl UserInterface {
                 self.set_allowed_to_use_action_buttons(false);
 
                 let victim = self.characters.get(victim_id);
-                popup_initial_lines.push("React".to_string());
+                popup_initial_lines.push("React (on hit)".to_string());
                 popup_initial_lines.push(format!(
                     "{} attacked {} for {} damage",
                     self.characters.get(attacker_id).name,
@@ -915,22 +919,23 @@ impl UserInterface {
             }
             GameEvent::SpellWasCast {
                 caster,
-                target_outcomes,
+                target_outcome,
+                area_outcomes,
                 spell,
                 detail_lines,
             } => {
-                let mut line = if spell.target_type.single_target() {
+                let mut line = if let Some((target_id, _outcome)) = target_outcome {
                     format!(
                         "{} cast {} on {}",
                         self.characters.get(caster).name,
                         spell.name,
-                        self.characters.get(target_outcomes[0].0).name
+                        self.characters.get(target_id).name
                     )
                 } else {
                     format!("{} cast {}", self.characters.get(caster).name, spell.name,)
                 };
 
-                for (_target, outcome) in &target_outcomes {
+                if let Some((_target_id, outcome)) = target_outcome {
                     match outcome {
                         SpellTargetOutcome::HitEnemy { damage } => {
                             if let Some(dmg) = damage {
@@ -948,14 +953,15 @@ impl UserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                for (target, outcome) in target_outcomes {
+                let mut duration = 0.0;
+
+                let animation_color = spell.animation_color;
+                if let Some((target, outcome)) = target_outcome {
                     let caster_pos = self.characters.get(caster).position_i32();
                     let target_pos = self.characters.get(target).position_i32();
 
-                    let color = spell.animation_color;
-
                     let dist = distance_between(caster_pos, target_pos);
-                    let duration = 0.15 * dist;
+                    duration = 0.15 * dist;
 
                     self.game_grid.add_effect(
                         caster_pos,
@@ -968,7 +974,7 @@ impl UserInterface {
                                 EffectGraphics::Circle {
                                     radius: 10.0,
                                     end_radius: Some(15.0),
-                                    fill: Some(color),
+                                    fill: Some(animation_color),
                                     stroke: None,
                                 },
                             ),
@@ -985,7 +991,7 @@ impl UserInterface {
                                 EffectGraphics::Circle {
                                     radius: 8.0,
                                     end_radius: Some(13.0),
-                                    fill: Some(color),
+                                    fill: Some(animation_color),
                                     stroke: None,
                                 },
                             ),
@@ -1002,7 +1008,7 @@ impl UserInterface {
                                 EffectGraphics::Circle {
                                     radius: 6.0,
                                     end_radius: Some(11.0),
-                                    fill: Some(color),
+                                    fill: Some(animation_color),
                                     stroke: None,
                                 },
                             ),
@@ -1032,6 +1038,56 @@ impl UserInterface {
                     );
 
                     self.animation_stopwatch.set_to_at_least(duration + 0.3);
+                }
+
+                if let Some((area_center_pos, outcomes)) = area_outcomes {
+                    let area_duration = 0.2;
+
+                    for (target_id, outcome) in outcomes {
+                        let target_pos = self.characters.get(target_id).position_i32();
+
+                        self.game_grid.add_effect(
+                            (area_center_pos.0 as i32, area_center_pos.1 as i32),
+                            target_pos,
+                            Effect {
+                                start_time: duration,
+                                end_time: duration + area_duration,
+                                variant: EffectVariant::At(
+                                    EffectPosition::Destination,
+                                    EffectGraphics::Circle {
+                                        radius: 20.0,
+                                        stroke: Some((animation_color, 4.0)),
+                                        end_radius: Some(25.0),
+                                        fill: None,
+                                    },
+                                ),
+                            },
+                        );
+
+                        let (target_text, goodness) = match outcome {
+                            SpellTargetOutcome::HitEnemy { damage } => {
+                                if let Some(dmg) = damage {
+                                    (format!("{}", dmg), Goodness::Bad)
+                                } else {
+                                    ("Hit".to_string(), Goodness::Bad)
+                                }
+                            }
+                            SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
+                            SpellTargetOutcome::HealedAlly(healing) => {
+                                (format!("{}", healing), Goodness::Good)
+                            }
+                        };
+
+                        self.game_grid.add_text_effect(
+                            target_pos,
+                            duration,
+                            0.5,
+                            target_text,
+                            goodness,
+                        );
+
+                        self.animation_stopwatch.set_to_at_least(duration + 0.3);
+                    }
                 }
             }
             GameEvent::CharacterReceivedSelfEffect {
@@ -1154,13 +1210,13 @@ impl UserInterface {
                             }
                             if let ActionReach::YesButDisadvantage(reason) = reach {
                                 circumstance_advantage = Some((-1, reason, Goodness::Bad));
-                                maybe_indicator = Some(RangeIndicator::SemiBad);
+                                maybe_indicator = Some(RangeIndicator::CanReachButDisadvantage);
                             } else {
                                 maybe_indicator = None;
                             }
                         }
                         ActionReach::No => {
-                            maybe_indicator = Some(RangeIndicator::Bad);
+                            maybe_indicator = Some(RangeIndicator::CannotReach);
                         }
                     }
 
@@ -1210,7 +1266,7 @@ impl UserInterface {
                         .range
                         .into_range();
                     self.game_grid.range_indicator =
-                        Some((range, RangeIndicator::GoodWithBackground));
+                        Some((range, RangeIndicator::ActionTargetRange));
                 }
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
@@ -1245,7 +1301,7 @@ impl UserInterface {
                         popup_enabled = true;
                         None
                     } else {
-                        Some(RangeIndicator::Bad)
+                        Some(RangeIndicator::CannotReach)
                     };
                     self.game_grid.range_indicator =
                         maybe_indicator.map(|indicator| (spell.range, indicator));
@@ -1258,12 +1314,12 @@ impl UserInterface {
                                 false,
                             );
                             popup_enabled = true;
-                            RangeIndicator::GoodWithBackground
+                            RangeIndicator::ActionTargetRange
                         }
                         SpellTargetType::SingleEnemy { .. } | SpellTargetType::SingleAlly(..) => {
                             self.target_ui
                                 .set_action("Select a target".to_string(), vec![], false);
-                            RangeIndicator::GoodWithBackground
+                            RangeIndicator::ActionTargetRange
                         }
                     };
 

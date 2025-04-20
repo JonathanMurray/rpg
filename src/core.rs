@@ -33,7 +33,7 @@ impl CoreGame {
             true,
             "Bob",
             SpriteId::Character,
-            Attributes::new(5, 2, 7, 7),
+            Attributes::new(5, 2, 4, 5),
             (1, 5),
         );
         bob.main_hand.weapon = Some(BOW);
@@ -363,7 +363,10 @@ impl CoreGame {
             let roll = roll_d20_with_advantage(0);
             let spell_result = roll + caster_ref.spell_modifier();
 
-            let target_outcomes = match spell.target_type {
+            let mut target_outcome = None;
+            let mut area_outcomes = None;
+
+            match spell.target_type {
                 SpellTargetType::NoTarget { enemy_area } => {
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -372,7 +375,7 @@ impl CoreGame {
                         spell_result,
                     ));
 
-                    self.perform_spell_area_enemy_effect(
+                    let outcomes = self.perform_spell_area_enemy_effect(
                         spell.range,
                         spell.name,
                         &enhancements,
@@ -381,12 +384,14 @@ impl CoreGame {
                         &mut detail_lines,
                         spell_result,
                         enemy_area,
-                    )
+                    );
+
+                    area_outcomes = Some((caster.position.get(), outcomes));
                 }
 
                 SpellTargetType::SingleEnemy { effect, area } => {
-                    let target_ref = self.characters.get(target_id.unwrap());
-                    assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
+                    let target = self.characters.get(target_id.unwrap());
+                    assert!(caster.can_reach_with_spell(spell, target.position.get()));
 
                     let mut line = format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -398,10 +403,10 @@ impl CoreGame {
                     if let Some(contest) = effect.contest_type {
                         match contest {
                             SpellContestType::Mental => {
-                                line.push_str(&format!(", vs will={}", target_ref.will()))
+                                line.push_str(&format!(", vs will={}", target.will()))
                             }
                             SpellContestType::Projectile => {
-                                line.push_str(&format!(", vs evasion={}", target_ref.evasion()))
+                                line.push_str(&format!(", vs evasion={}", target.evasion()))
                             }
                         }
                     }
@@ -413,11 +418,10 @@ impl CoreGame {
                         &enhancements,
                         effect,
                         spell_result,
-                        target_ref,
+                        target,
                         &mut detail_lines,
                     );
-
-                    let mut outcomes = vec![(target_id.unwrap(), outcome)];
+                    target_outcome = Some((target_id.unwrap(), outcome));
 
                     if let Some((area_range, area_effect)) = area {
                         detail_lines.push("Area of effect:".to_string());
@@ -427,21 +431,19 @@ impl CoreGame {
                             "AoE",
                             &enhancements,
                             caster,
-                            target_ref.position.get(),
+                            target.position.get(),
                             &mut detail_lines,
                             spell_result,
                             area_effect,
                         );
 
-                        outcomes.extend_from_slice(&area_target_outcomes);
+                        area_outcomes = Some((target.position.get(), area_target_outcomes));
                     }
-
-                    outcomes
                 }
 
                 SpellTargetType::SingleAlly(ally_effect) => {
-                    let target_ref = self.characters.get(target_id.unwrap());
-                    assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
+                    let target = self.characters.get(target_id.unwrap());
+                    assert!(caster.can_reach_with_spell(spell, target.position.get()));
 
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -466,16 +468,15 @@ impl CoreGame {
                         line.push_str(&format!(" = {}", healing));
                         detail_lines.push(line);
 
-                        health_gained = target_ref.health.gain(healing);
-                        detail_lines.push(format!(
-                            "{} was healed for {}",
-                            target_ref.name, health_gained
-                        ));
+                        health_gained = target.health.gain(healing);
+                        detail_lines
+                            .push(format!("{} was healed for {}", target.name, health_gained));
                     };
-                    vec![(
-                        target_ref.id(),
+
+                    target_outcome = Some((
+                        target_id.unwrap(),
                         SpellTargetOutcome::HealedAlly(health_gained),
-                    )]
+                    ));
                 }
             };
 
@@ -487,7 +488,8 @@ impl CoreGame {
 
             self.ui_handle_event(GameEvent::SpellWasCast {
                 caster: caster_id,
-                target_outcomes,
+                target_outcome,
+                area_outcomes,
                 spell,
                 detail_lines,
             })
@@ -582,14 +584,15 @@ impl CoreGame {
                 }
             };
 
-            let damage = if enemy_effect.damage > 0 {
-                let mut dmg_calculation = enemy_effect.damage as i32;
+            let damage = if let Some((dmg, is_dmg_increased_by_good_roll)) = enemy_effect.damage {
+                let mut dmg_calculation = dmg as i32;
                 let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, name);
 
-                let bonus_dmg = degree_of_success;
-                if bonus_dmg > 0 {
-                    dmg_str.push_str(&format!(" +{bonus_dmg} ({label})"));
-                    dmg_calculation += bonus_dmg as i32;
+                if is_dmg_increased_by_good_roll {
+                    if degree_of_success > 0 {
+                        dmg_str.push_str(&format!(" +{degree_of_success} ({label})"));
+                        dmg_calculation += degree_of_success as i32;
+                    }
                 }
 
                 for enhancement in enhancements {
@@ -615,9 +618,12 @@ impl CoreGame {
             };
 
             if let Some(mut effect) = enemy_effect.on_hit_effect {
-                if let ApplyEffect::Condition(ref mut condition) = effect {
-                    if let Some(stacks) = condition.stacks() {
-                        *stacks += degree_of_success;
+                match effect {
+                    ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::Condition(ref mut condition) => {
+                        if let Some(stacks) = condition.stacks() {
+                            *stacks += degree_of_success;
+                        }
                     }
                 }
 
@@ -1055,7 +1061,8 @@ pub enum GameEvent {
     },
     SpellWasCast {
         caster: CharacterId,
-        target_outcomes: Vec<(CharacterId, SpellTargetOutcome)>,
+        target_outcome: Option<(CharacterId, SpellTargetOutcome)>,
+        area_outcomes: Option<((u32, u32), Vec<(CharacterId, SpellTargetOutcome)>)>,
         spell: Spell,
         detail_lines: Vec<String>,
     },
@@ -1522,7 +1529,7 @@ pub struct Spell {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnemyEffect {
     pub contest_type: Option<SpellContestType>,
-    pub damage: u32,
+    pub damage: Option<(u32, bool)>,
     pub on_hit_effect: Option<ApplyEffect>,
 }
 
