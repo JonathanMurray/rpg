@@ -55,7 +55,7 @@ impl CoreGame {
             "Gremlin Nob",
             SpriteId::Character2,
             Attributes::new(5, 5, 3, 3),
-            (2, 4),
+            (3, 4),
         );
         enemy1.main_hand.weapon = Some(BOW);
         enemy1.off_hand.shield = Some(SMALL_SHIELD);
@@ -69,7 +69,7 @@ impl CoreGame {
             "Gromp",
             SpriteId::Character3,
             Attributes::new(1, 4, 1, 5),
-            (6, 3),
+            (4, 4),
         );
         enemy2.main_hand.weapon = Some(BOW);
 
@@ -372,71 +372,73 @@ impl CoreGame {
                         spell_result,
                     ));
 
-                    let mut target_outcomes = vec![];
-
-                    for other_char in self.characters.iter() {
-                        if other_char.player_controlled == caster.player_controlled {
-                            continue;
-                        }
-
-                        if within_range_squared(
-                            spell.range.squared(),
-                            caster.position.get(),
-                            other_char.position.get(),
-                        ) {
-                            let (defense_label, defense) = match enemy_area.attack_type {
-                                SpellAttackType::Mental => ("will", other_char.will()),
-                                SpellAttackType::Projectile => ("evasion", other_char.evasion()),
-                            };
-
-                            detail_lines
-                                .push(
-                                    format!("{} {}={}", other_char.name, defense_label, defense,),
-                                );
-
-                            let outcome = self.perform_spell_enemy_effect(
-                                spell,
-                                &enhancements,
-                                enemy_area,
-                                spell_result,
-                                &other_char,
-                                &mut detail_lines,
-                            );
-
-                            target_outcomes.push((other_char.id(), outcome));
-                        }
-                    }
-
-                    target_outcomes
+                    self.perform_spell_area_enemy_effect(
+                        spell.range,
+                        spell.name,
+                        &enhancements,
+                        caster,
+                        caster.position.get(),
+                        &mut detail_lines,
+                        spell_result,
+                        enemy_area,
+                    )
                 }
+
                 SpellTargetType::SingleEnemy { effect, area } => {
                     let target_ref = self.characters.get(target_id.unwrap());
                     assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
 
-                    let (defense_label, defense) = match effect.attack_type {
-                        SpellAttackType::Mental => ("will", target_ref.will()),
-                        SpellAttackType::Projectile => ("evasion", target_ref.evasion()),
-                    };
-
-                    detail_lines.push(format!(
-                        "Rolled: {} (+{} spell mod) = {}, vs {}={}",
+                    let mut line = format!(
+                        "Rolled: {} (+{} spell mod) = {}",
                         roll,
                         caster_ref.spell_modifier(),
                         spell_result,
-                        defense_label,
-                        defense,
-                    ));
+                    );
+
+                    if let Some(contest) = effect.contest_type {
+                        match contest {
+                            SpellContestType::Mental => {
+                                line.push_str(&format!(", vs will={}", target_ref.will()))
+                            }
+                            SpellContestType::Projectile => {
+                                line.push_str(&format!(", vs evasion={}", target_ref.evasion()))
+                            }
+                        }
+                    }
+
+                    detail_lines.push(line);
 
                     let outcome = self.perform_spell_enemy_effect(
-                        spell,
+                        spell.name,
                         &enhancements,
                         effect,
                         spell_result,
                         target_ref,
                         &mut detail_lines,
                     );
-                    vec![(target_id.unwrap(), outcome)]
+
+                    let mut outcomes = vec![(target_id.unwrap(), outcome)];
+
+                    if let Some((area_range, area_effect)) = area {
+                        detail_lines.push("Area of effect:".to_string());
+
+                        let area_target_outcomes = self.perform_spell_area_enemy_effect(
+                            area_range,
+                            "AoE",
+                            &enhancements,
+                            caster,
+                            target_ref.position.get(),
+                            &mut detail_lines,
+                            spell_result,
+                            area_effect,
+                        );
+
+                        outcomes.extend_from_slice(&area_target_outcomes);
+                    }
+
+                    outcomes
                 }
+
                 SpellTargetType::SingleAlly(ally_effect) => {
                     let target_ref = self.characters.get(target_id.unwrap());
                     assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
@@ -493,23 +495,81 @@ impl CoreGame {
         }
     }
 
+    fn perform_spell_area_enemy_effect(
+        &self,
+        range: Range,
+        name: &'static str,
+        enhancements: &Vec<SpellEnhancement>,
+        caster: &Character,
+        area_center: (u32, u32),
+        detail_lines: &mut Vec<String>,
+        spell_result: u32,
+        enemy_area: SpellEnemyEffect,
+    ) -> Vec<(u32, SpellTargetOutcome)> {
+        let mut target_outcomes = vec![];
+
+        for other_char in self.characters.iter() {
+            if other_char.player_controlled == caster.player_controlled {
+                continue;
+            }
+
+            if within_range_squared(range.squared(), area_center, other_char.position.get()) {
+                let mut line = other_char.name.to_string();
+                if let Some(contest) = enemy_area.contest_type {
+                    match contest {
+                        SpellContestType::Mental => {
+                            line.push_str(&format!(" will={}", other_char.will()))
+                        }
+                        SpellContestType::Projectile => {
+                            line.push_str(&format!(" evasion={}", other_char.evasion()))
+                        }
+                    }
+                }
+
+                detail_lines.push(line);
+
+                let outcome = self.perform_spell_enemy_effect(
+                    name,
+                    enhancements,
+                    enemy_area,
+                    spell_result,
+                    &other_char,
+                    detail_lines,
+                );
+
+                target_outcomes.push((other_char.id(), outcome));
+            }
+        }
+
+        target_outcomes
+    }
+
     fn perform_spell_enemy_effect(
         &self,
-        spell: Spell,
+        name: &'static str,
         enhancements: &[SpellEnhancement],
         enemy_effect: SpellEnemyEffect,
         spell_result: u32,
         target: &Character,
         detail_lines: &mut Vec<String>,
     ) -> SpellTargetOutcome {
-        let defense = match enemy_effect.attack_type {
-            SpellAttackType::Mental => target.will(),
-            SpellAttackType::Projectile => target.evasion(),
+        let success = match enemy_effect.contest_type {
+            Some(contest) => {
+                let defense = match contest {
+                    SpellContestType::Mental => target.will(),
+                    SpellContestType::Projectile => target.evasion(),
+                };
+
+                if spell_result >= defense {
+                    Some((spell_result - defense) / 5)
+                } else {
+                    None
+                }
+            }
+            None => Some(0),
         };
 
-        if spell_result >= defense {
-            let degree_of_success = (spell_result - defense) / 5;
-
+        if let Some(degree_of_success) = success {
             let label = match degree_of_success {
                 0 => "".to_string(),
                 1 => {
@@ -524,7 +584,7 @@ impl CoreGame {
 
             let damage = if enemy_effect.damage > 0 {
                 let mut dmg_calculation = enemy_effect.damage as i32;
-                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
+                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, name);
 
                 let bonus_dmg = degree_of_success;
                 if bonus_dmg > 0 {
@@ -574,13 +634,14 @@ impl CoreGame {
 
             SpellTargetOutcome::HitEnemy { damage }
         } else {
-            match enemy_effect.attack_type {
-                SpellAttackType::Mental => {
+            match enemy_effect.contest_type {
+                Some(SpellContestType::Mental) => {
                     detail_lines.push(format!("  {} resisted the spell", target.name))
                 }
-                SpellAttackType::Projectile => {
+                Some(SpellContestType::Projectile) => {
                     detail_lines.push(format!("  The spell missed {}", target.name))
                 }
+                None => unreachable!("uncontested effect cannot fail"),
             }
             SpellTargetOutcome::Resist
         }
@@ -1089,12 +1150,12 @@ pub fn prob_attack_hit(
 
 pub fn prob_spell_hit(
     caster: &Character,
-    spell_type: SpellAttackType,
+    spell_type: SpellContestType,
     defender: &Character,
 ) -> f32 {
     let defender_value = match spell_type {
-        SpellAttackType::Mental => defender.will(),
-        SpellAttackType::Projectile => defender.evasion(),
+        SpellContestType::Mental => defender.will(),
+        SpellContestType::Projectile => defender.evasion(),
     };
     let target = defender_value
         .saturating_sub(caster.spell_modifier())
@@ -1460,7 +1521,7 @@ pub struct Spell {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnemyEffect {
-    pub attack_type: SpellAttackType,
+    pub contest_type: Option<SpellContestType>,
     pub damage: u32,
     pub on_hit_effect: Option<ApplyEffect>,
 }
@@ -1518,7 +1579,7 @@ pub enum AttackEnhancementOnHitEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum SpellAttackType {
+pub enum SpellContestType {
     Mental,
     Projectile,
 }

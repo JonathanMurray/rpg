@@ -17,7 +17,7 @@ use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
         AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, Spell, SpellAttackType, SpellEnhancement, SpellTargetType,
+        OnHitReaction, Spell, SpellContestType, SpellEnhancement, SpellTargetType,
     },
     textures::IconId,
 };
@@ -107,6 +107,16 @@ fn base_action_tooltip(
             };
         }
         BaseAction::SelfEffect(sea) => {
+            let mut technical_line = "Self: ".to_string();
+            match sea.effect {
+                crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                    technical_line.push_str(&format!("Loses {} AP", n))
+                }
+                crate::core::ApplyEffect::Condition(condition) => {
+                    technical_line.push_str(&format!("{}", condition.name()))
+                }
+            }
+
             return ActionButtonTooltip {
                 header: format!(
                     "{} ({})",
@@ -114,7 +124,7 @@ fn base_action_tooltip(
                     cost_string(sea.action_point_cost, sea.stamina_cost, 0)
                 ),
                 description: Some(sea.description),
-                technical_description: Default::default(),
+                technical_description: vec![technical_line],
             };
         }
         BaseAction::CastSpell(spell) => {
@@ -127,41 +137,80 @@ fn base_action_tooltip(
 
             match spell.target_type {
                 SpellTargetType::SingleEnemy { effect, area } => {
-                    let mut line = "Target enemy: ".to_string();
+                    technical_description.push("Target enemy: ".to_string());
                     if effect.damage > 0 {
-                        line.push_str(&format!("[{}+] damage ", effect.damage));
+                        if effect.contest_type.is_some() {
+                            technical_description.push(format!("  {}+ damage ", effect.damage));
+                        } else {
+                            technical_description.push(format!("  {} damage ", effect.damage));
+                        }
                     }
                     if let Some(apply_effect) = effect.on_hit_effect {
                         match apply_effect {
                             crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                line.push_str(&format!("lose {} AP", n))
+                                technical_description.push(format!("  loses {} AP", n));
                             }
                             crate::core::ApplyEffect::Condition(condition) => {
-                                line.push_str(condition.name())
+                                technical_description.push(format!("  {}", condition.name()));
                             }
                         }
                     }
-                    technical_description.push(line);
-                    match effect.attack_type {
-                        SpellAttackType::Mental => {
-                            technical_description.push(format!("targets [Will]"))
+                    match effect.contest_type {
+                        Some(SpellContestType::Mental) => {
+                            technical_description.push(format!("  [Will] defense"))
                         }
-                        SpellAttackType::Projectile => {
-                            technical_description.push(format!("vs [Evasion]"))
+                        Some(SpellContestType::Projectile) => {
+                            technical_description.push(format!("  [Evasion] defense"))
                         }
+                        None => {}
                     };
+
+                    if let Some((_range, effect)) = area {
+                        technical_description.push("Impact area".to_string());
+
+                        if effect.damage > 0 {
+                            if effect.contest_type.is_some() {
+                                technical_description.push(format!("  {}+ damage ", effect.damage));
+                            } else {
+                                technical_description.push(format!("  {} damage ", effect.damage));
+                            }
+                        }
+                        if let Some(apply_effect) = effect.on_hit_effect {
+                            match apply_effect {
+                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                                    technical_description.push(format!("  loses {} AP", n));
+                                }
+                                crate::core::ApplyEffect::Condition(condition) => {
+                                    technical_description.push(format!("  {}", condition.name()));
+                                }
+                            }
+                        }
+                        match effect.contest_type {
+                            Some(SpellContestType::Mental) => {
+                                technical_description.push(format!("  [Will] defense"))
+                            }
+                            Some(SpellContestType::Projectile) => {
+                                technical_description.push(format!("  [Evasion] defense"))
+                            }
+                            None => {}
+                        };
+                    }
                 }
                 SpellTargetType::SingleAlly(effect) => {
                     let mut line = "Target ally: ".to_string();
                     if effect.healing > 0 {
-                        line.push_str(&format!("[{}+] healing", effect.healing));
+                        line.push_str(&format!("{}+ healing", effect.healing));
                     }
                     technical_description.push(line);
                 }
                 SpellTargetType::NoTarget { enemy_area: effect } => {
-                    let mut line = "Enemies in range: ".to_string();
+                    let mut line = "Self area (enemies): ".to_string();
                     if effect.damage > 0 {
-                        line.push_str(&format!("[{}+] damage", effect.damage));
+                        if effect.contest_type.is_some() {
+                            technical_description.push(format!("  {}+ damage ", effect.damage));
+                        } else {
+                            technical_description.push(format!("  {} damage ", effect.damage));
+                        }
                     }
                     if let Some(apply_effect) = effect.on_hit_effect {
                         match apply_effect {
@@ -174,13 +223,14 @@ fn base_action_tooltip(
                         }
                     }
                     technical_description.push(line);
-                    match effect.attack_type {
-                        SpellAttackType::Mental => {
-                            technical_description.push(format!("targets [Will]"))
+                    match effect.contest_type {
+                        Some(SpellContestType::Mental) => {
+                            technical_description.push(format!("  [Will] defense"))
                         }
-                        SpellAttackType::Projectile => {
-                            technical_description.push(format!("vs [Evasion]"))
+                        Some(SpellContestType::Projectile) => {
+                            technical_description.push(format!("  [Evasion] defense"))
                         }
+                        None => {}
                     };
                 }
             };
@@ -309,19 +359,19 @@ impl ActionButton {
 fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     let mut s = String::new();
     if action_points > 0 {
-        s.push_str("{action_points} AP");
+        s.push_str(&format!("{action_points} AP"));
     }
     if stamina > 0 {
         if !s.is_empty() {
             s.push_str(", ");
         }
-        s.push_str("{stamina} stamina");
+        s.push_str(&format!("{stamina} stamina"));
     }
     if mana > 0 {
         if !s.is_empty() {
             s.push_str(", ");
         }
-        s.push_str("{mana} mana");
+        s.push_str(&format!("{mana} mana"));
     }
     s
 }

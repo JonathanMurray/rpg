@@ -5,7 +5,7 @@ use crate::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
         AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
         OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
-        Shield, Spell, SpellAllyEffect, SpellAttackType, SpellEnemyEffect, SpellEnhancement,
+        Shield, Spell, SpellAllyEffect, SpellContestType, SpellEnemyEffect, SpellEnhancement,
         SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
@@ -245,7 +245,7 @@ pub const SCREAM: Spell = Spell {
     range: Range::Ranged(3),
     target_type: SpellTargetType::NoTarget {
         enemy_area: SpellEnemyEffect {
-            attack_type: SpellAttackType::Mental,
+            contest_type: Some(SpellContestType::Mental),
             damage: 0,
             on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
         },
@@ -274,7 +274,7 @@ pub const MIND_BLAST: Spell = Spell {
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
-            attack_type: SpellAttackType::Mental,
+            contest_type: Some(SpellContestType::Mental),
             damage: 1,
             on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
         },
@@ -324,11 +324,18 @@ pub const FIREBALL: Spell = Spell {
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
-            attack_type: SpellAttackType::Projectile,
+            contest_type: Some(SpellContestType::Projectile),
             damage: 2,
             on_hit_effect: None,
         },
-        area: None,
+        area: Some((
+            Range::Melee,
+            SpellEnemyEffect {
+                contest_type: None,
+                damage: 1,
+                on_hit_effect: None,
+            },
+        )),
     },
     animation_color: RED,
 };
@@ -343,7 +350,7 @@ pub const KILL: Spell = Spell {
     range: Range::Ranged(99),
     target_type: SpellTargetType::SingleEnemy {
         effect: SpellEnemyEffect {
-            attack_type: SpellAttackType::Projectile,
+            contest_type: None,
             damage: 99,
             on_hit_effect: None,
         },

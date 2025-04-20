@@ -31,7 +31,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellAttackType, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
+        OnHitReaction, SpellContestType, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
         MOVE_ACTION_COST,
     },
     grid::{
@@ -420,12 +420,7 @@ impl UserInterface {
     pub fn draw(&mut self) {
         let mut y = Y_USER_INTERFACE;
 
-        let popup_rectangle = Rect {
-            x: 20.0,
-            y: y - 74.0,
-            w: self.activity_popup.last_drawn_size.0,
-            h: self.activity_popup.last_drawn_size.1,
-        };
+        let popup_rectangle = self.activity_popup.last_drawn_rectangle;
 
         self.game_grid.position_on_screen = (0.0, 0.0);
 
@@ -440,8 +435,7 @@ impl UserInterface {
         draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
         draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
 
-        self.activity_popup
-            .draw(popup_rectangle.x, popup_rectangle.y);
+        self.activity_popup.draw(20.0, y + 1.0);
 
         y -= 60.0;
 
@@ -574,7 +568,7 @@ impl UserInterface {
 
         self.state = state;
 
-        self.activity_popup.reaction_probability_line = None;
+        self.activity_popup.additional_line = None;
 
         let mut popup_initial_lines = vec![];
         let mut popup_buttons = vec![];
@@ -786,7 +780,7 @@ impl UserInterface {
         if !explanation.is_empty() {
             line.push_str(&format!("  {explanation}"));
         }
-        self.activity_popup.reaction_probability_line = Some(line);
+        self.activity_popup.additional_line = Some(line);
         self.game_grid.set_enemys_target(reactor);
     }
 
@@ -1229,11 +1223,13 @@ impl UserInterface {
                             format!("{} (AoE)", spell.name.to_string())
                         }
                         SpellTargetType::SingleEnemy { effect, area } => {
-                            let chance = as_percentage(prob_spell_hit(
-                                self.active_character(),
-                                effect.attack_type,
-                                target_char,
-                            ));
+                            let prob = effect
+                                .contest_type
+                                .map(|contest| {
+                                    prob_spell_hit(self.active_character(), contest, target_char)
+                                })
+                                .unwrap_or(1.0);
+                            let chance = as_percentage(prob);
 
                             format!("{}: {}", spell.name, chance)
                         }

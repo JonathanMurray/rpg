@@ -70,13 +70,6 @@ struct CharacterMotion {
     duration: f32,
 }
 
-#[derive(Copy, Clone, Debug)]
-enum PlayersTarget {
-    Some(CharacterId),
-    Memorized(CharacterId),
-    None,
-}
-
 struct MovementRange {
     options: Vec<(u32, f32)>,
     selected_i: usize,

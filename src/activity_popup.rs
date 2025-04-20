@@ -3,8 +3,9 @@ use std::{cell::RefCell, rc::Rc};
 use indexmap::IndexMap;
 use macroquad::{
     color::{BLACK, GRAY, ORANGE, WHITE, YELLOW},
+    math::Rect,
     shapes::{draw_line, draw_rectangle},
-    text::{draw_text_ex, Font, TextParams},
+    text::{draw_text_ex, measure_text, Font, TextParams},
 };
 
 use crate::{
@@ -25,8 +26,8 @@ pub struct ActivityPopup {
 
     font: Font,
 
-    initial_lines: Vec<String>,
-    pub reaction_probability_line: Option<String>,
+    base_lines: Vec<String>,
+    pub additional_line: Option<String>,
 
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
@@ -38,7 +39,7 @@ pub struct ActivityPopup {
     selected_choice_button_ids: Vec<u32>,
     hovered_choice_button_id: Option<u32>,
 
-    pub last_drawn_size: (f32, f32),
+    pub last_drawn_rectangle: Rect,
 }
 
 impl ActivityPopup {
@@ -51,8 +52,8 @@ impl ActivityPopup {
         Self {
             state,
             font,
-            initial_lines: vec![],
-            reaction_probability_line: None,
+            base_lines: vec![],
+            additional_line: None,
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
@@ -61,98 +62,122 @@ impl ActivityPopup {
             choice_button_events: Rc::new(RefCell::new(vec![])),
             base_action: None,
             hovered_choice_button_id: None,
-            last_drawn_size: (0.0, 0.0),
+            last_drawn_rectangle: Default::default(),
         }
     }
 
     pub fn draw(&mut self, x: f32, y: f32) {
         if matches!(self.state, UiState::Idle | UiState::ChoosingAction) {
-            self.last_drawn_size = (0.0, 0.0);
+            self.last_drawn_rectangle = Rect {
+                x,
+                y,
+                w: 0.0,
+                h: 0.0,
+            };
             return;
         }
 
-        let x0 = x + 10.0;
-        let mut y0 = y + 20.0;
-
-        //let bg_color = Color::new(0.2, 0.2, 0.2, 1.0);
         let bg_color = BLACK;
 
-        let size = (500.0, 75.0);
-        draw_rectangle(x, y, size.0, size.1, bg_color);
-        //draw_rectangle_lines(x, y, size.0, size.1, 2.0, border_color);
+        let top_pad = 5.0;
 
-        let upper_border_color = ORANGE;
-        draw_line(x, y, x, y + size.1, 1.0, upper_border_color);
-        draw_line(
-            x + size.0,
-            y,
-            x + size.0,
-            y + size.1,
-            1.0,
-            upper_border_color,
-        );
-        draw_line(x, y, x + size.0, y, 1.0, upper_border_color);
-
-        //draw_line(x, y+size.1   , x+size.0, y+size.1, 1.0, LIGHTGRAY);
-
-        draw_dashed_line((x, y + size.1), (x + size.0, y + size.1), 1.0, GRAY, 5.0);
-
-        self.last_drawn_size = size;
-
-        let line_height = 18.0;
-
-        let text_params = TextParams {
+        let base_text_params = TextParams {
             font: Some(&self.font),
             font_size: 16,
             color: WHITE,
             ..Default::default()
         };
+        let header_params = TextParams {
+            font: Some(&self.font),
+            font_size: 22,
+            color: BLACK,
+            ..Default::default()
+        };
 
-        for (i, line) in self.initial_lines.iter().enumerate() {
-            let mut params = text_params.clone();
+        let mut measured_lines = vec![];
+
+        let header_dimensions = measure_text(
+            &self.base_lines[0],
+            header_params.font,
+            header_params.font_size,
+            1.0,
+        );
+        measured_lines.push((&self.base_lines[0], header_dimensions));
+
+        for (i, line) in self.base_lines.iter().skip(1).enumerate() {
+            let dimensions =
+                measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
+            measured_lines.push((&line, dimensions));
+        }
+
+        if let Some(line) = &self.additional_line {
+            let dimensions =
+                measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
+            measured_lines.push((&line, dimensions));
+        }
+
+        let line_margin = 8.0;
+        let mut text_content_h = top_pad + header_dimensions.offset_y;
+        let mut text_content_w = 0.0;
+        for (_line, dim) in &measured_lines {
+            text_content_h += dim.height;
+            if dim.width > text_content_w {
+                text_content_w = dim.width;
+            }
+        }
+        text_content_h += (measured_lines.len() - 1) as f32 * line_margin;
+
+        let height = text_content_h.max(74.0);
+
+        let hor_pad = 10.0;
+        let margin_between_text_and_buttons = 20.0;
+        let button_margin = 10.0;
+
+        let mut width =
+            text_content_w + margin_between_text_and_buttons + self.proceed_button.size.0;
+        for btn in self.choice_buttons.values() {
+            width += button_margin + btn.size.0;
+        }
+        width += hor_pad * 2.0;
+
+        draw_rectangle(x, y - height, width, height, bg_color);
+
+        let upper_border_color = ORANGE;
+        draw_line(x, y, x, y - height, 1.0, upper_border_color);
+        draw_line(x + width, y, x + width, y - height, 1.0, upper_border_color);
+        draw_line(
+            x,
+            y - height,
+            x + width,
+            y - height,
+            1.0,
+            upper_border_color,
+        );
+
+        draw_dashed_line((x, y), (x + width, y), 1.0, GRAY, 5.0);
+
+        self.last_drawn_rectangle = Rect {
+            x,
+            y: y - height,
+            w: width,
+            h: height,
+        };
+
+        let x0 = x + hor_pad;
+        let mut y0 = y - height + top_pad + header_dimensions.offset_y;
+
+        for (i, (line, dim)) in measured_lines.iter().enumerate() {
             if i == 0 {
-                params.font_size = 22;
-                params.color = BLACK;
+                let mut params = header_params.clone();
                 draw_text_ex(line, x0 + 2.0, y0 + 2.0, params.clone());
                 params.color = YELLOW;
                 draw_text_ex(line, x0, y0, params.clone());
             } else {
-                draw_text_ex(line, x0, y0, params);
+                draw_text_ex(line, x0, y0, base_text_params.clone());
             }
 
-            y0 += line_height;
+            y0 += dim.height + line_margin;
         }
-
-        if let Some(line) = &self.reaction_probability_line {
-            draw_text_ex(line, x0, y0, text_params.clone());
-            y0 += line_height;
-        }
-
-        /*
-        if let Some(line) = &self.target_line {
-            draw_text_ex(line, x0, y0, text_params.clone());
-            y0 += line_height;
-        }
-         */
-
-        /*
-        let mut choice_description_line = "".to_string();
-        for action in self.selected_choices() {
-            choice_description_line.push('[');
-            let s = match action {
-                ButtonAction::AttackEnhancement(enhancement) => enhancement.description,
-                ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
-                ButtonAction::MovementEnhancement(enhancement) => enhancement.name,
-                ButtonAction::OnAttackedReaction(reaction) => reaction.name,
-                ButtonAction::OnHitReaction(reaction) => reaction.name,
-                ButtonAction::Action(..) | ButtonAction::Proceed => unreachable!(),
-            };
-            choice_description_line.push_str(s);
-            choice_description_line.push(']');
-        }
-        draw_text_ex(&choice_description_line, x0, y0, text_params.clone());
-        y0 += line_height;
-         */
 
         if self.enabled {
             match &self.state {
@@ -165,7 +190,7 @@ impl ActivityPopup {
                                 .sum();
                             let range = range * (1.0 + percentage as f32 / 100.0);
                             let text = format!("range: {range:.2}");
-                            draw_text_ex(&text, x0, y0, text_params.clone());
+                            draw_text_ex(&text, x0, y0, base_text_params.clone());
                         }
                         BaseAction::Attack { .. }
                         | BaseAction::CastSpell(..)
@@ -177,21 +202,22 @@ impl ActivityPopup {
             }
         }
 
-        let y_btn = y + 5.0;
-        let mut x_btn = x + 425.0;
+        let y_btn = y - height / 2.0 - 32.0;
+        //let mut x_btn = x + 425.0;
 
-        self.proceed_button.draw(x_btn, y_btn + 6.0);
-        x_btn -= self.proceed_button.size.0 + 10.0;
+        let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        for btn in self.choice_buttons.values().rev() {
+        for btn in self.choice_buttons.values() {
             btn.draw(x_btn, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
                 draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip);
             }
 
-            x_btn -= btn.size.0 + 10.0;
+            x_btn += btn.size.0 + button_margin;
         }
+
+        self.proceed_button.draw(x_btn, y_btn + 6.0);
     }
 
     fn are_choice_buttons_mutually_exclusive(&self) -> bool {
@@ -422,7 +448,7 @@ impl ActivityPopup {
         }
 
         self.state = state;
-        self.initial_lines = lines;
+        self.base_lines = lines;
         self.choice_buttons = choice_buttons;
         self.selected_choice_button_ids.clear();
 
