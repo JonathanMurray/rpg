@@ -647,9 +647,9 @@ impl GameGrid {
             UiState::ConfiguringAction(base_action) => match base_action {
                 BaseAction::Attack { .. } => MouseState::RequiresEnemyTarget,
                 BaseAction::CastSpell(spell) => match spell.target_type {
-                    SpellTargetType::SelfAreaEnemy(..) => MouseState::ImplicitTarget,
-                    SpellTargetType::SingleEnemy(..) => MouseState::RequiresEnemyTarget,
-                    SpellTargetType::SingleAlly => MouseState::RequiresAllyTarget,
+                    SpellTargetType::NoTarget { .. } => MouseState::ImplicitTarget,
+                    SpellTargetType::SingleEnemy { .. } => MouseState::RequiresEnemyTarget,
+                    SpellTargetType::SingleAlly(..) => MouseState::RequiresAllyTarget,
                 },
                 BaseAction::Move { .. } => MouseState::MayInputMovement,
                 BaseAction::SelfEffect(..) => MouseState::ImplicitTarget,

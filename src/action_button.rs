@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    default,
     rc::Rc,
 };
 
@@ -15,138 +16,197 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        AttackEnhancement, BaseAction, Character, MovementEnhancement, OffensiveSpellType,
-        OnAttackedReaction, OnHitReaction, Spell, SpellEnhancement, SpellTargetType,
+        AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
+        OnHitReaction, Spell, SpellAttackType, SpellEnhancement, SpellTargetType,
     },
     textures::IconId,
 };
 
-fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -> Vec<String> {
+pub struct ActionButtonTooltip {
+    pub header: String,
+    pub description: Option<&'static str>,
+    pub technical_description: Vec<String>,
+}
+
+fn button_action_tooltip(
+    action: &ButtonAction,
+    character: Option<&Character>,
+) -> ActionButtonTooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action, character),
-        ButtonAction::AttackEnhancement(enhancement) => {
-            vec![
-                format!(
-                    "{} ({})",
-                    enhancement.name,
-                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
-                ),
-                //"Attack enhancement:".to_string(),
-                enhancement.description.to_string(),
-            ]
-        }
+        ButtonAction::AttackEnhancement(enhancement) => ActionButtonTooltip {
+            header: format!(
+                "{} ({})",
+                enhancement.name,
+                cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
+            ),
+            description: Some(enhancement.description),
+            technical_description: Default::default(),
+        },
 
-        ButtonAction::SpellEnhancement(enhancement) => {
-            vec![
-                format!("{} ({} mana)", enhancement.name, enhancement.mana_cost),
-                "Spell enhancement:".to_string(),
-                enhancement.description.to_string(),
-            ]
-        }
-        ButtonAction::MovementEnhancement(enhancement) => {
-            vec![
-                format!(
-                    "{} ({})",
-                    enhancement.name,
-                    cost_string(enhancement.action_point_cost, enhancement.stamina_cost)
-                ),
-                "Enhancement:".to_string(),
-                format!("+{}% range", enhancement.add_percentage),
-            ]
-        }
-        ButtonAction::OnAttackedReaction(reaction) => {
-            vec![
-                format!(
-                    "{} ({})",
-                    reaction.name,
-                    cost_string(reaction.action_point_cost, reaction.stamina_cost)
-                ),
-                reaction.description.to_string(),
-            ]
-        }
-        ButtonAction::OnHitReaction(reaction) => {
-            vec![
-                format!("{} ({} AP)", reaction.name, reaction.action_point_cost),
-                reaction.description.to_string(),
-            ]
-        }
+        ButtonAction::SpellEnhancement(enhancement) => ActionButtonTooltip {
+            header: format!(
+                "{} ({})",
+                enhancement.name,
+                cost_string(enhancement.action_point_cost, 0, enhancement.mana_cost)
+            ),
+            description: Some(enhancement.description),
+            technical_description: Default::default(),
+        },
+        ButtonAction::MovementEnhancement(enhancement) => ActionButtonTooltip {
+            header: format!(
+                "{} ({})",
+                enhancement.name,
+                cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
+            ),
+            description: None,
+            technical_description: vec![format!("+{}% range", enhancement.add_percentage)],
+        },
+        ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
+            header: format!(
+                "{} ({})",
+                reaction.name,
+                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+            ),
+            description: Some(reaction.description),
+            technical_description: Default::default(),
+        },
+        ButtonAction::OnHitReaction(reaction) => ActionButtonTooltip {
+            header: format!(
+                "{} ({})",
+                reaction.name,
+                cost_string(reaction.action_point_cost, 0, 0)
+            ),
+            description: Some(reaction.description),
+            technical_description: Default::default(),
+        },
 
-        ButtonAction::Proceed => {
-            vec![
-                "Proceed".to_string(),
-                "Spend the required resources and perform the action".to_string(),
-            ]
-        }
+        ButtonAction::Proceed => ActionButtonTooltip {
+            header: "Proceed".to_string(),
+            description: None,
+            technical_description: Default::default(),
+        },
     }
 }
 
-fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) -> Vec<String> {
-    let mut tooltip_lines = vec![];
+fn base_action_tooltip(
+    base_action: &BaseAction,
+    character: Option<&Character>,
+) -> ActionButtonTooltip {
     match base_action {
         BaseAction::Attack { hand, .. } => {
             let weapon = character.unwrap().weapon(*hand).unwrap();
-            tooltip_lines.push(format!(
-                "{} attack ({} AP)",
-                weapon.name, weapon.action_point_cost
-            ));
-            tooltip_lines.push(format!("{} damage", weapon.damage));
-            tooltip_lines.push("vs Evasion".to_string());
+
+            return ActionButtonTooltip {
+                header: format!("{} attack ({} AP)", weapon.name, weapon.action_point_cost),
+                description: None,
+                technical_description: vec![
+                    format!("{} damage", weapon.damage),
+                    "vs Evasion".to_string(),
+                ],
+            };
         }
         BaseAction::SelfEffect(sea) => {
-            tooltip_lines.push(format!(
-                "{} ({})",
-                sea.name,
-                cost_string(sea.action_point_cost, sea.stamina_cost)
-            ));
-
-            tooltip_lines.push(sea.description.to_string());
+            return ActionButtonTooltip {
+                header: format!(
+                    "{} ({})",
+                    sea.name,
+                    cost_string(sea.action_point_cost, sea.stamina_cost, 0)
+                ),
+                description: Some(sea.description),
+                technical_description: Default::default(),
+            };
         }
         BaseAction::CastSpell(spell) => {
-            tooltip_lines.push(format!(
+            let header = format!(
                 "{} ({} AP, {} mana)",
                 spell.name, spell.action_point_cost, spell.mana_cost
-            ));
-            let mut description = spell.description.to_string();
-            if spell.damage > 0 {
-                description.push_str(&format!(" ({} damage)", spell.damage));
-            }
+            );
 
-            tooltip_lines.push(description);
+            let mut technical_description = vec![];
 
-            let attribute_line = match spell.target_type {
-                SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Mental) => {
-                    "Targets AoE [will]".to_string()
+            match spell.target_type {
+                SpellTargetType::SingleEnemy { effect, area } => {
+                    let mut line = "Target enemy: ".to_string();
+                    if effect.damage > 0 {
+                        line.push_str(&format!("[{}+] damage ", effect.damage));
+                    }
+                    if let Some(apply_effect) = effect.on_hit_effect {
+                        match apply_effect {
+                            crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                                line.push_str(&format!("lose {} AP", n))
+                            }
+                            crate::core::ApplyEffect::Condition(condition) => {
+                                line.push_str(condition.name())
+                            }
+                        }
+                    }
+                    technical_description.push(line);
+                    match effect.attack_type {
+                        SpellAttackType::Mental => {
+                            technical_description.push(format!("targets [Will]"))
+                        }
+                        SpellAttackType::Projectile => {
+                            technical_description.push(format!("vs [Evasion]"))
+                        }
+                    };
                 }
-                SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Projectile) => {
-                    "Targets AoE [evasion]".to_string()
+                SpellTargetType::SingleAlly(effect) => {
+                    let mut line = "Target ally: ".to_string();
+                    if effect.healing > 0 {
+                        line.push_str(&format!("[{}+] healing", effect.healing));
+                    }
+                    technical_description.push(line);
                 }
-                SpellTargetType::SingleEnemy(OffensiveSpellType::Mental) => {
-                    "Targets [will]".to_string()
+                SpellTargetType::NoTarget { enemy_area: effect } => {
+                    let mut line = "Enemies in range: ".to_string();
+                    if effect.damage > 0 {
+                        line.push_str(&format!("[{}+] damage", effect.damage));
+                    }
+                    if let Some(apply_effect) = effect.on_hit_effect {
+                        match apply_effect {
+                            crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                                line.push_str(&format!("lose {} AP", n))
+                            }
+                            crate::core::ApplyEffect::Condition(condition) => {
+                                line.push_str(condition.name())
+                            }
+                        }
+                    }
+                    technical_description.push(line);
+                    match effect.attack_type {
+                        SpellAttackType::Mental => {
+                            technical_description.push(format!("targets [Will]"))
+                        }
+                        SpellAttackType::Projectile => {
+                            technical_description.push(format!("vs [Evasion]"))
+                        }
+                    };
                 }
-                SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile) => {
-                    "Targets [evasion]".to_string()
-                }
-                SpellTargetType::SingleAlly => "".to_string(),
             };
 
-            if !attribute_line.is_empty() {
-                tooltip_lines.push(attribute_line);
-            }
+            return ActionButtonTooltip {
+                header,
+                description: Some(spell.description),
+                technical_description,
+            };
         }
         BaseAction::Move {
             action_point_cost,
             range: _,
         } => {
-            tooltip_lines.push(format!("Movement ({} AP)", action_point_cost));
+            return ActionButtonTooltip {
+                header: format!("Movement ({} AP)", action_point_cost),
+                description: None,
+                technical_description: Default::default(),
+            }
         }
     }
-
-    tooltip_lines
 }
 
 pub struct ActionButton {
     pub id: u32,
-    pub tooltip_lines: Vec<String>,
+    pub tooltip: ActionButtonTooltip,
     pub action: ButtonAction,
     pub size: (f32, f32),
     texture_draw_size: (f32, f32),
@@ -172,7 +232,7 @@ impl ActionButton {
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
         let icon = action.icon();
-        let tooltip_lines = button_action_tooltip(&action, character);
+        let tooltip = button_action_tooltip(&action, character);
 
         let (size, texture_draw_size) = match action {
             // TODO
@@ -228,7 +288,7 @@ impl ActionButton {
                 queue: Rc::clone(event_queue),
             }),
             icon,
-            tooltip_lines,
+            tooltip,
         }
     }
 
@@ -246,12 +306,24 @@ impl ActionButton {
     }
 }
 
-fn cost_string(action_points: u32, stamina: u32) -> String {
-    match (action_points, stamina) {
-        (0, sta) => format!("{} stamina", sta),
-        (ap, 0) => format!("{} AP", ap),
-        (ap, sta) => format!("{} AP, {} stamina", ap, sta),
+fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+    let mut s = String::new();
+    if action_points > 0 {
+        s.push_str("{action_points} AP");
     }
+    if stamina > 0 {
+        if !s.is_empty() {
+            s.push_str(", ");
+        }
+        s.push_str("{stamina} stamina");
+    }
+    if mana > 0 {
+        if !s.is_empty() {
+            s.push_str(", ");
+        }
+        s.push_str("{mana} mana");
+    }
+    s
 }
 
 impl Drawable for ActionButton {
@@ -360,7 +432,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost,
             ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
-            ButtonAction::SpellEnhancement(..) => 0,
+            ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
         }
@@ -448,11 +520,21 @@ pub enum InternalUiEvent {
     ButtonClicked(u32, ButtonAction),
 }
 
-pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), lines: &[String]) {
+pub fn draw_button_tooltip(
+    font: &Font,
+    button_position: (f32, f32),
+    tooltip: &ActionButtonTooltip,
+) {
+    let mut lines = vec![tooltip.header.to_string()];
+    if let Some(description) = tooltip.description {
+        lines.push(description.to_string());
+    }
+    lines.extend_from_slice(&tooltip.technical_description);
+
     draw_tooltip(
         font,
         TooltipPosition::BottomLeft((button_position.0, button_position.1 - 3.0)),
-        lines,
+        &lines,
     );
 }
 

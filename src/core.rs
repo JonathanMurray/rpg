@@ -34,7 +34,7 @@ impl CoreGame {
             "Bob",
             SpriteId::Character,
             Attributes::new(5, 2, 7, 7),
-            (0, 10),
+            (1, 5),
         );
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
@@ -344,6 +344,7 @@ impl CoreGame {
         caster.mana.spend(spell.mana_cost);
 
         for enhancement in &enhancements {
+            caster.action_points.spend(enhancement.action_point_cost);
             caster.mana.spend(enhancement.mana_cost);
         }
 
@@ -363,7 +364,7 @@ impl CoreGame {
             let spell_result = roll + caster_ref.spell_modifier();
 
             let target_outcomes = match spell.target_type {
-                SpellTargetType::SelfAreaEnemy(spell_type) => {
+                SpellTargetType::NoTarget { enemy_area } => {
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
                         roll,
@@ -383,9 +384,9 @@ impl CoreGame {
                             caster.position.get(),
                             other_char.position.get(),
                         ) {
-                            let (defense_label, defense) = match spell_type {
-                                OffensiveSpellType::Mental => ("will", other_char.will()),
-                                OffensiveSpellType::Projectile => ("evasion", other_char.evasion()),
+                            let (defense_label, defense) = match enemy_area.attack_type {
+                                SpellAttackType::Mental => ("will", other_char.will()),
+                                SpellAttackType::Projectile => ("evasion", other_char.evasion()),
                             };
 
                             detail_lines
@@ -393,10 +394,10 @@ impl CoreGame {
                                     format!("{} {}={}", other_char.name, defense_label, defense,),
                                 );
 
-                            let outcome = self.perform_offensive_spell_on_target(
+                            let outcome = self.perform_spell_enemy_effect(
                                 spell,
                                 &enhancements,
-                                spell_type,
+                                enemy_area,
                                 spell_result,
                                 &other_char,
                                 &mut detail_lines,
@@ -408,13 +409,13 @@ impl CoreGame {
 
                     target_outcomes
                 }
-                SpellTargetType::SingleEnemy(spell_type) => {
+                SpellTargetType::SingleEnemy { effect, area } => {
                     let target_ref = self.characters.get(target_id.unwrap());
                     assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
 
-                    let (defense_label, defense) = match spell_type {
-                        OffensiveSpellType::Mental => ("will", target_ref.will()),
-                        OffensiveSpellType::Projectile => ("evasion", target_ref.evasion()),
+                    let (defense_label, defense) = match effect.attack_type {
+                        SpellAttackType::Mental => ("will", target_ref.will()),
+                        SpellAttackType::Projectile => ("evasion", target_ref.evasion()),
                     };
 
                     detail_lines.push(format!(
@@ -426,17 +427,17 @@ impl CoreGame {
                         defense,
                     ));
 
-                    let outcome = self.perform_offensive_spell_on_target(
+                    let outcome = self.perform_spell_enemy_effect(
                         spell,
                         &enhancements,
-                        spell_type,
+                        effect,
                         spell_result,
                         target_ref,
                         &mut detail_lines,
                     );
                     vec![(target_id.unwrap(), outcome)]
                 }
-                SpellTargetType::SingleAlly => {
+                SpellTargetType::SingleAlly(ally_effect) => {
                     let target_ref = self.characters.get(target_id.unwrap());
                     assert!(caster.can_reach_with_spell(spell, target_ref.position.get()));
 
@@ -448,10 +449,11 @@ impl CoreGame {
                     ));
 
                     let mut health_gained = 0;
-                    if spell.healing > 0 {
-                        let mut healing = spell.healing;
 
-                        let mut line = format!("Healing: {} ({})", spell.healing, spell.name);
+                    if ally_effect.healing > 0 {
+                        let mut healing = ally_effect.healing;
+
+                        let mut line = format!("Healing: {} ({})", ally_effect.healing, spell.name);
 
                         let effectiveness = spell_result / 10;
                         if effectiveness > 0 {
@@ -491,18 +493,18 @@ impl CoreGame {
         }
     }
 
-    fn perform_offensive_spell_on_target(
+    fn perform_spell_enemy_effect(
         &self,
         spell: Spell,
         enhancements: &[SpellEnhancement],
-        spell_type: OffensiveSpellType,
+        enemy_effect: SpellEnemyEffect,
         spell_result: u32,
         target: &Character,
         detail_lines: &mut Vec<String>,
     ) -> SpellTargetOutcome {
-        let defense = match spell_type {
-            OffensiveSpellType::Mental => target.will(),
-            OffensiveSpellType::Projectile => target.evasion(),
+        let defense = match enemy_effect.attack_type {
+            SpellAttackType::Mental => target.will(),
+            SpellAttackType::Projectile => target.evasion(),
         };
 
         if spell_result >= defense {
@@ -520,8 +522,8 @@ impl CoreGame {
                 }
             };
 
-            let damage = if spell.damage > 0 {
-                let mut dmg_calculation = spell.damage as i32;
+            let damage = if enemy_effect.damage > 0 {
+                let mut dmg_calculation = enemy_effect.damage as i32;
                 let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, spell.name);
 
                 let bonus_dmg = degree_of_success;
@@ -552,7 +554,7 @@ impl CoreGame {
                 None
             };
 
-            if let Some(mut effect) = spell.on_hit_effect {
+            if let Some(mut effect) = enemy_effect.on_hit_effect {
                 if let ApplyEffect::Condition(ref mut condition) = effect {
                     if let Some(stacks) = condition.stacks() {
                         *stacks += degree_of_success;
@@ -572,11 +574,11 @@ impl CoreGame {
 
             SpellTargetOutcome::HitEnemy { damage }
         } else {
-            match spell_type {
-                OffensiveSpellType::Mental => {
+            match enemy_effect.attack_type {
+                SpellAttackType::Mental => {
                     detail_lines.push(format!("  {} resisted the spell", target.name))
                 }
-                OffensiveSpellType::Projectile => {
+                SpellAttackType::Projectile => {
                     detail_lines.push(format!("  The spell missed {}", target.name))
                 }
             }
@@ -1087,12 +1089,12 @@ pub fn prob_attack_hit(
 
 pub fn prob_spell_hit(
     caster: &Character,
-    spell_type: OffensiveSpellType,
+    spell_type: SpellAttackType,
     defender: &Character,
 ) -> f32 {
     let defender_value = match spell_type {
-        OffensiveSpellType::Mental => defender.will(),
-        OffensiveSpellType::Projectile => defender.evasion(),
+        SpellAttackType::Mental => defender.will(),
+        SpellAttackType::Projectile => defender.evasion(),
     };
     let target = defender_value
         .saturating_sub(caster.spell_modifier())
@@ -1274,7 +1276,7 @@ impl Condition {
         }
     }
 
-    const fn name(&self) -> &'static str {
+    pub const fn name(&self) -> &'static str {
         match self {
             Condition::Dazed(_) => "Dazed",
             Condition::Bleeding => "Bleeding",
@@ -1449,9 +1451,7 @@ pub struct Spell {
     pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
-    pub damage: u32,
-    pub healing: u32,
-    pub on_hit_effect: Option<ApplyEffect>,
+
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
     pub range: Range,
     pub target_type: SpellTargetType,
@@ -1459,18 +1459,37 @@ pub struct Spell {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub struct SpellEnemyEffect {
+    pub attack_type: SpellAttackType,
+    pub damage: u32,
+    pub on_hit_effect: Option<ApplyEffect>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct SpellAllyEffect {
+    pub healing: u32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellTargetType {
-    SelfAreaEnemy(OffensiveSpellType),
-    SingleEnemy(OffensiveSpellType),
-    SingleAlly,
+    SingleEnemy {
+        effect: SpellEnemyEffect,
+        area: Option<(Range, SpellEnemyEffect)>,
+    },
+
+    SingleAlly(SpellAllyEffect),
+
+    NoTarget {
+        enemy_area: SpellEnemyEffect,
+    },
 }
 
 impl SpellTargetType {
     pub fn single_target(&self) -> bool {
         match self {
-            SpellTargetType::SelfAreaEnemy(..) => false,
-            SpellTargetType::SingleEnemy(..) => true,
-            SpellTargetType::SingleAlly => true,
+            SpellTargetType::NoTarget { .. } => false,
+            SpellTargetType::SingleEnemy { .. } => true,
+            SpellTargetType::SingleAlly(..) => true,
         }
     }
 }
@@ -1480,6 +1499,7 @@ pub struct SpellEnhancement {
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
+    pub action_point_cost: u32,
     pub mana_cost: u32,
     pub bonus_damage: u32,
     pub effect: Option<SpellEnhancementEffect>,
@@ -1498,7 +1518,7 @@ pub enum AttackEnhancementOnHitEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum OffensiveSpellType {
+pub enum SpellAttackType {
     Mental,
     Projectile,
 }
@@ -1965,7 +1985,8 @@ impl Character {
 
     pub fn can_use_spell_enhancement(&self, spell: Spell, enhancement: SpellEnhancement) -> bool {
         //let enhancement = spell.possible_enhancements[enhancement_index].unwrap();
-        self.mana.current() >= spell.mana_cost + enhancement.mana_cost
+        self.action_points.current() >= spell.action_point_cost + enhancement.action_point_cost
+            && self.mana.current() >= spell.mana_cost + enhancement.mana_cost
     }
 
     fn strength(&self) -> u32 {

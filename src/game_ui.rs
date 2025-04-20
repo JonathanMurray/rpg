@@ -30,8 +30,8 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OffensiveSpellType,
-        OnAttackedReaction, OnHitReaction, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
+        GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OnAttackedReaction,
+        OnHitReaction, SpellAttackType, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
         MOVE_ACTION_COST,
     },
     grid::{
@@ -492,7 +492,7 @@ impl UserInterface {
                 .find(|btn| btn.id == btn_id)
                 .expect("hovered button");
 
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip_lines[..]);
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip);
         }
 
         if let Some(grid_switched_to) = grid_outcome.switched_action {
@@ -588,12 +588,12 @@ impl UserInterface {
             UiState::ConfiguringAction(base_action) => {
                 self.set_allowed_to_use_action_buttons(true);
 
-                popup_initial_lines = self.character_uis[&self.active_character_id]
-                    .tracked_action_buttons[&button_action_id(ButtonAction::Action(base_action))]
-                    .tooltip_lines
-                    .iter()
-                    .map(|s| s.to_string())
-                    .collect();
+                let tooltip = &self.character_uis[&self.active_character_id].tracked_action_buttons
+                    [&button_action_id(ButtonAction::Action(base_action))]
+                    .tooltip;
+
+                popup_initial_lines.push(tooltip.header.to_string());
+                popup_initial_lines.extend_from_slice(&tooltip.technical_description);
 
                 self.set_highlighted_action(Some(ButtonAction::Action(base_action)));
 
@@ -623,9 +623,9 @@ impl UserInterface {
                         }
 
                         match spell.target_type {
-                            SpellTargetType::SelfAreaEnemy(..) => player_wants_enemy_target = true,
-                            SpellTargetType::SingleEnemy(..) => player_wants_enemy_target = true,
-                            SpellTargetType::SingleAlly => player_wants_ally_target = true,
+                            SpellTargetType::NoTarget { .. } => player_wants_enemy_target = true,
+                            SpellTargetType::SingleEnemy { .. } => player_wants_enemy_target = true,
+                            SpellTargetType::SingleAlly { .. } => player_wants_ally_target = true,
                         }
                     }
                     BaseAction::Move { .. } => {
@@ -1225,19 +1225,19 @@ impl UserInterface {
                     let target_char = self.characters.get(i);
 
                     let action_text = match spell.target_type {
-                        SpellTargetType::SelfAreaEnemy(..) => {
+                        SpellTargetType::NoTarget { .. } => {
                             format!("{} (AoE)", spell.name.to_string())
                         }
-                        SpellTargetType::SingleEnemy(spell_type) => {
+                        SpellTargetType::SingleEnemy { effect, area } => {
                             let chance = as_percentage(prob_spell_hit(
                                 self.active_character(),
-                                spell_type,
+                                effect.attack_type,
                                 target_char,
                             ));
 
                             format!("{}: {}", spell.name, chance)
                         }
-                        SpellTargetType::SingleAlly => spell.name.to_string(),
+                        SpellTargetType::SingleAlly(..) => spell.name.to_string(),
                     };
 
                     self.target_ui.set_action(action_text, vec![], true);
@@ -1255,7 +1255,7 @@ impl UserInterface {
                         maybe_indicator.map(|indicator| (spell.range, indicator));
                 } else {
                     let range_indicator = match spell.target_type {
-                        SpellTargetType::SelfAreaEnemy(..) => {
+                        SpellTargetType::NoTarget { .. } => {
                             self.target_ui.set_action(
                                 format!("{} (AoE)", spell.name.to_string()),
                                 vec![],
@@ -1264,7 +1264,7 @@ impl UserInterface {
                             popup_enabled = true;
                             RangeIndicator::GoodWithBackground
                         }
-                        SpellTargetType::SingleEnemy(..) | SpellTargetType::SingleAlly => {
+                        SpellTargetType::SingleEnemy { .. } | SpellTargetType::SingleAlly(..) => {
                             self.target_ui
                                 .set_action("Select a target".to_string(), vec![], false);
                             RangeIndicator::GoodWithBackground

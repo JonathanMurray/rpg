@@ -187,7 +187,7 @@ impl ActivityPopup {
             btn.draw(x_btn, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip_lines[..]);
+                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip);
             }
 
             x_btn -= btn.size.0 + 10.0;

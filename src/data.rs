@@ -3,10 +3,10 @@ use macroquad::color::{BLACK, BLUE, GREEN, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, ConditionDescription, OffensiveSpellType, OnAttackedReaction,
+        AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
         OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
-        Shield, Spell, SpellEnhancement, SpellEnhancementEffect, SpellTargetType, Weapon,
-        WeaponGrip, WeaponRange,
+        Shield, Spell, SpellAllyEffect, SpellAttackType, SpellEnemyEffect, SpellEnhancement,
+        SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -224,18 +224,16 @@ pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
 
 pub const SCREAM: Spell = Spell {
     name: "Scream",
-    description: "Causes nearby enemies to become Dazed",
+    description: "Daze nearby enemies",
     icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
-    damage: 0,
-    healing: 0,
-    on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
             description: "Targets also lose 1 AP",
             icon: IconId::Banshee,
+            action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 0,
             effect: Some(SpellEnhancementEffect::OnHitEffect(
@@ -245,24 +243,28 @@ pub const SCREAM: Spell = Spell {
         None,
     ],
     range: Range::Ranged(3),
-    target_type: SpellTargetType::SelfAreaEnemy(OffensiveSpellType::Mental),
+    target_type: SpellTargetType::NoTarget {
+        enemy_area: SpellEnemyEffect {
+            attack_type: SpellAttackType::Mental,
+            damage: 0,
+            on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+        },
+    },
     animation_color: BLUE,
 };
 
 pub const MIND_BLAST: Spell = Spell {
     name: "Mind blast",
-    description: "Damage and stagger an enemy",
+    description: "Assault an enemy's mind, damaging and disrupting them",
     icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
-    damage: 1,
-    healing: 0,
-    on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Dualcast",
             description: "Spell is cast twice",
             icon: IconId::Dualcast,
+            action_point_cost: 1,
             mana_cost: 1,
             bonus_damage: 0,
             effect: Some(SpellEnhancementEffect::CastTwice),
@@ -270,39 +272,41 @@ pub const MIND_BLAST: Spell = Spell {
         None,
     ],
     range: Range::Ranged(5),
-    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    target_type: SpellTargetType::SingleEnemy {
+        effect: SpellEnemyEffect {
+            attack_type: SpellAttackType::Mental,
+            damage: 1,
+            on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
+        },
+        area: None,
+    },
     animation_color: PURPLE,
 };
 
 pub const HEAL: Spell = Spell {
     name: "Heal",
-    description: "Heal an ally",
+    description: "Restore an ally's health",
     icon: IconId::Plus,
     action_point_cost: 2,
     mana_cost: 1,
-    damage: 0,
-    healing: 1,
-    on_hit_effect: None,
     possible_enhancements: [None, None],
     range: Range::Ranged(5),
-    target_type: SpellTargetType::SingleAlly,
+    target_type: SpellTargetType::SingleAlly(SpellAllyEffect { healing: 1 }),
     animation_color: GREEN,
 };
 
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
-    description: "Damage an enemy",
+    description: "Hurl fire at an enemy, damaging them",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
-    damage: 2,
-    healing: 0,
-    on_hit_effect: None,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Big",
             description: "+1 damage",
             icon: IconId::Plus,
+            action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 1,
             effect: None,
@@ -311,13 +315,21 @@ pub const FIREBALL: Spell = Spell {
             name: "Massive",
             description: "+2 damage",
             icon: IconId::PlusPlus,
+            action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 2,
             effect: None,
         }),
     ],
     range: Range::Ranged(5),
-    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Projectile),
+    target_type: SpellTargetType::SingleEnemy {
+        effect: SpellEnemyEffect {
+            attack_type: SpellAttackType::Projectile,
+            damage: 2,
+            on_hit_effect: None,
+        },
+        area: None,
+    },
     animation_color: RED,
 };
 
@@ -327,11 +339,15 @@ pub const KILL: Spell = Spell {
     icon: IconId::Fireball,
     action_point_cost: 5,
     mana_cost: 0,
-    damage: 99,
-    healing: 0,
-    on_hit_effect: None,
     possible_enhancements: [None; 2],
     range: Range::Ranged(99),
-    target_type: SpellTargetType::SingleEnemy(OffensiveSpellType::Mental),
+    target_type: SpellTargetType::SingleEnemy {
+        effect: SpellEnemyEffect {
+            attack_type: SpellAttackType::Projectile,
+            damage: 99,
+            on_hit_effect: None,
+        },
+        area: None,
+    },
     animation_color: BLACK,
 };
