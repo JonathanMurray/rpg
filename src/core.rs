@@ -8,8 +8,8 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL, MASS_HEAL,
-    PARRY_EVASION_BONUS, RAGE, RAGING_DESCRIPTION,
+    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, HEALING_NOVA,
+    HEALING_RAIN, KILL, PARRY_EVASION_BONUS, RAGE, RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -46,8 +46,8 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
-        bob.known_actions.push(BaseAction::CastSpell(HEAL));
-        bob.known_actions.push(BaseAction::CastSpell(MASS_HEAL));
+        bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
+        bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
         bob.known_actions.push(BaseAction::SelfEffect(BRACE));
 
         let mut enemy1 = Character::new(
@@ -335,7 +335,7 @@ impl CoreGame {
 
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
-        target_id: Option<CharacterId>,
+        selected_target: ActionTarget,
     ) {
         let caster = self.active_character();
         let caster_id = caster.id();
@@ -367,46 +367,15 @@ impl CoreGame {
             let mut area_outcomes = None;
 
             match spell.target_type {
-                SpellTargetType::NoTarget(area_effect) => {
-                    detail_lines.push(format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        spell_result,
-                    ));
-
-                    match area_effect {
-                        SpellAreaEffect::Enemy(enemy_area) => {
-                            let outcomes = self.perform_spell_area_enemy_effect(
-                                spell.range,
-                                spell.name,
-                                &enhancements,
-                                caster,
-                                caster.position.get(),
-                                &mut detail_lines,
-                                spell_result,
-                                enemy_area,
-                            );
-                            area_outcomes = Some((caster.position.get(), outcomes));
-                        }
-
-                        SpellAreaEffect::Ally(ally_area) => {
-                            let outcomes = self.perform_spell_area_ally_effect(
-                                spell.range,
-                                spell.name,
-                                caster,
-                                caster.position.get(),
-                                &mut detail_lines,
-                                spell_result,
-                                ally_area,
-                            );
-                            area_outcomes = Some((caster.position.get(), outcomes));
-                        }
-                    }
-                }
-
-                SpellTargetType::SingleEnemy { effect, area } => {
-                    let target = self.characters.get(target_id.unwrap());
+                SpellTargetType::TargetEnemy {
+                    effect,
+                    impact_area: area,
+                    range,
+                } => {
+                    let ActionTarget::Character(target_id) = selected_target else {
+                        unreachable!()
+                    };
+                    let target = self.characters.get(target_id);
                     assert!(caster.can_reach_with_spell(spell, target.position.get()));
 
                     let mut line = format!(
@@ -437,7 +406,7 @@ impl CoreGame {
                         target,
                         &mut detail_lines,
                     );
-                    target_outcome = Some((target_id.unwrap(), outcome));
+                    target_outcome = Some((target_id, outcome));
 
                     if let Some((area_range, area_effect)) = area {
                         detail_lines.push("Area of effect:".to_string());
@@ -457,8 +426,11 @@ impl CoreGame {
                     }
                 }
 
-                SpellTargetType::SingleAlly(ally_effect) => {
-                    let target = self.characters.get(target_id.unwrap());
+                SpellTargetType::TargetAlly { range, effect } => {
+                    let ActionTarget::Character(target_id) = selected_target else {
+                        unreachable!()
+                    };
+                    let target = self.characters.get(target_id);
                     assert!(caster.can_reach_with_spell(spell, target.position.get()));
 
                     detail_lines.push(format!(
@@ -473,13 +445,66 @@ impl CoreGame {
                     }
                     let outcome = self.perform_spell_ally_effect(
                         spell.name,
-                        ally_effect,
+                        effect,
                         target,
                         &mut detail_lines,
                         degree_of_success,
                     );
 
-                    target_outcome = Some((target_id.unwrap(), outcome));
+                    target_outcome = Some((target_id, outcome));
+                }
+
+                SpellTargetType::TargetArea {
+                    range,
+                    radius,
+                    effect,
+                } => {
+                    let ActionTarget::Position(target_pos) = selected_target else {
+                        unreachable!()
+                    };
+                    assert!(caster.can_reach_with_spell(spell, target_pos));
+
+                    detail_lines.push(format!(
+                        "Rolled: {} (+{} spell mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        spell_result,
+                    ));
+
+                    let outcomes = self.perform_spell_area_effect(
+                        spell.name,
+                        &enhancements,
+                        caster,
+                        target_pos,
+                        radius,
+                        &mut detail_lines,
+                        spell_result,
+                        effect,
+                    );
+
+                    area_outcomes = Some((target_pos, outcomes));
+                }
+
+                SpellTargetType::NoTarget { radius, effect } => {
+                    detail_lines.push(format!(
+                        "Rolled: {} (+{} spell mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        spell_result,
+                    ));
+
+                    let outcomes = self.perform_spell_area_effect(
+                        spell.name,
+                        &enhancements,
+                        caster,
+                        caster.position.get(),
+                        radius,
+                        &mut detail_lines,
+                        spell_result,
+                        effect,
+                    );
+
+                    area_outcomes = Some((caster.position.get(), outcomes));
                 }
             };
 
@@ -497,6 +522,47 @@ impl CoreGame {
                 detail_lines,
             })
             .await;
+        }
+    }
+
+    fn perform_spell_area_effect(
+        &self,
+        name: &'static str,
+        enhancements: &[SpellEnhancement],
+        caster: &Character,
+        area_center: (u32, u32),
+        radius: Range,
+        detail_lines: &mut Vec<String>,
+        spell_result: u32,
+        effect: SpellEffect,
+    ) -> Vec<(u32, SpellTargetOutcome)> {
+        match effect {
+            SpellEffect::Enemy(enemy_area) => {
+                let outcomes = self.perform_spell_area_enemy_effect(
+                    radius,
+                    name,
+                    enhancements,
+                    caster,
+                    area_center,
+                    detail_lines,
+                    spell_result,
+                    enemy_area,
+                );
+                outcomes
+            }
+
+            SpellEffect::Ally(ally_area) => {
+                let outcomes = self.perform_spell_area_ally_effect(
+                    radius,
+                    name,
+                    caster,
+                    area_center,
+                    detail_lines,
+                    spell_result,
+                    ally_area,
+                );
+                outcomes
+            }
         }
     }
 
@@ -576,7 +642,7 @@ impl CoreGame {
         &self,
         range: Range,
         name: &'static str,
-        enhancements: &Vec<SpellEnhancement>,
+        enhancements: &[SpellEnhancement],
         caster: &Character,
         area_center: (u32, u32),
         detail_lines: &mut Vec<String>,
@@ -1514,13 +1580,20 @@ pub enum Action {
     CastSpell {
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
-        target: Option<CharacterId>,
+        target: ActionTarget,
     },
     Move {
         positions: Vec<(u32, u32)>,
         enhancements: Vec<MovementEnhancement>,
         action_point_cost: u32,
     },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum ActionTarget {
+    Character(CharacterId),
+    Position((u32, u32)),
+    None,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1596,13 +1669,12 @@ pub struct Spell {
     pub mana_cost: u32,
 
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
-    pub range: Range,
     pub target_type: SpellTargetType,
     pub animation_color: Color,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum SpellAreaEffect {
+pub enum SpellEffect {
     Enemy(SpellEnemyEffect),
     Ally(SpellAllyEffect),
 }
@@ -1621,22 +1693,45 @@ pub struct SpellAllyEffect {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellTargetType {
-    SingleEnemy {
+    TargetEnemy {
+        range: Range,
         effect: SpellEnemyEffect,
-        area: Option<(Range, SpellEnemyEffect)>,
+        impact_area: Option<(Range, SpellEnemyEffect)>,
     },
 
-    SingleAlly(SpellAllyEffect),
+    TargetAlly {
+        range: Range,
+        effect: SpellAllyEffect,
+    },
 
-    NoTarget(SpellAreaEffect),
+    TargetArea {
+        range: Range,
+        radius: Range,
+        effect: SpellEffect,
+    },
+
+    NoTarget {
+        radius: Range,
+        effect: SpellEffect,
+    },
 }
 
 impl SpellTargetType {
     pub fn single_target(&self) -> bool {
         match self {
+            SpellTargetType::TargetEnemy { .. } => true,
+            SpellTargetType::TargetAlly { .. } => true,
+            SpellTargetType::TargetArea { .. } => false,
             SpellTargetType::NoTarget { .. } => false,
-            SpellTargetType::SingleEnemy { .. } => true,
-            SpellTargetType::SingleAlly(..) => true,
+        }
+    }
+
+    pub fn range(&self) -> Range {
+        *match self {
+            SpellTargetType::TargetEnemy { range, .. } => range,
+            SpellTargetType::TargetAlly { range, .. } => range,
+            SpellTargetType::TargetArea { range, .. } => range,
+            SpellTargetType::NoTarget { radius, .. } => radius,
         }
     }
 }
@@ -1920,7 +2015,11 @@ impl Character {
     }
 
     pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
-        within_range_squared(spell.range.squared(), self.position.get(), target_position)
+        within_range_squared(
+            spell.target_type.range().squared(),
+            self.position.get(),
+            target_position,
+        )
     }
 
     pub fn known_actions(&self) -> Vec<(&'static str, BaseAction)> {

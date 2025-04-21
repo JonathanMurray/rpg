@@ -33,10 +33,10 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellAreaEffect, SpellContestType, SpellTargetOutcome, SpellTargetType,
-        MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
+        Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
+        OnAttackedReaction, OnHitReaction, SpellContestType, SpellEffect, SpellTargetOutcome,
+        SpellTargetType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
@@ -621,9 +621,10 @@ impl UserInterface {
                         }
 
                         match spell.target_type {
-                            SpellTargetType::NoTarget { .. } => player_wants_enemy_target = true,
-                            SpellTargetType::SingleEnemy { .. } => player_wants_enemy_target = true,
-                            SpellTargetType::SingleAlly { .. } => player_wants_ally_target = true,
+                            SpellTargetType::TargetEnemy { .. } => player_wants_enemy_target = true,
+                            SpellTargetType::TargetAlly { .. } => player_wants_ally_target = true,
+                            SpellTargetType::TargetArea { .. } => {}
+                            SpellTargetType::NoTarget { .. } => {}
                         }
                     }
                     BaseAction::Move { .. } => {
@@ -1187,145 +1188,202 @@ impl UserInterface {
         match self.state {
             UiState::ConfiguringAction(base_action @ BaseAction::Attack { hand, .. }) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(target_id) = self.game_grid.players_action_target() {
-                    let target_char = self.characters.get(target_id);
 
-                    let enhancements: Vec<AttackEnhancement> = self
-                        .activity_popup
-                        .selected_choices()
-                        .map(|action| action.unwrap_attack_enhancement())
-                        .collect();
+                match self.game_grid.players_action_target() {
+                    ActionTarget::Character(target_id) => {
+                        let target_char = self.characters.get(target_id);
 
-                    let (range, reach) = self
-                        .active_character()
-                        .reaches_with_attack(hand, target_char.position.get());
+                        let enhancements: Vec<AttackEnhancement> = self
+                            .activity_popup
+                            .selected_choices()
+                            .map(|action| action.unwrap_attack_enhancement())
+                            .collect();
 
-                    let mut circumstance_advantage = None;
+                        let (range, reach) = self
+                            .active_character()
+                            .reaches_with_attack(hand, target_char.position.get());
 
-                    let maybe_indicator;
-                    match reach {
-                        ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
-                            if self.active_character().can_use_action(base_action) {
-                                popup_enabled = true;
+                        let mut circumstance_advantage = None;
+
+                        let maybe_indicator;
+                        match reach {
+                            ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
+                                if self.active_character().can_use_action(base_action) {
+                                    popup_enabled = true;
+                                }
+                                if let ActionReach::YesButDisadvantage(reason) = reach {
+                                    circumstance_advantage = Some((-1, reason, Goodness::Bad));
+                                    maybe_indicator = Some(RangeIndicator::CanReachButDisadvantage);
+                                } else {
+                                    maybe_indicator = None;
+                                }
                             }
-                            if let ActionReach::YesButDisadvantage(reason) = reach {
-                                circumstance_advantage = Some((-1, reason, Goodness::Bad));
-                                maybe_indicator = Some(RangeIndicator::CanReachButDisadvantage);
-                            } else {
-                                maybe_indicator = None;
+                            ActionReach::No => {
+                                maybe_indicator = Some(RangeIndicator::CannotReach);
                             }
                         }
-                        ActionReach::No => {
-                            maybe_indicator = Some(RangeIndicator::CannotReach);
+
+                        // We cannot know yet if the defender will react
+                        let defender_reaction = None;
+
+                        let chance = as_percentage(prob_attack_hit(
+                            self.active_character(),
+                            hand,
+                            target_char,
+                            circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
+                            &enhancements,
+                            defender_reaction,
+                        ));
+
+                        let mut details = vec![];
+
+                        for (term, goodness) in self
+                            .active_character()
+                            .explain_attack_bonus(hand, &enhancements)
+                        {
+                            details.push((term, goodness));
                         }
+                        for (term, goodness) in
+                            target_char.explain_incoming_attack_circumstances(defender_reaction)
+                        {
+                            details.push((term, goodness));
+                        }
+
+                        if let Some((_advantage, term, goodness)) = circumstance_advantage {
+                            details.push((term.to_string(), goodness));
+                        }
+
+                        self.target_ui
+                            .set_action(format!("Attack: {}", chance), details, true);
+
+                        self.game_grid.range_indicator =
+                            maybe_indicator.map(|indicator| (range, indicator));
                     }
 
-                    // We cannot know yet if the defender will react
-                    let defender_reaction = None;
+                    ActionTarget::None => {
+                        self.target_ui
+                            .set_action("Select a target".to_string(), vec![], false);
 
-                    let chance = as_percentage(prob_attack_hit(
-                        self.active_character(),
-                        hand,
-                        target_char,
-                        circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
-                        &enhancements,
-                        defender_reaction,
-                    ));
-
-                    let mut details = vec![];
-
-                    for (term, goodness) in self
-                        .active_character()
-                        .explain_attack_bonus(hand, &enhancements)
-                    {
-                        details.push((term, goodness));
-                    }
-                    for (term, goodness) in
-                        target_char.explain_incoming_attack_circumstances(defender_reaction)
-                    {
-                        details.push((term, goodness));
+                        let range = self
+                            .active_character()
+                            .weapon(hand)
+                            .unwrap()
+                            .range
+                            .into_range();
+                        self.game_grid.range_indicator =
+                            Some((range, RangeIndicator::ActionTargetRange));
                     }
 
-                    if let Some((_advantage, term, goodness)) = circumstance_advantage {
-                        details.push((term.to_string(), goodness));
-                    }
-
-                    self.target_ui
-                        .set_action(format!("Attack: {}", chance), details, true);
-
-                    self.game_grid.range_indicator =
-                        maybe_indicator.map(|indicator| (range, indicator));
-                } else {
-                    self.target_ui
-                        .set_action("Select a target".to_string(), vec![], false);
-
-                    let range = self
-                        .active_character()
-                        .weapon(hand)
-                        .unwrap()
-                        .range
-                        .into_range();
-                    self.game_grid.range_indicator =
-                        Some((range, RangeIndicator::ActionTargetRange));
+                    ActionTarget::Position(_) => unreachable!(),
                 }
             }
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
-                if let Some(i) = self.game_grid.players_action_target() {
-                    let target_char = self.characters.get(i);
 
-                    let action_text = match spell.target_type {
-                        SpellTargetType::SingleEnemy { effect, .. } => {
-                            let prob = effect
-                                .contest_type
-                                .map(|contest| {
-                                    prob_spell_hit(self.active_character(), contest, target_char)
-                                })
-                                .unwrap_or(1.0);
-                            let chance = as_percentage(prob);
+                match self.game_grid.players_action_target() {
+                    ActionTarget::Character(target_id) => {
+                        let target_char = self.characters.get(target_id);
 
-                            format!("{}: {}", spell.name, chance)
-                        }
-                        SpellTargetType::SingleAlly(..) => spell.name.to_string(),
-                        SpellTargetType::NoTarget { .. } => unreachable!(),
-                    };
+                        let action_text = match spell.target_type {
+                            SpellTargetType::TargetEnemy { effect, .. } => {
+                                let prob = effect
+                                    .contest_type
+                                    .map(|contest| {
+                                        prob_spell_hit(
+                                            self.active_character(),
+                                            contest,
+                                            target_char,
+                                        )
+                                    })
+                                    .unwrap_or(1.0);
+                                let chance = as_percentage(prob);
 
-                    self.target_ui.set_action(action_text, vec![], true);
+                                format!("{}: {}", spell.name, chance)
+                            }
+                            SpellTargetType::TargetAlly { .. } => spell.name.to_string(),
+                            SpellTargetType::NoTarget { .. }
+                            | SpellTargetType::TargetArea { .. } => {
+                                unreachable!()
+                            }
+                        };
 
-                    let maybe_indicator = if self
-                        .active_character()
-                        .can_reach_with_spell(spell, target_char.position.get())
-                    {
-                        popup_enabled = true;
-                        None
-                    } else {
-                        Some(RangeIndicator::CannotReach)
-                    };
-                    self.game_grid.range_indicator =
-                        maybe_indicator.map(|indicator| (spell.range, indicator));
-                } else {
-                    let range_indicator = match spell.target_type {
-                        SpellTargetType::NoTarget(effect) => {
-                            let header = match effect {
-                                SpellAreaEffect::Enemy { .. } => {
-                                    format!("{} (enemy AoE)", spell.name.to_string())
-                                }
-                                SpellAreaEffect::Ally { .. } => {
-                                    format!("{} (ally AoE)", spell.name.to_string())
-                                }
-                            };
-                            self.target_ui.set_action(header, vec![], false);
+                        self.target_ui.set_action(action_text, vec![], true);
+
+                        let maybe_indicator = if self
+                            .active_character()
+                            .can_reach_with_spell(spell, target_char.position.get())
+                        {
                             popup_enabled = true;
-                            RangeIndicator::ActionTargetRange
-                        }
-                        SpellTargetType::SingleEnemy { .. } | SpellTargetType::SingleAlly(..) => {
-                            self.target_ui
-                                .set_action("Select a target".to_string(), vec![], false);
-                            RangeIndicator::ActionTargetRange
-                        }
-                    };
+                            None
+                        } else {
+                            Some(RangeIndicator::CannotReach)
+                        };
+                        self.game_grid.range_indicator =
+                            maybe_indicator.map(|indicator| (spell.target_type.range(), indicator));
+                    }
 
-                    self.game_grid.range_indicator = Some((spell.range, range_indicator));
+                    ActionTarget::Position(target_pos) => {
+                        assert!(matches!(
+                            spell.target_type,
+                            SpellTargetType::TargetArea { .. }
+                        ));
+
+                        self.target_ui.set_action(
+                            format!("{} (AoE)", spell.name.to_string()),
+                            vec![],
+                            false,
+                        );
+
+                        let maybe_indicator = if self
+                            .active_character()
+                            .can_reach_with_spell(spell, target_pos)
+                        {
+                            popup_enabled = true;
+                            None
+                        } else {
+                            Some(RangeIndicator::CannotReach)
+                        };
+                        self.game_grid.range_indicator =
+                            maybe_indicator.map(|indicator| (spell.target_type.range(), indicator));
+                    }
+
+                    ActionTarget::None => {
+                        match spell.target_type {
+                            SpellTargetType::TargetEnemy { .. }
+                            | SpellTargetType::TargetAlly { .. } => {
+                                self.target_ui.set_action(
+                                    "Select a target".to_string(),
+                                    vec![],
+                                    false,
+                                );
+                            }
+
+                            SpellTargetType::NoTarget { effect, .. } => {
+                                let header = match effect {
+                                    SpellEffect::Enemy { .. } => {
+                                        format!("{} (enemy AoE)", spell.name.to_string())
+                                    }
+                                    SpellEffect::Ally { .. } => {
+                                        format!("{} (ally AoE)", spell.name.to_string())
+                                    }
+                                };
+                                self.target_ui.set_action(header, vec![], false);
+                                popup_enabled = true;
+                            }
+
+                            SpellTargetType::TargetArea { .. } => {
+                                self.target_ui.set_action(
+                                    "Select an area".to_string(),
+                                    vec![],
+                                    false,
+                                );
+                                popup_enabled = true;
+                            }
+                        };
+
+                        self.game_grid.range_indicator =
+                            Some((spell.target_type.range(), RangeIndicator::ActionTargetRange));
+                    }
                 }
             }
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
@@ -1412,11 +1470,16 @@ impl UserInterface {
             UiState::ConfiguringAction(base_action) => {
                 let target = self.game_grid.players_action_target();
                 let action = match base_action {
-                    BaseAction::Attack { hand, .. } => Action::Attack {
-                        hand,
-                        enhancements: self.activity_popup.selected_attack_enhancements(),
-                        target: target.unwrap(),
-                    },
+                    BaseAction::Attack { hand, .. } => {
+                        let ActionTarget::Character(target_id) = target else {
+                            unreachable!();
+                        };
+                        Action::Attack {
+                            hand,
+                            enhancements: self.activity_popup.selected_attack_enhancements(),
+                            target: target_id,
+                        }
+                    }
                     BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
                     BaseAction::CastSpell(spell) => Action::CastSpell {
                         spell,
@@ -1434,12 +1497,15 @@ impl UserInterface {
                 };
                 PlayerChose::Action(action)
             }
+
             UiState::ReactingToAttack { .. } => {
                 PlayerChose::AttackedReaction(self.activity_popup.selected_on_attacked_reaction())
             }
+
             UiState::ReactingToHit { .. } => {
                 PlayerChose::HitReaction(self.activity_popup.selected_on_hit_reaction())
             }
+
             UiState::ChoosingAction | UiState::Idle => unreachable!(),
         }
     }

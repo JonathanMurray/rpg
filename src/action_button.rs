@@ -136,8 +136,12 @@ fn base_action_tooltip(
             let mut technical_description = vec![];
 
             match spell.target_type {
-                SpellTargetType::SingleEnemy { effect, area } => {
-                    technical_description.push(format!("Target enemy (range {})", spell.range));
+                SpellTargetType::TargetEnemy {
+                    effect,
+                    impact_area: area,
+                    range,
+                } => {
+                    technical_description.push(format!("Target enemy (range {})", range));
 
                     match effect.damage {
                         Some((dmg, true)) => {
@@ -203,17 +207,16 @@ fn base_action_tooltip(
                     }
                 }
 
-                SpellTargetType::SingleAlly(effect) => {
-                    technical_description.push(format!("Target ally (range {})", spell.range));
+                SpellTargetType::TargetAlly { range, effect } => {
+                    technical_description.push(format!("Target ally (range {})", range));
                     if effect.healing > 0 {
                         technical_description.push(format!("  {}^ healing", effect.healing));
                     }
                 }
 
-                SpellTargetType::NoTarget(area_effect) => match area_effect {
-                    crate::core::SpellAreaEffect::Enemy(effect) => {
-                        technical_description
-                            .push(format!("Self area (enemies in range {})", spell.range));
+                SpellTargetType::NoTarget { radius, effect } => match effect {
+                    crate::core::SpellEffect::Enemy(effect) => {
+                        technical_description.push(format!("Nearby enemies (radius {})", radius));
                         match effect.damage {
                             Some((dmg, true)) => {
                                 technical_description.push(format!("  {}^ damage", dmg))
@@ -244,9 +247,54 @@ fn base_action_tooltip(
                             None => {}
                         };
                     }
-                    crate::core::SpellAreaEffect::Ally(effect) => {
-                        technical_description
-                            .push(format!("Self area (allies in range {})", spell.range));
+                    crate::core::SpellEffect::Ally(effect) => {
+                        technical_description.push(format!("Nearby allies (radius {})", radius));
+
+                        if effect.healing > 0 {
+                            technical_description.push(format!("  {}^ healing", effect.healing));
+                        }
+                    }
+                },
+
+                SpellTargetType::TargetArea {
+                    range: _,
+                    radius,
+                    effect,
+                } => match effect {
+                    crate::core::SpellEffect::Enemy(effect) => {
+                        technical_description.push(format!("Area (radius {})", radius));
+                        match effect.damage {
+                            Some((dmg, true)) => {
+                                technical_description.push(format!("  {}^ damage", dmg))
+                            }
+                            Some((dmg, false)) => {
+                                technical_description.push(format!("  {} damage", dmg))
+                            }
+                            None => {}
+                        }
+                        if let Some(apply_effect) = effect.on_hit_effect {
+                            match apply_effect {
+                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                                    technical_description.push(format!("  Loses {}^ AP", n))
+                                }
+                                crate::core::ApplyEffect::Condition(condition) => {
+                                    technical_description.push(format!("  {}", condition.name()))
+                                }
+                            }
+                        }
+
+                        match effect.contest_type {
+                            Some(SpellContestType::Mental) => {
+                                technical_description.push(format!("  [Will] defense"))
+                            }
+                            Some(SpellContestType::Projectile) => {
+                                technical_description.push(format!("  [Evasion] defense"))
+                            }
+                            None => {}
+                        };
+                    }
+                    crate::core::SpellEffect::Ally(effect) => {
+                        technical_description.push(format!("Area (radius {})", radius));
 
                         if effect.healing > 0 {
                             technical_description.push(format!("  {}^ healing", effect.healing));

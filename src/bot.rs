@@ -1,6 +1,7 @@
 use crate::{
     core::{
-        Action, ActionReach, BaseAction, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction,
+        Action, ActionReach, ActionTarget, BaseAction, CharacterId, CoreGame, OnAttackedReaction,
+        OnHitReaction,
     },
     pathfind::PathfindGrid,
 };
@@ -47,7 +48,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                             chosen_action = Some(Action::CastSpell {
                                 spell,
                                 enhancements: vec![],
-                                target: Some(*id),
+                                target: ActionTarget::Character(*id),
                             });
                             break;
                         }
