@@ -120,7 +120,8 @@ impl ActivityPopup {
         let mut text_content_h = top_pad + header_dimensions.offset_y;
         let mut text_content_w = 0.0;
         for (_line, dim) in &measured_lines {
-            text_content_h += dim.height;
+            //text_content_h += dim.height;
+            text_content_h += dim.offset_y;
             if dim.width > text_content_w {
                 text_content_w = dim.width;
             }
@@ -176,7 +177,8 @@ impl ActivityPopup {
                 draw_text_ex(line, x0, y0, base_text_params.clone());
             }
 
-            y0 += dim.height + line_margin;
+            //y0 += dim.height + line_margin;
+            y0 += dim.offset_y + line_margin;
         }
 
         if self.enabled {

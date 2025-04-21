@@ -8,7 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL,
+    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, KILL, MASS_HEAL,
     PARRY_EVASION_BONUS, RAGE, RAGING_DESCRIPTION,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
@@ -47,7 +47,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
-        bob.known_actions.push(BaseAction::CastSpell(KILL));
+        bob.known_actions.push(BaseAction::CastSpell(MASS_HEAL));
         bob.known_actions.push(BaseAction::SelfEffect(BRACE));
 
         let mut enemy1 = Character::new(
@@ -367,7 +367,7 @@ impl CoreGame {
             let mut area_outcomes = None;
 
             match spell.target_type {
-                SpellTargetType::NoTarget { enemy_area } => {
+                SpellTargetType::NoTarget(area_effect) => {
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
                         roll,
@@ -375,18 +375,34 @@ impl CoreGame {
                         spell_result,
                     ));
 
-                    let outcomes = self.perform_spell_area_enemy_effect(
-                        spell.range,
-                        spell.name,
-                        &enhancements,
-                        caster,
-                        caster.position.get(),
-                        &mut detail_lines,
-                        spell_result,
-                        enemy_area,
-                    );
+                    match area_effect {
+                        SpellAreaEffect::Enemy(enemy_area) => {
+                            let outcomes = self.perform_spell_area_enemy_effect(
+                                spell.range,
+                                spell.name,
+                                &enhancements,
+                                caster,
+                                caster.position.get(),
+                                &mut detail_lines,
+                                spell_result,
+                                enemy_area,
+                            );
+                            area_outcomes = Some((caster.position.get(), outcomes));
+                        }
 
-                    area_outcomes = Some((caster.position.get(), outcomes));
+                        SpellAreaEffect::Ally(ally_area) => {
+                            let outcomes = self.perform_spell_area_ally_effect(
+                                spell.range,
+                                spell.name,
+                                caster,
+                                caster.position.get(),
+                                &mut detail_lines,
+                                spell_result,
+                                ally_area,
+                            );
+                            area_outcomes = Some((caster.position.get(), outcomes));
+                        }
+                    }
                 }
 
                 SpellTargetType::SingleEnemy { effect, area } => {
@@ -451,32 +467,19 @@ impl CoreGame {
                         caster_ref.spell_modifier(),
                         spell_result,
                     ));
+                    let degree_of_success = spell_result / 10;
+                    if degree_of_success > 0 {
+                        detail_lines.push(format!("Fortune: {}", degree_of_success));
+                    }
+                    let outcome = self.perform_spell_ally_effect(
+                        spell.name,
+                        ally_effect,
+                        target,
+                        &mut detail_lines,
+                        degree_of_success,
+                    );
 
-                    let mut health_gained = 0;
-
-                    if ally_effect.healing > 0 {
-                        let mut healing = ally_effect.healing;
-
-                        let mut line = format!("Healing: {} ({})", ally_effect.healing, spell.name);
-
-                        let effectiveness = spell_result / 10;
-                        if effectiveness > 0 {
-                            detail_lines.push(format!("Fortune: {}", effectiveness));
-                            line.push_str(&format!(" +{} (fortune)", effectiveness));
-                            healing += effectiveness;
-                        }
-                        line.push_str(&format!(" = {}", healing));
-                        detail_lines.push(line);
-
-                        health_gained = target.health.gain(healing);
-                        detail_lines
-                            .push(format!("{} was healed for {}", target.name, health_gained));
-                    };
-
-                    target_outcome = Some((
-                        target_id.unwrap(),
-                        SpellTargetOutcome::HealedAlly(health_gained),
-                    ));
+                    target_outcome = Some((target_id.unwrap(), outcome));
                 }
             };
 
@@ -495,6 +498,78 @@ impl CoreGame {
             })
             .await;
         }
+    }
+
+    fn perform_spell_area_ally_effect(
+        &self,
+        range: Range,
+        name: &'static str,
+        caster: &Character,
+        area_center: (u32, u32),
+        detail_lines: &mut Vec<String>,
+        spell_result: u32,
+        ally_area: SpellAllyEffect,
+    ) -> Vec<(u32, SpellTargetOutcome)> {
+        let mut target_outcomes = vec![];
+
+        let degree_of_success = spell_result / 10;
+        if degree_of_success > 0 {
+            detail_lines.push(format!("Fortune: {}", degree_of_success));
+        }
+
+        for other_char in self.characters.iter() {
+            if other_char.player_controlled != caster.player_controlled {
+                continue;
+            }
+
+            if within_range_squared(range.squared(), area_center, other_char.position.get()) {
+                detail_lines.push(other_char.name.to_string());
+
+                let outcome = self.perform_spell_ally_effect(
+                    name,
+                    ally_area,
+                    &other_char,
+                    detail_lines,
+                    degree_of_success,
+                );
+
+                target_outcomes.push((other_char.id(), outcome));
+            }
+        }
+
+        target_outcomes
+    }
+
+    fn perform_spell_ally_effect(
+        &self,
+        name: &'static str,
+        ally_effect: SpellAllyEffect,
+        target: &Character,
+        detail_lines: &mut Vec<String>,
+        degree_of_success: u32,
+    ) -> SpellTargetOutcome {
+        let mut health_gained = 0;
+
+        if ally_effect.healing > 0 {
+            let mut healing = ally_effect.healing;
+
+            let mut line = format!("  Healing: {} ({})", ally_effect.healing, name);
+
+            if degree_of_success > 0 {
+                line.push_str(&format!(" +{} (fortune)", degree_of_success));
+                healing += degree_of_success;
+            }
+            line.push_str(&format!(" = {}", healing));
+            detail_lines.push(line);
+
+            health_gained = target.health.gain(healing);
+            detail_lines.push(format!(
+                "  {} was healed for {}",
+                target.name, health_gained
+            ));
+        };
+
+        SpellTargetOutcome::HealedAlly(health_gained)
     }
 
     fn perform_spell_area_enemy_effect(
@@ -1527,6 +1602,12 @@ pub struct Spell {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellAreaEffect {
+    Enemy(SpellEnemyEffect),
+    Ally(SpellAllyEffect),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnemyEffect {
     pub contest_type: Option<SpellContestType>,
     pub damage: Option<(u32, bool)>,
@@ -1547,9 +1628,7 @@ pub enum SpellTargetType {
 
     SingleAlly(SpellAllyEffect),
 
-    NoTarget {
-        enemy_area: SpellEnemyEffect,
-    },
+    NoTarget(SpellAreaEffect),
 }
 
 impl SpellTargetType {

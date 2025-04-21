@@ -5,8 +5,8 @@ use crate::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
         AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
         OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
-        Shield, Spell, SpellAllyEffect, SpellContestType, SpellEnemyEffect, SpellEnhancement,
-        SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
+        Shield, Spell, SpellAllyEffect, SpellAreaEffect, SpellContestType, SpellEnemyEffect,
+        SpellEnhancement, SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -244,13 +244,11 @@ pub const SCREAM: Spell = Spell {
         None,
     ],
     range: Range::Ranged(3),
-    target_type: SpellTargetType::NoTarget {
-        enemy_area: SpellEnemyEffect {
-            contest_type: Some(SpellContestType::Mental),
-            damage: None,
-            on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
-        },
-    },
+    target_type: SpellTargetType::NoTarget(SpellAreaEffect::Enemy(SpellEnemyEffect {
+        contest_type: Some(SpellContestType::Mental),
+        damage: None,
+        on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+    })),
     animation_color: BLUE,
 };
 
@@ -293,6 +291,18 @@ pub const HEAL: Spell = Spell {
     possible_enhancements: [None, None],
     range: Range::Ranged(5),
     target_type: SpellTargetType::SingleAlly(SpellAllyEffect { healing: 1 }),
+    animation_color: GREEN,
+};
+
+pub const MASS_HEAL: Spell = Spell {
+    name: "Mass heal",
+    description: "Restore health to nearby allies",
+    icon: IconId::PlusPlus,
+    action_point_cost: 2,
+    mana_cost: 1,
+    possible_enhancements: [None, None],
+    range: Range::Ranged(5),
+    target_type: SpellTargetType::NoTarget(SpellAreaEffect::Ally(SpellAllyEffect { healing: 1 })),
     animation_color: GREEN,
 };
 

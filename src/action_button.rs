@@ -210,38 +210,49 @@ fn base_action_tooltip(
                     }
                 }
 
-                SpellTargetType::NoTarget { enemy_area: effect } => {
-                    technical_description.push(format!("Self area (range {})", spell.range));
-                    match effect.damage {
-                        Some((dmg, true)) => {
-                            technical_description.push(format!("  {}^ damage", dmg))
-                        }
-                        Some((dmg, false)) => {
-                            technical_description.push(format!("  {} damage", dmg))
-                        }
-                        None => {}
-                    }
-                    if let Some(apply_effect) = effect.on_hit_effect {
-                        match apply_effect {
-                            crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                technical_description.push(format!("  Loses {}^ AP", n))
+                SpellTargetType::NoTarget(area_effect) => match area_effect {
+                    crate::core::SpellAreaEffect::Enemy(effect) => {
+                        technical_description
+                            .push(format!("Self area (enemies in range {})", spell.range));
+                        match effect.damage {
+                            Some((dmg, true)) => {
+                                technical_description.push(format!("  {}^ damage", dmg))
                             }
-                            crate::core::ApplyEffect::Condition(condition) => {
-                                technical_description.push(format!("  {}", condition.name()))
+                            Some((dmg, false)) => {
+                                technical_description.push(format!("  {} damage", dmg))
+                            }
+                            None => {}
+                        }
+                        if let Some(apply_effect) = effect.on_hit_effect {
+                            match apply_effect {
+                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
+                                    technical_description.push(format!("  Loses {}^ AP", n))
+                                }
+                                crate::core::ApplyEffect::Condition(condition) => {
+                                    technical_description.push(format!("  {}", condition.name()))
+                                }
                             }
                         }
-                    }
 
-                    match effect.contest_type {
-                        Some(SpellContestType::Mental) => {
-                            technical_description.push(format!("  [Will] defense"))
+                        match effect.contest_type {
+                            Some(SpellContestType::Mental) => {
+                                technical_description.push(format!("  [Will] defense"))
+                            }
+                            Some(SpellContestType::Projectile) => {
+                                technical_description.push(format!("  [Evasion] defense"))
+                            }
+                            None => {}
+                        };
+                    }
+                    crate::core::SpellAreaEffect::Ally(effect) => {
+                        technical_description
+                            .push(format!("Self area (allies in range {})", spell.range));
+
+                        if effect.healing > 0 {
+                            technical_description.push(format!("  {}^ healing", effect.healing));
                         }
-                        Some(SpellContestType::Projectile) => {
-                            technical_description.push(format!("  [Evasion] defense"))
-                        }
-                        None => {}
-                    };
-                }
+                    }
+                },
             };
 
             return ActionButtonTooltip {

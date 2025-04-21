@@ -35,8 +35,8 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
         GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellContestType, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
-        MOVE_ACTION_COST,
+        OnHitReaction, SpellAreaEffect, SpellContestType, SpellTargetOutcome, SpellTargetType,
+        MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
@@ -1275,10 +1275,7 @@ impl UserInterface {
                     let target_char = self.characters.get(i);
 
                     let action_text = match spell.target_type {
-                        SpellTargetType::NoTarget { .. } => {
-                            format!("{} (AoE)", spell.name.to_string())
-                        }
-                        SpellTargetType::SingleEnemy { effect, area } => {
+                        SpellTargetType::SingleEnemy { effect, .. } => {
                             let prob = effect
                                 .contest_type
                                 .map(|contest| {
@@ -1290,6 +1287,7 @@ impl UserInterface {
                             format!("{}: {}", spell.name, chance)
                         }
                         SpellTargetType::SingleAlly(..) => spell.name.to_string(),
+                        SpellTargetType::NoTarget { .. } => unreachable!(),
                     };
 
                     self.target_ui.set_action(action_text, vec![], true);
@@ -1307,12 +1305,16 @@ impl UserInterface {
                         maybe_indicator.map(|indicator| (spell.range, indicator));
                 } else {
                     let range_indicator = match spell.target_type {
-                        SpellTargetType::NoTarget { .. } => {
-                            self.target_ui.set_action(
-                                format!("{} (AoE)", spell.name.to_string()),
-                                vec![],
-                                false,
-                            );
+                        SpellTargetType::NoTarget(effect) => {
+                            let header = match effect {
+                                SpellAreaEffect::Enemy { .. } => {
+                                    format!("{} (enemy AoE)", spell.name.to_string())
+                                }
+                                SpellAreaEffect::Ally { .. } => {
+                                    format!("{} (ally AoE)", spell.name.to_string())
+                                }
+                            };
+                            self.target_ui.set_action(header, vec![], false);
                             popup_enabled = true;
                             RangeIndicator::ActionTargetRange
                         }
