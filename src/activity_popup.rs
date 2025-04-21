@@ -306,7 +306,7 @@ impl ActivityPopup {
         None
     }
 
-    pub fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
+    fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
             .map(|id| &self.choice_buttons[id].action)
@@ -426,9 +426,14 @@ impl ActivityPopup {
 
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
+
+        // TODO
+        /*
         for btn in &mut self.choice_buttons.values() {
             btn.enabled.set(enabled);
         }
+         */
+
         self.proceed_button.enabled.set(enabled);
     }
 

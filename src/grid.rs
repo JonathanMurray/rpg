@@ -22,8 +22,7 @@ use macroquad::{
 
 use crate::{
     core::{
-        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement, Position,
-        SpellTargetType,
+        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement, Position, SpellTarget,
     },
     game_ui::UiState,
     pathfind::PathfindGrid,
@@ -644,8 +643,8 @@ impl GameGrid {
             UiState::ChoosingAction => MouseState::MayInputMovement,
             UiState::ConfiguringAction(base_action) => match base_action {
                 BaseAction::Attack { .. } => MouseState::RequiresEnemyTarget { area_range: None },
-                BaseAction::CastSpell(spell) => match spell.target_type {
-                    SpellTargetType::TargetEnemy {
+                BaseAction::CastSpell(spell) => match spell.target {
+                    SpellTarget::Enemy {
                         impact_area: area, ..
                     } => {
                         if let Some((area_range, _effect)) = area {
@@ -656,13 +655,11 @@ impl GameGrid {
                             MouseState::RequiresEnemyTarget { area_range: None }
                         }
                     }
-                    SpellTargetType::TargetAlly { .. } => MouseState::RequiresAllyTarget,
+                    SpellTarget::Ally { .. } => MouseState::RequiresAllyTarget,
 
-                    SpellTargetType::TargetArea { radius, .. } => {
-                        MouseState::RequiresPositionTarget(radius)
-                    }
+                    SpellTarget::Area { radius, .. } => MouseState::RequiresPositionTarget(radius),
 
-                    SpellTargetType::NoTarget { .. } => MouseState::ImplicitTarget,
+                    SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
                 BaseAction::Move { .. } => MouseState::MayInputMovement,
                 BaseAction::SelfEffect(..) => MouseState::ImplicitTarget,

@@ -30,8 +30,8 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
         Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
-        MOVE_ACTION_COST,
+        OnAttackedReaction, OnHitReaction, Range, SpellEnhancementEffect, SpellTarget,
+        SpellTargetOutcome, MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
@@ -615,11 +615,11 @@ impl UserInterface {
                             }
                         }
 
-                        match spell.target_type {
-                            SpellTargetType::TargetEnemy { .. } => player_wants_enemy_target = true,
-                            SpellTargetType::TargetAlly { .. } => player_wants_ally_target = true,
-                            SpellTargetType::TargetArea { .. } => {}
-                            SpellTargetType::NoTarget { .. } => {}
+                        match spell.target {
+                            SpellTarget::Enemy { .. } => player_wants_enemy_target = true,
+                            SpellTarget::Ally { .. } => player_wants_ally_target = true,
+                            SpellTarget::Area { .. } => {}
+                            SpellTarget::None { .. } => {}
                         }
                     }
                     BaseAction::Move { .. } => {
@@ -1186,11 +1186,8 @@ impl UserInterface {
                     ActionTarget::Character(target_id) => {
                         let target_char = self.characters.get(target_id);
 
-                        let enhancements: Vec<AttackEnhancement> = self
-                            .activity_popup
-                            .selected_choices()
-                            .map(|action| action.unwrap_attack_enhancement())
-                            .collect();
+                        let enhancements: Vec<AttackEnhancement> =
+                            self.activity_popup.selected_attack_enhancements();
 
                         let (range, reach) = self
                             .active_character()
@@ -1273,12 +1270,14 @@ impl UserInterface {
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
 
+                let enhancements = self.activity_popup.selected_spell_enhancements();
+
                 match self.game_grid.players_action_target() {
                     ActionTarget::Character(target_id) => {
                         let target_char = self.characters.get(target_id);
 
-                        let action_text = match spell.target_type {
-                            SpellTargetType::TargetEnemy { effect, .. } => {
+                        let action_text = match spell.target {
+                            SpellTarget::Enemy { effect, .. } => {
                                 let prob = effect
                                     .contest_type
                                     .map(|contest| {
@@ -1293,54 +1292,53 @@ impl UserInterface {
 
                                 format!("{}: {}", spell.name, chance)
                             }
-                            SpellTargetType::TargetAlly { .. } => spell.name.to_string(),
-                            SpellTargetType::NoTarget { .. }
-                            | SpellTargetType::TargetArea { .. } => {
+                            SpellTarget::Ally { .. } => spell.name.to_string(),
+                            SpellTarget::None { .. } | SpellTarget::Area { .. } => {
                                 unreachable!()
                             }
                         };
 
                         self.target_ui.set_action(action_text, vec![], true);
 
-                        let maybe_indicator = if self
-                            .active_character()
-                            .can_reach_with_spell(spell, target_char.position.get())
-                        {
+                        let maybe_indicator = if self.active_character().can_reach_with_spell(
+                            spell,
+                            &enhancements,
+                            target_char.position.get(),
+                        ) {
                             popup_enabled = true;
                             None
                         } else {
                             Some(RangeIndicator::CannotReach)
                         };
-                        self.game_grid.range_indicator = maybe_indicator
-                            .map(|indicator| (spell.target_type.range().unwrap(), indicator));
+                        self.game_grid.range_indicator = maybe_indicator.map(|indicator| {
+                            (spell.target.range(&enhancements).unwrap(), indicator)
+                        });
                     }
 
                     ActionTarget::Position(target_pos) => {
-                        assert!(matches!(
-                            spell.target_type,
-                            SpellTargetType::TargetArea { .. }
-                        ));
+                        assert!(matches!(spell.target, SpellTarget::Area { .. }));
 
                         self.target_ui
                             .set_action(format!("{} (AoE)", spell.name), vec![], false);
 
-                        let maybe_indicator = if self
-                            .active_character()
-                            .can_reach_with_spell(spell, target_pos)
-                        {
+                        let maybe_indicator = if self.active_character().can_reach_with_spell(
+                            spell,
+                            &enhancements,
+                            target_pos,
+                        ) {
                             popup_enabled = true;
                             None
                         } else {
                             Some(RangeIndicator::CannotReach)
                         };
-                        self.game_grid.range_indicator = maybe_indicator
-                            .map(|indicator| (spell.target_type.range().unwrap(), indicator));
+                        self.game_grid.range_indicator = maybe_indicator.map(|indicator| {
+                            (spell.target.range(&enhancements).unwrap(), indicator)
+                        });
                     }
 
                     ActionTarget::None => {
-                        match spell.target_type {
-                            SpellTargetType::TargetEnemy { .. }
-                            | SpellTargetType::TargetAlly { .. } => {
+                        match spell.target {
+                            SpellTarget::Enemy { .. } | SpellTarget::Ally { .. } => {
                                 self.target_ui.set_action(
                                     "Select a target".to_string(),
                                     vec![],
@@ -1348,13 +1346,13 @@ impl UserInterface {
                                 );
                             }
 
-                            SpellTargetType::NoTarget { .. } => {
+                            SpellTarget::None { .. } => {
                                 let header = spell.name.to_string();
                                 self.target_ui.set_action(header, vec![], false);
                                 popup_enabled = true;
                             }
 
-                            SpellTargetType::TargetArea { .. } => {
+                            SpellTarget::Area { .. } => {
                                 self.target_ui.set_action(
                                     "Select an area".to_string(),
                                     vec![],
@@ -1364,7 +1362,7 @@ impl UserInterface {
                             }
                         };
 
-                        if let Some(range) = spell.target_type.range() {
+                        if let Some(mut range) = spell.target.range(&enhancements) {
                             self.game_grid.range_indicator =
                                 Some((range, RangeIndicator::ActionTargetRange));
                         } else {

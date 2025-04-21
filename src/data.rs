@@ -6,7 +6,7 @@ use crate::{
         AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
         OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellAllyEffect,
         SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect,
-        SpellTargetType, Weapon, WeaponGrip, WeaponRange,
+        SpellTarget, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -220,28 +220,25 @@ pub const SCREAM: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     possible_enhancements: [
-        // TODO Let this increase the range of the spell
         Some(SpellEnhancement {
             name: "Shriek",
-            description: "Targets also lose 1 AP",
+            description: "Increased range",
             icon: IconId::Banshee,
             action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::OnHitEffect(
-                ApplyEffect::RemoveActionPoints(1),
-            )),
+            effect: Some(SpellEnhancementEffect::IncreasedRange(2)),
         }),
         None,
     ],
 
-    target_type: SpellTargetType::NoTarget {
+    target: SpellTarget::None {
         self_area: Some((
             Range::Ranged(3),
             SpellEffect::Enemy(SpellEnemyEffect {
                 contest_type: Some(SpellContestType::Mental),
                 damage: None,
-                on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+                on_hit: Some(ApplyEffect::Condition(Condition::Dazed(1))),
             }),
         )),
         self_effect: None,
@@ -267,11 +264,11 @@ pub const MIND_BLAST: Spell = Spell {
         }),
         None,
     ],
-    target_type: SpellTargetType::TargetEnemy {
+    target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Mental),
             damage: Some((1, false)),
-            on_hit_effect: Some(ApplyEffect::RemoveActionPoints(1)),
+            on_hit: Some(ApplyEffect::RemoveActionPoints(1)),
         },
         impact_area: None,
         range: Range::Ranged(5),
@@ -286,7 +283,7 @@ pub const HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     possible_enhancements: [None, None],
-    target_type: SpellTargetType::TargetAlly {
+    target: SpellTarget::Ally {
         range: Range::Ranged(5),
         effect: SpellAllyEffect {
             healing: 1,
@@ -303,7 +300,7 @@ pub const HEALING_NOVA: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     possible_enhancements: [None, None],
-    target_type: SpellTargetType::NoTarget {
+    target: SpellTarget::None {
         self_area: Some((
             Range::Ranged(4),
             SpellEffect::Ally(SpellAllyEffect {
@@ -323,7 +320,7 @@ pub const SELF_HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     possible_enhancements: [None, None],
-    target_type: SpellTargetType::NoTarget {
+    target: SpellTarget::None {
         self_area: None,
         self_effect: Some(SpellAllyEffect {
             healing: 1,
@@ -340,7 +337,7 @@ pub const HEALING_RAIN: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 2,
     possible_enhancements: [None, None],
-    target_type: SpellTargetType::TargetArea {
+    target: SpellTarget::Area {
         range: Range::Ranged(5),
         radius: Range::Float(1.95),
         effect: SpellEffect::Ally(SpellAllyEffect {
@@ -360,16 +357,16 @@ pub const FIREBALL: Spell = Spell {
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Big",
-            description: "+1 damage",
+            description: "Increased range",
             icon: IconId::Plus,
             action_point_cost: 0,
             mana_cost: 1,
-            bonus_damage: 1,
-            effect: None,
+            bonus_damage: 0,
+            effect: Some(SpellEnhancementEffect::IncreasedRange(3)),
         }),
         Some(SpellEnhancement {
             name: "Massive",
-            description: "+2 damage",
+            description: "Greatly increased damage",
             icon: IconId::PlusPlus,
             action_point_cost: 0,
             mana_cost: 1,
@@ -377,21 +374,21 @@ pub const FIREBALL: Spell = Spell {
             effect: None,
         }),
     ],
-    target_type: SpellTargetType::TargetEnemy {
+    target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Projectile),
             damage: Some((2, true)),
-            on_hit_effect: None,
+            on_hit: None,
         },
         impact_area: Some((
             Range::Melee,
             SpellEnemyEffect {
                 contest_type: None,
                 damage: Some((1, false)),
-                on_hit_effect: None,
+                on_hit: None,
             },
         )),
-        range: Range::Ranged(5),
+        range: Range::Ranged(3),
     },
     animation_color: RED,
 };
@@ -403,11 +400,11 @@ pub const KILL: Spell = Spell {
     action_point_cost: 5,
     mana_cost: 0,
     possible_enhancements: [None; 2],
-    target_type: SpellTargetType::TargetEnemy {
+    target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
             contest_type: None,
             damage: Some((99, false)),
-            on_hit_effect: None,
+            on_hit: None,
         },
         impact_area: None,
         range: Range::Ranged(10),

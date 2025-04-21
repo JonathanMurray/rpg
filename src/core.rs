@@ -8,7 +8,8 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, EFFICIENT, HEALING_NOVA, PARRY_EVASION_BONUS, RAGE, SELF_HEAL,
+    BOW, BRACE, BRACED_DEFENSE_BONUS, EFFICIENT, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS,
+    RAGE, SELF_HEAL,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -48,7 +49,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
-        bob.known_actions.push(BaseAction::CastSpell(SELF_HEAL));
+        bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
         bob.known_actions.push(BaseAction::SelfEffect(BRACE));
 
         let mut enemy1 = Character::new(
@@ -365,17 +366,21 @@ impl CoreGame {
             let mut target_outcome = None;
             let mut area_outcomes = None;
 
-            match spell.target_type {
-                SpellTargetType::TargetEnemy {
+            match spell.target {
+                SpellTarget::Enemy {
                     effect,
-                    impact_area: area,
-                    range,
+                    impact_area,
+                    range: _,
                 } => {
                     let ActionTarget::Character(target_id) = selected_target else {
                         unreachable!()
                     };
                     let target = self.characters.get(target_id);
-                    assert!(caster.can_reach_with_spell(spell, target.position.get()));
+                    assert!(caster.can_reach_with_spell(
+                        spell,
+                        &enhancements,
+                        target.position.get()
+                    ));
 
                     let mut line = format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -407,7 +412,7 @@ impl CoreGame {
                     );
                     target_outcome = Some((target_id, outcome));
 
-                    if let Some((area_range, area_effect)) = area {
+                    if let Some((area_range, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
 
                         let area_target_outcomes = self.perform_spell_area_enemy_effect(
@@ -425,12 +430,16 @@ impl CoreGame {
                     }
                 }
 
-                SpellTargetType::TargetAlly { range, effect } => {
+                SpellTarget::Ally { range: _, effect } => {
                     let ActionTarget::Character(target_id) = selected_target else {
                         unreachable!()
                     };
                     let target = self.characters.get(target_id);
-                    assert!(caster.can_reach_with_spell(spell, target.position.get()));
+                    assert!(caster.can_reach_with_spell(
+                        spell,
+                        &enhancements,
+                        target.position.get()
+                    ));
 
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -453,15 +462,15 @@ impl CoreGame {
                     target_outcome = Some((target_id, outcome));
                 }
 
-                SpellTargetType::TargetArea {
-                    range,
+                SpellTarget::Area {
+                    range: _,
                     radius,
                     effect,
                 } => {
                     let ActionTarget::Position(target_pos) = selected_target else {
                         unreachable!()
                     };
-                    assert!(caster.can_reach_with_spell(spell, target_pos));
+                    assert!(caster.can_reach_with_spell(spell, &enhancements, target_pos));
 
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
@@ -484,7 +493,7 @@ impl CoreGame {
                     area_outcomes = Some((target_pos, outcomes));
                 }
 
-                SpellTargetType::NoTarget {
+                SpellTarget::None {
                     self_area,
                     self_effect,
                 } => {
@@ -510,7 +519,15 @@ impl CoreGame {
                         target_outcome = Some((caster_id, outcome));
                     }
 
-                    if let Some((radius, effect)) = self_area {
+                    if let Some((mut radius, effect)) = self_area {
+                        for enhancement in &enhancements {
+                            if let Some(SpellEnhancementEffect::IncreasedRange(n)) =
+                                enhancement.effect
+                            {
+                                radius = radius.plus(n);
+                            }
+                        }
+
                         let outcomes = self.perform_spell_area_effect(
                             spell.name,
                             &enhancements,
@@ -782,7 +799,7 @@ impl CoreGame {
                 None
             };
 
-            if let Some(mut effect) = enemy_effect.on_hit_effect {
+            if let Some(mut effect) = enemy_effect.on_hit {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref mut condition) => {
@@ -797,7 +814,7 @@ impl CoreGame {
             }
 
             for enhancement in enhancements {
-                if let Some(SpellEnhancementEffect::OnHitEffect(effect)) = enhancement.effect {
+                if let Some(SpellEnhancementEffect::OnHit(effect)) = enhancement.effect {
                     let log_line = self.perform_effect_application(effect, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
@@ -1701,7 +1718,7 @@ pub struct Spell {
     pub mana_cost: u32,
 
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
-    pub target_type: SpellTargetType,
+    pub target: SpellTarget,
     pub animation_color: Color,
 }
 
@@ -1715,7 +1732,7 @@ pub enum SpellEffect {
 pub struct SpellEnemyEffect {
     pub contest_type: Option<SpellContestType>,
     pub damage: Option<(u32, bool)>,
-    pub on_hit_effect: Option<ApplyEffect>,
+    pub on_hit: Option<ApplyEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1725,49 +1742,60 @@ pub struct SpellAllyEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum SpellTargetType {
-    TargetEnemy {
+pub enum SpellTarget {
+    Enemy {
         range: Range,
         effect: SpellEnemyEffect,
         impact_area: Option<(Range, SpellEnemyEffect)>,
     },
 
-    TargetAlly {
+    Ally {
         range: Range,
         effect: SpellAllyEffect,
     },
 
-    TargetArea {
+    Area {
         range: Range,
         radius: Range,
         effect: SpellEffect,
     },
 
-    NoTarget {
+    None {
         self_area: Option<(Range, SpellEffect)>,
         self_effect: Option<SpellAllyEffect>,
     },
 }
 
-impl SpellTargetType {
+impl SpellTarget {
     pub fn single_target(&self) -> bool {
         match self {
-            SpellTargetType::TargetEnemy { .. } => true,
-            SpellTargetType::TargetAlly { .. } => true,
-            SpellTargetType::TargetArea { .. } => false,
-            SpellTargetType::NoTarget { .. } => false,
+            SpellTarget::Enemy { .. } => true,
+            SpellTarget::Ally { .. } => true,
+            SpellTarget::Area { .. } => false,
+            SpellTarget::None { .. } => false,
         }
     }
 
-    pub fn range(&self) -> Option<Range> {
+    pub fn base_range(&self) -> Option<Range> {
         match self {
-            SpellTargetType::TargetEnemy { range, .. } => Some(*range),
-            SpellTargetType::TargetAlly { range, .. } => Some(*range),
-            SpellTargetType::TargetArea { range, .. } => Some(*range),
-            SpellTargetType::NoTarget { self_area, .. } => {
+            SpellTarget::Enemy { range, .. } => Some(*range),
+            SpellTarget::Ally { range, .. } => Some(*range),
+            SpellTarget::Area { range, .. } => Some(*range),
+            SpellTarget::None { self_area, .. } => {
                 self_area.as_ref().map(|(radius, _effect)| *radius)
             }
         }
+    }
+
+    pub fn range(&self, enhancements: &[SpellEnhancement]) -> Option<Range> {
+        self.base_range().map(|mut range| {
+            for enhancement in enhancements {
+                if let Some(SpellEnhancementEffect::IncreasedRange(n)) = enhancement.effect {
+                    range = range.plus(n);
+                }
+            }
+            range
+        })
     }
 }
 
@@ -1785,7 +1813,8 @@ pub struct SpellEnhancement {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum SpellEnhancementEffect {
     CastTwice,
-    OnHitEffect(ApplyEffect),
+    OnHit(ApplyEffect),
+    IncreasedRange(u32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1841,10 +1870,6 @@ impl Attributes {
         }
     }
 }
-
-// TODO Give Character interior mutability?
-// Then RefCell<Character> wouldn't be necessary, and CoreGame could freely
-// hold onto character references while making calls to the UI.
 
 #[derive(Debug)]
 pub struct Character {
@@ -2047,12 +2072,14 @@ impl Character {
         }
     }
 
-    pub fn can_reach_with_spell(&self, spell: Spell, target_position: Position) -> bool {
-        within_range_squared(
-            spell.target_type.range().unwrap().squared(),
-            self.position.get(),
-            target_position,
-        )
+    pub fn can_reach_with_spell(
+        &self,
+        spell: Spell,
+        enhancements: &[SpellEnhancement],
+        target_position: Position,
+    ) -> bool {
+        let range = spell.target.range(enhancements).unwrap();
+        within_range_squared(range.squared(), self.position.get(), target_position)
     }
 
     pub fn known_actions(&self) -> Vec<(&'static str, BaseAction)> {
@@ -2650,6 +2677,15 @@ impl Range {
             Range::Ranged(range) => range.pow(2) as f32,
             Range::ExtendableRanged(range) => range.pow(2) as f32,
             Range::Float(range) => range.powf(2.0),
+        }
+    }
+
+    pub fn plus(&self, n: u32) -> Range {
+        match self {
+            Range::Melee => Range::Float(2f32.sqrt() + n as f32),
+            Range::Ranged(range) => Range::Ranged(range + n),
+            Range::ExtendableRanged(range) => Range::Ranged(range + n),
+            Range::Float(range) => Range::Float(range + n as f32),
         }
     }
 }
