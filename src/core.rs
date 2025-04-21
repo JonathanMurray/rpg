@@ -16,6 +16,8 @@ use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMA
 use crate::game_ui_orchestration::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, SpriteId};
 
+pub type Position = (i32, i32);
+
 pub const MAX_ACTION_POINTS: u32 = 5;
 
 pub struct CoreGame {
@@ -282,7 +284,7 @@ impl CoreGame {
             .await
     }
 
-    async fn perform_movement(&self, mut positions: Vec<(u32, u32)>) {
+    async fn perform_movement(&self, mut positions: Vec<Position>) {
         while !positions.is_empty() {
             let character = self.active_character();
             let new_position = positions.remove(0);
@@ -546,39 +548,33 @@ impl CoreGame {
         name: &'static str,
         enhancements: &[SpellEnhancement],
         caster: &Character,
-        area_center: (u32, u32),
+        area_center: Position,
         radius: Range,
         detail_lines: &mut Vec<String>,
         spell_result: u32,
         effect: SpellEffect,
     ) -> Vec<(u32, SpellTargetOutcome)> {
         match effect {
-            SpellEffect::Enemy(enemy_area) => {
-                
-                self.perform_spell_area_enemy_effect(
-                    radius,
-                    name,
-                    enhancements,
-                    caster,
-                    area_center,
-                    detail_lines,
-                    spell_result,
-                    enemy_area,
-                )
-            }
+            SpellEffect::Enemy(enemy_area) => self.perform_spell_area_enemy_effect(
+                radius,
+                name,
+                enhancements,
+                caster,
+                area_center,
+                detail_lines,
+                spell_result,
+                enemy_area,
+            ),
 
-            SpellEffect::Ally(ally_area) => {
-                
-                self.perform_spell_area_ally_effect(
-                    radius,
-                    name,
-                    caster,
-                    area_center,
-                    detail_lines,
-                    spell_result,
-                    ally_area,
-                )
-            }
+            SpellEffect::Ally(ally_area) => self.perform_spell_area_ally_effect(
+                radius,
+                name,
+                caster,
+                area_center,
+                detail_lines,
+                spell_result,
+                ally_area,
+            ),
         }
     }
 
@@ -587,7 +583,7 @@ impl CoreGame {
         range: Range,
         name: &'static str,
         caster: &Character,
-        area_center: (u32, u32),
+        area_center: Position,
         detail_lines: &mut Vec<String>,
         spell_result: u32,
         ally_area: SpellAllyEffect,
@@ -674,7 +670,7 @@ impl CoreGame {
         name: &'static str,
         enhancements: &[SpellEnhancement],
         caster: &Character,
-        area_center: (u32, u32),
+        area_center: Position,
         detail_lines: &mut Vec<String>,
         spell_result: u32,
         enemy_area: SpellEnemyEffect,
@@ -1213,8 +1209,8 @@ pub enum GameEvent {
     LogLine(String),
     Moved {
         character: CharacterId,
-        from: (u32, u32),
-        to: (u32, u32),
+        from: Position,
+        to: Position,
     },
     CharacterReactedToHit {
         main_line: String,
@@ -1231,7 +1227,7 @@ pub enum GameEvent {
     SpellWasCast {
         caster: CharacterId,
         target_outcome: Option<(CharacterId, SpellTargetOutcome)>,
-        area_outcomes: Option<((u32, u32), Vec<(CharacterId, SpellTargetOutcome)>)>,
+        area_outcomes: Option<(Position, Vec<(CharacterId, SpellTargetOutcome)>)>,
         spell: Spell,
         detail_lines: Vec<String>,
     },
@@ -1528,29 +1524,32 @@ impl Condition {
         }
     }
 
-    
     pub const fn description(&self) -> &'static str {
         match self {
             Condition::Protected(_) => "Gains +3 armor",
             Condition::Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
             Condition::Bleeding(_) => "Loses 1 health at end of turn",
-            Condition::Braced =>  "Gain +3 evasion against the next incoming attack",
+            Condition::Braced => "Gain +3 evasion against the next incoming attack",
             Condition::Raging => "Gains advantage on the next attack",
             Condition::Weakened(_) => "-1 to attributes for each stack",
-            Condition::MainHandExertion(_) =>  "-1 per stack on further similar actions",
-            Condition::OffHandExertion(_) =>  "-1 per stack on further similar actions",
+            Condition::MainHandExertion(_) => "-1 per stack on further similar actions",
+            Condition::OffHandExertion(_) => "-1 per stack on further similar actions",
         }
     }
 
     pub const fn info(&mut self) -> (ConditionInfo, Option<u32>) {
-        (ConditionInfo { name: self.name(), description: self.description() }, self.stacks().copied())
+        (
+            ConditionInfo {
+                name: self.name(),
+                description: self.description(),
+            },
+            self.stacks().copied(),
+        )
     }
 }
 
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
 const PROTECTED_ARMOR_BONUS: u32 = 3;
-
-
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -1569,7 +1568,6 @@ struct Conditions {
     mainhand_exertion: u32,
     offhand_exertion: u32,
 }
-
 
 impl Conditions {
     pub fn infos(&mut self) -> Vec<(ConditionInfo, Option<u32>)> {
@@ -1617,7 +1615,7 @@ pub enum Action {
         target: ActionTarget,
     },
     Move {
-        positions: Vec<(u32, u32)>,
+        positions: Vec<Position>,
         enhancements: Vec<MovementEnhancement>,
         action_point_cost: u32,
     },
@@ -1626,7 +1624,7 @@ pub enum Action {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum ActionTarget {
     Character(CharacterId),
-    Position((u32, u32)),
+    Position(Position),
     None,
 }
 
@@ -1766,7 +1764,9 @@ impl SpellTargetType {
             SpellTargetType::TargetEnemy { range, .. } => Some(*range),
             SpellTargetType::TargetAlly { range, .. } => Some(*range),
             SpellTargetType::TargetArea { range, .. } => Some(*range),
-            SpellTargetType::NoTarget { self_area, .. } => self_area.as_ref().map(|(radius, _effect)| *radius),
+            SpellTargetType::NoTarget { self_area, .. } => {
+                self_area.as_ref().map(|(radius, _effect)| *radius)
+            }
         }
     }
 }
@@ -1852,8 +1852,7 @@ pub struct Character {
     pub sprite: SpriteId,
     pub has_died: Cell<bool>,
     pub player_controlled: bool,
-    // TODO i32 instead?
-    pub position: Cell<(u32, u32)>,
+    pub position: Cell<Position>,
     pub name: &'static str,
     pub base_attributes: Attributes,
     pub health: NumberedResource,
@@ -1881,7 +1880,7 @@ impl Character {
         name: &'static str,
         texture: SpriteId,
         base_attributes: Attributes,
-        position: (u32, u32),
+        position: Position,
     ) -> Self {
         let max_health = 6 + base_attributes.strength;
         let max_mana = (base_attributes.spirit * 2).saturating_sub(5);
@@ -1971,9 +1970,8 @@ impl Character {
         self.conditions.borrow_mut().infos()
     }
 
-    pub fn position_i32(&self) -> (i32, i32) {
-        let pos = self.position.get();
-        (pos.0 as i32, pos.1 as i32)
+    pub fn pos(&self) -> Position {
+        self.position.get()
     }
 
     pub fn id(&self) -> CharacterId {
@@ -1998,7 +1996,7 @@ impl Character {
     pub fn reaches_with_attack(
         &self,
         hand: HandType,
-        target_position: (u32, u32),
+        target_position: Position,
     ) -> (Range, ActionReach) {
         let weapon = self.weapon(hand).unwrap();
         let weapon_range = weapon.range;
@@ -2049,7 +2047,7 @@ impl Character {
         }
     }
 
-    pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
+    pub fn can_reach_with_spell(&self, spell: Spell, target_position: Position) -> bool {
         within_range_squared(
             spell.target_type.range().unwrap().squared(),
             self.position.get(),
@@ -2342,7 +2340,7 @@ impl Character {
             protection += armor.protection;
         }
 
-        if self.conditions.borrow().protected > 0{
+        if self.conditions.borrow().protected > 0 {
             protection += PROTECTED_ARMOR_BONUS;
         }
 
@@ -2474,17 +2472,16 @@ pub enum ActionReach {
     No,
 }
 
-fn within_range_squared(range_squared: f32, source: (u32, u32), destination: (u32, u32)) -> bool {
-    let distance_squared = (destination.0 as i32 - source.0 as i32).pow(2)
-        + (destination.1 as i32 - source.1 as i32).pow(2);
+fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
+    let distance_squared = (destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2);
     distance_squared as f32 <= range_squared
 }
 
-fn within_meele(source: (u32, u32), destination: (u32, u32)) -> bool {
+fn within_meele(source: Position, destination: Position) -> bool {
     within_range_squared(2.0, source, destination)
 }
 
-pub fn distance_between(source: (i32, i32), destination: (i32, i32)) -> f32 {
+pub fn distance_between(source: Position, destination: Position) -> f32 {
     (((destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2)) as f32).sqrt()
 }
 

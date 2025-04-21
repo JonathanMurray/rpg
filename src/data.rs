@@ -3,10 +3,10 @@ use macroquad::color::{BLACK, BLUE, GREEN, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, OnAttackedReaction,
-        OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
-        Shield, Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect,
-        SpellEnhancement, SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
+        AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
+        OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellAllyEffect,
+        SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect,
+        SpellTargetType, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };

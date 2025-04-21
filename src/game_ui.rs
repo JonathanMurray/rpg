@@ -4,10 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{
-    color::SKYBLUE,
-    rand,
-};
+use macroquad::{color::SKYBLUE, rand};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -33,8 +30,8 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
         Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellTargetOutcome,
-        SpellTargetType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        OnAttackedReaction, OnHitReaction, SpellTargetOutcome, SpellTargetType, MAX_ACTION_POINTS,
+        MOVE_ACTION_COST,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
@@ -806,7 +803,7 @@ impl UserInterface {
             } => {
                 self.log.add_with_details(main_line, detail_lines);
 
-                let reactor_pos = self.characters.get(reactor).position_i32();
+                let reactor_pos = self.characters.get(reactor).pos();
 
                 if let Some(condition) = outcome.received_condition {
                     self.game_grid.add_text_effect(
@@ -818,7 +815,7 @@ impl UserInterface {
                     );
                 }
 
-                let attacker_pos = self.active_character().position_i32();
+                let attacker_pos = self.active_character().pos();
                 if let Some(offensive) = outcome.offensive {
                     if let Some(condition) = offensive.inflicted_condition {
                         self.game_grid.add_text_effect(
@@ -862,11 +859,10 @@ impl UserInterface {
 
                 self.log.add_with_details(line, detail_lines);
 
-                let attacker_pos = self.characters.get(attacker).position_i32();
-                let target_pos = self.characters.get(target).position_i32();
+                let attacker_pos = self.characters.get(attacker).pos();
+                let target_pos = self.characters.get(target).pos();
 
-                let dist = distance_between(attacker_pos, target_pos);
-                let duration = 0.15 * dist;
+                let duration = 0.15 * distance_between(attacker_pos, target_pos);
 
                 self.animation_stopwatch.set_to_at_least(duration + 0.4);
                 let impact_text = match outcome {
@@ -956,11 +952,10 @@ impl UserInterface {
 
                 let animation_color = spell.animation_color;
                 if let Some((target, outcome)) = target_outcome {
-                    let caster_pos = self.characters.get(caster).position_i32();
-                    let target_pos = self.characters.get(target).position_i32();
+                    let caster_pos = self.characters.get(caster).pos();
+                    let target_pos = self.characters.get(target).pos();
 
-                    let dist = distance_between(caster_pos, target_pos);
-                    duration = 0.15 * dist;
+                    duration = 0.15 * distance_between(caster_pos, target_pos);
 
                     self.game_grid.add_effect(
                         caster_pos,
@@ -1043,10 +1038,10 @@ impl UserInterface {
                     let area_duration = 0.2;
 
                     for (target_id, outcome) in outcomes {
-                        let target_pos = self.characters.get(target_id).position_i32();
+                        let target_pos = self.characters.get(target_id).pos();
 
                         self.game_grid.add_effect(
-                            (area_center_pos.0 as i32, area_center_pos.1 as i32),
+                            (area_center_pos.0, area_center_pos.1),
                             target_pos,
                             Effect {
                                 start_time: duration,
@@ -1096,7 +1091,7 @@ impl UserInterface {
                 let pos = self.characters.get(character).position.get();
                 let duration = 1.0;
                 self.game_grid.add_text_effect(
-                    (pos.0 as i32, pos.1 as i32),
+                    (pos.0, pos.1),
                     0.0,
                     duration,
                     format!("{:?}", condition),
@@ -1326,11 +1321,8 @@ impl UserInterface {
                             SpellTargetType::TargetArea { .. }
                         ));
 
-                        self.target_ui.set_action(
-                            format!("{} (AoE)", spell.name),
-                            vec![],
-                            false,
-                        );
+                        self.target_ui
+                            .set_action(format!("{} (AoE)", spell.name), vec![], false);
 
                         let maybe_indicator = if self
                             .active_character()

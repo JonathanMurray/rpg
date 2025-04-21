@@ -1,19 +1,21 @@
 use std::collections::{HashMap, HashSet};
 
+use crate::core::Position;
+
 pub struct PathfindGrid {
-    dimensions: (i32, i32),
-    pub blocked_positions: HashSet<(i32, i32)>,
-    pub routes: HashMap<(i32, i32), Route>,
+    dimensions: (u32, u32),
+    pub blocked_positions: HashSet<Position>,
+    pub routes: HashMap<Position, Route>,
 }
 
 #[derive(Copy, Clone, Debug)]
 pub struct Route {
     pub distance_from_start: f32,
-    pub came_from: (i32, i32),
+    pub came_from: Position,
 }
 
 impl PathfindGrid {
-    pub fn new(dimensions: (i32, i32)) -> Self {
+    pub fn new(dimensions: (u32, u32)) -> Self {
         Self {
             dimensions,
             blocked_positions: Default::default(),
@@ -21,10 +23,10 @@ impl PathfindGrid {
         }
     }
 
-    pub fn run(&mut self, (start_x, start_y): (i32, i32), range: f32) {
+    pub fn run(&mut self, (start_x, start_y): Position, range: f32) {
         self.routes.clear();
 
-        let mut next: Vec<((i32, i32), Route)> = vec![(
+        let mut next: Vec<(Position, Route)> = vec![(
             (start_x, start_y),
             Route {
                 distance_from_start: 0.0,
@@ -60,8 +62,8 @@ impl PathfindGrid {
             ];
 
             for (neighbor_node, neighbor_dist) in neighbors {
-                let within_grid = (0..self.dimensions.0).contains(&neighbor_node.0)
-                    && (0..self.dimensions.1).contains(&neighbor_node.1);
+                let within_grid = (0..self.dimensions.0 as i32).contains(&neighbor_node.0)
+                    && (0..self.dimensions.1 as i32).contains(&neighbor_node.1);
                 if neighbor_dist <= range
                     && within_grid
                     && !self.blocked_positions.contains(&neighbor_node)

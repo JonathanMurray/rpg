@@ -7,7 +7,7 @@ use crate::{
 };
 use macroquad::rand;
 
-pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option<Action> {
+pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option<Action> {
     let character = game.active_character();
 
     assert!(!character.player_controlled);
@@ -64,18 +64,14 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (i32, i32)) -> Option
                             continue; // Avoid borrowing already borrowed active character
                         }
                         let pos = character.position.get();
-                        pathfind_grid
-                            .blocked_positions
-                            .insert((pos.0 as i32, pos.1 as i32));
+                        pathfind_grid.blocked_positions.insert((pos.0, pos.1));
                     }
                     let pos = character.position.get();
-                    pathfind_grid.run((pos.0 as i32, pos.1 as i32), character.move_range);
+                    pathfind_grid.run((pos.0, pos.1), character.move_range);
 
                     for (destination, route) in pathfind_grid.routes {
-                        if route.came_from == (pos.0 as i32, pos.1 as i32)
-                            && route.distance_from_start > 0.0
-                        {
-                            let destination = (destination.0 as u32, destination.1 as u32);
+                        if route.came_from == (pos.0, pos.1) && route.distance_from_start > 0.0 {
+                            let destination = (destination.0, destination.1);
                             assert!(destination != pos);
                             chosen_action = Some(Action::Move {
                                 action_point_cost,

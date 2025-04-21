@@ -15,7 +15,9 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEnhancement, SpellTargetType
+        ApplyEffect, AttackEnhancement, BaseAction, Character, MovementEnhancement,
+        OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType,
+        SpellEnhancement, SpellTargetType,
     },
     textures::IconId,
 };
@@ -122,13 +124,11 @@ fn base_action_tooltip(
         BaseAction::Move {
             action_point_cost,
             range: _,
-        } => {
-            ActionButtonTooltip {
-                header: format!("Movement ({} AP)", action_point_cost),
-                description: None,
-                technical_description: Default::default(),
-            }
-        }
+        } => ActionButtonTooltip {
+            header: format!("Movement ({} AP)", action_point_cost),
+            description: None,
+            technical_description: Default::default(),
+        },
     }
 }
 

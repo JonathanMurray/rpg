@@ -22,7 +22,7 @@ use macroquad::{
 
 use crate::{
     core::{
-        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement,
+        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement, Position,
         SpellTargetType,
     },
     game_ui::UiState,
@@ -66,8 +66,8 @@ const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 #[derive(Debug, Copy, Clone)]
 struct CharacterMotion {
     character_id: CharacterId,
-    from: (i32, i32),
-    to: (i32, i32),
+    from: Position,
+    to: Position,
     remaining_duration: f32,
     duration: f32,
 }
@@ -140,7 +140,7 @@ pub struct GameGrid {
 
     character_motion: Option<CharacterMotion>,
 
-    pub grid_dimensions: (i32, i32),
+    pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
 
     camera_position: (Cell<f32>, Cell<f32>),
@@ -151,7 +151,7 @@ pub struct GameGrid {
     active_character_id: CharacterId,
 
     movement_range: MovementRange,
-    selected_movement_path: Option<Vec<(f32, (i32, i32))>>,
+    selected_movement_path: Option<Vec<(f32, Position)>>,
 
     pub range_indicator: Option<(Range, RangeIndicator)>,
     players_action_target: ActionTarget,
@@ -168,7 +168,7 @@ impl GameGrid {
         big_font: Font,
         simple_font: Font,
         background_textures: Vec<Texture2D>,
-        grid_dimensions: (i32, i32),
+        grid_dimensions: (u32, u32),
         cell_backgrounds: Vec<usize>,
     ) -> Self {
         let characters = characters.clone();
@@ -203,15 +203,15 @@ impl GameGrid {
     pub fn set_character_motion(
         &mut self,
         character_id: CharacterId,
-        from: (u32, u32),
-        to: (u32, u32),
+        from: Position,
+        to: Position,
         duration: f32,
     ) {
         assert!(self.character_motion.is_none());
         self.character_motion = Some(CharacterMotion {
             character_id,
-            from: (from.0 as i32, from.1 as i32),
-            to: (to.0 as i32, to.1 as i32),
+            from: (from.0, from.1),
+            to: (to.0, to.1),
             remaining_duration: duration,
             duration,
         });
@@ -234,12 +234,12 @@ impl GameGrid {
         self.selected_player_character_id = selected_player_character_id;
 
         for character in characters.iter() {
-            let pos = character.position_i32();
+            let pos = character.pos();
 
             self.pathfind_grid.blocked_positions.insert(pos);
         }
 
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
 
         for effect in &mut self.effects {
@@ -271,7 +271,7 @@ impl GameGrid {
 
     pub fn add_text_effect(
         &mut self,
-        position: (i32, i32),
+        position: Position,
         start_time: f32,
         duration: f32,
         text: impl Into<String>,
@@ -303,7 +303,7 @@ impl GameGrid {
         self.effects.push(effect);
     }
 
-    pub fn add_effect(&mut self, source: (i32, i32), destination: (i32, i32), effect: Effect) {
+    pub fn add_effect(&mut self, source: Position, destination: Position, effect: Effect) {
         let source_pos = (
             self.grid_x_to_screen(source.0),
             self.grid_y_to_screen(source.1),
@@ -326,7 +326,7 @@ impl GameGrid {
     }
 
     fn set_an_arbitrary_valid_movement_path(&mut self) {
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self.characters.get(self.active_character_id).pos();
         let mut movement_preview = vec![];
         for (destination, route) in &self.pathfind_grid.routes {
             if route.came_from == pos
@@ -366,7 +366,7 @@ impl GameGrid {
     ) {
         self.movement_range.set(range, enhancements);
         self.ensure_movement_preview_is_within_selected_move_range();
-        let pos = self.characters.get(self.active_character_id).position_i32();
+        let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
     }
 
@@ -385,7 +385,7 @@ impl GameGrid {
         }
     }
 
-    pub fn take_movement_path(&mut self) -> Vec<(u32, u32)> {
+    pub fn take_movement_path(&mut self) -> Vec<Position> {
         let mut reversed_path = self.selected_movement_path.take().unwrap();
 
         // Remove the character's current position; it should not be part of the movement path
@@ -394,7 +394,7 @@ impl GameGrid {
         reversed_path
             .into_iter()
             .rev()
-            .map(|(_dist, (x, y))| (x as u32, y as u32))
+            .map(|(_dist, (x, y))| (x, y))
             .collect()
     }
 
@@ -406,7 +406,7 @@ impl GameGrid {
         self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get()
     }
 
-    fn grid_pos_to_screen(&self, pos: (i32, i32)) -> (f32, f32) {
+    fn grid_pos_to_screen(&self, pos: Position) -> (f32, f32) {
         (self.grid_x_to_screen(pos.0), self.grid_y_to_screen(pos.1))
     }
 
@@ -429,14 +429,14 @@ impl GameGrid {
             }
         }
         (
-            self.grid_x_to_screen(character.position_i32().0),
-            self.grid_y_to_screen(character.position_i32().1),
+            self.grid_x_to_screen(character.pos().0),
+            self.grid_y_to_screen(character.pos().1),
         )
     }
 
     fn draw_cell_outline(
         &self,
-        (grid_x, grid_y): (i32, i32),
+        (grid_x, grid_y): Position,
         color: Color,
         margin: f32,
         thickness: f32,
@@ -451,7 +451,7 @@ impl GameGrid {
         )
     }
 
-    fn fill_cell(&self, (grid_x, grid_y): (i32, i32), color: Color) {
+    fn fill_cell(&self, (grid_x, grid_y): Position, color: Color) {
         let margin = 2.0;
         draw_rectangle(
             self.grid_x_to_screen(grid_x) + margin,
@@ -500,33 +500,34 @@ impl GameGrid {
     }
 
     fn draw_background(&self) {
-        for col in 0..self.grid_dimensions.0 + 1 {
+        for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
             draw_line(
                 x0,
                 self.grid_y_to_screen(0),
                 x0,
-                self.grid_y_to_screen(self.grid_dimensions.1),
+                self.grid_y_to_screen(self.grid_dimensions.1 as i32),
                 1.0,
                 GRID_COLOR,
             );
-            for row in 0..self.grid_dimensions.1 + 1 {
+            for row in 0..self.grid_dimensions.1 as i32 + 1 {
                 let y0 = self.grid_y_to_screen(row);
                 draw_line(
                     self.grid_x_to_screen(0),
                     y0,
-                    self.grid_x_to_screen(self.grid_dimensions.0),
+                    self.grid_x_to_screen(self.grid_dimensions.0 as i32),
                     y0,
                     1.0,
                     GRID_COLOR,
                 );
 
-                if col < self.grid_dimensions.0 && row < self.grid_dimensions.1 {
+                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     let params = DrawTextureParams {
                         dest_size: Some(Vec2::new(self.cell_w, self.cell_w)),
                         ..Default::default()
                     };
-                    let i = self.cell_backgrounds[(row * self.grid_dimensions.0 + col) as usize];
+                    let i =
+                        self.cell_backgrounds[(row * self.grid_dimensions.0 as i32 + col) as usize];
                     let texture = &self.background_textures[i];
                     draw_texture_ex(texture, x0, y0, WHITE, params);
                 }
@@ -581,9 +582,8 @@ impl GameGrid {
         let (mouse_grid_x, mouse_grid_y) = mouse_relative_to_grid(mouse_relative);
 
         let is_mouse_within_grid = (0f32..w).contains(&mouse_relative.0)
-            && (0..self.grid_dimensions.0).contains(&mouse_grid_x)
             && (0f32..h).contains(&mouse_relative.1)
-            && (0..self.grid_dimensions.1).contains(&mouse_grid_y);
+            && self.is_within_grid((mouse_grid_x, mouse_grid_y));
 
         if is_mouse_within_grid && receptive_to_input {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -612,7 +612,7 @@ impl GameGrid {
 
         self.draw_background();
 
-        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
+        let active_char_pos = self.characters.get(self.active_character_id).pos();
 
         self.draw_active_character_highlight();
 
@@ -624,7 +624,7 @@ impl GameGrid {
 
         let mut hovered_character_id = None;
         for character in self.characters.iter() {
-            if character.position_i32() == (mouse_grid_x, mouse_grid_y) {
+            if character.pos() == (mouse_grid_x, mouse_grid_y) {
                 let id = character.id();
                 outcome.hovered_character_id = Some(id);
                 hovered_character_id = Some(id);
@@ -676,7 +676,7 @@ impl GameGrid {
             } => {
                 if let ActionTarget::Character(target_id) = self.players_action_target {
                     self.draw_range_indicator(
-                        self.characters.get(target_id).position_i32(),
+                        self.characters.get(target_id).pos(),
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
@@ -691,7 +691,7 @@ impl GameGrid {
             MouseState::RequiresPositionTarget(range) => {
                 if let ActionTarget::Position(pos) = self.players_action_target {
                     self.draw_range_indicator(
-                        (pos.0 as i32, pos.1 as i32),
+                        (pos.0, pos.1),
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
@@ -712,7 +712,7 @@ impl GameGrid {
 
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {
-                if character.position_i32() == (mouse_grid_x, mouse_grid_y) {
+                if character.pos() == (mouse_grid_x, mouse_grid_y) {
                     let id = character.id();
                     outcome.hovered_character_id = Some(id);
                     hovered_character_id = Some(id);
@@ -734,10 +734,12 @@ impl GameGrid {
                 self.players_inspect_target = None;
             }
 
-            if pressed_left_mouse && matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
+            if pressed_left_mouse
+                && matches!(mouse_state, MouseState::RequiresPositionTarget { .. })
+            {
                 if self.players_action_target == ActionTarget::None {
                     self.players_action_target =
-                        ActionTarget::Position((mouse_grid_x as u32, mouse_grid_y as u32));
+                        ActionTarget::Position((mouse_grid_x, mouse_grid_y));
                 } else {
                     outcome.switched_action = Some(GridSwitchedTo::Idle);
                 }
@@ -902,12 +904,12 @@ impl GameGrid {
 
         match self.players_action_target {
             ActionTarget::Character(target) => {
-                let target_pos = self.characters.get(target).position_i32();
+                let target_pos = self.characters.get(target).pos();
                 self.draw_target_crosshair(target_pos, PLAYERS_TARGET_CROSSHAIR_COLOR);
             }
             ActionTarget::Position(target_pos) => {
                 self.draw_target_crosshair(
-                    (target_pos.0 as i32, target_pos.1 as i32),
+                    (target_pos.0, target_pos.1),
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
                 );
             }
@@ -915,7 +917,7 @@ impl GameGrid {
         }
 
         if let Some(target) = self.enemys_target {
-            let target_pos = self.characters.get(target).position_i32();
+            let target_pos = self.characters.get(target).pos();
             self.draw_target_crosshair(target_pos, ENEMYS_TARGET_CROSSHAIR_COLOR);
         }
 
@@ -1070,9 +1072,9 @@ impl GameGrid {
 
     fn build_path_from_route(
         &self,
-        start: (i32, i32),
-        destination: (i32, i32),
-    ) -> Vec<(f32, (i32, i32))> {
+        start: Position,
+        destination: Position,
+    ) -> Vec<(f32, Position)> {
         let route = self.pathfind_grid.routes.get(&destination).unwrap();
         let mut dist = route.distance_from_start;
 
@@ -1092,8 +1094,8 @@ impl GameGrid {
         movement_preview
     }
 
-    fn draw_target_crosshair(&self, target_pos: (i32, i32), crosshair_color: Color) {
-        let actor_pos = self.characters.get(self.active_character_id).position_i32();
+    fn draw_target_crosshair(&self, target_pos: Position, crosshair_color: Color) {
+        let actor_pos = self.characters.get(self.active_character_id).pos();
 
         let actor_x = self.grid_x_to_screen(actor_pos.0);
         let actor_y = self.grid_y_to_screen(actor_pos.1);
@@ -1161,21 +1163,23 @@ impl GameGrid {
     }
 
     fn draw_movement_path_background(&self) {
-        let active_char_pos = self.characters.get(self.active_character_id).position_i32();
+        let active_char_pos = self.characters.get(self.active_character_id).pos();
 
         self.draw_move_range_indicator(active_char_pos);
 
         for pos in self.pathfind_grid.routes.keys() {
-            if (0..self.grid_dimensions.0).contains(&pos.0)
-                && (0..self.grid_dimensions.1).contains(&pos.1)
-                && *pos != active_char_pos
-            {
+            if self.is_within_grid(*pos) && *pos != active_char_pos {
                 self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR);
             }
         }
     }
 
-    fn draw_movement_path(&self, path: &[(f32, (i32, i32))], hover: bool) {
+    fn is_within_grid(&self, pos: Position) -> bool {
+        (0..self.grid_dimensions.0 as i32).contains(&pos.0)
+            && (0..self.grid_dimensions.1 as i32).contains(&pos.1)
+    }
+
+    fn draw_movement_path(&self, path: &[(f32, Position)], hover: bool) {
         if hover {
             self.draw_movement_path_arrow(path, HOVER_MOVEMENT_ARROW_COLOR, 2.0);
         } else {
@@ -1205,7 +1209,7 @@ impl GameGrid {
         );
     }
 
-    fn draw_movement_path_arrow(&self, path: &[(f32, (i32, i32))], color: Color, thickness: f32) {
+    fn draw_movement_path_arrow(&self, path: &[(f32, Position)], color: Color, thickness: f32) {
         for i in 0..path.len() - 1 {
             let a = path[i].1;
             let b = path[i + 1].1;
@@ -1238,7 +1242,7 @@ impl GameGrid {
         );
     }
 
-    fn draw_move_range_indicator(&self, origin: (i32, i32)) {
+    fn draw_move_range_indicator(&self, origin: Position) {
         let range = self.movement_range.selected();
         let range_ceil = range.ceil() as i32;
 
@@ -1250,11 +1254,11 @@ impl GameGrid {
                 .unwrap_or(false)
         };
 
-        for x in
-            (origin.0 - range_ceil).max(0)..=(origin.0 + range_ceil).min(self.grid_dimensions.0 - 1)
+        for x in (origin.0 - range_ceil).max(0)
+            ..=(origin.0 + range_ceil).min(self.grid_dimensions.0 as i32 - 1)
         {
             for y in (origin.1 - range_ceil).max(0)
-                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
+                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 as i32 - 1)
             {
                 let thickness = 2.0;
 
@@ -1274,7 +1278,7 @@ impl GameGrid {
         }
     }
 
-    fn draw_range_indicator(&self, origin: (i32, i32), range: Range, indicator: RangeIndicator) {
+    fn draw_range_indicator(&self, origin: Position, range: Range, indicator: RangeIndicator) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
         let draw_background = matches!(indicator, RangeIndicator::ActionTargetRange);
@@ -1286,11 +1290,11 @@ impl GameGrid {
         };
         let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;
-        for x in
-            (origin.0 - range_ceil).max(0)..=(origin.0 + range_ceil).min(self.grid_dimensions.0 - 1)
+        for x in (origin.0 - range_ceil).max(0)
+            ..=(origin.0 + range_ceil).min(self.grid_dimensions.0 as i32 - 1)
         {
             for y in (origin.1 - range_ceil).max(0)
-                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 - 1)
+                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 as i32 - 1)
             {
                 if is_cell_within(x, y) {
                     let mut thickness = 2.0;
