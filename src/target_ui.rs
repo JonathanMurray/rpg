@@ -46,7 +46,7 @@ impl TargetUi {
             name_text_line.set_min_height(20.0);
 
             let conditions_list =
-                ConditionsList::new(self.simple_font.clone(), char.condition_descriptions());
+                ConditionsList::new(self.simple_font.clone(), char.condition_infos());
 
             let armor_text_line = TextLine::new(
                 format!("Armor: {}", char.protection_from_armor()),

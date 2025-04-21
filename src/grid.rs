@@ -22,7 +22,7 @@ use macroquad::{
 
 use crate::{
     core::{
-        ActionReach, ActionTarget, BaseAction, Character, Goodness, MovementEnhancement,
+        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement,
         SpellTargetType,
     },
     game_ui::UiState,
@@ -680,14 +680,12 @@ impl GameGrid {
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
-                } else {
-                    if is_mouse_within_grid && receptive_to_input {
-                        self.draw_range_indicator(
-                            (mouse_grid_x, mouse_grid_y),
-                            range,
-                            RangeIndicator::TargetAreaEffect,
-                        );
-                    }
+                } else if is_mouse_within_grid && receptive_to_input {
+                    self.draw_range_indicator(
+                        (mouse_grid_x, mouse_grid_y),
+                        range,
+                        RangeIndicator::TargetAreaEffect,
+                    );
                 }
             }
             MouseState::RequiresPositionTarget(range) => {
@@ -697,14 +695,12 @@ impl GameGrid {
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
-                } else {
-                    if is_mouse_within_grid && receptive_to_input {
-                        self.draw_range_indicator(
-                            (mouse_grid_x, mouse_grid_y),
-                            range,
-                            RangeIndicator::TargetAreaEffect,
-                        );
-                    }
+                } else if is_mouse_within_grid && receptive_to_input {
+                    self.draw_range_indicator(
+                        (mouse_grid_x, mouse_grid_y),
+                        range,
+                        RangeIndicator::TargetAreaEffect,
+                    );
                 }
             }
             _ => {}
@@ -738,14 +734,12 @@ impl GameGrid {
                 self.players_inspect_target = None;
             }
 
-            if pressed_left_mouse {
-                if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
-                    if self.players_action_target == ActionTarget::None {
-                        self.players_action_target =
-                            ActionTarget::Position((mouse_grid_x as u32, mouse_grid_y as u32));
-                    } else {
-                        outcome.switched_action = Some(GridSwitchedTo::Idle);
-                    }
+            if pressed_left_mouse && matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
+                if self.players_action_target == ActionTarget::None {
+                    self.players_action_target =
+                        ActionTarget::Position((mouse_grid_x as u32, mouse_grid_y as u32));
+                } else {
+                    outcome.switched_action = Some(GridSwitchedTo::Idle);
                 }
             }
 

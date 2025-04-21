@@ -1,7 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    default,
     rc::Rc,
 };
 
@@ -16,8 +15,7 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, Spell, SpellContestType, SpellEnhancement, SpellTargetType,
+        ApplyEffect, AttackEnhancement, BaseAction, Character, MovementEnhancement, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEnhancement, SpellTargetType
     },
     textures::IconId,
 };
@@ -97,124 +95,126 @@ fn base_action_tooltip(
         BaseAction::Attack { hand, .. } => {
             let weapon = character.unwrap().weapon(*hand).unwrap();
 
-            return ActionButtonTooltip {
+            ActionButtonTooltip {
                 header: format!("{} attack ({} AP)", weapon.name, weapon.action_point_cost),
                 description: None,
                 technical_description: vec![
                     format!("{} damage", weapon.damage),
                     "vs Evasion".to_string(),
                 ],
-            };
+            }
         }
         BaseAction::SelfEffect(sea) => {
-            let mut technical_line = "Self: ".to_string();
-            match sea.effect {
-                crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                    technical_line.push_str(&format!("Loses {}^ AP", n))
-                }
-                crate::core::ApplyEffect::Condition(condition) => {
-                    technical_line.push_str(&format!("{}", condition.name()))
-                }
-            }
+            let mut technical_description = vec!["Self effect".to_string()];
+            describe_apply_effect(sea.effect, &mut technical_description);
 
-            return ActionButtonTooltip {
+            ActionButtonTooltip {
                 header: format!(
                     "{} ({})",
                     sea.name,
                     cost_string(sea.action_point_cost, sea.stamina_cost, 0)
                 ),
                 description: Some(sea.description),
-                technical_description: vec![technical_line],
-            };
+                technical_description,
+            }
         }
-        BaseAction::CastSpell(spell) => {
-            let header = format!(
-                "{} ({} AP, {} mana)",
-                spell.name, spell.action_point_cost, spell.mana_cost
-            );
+        BaseAction::CastSpell(spell) => spell_tooltip(spell),
+        BaseAction::Move {
+            action_point_cost,
+            range: _,
+        } => {
+            ActionButtonTooltip {
+                header: format!("Movement ({} AP)", action_point_cost),
+                description: None,
+                technical_description: Default::default(),
+            }
+        }
+    }
+}
 
-            let mut technical_description = vec![];
+fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<String>) {
+    match effect {
+        ApplyEffect::RemoveActionPoints(n) => {
+            technical_description.push(format!("  Loses {}^ AP", n))
+        }
+        ApplyEffect::Condition(condition) => {
+            technical_description.push(format!("  {}", condition.name()))
+        }
+    }
+}
 
-            match spell.target_type {
-                SpellTargetType::TargetEnemy {
-                    effect,
-                    impact_area: area,
-                    range,
-                } => {
-                    technical_description.push(format!("Target enemy (range {})", range));
+fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
+    let header = format!(
+        "{} ({} AP, {} mana)",
+        spell.name, spell.action_point_cost, spell.mana_cost
+    );
+    let mut technical_description = vec![];
+    match spell.target_type {
+        SpellTargetType::TargetEnemy {
+            effect,
+            impact_area: area,
+            range,
+        } => {
+            technical_description.push(format!("Target enemy (range {})", range));
 
-                    match effect.damage {
-                        Some((dmg, true)) => {
-                            technical_description.push(format!("  {}^ damage", dmg))
-                        }
-                        Some((dmg, false)) => {
-                            technical_description.push(format!("  {} damage", dmg))
-                        }
-                        None => {}
-                    }
+            match effect.damage {
+                Some((dmg, true)) => technical_description.push(format!("  {}^ damage", dmg)),
+                Some((dmg, false)) => technical_description.push(format!("  {} damage", dmg)),
+                None => {}
+            }
 
-                    if let Some(apply_effect) = effect.on_hit_effect {
-                        match apply_effect {
-                            crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                technical_description.push(format!("  Loses {}^ AP", n));
-                            }
-                            crate::core::ApplyEffect::Condition(condition) => {
-                                technical_description.push(format!("  {}", condition.name()));
-                            }
-                        }
-                    }
-                    match effect.contest_type {
-                        Some(SpellContestType::Mental) => {
-                            technical_description.push(format!("  [Will] defense"))
-                        }
-                        Some(SpellContestType::Projectile) => {
-                            technical_description.push(format!("  [Evasion] defense"))
-                        }
-                        None => {}
-                    };
-
-                    if let Some((range, effect)) = area {
-                        technical_description.push(format!("Impact area (range {})", range));
-
-                        match effect.damage {
-                            Some((dmg, true)) => {
-                                technical_description.push(format!("  {}^ damage", dmg))
-                            }
-                            Some((dmg, false)) => {
-                                technical_description.push(format!("  {} damage", dmg))
-                            }
-                            None => {}
-                        }
-                        if let Some(apply_effect) = effect.on_hit_effect {
-                            match apply_effect {
-                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                    technical_description.push(format!("  Loses {}^ AP", n));
-                                }
-                                crate::core::ApplyEffect::Condition(condition) => {
-                                    technical_description.push(format!("  {}", condition.name()));
-                                }
-                            }
-                        }
-                        match effect.contest_type {
-                            Some(SpellContestType::Mental) => {
-                                technical_description.push(format!("  [Will] defense"))
-                            }
-                            Some(SpellContestType::Projectile) => {
-                                technical_description.push(format!("  [Evasion] defense"))
-                            }
-                            None => {}
-                        };
-                    }
+            if let Some(apply_effect) = effect.on_hit_effect {
+                describe_apply_effect(apply_effect, &mut technical_description);
+            }
+            match effect.contest_type {
+                Some(SpellContestType::Mental) => {
+                    technical_description.push("  [Will] defense".to_string())
                 }
-
-                SpellTargetType::TargetAlly { range, effect } => {
-                    technical_description.push(format!("Target ally (range {})", range));
-                    if effect.healing > 0 {
-                        technical_description.push(format!("  {}^ healing", effect.healing));
-                    }
+                Some(SpellContestType::Projectile) => {
+                    technical_description.push("  [Evasion] defense".to_string())
                 }
+                None => {}
+            };
 
-                SpellTargetType::NoTarget { radius, effect } => match effect {
+            if let Some((range, effect)) = area {
+                technical_description.push(format!("Impact area (range {})", range));
+
+                match effect.damage {
+                    Some((dmg, true)) => technical_description.push(format!("  {}^ damage", dmg)),
+                    Some((dmg, false)) => technical_description.push(format!("  {} damage", dmg)),
+                    None => {}
+                }
+                if let Some(apply_effect) = effect.on_hit_effect {
+                    describe_apply_effect(apply_effect, &mut technical_description);
+                }
+                match effect.contest_type {
+                    Some(SpellContestType::Mental) => {
+                        technical_description.push("  [Will] defense".to_string())
+                    }
+                    Some(SpellContestType::Projectile) => {
+                        technical_description.push("  [Evasion] defense".to_string())
+                    }
+                    None => {}
+                };
+            }
+        }
+
+        SpellTargetType::TargetAlly { range, effect } => {
+            technical_description.push(format!("Target ally (range {})", range));
+            describe_spell_ally_effect(effect, &mut technical_description);
+        }
+
+        SpellTargetType::NoTarget {
+            self_area,
+            self_effect,
+        } => {
+            if let Some(effect) = self_effect {
+                technical_description.push("Self effect".to_string());
+                describe_spell_ally_effect(effect, &mut technical_description);
+            }
+
+            if let Some((radius, effect)) = self_area {
+                match effect {
                     crate::core::SpellEffect::Enemy(effect) => {
                         technical_description.push(format!("Nearby enemies (radius {})", radius));
                         match effect.damage {
@@ -227,98 +227,73 @@ fn base_action_tooltip(
                             None => {}
                         }
                         if let Some(apply_effect) = effect.on_hit_effect {
-                            match apply_effect {
-                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                    technical_description.push(format!("  Loses {}^ AP", n))
-                                }
-                                crate::core::ApplyEffect::Condition(condition) => {
-                                    technical_description.push(format!("  {}", condition.name()))
-                                }
-                            }
+                            describe_apply_effect(apply_effect, &mut technical_description);
                         }
 
                         match effect.contest_type {
                             Some(SpellContestType::Mental) => {
-                                technical_description.push(format!("  [Will] defense"))
+                                technical_description.push("  [Will] defense".to_string())
                             }
                             Some(SpellContestType::Projectile) => {
-                                technical_description.push(format!("  [Evasion] defense"))
+                                technical_description.push("  [Evasion] defense".to_string())
                             }
                             None => {}
                         };
                     }
                     crate::core::SpellEffect::Ally(effect) => {
                         technical_description.push(format!("Nearby allies (radius {})", radius));
-
-                        if effect.healing > 0 {
-                            technical_description.push(format!("  {}^ healing", effect.healing));
-                        }
+                        describe_spell_ally_effect(effect, &mut technical_description);
                     }
-                },
-
-                SpellTargetType::TargetArea {
-                    range: _,
-                    radius,
-                    effect,
-                } => match effect {
-                    crate::core::SpellEffect::Enemy(effect) => {
-                        technical_description.push(format!("Area (radius {})", radius));
-                        match effect.damage {
-                            Some((dmg, true)) => {
-                                technical_description.push(format!("  {}^ damage", dmg))
-                            }
-                            Some((dmg, false)) => {
-                                technical_description.push(format!("  {} damage", dmg))
-                            }
-                            None => {}
-                        }
-                        if let Some(apply_effect) = effect.on_hit_effect {
-                            match apply_effect {
-                                crate::core::ApplyEffect::RemoveActionPoints(n) => {
-                                    technical_description.push(format!("  Loses {}^ AP", n))
-                                }
-                                crate::core::ApplyEffect::Condition(condition) => {
-                                    technical_description.push(format!("  {}", condition.name()))
-                                }
-                            }
-                        }
-
-                        match effect.contest_type {
-                            Some(SpellContestType::Mental) => {
-                                technical_description.push(format!("  [Will] defense"))
-                            }
-                            Some(SpellContestType::Projectile) => {
-                                technical_description.push(format!("  [Evasion] defense"))
-                            }
-                            None => {}
-                        };
-                    }
-                    crate::core::SpellEffect::Ally(effect) => {
-                        technical_description.push(format!("Area (radius {})", radius));
-
-                        if effect.healing > 0 {
-                            technical_description.push(format!("  {}^ healing", effect.healing));
-                        }
-                    }
-                },
-            };
-
-            return ActionButtonTooltip {
-                header,
-                description: Some(spell.description),
-                technical_description,
-            };
-        }
-        BaseAction::Move {
-            action_point_cost,
-            range: _,
-        } => {
-            return ActionButtonTooltip {
-                header: format!("Movement ({} AP)", action_point_cost),
-                description: None,
-                technical_description: Default::default(),
+                }
             }
         }
+
+        SpellTargetType::TargetArea {
+            range: _,
+            radius,
+            effect,
+        } => match effect {
+            crate::core::SpellEffect::Enemy(effect) => {
+                technical_description.push(format!("Area (radius {})", radius));
+                match effect.damage {
+                    Some((dmg, true)) => technical_description.push(format!("  {}^ damage", dmg)),
+                    Some((dmg, false)) => technical_description.push(format!("  {} damage", dmg)),
+                    None => {}
+                }
+                if let Some(apply_effect) = effect.on_hit_effect {
+                    describe_apply_effect(apply_effect, &mut technical_description);
+                }
+
+                match effect.contest_type {
+                    Some(SpellContestType::Mental) => {
+                        technical_description.push("  [Will] defense".to_string())
+                    }
+                    Some(SpellContestType::Projectile) => {
+                        technical_description.push("  [Evasion] defense".to_string())
+                    }
+                    None => {}
+                };
+            }
+            crate::core::SpellEffect::Ally(effect) => {
+                technical_description.push(format!("Area (radius {})", radius));
+                describe_spell_ally_effect(effect, &mut technical_description);
+            }
+        },
+    };
+    ActionButtonTooltip {
+        header,
+        description: Some(spell.description),
+        technical_description,
+    }
+}
+
+fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &mut Vec<String>) {
+    if effect.healing > 0 {
+        technical_description.push(format!("  {}^ healing", effect.healing));
+    }
+
+    if let Some(apply) = effect.apply {
+        describe_apply_effect(apply, technical_description);
     }
 }
 

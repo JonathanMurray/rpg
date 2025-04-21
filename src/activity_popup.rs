@@ -107,13 +107,13 @@ impl ActivityPopup {
         for (i, line) in self.base_lines.iter().skip(1).enumerate() {
             let dimensions =
                 measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
-            measured_lines.push((&line, dimensions));
+            measured_lines.push((line, dimensions));
         }
 
         if let Some(line) = &self.additional_line {
             let dimensions =
                 measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
-            measured_lines.push((&line, dimensions));
+            measured_lines.push((line, dimensions));
         }
 
         let line_margin = 8.0;

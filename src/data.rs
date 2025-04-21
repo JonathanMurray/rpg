@@ -3,7 +3,7 @@ use macroquad::color::{BLACK, BLUE, GREEN, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, ConditionDescription, OnAttackedReaction,
+        AttackHitEffect, Condition, OnAttackedReaction,
         OnAttackedReactionEffect, OnHitReaction, OnHitReactionEffect, Range, SelfEffectAction,
         Shield, Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect,
         SpellEnhancement, SpellEnhancementEffect, SpellTargetType, Weapon, WeaponGrip, WeaponRange,
@@ -54,7 +54,7 @@ pub const SWORD: Weapon = Weapon {
     attack_enhancement: None,
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Bleeding,
+        Condition::Bleeding(1),
     ))),
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
@@ -196,30 +196,21 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
 
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
-    description: RAGING_DESCRIPTION.description,
+    description: Condition::Raging.description(),
     icon: IconId::Rage,
     action_point_cost: 1,
     effect: OnHitReactionEffect::Rage,
     must_be_melee: false,
 };
 
-pub const RAGING_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Raging",
-    description: "Gains advantage on the next attack",
-};
-
 pub const BRACED_DEFENSE_BONUS: u32 = 3;
 pub const BRACE: SelfEffectAction = SelfEffectAction {
     name: "Brace",
-    description: "Gain +3 evasion against the next incoming attack",
+    description: Condition::Braced.description(),
     icon: IconId::Brace,
     action_point_cost: 1,
     stamina_cost: 1,
     effect: ApplyEffect::Condition(Condition::Braced),
-};
-pub const BRACED_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Braced",
-    description: "Has +3 evasion against the next incoming attack",
 };
 
 pub const SCREAM: Spell = Spell {
@@ -245,12 +236,15 @@ pub const SCREAM: Spell = Spell {
     ],
 
     target_type: SpellTargetType::NoTarget {
-        radius: Range::Ranged(3),
-        effect: SpellEffect::Enemy(SpellEnemyEffect {
-            contest_type: Some(SpellContestType::Mental),
-            damage: None,
-            on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
-        }),
+        self_area: Some((
+            Range::Ranged(3),
+            SpellEffect::Enemy(SpellEnemyEffect {
+                contest_type: Some(SpellContestType::Mental),
+                damage: None,
+                on_hit_effect: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+            }),
+        )),
+        self_effect: None,
     },
     animation_color: BLUE,
 };
@@ -294,7 +288,10 @@ pub const HEAL: Spell = Spell {
     possible_enhancements: [None, None],
     target_type: SpellTargetType::TargetAlly {
         range: Range::Ranged(5),
-        effect: SpellAllyEffect { healing: 1 },
+        effect: SpellAllyEffect {
+            healing: 1,
+            apply: None,
+        },
     },
     animation_color: GREEN,
 };
@@ -307,8 +304,31 @@ pub const HEALING_NOVA: Spell = Spell {
     mana_cost: 1,
     possible_enhancements: [None, None],
     target_type: SpellTargetType::NoTarget {
-        radius: Range::Ranged(4),
-        effect: SpellEffect::Ally(SpellAllyEffect { healing: 1 }),
+        self_area: Some((
+            Range::Ranged(4),
+            SpellEffect::Ally(SpellAllyEffect {
+                healing: 1,
+                apply: None,
+            }),
+        )),
+        self_effect: None,
+    },
+    animation_color: GREEN,
+};
+
+pub const SELF_HEAL: Spell = Spell {
+    name: "Self heal",
+    description: "Restore the caster's health and grants protection",
+    icon: IconId::PlusPlus,
+    action_point_cost: 2,
+    mana_cost: 1,
+    possible_enhancements: [None, None],
+    target_type: SpellTargetType::NoTarget {
+        self_area: None,
+        self_effect: Some(SpellAllyEffect {
+            healing: 1,
+            apply: Some(ApplyEffect::Condition(Condition::Protected(1))),
+        }),
     },
     animation_color: GREEN,
 };
@@ -323,7 +343,10 @@ pub const HEALING_RAIN: Spell = Spell {
     target_type: SpellTargetType::TargetArea {
         range: Range::Ranged(5),
         radius: Range::Float(1.95),
-        effect: SpellEffect::Ally(SpellAllyEffect { healing: 1 }),
+        effect: SpellEffect::Ally(SpellAllyEffect {
+            healing: 1,
+            apply: None,
+        }),
     },
     animation_color: GREEN,
 };

@@ -9,17 +9,17 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPosition},
     base_ui::Drawable,
-    core::ConditionDescription,
+    core::ConditionInfo,
 };
 
 pub struct ConditionsList {
     pub font: Font,
-    pub descriptions: Vec<(ConditionDescription, Option<u32>)>,
+    pub descriptions: Vec<(ConditionInfo, Option<u32>)>,
     size: Cell<(f32, f32)>,
 }
 
 impl ConditionsList {
-    pub fn new(font: Font, descriptions: Vec<(ConditionDescription, Option<u32>)>) -> Self {
+    pub fn new(font: Font, descriptions: Vec<(ConditionInfo, Option<u32>)>) -> Self {
         Self {
             font,
             descriptions,
@@ -43,7 +43,7 @@ fn draw_conditions(
     x: f32,
     y: f32,
     font: &Font,
-    condition_descriptions: &[(ConditionDescription, Option<u32>)],
+    condition_descriptions: &[(ConditionInfo, Option<u32>)],
 ) -> (f32, f32) {
     let text_params = TextParams {
         font: Some(font),

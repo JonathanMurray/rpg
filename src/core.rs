@@ -8,8 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, BRACED_DESCRIPTION, EFFICIENT, HEAL, HEALING_NOVA,
-    HEALING_RAIN, KILL, PARRY_EVASION_BONUS, RAGE, RAGING_DESCRIPTION,
+    BOW, BRACE, BRACED_DEFENSE_BONUS, EFFICIENT, HEALING_NOVA, PARRY_EVASION_BONUS, RAGE, SELF_HEAL,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -47,28 +46,26 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
-        bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
+        bob.known_actions.push(BaseAction::CastSpell(SELF_HEAL));
         bob.known_actions.push(BaseAction::SelfEffect(BRACE));
 
         let mut enemy1 = Character::new(
             false,
             "Gremlin Nob",
             SpriteId::Character2,
-            Attributes::new(5, 5, 3, 3),
+            Attributes::new(8, 8, 3, 3),
             (3, 4),
         );
         enemy1.main_hand.weapon = Some(BOW);
         enemy1.off_hand.shield = Some(SMALL_SHIELD);
         enemy1.armor = Some(LEATHER_ARMOR);
         enemy1.known_attacked_reactions.push(SIDE_STEP);
-        enemy1.receive_condition(Condition::Bleeding);
-        enemy1.receive_condition(Condition::Dazed(5));
 
         let mut enemy2 = Character::new(
             false,
             "Gromp",
             SpriteId::Character3,
-            Attributes::new(1, 4, 1, 5),
+            Attributes::new(8, 8, 1, 5),
             (4, 4),
         );
         enemy2.main_hand.weapon = Some(BOW);
@@ -485,7 +482,10 @@ impl CoreGame {
                     area_outcomes = Some((target_pos, outcomes));
                 }
 
-                SpellTargetType::NoTarget { radius, effect } => {
+                SpellTargetType::NoTarget {
+                    self_area,
+                    self_effect,
+                } => {
                     detail_lines.push(format!(
                         "Rolled: {} (+{} spell mod) = {}",
                         roll,
@@ -493,18 +493,34 @@ impl CoreGame {
                         spell_result,
                     ));
 
-                    let outcomes = self.perform_spell_area_effect(
-                        spell.name,
-                        &enhancements,
-                        caster,
-                        caster.position.get(),
-                        radius,
-                        &mut detail_lines,
-                        spell_result,
-                        effect,
-                    );
+                    if let Some(effect) = self_effect {
+                        let degree_of_success = spell_result / 10;
+                        if degree_of_success > 0 {
+                            detail_lines.push(format!("Fortune: {}", degree_of_success));
+                        }
+                        let outcome = self.perform_spell_ally_effect(
+                            spell.name,
+                            effect,
+                            caster,
+                            &mut detail_lines,
+                            degree_of_success,
+                        );
+                        target_outcome = Some((caster_id, outcome));
+                    }
 
-                    area_outcomes = Some((caster.position.get(), outcomes));
+                    if let Some((radius, effect)) = self_area {
+                        let outcomes = self.perform_spell_area_effect(
+                            spell.name,
+                            &enhancements,
+                            caster,
+                            caster.position.get(),
+                            radius,
+                            &mut detail_lines,
+                            spell_result,
+                            effect,
+                        );
+                        area_outcomes = Some((caster.position.get(), outcomes));
+                    }
                 }
             };
 
@@ -538,7 +554,8 @@ impl CoreGame {
     ) -> Vec<(u32, SpellTargetOutcome)> {
         match effect {
             SpellEffect::Enemy(enemy_area) => {
-                let outcomes = self.perform_spell_area_enemy_effect(
+                
+                self.perform_spell_area_enemy_effect(
                     radius,
                     name,
                     enhancements,
@@ -547,12 +564,12 @@ impl CoreGame {
                     detail_lines,
                     spell_result,
                     enemy_area,
-                );
-                outcomes
+                )
             }
 
             SpellEffect::Ally(ally_area) => {
-                let outcomes = self.perform_spell_area_ally_effect(
+                
+                self.perform_spell_area_ally_effect(
                     radius,
                     name,
                     caster,
@@ -560,8 +577,7 @@ impl CoreGame {
                     detail_lines,
                     spell_result,
                     ally_area,
-                );
-                outcomes
+                )
             }
         }
     }
@@ -594,7 +610,7 @@ impl CoreGame {
                 let outcome = self.perform_spell_ally_effect(
                     name,
                     ally_area,
-                    &other_char,
+                    other_char,
                     detail_lines,
                     degree_of_success,
                 );
@@ -634,6 +650,20 @@ impl CoreGame {
                 target.name, health_gained
             ));
         };
+
+        if let Some(mut effect) = ally_effect.apply {
+            match effect {
+                ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                ApplyEffect::Condition(ref mut condition) => {
+                    if let Some(stacks) = condition.stacks() {
+                        *stacks += degree_of_success;
+                    }
+                }
+            }
+
+            let log_line = self.perform_effect_application(effect, target);
+            detail_lines.push(log_line);
+        }
 
         SpellTargetOutcome::HealedAlly(health_gained)
     }
@@ -676,7 +706,7 @@ impl CoreGame {
                     enhancements,
                     enemy_area,
                     spell_result,
-                    &other_char,
+                    other_char,
                     detail_lines,
                 );
 
@@ -729,11 +759,9 @@ impl CoreGame {
                 let mut dmg_calculation = dmg as i32;
                 let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, name);
 
-                if is_dmg_increased_by_good_roll {
-                    if degree_of_success > 0 {
-                        dmg_str.push_str(&format!(" +{degree_of_success} ({label})"));
-                        dmg_calculation += degree_of_success as i32;
-                    }
+                if is_dmg_increased_by_good_roll && degree_of_success > 0 {
+                    dmg_str.push_str(&format!(" +{degree_of_success} ({label})"));
+                    dmg_calculation += degree_of_success as i32;
                 }
 
                 for enhancement in enhancements {
@@ -1463,8 +1491,9 @@ impl Display for AttackHitEffect {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum Condition {
+    Protected(u32),
     Dazed(u32),
-    Bleeding,
+    Bleeding(u32),
     Braced,
     Raging,
     Weakened(u32),
@@ -1473,10 +1502,11 @@ pub enum Condition {
 }
 
 impl Condition {
-    fn stacks(&mut self) -> Option<&mut u32> {
+    const fn stacks(&mut self) -> Option<&mut u32> {
         match self {
+            Condition::Protected(n) => Some(n),
             Condition::Dazed(n) => Some(n),
-            Condition::Bleeding => None,
+            Condition::Bleeding(n) => Some(n),
             Condition::Braced => None,
             Condition::Raging => None,
             Condition::Weakened(n) => Some(n),
@@ -1487,8 +1517,9 @@ impl Condition {
 
     pub const fn name(&self) -> &'static str {
         match self {
+            Condition::Protected(_) => "Protected",
             Condition::Dazed(_) => "Dazed",
-            Condition::Bleeding => "Bleeding",
+            Condition::Bleeding(_) => "Bleeding",
             Condition::Braced => "Braced",
             Condition::Raging => "Raging",
             Condition::Weakened(_) => "Weakened",
@@ -1496,16 +1527,40 @@ impl Condition {
             Condition::OffHandExertion(_) => "Exerted (off-hand)",
         }
     }
+
+    
+    pub const fn description(&self) -> &'static str {
+        match self {
+            Condition::Protected(_) => "Gains +3 armor",
+            Condition::Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
+            Condition::Bleeding(_) => "Loses 1 health at end of turn",
+            Condition::Braced =>  "Gain +3 evasion against the next incoming attack",
+            Condition::Raging => "Gains advantage on the next attack",
+            Condition::Weakened(_) => "-1 to attributes for each stack",
+            Condition::MainHandExertion(_) =>  "-1 per stack on further similar actions",
+            Condition::OffHandExertion(_) =>  "-1 per stack on further similar actions",
+        }
+    }
+
+    pub const fn info(&mut self) -> (ConditionInfo, Option<u32>) {
+        (ConditionInfo { name: self.name(), description: self.description() }, self.stacks().copied())
+    }
 }
 
+const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
+const PROTECTED_ARMOR_BONUS: u32 = 3;
+
+
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct ConditionDescription {
+pub struct ConditionInfo {
     pub name: &'static str,
     pub description: &'static str,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
 struct Conditions {
+    protected: u32,
     dazed: u32,
     bleeding: u32,
     braced: bool,
@@ -1515,54 +1570,33 @@ struct Conditions {
     offhand_exertion: u32,
 }
 
-pub const DAZED_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Dazed",
-    description: "Gains no evasion from agility and attacks with disadvantage",
-};
-
-const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
-pub const BLEEDING_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Bleeding",
-    description: "Loses 1 health at end of turn",
-};
-
-pub const WEAKENED_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Weakened",
-    description: "-1 to attributes for each stack",
-};
-
-pub const MAINHAND_EXERTION_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Exerted (main-hand)",
-    description: "-1 per stack on further similar actions",
-};
-pub const OFFHAND_EXERTION_DESCRIPTION: ConditionDescription = ConditionDescription {
-    name: "Exerted (off-hand)",
-    description: "-1 per stack on further similar actions",
-};
 
 impl Conditions {
-    pub fn descriptions(&self) -> Vec<(ConditionDescription, Option<u32>)> {
+    pub fn infos(&mut self) -> Vec<(ConditionInfo, Option<u32>)> {
         let mut result = vec![];
+        if self.protected > 0 {
+            result.push(Condition::Protected(self.protected).info());
+        }
         if self.dazed > 0 {
-            result.push((DAZED_DESCRIPTION, Some(self.dazed)));
+            result.push(Condition::Dazed(self.dazed).info());
         }
         if self.bleeding > 0 {
-            result.push((BLEEDING_DESCRIPTION, Some(self.bleeding)));
+            result.push(Condition::Bleeding(self.bleeding).info());
         }
         if self.braced {
-            result.push((BRACED_DESCRIPTION, None));
+            result.push(Condition::Braced.info());
         }
         if self.raging {
-            result.push((RAGING_DESCRIPTION, None));
+            result.push(Condition::Raging.info());
         }
         if self.weakened > 0 {
-            result.push((WEAKENED_DESCRIPTION, Some(self.weakened)));
+            result.push(Condition::Weakened(self.weakened).info());
         }
         if self.mainhand_exertion > 0 {
-            result.push((MAINHAND_EXERTION_DESCRIPTION, Some(self.mainhand_exertion)));
+            result.push(Condition::MainHandExertion(self.mainhand_exertion).info());
         }
         if self.offhand_exertion > 0 {
-            result.push((OFFHAND_EXERTION_DESCRIPTION, Some(self.offhand_exertion)));
+            result.push(Condition::OffHandExertion(self.offhand_exertion).info());
         }
 
         result
@@ -1689,6 +1723,7 @@ pub struct SpellEnemyEffect {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellAllyEffect {
     pub healing: u32,
+    pub apply: Option<ApplyEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1711,8 +1746,8 @@ pub enum SpellTargetType {
     },
 
     NoTarget {
-        radius: Range,
-        effect: SpellEffect,
+        self_area: Option<(Range, SpellEffect)>,
+        self_effect: Option<SpellAllyEffect>,
     },
 }
 
@@ -1726,12 +1761,12 @@ impl SpellTargetType {
         }
     }
 
-    pub fn range(&self) -> Range {
-        *match self {
-            SpellTargetType::TargetEnemy { range, .. } => range,
-            SpellTargetType::TargetAlly { range, .. } => range,
-            SpellTargetType::TargetArea { range, .. } => range,
-            SpellTargetType::NoTarget { radius, .. } => radius,
+    pub fn range(&self) -> Option<Range> {
+        match self {
+            SpellTargetType::TargetEnemy { range, .. } => Some(*range),
+            SpellTargetType::TargetAlly { range, .. } => Some(*range),
+            SpellTargetType::TargetArea { range, .. } => Some(*range),
+            SpellTargetType::NoTarget { self_area, .. } => self_area.as_ref().map(|(radius, _effect)| *radius),
         }
     }
 }
@@ -1932,8 +1967,8 @@ impl Character {
         sum
     }
 
-    pub fn condition_descriptions(&self) -> Vec<(ConditionDescription, Option<u32>)> {
-        self.conditions.borrow().descriptions()
+    pub fn condition_infos(&self) -> Vec<(ConditionInfo, Option<u32>)> {
+        self.conditions.borrow_mut().infos()
     }
 
     pub fn position_i32(&self) -> (i32, i32) {
@@ -2016,7 +2051,7 @@ impl Character {
 
     pub fn can_reach_with_spell(&self, spell: Spell, target_position: (u32, u32)) -> bool {
         within_range_squared(
-            spell.target_type.range().squared(),
+            spell.target_type.range().unwrap().squared(),
             self.position.get(),
             target_position,
         )
@@ -2302,7 +2337,16 @@ impl Character {
     }
 
     pub fn protection_from_armor(&self) -> u32 {
-        self.armor.map(|armor| armor.protection).unwrap_or(0)
+        let mut protection = 0;
+        if let Some(armor) = self.armor {
+            protection += armor.protection;
+        }
+
+        if self.conditions.borrow().protected > 0{
+            protection += PROTECTED_ARMOR_BONUS;
+        }
+
+        protection
     }
 
     pub fn attack_modifier(&self, hand: HandType) -> u32 {
@@ -2404,8 +2448,9 @@ impl Character {
     fn receive_condition(&self, condition: Condition) {
         let mut conditions = self.conditions.borrow_mut();
         match condition {
+            Condition::Protected(n) => conditions.protected += n,
             Condition::Dazed(n) => conditions.dazed += n,
-            Condition::Bleeding => conditions.bleeding += 1,
+            Condition::Bleeding(n) => conditions.bleeding += n,
             Condition::Braced => conditions.braced = true,
             Condition::Raging => conditions.raging = true,
             Condition::Weakened(n) => conditions.weakened += n,

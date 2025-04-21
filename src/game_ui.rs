@@ -1,12 +1,11 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    default,
     rc::Rc,
 };
 
 use macroquad::{
-    color::{PURPLE, SKYBLUE},
+    color::SKYBLUE,
     rand,
 };
 
@@ -16,7 +15,6 @@ use macroquad::{
         Color, BLACK, BLUE, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE,
     },
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    math::Rect,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::Font,
     texture::Texture2D,
@@ -35,7 +33,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
         Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellContestType, SpellEffect, SpellTargetOutcome,
+        OnAttackedReaction, OnHitReaction, SpellTargetOutcome,
         SpellTargetType, MAX_ACTION_POINTS, MOVE_ACTION_COST,
     },
     grid::{
@@ -1318,8 +1316,8 @@ impl UserInterface {
                         } else {
                             Some(RangeIndicator::CannotReach)
                         };
-                        self.game_grid.range_indicator =
-                            maybe_indicator.map(|indicator| (spell.target_type.range(), indicator));
+                        self.game_grid.range_indicator = maybe_indicator
+                            .map(|indicator| (spell.target_type.range().unwrap(), indicator));
                     }
 
                     ActionTarget::Position(target_pos) => {
@@ -1329,7 +1327,7 @@ impl UserInterface {
                         ));
 
                         self.target_ui.set_action(
-                            format!("{} (AoE)", spell.name.to_string()),
+                            format!("{} (AoE)", spell.name),
                             vec![],
                             false,
                         );
@@ -1343,8 +1341,8 @@ impl UserInterface {
                         } else {
                             Some(RangeIndicator::CannotReach)
                         };
-                        self.game_grid.range_indicator =
-                            maybe_indicator.map(|indicator| (spell.target_type.range(), indicator));
+                        self.game_grid.range_indicator = maybe_indicator
+                            .map(|indicator| (spell.target_type.range().unwrap(), indicator));
                     }
 
                     ActionTarget::None => {
@@ -1358,15 +1356,8 @@ impl UserInterface {
                                 );
                             }
 
-                            SpellTargetType::NoTarget { effect, .. } => {
-                                let header = match effect {
-                                    SpellEffect::Enemy { .. } => {
-                                        format!("{} (enemy AoE)", spell.name.to_string())
-                                    }
-                                    SpellEffect::Ally { .. } => {
-                                        format!("{} (ally AoE)", spell.name.to_string())
-                                    }
-                                };
+                            SpellTargetType::NoTarget { .. } => {
+                                let header = spell.name.to_string();
                                 self.target_ui.set_action(header, vec![], false);
                                 popup_enabled = true;
                             }
@@ -1381,8 +1372,12 @@ impl UserInterface {
                             }
                         };
 
-                        self.game_grid.range_indicator =
-                            Some((spell.target_type.range(), RangeIndicator::ActionTargetRange));
+                        if let Some(range) = spell.target_type.range() {
+                            self.game_grid.range_indicator =
+                                Some((range, RangeIndicator::ActionTargetRange));
+                        } else {
+                            self.game_grid.range_indicator = None;
+                        }
                     }
                 }
             }
@@ -1575,7 +1570,7 @@ impl UserInterface {
                     .borrow_mut()
                     .set_current(character.stamina.current());
 
-                ui.conditions_list.descriptions = character.condition_descriptions();
+                ui.conditions_list.descriptions = character.condition_infos();
 
                 ui.action_points_row.current_ap = self
                     .characters
