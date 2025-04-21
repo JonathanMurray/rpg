@@ -23,7 +23,8 @@ use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnH
 use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
 use rpg::game_ui_orchestration::GameUserInterfaceConnection;
 use rpg::textures::{
-    load_all_equipment_icons, load_all_icons, load_all_sprites, load_and_init_texture,
+    load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
+    load_and_init_texture,
 };
 
 async fn load_font(path: &str) -> Font {
@@ -57,6 +58,8 @@ async fn main() {
 
     let equipment_icons = load_all_equipment_icons().await;
 
+    let portrait_textures = load_all_portraits().await;
+
     //let font_path = "manaspace/manaspc.ttf";
     //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
     //let font_path = "pixy/PIXY.ttf"; // <-- only uppercase, looks a bit too sci-fi?
@@ -86,6 +89,7 @@ async fn main() {
         sprites,
         icons,
         equipment_icons,
+        portrait_textures,
         font,
         decorative_font,
         grid_big_font,

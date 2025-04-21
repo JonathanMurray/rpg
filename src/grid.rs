@@ -1,7 +1,9 @@
 use std::collections::HashMap;
 
 use macroquad::{
+    camera,
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
+    input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
@@ -143,6 +145,7 @@ pub struct GameGrid {
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
 
+    zoom_index: usize,
     camera_position: (Cell<f32>, Cell<f32>),
     dragging_camera_from: Option<(f32, f32)>,
 
@@ -159,6 +162,8 @@ pub struct GameGrid {
     enemys_target: Option<CharacterId>,
 }
 
+const ZOOM_LEVELS: [f32; 7] = [32.0, 40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
+
 impl GameGrid {
     pub fn new(
         selected_character_id: CharacterId,
@@ -172,6 +177,9 @@ impl GameGrid {
         cell_backgrounds: Vec<usize>,
     ) -> Self {
         let characters = characters.clone();
+
+        let zoom_index = 3;
+        let cell_w = ZOOM_LEVELS[zoom_index];
 
         Self {
             sprites,
@@ -188,7 +196,8 @@ impl GameGrid {
             players_inspect_target: None,
             enemys_target: None,
             range_indicator: None,
-            cell_w: 64.0,
+            zoom_index,
+            cell_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0), // is set later
             character_motion: None,
@@ -267,6 +276,31 @@ impl GameGrid {
         if is_key_down(KeyCode::Down) {
             self.pan_camera(0.0, camera_speed);
         }
+    }
+
+    fn zoom(&mut self, i: isize) {
+        self.zoom_index = ((self.zoom_index as isize) + i)
+            .max(0)
+            .min(ZOOM_LEVELS.len() as isize - 1) as usize;
+
+        let camera_center = (
+            self.camera_position.0.get() + self.size.0 / 2.0,
+            self.camera_position.1.get() + self.size.1 / 2.0,
+        );
+
+        let new_cell_w = ZOOM_LEVELS[self.zoom_index];
+        let factor = new_cell_w / self.cell_w;
+
+        let new_camera_center = (camera_center.0 * factor, camera_center.1 * factor);
+
+        self.camera_position
+            .0
+            .set(new_camera_center.0 - self.size.0 / 2.0);
+        self.camera_position
+            .1
+            .set(new_camera_center.1 - self.size.1 / 2.0);
+
+        self.cell_w = new_cell_w;
     }
 
     pub fn add_text_effect(
@@ -610,6 +644,13 @@ impl GameGrid {
                 || is_mouse_button_pressed(MouseButton::Middle)
             {
                 self.dragging_camera_from = Some(mouse_relative);
+            }
+
+            let (_dx, dy) = mouse_wheel();
+            if dy < 0.0 {
+                self.zoom(-1);
+            } else if dy > 0.0 {
+                self.zoom(1);
             }
         }
 

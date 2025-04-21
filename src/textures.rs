@@ -7,6 +7,7 @@ pub enum SpriteId {
     Character,
     Character2,
     Character3,
+    Character4,
     Warhammer,
     Bow,
     Sword,
@@ -20,6 +21,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::Character, "character.png"),
         (SpriteId::Character2, "character2.png"),
         (SpriteId::Character3, "character3.png"),
+        (SpriteId::Character4, "character4.png"),
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
@@ -56,7 +58,7 @@ pub enum IconId {
 }
 
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
-    load_icons(vec![
+    load_and_init_textures(vec![
         (IconId::Fireball, "fireball_icon.png"),
         (IconId::Attack, "attack_icon.png"),
         (IconId::Brace, "brace_icon.png"),
@@ -83,6 +85,22 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum PortraitId {
+    Portrait1,
+    Portrait2,
+    Portrait3,
+}
+
+pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
+    load_and_init_textures(vec![
+        (PortraitId::Portrait1, "portrait_1.png"),
+        (PortraitId::Portrait2, "portrait_2.png"),
+        (PortraitId::Portrait3, "portrait_3.png"),
+    ])
+    .await
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum EquipmentIconId {
     Rapier,
     Warhammer,
@@ -95,7 +113,7 @@ pub enum EquipmentIconId {
 }
 
 pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
-    load_icons(vec![
+    load_and_init_textures(vec![
         (EquipmentIconId::Rapier, "eq_rapier.png"),
         (EquipmentIconId::Warhammer, "eq_warhammer.png"),
         (EquipmentIconId::Bow, "eq_bow.png"),
@@ -116,7 +134,7 @@ async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture
     textures
 }
 
-pub async fn load_icons<T>(paths: Vec<(T, &str)>) -> HashMap<T, Texture2D>
+pub async fn load_and_init_textures<T>(paths: Vec<(T, &str)>) -> HashMap<T, Texture2D>
 where
     T: Hash + Eq,
 {

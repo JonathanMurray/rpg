@@ -4,7 +4,11 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{color::SKYBLUE, rand};
+use macroquad::{
+    color::SKYBLUE,
+    rand,
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -40,7 +44,7 @@ use crate::{
         RangeIndicator,
     },
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, SpriteId},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
 };
 
 const Y_USER_INTERFACE: f32 = 800.0;
@@ -133,6 +137,7 @@ impl UserInterface {
         sprites: HashMap<SpriteId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
         equipment_icons: HashMap<EquipmentIconId, Texture2D>,
+        portrait_textures: HashMap<PortraitId, Texture2D>,
         simple_font: Font,
         decorative_font: Font,
         big_font: Font,
@@ -372,6 +377,7 @@ impl UserInterface {
             first_player_character_id,
             active_character_id,
             decorative_font.clone(),
+            portrait_textures,
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
@@ -450,8 +456,8 @@ impl UserInterface {
 
         y -= 60.0;
 
-        self.player_portraits.draw(620.0, y + 70.0);
-        self.character_sheet_toggle.draw(620.0, y + 120.0);
+        self.player_portraits.draw(570.0, y + 65.0);
+        self.character_sheet_toggle.draw(570.0, y + 150.0);
 
         let character_ui = self
             .character_uis
@@ -460,7 +466,7 @@ impl UserInterface {
 
         character_ui.actions_section.draw(20.0, y + 70.0);
 
-        character_ui.action_points_row.draw(430.0, y + 70.0);
+        character_ui.action_points_row.draw(430.0, y + 65.0);
         character_ui.resource_bars.draw(400.0, y + 100.0);
 
         self.log.draw(800.0, y + 60.0);
@@ -1855,17 +1861,21 @@ impl PlayerPortraits {
         selected_id: CharacterId,
         active_id: CharacterId,
         font: Font,
+        portrait_textures: HashMap<PortraitId, Texture2D>,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
         for (id, character) in characters.iter_with_ids() {
             if character.player_controlled {
+                let texture = portrait_textures.get(&character.portrait).unwrap().clone();
+
                 portraits.insert(
                     *id,
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         character,
                         font.clone(),
+                        texture,
                     ))),
                 );
             }
@@ -1940,10 +1950,11 @@ struct PlayerCharacterPortrait {
     active_character: Cell<bool>,
     padding: f32,
     has_been_clicked: Cell<bool>,
+    texture: Texture2D,
 }
 
 impl PlayerCharacterPortrait {
-    fn new(character: &Character, font: Font) -> Self {
+    fn new(character: &Character, font: Font, texture: Texture2D) -> Self {
         let mut text = TextLine::new(character.name, 20, WHITE, Some(font));
         text.set_depth(BLACK, 2.0);
         Self {
@@ -1952,6 +1963,7 @@ impl PlayerCharacterPortrait {
             active_character: Cell::new(false),
             padding: 10.0,
             has_been_clicked: Cell::new(false),
+            texture,
         }
     }
 }
@@ -1960,13 +1972,20 @@ impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size();
         draw_rectangle(x, y, w, h, DARKGRAY);
+
+        let params = DrawTextureParams {
+            dest_size: Some((w, h).into()),
+            ..Default::default()
+        };
+        draw_texture_ex(&self.texture, x, y, WHITE, params);
+
         if self.shown_character.get() {
             draw_rectangle_lines(x, y, w, h, 3.0, WHITE);
         } else {
             draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
         }
 
-        self.text.draw(self.padding + x, self.padding + y);
+        //self.text.draw(self.padding + x, self.padding + y);
 
         if self.active_character.get() {
             let y_line = y + h - 5.0;
@@ -1994,7 +2013,9 @@ impl Drawable for PlayerCharacterPortrait {
 
     fn size(&self) -> (f32, f32) {
         let text_size = self.text.size();
-        (text_size.0 + self.padding * 2.0, 15.0 + self.padding * 2.0)
+        //(text_size.0 + self.padding * 2.0, 15.0 + self.padding * 2.0)
+
+        (64.0, 80.0)
     }
 }
 

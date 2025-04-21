@@ -9,12 +9,13 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::{
     BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS, RAGE, SELF_HEAL,
+    SWORD,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
 use crate::game_ui_orchestration::GameUserInterfaceConnection;
-use crate::textures::{EquipmentIconId, IconId, SpriteId};
+use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 
 pub type Position = (i32, i32);
 
@@ -28,11 +29,12 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 0;
+        let active_character_id = 3;
 
         let mut bob = Character::new(
             true,
             "Bob",
+            PortraitId::Portrait2,
             SpriteId::Character,
             Attributes::new(5, 2, 4, 5),
             (1, 5),
@@ -59,6 +61,7 @@ impl CoreGame {
         let mut enemy1 = Character::new(
             false,
             "Gremlin Nob",
+            PortraitId::Portrait2,
             SpriteId::Character2,
             Attributes::new(8, 8, 3, 3),
             (3, 4),
@@ -71,6 +74,7 @@ impl CoreGame {
         let mut enemy2 = Character::new(
             true,
             "Gromp",
+            PortraitId::Portrait3,
             SpriteId::Character3,
             Attributes::new(8, 8, 1, 5),
             (4, 4),
@@ -80,12 +84,14 @@ impl CoreGame {
         let mut david = Character::new(
             true,
             "David",
-            SpriteId::Character,
+            PortraitId::Portrait1,
+            SpriteId::Character4,
             Attributes::new(2, 10, 10, 5),
             (5, 7),
         );
         david.health.lose(6);
-        david.main_hand.weapon = Some(DAGGER);
+        david.main_hand.weapon = Some(SWORD);
+        david.off_hand.shield = Some(SMALL_SHIELD);
 
         let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
 
@@ -1837,11 +1843,13 @@ impl Attributes {
 #[derive(Debug)]
 pub struct Character {
     id: Option<CharacterId>,
+    pub name: &'static str,
+    pub portrait: PortraitId,
+
     pub sprite: SpriteId,
     pub has_died: Cell<bool>,
     pub player_controlled: bool,
     pub position: Cell<Position>,
-    pub name: &'static str,
     pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
@@ -1866,7 +1874,8 @@ impl Character {
     fn new(
         player_controlled: bool,
         name: &'static str,
-        texture: SpriteId,
+        portrait: PortraitId,
+        sprite: SpriteId,
         base_attributes: Attributes,
         position: Position,
     ) -> Self {
@@ -1879,7 +1888,8 @@ impl Character {
         let capacity = base_attributes.strength * 2;
         Self {
             id: None,
-            sprite: texture,
+            portrait,
+            sprite,
             has_died: Cell::new(false),
             player_controlled,
             position: Cell::new(position),
