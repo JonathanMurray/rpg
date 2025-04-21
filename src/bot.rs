@@ -41,7 +41,6 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
                         }
                     }
                 }
-                BaseAction::SelfEffect(sea) => chosen_action = Some(Action::SelfEffect(sea)),
                 BaseAction::CastSpell(spell) => {
                     for (id, other_character) in game.characters.iter_with_ids() {
                         if other_character.player_controlled {

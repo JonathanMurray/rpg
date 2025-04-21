@@ -5,8 +5,10 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
+    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    math::Rect,
+    miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
@@ -19,6 +21,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
         SpellEnemyEffect, SpellEnhancement, SpellTarget,
     },
+    drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     textures::IconId,
 };
 
@@ -128,19 +131,6 @@ fn base_action_tooltip(
                 ],
             }
         }
-        BaseAction::SelfEffect(sea) => {
-            let mut technical_description = vec!["Self effect".to_string()];
-            describe_apply_effect(sea.effect, &mut technical_description);
-            ActionButtonTooltip {
-                header: format!(
-                    "{} ({})",
-                    sea.name,
-                    cost_string(sea.action_point_cost, sea.stamina_cost, 0)
-                ),
-                description: Some(sea.description),
-                technical_description,
-            }
-        }
         BaseAction::CastSpell(spell) => spell_tooltip(spell),
         BaseAction::Move {
             action_point_cost,
@@ -166,8 +156,9 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
 
 fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
     let header = format!(
-        "{} ({} AP, {} mana)",
-        spell.name, spell.action_point_cost, spell.mana_cost
+        "{} ({})",
+        spell.name,
+        cost_string(spell.action_point_cost, spell.stamina_cost, spell.mana_cost)
     );
     let mut technical_description = vec![];
     match spell.target {
@@ -276,9 +267,16 @@ pub struct ActionButton {
     points_row: Container,
     hovered: Cell<bool>,
     pub enabled: Cell<bool>,
-    pub highlighted: Cell<bool>,
+    pub selected: Cell<ButtonSelected>,
     pub event_sender: Option<EventSender>,
     icon: Texture2D,
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ButtonSelected {
+    No,
+    Partially,
+    Yes,
 }
 
 impl ActionButton {
@@ -296,8 +294,6 @@ impl ActionButton {
         let tooltip = button_action_tooltip(&action, character);
 
         let (size, texture_draw_size) = match action {
-            // TODO
-            //ButtonAction::Proceed => (64.0, 52.0),
             ButtonAction::Proceed => ((64.0, 52.0), (60.0, 48.0)),
             ButtonAction::MovementEnhancement(..) => ((36.0, 64.0), (36.0, 48.0)),
             _ => ((64.0, 64.0), (60.0, 48.0)),
@@ -344,7 +340,7 @@ impl ActionButton {
             points_row,
             hovered: Cell::new(false),
             enabled: Cell::new(true),
-            highlighted: Cell::new(false),
+            selected: Cell::new(ButtonSelected::No),
             event_sender: Some(EventSender {
                 queue: Rc::clone(event_queue),
             }),
@@ -353,8 +349,25 @@ impl ActionButton {
         }
     }
 
-    pub fn toggle_highlighted(&self) {
-        self.highlighted.set(!self.highlighted.get());
+    pub fn toggle_selected(&self) {
+        match self.selected.get() {
+            ButtonSelected::Yes => self.selected.set(ButtonSelected::No),
+            ButtonSelected::No => self.selected.set(ButtonSelected::Yes),
+            ButtonSelected::Partially => {}
+        }
+    }
+
+    pub fn set_selected(&self, value: bool) {
+        let selected = if value {
+            ButtonSelected::Yes
+        } else {
+            ButtonSelected::No
+        };
+        self.selected.set(selected);
+    }
+
+    pub fn deselect(&self) {
+        self.selected.set(ButtonSelected::No);
     }
 
     pub fn notify_hidden(&self) {
@@ -420,16 +433,7 @@ impl Drawable for ActionButton {
             }
         }
 
-        if self.enabled.get() {
-            if hovered {
-                if is_mouse_button_pressed(MouseButton::Left) {
-                    if let Some(event_sender) = &self.event_sender {
-                        event_sender.send(InternalUiEvent::ButtonClicked(self.id, self.action));
-                    }
-                }
-                draw_rectangle_lines(x, y, w, h, 2.0, self.hover_border_color);
-            }
-        } else {
+        if !self.enabled.get() {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.5));
         }
 
@@ -441,8 +445,49 @@ impl Drawable for ActionButton {
         };
         draw_texture_ex(&self.icon, x + 2.0, y + 2.0, WHITE, params);
 
-        if self.highlighted.get() {
-            draw_rectangle_lines(x, y, w, h, 3.0, GREEN);
+        match self.selected.get() {
+            ButtonSelected::Yes => {
+                let margin = 1.0;
+                draw_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    4.0,
+                    GREEN,
+                );
+            }
+            ButtonSelected::Partially => {
+                let margin = -0.0;
+                draw_dashed_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    4.0,
+                    GREEN,
+                    6.4,
+                );
+            }
+            ButtonSelected::No => {}
+        }
+
+        if self.enabled.get() && hovered {
+            if is_mouse_button_pressed(MouseButton::Left) {
+                if let Some(event_sender) = &self.event_sender {
+                    event_sender.send(InternalUiEvent::ButtonClicked(self.id, self.action));
+                }
+            }
+            let margin = -1.0;
+
+            draw_rectangle_lines(
+                x - margin,
+                y - margin,
+                w + margin * 2.0,
+                h + margin * 2.0,
+                2.0,
+                self.hover_border_color,
+            );
         }
 
         self.points_row.draw(
@@ -474,7 +519,6 @@ impl ButtonAction {
         match self {
             ButtonAction::Action(base_action) => match base_action {
                 BaseAction::Attack { .. } => IconId::Attack,
-                BaseAction::SelfEffect(sea) => sea.icon,
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move { .. } => IconId::Move,
             },
@@ -592,9 +636,18 @@ pub fn draw_button_tooltip(
     }
     lines.extend_from_slice(&tooltip.technical_description);
 
+    // TODO
+    let button_size = (64.0, 64.0);
+
     draw_tooltip(
         font,
-        TooltipPosition::BottomLeft((button_position.0, button_position.1 - 3.0)),
+        Rect::new(
+            button_position.0,
+            button_position.1,
+            button_size.0,
+            button_size.1,
+        ),
+        TooltipPositionPreference::Top,
         &lines,
     );
 }
@@ -605,7 +658,20 @@ pub enum TooltipPosition {
     TopRight((f32, f32)),
 }
 
-pub fn draw_tooltip(font: &Font, position: TooltipPosition, lines: &[String]) {
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum TooltipPositionPreference {
+    Top,
+    Right,
+    Bottom,
+    Left,
+}
+
+pub fn draw_tooltip(
+    font: &Font,
+    rect: Rect,
+    mut pos_preference: TooltipPositionPreference,
+    lines: &[String],
+) {
     let font_size = 18;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
@@ -621,10 +687,38 @@ pub fn draw_tooltip(font: &Font, position: TooltipPosition, lines: &[String]) {
     let line_h = 22.0;
     let tooltip_h = lines.len() as f32 * line_h + text_margin * 2.0;
 
-    let (x, y) = match position {
-        TooltipPosition::TopLeft((x, y)) => (x, y),
-        TooltipPosition::BottomLeft((x, y)) => (x, y - tooltip_h),
-        TooltipPosition::TopRight((x, y)) => (x - tooltip_w, y),
+    let (screen_w, screen_h) = screen_size();
+
+    if pos_preference == TooltipPositionPreference::Top && rect.top() - tooltip_h < 0.0 {
+        pos_preference = TooltipPositionPreference::Bottom;
+    }
+    if pos_preference == TooltipPositionPreference::Bottom && rect.bottom() + tooltip_h > screen_h {
+        pos_preference = TooltipPositionPreference::Top;
+    }
+    if pos_preference == TooltipPositionPreference::Left && rect.left() - tooltip_w < 0.0 {
+        pos_preference = TooltipPositionPreference::Right;
+    }
+    if pos_preference == TooltipPositionPreference::Right && rect.right() + tooltip_w > screen_w {
+        pos_preference = TooltipPositionPreference::Left;
+    }
+
+    let space = 3.0;
+
+    let (x, y) = match pos_preference {
+        TooltipPositionPreference::Top => (
+            rect.left().min(screen_w - tooltip_w),
+            rect.top() - space - tooltip_h,
+        ),
+        TooltipPositionPreference::Right => {
+            (rect.right() + space, rect.top().min(screen_h - tooltip_h))
+        }
+        TooltipPositionPreference::Bottom => {
+            (rect.left().min(screen_w - tooltip_w), rect.bottom() + space)
+        }
+        TooltipPositionPreference::Left => (
+            rect.left() - space - tooltip_w,
+            rect.top().min(screen_h - tooltip_h),
+        ),
     };
 
     let tooltip_rect = (x, y, tooltip_w, tooltip_h);

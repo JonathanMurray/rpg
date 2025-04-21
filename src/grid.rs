@@ -54,12 +54,13 @@ const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
 const MOVE_RANGE_COLOR: Color = GREEN;
 
-const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.3, 0.3, 0.3, 0.4);
+const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.5, 0.5, 0.5, 0.25);
 const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
 const RANGE_INDICATOR_SEMI_BAD_COLOR: Color = ORANGE;
 const RANGE_INDICATOR_BAD_COLOR: Color = RED;
 
 const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = WHITE;
+const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
 #[derive(Debug, Copy, Clone)]
@@ -563,7 +564,12 @@ impl GameGrid {
         }
     }
 
-    pub fn draw(&mut self, receptive_to_input: bool, ui_state: &UiState) -> GridOutcome {
+    pub fn draw(
+        &mut self,
+        receptive_to_input: bool,
+        receptive_to_dragging: bool,
+        ui_state: &UiState,
+    ) -> GridOutcome {
         let previous_inspect_target = self.players_inspect_target;
 
         let (w, h) = self.size;
@@ -578,13 +584,13 @@ impl GameGrid {
         };
         let (mouse_x, mouse_y) = mouse_position();
         let mouse_relative = (mouse_x - x, mouse_y - y);
-        let (mouse_grid_x, mouse_grid_y) = mouse_relative_to_grid(mouse_relative);
+        let mouse_grid_pos = mouse_relative_to_grid(mouse_relative);
 
         let is_mouse_within_grid = (0f32..w).contains(&mouse_relative.0)
             && (0f32..h).contains(&mouse_relative.1)
-            && self.is_within_grid((mouse_grid_x, mouse_grid_y));
+            && self.is_within_grid(mouse_grid_pos);
 
-        if is_mouse_within_grid && receptive_to_input {
+        if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
                 if is_mouse_button_down(MouseButton::Right)
                     || is_mouse_button_down(MouseButton::Middle)
@@ -623,7 +629,7 @@ impl GameGrid {
 
         let mut hovered_character_id = None;
         for character in self.characters.iter() {
-            if character.pos() == (mouse_grid_x, mouse_grid_y) {
+            if character.pos() == mouse_grid_pos {
                 let id = character.id();
                 outcome.hovered_character_id = Some(id);
                 hovered_character_id = Some(id);
@@ -662,7 +668,6 @@ impl GameGrid {
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
                 BaseAction::Move { .. } => MouseState::MayInputMovement,
-                BaseAction::SelfEffect(..) => MouseState::ImplicitTarget,
             },
             _ => MouseState::None,
         };
@@ -679,7 +684,7 @@ impl GameGrid {
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
                     self.draw_range_indicator(
-                        (mouse_grid_x, mouse_grid_y),
+                        mouse_grid_pos,
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
@@ -694,7 +699,7 @@ impl GameGrid {
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
                     self.draw_range_indicator(
-                        (mouse_grid_x, mouse_grid_y),
+                        mouse_grid_pos,
                         range,
                         RangeIndicator::TargetAreaEffect,
                     );
@@ -709,7 +714,7 @@ impl GameGrid {
 
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {
-                if character.pos() == (mouse_grid_x, mouse_grid_y) {
+                if character.pos() == mouse_grid_pos {
                     let id = character.id();
                     outcome.hovered_character_id = Some(id);
                     hovered_character_id = Some(id);
@@ -735,8 +740,7 @@ impl GameGrid {
                 && matches!(mouse_state, MouseState::RequiresPositionTarget { .. })
             {
                 if self.players_action_target == ActionTarget::None {
-                    self.players_action_target =
-                        ActionTarget::Position((mouse_grid_x, mouse_grid_y));
+                    self.players_action_target = ActionTarget::Position(mouse_grid_pos);
                 } else {
                     outcome.switched_action = Some(GridSwitchedTo::Idle);
                 }
@@ -745,21 +749,59 @@ impl GameGrid {
             let player_has_action_char_target =
                 matches!(self.players_action_target, ActionTarget::Character { .. });
 
-            if matches!(
-                mouse_state,
-                MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget
-            ) && !player_has_action_char_target
-                && hovered_character_id.is_none()
-            {
-                self.draw_cornered_outline(
-                    self.grid_pos_to_screen((mouse_grid_x, mouse_grid_y)),
-                    HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
-                    5.0,
-                    2.0,
-                );
+            match mouse_state {
+                MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
+                    if !player_has_action_char_target && hovered_character_id.is_none() {
+                        let mut out_of_range = false;
+                        if let Some((range, _indicator)) = self.range_indicator {
+                            out_of_range = (((mouse_grid_pos.0 - active_char_pos.0).pow(2)
+                                + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
+                                as f32)
+                                > range.squared();
+                        }
+
+                        if out_of_range {
+                            self.draw_invalid_target_marker(mouse_grid_pos);
+                        } else {
+                            self.draw_cornered_outline(
+                                self.grid_pos_to_screen(mouse_grid_pos),
+                                HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
+                                5.0,
+                                2.0,
+                            );
+                        }
+                    }
+                }
+                MouseState::RequiresPositionTarget { .. } => {
+                    if !matches!(self.players_action_target, ActionTarget::Position { .. }) {
+                        let mut out_of_range = false;
+                        if let Some((range, _indicator)) = self.range_indicator {
+                            out_of_range = (((mouse_grid_pos.0 - active_char_pos.0).pow(2)
+                                + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
+                                as f32)
+                                > range.squared();
+                        }
+
+                        if out_of_range {
+                            self.draw_invalid_target_marker(mouse_grid_pos);
+                        } else {
+                            self.draw_cornered_outline(
+                                self.grid_pos_to_screen(mouse_grid_pos),
+                                HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
+                                5.0,
+                                2.0,
+                            );
+                            self.draw_target_crosshair(
+                                mouse_grid_pos,
+                                HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+                            );
+                        }
+                    }
+                }
+                _ => {}
             }
 
-            let hovered_move_route = self.pathfind_grid.routes.get(&(mouse_grid_x, mouse_grid_y));
+            let hovered_move_route = self.pathfind_grid.routes.get(&mouse_grid_pos);
             let mut valid_hovered_move_route = None;
             if matches!(mouse_state, MouseState::MayInputMovement) && hovered_character_id.is_none()
             {
@@ -768,8 +810,7 @@ impl GameGrid {
 
             if let Some(hovered_route) = valid_hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
-                    let path =
-                        self.build_path_from_route(active_char_pos, (mouse_grid_x, mouse_grid_y));
+                    let path = self.build_path_from_route(active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path, true);
 
                     if pressed_left_mouse {
@@ -789,16 +830,17 @@ impl GameGrid {
                 if player_controlled {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_cornered_outline(
-                            self.grid_pos_to_screen((mouse_grid_x, mouse_grid_y)),
+                            self.grid_pos_to_screen(mouse_grid_pos),
                             HOVER_ALLY_COLOR,
                             5.0,
                             4.0,
                         );
-                    } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                        self.fill_cell(
-                            (mouse_grid_x, mouse_grid_y),
-                            Color::new(1.0, 0.0, 0.0, 0.3),
+                        self.draw_target_crosshair(
+                            mouse_grid_pos,
+                            HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
+                    } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
+                        self.draw_invalid_target_marker(mouse_grid_pos);
                     }
 
                     if pressed_left_mouse {
@@ -821,16 +863,17 @@ impl GameGrid {
                 } else {
                     if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                         self.draw_cornered_outline(
-                            self.grid_pos_to_screen((mouse_grid_x, mouse_grid_y)),
+                            self.grid_pos_to_screen(mouse_grid_pos),
                             HOVER_ENEMY_COLOR,
                             5.0,
                             3.0,
                         );
-                    } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
-                        self.fill_cell(
-                            (mouse_grid_x, mouse_grid_y),
-                            Color::new(1.0, 0.0, 0.0, 0.3),
+                        self.draw_target_crosshair(
+                            mouse_grid_pos,
+                            HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
+                    } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
+                        self.draw_invalid_target_marker(mouse_grid_pos);
                     }
 
                     if pressed_left_mouse {
@@ -869,12 +912,7 @@ impl GameGrid {
                     }
                 }
             } else if self.selected_movement_path.is_some() && self.dragging_camera_from.is_none() {
-                self.draw_cell_outline(
-                    (mouse_grid_x, mouse_grid_y),
-                    HOVER_INVALID_MOVEMENT_COLOR,
-                    5.0,
-                    2.0,
-                );
+                self.draw_cell_outline(mouse_grid_pos, HOVER_INVALID_MOVEMENT_COLOR, 5.0, 2.0);
             }
         }
 
@@ -905,10 +943,7 @@ impl GameGrid {
                 self.draw_target_crosshair(target_pos, PLAYERS_TARGET_CROSSHAIR_COLOR);
             }
             ActionTarget::Position(target_pos) => {
-                self.draw_target_crosshair(
-                    (target_pos.0, target_pos.1),
-                    PLAYERS_TARGET_CROSSHAIR_COLOR,
-                );
+                self.draw_target_crosshair(target_pos, PLAYERS_TARGET_CROSSHAIR_COLOR);
             }
             ActionTarget::None => {}
         }
@@ -934,6 +969,10 @@ impl GameGrid {
         }
 
         outcome
+    }
+
+    fn draw_invalid_target_marker(&self, grid_pos: Position) {
+        self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3));
     }
 
     fn draw_character_label(&self, char: &Character) {
@@ -1178,9 +1217,9 @@ impl GameGrid {
 
     fn draw_movement_path(&self, path: &[(f32, Position)], hover: bool) {
         if hover {
-            self.draw_movement_path_arrow(path, HOVER_MOVEMENT_ARROW_COLOR, 2.0);
+            self.draw_movement_path_arrow(path, HOVER_MOVEMENT_ARROW_COLOR, 3.0);
         } else {
-            self.draw_movement_path_arrow(path, MOVEMENT_ARROW_COLOR, 4.0);
+            self.draw_movement_path_arrow(path, MOVEMENT_ARROW_COLOR, 5.0);
         };
 
         let distance = path[0].0;

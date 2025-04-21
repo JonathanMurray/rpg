@@ -19,7 +19,9 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
+    action_button::{
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
+    },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
         Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
@@ -179,7 +181,6 @@ impl UserInterface {
                         attack_button_for_character_sheet = Some(btn.clone());
                         hoverable_buttons.push(btn);
                     }
-                    BaseAction::SelfEffect(..) => basic_buttons.push(btn),
                     BaseAction::CastSpell(spell) => {
                         spell_buttons.push(btn);
 
@@ -208,19 +209,6 @@ impl UserInterface {
                     }
                 }
             }
-
-            let basic_row = buttons_row(
-                basic_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-            let spell_row = buttons_row(
-                spell_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
 
             let mut reaction_buttons_for_character_sheet = vec![];
             for (_subtext, reaction) in character.known_on_attacked_reactions() {
@@ -253,10 +241,29 @@ impl UserInterface {
                 spell_buttons_for_character_sheet,
             );
 
+            let mut upper_buttons = basic_buttons;
+            let mut lower_buttons = spell_buttons;
+            while lower_buttons.len() > upper_buttons.len() + 1 {
+                upper_buttons.push(lower_buttons.pop().unwrap());
+            }
+
+            let upper_row = buttons_row(
+                upper_buttons
+                    .into_iter()
+                    .map(|btn| Element::Rc(btn))
+                    .collect(),
+            );
+            let lower_row = buttons_row(
+                lower_buttons
+                    .into_iter()
+                    .map(|btn| Element::Rc(btn))
+                    .collect(),
+            );
+
             let actions_section = Container {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 5.0,
-                children: vec![basic_row, spell_row],
+                children: vec![upper_row, lower_row],
                 ..Default::default()
             };
 
@@ -424,12 +431,17 @@ impl UserInterface {
         self.game_grid.position_on_screen = (0.0, 0.0);
 
         let (mouse_x, mouse_y) = mouse_position();
-        let grid_receptive_to_input = !matches!(self.state, UiState::Idle)
-            && !self.character_sheet_toggle.shown.get()
+        let is_grid_obstructed = popup_rectangle.contains((mouse_x, mouse_y).into())
+            || self.character_sheet_toggle.shown.get();
+        let is_grid_receptive_to_input = !matches!(self.state, UiState::Idle)
             && self.active_character().player_controlled
-            && !popup_rectangle.contains((mouse_x, mouse_y).into());
-
-        let grid_outcome = self.game_grid.draw(grid_receptive_to_input, &self.state);
+            && !is_grid_obstructed;
+        let is_grid_receptive_to_dragging = !is_grid_obstructed;
+        let grid_outcome = self.game_grid.draw(
+            is_grid_receptive_to_input,
+            is_grid_receptive_to_dragging,
+            &self.state,
+        );
 
         draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
         draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
@@ -558,6 +570,39 @@ impl UserInterface {
         self.characters.get(self.active_character_id)
     }
 
+    fn update_selected_action_button(&mut self) {
+        match self.state {
+            UiState::ConfiguringAction(base_action) => {
+                let mut action_is_waiting_for_target_selection = false;
+
+                match base_action {
+                    BaseAction::Attack { .. } => {
+                        action_is_waiting_for_target_selection =
+                            matches!(self.game_grid.players_action_target(), ActionTarget::None);
+                    }
+                    BaseAction::CastSpell(spell) => {
+                        if matches!(
+                            spell.target,
+                            SpellTarget::Enemy { .. }
+                                | SpellTarget::Ally { .. }
+                                | SpellTarget::Area { .. }
+                        ) {
+                            action_is_waiting_for_target_selection = matches!(
+                                self.game_grid.players_action_target(),
+                                ActionTarget::None
+                            );
+                        }
+                    }
+                    BaseAction::Move { .. } => {}
+                }
+
+                let fully_selected = !action_is_waiting_for_target_selection;
+                self.set_selected_action(Some((ButtonAction::Action(base_action), fully_selected)));
+            }
+            _ => {}
+        }
+    }
+
     pub fn set_state(&mut self, state: UiState) {
         if self.state == state {
             return;
@@ -588,8 +633,6 @@ impl UserInterface {
                 popup_initial_lines.push(tooltip.header.to_string());
                 popup_initial_lines.extend_from_slice(&tooltip.technical_description);
 
-                self.set_highlighted_action(Some(ButtonAction::Action(base_action)));
-
                 match base_action {
                     BaseAction::Attack {
                         hand,
@@ -602,7 +645,6 @@ impl UserInterface {
                         }
                         player_wants_enemy_target = true;
                     }
-                    BaseAction::SelfEffect(..) => {}
                     BaseAction::CastSpell(spell) => {
                         for enhancement in spell.possible_enhancements.iter().flatten().copied() {
                             if self
@@ -616,8 +658,12 @@ impl UserInterface {
                         }
 
                         match spell.target {
-                            SpellTarget::Enemy { .. } => player_wants_enemy_target = true,
-                            SpellTarget::Ally { .. } => player_wants_ally_target = true,
+                            SpellTarget::Enemy { .. } => {
+                                player_wants_enemy_target = true;
+                            }
+                            SpellTarget::Ally { .. } => {
+                                player_wants_ally_target = true;
+                            }
                             SpellTarget::Area { .. } => {}
                             SpellTarget::None { .. } => {}
                         }
@@ -692,7 +738,7 @@ impl UserInterface {
 
             UiState::ChoosingAction => {
                 self.set_allowed_to_use_action_buttons(true);
-                self.set_highlighted_action(None);
+                self.set_selected_action(None);
             }
 
             UiState::Idle => {
@@ -734,6 +780,8 @@ impl UserInterface {
         if !npc_action_has_target {
             self.game_grid.clear_enemys_target();
         }
+
+        self.update_selected_action_button();
 
         //self.update_shown_target();
     }
@@ -1084,21 +1132,7 @@ impl UserInterface {
                     }
                 }
             }
-            GameEvent::CharacterReceivedSelfEffect {
-                character,
-                condition,
-            } => {
-                let pos = self.characters.get(character).position.get();
-                let duration = 1.0;
-                self.game_grid.add_text_effect(
-                    (pos.0, pos.1),
-                    0.0,
-                    duration,
-                    format!("{:?}", condition),
-                    Goodness::Neutral,
-                );
-                self.animation_stopwatch.set_to_at_least(duration);
-            }
+
             GameEvent::CharacterDied { character } => {
                 self.log
                     .add(format!("{} died", self.characters.get(character).name));
@@ -1252,7 +1286,7 @@ impl UserInterface {
 
                     ActionTarget::None => {
                         self.target_ui
-                            .set_action("Select a target".to_string(), vec![], false);
+                            .set_action("Select an enemy".to_string(), vec![], false);
 
                         let range = self
                             .active_character()
@@ -1338,9 +1372,17 @@ impl UserInterface {
 
                     ActionTarget::None => {
                         match spell.target {
-                            SpellTarget::Enemy { .. } | SpellTarget::Ally { .. } => {
+                            SpellTarget::Enemy { .. } => {
                                 self.target_ui.set_action(
-                                    "Select a target".to_string(),
+                                    "Select an enemy".to_string(),
+                                    vec![],
+                                    false,
+                                );
+                            }
+
+                            SpellTarget::Ally { .. } => {
+                                self.target_ui.set_action(
+                                    "Select an ally".to_string(),
                                     vec![],
                                     false,
                                 );
@@ -1381,10 +1423,6 @@ impl UserInterface {
                         .set_action("Select a destination".to_string(), vec![], false);
                 }
             }
-            UiState::ConfiguringAction(BaseAction::SelfEffect(..)) => {
-                popup_enabled = true;
-                self.target_ui.clear_action();
-            }
             UiState::ChoosingAction => {
                 self.target_ui
                     .set_action("Select an action".to_string(), vec![], false);
@@ -1402,6 +1440,8 @@ impl UserInterface {
 
         self.character_portraits.update(game);
         self.player_portraits.update(game);
+
+        self.update_selected_action_button();
 
         // TODO Update the stats / condition of shown character in target UI (so that it doesn't only refresh when changing inspection target)
 
@@ -1449,7 +1489,7 @@ impl UserInterface {
 
     fn handle_popup_proceed(&mut self) -> PlayerChose {
         // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
-        self.set_highlighted_action(None);
+        self.set_selected_action(None);
 
         match self.state {
             UiState::ConfiguringAction(base_action) => {
@@ -1465,7 +1505,6 @@ impl UserInterface {
                             target: target_id,
                         }
                     }
-                    BaseAction::SelfEffect(sea) => Action::SelfEffect(sea),
                     BaseAction::CastSpell(spell) => Action::CastSpell {
                         spell,
                         enhancements: self.activity_popup.selected_spell_enhancements(),
@@ -1529,8 +1568,13 @@ impl UserInterface {
         }
     }
 
-    fn set_highlighted_action(&self, highlighted_action: Option<ButtonAction>) {
-        let highlighted_id = highlighted_action.map(button_action_id);
+    fn set_selected_action(&self, highlighted_action: Option<(ButtonAction, bool)>) {
+        let mut highlighted_id = None;
+        let mut fully_selected = false;
+        if let Some((action, fully)) = highlighted_action {
+            highlighted_id = Some(button_action_id(action));
+            fully_selected = fully;
+        }
 
         if self.active_character().player_controlled {
             if self.player_portraits.selected_i.get() != self.active_character_id {
@@ -1541,8 +1585,15 @@ impl UserInterface {
             for (btn_action_id, btn) in
                 &self.character_uis[&self.active_character_id].tracked_action_buttons
             {
-                btn.highlighted
-                    .set(highlighted_id.as_ref() == Some(btn_action_id));
+                if highlighted_id.as_ref() == Some(btn_action_id) {
+                    if fully_selected {
+                        btn.selected.set(ButtonSelected::Yes);
+                    } else {
+                        btn.selected.set(ButtonSelected::Partially);
+                    }
+                } else {
+                    btn.selected.set(ButtonSelected::No);
+                }
             }
         }
     }
@@ -1577,7 +1628,6 @@ fn button_action_id(btn_action: ButtonAction) -> String {
     match btn_action {
         ButtonAction::Action(base_action) => match base_action {
             BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
-            BaseAction::SelfEffect(sea) => format!("SELF_EFFECT_{}", sea.name),
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
             BaseAction::Move { .. } => "MOVE".to_string(),
         },
@@ -1900,7 +1950,7 @@ impl PlayerCharacterPortrait {
             text,
             shown_character: Cell::new(false),
             active_character: Cell::new(false),
-            padding: 15.0,
+            padding: 10.0,
             has_been_clicked: Cell::new(false),
         }
     }
@@ -1919,7 +1969,7 @@ impl Drawable for PlayerCharacterPortrait {
         self.text.draw(self.padding + x, self.padding + y);
 
         if self.active_character.get() {
-            let y_line = y + h - 10.0;
+            let y_line = y + h - 5.0;
             let line_margin = 5.0;
             draw_line(
                 x + self.padding - line_margin,
@@ -1944,10 +1994,7 @@ impl Drawable for PlayerCharacterPortrait {
 
     fn size(&self) -> (f32, f32) {
         let text_size = self.text.size();
-        (
-            text_size.0 + self.padding * 2.0,
-            text_size.1 + self.padding * 2.0,
-        )
+        (text_size.0 + self.padding * 2.0, 15.0 + self.padding * 2.0)
     }
 }
 
@@ -2051,7 +2098,7 @@ impl Log {
     }
 
     fn draw(&self, x: f32, y: f32) {
-        draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
+        //draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
         self.container.draw(x + self.padding, y + self.padding);
 
         let size = self.size();

@@ -392,17 +392,27 @@ impl Default for Align {
     }
 }
 
-#[derive(Default)]
 pub struct ContainerScroll {
     offset: Cell<f32>,
     draw_overflow: bool,
+    pub scroll_speed: f32,
 }
 
 impl ContainerScroll {
-    pub fn with_draw_overflow() -> Self {
+    pub fn new(scroll_speed: f32) -> Self {
         Self {
-            draw_overflow: true,
+            scroll_speed,
             ..Default::default()
+        }
+    }
+}
+
+impl Default for ContainerScroll {
+    fn default() -> Self {
+        Self {
+            offset: Default::default(),
+            draw_overflow: Default::default(),
+            scroll_speed: 15.0,
         }
     }
 }
@@ -591,8 +601,7 @@ impl Container {
                 if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
                     let (_dx, dy) = mouse_wheel();
                     if dy != 0.0 {
-                        const SCROLL_SPEED: f32 = 15.0;
-                        let new_offset = (scroll.offset.get() - dy.signum() * SCROLL_SPEED)
+                        let new_offset = (scroll.offset.get() - dy.signum() * scroll.scroll_speed)
                             .max(0.0)
                             .min(content_size.1 - size.1);
                         scroll.offset.set(new_offset);

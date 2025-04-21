@@ -3,11 +3,12 @@ use std::cell::Cell;
 use macroquad::{
     color::WHITE,
     input::mouse_position,
+    math::Rect,
     text::{draw_text_ex, Font, TextParams},
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPosition},
+    action_button::{draw_tooltip, TooltipPosition, TooltipPositionPreference},
     base_ui::Drawable,
     core::ConditionInfo,
 };
@@ -78,11 +79,15 @@ fn draw_conditions(
         if (x..x + dimensions.width).contains(&mouse_x)
             && (y0 - dimensions.height..y0).contains(&mouse_y)
         {
-            // TODO Pick corner dynamically based on whether the tooltip exceeds out of the screen
-            // Maybe draw_tooltip should accept the rectangle of the item, rather than a prescribed
-            // corner position
-            let pos = TooltipPosition::TopRight((x - 5.0, y0 - dimensions.height));
-            tooltip = Some((pos, condition));
+            tooltip = Some((
+                Rect::new(
+                    x,
+                    y0 - dimensions.height,
+                    dimensions.width,
+                    dimensions.height,
+                ),
+                condition,
+            ));
         }
 
         if dimensions.width > max_w {
@@ -90,10 +95,11 @@ fn draw_conditions(
         }
     }
 
-    if let Some((pos, condition)) = tooltip {
+    if let Some((rect, condition)) = tooltip {
         draw_tooltip(
             font,
-            pos,
+            rect,
+            TooltipPositionPreference::Right,
             &[
                 condition.name.to_string(),
                 condition.description.to_string(),

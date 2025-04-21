@@ -72,3 +72,25 @@ pub fn draw_dashed_line(
     }
     draw_line(prev_x, prev_y, to.0, to.1, thickness, color);
 }
+
+pub fn draw_dashed_rectangle_lines(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    thickness: f32,
+    color: Color,
+    segment_len: f32,
+) {
+    // top
+    draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len);
+
+    // right
+    draw_dashed_line((x + w, y), (x + w, y + h), thickness, color, segment_len);
+
+    // bottom
+    draw_dashed_line((x + w, y + h), (x, y + h), thickness, color, segment_len);
+
+    // left
+    draw_dashed_line((x, y + h), (x, y), thickness, color, segment_len);
+}

@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use macroquad::{
     color::SKYBLUE,
+    math::Rect,
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -13,7 +14,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPosition},
+    action_button::{draw_tooltip, TooltipPosition, TooltipPositionPreference},
     base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle},
     core::{ArmorPiece, Character, HandType, Shield, Weapon, WeaponRange},
     data::{BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER},
@@ -261,9 +262,12 @@ impl Drawable for EquipmentIcon {
             && (y..y + self.size.1).contains(&mouse_y)
             && !self.tooltip_lines.is_empty()
         {
+            let rect = Rect::new(x, y, self.size.0, self.size.1);
+
             draw_tooltip(
                 &self.font,
-                TooltipPosition::BottomLeft((x, y)),
+                rect,
+                TooltipPositionPreference::Bottom,
                 &self.tooltip_lines,
             );
         }

@@ -9,7 +9,9 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_button_tooltip, ButtonAction, EventSender, InternalUiEvent},
+    action_button::{
+        draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
+    },
     base_ui::Drawable,
     core::{
         AttackEnhancement, BaseAction, MovementEnhancement, OnAttackedReaction, OnHitReaction,
@@ -194,9 +196,7 @@ impl ActivityPopup {
                             let text = format!("range: {range:.2}");
                             draw_text_ex(&text, x0, y0, base_text_params.clone());
                         }
-                        BaseAction::Attack { .. }
-                        | BaseAction::CastSpell(..)
-                        | BaseAction::SelfEffect(..) => {}
+                        BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
                     };
                 }
                 UiState::ReactingToAttack { .. } | UiState::ReactingToHit { .. } => {}
@@ -246,7 +246,7 @@ impl ActivityPopup {
 
                 InternalUiEvent::ButtonClicked(id, _button_action) => {
                     let clicked_btn = &self.choice_buttons[&id];
-                    clicked_btn.toggle_highlighted();
+                    clicked_btn.toggle_selected();
 
                     if let ButtonAction::MovementEnhancement(..) = clicked_btn.action {
                         changed_movement_range = true;
@@ -256,14 +256,14 @@ impl ActivityPopup {
                     if self.are_choice_buttons_mutually_exclusive() {
                         for btn in self.choice_buttons.values() {
                             if btn.id != id {
-                                btn.highlighted.set(false);
+                                btn.deselect();
                             }
                         }
                     }
 
                     self.selected_choice_button_ids.clear();
                     for btn in self.choice_buttons.values() {
-                        if btn.highlighted.get() {
+                        if btn.selected.get() == ButtonSelected::Yes {
                             self.selected_choice_button_ids.push(btn.id);
                         }
                     }
@@ -349,12 +349,12 @@ impl ActivityPopup {
         ));
 
         for (i, (_id, btn)) in self.choice_buttons.iter().enumerate() {
-            btn.highlighted.set(selected_enhancement == Some(i));
+            btn.set_selected(selected_enhancement == Some(i));
         }
 
         self.selected_choice_button_ids.clear();
         for btn in self.choice_buttons.values() {
-            if btn.highlighted.get() {
+            if btn.selected.get() == ButtonSelected::Yes {
                 self.selected_choice_button_ids.push(btn.id);
             }
         }

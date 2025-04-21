@@ -1,12 +1,12 @@
-use macroquad::color::{BLACK, BLUE, GREEN, PURPLE, RED};
+use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
         AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
-        OnHitReactionEffect, Range, SelfEffectAction, Shield, Spell, SpellAllyEffect,
-        SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect,
-        SpellTarget, Weapon, WeaponGrip, WeaponRange,
+        OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
+        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget, Weapon,
+        WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -203,14 +203,22 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     must_be_melee: false,
 };
 
-pub const BRACED_DEFENSE_BONUS: u32 = 3;
-pub const BRACE: SelfEffectAction = SelfEffectAction {
+pub const BRACE: Spell = Spell {
     name: "Brace",
     description: Condition::Braced.description(),
     icon: IconId::Brace,
     action_point_cost: 1,
+    mana_cost: 0,
     stamina_cost: 1,
-    effect: ApplyEffect::Condition(Condition::Braced),
+    possible_enhancements: [None; 2],
+    target: SpellTarget::None {
+        self_area: None,
+        self_effect: Some(SpellAllyEffect {
+            healing: 0,
+            apply: Some(ApplyEffect::Condition(Condition::Braced)),
+        }),
+    },
+    animation_color: MAGENTA,
 };
 
 pub const SCREAM: Spell = Spell {
@@ -219,6 +227,7 @@ pub const SCREAM: Spell = Spell {
     icon: IconId::Scream,
     action_point_cost: 2,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
@@ -252,6 +261,7 @@ pub const MIND_BLAST: Spell = Spell {
     icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Dualcast",
@@ -282,6 +292,7 @@ pub const HEAL: Spell = Spell {
     icon: IconId::Plus,
     action_point_cost: 2,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [None, None],
     target: SpellTarget::Ally {
         range: Range::Ranged(5),
@@ -299,6 +310,7 @@ pub const HEALING_NOVA: Spell = Spell {
     icon: IconId::PlusPlus,
     action_point_cost: 2,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [None, None],
     target: SpellTarget::None {
         self_area: Some((
@@ -319,6 +331,7 @@ pub const SELF_HEAL: Spell = Spell {
     icon: IconId::PlusPlus,
     action_point_cost: 2,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [None, None],
     target: SpellTarget::None {
         self_area: None,
@@ -336,6 +349,7 @@ pub const HEALING_RAIN: Spell = Spell {
     icon: IconId::PlusPlus,
     action_point_cost: 2,
     mana_cost: 2,
+    stamina_cost: 0,
     possible_enhancements: [None, None],
     target: SpellTarget::Area {
         range: Range::Ranged(5),
@@ -354,6 +368,7 @@ pub const FIREBALL: Spell = Spell {
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
+    stamina_cost: 0,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Big",
@@ -399,6 +414,7 @@ pub const KILL: Spell = Spell {
     icon: IconId::Fireball,
     action_point_cost: 5,
     mana_cost: 0,
+    stamina_cost: 0,
     possible_enhancements: [None; 2],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {

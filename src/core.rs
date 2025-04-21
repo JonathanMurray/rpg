@@ -8,8 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, BRACED_DEFENSE_BONUS, EFFICIENT, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS,
-    RAGE, SELF_HEAL,
+    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS, RAGE, SELF_HEAL,
 };
 use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -48,9 +47,14 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
+        bob.known_actions.push(BaseAction::CastSpell(HEAL));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
-        bob.known_actions.push(BaseAction::SelfEffect(BRACE));
+        bob.known_actions.push(BaseAction::CastSpell(BRACE));
+
+        bob.receive_condition(Condition::Braced);
+        bob.receive_condition(Condition::Bleeding(2));
+        bob.receive_condition(Condition::Dazed(2));
 
         let mut enemy1 = Character::new(
             false,
@@ -65,7 +69,7 @@ impl CoreGame {
         enemy1.known_attacked_reactions.push(SIDE_STEP);
 
         let mut enemy2 = Character::new(
-            false,
+            true,
             "Gromp",
             SpriteId::Character3,
             Attributes::new(8, 8, 1, 5),
@@ -201,32 +205,7 @@ impl CoreGame {
                 self.perform_attack(hand, enhancements, target, reaction)
                     .await
             }
-            Action::SelfEffect(SelfEffectAction {
-                name,
-                action_point_cost,
-                stamina_cost,
-                effect,
-                ..
-            }) => {
-                let character = self.active_character();
-                character.action_points.spend(action_point_cost);
-                character.stamina.spend(stamina_cost);
-                let character_name = character.name;
 
-                self.log(format!("{} uses {}", character_name, name)).await;
-
-                if let ApplyEffect::Condition(condition) = effect {
-                    self.ui_handle_event(GameEvent::CharacterReceivedSelfEffect {
-                        character: self.active_character_id,
-                        condition,
-                    })
-                    .await;
-                }
-
-                let log_line = self.perform_effect_application(effect, self.active_character());
-                self.log(log_line).await;
-                None
-            }
             Action::CastSpell {
                 spell,
                 enhancements,
@@ -342,6 +321,7 @@ impl CoreGame {
 
         caster.action_points.spend(spell.action_point_cost);
         caster.mana.spend(spell.mana_cost);
+        caster.stamina.spend(spell.stamina_cost);
 
         for enhancement in &enhancements {
             caster.action_points.spend(enhancement.action_point_cost);
@@ -1248,10 +1228,6 @@ pub enum GameEvent {
         spell: Spell,
         detail_lines: Vec<String>,
     },
-    CharacterReceivedSelfEffect {
-        character: CharacterId,
-        condition: Condition,
-    },
     CharacterDied {
         character: CharacterId,
     },
@@ -1567,6 +1543,7 @@ impl Condition {
 
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
 const PROTECTED_ARMOR_BONUS: u32 = 3;
+const BRACED_DEFENSE_BONUS: u32 = 3;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -1625,7 +1602,6 @@ pub enum Action {
         enhancements: Vec<AttackEnhancement>,
         target: CharacterId,
     },
-    SelfEffect(SelfEffectAction),
     CastSpell {
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
@@ -1645,23 +1621,12 @@ pub enum ActionTarget {
     None,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct SelfEffectAction {
-    pub name: &'static str,
-    pub description: &'static str,
-    pub icon: IconId,
-    pub action_point_cost: u32,
-    pub stamina_cost: u32,
-    pub effect: ApplyEffect,
-}
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum BaseAction {
     Attack {
         hand: HandType,
         action_point_cost: u32,
     },
-    SelfEffect(SelfEffectAction),
     CastSpell(Spell),
     Move {
         range: f32,
@@ -1676,7 +1641,6 @@ impl BaseAction {
                 hand: _,
                 action_point_cost,
             } => *action_point_cost,
-            BaseAction::SelfEffect(sea) => sea.action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move {
                 action_point_cost, ..
@@ -1687,7 +1651,6 @@ impl BaseAction {
     pub fn mana_cost(&self) -> u32 {
         match self {
             BaseAction::Attack { .. } => 0,
-            BaseAction::SelfEffect(..) => 0,
             BaseAction::CastSpell(spell) => spell.mana_cost,
             BaseAction::Move { .. } => 0,
         }
@@ -1696,8 +1659,7 @@ impl BaseAction {
     pub fn stamina_cost(&self) -> u32 {
         match self {
             BaseAction::Attack { .. } => 0,
-            BaseAction::SelfEffect(sea) => sea.stamina_cost,
-            BaseAction::CastSpell(..) => 0,
+            BaseAction::CastSpell(spell) => spell.stamina_cost,
             BaseAction::Move { .. } => 0,
         }
     }
@@ -1716,6 +1678,7 @@ pub struct Spell {
     pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
+    pub stamina_cost: u32,
 
     pub possible_enhancements: [Option<SpellEnhancement>; 2],
     pub target: SpellTarget,
@@ -2095,7 +2058,6 @@ impl Character {
                         },
                     )
                 }),
-                BaseAction::SelfEffect(_self_effect_action) => Some(("", *action)),
                 BaseAction::CastSpell(_spell) => Some(("", *action)),
                 BaseAction::Move { .. } => Some(("", *action)),
             })
@@ -2122,11 +2084,10 @@ impl Character {
                 hand,
                 action_point_cost: _,
             } => matches!(self.weapon(hand), Some(weapon) if ap >= weapon.action_point_cost),
-            BaseAction::SelfEffect(sea) => {
-                ap >= sea.action_point_cost && self.stamina.current() >= sea.stamina_cost
-            }
             BaseAction::CastSpell(spell) => {
-                ap >= spell.action_point_cost && self.mana.current() >= spell.mana_cost
+                ap >= spell.action_point_cost
+                    && self.stamina.current() >= spell.stamina_cost
+                    && self.mana.current() >= spell.mana_cost
             }
             BaseAction::Move {
                 action_point_cost, ..

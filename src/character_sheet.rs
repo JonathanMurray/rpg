@@ -92,7 +92,7 @@ impl CharacterSheet {
             layout_dir: LayoutDirection::Vertical,
             margin: 5.0,
             children: vec![],
-            scroll: Some(ContainerScroll::default()),
+            scroll: Some(ContainerScroll::new(40.0)),
             max_height: Some(450.0),
             style: Style {
                 padding: 10.0,
