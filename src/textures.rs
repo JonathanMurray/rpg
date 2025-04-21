@@ -128,7 +128,7 @@ where
 }
 
 pub async fn load_and_init_texture(path: &str) -> Texture2D {
-    let texture = load_texture(path).await.unwrap();
+    let texture = load_texture(&format!("images/{}", path)).await.unwrap();
     texture.set_filter(FilterMode::Nearest);
     texture
 }
