@@ -13,7 +13,7 @@ use crate::{
     },
     conditions_ui::ConditionsList,
     core::{Character, Goodness},
-    game_ui::{ActionPointsRow, ResourceBar},
+    game_ui_components::{ActionPointsRow, ResourceBar},
 };
 
 pub struct TargetUi {

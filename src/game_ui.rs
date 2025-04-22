@@ -5,22 +5,16 @@ use std::{
 };
 
 use macroquad::{
-    color::SKYBLUE,
-    miniquad::{
-        window::{self, screen_size},
-        CursorIcon,
-    },
+    miniquad::window::{screen_size},
     rand,
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
 
-use indexmap::IndexMap;
 use macroquad::{
     color::{
-        Color, BLACK, BLUE, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE,
+        BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE,
     },
-    input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
+    input::mouse_position,
+    shapes::{draw_line, draw_rectangle},
     text::Font,
     texture::Texture2D,
     window::{screen_height, screen_width},
@@ -32,16 +26,20 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
+        Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
-        Characters, CoreGame, GameEvent, GameEventHandler, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, Range, SpellEnhancementEffect, SpellTarget,
-        SpellTargetOutcome, MAX_ACTION_POINTS, MOVE_ACTION_COST,
+        Characters, CoreGame, GameEvent, Goodness, HandType, MovementEnhancement,
+        OnAttackedReaction, OnHitReaction, SpellTarget,
+        SpellTargetOutcome, MOVE_ACTION_COST,
+    },
+    game_ui_components::{
+        ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
+        PlayerPortraits,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
@@ -475,7 +473,13 @@ impl UserInterface {
         self.log.draw(800.0, y + 60.0);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
-        self.draw_player_conditions(620.0, y + 160.0);
+        {
+            let this = &self;
+            let y = y + 160.0;
+            this.character_uis[&this.player_portraits.selected_i.get()]
+                .conditions_list
+                .draw(620.0, y);
+        };
 
         self.character_portraits
             .set_hovered_character_id(grid_outcome.hovered_character_id);
@@ -484,7 +488,11 @@ impl UserInterface {
 
         if let Some(new_inspect_target) = grid_outcome.switched_inspect_target {
             dbg!(new_inspect_target);
-            self.update_shown_target(new_inspect_target);
+            {
+                let this = &mut *self;
+                let target = new_inspect_target.map(|id| this.characters.get(id));
+                this.target_ui.set_character(target);
+            };
         }
 
         self.target_ui
@@ -545,17 +553,6 @@ impl UserInterface {
         }
     }
 
-    fn update_shown_target(&mut self, shown_target_id: Option<CharacterId>) {
-        let target = shown_target_id.map(|id| self.characters.get(id));
-        self.target_ui.set_character(target);
-    }
-
-    fn draw_player_conditions(&self, x: f32, y: f32) {
-        self.character_uis[&self.player_portraits.selected_i.get()]
-            .conditions_list
-            .draw(x, y);
-    }
-
     fn set_allowed_to_use_action_buttons(&self, allowed: bool) {
         for btn in self.character_uis[&self.player_portraits.selected_i.get()]
             .tracked_action_buttons
@@ -580,35 +577,32 @@ impl UserInterface {
     }
 
     fn update_selected_action_button(&mut self) {
-        match self.state {
-            UiState::ConfiguringAction(base_action) => {
-                let mut action_is_waiting_for_target_selection = false;
+        if let UiState::ConfiguringAction(base_action) = self.state {
+            let mut action_is_waiting_for_target_selection = false;
 
-                match base_action {
-                    BaseAction::Attack { .. } => {
-                        action_is_waiting_for_target_selection =
-                            matches!(self.game_grid.players_action_target(), ActionTarget::None);
-                    }
-                    BaseAction::CastSpell(spell) => {
-                        if matches!(
-                            spell.target,
-                            SpellTarget::Enemy { .. }
-                                | SpellTarget::Ally { .. }
-                                | SpellTarget::Area { .. }
-                        ) {
-                            action_is_waiting_for_target_selection = matches!(
-                                self.game_grid.players_action_target(),
-                                ActionTarget::None
-                            );
-                        }
-                    }
-                    BaseAction::Move { .. } => {}
+            match base_action {
+                BaseAction::Attack { .. } => {
+                    action_is_waiting_for_target_selection =
+                        matches!(self.game_grid.players_action_target(), ActionTarget::None);
                 }
-
-                let fully_selected = !action_is_waiting_for_target_selection;
-                self.set_selected_action(Some((ButtonAction::Action(base_action), fully_selected)));
+                BaseAction::CastSpell(spell) => {
+                    if matches!(
+                        spell.target,
+                        SpellTarget::Enemy { .. }
+                            | SpellTarget::Ally { .. }
+                            | SpellTarget::Area { .. }
+                    ) {
+                        action_is_waiting_for_target_selection = matches!(
+                            self.game_grid.players_action_target(),
+                            ActionTarget::None
+                        );
+                    }
+                }
+                BaseAction::Move { .. } => {}
             }
-            _ => {}
+
+            let fully_selected = !action_is_waiting_for_target_selection;
+            self.set_selected_action(Some((ButtonAction::Action(base_action), fully_selected)));
         }
     }
 
@@ -969,6 +963,7 @@ impl UserInterface {
                 self.game_grid
                     .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
             }
+
             GameEvent::SpellWasCast {
                 caster,
                 target_outcome,
@@ -1310,6 +1305,7 @@ impl UserInterface {
                     ActionTarget::Position(_) => unreachable!(),
                 }
             }
+
             UiState::ConfiguringAction(BaseAction::CastSpell(spell)) => {
                 popup_enabled = false; // until proven otherwise
 
@@ -1413,7 +1409,7 @@ impl UserInterface {
                             }
                         };
 
-                        if let Some(mut range) = spell.target.range(&enhancements) {
+                        if let Some(range) = spell.target.range(&enhancements) {
                             self.game_grid.range_indicator =
                                 Some((range, RangeIndicator::ActionTargetRange));
                         } else {
@@ -1422,6 +1418,7 @@ impl UserInterface {
                     }
                 }
             }
+
             UiState::ConfiguringAction(BaseAction::Move { .. }) => {
                 if self.game_grid.has_non_empty_movement_preview() {
                     popup_enabled = true;
@@ -1432,13 +1429,16 @@ impl UserInterface {
                         .set_action("Select a destination".to_string(), vec![], false);
                 }
             }
+
             UiState::ChoosingAction => {
                 self.target_ui
                     .set_action("Select an action".to_string(), vec![], false);
             }
+
             UiState::Idle => {
                 self.target_ui.clear_action();
             }
+
             UiState::ReactingToAttack { .. } | UiState::ReactingToHit { .. } => {
                 self.target_ui
                     .set_action("Select a reaction".to_string(), vec![], false);
@@ -1489,9 +1489,7 @@ impl UserInterface {
                 .set_reserved(self.activity_popup.stamina_points());
         };
 
-        if self.animation_stopwatch.update(elapsed) {
-            println!("UI is now ready...");
-        }
+        self.animation_stopwatch.update(elapsed);
 
         player_choice
     }
@@ -1577,11 +1575,11 @@ impl UserInterface {
         }
     }
 
-    fn set_selected_action(&self, highlighted_action: Option<(ButtonAction, bool)>) {
-        let mut highlighted_id = None;
+    fn set_selected_action(&self, selected_action: Option<(ButtonAction, bool)>) {
+        let mut selected_id = None;
         let mut fully_selected = false;
-        if let Some((action, fully)) = highlighted_action {
-            highlighted_id = Some(button_action_id(action));
+        if let Some((action, fully)) = selected_action {
+            selected_id = Some(button_action_id(action));
             fully_selected = fully;
         }
 
@@ -1594,7 +1592,7 @@ impl UserInterface {
             for (btn_action_id, btn) in
                 &self.character_uis[&self.active_character_id].tracked_action_buttons
             {
-                if highlighted_id.as_ref() == Some(btn_action_id) {
+                if selected_id.as_ref() == Some(btn_action_id) {
                     if fully_selected {
                         btn.selected.set(ButtonSelected::Yes);
                     } else {
@@ -1641,817 +1639,6 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::Move { .. } => "MOVE".to_string(),
         },
         _ => unreachable!(),
-    }
-}
-
-struct CharacterPortraits {
-    row: Container,
-    active_id: CharacterId,
-    hovered_id: Option<CharacterId>,
-    portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
-}
-
-impl CharacterPortraits {
-    fn new(characters: &Characters, active_id: CharacterId, font: Font) -> Self {
-        let mut portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>> =
-            Default::default();
-
-        let mut elements = vec![];
-
-        for (id, character) in characters.iter_with_ids() {
-            let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(
-                character,
-                font.clone(),
-            )));
-            let cloned = Rc::downgrade(&portrait);
-            portraits.insert(*id, portrait);
-            elements.push(Element::WeakRefCell(cloned));
-        }
-
-        let row = Container {
-            layout_dir: LayoutDirection::Horizontal,
-            margin: 4.0,
-            children: elements,
-            style: Style {
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let mut this = Self {
-            row,
-            active_id,
-            hovered_id: None,
-            portraits,
-        };
-
-        this.set_active_character(active_id);
-        this
-    }
-
-    fn set_active_character(&mut self, id: CharacterId) {
-        if let Some(portrait) = self.portraits.get(&self.active_id) {
-            // The entry may have been removed if the active character died during its turn
-            portrait.borrow_mut().strong_highlight = false;
-        }
-        self.active_id = id;
-        self.portraits[&self.active_id]
-            .borrow_mut()
-            .strong_highlight = true;
-    }
-
-    fn update(&mut self, game: &CoreGame) {
-        self.set_active_character(game.active_character_id);
-        for (id, character) in game.characters.iter_with_ids() {
-            let portrait = self.portraits[id].borrow_mut();
-            portrait.action_points_row.borrow_mut().current_ap = character.action_points.current();
-            portrait.action_points_row.borrow_mut().is_characters_turn =
-                *id == game.active_character_id;
-            portrait.health_bar.borrow_mut().current = character.health.current();
-        }
-    }
-
-    fn set_hovered_character_id(&mut self, id: Option<CharacterId>) {
-        if let Some(previous_id) = self.hovered_id {
-            if let Some(portrait) = self.portraits.get(&previous_id) {
-                // The entry may have been removed if the character died recently
-                portrait.borrow_mut().weak_highlight = false;
-            }
-        }
-        self.hovered_id = id;
-        if let Some(id) = self.hovered_id {
-            self.portraits[&id].borrow_mut().weak_highlight = true;
-        }
-    }
-
-    fn draw(&self, x: f32, y: f32) {
-        self.row.draw(x, y);
-    }
-
-    fn remove_dead(&mut self) {
-        self.portraits
-            .retain(|_id, portrait| !portrait.borrow().character.has_died.get());
-        self.row.remove_dropped_children();
-    }
-}
-
-struct TopCharacterPortrait {
-    strong_highlight: bool,
-    weak_highlight: bool,
-    action_points_row: Rc<RefCell<ActionPointsRow>>,
-    health_bar: Rc<RefCell<ResourceBar>>,
-    padding: f32,
-    container: Container,
-    character: Rc<Character>,
-}
-
-impl TopCharacterPortrait {
-    fn new(character: &Rc<Character>, font: Font) -> Self {
-        let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
-            character.max_reactive_action_points,
-            (10.0, 10.0),
-            0.25,
-            Style::default(),
-        )));
-        let cloned_ap_row = Rc::clone(&action_points_row);
-
-        let name_color = if character.player_controlled {
-            WHITE
-        } else {
-            Color::new(1.0, 0.7, 0.7, 1.0)
-        };
-
-        let mut name_text_line = TextLine::new(character.name, 16, name_color, Some(font.clone()));
-        name_text_line.set_min_height(13.0);
-        let mut container = Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
-            children: vec![
-                Element::Text(name_text_line),
-                Element::RcRefCell(cloned_ap_row),
-            ],
-            margin: 3.0,
-            ..Default::default()
-        };
-
-        let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
-            character.health.max,
-            RED,
-            (container.content_size().0, 6.0),
-        )));
-
-        container
-            .children
-            .push(Element::RcRefCell(health_bar.clone()));
-
-        Self {
-            strong_highlight: false,
-            weak_highlight: false,
-            action_points_row,
-            health_bar,
-            padding: 5.0,
-            container,
-            character: character.clone(),
-        }
-    }
-}
-
-impl Drawable for TopCharacterPortrait {
-    fn draw(&self, x: f32, y: f32) {
-        let (w, h) = self.size();
-        draw_rectangle(x, y, w, h, BLACK);
-        draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, DARKGRAY);
-        if self.strong_highlight {
-            draw_rectangle_lines(x, y, w, h, 5.0, GOLD);
-        }
-        if self.weak_highlight {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 2.0, LIGHTGRAY);
-        }
-        self.container.draw(x + self.padding, y + self.padding);
-    }
-
-    fn size(&self) -> (f32, f32) {
-        let (w, h) = self.container.size();
-        (w + self.padding * 2.0, h + self.padding * 2.0)
-    }
-}
-
-struct CharacterSheetToggle {
-    shown: Cell<bool>,
-    text_line: TextLine,
-    padding: f32,
-}
-
-impl Drawable for CharacterSheetToggle {
-    fn draw(&self, x: f32, y: f32) {
-        self.text_line.draw(x + self.padding, y + self.padding);
-
-        let size = self.size();
-
-        let (mouse_x, mouse_y) = mouse_position();
-        let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
-        if hovered && is_mouse_button_pressed(MouseButton::Left) {
-            self.shown.set(!self.shown.get());
-        }
-
-        if self.shown.get() {
-            draw_rectangle_lines(x, y, size.0, size.1, 2.0, GOLD);
-        } else {
-            draw_rectangle_lines(x, y, size.0, size.1, 1.0, LIGHTGRAY);
-        }
-
-        if hovered {
-            draw_rectangle_lines(x + 2.0, y + 2.0, size.0 - 4.0, size.1 - 4.0, 1.0, WHITE);
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        let (w, h) = self.text_line.size();
-        (w + self.padding * 2.0, h + self.padding * 2.0)
-    }
-}
-
-struct PlayerPortraits {
-    row: Container,
-    selected_i: Cell<CharacterId>,
-    active_i: Cell<CharacterId>,
-    portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
-}
-
-impl PlayerPortraits {
-    fn new(
-        characters: &Characters,
-        selected_id: CharacterId,
-        active_id: CharacterId,
-        font: Font,
-        portrait_textures: HashMap<PortraitId, Texture2D>,
-    ) -> Self {
-        let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
-            Default::default();
-
-        for (id, character) in characters.iter_with_ids() {
-            if character.player_controlled {
-                let texture = portrait_textures.get(&character.portrait).unwrap().clone();
-
-                portraits.insert(
-                    *id,
-                    Rc::new(RefCell::new(PlayerCharacterPortrait::new(
-                        character,
-                        font.clone(),
-                        texture,
-                    ))),
-                );
-            }
-        }
-
-        let mut elements = vec![];
-        for portrait in portraits.values() {
-            let cloned = Rc::clone(portrait);
-            elements.push(Element::RcRefCell(cloned));
-        }
-
-        let row = Container {
-            layout_dir: LayoutDirection::Horizontal,
-            margin: 10.0,
-            children: elements,
-            ..Default::default()
-        };
-
-        let this = Self {
-            row,
-            selected_i: Cell::new(selected_id),
-            active_i: Cell::new(active_id),
-            portraits,
-        };
-
-        this.set_selected_character(selected_id);
-        this
-    }
-
-    fn set_selected_character(&self, character_id: CharacterId) {
-        self.portraits[&self.selected_i.get()]
-            .borrow()
-            .shown_character
-            .set(false);
-        self.selected_i.set(character_id);
-        self.portraits[&self.selected_i.get()]
-            .borrow()
-            .shown_character
-            .set(true);
-    }
-
-    fn set_active_character(&self, character_id: CharacterId) {
-        if let Some(portrait) = self.portraits.get(&self.active_i.get()) {
-            portrait.borrow().active_character.set(false);
-        }
-        self.active_i.set(character_id);
-        if let Some(portrait) = self.portraits.get(&character_id) {
-            portrait.borrow().active_character.set(true);
-        }
-    }
-
-    fn update(&self, game: &CoreGame) {
-        self.set_active_character(game.active_character_id);
-    }
-
-    fn draw(&self, x: f32, y: f32) {
-        self.row.draw(x, y);
-
-        for (i, portrait) in &self.portraits {
-            if portrait.borrow().has_been_clicked.get() {
-                portrait.borrow().has_been_clicked.set(false);
-                self.set_selected_character(*i);
-                break;
-            }
-        }
-    }
-}
-
-struct PlayerCharacterPortrait {
-    text: TextLine,
-    shown_character: Cell<bool>,
-    active_character: Cell<bool>,
-    padding: f32,
-    has_been_clicked: Cell<bool>,
-    texture: Texture2D,
-}
-
-impl PlayerCharacterPortrait {
-    fn new(character: &Character, font: Font, texture: Texture2D) -> Self {
-        let mut text = TextLine::new(character.name, 20, WHITE, Some(font));
-        text.set_depth(BLACK, 2.0);
-        Self {
-            text,
-            shown_character: Cell::new(false),
-            active_character: Cell::new(false),
-            padding: 10.0,
-            has_been_clicked: Cell::new(false),
-            texture,
-        }
-    }
-}
-
-impl Drawable for PlayerCharacterPortrait {
-    fn draw(&self, x: f32, y: f32) {
-        let (w, h) = self.size();
-        draw_rectangle(x, y, w, h, DARKGRAY);
-
-        let params = DrawTextureParams {
-            dest_size: Some((w, h).into()),
-            ..Default::default()
-        };
-        draw_texture_ex(&self.texture, x, y, WHITE, params);
-
-        if self.shown_character.get() {
-            draw_rectangle_lines(x, y, w, h, 3.0, WHITE);
-        } else {
-            draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
-        }
-
-        //self.text.draw(self.padding + x, self.padding + y);
-
-        if self.active_character.get() {
-            let y_line = y + h - 5.0;
-            let line_margin = 5.0;
-            draw_line(
-                x + self.padding - line_margin,
-                y_line,
-                x + w - self.padding + line_margin,
-                y_line,
-                2.0,
-                GOLD,
-            );
-        }
-
-        let (mouse_x, mouse_y) = mouse_position();
-        let hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
-
-        if hovered {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
-            if is_mouse_button_pressed(MouseButton::Left) {
-                self.has_been_clicked.set(true);
-            }
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        let text_size = self.text.size();
-        //(text_size.0 + self.padding * 2.0, 15.0 + self.padding * 2.0)
-
-        (64.0, 80.0)
-    }
-}
-
-#[derive(Debug)]
-pub struct UiGameEventHandler {
-    pub events: RefCell<Vec<GameEvent>>,
-}
-
-impl Default for UiGameEventHandler {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl UiGameEventHandler {
-    pub fn new() -> Self {
-        Self {
-            events: RefCell::new(vec![]),
-        }
-    }
-}
-
-impl GameEventHandler for UiGameEventHandler {
-    fn handle(&self, event: GameEvent) {
-        self.events.borrow_mut().push(event);
-    }
-}
-
-struct Log {
-    container: Container,
-    text_lines: Vec<Rc<TextLine>>,
-    line_details: Vec<Option<Container>>,
-    font: Font,
-    padding: f32,
-}
-
-impl Log {
-    fn new(font: Font) -> Self {
-        let h = 150.0;
-        Self {
-            container: Container {
-                layout_dir: LayoutDirection::Vertical,
-                children: vec![],
-                margin: 4.0,
-                align: Align::End,
-                scroll: Some(ContainerScroll::default()),
-                min_width: Some(450.0),
-                min_height: Some(h),
-                max_height: Some(h),
-                style: Style {
-                    border_color: Some(GRAY),
-                    padding: 5.0,
-                    ..Default::default()
-                },
-                ..Default::default()
-            },
-            text_lines: vec![],
-            line_details: vec![],
-            font,
-            padding: 10.0,
-        }
-    }
-
-    fn add(&mut self, text: impl Into<String>) {
-        self.add_with_details(text, vec![]);
-    }
-
-    fn add_with_details(&mut self, text: impl Into<String>, details: Vec<String>) {
-        const MAX_LINES: usize = 50;
-        if self.container.children.len() == MAX_LINES {
-            self.container.children.remove(0);
-            self.text_lines.remove(0);
-            self.line_details.remove(0);
-        }
-        let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
-        text_line.set_padding(3.0, 3.0);
-        let text_line = Rc::new(text_line);
-        self.text_lines.push(text_line.clone());
-        self.container.children.push(Element::Rc(text_line));
-
-        if !details.is_empty() {
-            let details_container = Container {
-                layout_dir: LayoutDirection::Vertical,
-                margin: 5.0,
-                style: Style {
-                    background_color: Some(BLACK),
-                    padding: 5.0,
-                    border_color: Some(GOLD),
-                    ..Default::default()
-                },
-                children: details
-                    .iter()
-                    .map(|s| Element::Text(TextLine::new(s, 18, WHITE, Some(self.font.clone()))))
-                    .collect(),
-                ..Default::default()
-            };
-            self.line_details.push(Some(details_container));
-        } else {
-            self.line_details.push(None);
-        }
-    }
-
-    fn draw(&self, x: f32, y: f32) {
-        //draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
-        self.container.draw(x + self.padding, y + self.padding);
-
-        let size = self.size();
-        for (i, text_line) in self.text_lines.iter().enumerate() {
-            if let Some(line_pos) = text_line.has_been_hovered.take() {
-                if let Some(details) = &self.line_details[i] {
-                    let popup_size = details.size();
-                    let details_x = x + size.0 - details.size().0 - 10.0;
-                    let mut details_y = line_pos.1 + text_line.size().1 + 5.0;
-
-                    if details_y + popup_size.1 > y + size.1 {
-                        details_y = line_pos.1 - popup_size.1 - 5.0;
-                    }
-
-                    details.draw(details_x, details_y);
-                }
-            }
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        let container_size = self.container.size();
-        (
-            container_size.0 + self.padding,
-            container_size.1 + self.padding,
-        )
-    }
-}
-
-#[derive(Default)]
-pub struct ActionPointsRow {
-    pub is_characters_turn: bool,
-    max_reactive_ap: u32,
-    pub current_ap: u32,
-    reserved_and_hovered_ap: (u32, u32),
-    max_ap: u32,
-    cell_size: (f32, f32),
-    padding: f32,
-    style: Style,
-    radius_factor: f32,
-}
-
-impl ActionPointsRow {
-    pub fn new(
-        max_reactive_ap: u32,
-        cell_size: (f32, f32),
-        radius_factor: f32,
-        style: Style,
-    ) -> Self {
-        Self {
-            is_characters_turn: false,
-            max_reactive_ap,
-            current_ap: 0,
-            reserved_and_hovered_ap: (0, 0),
-            max_ap: MAX_ACTION_POINTS,
-            cell_size,
-            radius_factor,
-            padding: 3.0,
-            style,
-        }
-    }
-}
-
-impl Drawable for ActionPointsRow {
-    fn draw(&self, x: f32, y: f32) {
-        assert!(self.current_ap <= self.max_ap);
-
-        let size = self.size();
-        draw_rectangle(x, y, size.0, size.1, BLACK);
-
-        let mut x0 = x + self.padding;
-        let y0 = y + self.padding;
-        let r = self.cell_size.1 * self.radius_factor;
-        let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
-
-        for i in 0..self.max_ap {
-            let is_point_hovered =
-                (self.current_ap.saturating_sub(hovered_ap)..self.current_ap).contains(&i);
-
-            let blocked_by_lack_of_reactive_ap = !self.is_characters_turn
-                && i < self.max_ap.saturating_sub(self.max_reactive_ap)
-                && i < self.current_ap;
-
-            let mut overcomitted = false;
-
-            if i < self.current_ap.saturating_sub(reserved_ap) {
-                // Unreserved point
-
-                if blocked_by_lack_of_reactive_ap {
-                    draw_circle(
-                        x0 + self.cell_size.0 / 2.0,
-                        y0 + self.cell_size.1 / 2.0,
-                        r,
-                        GOLD,
-                    );
-                    draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);
-                } else {
-                    draw_circle(
-                        x0 + self.cell_size.0 / 2.0,
-                        y0 + self.cell_size.1 / 2.0,
-                        r,
-                        GOLD,
-                    );
-                }
-            } else if i < self.current_ap {
-                // Reserved
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    WHITE,
-                );
-            } else if i < reserved_ap.max(hovered_ap) {
-                // Overcomitted
-                overcomitted = true;
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    GRAY,
-                );
-            } else {
-                // Spent / missing
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    GRAY,
-                );
-            }
-
-            if overcomitted {
-                draw_circle_lines(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    2.0,
-                    RED,
-                );
-            } else if is_point_hovered {
-                draw_circle_lines(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    2.0,
-                    SKYBLUE,
-                );
-            } else {
-                draw_circle_lines(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    1.0,
-                    GRAY,
-                );
-            }
-
-            x0 += self.cell_size.0;
-        }
-
-        self.style.draw(x, y, self.size());
-    }
-
-    fn size(&self) -> (f32, f32) {
-        (
-            self.max_ap as f32 * self.cell_size.0 + self.padding * 2.0,
-            self.cell_size.1 + self.padding * 2.0,
-        )
-    }
-}
-
-pub struct ResourceBar {
-    pub current: u32,
-    pub reserved: u32,
-    pub max: u32,
-    pub color: Color,
-    pub cell_size: (f32, f32),
-    pub layout: LayoutDirection,
-}
-
-impl ResourceBar {
-    pub fn horizontal(max: u32, color: Color, size: (f32, f32)) -> Self {
-        Self {
-            current: max,
-            reserved: 0,
-            max,
-            color,
-            cell_size: (size.0 / max as f32, size.1),
-            layout: LayoutDirection::Horizontal,
-        }
-    }
-}
-
-impl Drawable for ResourceBar {
-    fn draw(&self, x: f32, y: f32) {
-        assert!(self.current <= self.max);
-
-        let cell_size = self.cell_size;
-        let mut x0 = x;
-        let mut y0 = y;
-
-        match self.layout {
-            LayoutDirection::Horizontal => {
-                for i in 0..self.max {
-                    if i < self.current + self.reserved {
-                        if i >= self.current {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, WHITE);
-                        } else {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
-                        }
-                    }
-
-                    if i > 0 {
-                        let space = 4.0;
-                        draw_line(x0, y0 + space, x0, y0 + cell_size.1 - space, 1.0, DARKGRAY);
-                    }
-                    x0 += cell_size.0;
-                }
-
-                draw_rectangle_lines(x, y, self.max as f32 * cell_size.0, cell_size.1, 1.0, WHITE);
-            }
-            LayoutDirection::Vertical => {
-                for i in 0..self.max {
-                    if i >= self.max - self.current {
-                        if i < self.max - self.current + self.reserved {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, WHITE);
-                        } else {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
-                        }
-                    }
-
-                    if i > 0 {
-                        let space = 4.0;
-                        draw_line(x0 + space, y0, x0 + cell_size.0 - space, y0, 1.0, DARKGRAY);
-                    }
-                    y0 += cell_size.1;
-                }
-
-                draw_rectangle_lines(x, y, cell_size.0, self.max as f32 * cell_size.1, 1.0, WHITE);
-            }
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        match self.layout {
-            LayoutDirection::Horizontal => (self.cell_size.0 * self.max as f32, self.cell_size.1),
-            LayoutDirection::Vertical => (self.cell_size.0, self.cell_size.1 * self.max as f32),
-        }
-    }
-}
-
-struct LabelledResourceBar {
-    list: Container,
-    bar: Rc<RefCell<ResourceBar>>,
-    value_text: Rc<RefCell<TextLine>>,
-    max_value: u32,
-}
-
-impl LabelledResourceBar {
-    fn new(current: u32, max: u32, label: &'static str, color: Color, font: Font) -> Self {
-        assert!(current <= max);
-
-        let cell_w = 15.0;
-        let max_h = 70.0;
-        let cell_h = if max <= 7 {
-            max_h / 7.0
-        } else {
-            max_h / max as f32
-        };
-        let bar = Rc::new(RefCell::new(ResourceBar {
-            current,
-            reserved: 0,
-            max,
-            color,
-            cell_size: (cell_w, cell_h),
-            layout: LayoutDirection::Vertical,
-        }));
-        let cloned_bar = Rc::clone(&bar);
-
-        let value_text = Rc::new(RefCell::new(TextLine::new(
-            format!("{}/{}", current, max),
-            17,
-            WHITE,
-            Some(font.clone()),
-        )));
-        let cloned_value_text = Rc::clone(&value_text);
-        let label_text = TextLine::new(label, 16, WHITE, Some(font.clone()));
-
-        let list = Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
-            margin: 5.0,
-            children: vec![
-                Element::RcRefCell(cloned_bar),
-                Element::RcRefCell(cloned_value_text),
-                Element::Text(label_text),
-            ],
-            min_width: Some(40.0),
-            ..Default::default()
-        };
-
-        Self {
-            list,
-            bar,
-            value_text,
-            max_value: max,
-        }
-    }
-
-    fn set_current(&mut self, value: u32) {
-        assert!(value <= self.bar.borrow().max);
-        self.bar.borrow_mut().current = value;
-        self.value_text
-            .borrow_mut()
-            .set_string(format!("{}/{}", value, self.max_value));
-    }
-
-    fn set_reserved(&mut self, value: u32) {
-        self.bar.borrow_mut().reserved = value;
-    }
-}
-
-impl Drawable for LabelledResourceBar {
-    fn draw(&self, x: f32, y: f32) {
-        self.list.draw(x, y);
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.list.size()
     }
 }
 

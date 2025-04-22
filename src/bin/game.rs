@@ -20,8 +20,8 @@ use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
-use rpg::game_ui::{PlayerChose, UiGameEventHandler, UiState, UserInterface};
-use rpg::game_ui_orchestration::GameUserInterfaceConnection;
+use rpg::game_ui::{PlayerChose, UiState, UserInterface};
+use rpg::game_ui_connection::GameUserInterfaceConnection;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture,

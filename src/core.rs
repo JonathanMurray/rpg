@@ -13,7 +13,7 @@ use crate::data::{
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
-use crate::game_ui_orchestration::GameUserInterfaceConnection;
+use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 
 pub type Position = (i32, i32);
