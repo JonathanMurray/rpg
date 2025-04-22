@@ -8,10 +8,9 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS, RAGE, SELF_HEAL,
-    SWORD,
+    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS, RAGE, SWORD,
 };
-use crate::data::{CHAIN_MAIL, DAGGER, SIDE_STEP};
+use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
 use crate::game_ui_orchestration::GameUserInterfaceConnection;
@@ -29,7 +28,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 3;
+        let active_character_id = 0;
 
         let mut bob = Character::new(
             true,

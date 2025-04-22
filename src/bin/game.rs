@@ -105,7 +105,8 @@ fn window_conf() -> Conf {
     Conf {
         window_title: "UI test".to_owned(),
         window_width: 1280,
-        window_height: 960,
+        //window_height: 960,
+        window_height: 1060,
         high_dpi: false,
         ..Default::default()
     }

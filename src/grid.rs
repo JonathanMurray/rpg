@@ -1,12 +1,12 @@
 use std::collections::HashMap;
 
 use macroquad::{
-    camera,
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
+    window::{screen_height, screen_width},
 };
 
 use std::cell::Cell;
@@ -162,7 +162,7 @@ pub struct GameGrid {
     enemys_target: Option<CharacterId>,
 }
 
-const ZOOM_LEVELS: [f32; 7] = [32.0, 40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
+const ZOOM_LEVELS: [f32; 6] = [40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
 
 impl GameGrid {
     pub fn new(
@@ -178,7 +178,7 @@ impl GameGrid {
     ) -> Self {
         let characters = characters.clone();
 
-        let zoom_index = 3;
+        let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         Self {
@@ -199,7 +199,7 @@ impl GameGrid {
             zoom_index,
             cell_w,
             grid_dimensions,
-            position_on_screen: (0.0, 0.0), // is set later
+            position_on_screen: (0.0, 0.0),
             character_motion: None,
             size,
             big_font,
@@ -283,9 +283,12 @@ impl GameGrid {
             .max(0)
             .min(ZOOM_LEVELS.len() as isize - 1) as usize;
 
+        let w = screen_width();
+        let h = screen_height();
+
         let camera_center = (
-            self.camera_position.0.get() + self.size.0 / 2.0,
-            self.camera_position.1.get() + self.size.1 / 2.0,
+            self.camera_position.0.get() + w / 2.0,
+            self.camera_position.1.get() + h / 2.0,
         );
 
         let new_cell_w = ZOOM_LEVELS[self.zoom_index];
@@ -293,12 +296,9 @@ impl GameGrid {
 
         let new_camera_center = (camera_center.0 * factor, camera_center.1 * factor);
 
-        self.camera_position
-            .0
-            .set(new_camera_center.0 - self.size.0 / 2.0);
-        self.camera_position
-            .1
-            .set(new_camera_center.1 - self.size.1 / 2.0);
+        self.camera_position.0.set(new_camera_center.0 - w / 2.0);
+
+        self.camera_position.1.set(new_camera_center.1 - h / 2.0);
 
         self.cell_w = new_cell_w;
     }
@@ -606,8 +606,6 @@ impl GameGrid {
     ) -> GridOutcome {
         let previous_inspect_target = self.players_inspect_target;
 
-        let (w, h) = self.size;
-
         let (x, y) = self.position_on_screen;
 
         let mouse_relative_to_grid = |(x, y): (f32, f32)| {
@@ -620,9 +618,10 @@ impl GameGrid {
         let mouse_relative = (mouse_x - x, mouse_y - y);
         let mouse_grid_pos = mouse_relative_to_grid(mouse_relative);
 
-        let is_mouse_within_grid = (0f32..w).contains(&mouse_relative.0)
+        let is_mouse_within_grid =
+            /* (0f32..w).contains(&mouse_relative.0)
             && (0f32..h).contains(&mouse_relative.1)
-            && self.is_within_grid(mouse_grid_pos);
+            && */ self.is_within_grid(mouse_grid_pos);
 
         if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -654,7 +653,7 @@ impl GameGrid {
             }
         }
 
-        draw_rectangle(x, y, w, h, BACKGROUND_COLOR);
+        draw_rectangle(x, y, screen_width(), screen_height(), BACKGROUND_COLOR);
 
         self.draw_background();
 
@@ -1452,9 +1451,9 @@ impl GameGrid {
     fn pan_camera(&self, dx: f32, dy: f32) {
         let new_x = self.camera_position.0.get() + dx;
         let new_y = self.camera_position.1.get() + dy;
-        let max_space = 250.0;
-        let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - self.size.0;
-        let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - self.size.1;
+        let max_space = 450.0;
+        let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - screen_width();
+        let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - screen_height();
         self.camera_position.0.set(new_x.max(-max_space).min(max_x));
         self.camera_position.1.set(new_y.max(-max_space).min(max_y));
     }

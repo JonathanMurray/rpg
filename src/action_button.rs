@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, SKYBLUE, WHITE, YELLOW},
+    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -21,7 +21,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
         SpellEnemyEffect, SpellEnhancement, SpellTarget,
     },
-    drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
+    drawing::draw_dashed_rectangle_lines,
     textures::IconId,
 };
 

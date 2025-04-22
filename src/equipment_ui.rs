@@ -14,7 +14,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPosition, TooltipPositionPreference},
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle},
     core::{ArmorPiece, Character, HandType, Shield, Weapon, WeaponRange},
     data::{BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER},

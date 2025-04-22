@@ -8,7 +8,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPosition, TooltipPositionPreference},
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::Drawable,
     core::ConditionInfo,
 };

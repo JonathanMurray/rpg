@@ -6,6 +6,10 @@ use std::{
 
 use macroquad::{
     color::SKYBLUE,
+    miniquad::{
+        window::{self, screen_size},
+        CursorIcon,
+    },
     rand,
     texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
@@ -46,8 +50,6 @@ use crate::{
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
 };
-
-const Y_USER_INTERFACE: f32 = 800.0;
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum UiState {
@@ -362,7 +364,7 @@ impl UserInterface {
             first_player_character_id,
             &game.characters,
             sprites,
-            (screen_width(), Y_USER_INTERFACE),
+            screen_size(),
             big_font.clone(),
             simple_font.clone(),
             background_textures,
@@ -430,15 +432,16 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) {
-        let mut y = Y_USER_INTERFACE;
+        let y_ui = screen_height() - 160.0;
+
+        let mut y = y_ui;
 
         let popup_rectangle = self.activity_popup.last_drawn_rectangle;
 
-        self.game_grid.position_on_screen = (0.0, 0.0);
-
         let (mouse_x, mouse_y) = mouse_position();
         let is_grid_obstructed = popup_rectangle.contains((mouse_x, mouse_y).into())
-            || self.character_sheet_toggle.shown.get();
+            || self.character_sheet_toggle.shown.get()
+            || mouse_y >= y_ui - 1.0;
         let is_grid_receptive_to_input = !matches!(self.state, UiState::Idle)
             && self.active_character().player_controlled
             && !is_grid_obstructed;
@@ -485,7 +488,7 @@ impl UserInterface {
         }
 
         self.target_ui
-            .draw(1280.0 - self.target_ui.size().0 - 10.0, 10.0);
+            .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         let character_ui = self
             .character_uis
