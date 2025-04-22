@@ -15,8 +15,8 @@ use crate::{
     },
     base_ui::Drawable,
     core::{
-        AttackEnhancement, BaseAction, Characters, MovementEnhancement, OnAttackedReaction,
-        OnHitReaction, SpellEnhancement,
+        AttackEnhancement, BaseAction, CharacterId, Characters, MovementEnhancement,
+        OnAttackedReaction, OnHitReaction, SpellEnhancement,
     },
     drawing::draw_dashed_line,
     game_ui::UiState,
@@ -27,6 +27,7 @@ use crate::action_button::ActionButton;
 
 pub struct ActivityPopup {
     characters: Characters,
+    icons: HashMap<IconId, Texture2D>,
     state: UiState,
 
     font: Font,
@@ -52,7 +53,7 @@ impl ActivityPopup {
     pub fn new(
         font: Font,
         state: UiState,
-        icons: &HashMap<IconId, Texture2D>,
+        icons: HashMap<IconId, Texture2D>,
         characters: Characters,
     ) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
@@ -62,13 +63,14 @@ impl ActivityPopup {
             ButtonAction::Proceed,
             &proceed_button_events,
             next_button_id,
-            icons,
+            &icons,
             None,
         );
         next_button_id += 1;
 
         Self {
             characters,
+            icons,
             state,
             font,
             base_lines: vec![],
@@ -448,26 +450,79 @@ impl ActivityPopup {
         self.proceed_button.enabled.set(enabled);
     }
 
+    fn new_button(&mut self, btn_action: ButtonAction) -> ActionButton {
+        let btn = ActionButton::new(
+            btn_action,
+            &self.choice_button_events,
+            self.next_button_id,
+            &self.icons,
+            None,
+        );
+        self.next_button_id += 1;
+        btn
+    }
+
     pub fn set_state(
         &mut self,
+        active_character_id: CharacterId,
         state: UiState,
-        buttons: Vec<ActionButton>,
         relevant_action_button: Option<Rc<ActionButton>>,
     ) {
         let mut lines = vec![];
+        let mut popup_buttons = vec![];
 
         match state {
-            UiState::ConfiguringAction(_base_action) => {
+            UiState::ConfiguringAction(base_action) => {
                 let tooltip = &relevant_action_button.unwrap().tooltip;
                 lines.push(tooltip.header.to_string());
                 lines.extend_from_slice(&tooltip.technical_description);
+
+                match base_action {
+                    BaseAction::Attack {
+                        hand,
+                        action_point_cost: _,
+                    } => {
+                        for (_subtext, enhancement) in self
+                            .characters
+                            .get(active_character_id)
+                            .usable_attack_enhancements(hand)
+                        {
+                            let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
+                            popup_buttons.push(btn);
+                        }
+                    }
+                    BaseAction::CastSpell(spell) => {
+                        for enhancement in spell.possible_enhancements.iter().flatten().copied() {
+                            if self
+                                .characters
+                                .get(active_character_id)
+                                .can_use_spell_enhancement(spell, enhancement)
+                            {
+                                let btn =
+                                    self.new_button(ButtonAction::SpellEnhancement(enhancement));
+                                popup_buttons.push(btn);
+                            }
+                        }
+                    }
+                    BaseAction::Move { .. } => {
+                        for (_subtext, enhancement) in self
+                            .characters
+                            .get(active_character_id)
+                            .usable_movement_enhancements()
+                        {
+                            let btn =
+                                self.new_button(ButtonAction::MovementEnhancement(enhancement));
+                            popup_buttons.push(btn);
+                        }
+                    }
+                }
             }
 
             UiState::ReactingToAttack {
                 attacker: attacker_id,
                 hand,
                 reactor: reactor_id,
-                is_within_melee: _,
+                is_within_melee,
             } => {
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
@@ -480,13 +535,21 @@ impl ActivityPopup {
                     defender.evasion(),
                 );
                 lines.push(attacks_str);
+
+                let defender = self.characters.get(reactor_id);
+
+                for (_subtext, reaction) in defender.usable_on_attacked_reactions(is_within_melee) {
+                    let btn_action = ButtonAction::OnAttackedReaction(reaction);
+                    let btn = self.new_button(btn_action);
+                    popup_buttons.push(btn);
+                }
             }
 
             UiState::ReactingToHit {
                 attacker: attacker_id,
                 damage,
                 victim: victim_id,
-                is_within_melee: _,
+                is_within_melee,
             } => {
                 let victim = self.characters.get(victim_id);
                 lines.push("React (on hit)".to_string());
@@ -496,6 +559,13 @@ impl ActivityPopup {
                     victim.name,
                     damage,
                 ));
+
+                let victim = self.characters.get(victim_id);
+                for (_subtext, reaction) in victim.usable_on_hit_reactions(is_within_melee) {
+                    let btn_action = ButtonAction::OnHitReaction(reaction);
+                    let btn = self.new_button(btn_action);
+                    popup_buttons.push(btn);
+                }
             }
 
             UiState::ChoosingAction | UiState::Idle => {}
@@ -510,7 +580,7 @@ impl ActivityPopup {
         }
 
         let mut choice_buttons = IndexMap::new();
-        for mut btn in buttons {
+        for mut btn in popup_buttons {
             btn.event_sender = Some(EventSender {
                 queue: Rc::clone(&self.choice_button_events),
             });

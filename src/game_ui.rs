@@ -107,10 +107,7 @@ pub struct UserInterface {
 
     font: Font,
 
-    icons: HashMap<IconId, Texture2D>,
-
     hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
-    next_available_button_id: u32,
     active_character_id: CharacterId,
 
     pub game_grid: GameGrid,
@@ -384,7 +381,7 @@ impl UserInterface {
         let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
 
         let activity_popup =
-            ActivityPopup::new(simple_font.clone(), ui_state, &icons, characters.clone());
+            ActivityPopup::new(simple_font.clone(), ui_state, icons, characters.clone());
 
         Self {
             game_grid,
@@ -395,10 +392,8 @@ impl UserInterface {
             active_character_id,
             animation_stopwatch: StopWatch::default(),
 
-            icons,
             font: simple_font.clone(),
 
-            next_available_button_id: next_button_id,
             hovered_button: None,
             log: Log::new(simple_font.clone()),
             character_uis,
@@ -407,18 +402,6 @@ impl UserInterface {
             target_ui,
             state: ui_state,
         }
-    }
-
-    fn new_button(&mut self, btn_action: ButtonAction) -> ActionButton {
-        let btn = ActionButton::new(
-            btn_action,
-            &self.event_queue,
-            self.next_available_button_id,
-            &self.icons,
-            None,
-        );
-        self.next_available_button_id += 1;
-        btn
     }
 
     pub fn draw(&mut self) {
@@ -621,7 +604,6 @@ impl UserInterface {
 
         self.activity_popup.additional_line = None;
 
-        let mut popup_buttons = vec![];
         let mut movement = false;
         let mut npc_action_has_target = false;
         let mut relevant_action_button = None;
@@ -632,77 +614,25 @@ impl UserInterface {
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
                     .tracked_action_buttons
-                    .get(&button_action_id(ButtonAction::Action(base_action)))
-                    .map(|btn| btn.clone());
+                    .get(&button_action_id(ButtonAction::Action(base_action))).cloned();
 
                 match base_action {
-                    BaseAction::Attack {
-                        hand,
-                        action_point_cost: _,
-                    } => {
-                        for (_subtext, enhancement) in
-                            self.active_character().usable_attack_enhancements(hand)
-                        {
-                            let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
-                            popup_buttons.push(btn);
-                        }
-                    }
-                    BaseAction::CastSpell(spell) => {
-                        for enhancement in spell.possible_enhancements.iter().flatten().copied() {
-                            if self
-                                .active_character()
-                                .can_use_spell_enhancement(spell, enhancement)
-                            {
-                                let btn =
-                                    self.new_button(ButtonAction::SpellEnhancement(enhancement));
-                                popup_buttons.push(btn);
-                            }
-                        }
-                    }
+                    BaseAction::Attack { .. } => {}
+                    BaseAction::CastSpell(..) => {}
                     BaseAction::Move { .. } => {
-                        for (_subtext, enhancement) in
-                            self.active_character().usable_movement_enhancements()
-                        {
-                            let btn =
-                                self.new_button(ButtonAction::MovementEnhancement(enhancement));
-                            popup_buttons.push(btn);
-                        }
                         movement = true;
                     }
                 }
             }
 
-            UiState::ReactingToAttack {
-                reactor: reactor_id,
-                is_within_melee,
-                ..
-            } => {
+            UiState::ReactingToAttack { .. } => {
                 self.set_allowed_to_use_action_buttons(false);
-
-                let defender = self.characters.get(reactor_id);
-
-                for (_subtext, reaction) in defender.usable_on_attacked_reactions(is_within_melee) {
-                    let btn_action = ButtonAction::OnAttackedReaction(reaction);
-                    let btn = self.new_button(btn_action);
-                    popup_buttons.push(btn);
-                }
-
                 self.on_selected_attacked_reaction(None);
                 npc_action_has_target = true;
             }
 
-            UiState::ReactingToHit {
-                victim: victim_id,
-                is_within_melee,
-                ..
-            } => {
+            UiState::ReactingToHit { .. } => {
                 self.set_allowed_to_use_action_buttons(false);
-                let victim = self.characters.get(victim_id);
-                for (_subtext, reaction) in victim.usable_on_hit_reactions(is_within_melee) {
-                    let btn_action = ButtonAction::OnHitReaction(reaction);
-                    let btn = self.new_button(btn_action);
-                    popup_buttons.push(btn);
-                }
             }
 
             UiState::ChoosingAction => {
@@ -712,25 +642,20 @@ impl UserInterface {
 
             UiState::Idle => {
                 self.set_allowed_to_use_action_buttons(false);
-
                 self.game_grid.clear_players_action_target();
             }
         }
 
-        // TODO: Create the lines and buttons inside the popup instead?
-
         self.activity_popup
-            .set_state(state, popup_buttons, relevant_action_button);
+            .set_state(self.active_character_id, state, relevant_action_button);
 
         let move_range = self.active_character().move_range;
-
         let move_enhancements: Vec<MovementEnhancement> = self
             .active_character()
             .usable_movement_enhancements()
             .into_iter()
             .map(|(_, enhancement)| enhancement)
             .collect();
-
         self.game_grid
             .set_movement_range_options(move_range, move_enhancements);
 
@@ -743,8 +668,6 @@ impl UserInterface {
         }
 
         self.update_selected_action_button();
-
-        //self.update_shown_target();
     }
 
     fn on_selected_attacked_reaction(&mut self, reaction: Option<OnAttackedReaction>) {
