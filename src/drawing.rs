@@ -1,4 +1,8 @@
-use macroquad::{color::Color, shapes::draw_line};
+use macroquad::{
+    color::Color,
+    shapes::{draw_circle_lines, draw_line},
+};
+
 
 pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: Color) {
     let w = x;
@@ -93,4 +97,78 @@ pub fn draw_dashed_rectangle_lines(
 
     // left
     draw_dashed_line((x, y + h), (x, y), thickness, color, segment_len);
+}
+
+pub fn draw_cornered_rectangle_lines(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    thickness: f32,
+    color: Color,
+    margin: f32,
+) {
+    let left = x + margin;
+    let top = y + margin;
+    let right = x + w - margin;
+    let bot = y + h - margin;
+    let len = 15.0;
+
+    draw_line(left, top, left, top + len, thickness, color);
+    draw_line(left, top, left + len, top, thickness, color);
+    draw_line(right - len, top, right, top, thickness, color);
+    draw_line(right, top, right, top + len, thickness, color);
+    draw_line(right, bot - len, right, bot, thickness, color);
+    draw_line(right - len, bot, right, bot, thickness, color);
+    draw_line(left, bot, left + len, bot, thickness, color);
+    draw_line(left, bot, left, bot - len, thickness, color);
+}
+
+pub fn draw_dashed_rectangle_sides(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    thickness: f32,
+    color: Color,
+    segment_len: f32,
+    left: bool,
+    right: bool,
+    top: bool,
+    bottom: bool,
+) {
+    if left {
+        draw_dashed_line((x, y), (x, y + h), thickness, color, segment_len);
+    }
+    if right {
+        draw_dashed_line((x + w, y), (x + w, y + h), thickness, color, segment_len);
+    }
+    if top {
+        draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len);
+    }
+    if bottom {
+        draw_dashed_line((x, y + h), (x + w, y + h), thickness, color, segment_len);
+    }
+}
+
+pub fn draw_crosshair((x, y): (f32, f32), width: f32, crosshair_color: Color) {
+    draw_circle_lines(
+        x + width / 2.0,
+        y + width / 2.0,
+        width * 0.15,
+        3.0,
+        crosshair_color,
+    );
+    draw_arrow((x, y), width, (1, 1), crosshair_color);
+    draw_arrow((x, y), width, (-1, -1), crosshair_color);
+}
+
+pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, margin: f32) {
+    let left = x + margin;
+    let right = x + w - margin;
+    let top = y + margin;
+    let bot = y + h - margin;
+
+    draw_line(left, top, right, bot, thickness, color);
+    draw_line(left, bot, right, top, thickness, color);
 }

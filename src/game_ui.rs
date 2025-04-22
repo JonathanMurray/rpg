@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{miniquad::window::screen_size, rand};
+use macroquad::rand;
 
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
@@ -350,7 +350,6 @@ impl UserInterface {
             first_player_character_id,
             characters.clone(),
             sprites,
-            screen_size(),
             big_font.clone(),
             simple_font.clone(),
             background_textures,
@@ -522,7 +521,7 @@ impl UserInterface {
                     ButtonAction::Action(base_action) => {
                         self.active_character().can_use_action(base_action)
                     }
-                    _ => todo!(),
+                    _ => unreachable!(),
                 };
                 btn.enabled.set(enabled);
             } else {
@@ -614,7 +613,8 @@ impl UserInterface {
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
                     .tracked_action_buttons
-                    .get(&button_action_id(ButtonAction::Action(base_action))).cloned();
+                    .get(&button_action_id(ButtonAction::Action(base_action)))
+                    .cloned();
 
                 match base_action {
                     BaseAction::Attack { .. } => {}

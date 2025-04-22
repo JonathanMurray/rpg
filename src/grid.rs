@@ -26,6 +26,9 @@ use crate::{
     core::{
         ActionTarget, BaseAction, Character, Goodness, MovementEnhancement, Position, SpellTarget,
     },
+    drawing::{
+        draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
+    },
     game_ui::UiState,
     pathfind::PathfindGrid,
     textures::SpriteId,
@@ -133,7 +136,6 @@ pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
     cell_w: f32,
-    size: (f32, f32),
     background_textures: Vec<Texture2D>,
     cell_backgrounds: Vec<usize>,
     sprites: HashMap<SpriteId, Texture2D>,
@@ -169,7 +171,6 @@ impl GameGrid {
         selected_character_id: CharacterId,
         characters: Characters,
         sprites: HashMap<SpriteId, Texture2D>,
-        size: (f32, f32),
         big_font: Font,
         simple_font: Font,
         background_textures: Vec<Texture2D>,
@@ -199,7 +200,6 @@ impl GameGrid {
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
             character_motion: None,
-            size,
             big_font,
             simple_font,
             background_textures,
@@ -291,14 +291,10 @@ impl GameGrid {
 
         let new_cell_w = ZOOM_LEVELS[self.zoom_index];
         let factor = new_cell_w / self.cell_w;
-
-        let new_camera_center = (camera_center.0 * factor, camera_center.1 * factor);
-
-        self.camera_position.0.set(new_camera_center.0 - w / 2.0);
-
-        self.camera_position.1.set(new_camera_center.1 - h / 2.0);
-
         self.cell_w = new_cell_w;
+        let new_camera_center = (camera_center.0 * factor, camera_center.1 * factor);
+        self.camera_position.0.set(new_camera_center.0 - w / 2.0);
+        self.camera_position.1.set(new_camera_center.1 - h / 2.0);
     }
 
     pub fn add_text_effect(
@@ -445,14 +441,8 @@ impl GameGrid {
     fn character_screen_pos(&self, character: &Character) -> (f32, f32) {
         if let Some(motion) = self.character_motion {
             if motion.character_id == character.id() {
-                let from = (
-                    self.grid_x_to_screen(motion.from.0),
-                    self.grid_y_to_screen(motion.from.1),
-                );
-                let to = (
-                    self.grid_x_to_screen(motion.to.0),
-                    self.grid_y_to_screen(motion.to.1),
-                );
+                let from = self.grid_pos_to_screen(motion.from);
+                let to = self.grid_pos_to_screen(motion.to);
                 let remaining = motion.remaining_duration / motion.duration;
                 return (
                     to.0 - (to.0 - from.0) * remaining,
@@ -460,10 +450,7 @@ impl GameGrid {
                 );
             }
         }
-        (
-            self.grid_x_to_screen(character.pos().0),
-            self.grid_y_to_screen(character.pos().1),
-        )
+        self.grid_pos_to_screen(character.pos())
     }
 
     fn draw_cell_outline(
@@ -512,11 +499,6 @@ impl GameGrid {
                 self.players_action_target = ActionTarget::None;
             }
         }
-
-        /*
-        self.players_inspect_target
-            .take_if(|id| self.characters.get(*id).player_controlled);
-         */
     }
 
     fn clear_players_action_target_if_enemy(&mut self) {
@@ -525,10 +507,6 @@ impl GameGrid {
                 self.players_action_target = ActionTarget::None;
             }
         }
-        /*
-        self.players_inspect_target
-            .take_if(|id| !self.characters.get(*id).player_controlled);
-         */
     }
 
     pub fn set_enemys_target(&mut self, target_character_id: CharacterId) {
@@ -620,10 +598,7 @@ impl GameGrid {
         let mouse_relative = (mouse_x - x, mouse_y - y);
         let mouse_grid_pos = mouse_relative_to_grid(mouse_relative);
 
-        let is_mouse_within_grid =
-            /* (0f32..w).contains(&mouse_relative.0)
-            && (0f32..h).contains(&mouse_relative.1)
-            && */ self.is_within_grid(mouse_grid_pos);
+        let is_mouse_within_grid = self.is_within_grid(mouse_grid_pos);
 
         if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -1020,16 +995,7 @@ impl GameGrid {
     fn draw_invalid_target_marker(&self, grid_pos: Position) {
         self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3));
         let (x, y) = self.grid_pos_to_screen(grid_pos);
-        let color = RED;
-        let thickness = 2.0;
-        let margin = self.cell_w * 0.1;
-        let left = x + margin;
-        let right = x + self.cell_w - margin;
-        let top = y + margin;
-        let bot = y + self.cell_w - margin;
-
-        draw_line(left, top, right, bot, thickness, color);
-        draw_line(left, bot, right, top, thickness, color);
+        draw_cross(x, y, self.cell_w, self.cell_w, RED, 2.0, self.cell_w * 0.15);
     }
 
     fn draw_character_label(&self, char: &Character) {
@@ -1095,22 +1061,15 @@ impl GameGrid {
         margin: f32,
         thickness: f32,
     ) {
-        let (x, y) = screen_pos;
-
-        let left = x + margin;
-        let top = y + margin;
-        let right = x + self.cell_w - margin;
-        let bot = y + self.cell_w - margin;
-        let len = 15.0;
-
-        draw_line(left, top, left, top + len, thickness, color);
-        draw_line(left, top, left + len, top, thickness, color);
-        draw_line(right - len, top, right, top, thickness, color);
-        draw_line(right, top, right, top + len, thickness, color);
-        draw_line(right, bot - len, right, bot, thickness, color);
-        draw_line(right - len, bot, right, bot, thickness, color);
-        draw_line(left, bot, left + len, bot, thickness, color);
-        draw_line(left, bot, left, bot - len, thickness, color);
+        draw_cornered_rectangle_lines(
+            screen_pos.0,
+            screen_pos.1,
+            self.cell_w,
+            self.cell_w,
+            thickness,
+            color,
+            margin,
+        );
     }
 
     fn draw_effects(&self) {
@@ -1189,23 +1148,11 @@ impl GameGrid {
 
     fn draw_target_crosshair(&self, target_pos: Position, crosshair_color: Color) {
         let actor_pos = self.characters.get(self.active_character_id).pos();
-
         let actor_x = self.grid_x_to_screen(actor_pos.0);
         let actor_y = self.grid_y_to_screen(actor_pos.1);
-
         let target_x = self.grid_x_to_screen(target_pos.0);
         let target_y = self.grid_y_to_screen(target_pos.1);
-
-        draw_circle_lines(
-            target_x + self.cell_w / 2.0,
-            target_y + self.cell_w / 2.0,
-            self.cell_w * 0.15,
-            3.0,
-            crosshair_color,
-        );
-        draw_arrow((target_x, target_y), self.cell_w, (1, 1), crosshair_color);
-        draw_arrow((target_x, target_y), self.cell_w, (-1, -1), crosshair_color);
-
+        draw_crosshair((target_x, target_y), self.cell_w, crosshair_color);
         draw_dashed_line(
             (actor_x + self.cell_w / 2.0, actor_y + self.cell_w / 2.0),
             (target_x + self.cell_w / 2.0, target_y + self.cell_w / 2.0),
@@ -1423,46 +1370,23 @@ impl GameGrid {
         color: Color,
     ) {
         let segment_len = 8.0;
-        if left {
-            // Left border
-            draw_dashed_line(
-                (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
-                (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
-                thickness,
-                color,
-                segment_len,
-            );
-        }
-        if right {
-            // Right border
-            draw_dashed_line(
-                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
-                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
-                thickness,
-                color,
-                segment_len,
-            );
-        }
-        if top {
-            // Top border
-            draw_dashed_line(
-                (self.grid_x_to_screen(x), self.grid_y_to_screen(y)),
-                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y)),
-                thickness,
-                color,
-                segment_len,
-            );
-        }
-        if bottom {
-            // Bottom border
-            draw_dashed_line(
-                (self.grid_x_to_screen(x), self.grid_y_to_screen(y + 1)),
-                (self.grid_x_to_screen(x + 1), self.grid_y_to_screen(y + 1)),
-                thickness,
-                color,
-                segment_len,
-            );
-        }
+
+        let (x, y) = self.grid_pos_to_screen((x, y));
+        let (w, h) = (self.cell_w, self.cell_w);
+
+        draw_dashed_rectangle_sides(
+            x,
+            y,
+            w,
+            h,
+            thickness,
+            color,
+            segment_len,
+            left,
+            right,
+            top,
+            bottom,
+        );
     }
 
     fn pan_camera(&self, dx: f32, dy: f32) {
