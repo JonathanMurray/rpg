@@ -11,9 +11,7 @@ use macroquad::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{
-        Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, RED, WHITE,
-    },
+    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, RED, WHITE},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::Font,
@@ -24,10 +22,7 @@ use crate::{
     base_ui::{
         Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
     },
-    core::{
-        Character, CharacterId,
-        Characters, CoreGame, MAX_ACTION_POINTS,
-    },
+    core::{Character, CharacterId, Characters, CoreGame, MAX_ACTION_POINTS},
     textures::PortraitId,
 };
 

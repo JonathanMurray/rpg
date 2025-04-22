@@ -4,15 +4,10 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{
-    miniquad::window::{screen_size},
-    rand,
-};
+use macroquad::{miniquad::window::screen_size, rand};
 
 use macroquad::{
-    color::{
-        BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE,
-    },
+    color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
     input::mouse_position,
     shapes::{draw_line, draw_rectangle},
     text::Font,
@@ -25,25 +20,22 @@ use crate::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
-    base_ui::{
-        Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
-    },
+    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
         Characters, CoreGame, GameEvent, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellTarget,
-        SpellTargetOutcome, MOVE_ACTION_COST,
+        OnAttackedReaction, OnHitReaction, SpellTarget, SpellTargetOutcome, MOVE_ACTION_COST,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
         PlayerPortraits,
     },
     grid::{
-        Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridSwitchedTo,
-        RangeIndicator,
+        Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome,
+        GridSwitchedTo, RangeIndicator,
     },
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
@@ -430,16 +422,14 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) {
-        let y_ui = screen_height() - 160.0;
-
-        let mut y = y_ui;
+        let ui_y = screen_height() - 160.0;
 
         let popup_rectangle = self.activity_popup.last_drawn_rectangle;
 
-        let (mouse_x, mouse_y) = mouse_position();
-        let is_grid_obstructed = popup_rectangle.contains((mouse_x, mouse_y).into())
+        let mouse_pos = mouse_position();
+        let is_grid_obstructed = popup_rectangle.contains(mouse_pos.into())
             || self.character_sheet_toggle.shown.get()
-            || mouse_y >= y_ui - 1.0;
+            || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_input = !matches!(self.state, UiState::Idle)
             && self.active_character().player_controlled
             && !is_grid_obstructed;
@@ -450,58 +440,35 @@ impl UserInterface {
             &self.state,
         );
 
-        draw_rectangle(0.0, y, screen_width(), screen_height() - y, BLACK);
-        draw_line(0.0, y, screen_width(), y, 1.0, ORANGE);
+        self.handle_grid_outcome(grid_outcome);
 
-        self.activity_popup.draw(20.0, y + 1.0);
+        draw_rectangle(0.0, ui_y, screen_width(), screen_height() - ui_y, BLACK);
+        draw_line(0.0, ui_y, screen_width(), ui_y, 1.0, ORANGE);
 
-        y -= 60.0;
+        self.activity_popup.draw(20.0, ui_y + 1.0);
 
-        self.player_portraits.draw(570.0, y + 65.0);
-        self.character_sheet_toggle.draw(570.0, y + 150.0);
+        self.player_portraits.draw(570.0, ui_y + 5.0);
+        self.character_sheet_toggle.draw(570.0, ui_y + 90.0);
 
         let character_ui = self
             .character_uis
             .get_mut(&self.player_portraits.selected_i.get())
             .unwrap();
 
-        character_ui.actions_section.draw(20.0, y + 70.0);
+        character_ui.actions_section.draw(20.0, ui_y + 10.0);
+        character_ui.action_points_row.draw(430.0, ui_y + 5.0);
+        character_ui.resource_bars.draw(400.0, ui_y + 40.0);
 
-        character_ui.action_points_row.draw(430.0, y + 65.0);
-        character_ui.resource_bars.draw(400.0, y + 100.0);
-
-        self.log.draw(800.0, y + 60.0);
+        self.log.draw(800.0, ui_y);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
-        {
-            let this = &self;
-            let y = y + 160.0;
-            this.character_uis[&this.player_portraits.selected_i.get()]
-                .conditions_list
-                .draw(620.0, y);
-        };
-
-        self.character_portraits
-            .set_hovered_character_id(grid_outcome.hovered_character_id);
+        character_ui.conditions_list.draw(620.0, ui_y + 100.0);
 
         self.character_portraits.draw(10.0, 10.0);
-
-        if let Some(new_inspect_target) = grid_outcome.switched_inspect_target {
-            dbg!(new_inspect_target);
-            {
-                let this = &mut *self;
-                let target = new_inspect_target.map(|id| this.characters.get(id));
-                this.target_ui.set_character(target);
-            };
-        }
 
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
-        let character_ui = self
-            .character_uis
-            .get_mut(&self.player_portraits.selected_i.get())
-            .unwrap();
         if self.character_sheet_toggle.shown.get() {
             let clicked_close = character_ui.character_sheet.draw();
             self.character_sheet_toggle.shown.set(!clicked_close);
@@ -512,12 +479,25 @@ impl UserInterface {
                 .hoverable_buttons
                 .iter()
                 .find(|btn| btn.id == btn_id)
-                .expect("hovered button");
+                .unwrap();
 
             draw_button_tooltip(&self.font, btn_pos, &btn.tooltip);
         }
+    }
 
-        if let Some(grid_switched_to) = grid_outcome.switched_action {
+    fn handle_grid_outcome(&mut self, outcome: GridOutcome) {
+        self.character_portraits
+            .set_hovered_character_id(outcome.hovered_character_id);
+
+        if let Some(new_inspect_target) = outcome.switched_inspect_target {
+            dbg!(new_inspect_target);
+            let target = new_inspect_target.map(|id| self.characters.get(id));
+            self.target_ui.set_character(target);
+        }
+
+        if let Some(grid_switched_to) = outcome.switched_action {
+            dbg!(&grid_switched_to);
+
             match grid_switched_to {
                 GridSwitchedTo::Move { selected_option } => {
                     let move_range = self.active_character().move_range;
@@ -536,11 +516,7 @@ impl UserInterface {
                 }
                 GridSwitchedTo::Attack => {
                     let hand = HandType::MainHand;
-                    let action_point_cost = self
-                        .active_character()
-                        .weapon(hand)
-                        .unwrap()
-                        .action_point_cost;
+                    let action_point_cost = self.active_character().attack_action_point_cost(hand);
                     self.set_state(UiState::ConfiguringAction(BaseAction::Attack {
                         hand,
                         action_point_cost,
@@ -592,10 +568,8 @@ impl UserInterface {
                             | SpellTarget::Ally { .. }
                             | SpellTarget::Area { .. }
                     ) {
-                        action_is_waiting_for_target_selection = matches!(
-                            self.game_grid.players_action_target(),
-                            ActionTarget::None
-                        );
+                        action_is_waiting_for_target_selection =
+                            matches!(self.game_grid.players_action_target(), ActionTarget::None);
                     }
                 }
                 BaseAction::Move { .. } => {}
@@ -603,6 +577,36 @@ impl UserInterface {
 
             let fully_selected = !action_is_waiting_for_target_selection;
             self.set_selected_action(Some((ButtonAction::Action(base_action), fully_selected)));
+        }
+    }
+
+    fn set_selected_action(&self, selected_action: Option<(ButtonAction, bool)>) {
+        let mut selected_id = None;
+        let mut fully_selected = false;
+        if let Some((action, fully)) = selected_action {
+            selected_id = Some(button_action_id(action));
+            fully_selected = fully;
+        }
+
+        if self.active_character().player_controlled {
+            if self.player_portraits.selected_i.get() != self.active_character_id {
+                self.player_portraits
+                    .set_selected_character(self.active_character_id);
+            }
+
+            for (btn_action_id, btn) in
+                &self.character_uis[&self.active_character_id].tracked_action_buttons
+            {
+                if selected_id.as_ref() == Some(btn_action_id) {
+                    if fully_selected {
+                        btn.selected.set(ButtonSelected::Yes);
+                    } else {
+                        btn.selected.set(ButtonSelected::Partially);
+                    }
+                } else {
+                    btn.selected.set(ButtonSelected::No);
+                }
+            }
         }
     }
 
@@ -621,8 +625,6 @@ impl UserInterface {
         let mut popup_buttons = vec![];
         let mut movement = false;
 
-        let mut player_wants_enemy_target = false;
-        let mut player_wants_ally_target = false;
         let mut npc_action_has_target = false;
 
         match state {
@@ -641,12 +643,12 @@ impl UserInterface {
                         hand,
                         action_point_cost: _,
                     } => {
-                        let enhancements = self.active_character().usable_attack_enhancements(hand);
-                        for (_subtext, enhancement) in enhancements {
+                        for (_subtext, enhancement) in
+                            self.active_character().usable_attack_enhancements(hand)
+                        {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
-                        player_wants_enemy_target = true;
                     }
                     BaseAction::CastSpell(spell) => {
                         for enhancement in spell.possible_enhancements.iter().flatten().copied() {
@@ -654,26 +656,16 @@ impl UserInterface {
                                 .active_character()
                                 .can_use_spell_enhancement(spell, enhancement)
                             {
-                                let btn_action = ButtonAction::SpellEnhancement(enhancement);
-                                let btn = self.new_button(btn_action);
+                                let btn =
+                                    self.new_button(ButtonAction::SpellEnhancement(enhancement));
                                 popup_buttons.push(btn);
                             }
                         }
-
-                        match spell.target {
-                            SpellTarget::Enemy { .. } => {
-                                player_wants_enemy_target = true;
-                            }
-                            SpellTarget::Ally { .. } => {
-                                player_wants_ally_target = true;
-                            }
-                            SpellTarget::Area { .. } => {}
-                            SpellTarget::None { .. } => {}
-                        }
                     }
                     BaseAction::Move { .. } => {
-                        let enhancements = self.active_character().usable_movement_enhancements();
-                        for (_subtext, enhancement) in enhancements {
+                        for (_subtext, enhancement) in
+                            self.active_character().usable_movement_enhancements()
+                        {
                             let btn =
                                 self.new_button(ButtonAction::MovementEnhancement(enhancement));
                             popup_buttons.push(btn);
@@ -704,8 +696,7 @@ impl UserInterface {
                 );
                 popup_initial_lines.push(attacks_str);
 
-                let reactions = defender.usable_on_attacked_reactions(is_within_melee);
-                for (_subtext, reaction) in reactions {
+                for (_subtext, reaction) in defender.usable_on_attacked_reactions(is_within_melee) {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
@@ -731,8 +722,7 @@ impl UserInterface {
                     victim.name,
                     damage,
                 ));
-                let reactions = victim.usable_on_hit_reactions(is_within_melee);
-                for (_subtext, reaction) in reactions {
+                for (_subtext, reaction) in victim.usable_on_hit_reactions(is_within_melee) {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
@@ -749,6 +739,7 @@ impl UserInterface {
             }
         }
 
+        // TODO: Create the lines and buttons inside the popup instead?
         self.activity_popup
             .set_state(state, popup_initial_lines, popup_buttons);
 
@@ -764,20 +755,8 @@ impl UserInterface {
         self.game_grid
             .set_movement_range_options(move_range, move_enhancements);
 
-        if movement {
-            //self.game_grid.ensure_has_some_movement_preview();
-        } else {
+        if !movement {
             self.game_grid.remove_movement_preview();
-        }
-
-        if player_wants_enemy_target {
-            self.game_grid.clear_players_target_if_allied();
-            //self.game_grid.ensure_player_has_enemy_target();
-        } else if player_wants_ally_target {
-            self.game_grid.clear_players_action_target_if_enemy();
-            //self.game_grid.ensure_player_has_ally_target();
-        } else {
-            self.game_grid.clear_players_action_target();
         }
 
         if !npc_action_has_target {
@@ -1456,34 +1435,31 @@ impl UserInterface {
 
         self.update_character_status(&game.characters);
 
+        let character_ui = self
+            .character_uis
+            .get_mut(&self.player_portraits.selected_i.get())
+            .unwrap();
         if let Some(hovered_btn) = self.hovered_button {
-            self.character_uis
-                .get_mut(&self.player_portraits.selected_i.get())
-                .unwrap()
-                .action_points_row
-                .reserved_and_hovered_ap = (
+            character_ui.action_points_row.reserved_and_hovered_ap = (
                 self.activity_popup.reserved_and_hovered_action_points().0,
                 hovered_btn.1.action_point_cost(),
             );
-            self.character_uis[&self.player_portraits.selected_i.get()]
+            character_ui
                 .mana_bar
                 .borrow_mut()
                 .set_reserved(hovered_btn.1.mana_cost());
-            self.character_uis[&self.player_portraits.selected_i.get()]
+            character_ui
                 .stamina_bar
                 .borrow_mut()
                 .set_reserved(hovered_btn.1.stamina_cost());
         } else {
-            self.character_uis
-                .get_mut(&self.player_portraits.selected_i.get())
-                .unwrap()
-                .action_points_row
-                .reserved_and_hovered_ap = self.activity_popup.reserved_and_hovered_action_points();
-            self.character_uis[&self.player_portraits.selected_i.get()]
+            character_ui.action_points_row.reserved_and_hovered_ap =
+                self.activity_popup.reserved_and_hovered_action_points();
+            character_ui
                 .mana_bar
                 .borrow_mut()
                 .set_reserved(self.activity_popup.mana_points());
-            self.character_uis[&self.player_portraits.selected_i.get()]
+            character_ui
                 .stamina_bar
                 .borrow_mut()
                 .set_reserved(self.activity_popup.stamina_points());
@@ -1572,36 +1548,6 @@ impl UserInterface {
 
                 _ => unreachable!(),
             },
-        }
-    }
-
-    fn set_selected_action(&self, selected_action: Option<(ButtonAction, bool)>) {
-        let mut selected_id = None;
-        let mut fully_selected = false;
-        if let Some((action, fully)) = selected_action {
-            selected_id = Some(button_action_id(action));
-            fully_selected = fully;
-        }
-
-        if self.active_character().player_controlled {
-            if self.player_portraits.selected_i.get() != self.active_character_id {
-                self.player_portraits
-                    .set_selected_character(self.active_character_id);
-            }
-
-            for (btn_action_id, btn) in
-                &self.character_uis[&self.active_character_id].tracked_action_buttons
-            {
-                if selected_id.as_ref() == Some(btn_action_id) {
-                    if fully_selected {
-                        btn.selected.set(ButtonSelected::Yes);
-                    } else {
-                        btn.selected.set(ButtonSelected::Partially);
-                    }
-                } else {
-                    btn.selected.set(ButtonSelected::No);
-                }
-            }
         }
     }
 

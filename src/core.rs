@@ -1986,6 +1986,10 @@ impl Character {
         self.hand(hand).weapon
     }
 
+    pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {
+        self.hand(hand).weapon.unwrap().action_point_cost
+    }
+
     pub fn shield(&self) -> Option<Shield> {
         self.hand(HandType::OffHand).shield
     }

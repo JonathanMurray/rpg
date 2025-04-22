@@ -508,25 +508,29 @@ impl GameGrid {
         self.players_action_target
     }
 
-    pub fn clear_players_target_if_allied(&mut self) {
+    fn clear_players_target_if_allied(&mut self) {
         if let ActionTarget::Character(id) = self.players_action_target {
             if self.characters.get(id).player_controlled {
                 self.players_action_target = ActionTarget::None;
             }
         }
 
+        /*
         self.players_inspect_target
             .take_if(|id| self.characters.get(*id).player_controlled);
+         */
     }
 
-    pub fn clear_players_action_target_if_enemy(&mut self) {
+    fn clear_players_action_target_if_enemy(&mut self) {
         if let ActionTarget::Character(id) = self.players_action_target {
             if !self.characters.get(id).player_controlled {
                 self.players_action_target = ActionTarget::None;
             }
         }
+        /*
         self.players_inspect_target
             .take_if(|id| !self.characters.get(*id).player_controlled);
+         */
     }
 
     pub fn set_enemys_target(&mut self, target_character_id: CharacterId) {
@@ -693,13 +697,8 @@ impl GameGrid {
                     SpellTarget::Enemy {
                         impact_area: area, ..
                     } => {
-                        if let Some((area_range, _effect)) = area {
-                            MouseState::RequiresEnemyTarget {
-                                area_range: Some(area_range),
-                            }
-                        } else {
-                            MouseState::RequiresEnemyTarget { area_range: None }
-                        }
+                        let area_range = area.map(|(range, _effect)| range);
+                        MouseState::RequiresEnemyTarget { area_range }
                     }
                     SpellTarget::Ally { .. } => MouseState::RequiresAllyTarget,
 
@@ -711,6 +710,14 @@ impl GameGrid {
             },
             _ => MouseState::None,
         };
+
+        if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
+            self.clear_players_target_if_allied();
+        }
+
+        if matches!(mouse_state, MouseState::RequiresAllyTarget) {
+            self.clear_players_action_target_if_enemy();
+        }
 
         match mouse_state {
             MouseState::RequiresEnemyTarget {
@@ -768,6 +775,7 @@ impl GameGrid {
                     MouseState::RequiresAllyTarget
                     | MouseState::RequiresEnemyTarget { .. }
                     | MouseState::ImplicitTarget => {
+                        self.players_action_target = ActionTarget::None;
                         outcome.switched_action = Some(GridSwitchedTo::Idle);
                     }
                     _ => {}
@@ -1013,6 +1021,17 @@ impl GameGrid {
 
     fn draw_invalid_target_marker(&self, grid_pos: Position) {
         self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3));
+        let (x, y) = self.grid_pos_to_screen(grid_pos);
+        let color = RED;
+        let thickness = 2.0;
+        let margin = self.cell_w * 0.1;
+        let left = x + margin;
+        let right = x + self.cell_w - margin;
+        let top = y + margin;
+        let bot = y + self.cell_w - margin;
+
+        draw_line(left, top, right, bot, thickness, color);
+        draw_line(left, bot, right, top, thickness, color);
     }
 
     fn draw_character_label(&self, char: &Character) {
