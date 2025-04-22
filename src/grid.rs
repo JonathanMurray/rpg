@@ -167,7 +167,7 @@ const ZOOM_LEVELS: [f32; 6] = [40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
 impl GameGrid {
     pub fn new(
         selected_character_id: CharacterId,
-        characters: &Characters,
+        characters: Characters,
         sprites: HashMap<SpriteId, Texture2D>,
         size: (f32, f32),
         big_font: Font,
@@ -176,8 +176,6 @@ impl GameGrid {
         grid_dimensions: (u32, u32),
         cell_backgrounds: Vec<usize>,
     ) -> Self {
-        let characters = characters.clone();
-
         let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
 

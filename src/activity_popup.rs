@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -6,6 +6,7 @@ use macroquad::{
     math::Rect,
     shapes::{draw_line, draw_rectangle},
     text::{draw_text_ex, measure_text, Font, TextParams},
+    texture::Texture2D,
 };
 
 use crate::{
@@ -14,16 +15,18 @@ use crate::{
     },
     base_ui::Drawable,
     core::{
-        AttackEnhancement, BaseAction, MovementEnhancement, OnAttackedReaction, OnHitReaction,
-        SpellEnhancement,
+        AttackEnhancement, BaseAction, Characters, MovementEnhancement, OnAttackedReaction,
+        OnHitReaction, SpellEnhancement,
     },
     drawing::draw_dashed_line,
     game_ui::UiState,
+    textures::IconId,
 };
 
 use crate::action_button::ActionButton;
 
 pub struct ActivityPopup {
+    characters: Characters,
     state: UiState,
 
     font: Font,
@@ -31,6 +34,7 @@ pub struct ActivityPopup {
     base_lines: Vec<String>,
     pub additional_line: Option<String>,
 
+    next_button_id: u32,
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
@@ -45,13 +49,26 @@ pub struct ActivityPopup {
 }
 
 impl ActivityPopup {
-    pub fn new(font: Font, state: UiState, mut proceed_button: ActionButton) -> Self {
+    pub fn new(
+        font: Font,
+        state: UiState,
+        icons: &HashMap<IconId, Texture2D>,
+        characters: Characters,
+    ) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
-        proceed_button.event_sender = Some(EventSender {
-            queue: Rc::clone(&proceed_button_events),
-        });
+
+        let mut next_button_id = 0;
+        let proceed_button = ActionButton::new(
+            ButtonAction::Proceed,
+            &proceed_button_events,
+            next_button_id,
+            icons,
+            None,
+        );
+        next_button_id += 1;
 
         Self {
+            characters,
             state,
             font,
             base_lines: vec![],
@@ -59,6 +76,7 @@ impl ActivityPopup {
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
+            next_button_id,
             enabled: true,
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
@@ -427,17 +445,62 @@ impl ActivityPopup {
     pub fn set_enabled(&mut self, enabled: bool) {
         self.enabled = enabled;
 
-        // TODO
-        /*
-        for btn in &mut self.choice_buttons.values() {
-            btn.enabled.set(enabled);
-        }
-         */
-
         self.proceed_button.enabled.set(enabled);
     }
 
-    pub fn set_state(&mut self, state: UiState, lines: Vec<String>, buttons: Vec<ActionButton>) {
+    pub fn set_state(
+        &mut self,
+        state: UiState,
+        buttons: Vec<ActionButton>,
+        relevant_action_button: Option<Rc<ActionButton>>,
+    ) {
+        let mut lines = vec![];
+
+        match state {
+            UiState::ConfiguringAction(_base_action) => {
+                let tooltip = &relevant_action_button.unwrap().tooltip;
+                lines.push(tooltip.header.to_string());
+                lines.extend_from_slice(&tooltip.technical_description);
+            }
+
+            UiState::ReactingToAttack {
+                attacker: attacker_id,
+                hand,
+                reactor: reactor_id,
+                is_within_melee: _,
+            } => {
+                let attacker = self.characters.get(attacker_id);
+                let defender = self.characters.get(reactor_id);
+                lines.push("React (on attacked)".to_string());
+                let attacks_str = format!(
+                    "{} attacks {} (d20+{} vs {})",
+                    attacker.name,
+                    defender.name,
+                    attacker.attack_modifier(hand),
+                    defender.evasion(),
+                );
+                lines.push(attacks_str);
+            }
+
+            UiState::ReactingToHit {
+                attacker: attacker_id,
+                damage,
+                victim: victim_id,
+                is_within_melee: _,
+            } => {
+                let victim = self.characters.get(victim_id);
+                lines.push("React (on hit)".to_string());
+                lines.push(format!(
+                    "{} attacked {} for {} damage",
+                    self.characters.get(attacker_id).name,
+                    victim.name,
+                    damage,
+                ));
+            }
+
+            UiState::ChoosingAction | UiState::Idle => {}
+        }
+
         if self.state != state {
             // Assume that a change in the layout caused all buttons to no longer be hovered
             for btn in self.choice_buttons.values() {

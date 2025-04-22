@@ -151,7 +151,7 @@ impl UserInterface {
 
         let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
-        for character in game.characters.iter() {
+        for character in characters.iter() {
             if !character.player_controlled {
                 continue;
             }
@@ -334,7 +334,7 @@ impl UserInterface {
             character_uis.insert(character.id(), character_ui);
         }
 
-        let state = UiState::Idle;
+        let ui_state = UiState::Idle;
 
         let grid_dimensions = (16, 12);
         let mut cell_backgrounds = vec![];
@@ -343,8 +343,7 @@ impl UserInterface {
             cell_backgrounds.push(i);
         }
 
-        let first_player_character_id = game
-            .characters
+        let first_player_character_id = characters
             .iter_with_ids()
             .find(|(_id, ch)| ch.player_controlled)
             .unwrap()
@@ -352,7 +351,7 @@ impl UserInterface {
 
         let game_grid = GameGrid::new(
             first_player_character_id,
-            &game.characters,
+            characters.clone(),
             sprites,
             screen_size(),
             big_font.clone(),
@@ -362,10 +361,8 @@ impl UserInterface {
             cell_backgrounds,
         );
 
-        let popup_proceed_btn = new_button(ButtonAction::Proceed, None, true);
-
         let player_portraits = PlayerPortraits::new(
-            &game.characters,
+            &characters,
             first_player_character_id,
             active_character_id,
             decorative_font.clone(),
@@ -386,6 +383,9 @@ impl UserInterface {
 
         let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
 
+        let activity_popup =
+            ActivityPopup::new(simple_font.clone(), ui_state, &icons, characters.clone());
+
         Self {
             game_grid,
             characters,
@@ -403,9 +403,9 @@ impl UserInterface {
             log: Log::new(simple_font.clone()),
             character_uis,
             event_queue: Rc::clone(&event_queue),
-            activity_popup: ActivityPopup::new(simple_font, state, popup_proceed_btn),
+            activity_popup,
             target_ui,
-            state,
+            state: ui_state,
         }
     }
 
@@ -621,22 +621,19 @@ impl UserInterface {
 
         self.activity_popup.additional_line = None;
 
-        let mut popup_initial_lines = vec![];
         let mut popup_buttons = vec![];
         let mut movement = false;
-
         let mut npc_action_has_target = false;
+        let mut relevant_action_button = None;
 
         match state {
             UiState::ConfiguringAction(base_action) => {
                 self.set_allowed_to_use_action_buttons(true);
 
-                let tooltip = &self.character_uis[&self.active_character_id].tracked_action_buttons
-                    [&button_action_id(ButtonAction::Action(base_action))]
-                    .tooltip;
-
-                popup_initial_lines.push(tooltip.header.to_string());
-                popup_initial_lines.extend_from_slice(&tooltip.technical_description);
+                relevant_action_button = self.character_uis[&self.active_character_id]
+                    .tracked_action_buttons
+                    .get(&button_action_id(ButtonAction::Action(base_action)))
+                    .map(|btn| btn.clone());
 
                 match base_action {
                     BaseAction::Attack {
@@ -676,25 +673,13 @@ impl UserInterface {
             }
 
             UiState::ReactingToAttack {
-                attacker: attacker_id,
-                hand,
                 reactor: reactor_id,
                 is_within_melee,
+                ..
             } => {
                 self.set_allowed_to_use_action_buttons(false);
 
-                let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
-
-                popup_initial_lines.push("React (on attacked)".to_string());
-                let attacks_str = format!(
-                    "{} attacks {} (d20+{} vs {})",
-                    attacker.name,
-                    defender.name,
-                    attacker.attack_modifier(hand),
-                    defender.evasion(),
-                );
-                popup_initial_lines.push(attacks_str);
 
                 for (_subtext, reaction) in defender.usable_on_attacked_reactions(is_within_melee) {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
@@ -707,21 +692,12 @@ impl UserInterface {
             }
 
             UiState::ReactingToHit {
-                attacker: attacker_id,
-                damage,
                 victim: victim_id,
                 is_within_melee,
+                ..
             } => {
                 self.set_allowed_to_use_action_buttons(false);
-
                 let victim = self.characters.get(victim_id);
-                popup_initial_lines.push("React (on hit)".to_string());
-                popup_initial_lines.push(format!(
-                    "{} attacked {} for {} damage",
-                    self.characters.get(attacker_id).name,
-                    victim.name,
-                    damage,
-                ));
                 for (_subtext, reaction) in victim.usable_on_hit_reactions(is_within_melee) {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(btn_action);
@@ -736,12 +712,15 @@ impl UserInterface {
 
             UiState::Idle => {
                 self.set_allowed_to_use_action_buttons(false);
+
+                self.game_grid.clear_players_action_target();
             }
         }
 
         // TODO: Create the lines and buttons inside the popup instead?
+
         self.activity_popup
-            .set_state(state, popup_initial_lines, popup_buttons);
+            .set_state(state, popup_buttons, relevant_action_button);
 
         let move_range = self.active_character().move_range;
 
