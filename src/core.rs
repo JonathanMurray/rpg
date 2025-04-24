@@ -142,7 +142,14 @@ impl CoreGame {
 
                     if can_react {
                         if let Some(reaction) = self
-                            .ui_choose_hit_reaction(victim_id, damage, is_within_melee)
+                            .user_interface
+                            .choose_hit_reaction(
+                                &self,
+                                self.active_character_id,
+                                victim_id,
+                                damage,
+                                is_within_melee,
+                            )
                             .await
                         {
                             self.perform_on_hit_reaction(victim_id, reaction).await;
@@ -210,7 +217,14 @@ impl CoreGame {
                     .is_empty();
 
                 let reaction = if defender_can_react_to_attack {
-                    self.ui_choose_attack_reaction(hand, target, is_within_melee)
+                    self.user_interface
+                        .choose_attack_reaction(
+                            self,
+                            self.active_character_id,
+                            hand,
+                            target,
+                            is_within_melee,
+                        )
                         .await
                 } else {
                     None
@@ -250,27 +264,20 @@ impl CoreGame {
         self.user_interface.select_action(self).await
     }
 
-    async fn ui_choose_attack_reaction(
-        &self,
-        hand: HandType,
-        target: CharacterId,
-        is_within_melee: bool,
-    ) -> Option<OnAttackedReaction> {
-        let attacker_id = self.active_character_id;
-        self.user_interface
-            .choose_attack_reaction(self, attacker_id, hand, target, is_within_melee)
-            .await
-    }
-
     async fn ui_choose_hit_reaction(
         &self,
         victim_id: CharacterId,
         damage: u32,
         is_within_melee: bool,
     ) -> Option<OnHitReaction> {
-        let attacker_id = self.active_character_id;
         self.user_interface
-            .choose_hit_reaction(self, attacker_id, victim_id, damage, is_within_melee)
+            .choose_hit_reaction(
+                self,
+                self.active_character_id,
+                victim_id,
+                damage,
+                is_within_melee,
+            )
             .await
     }
 
