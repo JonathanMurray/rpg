@@ -684,11 +684,11 @@ impl UserInterface {
         let mut explanation = String::new();
 
         for (term, _bonus) in attacker.outgoing_attack_bonuses(hand, attack_enhancements) {
-            explanation.push_str(&term);
+            explanation.push_str(term);
             explanation.push(' ');
         }
         for (term, _bonus) in defender.incoming_attack_bonuses(reaction) {
-            explanation.push_str(&term);
+            explanation.push_str(term);
             explanation.push(' ');
         }
 

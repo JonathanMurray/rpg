@@ -28,7 +28,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 1;
+        let active_character_id = 0;
 
         let mut bob = Character::new(
             true,
@@ -84,7 +84,7 @@ impl CoreGame {
             Attributes::new(2, 10, 10, 5),
             (5, 7),
         );
-        david.health.lose(6);
+
         david.main_hand.weapon = Some(SWORD);
         david.off_hand.shield = Some(SMALL_SHIELD);
 
@@ -104,6 +104,12 @@ impl CoreGame {
                 char.receive_condition(Condition::Encumbered(encumbrance as u32));
             }
         }
+
+        // TODO
+        self.perform_losing_health(
+            self.active_character(),
+            self.active_character().health.current() - 1,
+        );
 
         loop {
             let action = self.ui_select_action().await;
@@ -821,6 +827,13 @@ impl CoreGame {
 
     fn perform_losing_health(&self, character: &Character, amount: u32) {
         character.health.lose(amount);
+
+        if character.health.current() <= character.health.max / 3 {
+            character.receive_condition(Condition::NearDeath);
+        } else {
+            character.conditions.borrow_mut().near_death = false;
+        }
+
         //self.log(format!("  {} took {} damage", character.name, amount));
 
         if character.health.current() == 0 {
@@ -857,6 +870,7 @@ impl CoreGame {
             defender,
             circumstance_advantage,
             &attack_enhancements,
+            defender_reaction,
         );
 
         let mut evasion = defender.evasion();
@@ -1172,7 +1186,13 @@ impl CoreGame {
             character.conditions.borrow_mut().raging = false;
             self.log(format!("{} stopped Raging", name)).await;
         }
-        character.action_points.set_to_max();
+
+        if character.conditions.borrow().near_death {
+            character.action_points.current.set(MAX_ACTION_POINTS - 2);
+        } else {
+            character.action_points.current.set(MAX_ACTION_POINTS);
+        }
+
         character.conditions.borrow_mut().mainhand_exertion = 0;
         character.conditions.borrow_mut().offhand_exertion = 0;
         let max_stamina = character.stamina.max;
@@ -1266,9 +1286,10 @@ pub fn attack_roll_bonus(
     defender: &Character,
     circumstance_advantage: i32,
     enhancements: &[AttackEnhancement],
+    reaction: Option<OnAttackedReaction>,
 ) -> DiceRollBonus {
     let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements);
-    bonus.advantage += defender.incoming_attack_advantage();
+    bonus.advantage += defender.incoming_attack_advantage(reaction);
     bonus.advantage += circumstance_advantage;
     bonus
 }
@@ -1287,6 +1308,7 @@ pub fn prob_attack_hit(
         defender,
         circumstance_advantage,
         enhancements,
+        reaction,
     );
     let mut evasion = defender.evasion();
 
@@ -1481,6 +1503,7 @@ pub enum Condition {
     MainHandExertion(u32),
     OffHandExertion(u32),
     Encumbered(u32),
+    NearDeath,
 }
 
 impl Condition {
@@ -1496,6 +1519,7 @@ impl Condition {
             MainHandExertion(n) => Some(n),
             OffHandExertion(n) => Some(n),
             Encumbered(n) => Some(n),
+            NearDeath => None,
         }
     }
 
@@ -1511,6 +1535,7 @@ impl Condition {
             MainHandExertion(_) => "Exerted (main-hand)",
             OffHandExertion(_) => "Exerted (off-hand)",
             Encumbered(_) => "Encumbered",
+            NearDeath => "Near-death",
         }
     }
 
@@ -1526,6 +1551,7 @@ impl Condition {
             MainHandExertion(_) => "-1 per stack on further similar actions",
             OffHandExertion(_) => "-1 per stack on further similar actions",
             Encumbered(_) => "-1 to Evasion per stack and -1 to all dice rolls per 2 stacks",
+            NearDeath => "Reduced AP, disadvantage on everything",
         }
     }
 
@@ -1561,6 +1587,7 @@ struct Conditions {
     mainhand_exertion: u32,
     offhand_exertion: u32,
     encumbered: u32,
+    near_death: bool,
 }
 
 impl Conditions {
@@ -1592,6 +1619,9 @@ impl Conditions {
         }
         if self.encumbered > 0 {
             result.push(Condition::Encumbered(self.encumbered).info());
+        }
+        if self.near_death {
+            result.push(Condition::NearDeath.info());
         }
 
         result
@@ -2340,16 +2370,17 @@ impl Character {
         if self.is_dazed() {
             bonuses.push(("Dazed", AttackBonus::Advantage(-1)));
         }
-        if self.conditions.borrow().raging {
+        let conditions = self.conditions.borrow();
+        if conditions.raging {
             if self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
                 bonuses.push(("Raging", AttackBonus::Advantage(1)));
             }
         }
-        if self.conditions.borrow().weakened > 0 {
+        if conditions.weakened > 0 {
             bonuses.push(("Weakened", AttackBonus::OtherNegative));
         }
 
-        let encumbrance_penalty = (self.conditions.borrow().encumbered / 2) as i32;
+        let encumbrance_penalty = (conditions.encumbered / 2) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",
@@ -2357,11 +2388,23 @@ impl Character {
             ));
         }
 
+        if conditions.near_death {
+            bonuses.push(("Near-death", AttackBonus::Advantage(-1)));
+        }
+
         bonuses
     }
 
-    fn incoming_attack_advantage(&self) -> i32 {
-        0
+    fn incoming_attack_advantage(&self, reaction: Option<OnAttackedReaction>) -> i32 {
+        let mut advantage = 0;
+        for (_label, bonus) in self.incoming_attack_bonuses(reaction) {
+            match bonus {
+                AttackBonus::Advantage(n) => advantage += n,
+                AttackBonus::OtherNegative | AttackBonus::OtherPositive => {}
+                AttackBonus::FlatAmount(_) => unreachable!(),
+            }
+        }
+        advantage
     }
 
     pub fn incoming_attack_bonuses(
@@ -2372,11 +2415,15 @@ impl Character {
         if self.is_dazed() {
             terms.push(("Dazed", AttackBonus::OtherPositive));
         }
-        if self.conditions.borrow().weakened > 0 {
+        let conditions = self.conditions.borrow();
+        if conditions.weakened > 0 {
             terms.push(("Weakened", AttackBonus::OtherPositive));
         }
-        if self.conditions.borrow().braced {
+        if conditions.braced {
             terms.push(("Braced", AttackBonus::OtherNegative));
+        }
+        if conditions.near_death {
+            terms.push(("Near-death", AttackBonus::Advantage(1)))
         }
 
         if let Some(reaction) = reaction {
@@ -2401,6 +2448,7 @@ impl Character {
             MainHandExertion(n) => conditions.mainhand_exertion += n,
             OffHandExertion(n) => conditions.offhand_exertion += n,
             Encumbered(n) => conditions.encumbered += n,
+            NearDeath => conditions.near_death = true,
         }
     }
 }
