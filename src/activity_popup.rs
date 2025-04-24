@@ -1,10 +1,18 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::RefCell,
+    collections::HashMap,
+    rc::Rc,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{BLACK, GRAY, ORANGE, WHITE, YELLOW},
+    color::{
+        BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE,
+        YELLOW,
+    },
+    input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    shapes::{draw_line, draw_rectangle},
+    shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
     texture::Texture2D,
 };
@@ -15,10 +23,10 @@ use crate::{
     },
     base_ui::Drawable,
     core::{
-        AttackEnhancement, BaseAction, CharacterId, Characters, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellEnhancement,
+        AttackEnhancement, BaseAction, CharacterId, Characters, OnAttackedReaction, OnHitReaction,
+        SpellEnhancement,
     },
-    drawing::draw_dashed_line,
+    drawing::{draw_cross, draw_dashed_line},
     game_ui::UiState,
     textures::IconId,
 };
@@ -27,6 +35,7 @@ use crate::action_button::ActionButton;
 
 pub struct ActivityPopup {
     characters: Characters,
+    active_character_id: CharacterId,
     icons: HashMap<IconId, Texture2D>,
     state: UiState,
 
@@ -39,12 +48,18 @@ pub struct ActivityPopup {
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
-    enabled: bool,
+    movement_stamina_slider: Option<MovementStaminaSlider>,
+
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     base_action: Option<BaseAction>,
     selected_choice_button_ids: Vec<u32>,
     hovered_choice_button_id: Option<u32>,
+
+    movement_base_ap_cost: u32,
+
+    // TODO remove this and just use the slider's value everywhere
+    movement_stamina_cost: u32,
 
     pub last_drawn_rectangle: Rect,
 }
@@ -55,6 +70,7 @@ impl ActivityPopup {
         state: UiState,
         icons: HashMap<IconId, Texture2D>,
         characters: Characters,
+        active_character_id: CharacterId,
     ) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
 
@@ -70,6 +86,7 @@ impl ActivityPopup {
 
         Self {
             characters,
+            active_character_id,
             icons,
             state,
             font,
@@ -79,11 +96,13 @@ impl ActivityPopup {
             choice_buttons: Default::default(),
             proceed_button,
             next_button_id,
-            enabled: true,
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
+            movement_stamina_slider: None,
             base_action: None,
             hovered_choice_button_id: None,
+            movement_base_ap_cost: 0,
+            movement_stamina_cost: 0,
             last_drawn_rectangle: Default::default(),
         }
     }
@@ -126,7 +145,7 @@ impl ActivityPopup {
         );
         measured_lines.push((&self.base_lines[0], header_dimensions));
 
-        for (i, line) in self.base_lines.iter().skip(1).enumerate() {
+        for line in self.base_lines.iter().skip(1) {
             let dimensions =
                 measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
             measured_lines.push((line, dimensions));
@@ -158,9 +177,25 @@ impl ActivityPopup {
 
         let mut width =
             text_content_w + margin_between_text_and_buttons + self.proceed_button.size.0;
+
         for btn in self.choice_buttons.values() {
             width += button_margin + btn.size.0;
         }
+
+        //let sprint_stamina_text = "Sprint (stamina)";
+        let sprint_stamina_text = "Spend stamina:";
+        let sprint_stamina_margin = 15.0;
+        if let Some(slider) = &self.movement_stamina_slider {
+            let text_dimensions = measure_text(
+                sprint_stamina_text,
+                base_text_params.font,
+                base_text_params.font_size,
+                1.0,
+            );
+            let move_config_w = slider.size().0.max(text_dimensions.width);
+            width += move_config_w + sprint_stamina_margin;
+        }
+
         width += hor_pad * 2.0;
 
         draw_rectangle(x, y - height, width, height, bg_color);
@@ -199,35 +234,34 @@ impl ActivityPopup {
                 draw_text_ex(line, x0, y0, base_text_params.clone());
             }
 
-            //y0 += dim.height + line_margin;
             y0 += dim.offset_y + line_margin;
         }
 
-        if self.enabled {
-            match &self.state {
-                UiState::ConfiguringAction(base_action) => {
-                    match base_action {
-                        BaseAction::Move { range, .. } => {
-                            let percentage: u32 = self
-                                .selected_choices()
-                                .map(|action| action.unwrap_movement_enhancement().add_percentage)
-                                .sum();
-                            let range = range * (1.0 + percentage as f32 / 100.0);
-                            let text = format!("range: {range:.2}");
-                            draw_text_ex(&text, x0, y0, base_text_params.clone());
-                        }
-                        BaseAction::Attack { .. } | BaseAction::CastSpell(..) => {}
-                    };
-                }
-                UiState::ReactingToAttack { .. } | UiState::ReactingToHit { .. } => {}
-                UiState::Idle | UiState::ChoosingAction => unreachable!(),
+        let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
+
+        if let UiState::ConfiguringAction(BaseAction::Move) = self.state {
+            let mut text = format!("{} AP", self.movement_base_ap_cost);
+            if self.movement_stamina_cost > 0 {
+                text.push_str(&format!(" -{}", self.movement_stamina_cost));
             }
+
+            draw_text_ex(&text, x0, y0, base_text_params.clone());
+        }
+
+        if let Some(slider) = &mut self.movement_stamina_slider {
+            let text_dimensions = draw_text_ex(
+                sprint_stamina_text,
+                x_btn,
+                y - height + 20.0,
+                base_text_params.clone(),
+            );
+            slider.draw(x_btn, y - slider.size().1 - 5.0);
+            self.movement_stamina_cost = slider.selected_stamina();
+            let movement_config_w = slider.size().0.max(text_dimensions.width);
+            x_btn += movement_config_w + sprint_stamina_margin;
         }
 
         let y_btn = y - height / 2.0 - 32.0;
-        //let mut x_btn = x + 425.0;
-
-        let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
         for btn in self.choice_buttons.values() {
             btn.draw(x_btn, y_btn);
@@ -247,12 +281,11 @@ impl ActivityPopup {
             || matches!(self.state, UiState::ReactingToHit { .. })
             || matches!(
                 self.state,
-                UiState::ConfiguringAction(BaseAction::Move { .. })
+                UiState::ConfiguringAction(BaseAction::Move)
             )
     }
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
-        let mut changed_movement_range = false;
         let mut changed_on_attacked_reaction = None;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
@@ -267,10 +300,6 @@ impl ActivityPopup {
                 InternalUiEvent::ButtonClicked(id, _button_action) => {
                     let clicked_btn = &self.choice_buttons[&id];
                     clicked_btn.toggle_selected();
-
-                    if let ButtonAction::MovementEnhancement(..) = clicked_btn.action {
-                        changed_movement_range = true;
-                    }
 
                     // Some choices work like radio boxes
                     if self.are_choice_buttons_mutually_exclusive() {
@@ -305,18 +334,6 @@ impl ActivityPopup {
             }
         }
 
-        if changed_movement_range {
-            let mut added_percentage = 0;
-            for action in self.selected_choices() {
-                if let ButtonAction::MovementEnhancement(enhancement) = action {
-                    added_percentage += enhancement.add_percentage;
-                }
-            }
-            return Some(ActivityPopupOutcome::ChangedMovementRangePercentage(
-                added_percentage,
-            ));
-        }
-
         if let Some(maybe_reaction) = changed_on_attacked_reaction {
             return Some(ActivityPopupOutcome::ChangedOnAttackedReaction(
                 maybe_reaction,
@@ -344,12 +361,6 @@ impl ActivityPopup {
             .collect()
     }
 
-    pub fn selected_movement_enhancements(&self) -> Vec<MovementEnhancement> {
-        self.selected_choices()
-            .map(|action| action.unwrap_movement_enhancement())
-            .collect()
-    }
-
     pub fn selected_on_attacked_reaction(&self) -> Option<OnAttackedReaction> {
         self.selected_choices()
             .next()
@@ -362,25 +373,34 @@ impl ActivityPopup {
             .map(|action| action.unwrap_on_hit_reaction())
     }
 
-    pub fn select_movement_option(&mut self, selected_enhancement: Option<usize>) {
+    pub fn set_movement_ap_cost(&mut self, ap_cost: u32) {
         assert!(matches!(
             self.state,
-            UiState::ConfiguringAction(BaseAction::Move { .. })
+            UiState::ConfiguringAction(BaseAction::Move)
         ));
 
-        for (i, (_id, btn)) in self.choice_buttons.iter().enumerate() {
-            btn.set_selected(selected_enhancement == Some(i));
-        }
+        self.movement_base_ap_cost = ap_cost;
 
-        self.selected_choice_button_ids.clear();
-        for btn in self.choice_buttons.values() {
-            if btn.selected.get() == ButtonSelected::Yes {
-                self.selected_choice_button_ids.push(btn.id);
-            }
+        if let Some(slider) = self.movement_stamina_slider.as_mut() {
+            // Each AP spent on movement can be accompanied by 1 stamina point
+            slider.set_max_allowed(ap_cost / 2);
+            self.movement_stamina_cost = slider.selected_stamina();
         }
     }
 
+    pub fn movement_ap_cost(&self) -> u32 {
+        self.movement_base_ap_cost - self.movement_stamina_cost
+    }
+
+    pub fn movement_stamina_cost(&self) -> u32 {
+        self.movement_stamina_cost
+    }
+
     pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
+        if self.movement_base_ap_cost > 0 {
+            return (self.movement_ap_cost(), 0);
+        }
+
         let reserved_from_action = self
             .base_action
             .as_ref()
@@ -428,6 +448,10 @@ impl ActivityPopup {
     }
 
     pub fn stamina_points(&self) -> u32 {
+        if self.movement_stamina_cost > 0 {
+            return self.movement_stamina_cost;
+        }
+
         let mut sta = self
             .base_action
             .as_ref()
@@ -444,8 +468,16 @@ impl ActivityPopup {
         sta
     }
 
-    pub fn set_enabled(&mut self, enabled: bool) {
-        self.enabled = enabled;
+    pub fn set_enabled(&mut self, mut enabled: bool) {
+        if self.movement_ap_cost()
+            > self
+                .characters
+                .get(self.active_character_id)
+                .action_points
+                .current()
+        {
+            enabled = false;
+        }
 
         self.proceed_button.enabled.set(enabled);
     }
@@ -468,8 +500,12 @@ impl ActivityPopup {
         state: UiState,
         relevant_action_button: Option<Rc<ActionButton>>,
     ) {
+        self.active_character_id = active_character_id;
+
         let mut lines = vec![];
         let mut popup_buttons = vec![];
+
+        let mut stamina_slider = None;
 
         match state {
             UiState::ConfiguringAction(base_action) => {
@@ -478,10 +514,7 @@ impl ActivityPopup {
                 lines.extend_from_slice(&tooltip.technical_description);
 
                 match base_action {
-                    BaseAction::Attack {
-                        hand,
-                        action_point_cost: _,
-                    } => {
+                    BaseAction::Attack { hand, .. } => {
                         for (_subtext, enhancement) in self
                             .characters
                             .get(active_character_id)
@@ -504,15 +537,15 @@ impl ActivityPopup {
                             }
                         }
                     }
-                    BaseAction::Move { .. } => {
-                        for (_subtext, enhancement) in self
-                            .characters
-                            .get(active_character_id)
-                            .usable_movement_enhancements()
-                        {
-                            let btn =
-                                self.new_button(ButtonAction::MovementEnhancement(enhancement));
-                            popup_buttons.push(btn);
+                    BaseAction::Move => {
+                        let active_char = self.characters.get(active_character_id);
+                        let speed = active_char.move_speed;
+                        lines.push(format!("Speed: {}", speed));
+                        let stamina = &active_char.stamina;
+                        if stamina.max > 0 {
+                            let max_stamina_spend =
+                                stamina.current().min(active_char.action_points.current());
+                            stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));
                         }
                     }
                 }
@@ -587,11 +620,16 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
+        self.movement_stamina_slider = stamina_slider;
+        self.movement_base_ap_cost = 0;
+        self.movement_stamina_cost = 0;
+
         self.state = state;
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
         self.selected_choice_button_ids.clear();
 
+        // TODO remove this and instead just use self.state
         self.base_action = if let UiState::ConfiguringAction(base_action) = state {
             Some(base_action)
         } else {
@@ -601,7 +639,99 @@ impl ActivityPopup {
 }
 
 pub enum ActivityPopupOutcome {
-    ChangedMovementRangePercentage(u32),
     ClickedProceed,
     ChangedOnAttackedReaction(Option<OnAttackedReaction>),
+}
+
+struct MovementStaminaSlider {
+    max: u32,
+    max_allowed: u32,
+    selected_i: u32,
+    is_sliding: bool,
+    cell_w: f32,
+    cell_h: f32,
+}
+
+impl MovementStaminaSlider {
+    fn new(max: u32) -> Self {
+        Self {
+            max,
+            max_allowed: 0,
+            selected_i: 0,
+            is_sliding: false,
+            cell_w: 35.0,
+            cell_h: 28.0,
+        }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        ((self.max + 1) as f32 * self.cell_w, self.cell_w)
+    }
+
+    fn set_max_allowed(&mut self, mut max_allowed: u32) {
+        max_allowed = max_allowed.min(self.max);
+        self.max_allowed = max_allowed;
+        self.selected_i = self.selected_i.min(max_allowed);
+    }
+
+    fn selected_stamina(&self) -> u32 {
+        self.selected_i
+    }
+
+    fn draw(&mut self, x: f32, y: f32) {
+        let (w, h) = (self.cell_w, self.cell_h);
+
+        let pad = 2.0;
+        for i in 0..self.selected_i + 1 {
+            let x0 = x + w * i as f32;
+            let color = if i == 0 { DARKGRAY } else { GREEN };
+            draw_rectangle(x0 + pad, y + pad, w - pad * 2.0, h - pad * 2.0, color);
+        }
+        for i in 0..self.max_allowed + 1 {
+            let x0 = x + w * i as f32;
+            draw_rectangle_lines(x0, y, w, h, 1.0, LIGHTGRAY);
+        }
+        for i in self.max_allowed + 1..self.max + 1 {
+            let x0 = x + w * i as f32;
+            draw_rectangle_lines(x0, y, w, h, 1.0, DARKGRAY);
+        }
+
+        let x0 = x + w * self.selected_i as f32;
+        let margin = 1.0;
+        draw_rectangle_lines(
+            x0 - margin,
+            y - margin,
+            w + margin * 2.0,
+            h + margin * 2.0,
+            2.0,
+            YELLOW,
+        );
+
+        let (mouse_x, mouse_y) = mouse_position();
+        if !is_mouse_button_down(MouseButton::Left) {
+            self.is_sliding = false;
+        }
+
+        if (y..y + h).contains(&mouse_y) && (x..x + w * (self.max + 1) as f32).contains(&mouse_x) {
+            let i = ((mouse_x - x) / w) as u32;
+
+            let x0 = x + w * i as f32;
+
+            if i < self.max_allowed + 1 {
+                draw_rectangle_lines(x0, y, w, h, 2.0, WHITE);
+            } else {
+                draw_rectangle_lines(x0, y, w, h, 1.0, RED);
+            }
+
+            if is_mouse_button_pressed(MouseButton::Left) {
+                self.is_sliding = true;
+            }
+
+            if self.is_sliding {
+                self.selected_i = (i).min(self.max_allowed);
+            }
+        }
+
+        draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
+    }
 }

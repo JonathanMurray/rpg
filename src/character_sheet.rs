@@ -6,7 +6,7 @@ use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
 };
-use macroquad::shapes::{draw_line, draw_rectangle, draw_rectangle_lines};
+use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
@@ -14,6 +14,7 @@ use macroquad::{
     texture::Texture2D,
 };
 
+use crate::drawing::draw_cross;
 use crate::equipment_ui::build_inventory_section;
 use crate::{
     action_button::ActionButton,
@@ -57,7 +58,7 @@ impl CharacterSheet {
                 (None, &[("Stamina", StatValue::U32(character.stamina.max))]),
                 (
                     Some(("Agility", character.base_attributes.agility)),
-                    &[("Movement", StatValue::F32(character.move_range))],
+                    &[("Movement", StatValue::F32(character.move_speed))],
                 ),
                 (None, &[("Evasion", StatValue::U32(character.evasion()))]),
                 (
@@ -309,11 +310,11 @@ impl CharacterSheet {
         let hover =
             (btn_x..btn_x + btn_w).contains(&mouse_x) && (btn_y..btn_y + btn_h).contains(&mouse_y);
 
-        draw_rectangle(btn_x, btn_y, btn_w, btn_h, DARKGRAY);
+        let bg_color = DARKGRAY;
+        draw_rectangle(btn_x, btn_y, btn_w, btn_h, bg_color);
 
         let cross_color = LIGHTGRAY;
-        draw_line(btn_x, btn_y, btn_x + btn_w, btn_y + btn_h, 1.0, cross_color);
-        draw_line(btn_x, btn_y + btn_h, btn_x + btn_w, btn_y, 1.0, cross_color);
+        draw_cross(btn_x, btn_y, btn_w, btn_h, cross_color, 1.0, 2.0);
         if hover {
             draw_rectangle_lines(btn_x, btn_y, btn_w, btn_h, 2.0, WHITE);
         } else {

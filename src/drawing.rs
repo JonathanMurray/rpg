@@ -3,7 +3,6 @@ use macroquad::{
     shapes::{draw_circle_lines, draw_line},
 };
 
-
 pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: Color) {
     let w = x;
     let n = y;

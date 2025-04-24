@@ -72,7 +72,7 @@ impl fmt::Display for StatValue {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             StatValue::U32(x) => f.write_fmt(format_args!("{}", x)),
-            StatValue::F32(x) => f.write_fmt(format_args!("{:.2}", x)),
+            StatValue::F32(x) => f.write_fmt(format_args!("{:.1}", x)),
             StatValue::String(s) => f.write_str(s),
         }
     }

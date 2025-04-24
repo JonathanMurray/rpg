@@ -26,8 +26,8 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
-        Characters, CoreGame, GameEvent, Goodness, HandType, MovementEnhancement,
-        OnAttackedReaction, OnHitReaction, SpellTarget, SpellTargetOutcome, MOVE_ACTION_COST,
+        Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction,
+        SpellTarget, SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -198,7 +198,7 @@ impl UserInterface {
 
                         hoverable_buttons.push(btn);
                     }
-                    BaseAction::Move { .. } => {
+                    BaseAction::Move => {
                         basic_buttons.push(btn);
                     }
                 }
@@ -374,13 +374,19 @@ impl UserInterface {
         let character_portraits = CharacterPortraits::new(
             &game.characters,
             game.active_character_id,
-            decorative_font.clone(),
+            simple_font.clone(),
+            //decorative_font.clone(),
         );
 
         let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
 
-        let activity_popup =
-            ActivityPopup::new(simple_font.clone(), ui_state, icons, characters.clone());
+        let activity_popup = ActivityPopup::new(
+            simple_font.clone(),
+            ui_state,
+            icons,
+            characters.clone(),
+            active_character_id,
+        );
 
         Self {
             game_grid,
@@ -481,20 +487,9 @@ impl UserInterface {
             dbg!(&grid_switched_to);
 
             match grid_switched_to {
-                GridSwitchedTo::Move { selected_option } => {
-                    let move_range = self.active_character().move_range;
-                    self.set_state(UiState::ConfiguringAction(BaseAction::Move {
-                        action_point_cost: MOVE_ACTION_COST,
-                        range: move_range,
-                    }));
-
-                    let selected_enhancement = if selected_option == 0 {
-                        None
-                    } else {
-                        Some(selected_option - 1)
-                    };
-                    self.activity_popup
-                        .select_movement_option(selected_enhancement);
+                GridSwitchedTo::Move { ap_cost } => {
+                    self.set_state(UiState::ConfiguringAction(BaseAction::Move {}));
+                    self.activity_popup.set_movement_ap_cost(ap_cost);
                 }
                 GridSwitchedTo::Attack => {
                     let hand = HandType::MainHand;
@@ -554,7 +549,7 @@ impl UserInterface {
                             matches!(self.game_grid.players_action_target(), ActionTarget::None);
                     }
                 }
-                BaseAction::Move { .. } => {}
+                BaseAction::Move => {}
             }
 
             let fully_selected = !action_is_waiting_for_target_selection;
@@ -619,7 +614,7 @@ impl UserInterface {
                 match base_action {
                     BaseAction::Attack { .. } => {}
                     BaseAction::CastSpell(..) => {}
-                    BaseAction::Move { .. } => {
+                    BaseAction::Move => {
                         movement = true;
                     }
                 }
@@ -649,18 +644,17 @@ impl UserInterface {
         self.activity_popup
             .set_state(self.active_character_id, state, relevant_action_button);
 
-        let move_range = self.active_character().move_range;
-        let move_enhancements: Vec<MovementEnhancement> = self
-            .active_character()
-            .usable_movement_enhancements()
-            .into_iter()
-            .map(|(_, enhancement)| enhancement)
-            .collect();
+        let active_char = self.active_character();
+        let speed = active_char.move_speed;
+        let ap = active_char.action_points.current();
+        let sta = active_char.stamina.current();
+        let max_move_range = ap as f32 * speed + sta.min(ap) as f32 * speed;
+
         self.game_grid
-            .set_movement_range_options(move_range, move_enhancements);
+            .set_move_speed_and_range(speed, max_move_range);
 
         if !movement {
-            self.game_grid.remove_movement_preview();
+            self.game_grid.remove_movement_path();
         }
 
         if !npc_action_has_target {
@@ -1075,10 +1069,6 @@ impl UserInterface {
 
         let mut player_choice = None;
         match popup_outcome {
-            Some(ActivityPopupOutcome::ChangedMovementRangePercentage(added_percentage)) => {
-                self.game_grid
-                    .set_selected_movement_percentage(added_percentage);
-            }
             Some(ActivityPopupOutcome::ClickedProceed) => {
                 player_choice = Some(self.handle_popup_proceed());
             }
@@ -1300,8 +1290,8 @@ impl UserInterface {
                 }
             }
 
-            UiState::ConfiguringAction(BaseAction::Move { .. }) => {
-                if self.game_grid.has_non_empty_movement_preview() {
+            UiState::ConfiguringAction(BaseAction::Move) => {
+                if self.game_grid.has_non_empty_selected_movement_path() {
                     popup_enabled = true;
                     self.target_ui.clear_action();
                 } else {
@@ -1395,12 +1385,9 @@ impl UserInterface {
                         enhancements: self.activity_popup.selected_spell_enhancements(),
                         target,
                     },
-                    BaseAction::Move {
-                        action_point_cost,
-                        range: _,
-                    } => Action::Move {
-                        action_point_cost,
-                        enhancements: self.activity_popup.selected_movement_enhancements(),
+                    BaseAction::Move => Action::Move {
+                        action_point_cost: self.activity_popup.movement_ap_cost(),
+                        stamina_cost: self.activity_popup.movement_stamina_cost(),
                         positions: self.game_grid.take_movement_path(),
                     },
                 };
@@ -1484,7 +1471,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
         ButtonAction::Action(base_action) => match base_action {
             BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
-            BaseAction::Move { .. } => "MOVE".to_string(),
+            BaseAction::Move => "MOVE".to_string(),
         },
         _ => unreachable!(),
     }

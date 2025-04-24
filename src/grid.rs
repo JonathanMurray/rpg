@@ -23,9 +23,7 @@ use macroquad::{
 };
 
 use crate::{
-    core::{
-        ActionTarget, BaseAction, Character, Goodness, MovementEnhancement, Position, SpellTarget,
-    },
+    core::{ActionTarget, BaseAction, Character, Goodness, Position, SpellTarget},
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
@@ -41,7 +39,7 @@ use crate::{
 const BACKGROUND_COLOR: Color = GRAY;
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
-const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.5, 0.6, 0.5, 0.5);
+const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.04);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
 const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
 const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
@@ -59,7 +57,7 @@ const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
 const MOVE_RANGE_COLOR: Color = GREEN;
 
-const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.5, 0.5, 0.5, 0.25);
+const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
 const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
 const RANGE_INDICATOR_SEMI_BAD_COLOR: Color = ORANGE;
 const RANGE_INDICATOR_BAD_COLOR: Color = RED;
@@ -78,48 +76,35 @@ struct CharacterMotion {
 }
 
 struct MovementRange {
-    options: Vec<(u32, f32)>,
-    selected_i: usize,
+    speed: f32,
+    max_range: f32,
 }
 
 impl MovementRange {
     fn max(&self) -> f32 {
-        self.options[self.options.len() - 1].1
+        self.max_range
     }
 
-    fn set(&mut self, range: f32, enhancements: Vec<MovementEnhancement>) {
-        self.options = vec![(0, range)];
-        for enhancement in enhancements {
-            let enhanced_range = range * (1.0 + enhancement.add_percentage as f32 / 100.0);
-            self.options
-                .push((enhancement.add_percentage, enhanced_range));
-        }
-
-        self.selected_i = self.selected_i.min(self.options.len() - 1);
+    fn set(&mut self, speed: f32, max_range: f32) {
+        self.speed = speed;
+        self.max_range = max_range;
     }
 
     fn selected(&self) -> f32 {
-        self.options[self.selected_i].1
+        0.0
     }
 
-    fn set_selected_percentage(&mut self, enhancement_added_percentage: u32) {
-        self.selected_i = self
-            .options
-            .iter()
-            .position(|(add_percentage, _range)| *add_percentage == enhancement_added_percentage)
-            .unwrap();
-    }
-
-    fn shortest_encompassing(&self, range: f32) -> usize {
-        self.options.iter().position(|(_, r)| range <= *r).unwrap()
+    fn ap_cost(&self, range: f32) -> u32 {
+        (range / self.speed).ceil() as u32
+        //self.options.iter().position(|(_, r)| range <= *r).unwrap()
     }
 }
 
 impl Default for MovementRange {
     fn default() -> Self {
         Self {
-            options: vec![(0, 0.0)],
-            selected_i: 0,
+            speed: 0.0,
+            max_range: 0.0,
         }
     }
 }
@@ -353,64 +338,21 @@ impl GameGrid {
         self.effects.push(concrete_effect);
     }
 
-    fn set_an_arbitrary_valid_movement_path(&mut self) {
-        let pos = self.characters.get(self.active_character_id).pos();
-        let mut movement_preview = vec![];
-        for (destination, route) in &self.pathfind_grid.routes {
-            if route.came_from == pos
-                && route.distance_from_start > 0.0
-                && route.distance_from_start <= self.movement_range.selected()
-            {
-                movement_preview.push((route.distance_from_start, *destination));
-                movement_preview.push((0.0, pos));
-                break;
-            }
-        }
-        assert!(movement_preview.len() > 1);
-        self.selected_movement_path = Some(movement_preview);
-    }
-
-    pub fn remove_movement_preview(&mut self) {
+    pub fn remove_movement_path(&mut self) {
         self.selected_movement_path = None;
     }
 
-    pub fn has_non_empty_movement_preview(&self) -> bool {
+    pub fn has_non_empty_selected_movement_path(&self) -> bool {
         self.selected_movement_path
             .as_ref()
             .map(|m| !m.is_empty())
             .unwrap_or(false)
     }
 
-    pub fn set_selected_movement_percentage(&mut self, enhancement_added_percentage: u32) {
-        self.movement_range
-            .set_selected_percentage(enhancement_added_percentage);
-        self.ensure_movement_preview_is_within_selected_move_range();
-    }
-
-    pub fn set_movement_range_options(
-        &mut self,
-        range: f32,
-        enhancements: Vec<MovementEnhancement>,
-    ) {
-        self.movement_range.set(range, enhancements);
-        self.ensure_movement_preview_is_within_selected_move_range();
+    pub fn set_move_speed_and_range(&mut self, speed: f32, max_range: f32) {
+        self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
-    }
-
-    fn ensure_movement_preview_is_within_selected_move_range(&mut self) {
-        if let Some(movement_preview) = &mut self.selected_movement_path {
-            while !movement_preview.is_empty()
-                && movement_preview[0].0 > self.movement_range.selected()
-            {
-                movement_preview.remove(0);
-            }
-
-            if movement_preview.len() == 1 {
-                // A path consisting only of one node is not valid.
-                self.set_an_arbitrary_valid_movement_path();
-            }
-        }
     }
 
     pub fn take_movement_path(&mut self) -> Vec<Position> {
@@ -470,8 +412,7 @@ impl GameGrid {
         )
     }
 
-    fn fill_cell(&self, (grid_x, grid_y): Position, color: Color) {
-        let margin = 2.0;
+    fn fill_cell(&self, (grid_x, grid_y): Position, color: Color, margin:f32) {
         draw_rectangle(
             self.grid_x_to_screen(grid_x) + margin,
             self.grid_y_to_screen(grid_y) + margin,
@@ -516,6 +457,7 @@ impl GameGrid {
     fn draw_background(&self) {
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
+            /*
             draw_line(
                 x0,
                 self.grid_y_to_screen(0),
@@ -524,8 +466,10 @@ impl GameGrid {
                 1.0,
                 GRID_COLOR,
             );
+             */
             for row in 0..self.grid_dimensions.1 as i32 + 1 {
                 let y0 = self.grid_y_to_screen(row);
+                /*
                 draw_line(
                     self.grid_x_to_screen(0),
                     y0,
@@ -534,6 +478,7 @@ impl GameGrid {
                     1.0,
                     GRID_COLOR,
                 );
+                 */
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     let params = DrawTextureParams {
@@ -636,6 +581,10 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
+        if let Some((range, indicator)) = self.range_indicator {
+            self.draw_range_indicator(active_char_pos, range, indicator);
+        }
+
         self.draw_active_character_highlight();
 
         for character in self.characters.iter() {
@@ -655,7 +604,7 @@ impl GameGrid {
 
         if matches!(
             ui_state,
-            UiState::ConfiguringAction(BaseAction::Move { .. })
+            UiState::ConfiguringAction(BaseAction::Move)
         ) {
             self.draw_movement_path_background();
         }
@@ -679,7 +628,7 @@ impl GameGrid {
 
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
-                BaseAction::Move { .. } => MouseState::MayInputMovement,
+                BaseAction::Move => MouseState::MayInputMovement,
             },
             _ => MouseState::None,
         };
@@ -728,9 +677,6 @@ impl GameGrid {
             _ => {}
         }
 
-        if let Some((range, indicator)) = self.range_indicator {
-            self.draw_range_indicator(active_char_pos, range, indicator);
-        }
 
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {
@@ -822,25 +768,24 @@ impl GameGrid {
                 _ => {}
             }
 
-            let hovered_move_route = self.pathfind_grid.routes.get(&mouse_grid_pos);
-            let mut valid_hovered_move_route = None;
-            if matches!(mouse_state, MouseState::MayInputMovement) && hovered_character_id.is_none()
+            let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement)
+                && hovered_character_id.is_none()
             {
-                valid_hovered_move_route = hovered_move_route;
-            }
+                self.pathfind_grid.routes.get(&mouse_grid_pos)
+            } else {
+                None
+            };
 
-            if let Some(hovered_route) = valid_hovered_move_route {
+            if let Some(hovered_route) = hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
                     let path = self.build_path_from_route(active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path, true);
 
                     if pressed_left_mouse {
-                        self.movement_range.selected_i = self
+                        let ap_cost = self
                             .movement_range
-                            .shortest_encompassing(hovered_route.distance_from_start);
-                        outcome.switched_action = Some(GridSwitchedTo::Move {
-                            selected_option: self.movement_range.selected_i,
-                        });
+                            .ap_cost(hovered_route.distance_from_start);
+                        outcome.switched_action = Some(GridSwitchedTo::Move { ap_cost });
 
                         self.selected_movement_path = Some(path);
                     }
@@ -902,7 +847,7 @@ impl GameGrid {
                             ui_state,
                             UiState::ChoosingAction
                                 | UiState::ConfiguringAction(
-                                    BaseAction::Move { .. } | BaseAction::Attack { .. }
+                                    BaseAction::Move | BaseAction::Attack { .. }
                                 )
                         );
 
@@ -993,7 +938,7 @@ impl GameGrid {
     }
 
     fn draw_invalid_target_marker(&self, grid_pos: Position) {
-        self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3));
+        self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3), 4.0);
         let (x, y) = self.grid_pos_to_screen(grid_pos);
         draw_cross(x, y, self.cell_w, self.cell_w, RED, 2.0, self.cell_w * 0.15);
     }
@@ -1205,11 +1150,12 @@ impl GameGrid {
     fn draw_movement_path_background(&self) {
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
+        // TODO: Keep this or not?
         self.draw_move_range_indicator(active_char_pos);
 
         for pos in self.pathfind_grid.routes.keys() {
             if self.is_within_grid(*pos) && *pos != active_char_pos {
-                self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR);
+                self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
             }
         }
     }
@@ -1230,7 +1176,7 @@ impl GameGrid {
         let destination = path[0].1;
         let (x, y) = (
             self.grid_x_to_screen(destination.0),
-            self.grid_y_to_screen(destination.1) + 14.0,
+            self.grid_y_to_screen(destination.1),
         );
 
         let text_color = if hover { LIGHTGRAY } else { WHITE };
@@ -1239,14 +1185,17 @@ impl GameGrid {
         } else {
             Color::new(0.0, 0.0, 0.0, 0.7)
         };
-        self.draw_static_text(
-            &format!("{:.4}", distance.to_string()),
-            text_color,
-            bg_color,
-            4.0,
-            x,
-            y,
-        );
+
+        let draw_ap_instead_of_distance = true;
+
+        let text = if draw_ap_instead_of_distance {
+            let ap = self.movement_range.ap_cost(distance);
+            format!("{}", ap)
+        } else {
+            format!("{:.4}", distance.to_string())
+        };
+
+        self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
     }
 
     fn draw_movement_path_arrow(&self, path: &[(f32, Position)], color: Color, thickness: f32) {
@@ -1339,7 +1288,7 @@ impl GameGrid {
                 if is_cell_within(x, y) {
                     let mut thickness = 2.0;
                     if draw_background {
-                        self.fill_cell((x, y), ACTION_RANGE_INDICATOR_BACKGROUND);
+                        self.fill_cell((x, y), ACTION_RANGE_INDICATOR_BACKGROUND, 0.0);
                         thickness = 1.0;
                     }
 
@@ -1409,7 +1358,7 @@ pub struct GridOutcome {
 
 #[derive(Debug)]
 pub enum GridSwitchedTo {
-    Move { selected_option: usize },
+    Move { ap_cost: u32 },
     Attack,
     Idle,
 }

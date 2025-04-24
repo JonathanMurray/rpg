@@ -184,6 +184,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     must_be_melee: true,
 };
 
+// TODO: instead grant a d6 to evasion
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     name: "Side step",
     description: "Double your evasion gained from agility",
@@ -194,6 +195,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     must_be_melee: false,
 };
 
+// TODO: change to "gains advantage on melee attacks until the end of your turn"
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
     description: Condition::Raging.description(),

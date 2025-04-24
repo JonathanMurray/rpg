@@ -152,14 +152,18 @@ impl TopCharacterPortrait {
                 Element::Text(name_text_line),
                 Element::RcRefCell(cloned_ap_row),
             ],
-            margin: 3.0,
+            margin: 1.0,
+            style: Style {
+                padding: 1.0,
+                ..Default::default()
+            },
             ..Default::default()
         };
 
         let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
             character.health.max,
             RED,
-            (container.content_size().0, 6.0),
+            (action_points_row.borrow().size().0, 8.0),
         )));
 
         container
@@ -641,6 +645,11 @@ impl Drawable for ActionPointsRow {
         }
 
         self.style.draw(x, y, self.size());
+
+        if reserved_ap > self.max_ap {
+            let (w, h) = self.size();
+            draw_rectangle_lines(x, y, w, h, 2.0, RED);
+        }
     }
 
     fn size(&self) -> (f32, f32) {
@@ -693,8 +702,22 @@ impl Drawable for ResourceBar {
                     }
 
                     if i > 0 {
-                        let space = 4.0;
-                        draw_line(x0, y0 + space, x0, y0 + cell_size.1 - space, 1.0, DARKGRAY);
+                        let thick = if self.max < 8 { true } else { i % 5 == 0 };
+
+                        let (thickness, color, space) = if thick {
+                            (2.0, BLACK, self.cell_size.1 * 0.14)
+                        } else {
+                            (1.0, DARKGRAY, self.cell_size.1 * 0.3)
+                        };
+
+                        draw_line(
+                            x0,
+                            y0 + space,
+                            x0,
+                            y0 + cell_size.1 - space,
+                            thickness,
+                            color,
+                        );
                     }
                     x0 += cell_size.0;
                 }
@@ -712,8 +735,26 @@ impl Drawable for ResourceBar {
                     }
 
                     if i > 0 {
-                        let space = 4.0;
-                        draw_line(x0 + space, y0, x0 + cell_size.0 - space, y0, 1.0, DARKGRAY);
+                        let thick = if self.max < 8 {
+                            true
+                        } else {
+                            (self.max - i) % 5 == 0
+                        };
+
+                        let (thickness, color, space) = if thick {
+                            (2.0, BLACK, self.cell_size.0 * 0.14)
+                        } else {
+                            (1.0, DARKGRAY, self.cell_size.0 * 0.3)
+                        };
+
+                        draw_line(
+                            x0 + space,
+                            y0,
+                            x0 + cell_size.0 - space,
+                            y0,
+                            thickness,
+                            color,
+                        );
                     }
                     y0 += cell_size.1;
                 }

@@ -35,12 +35,13 @@ impl CoreGame {
             "Bob",
             PortraitId::Portrait2,
             SpriteId::Character,
-            Attributes::new(5, 2, 4, 5),
+            Attributes::new(4, 4, 10, 10),
             (1, 5),
         );
         bob.main_hand.weapon = Some(BOW);
         bob.off_hand.shield = Some(SMALL_SHIELD);
         bob.armor = Some(CHAIN_MAIL);
+        bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_attack_enhancements.push(EFFICIENT);
@@ -221,16 +222,12 @@ impl CoreGame {
             }
             Action::Move {
                 action_point_cost,
+                stamina_cost,
                 positions,
-                enhancements,
             } => {
                 let character = self.active_character();
                 character.action_points.spend(action_point_cost);
-                for enhancement in &enhancements {
-                    character.action_points.spend(enhancement.action_point_cost);
-                    character.stamina.spend(enhancement.stamina_cost);
-                }
-
+                character.stamina.spend(stamina_cost);
                 self.perform_movement(positions).await;
                 None
             }
@@ -1614,8 +1611,8 @@ pub enum Action {
     },
     Move {
         positions: Vec<Position>,
-        enhancements: Vec<MovementEnhancement>,
         action_point_cost: u32,
+        stamina_cost: u32,
     },
 }
 
@@ -1633,23 +1630,17 @@ pub enum BaseAction {
         action_point_cost: u32,
     },
     CastSpell(Spell),
-    Move {
-        range: f32,
-        action_point_cost: u32,
-    },
+    Move,
 }
 
 impl BaseAction {
     pub fn action_point_cost(&self) -> u32 {
         match self {
             BaseAction::Attack {
-                hand: _,
-                action_point_cost,
-            } => *action_point_cost,
-            BaseAction::CastSpell(spell) => spell.action_point_cost,
-            BaseAction::Move {
                 action_point_cost, ..
             } => *action_point_cost,
+            BaseAction::CastSpell(spell) => spell.action_point_cost,
+            BaseAction::Move => 0,
         }
     }
 
@@ -1657,7 +1648,7 @@ impl BaseAction {
         match self {
             BaseAction::Attack { .. } => 0,
             BaseAction::CastSpell(spell) => spell.mana_cost,
-            BaseAction::Move { .. } => 0,
+            BaseAction::Move => 0,
         }
     }
 
@@ -1665,7 +1656,7 @@ impl BaseAction {
         match self {
             BaseAction::Attack { .. } => 0,
             BaseAction::CastSpell(spell) => spell.stamina_cost,
-            BaseAction::Move { .. } => 0,
+            BaseAction::Move => 0,
         }
     }
 }
@@ -1797,15 +1788,6 @@ pub enum SpellContestType {
     Projectile,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct MovementEnhancement {
-    pub name: &'static str,
-    pub action_point_cost: u32,
-    pub icon: IconId,
-    pub stamina_cost: u32,
-    pub add_percentage: u32,
-}
-
 #[derive(Debug, Copy, Clone, Default)]
 pub struct Hand {
     weapon: Option<Weapon>,
@@ -1852,7 +1834,7 @@ pub struct Character {
     pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
-    pub move_range: f32,
+    pub move_speed: f32,
     pub capacity: u32,
     pub armor: Option<ArmorPiece>,
     main_hand: Hand,
@@ -1867,8 +1849,6 @@ pub struct Character {
     known_on_hit_reactions: Vec<OnHitReaction>,
 }
 
-pub const MOVE_ACTION_COST: u32 = 1;
-
 impl Character {
     fn new(
         player_controlled: bool,
@@ -1881,7 +1861,7 @@ impl Character {
         let max_health = 6 + base_attributes.strength;
         let max_mana = (base_attributes.spirit * 2).saturating_sub(5);
 
-        let move_range = 0.9 + base_attributes.agility as f32 * 0.1;
+        let move_speed = 0.5 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
         let max_reactive_action_points = base_attributes.intellect / 2;
         let capacity = base_attributes.strength * 2;
@@ -1896,7 +1876,7 @@ impl Character {
             base_attributes,
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
-            move_range,
+            move_speed,
             capacity,
             armor: None,
             main_hand: Default::default(),
@@ -1916,10 +1896,7 @@ impl Character {
                     action_point_cost: 0,
                 },
                 //BaseAction::SelfEffect(BRACE),
-                BaseAction::Move {
-                    action_point_cost: MOVE_ACTION_COST,
-                    range: move_range,
-                },
+                BaseAction::Move,
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
@@ -2072,7 +2049,7 @@ impl Character {
                     )
                 }),
                 BaseAction::CastSpell(_spell) => Some(("", *action)),
-                BaseAction::Move { .. } => Some(("", *action)),
+                BaseAction::Move => Some(("", *action)),
             })
             .collect()
     }
@@ -2102,9 +2079,7 @@ impl Character {
                     && self.stamina.current() >= spell.stamina_cost
                     && self.mana.current() >= spell.mana_cost
             }
-            BaseAction::Move {
-                action_point_cost, ..
-            } => ap >= action_point_cost,
+            BaseAction::Move => ap > 0,
         }
     }
 
@@ -2142,56 +2117,6 @@ impl Character {
         let weapon = self.weapon(attack_hand).unwrap();
         self.action_points.current() >= weapon.action_point_cost + enhancement.action_point_cost
             && self.stamina.current() >= enhancement.stamina_cost
-    }
-
-    pub fn usable_movement_enhancements(&self) -> Vec<(String, MovementEnhancement)> {
-        let mut enhancements = vec![
-            (
-                "1.5x".to_string(),
-                MovementEnhancement {
-                    name: "Sprint",
-                    icon: IconId::X1point5,
-                    action_point_cost: 0,
-                    stamina_cost: 1,
-                    add_percentage: 50,
-                },
-            ),
-            (
-                "2x".to_string(),
-                MovementEnhancement {
-                    name: "Extended",
-                    icon: IconId::X2,
-                    action_point_cost: 1,
-                    stamina_cost: 0,
-                    add_percentage: 100,
-                },
-            ),
-            (
-                "2.5x".to_string(),
-                MovementEnhancement {
-                    name: "Extended + sprint",
-                    icon: IconId::X3,
-                    action_point_cost: 1,
-                    stamina_cost: 1,
-                    add_percentage: 150,
-                },
-            ),
-            (
-                "3x".to_string(),
-                MovementEnhancement {
-                    name: "Extended + 2 sprint",
-                    icon: IconId::X3,
-                    action_point_cost: 1,
-                    stamina_cost: 2,
-                    add_percentage: 200,
-                },
-            ),
-        ];
-        enhancements.retain(|(_, enhancement)| {
-            self.action_points.current() >= MOVE_ACTION_COST + enhancement.action_point_cost
-                && self.stamina.current() >= enhancement.stamina_cost
-        });
-        enhancements
     }
 
     pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {

@@ -17,7 +17,7 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, BaseAction, Character, MovementEnhancement,
+        ApplyEffect, AttackEnhancement, BaseAction, Character,
         OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
         SpellEnemyEffect, SpellEnhancement, SpellTarget,
     },
@@ -48,15 +48,6 @@ fn button_action_tooltip(
         },
 
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
-        ButtonAction::MovementEnhancement(enhancement) => ActionButtonTooltip {
-            header: format!(
-                "{} ({})",
-                enhancement.name,
-                cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
-            ),
-            description: None,
-            technical_description: vec![format!("+{}% range", enhancement.add_percentage)],
-        },
         ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
             header: format!(
                 "{} ({})",
@@ -132,11 +123,8 @@ fn base_action_tooltip(
             }
         }
         BaseAction::CastSpell(spell) => spell_tooltip(spell),
-        BaseAction::Move {
-            action_point_cost,
-            range: _,
-        } => ActionButtonTooltip {
-            header: format!("Movement ({} AP)", action_point_cost),
+        BaseAction::Move => ActionButtonTooltip {
+            header: "Movement".to_string(),
             description: None,
             technical_description: Default::default(),
         },
@@ -295,7 +283,6 @@ impl ActionButton {
 
         let (size, texture_draw_size) = match action {
             ButtonAction::Proceed => ((64.0, 52.0), (60.0, 48.0)),
-            ButtonAction::MovementEnhancement(..) => ((36.0, 64.0), (36.0, 48.0)),
             _ => ((64.0, 64.0), (60.0, 48.0)),
         };
 
@@ -510,7 +497,6 @@ pub enum ButtonAction {
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
     SpellEnhancement(SpellEnhancement),
-    MovementEnhancement(MovementEnhancement),
     Proceed,
 }
 
@@ -520,11 +506,10 @@ impl ButtonAction {
             ButtonAction::Action(base_action) => match base_action {
                 BaseAction::Attack { .. } => IconId::Attack,
                 BaseAction::CastSpell(spell) => spell.icon,
-                BaseAction::Move { .. } => IconId::Move,
+                BaseAction::Move => IconId::Move,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,
-            ButtonAction::MovementEnhancement(enhancement) => enhancement.icon,
             ButtonAction::OnAttackedReaction(reaction) => reaction.icon,
             ButtonAction::OnHitReaction(reaction) => reaction.icon,
             ButtonAction::Proceed => IconId::Go,
@@ -539,7 +524,6 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
-            ButtonAction::MovementEnhancement(enhancement) => enhancement.action_point_cost,
         }
     }
 
@@ -551,7 +535,6 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(..) => 0,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::Proceed => 0,
-            ButtonAction::MovementEnhancement(..) => 0,
         }
     }
 
@@ -563,14 +546,6 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::SpellEnhancement(_enhancement) => 0,
             ButtonAction::Proceed => 0,
-            ButtonAction::MovementEnhancement(enhancement) => enhancement.stamina_cost,
-        }
-    }
-
-    pub fn unwrap_movement_enhancement(&self) -> MovementEnhancement {
-        match self {
-            ButtonAction::MovementEnhancement(enhancement) => *enhancement,
-            _ => panic!(),
         }
     }
 
