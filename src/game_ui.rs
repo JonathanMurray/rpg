@@ -683,11 +683,11 @@ impl UserInterface {
 
         let mut explanation = String::new();
 
-        for (term, _goodness) in attacker.explain_attack_bonus(hand, attack_enhancements) {
+        for (term, _bonus) in attacker.outgoing_attack_bonuses(hand, attack_enhancements) {
             explanation.push_str(&term);
             explanation.push(' ');
         }
-        for (term, _goodness) in defender.explain_incoming_attack_circumstances(reaction) {
+        for (term, _bonus) in defender.incoming_attack_bonuses(reaction) {
             explanation.push_str(&term);
             explanation.push(' ');
         }
@@ -1136,16 +1136,15 @@ impl UserInterface {
 
                         let mut details = vec![];
 
-                        for (term, goodness) in self
+                        for (term, bonus) in self
                             .active_character()
-                            .explain_attack_bonus(hand, &enhancements)
+                            .outgoing_attack_bonuses(hand, &enhancements)
                         {
-                            details.push((term, goodness));
+                            details.push((term.to_string(), bonus.goodness()));
                         }
-                        for (term, goodness) in
-                            target_char.explain_incoming_attack_circumstances(defender_reaction)
+                        for (term, bonus) in target_char.incoming_attack_bonuses(defender_reaction)
                         {
-                            details.push((term, goodness));
+                            details.push((term.to_string(), bonus.goodness()));
                         }
 
                         if let Some((_advantage, term, goodness)) = circumstance_advantage {

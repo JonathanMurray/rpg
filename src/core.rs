@@ -8,7 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, PARRY_EVASION_BONUS, RAGE, SWORD,
+    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, RAGE, SWORD, WAR_HAMMER,
 };
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -28,18 +28,17 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 0;
+        let active_character_id = 1;
 
         let mut bob = Character::new(
             true,
             "Bob",
             PortraitId::Portrait2,
             SpriteId::Character,
-            Attributes::new(4, 4, 10, 10),
+            Attributes::new(3, 1, 10, 10),
             (1, 5),
         );
-        bob.main_hand.weapon = Some(BOW);
-        bob.off_hand.shield = Some(SMALL_SHIELD);
+        bob.main_hand.weapon = Some(WAR_HAMMER);
         bob.armor = Some(CHAIN_MAIL);
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attack_enhancements.push(OVERWHELMING);
@@ -53,10 +52,6 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
         bob.known_actions.push(BaseAction::CastSpell(BRACE));
-
-        bob.receive_condition(Condition::Braced);
-        bob.receive_condition(Condition::Bleeding(2));
-        bob.receive_condition(Condition::Dazed(2));
 
         let mut enemy1 = Character::new(
             false,
@@ -72,7 +67,7 @@ impl CoreGame {
         enemy1.known_attacked_reactions.push(SIDE_STEP);
 
         let mut enemy2 = Character::new(
-            true,
+            false,
             "Gromp",
             PortraitId::Portrait3,
             SpriteId::Character3,
@@ -103,6 +98,13 @@ impl CoreGame {
     }
 
     pub async fn run(mut self) {
+        for char in self.characters.iter() {
+            let encumbrance = char.equipment_weight() as i32 - char.capacity as i32;
+            if encumbrance > 0 {
+                char.receive_condition(Condition::Encumbered(encumbrance as u32));
+            }
+        }
+
         loop {
             let action = self.ui_select_action().await;
 
@@ -875,38 +877,27 @@ impl CoreGame {
 
             detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
 
-            match reaction.effect {
-                OnAttackedReactionEffect::Parry => {
+            if reaction.effect.bonus_evasion > 0 {
+                let bonus_evasion = reaction.effect.bonus_evasion;
+
+                detail_lines.push(format!(
+                    "  Evasion: {} +{} ({}) = {}",
+                    evasion,
+                    bonus_evasion,
+                    reaction.name,
+                    evasion + bonus_evasion
+                ));
+                evasion += bonus_evasion;
+                let p_hit = probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
+                detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
+            }
+
+            match reaction.id {
+                OnAttackedReactionId::Parry => {
                     defender_reacted_with_parry = true;
-                    let bonus_evasion = PARRY_EVASION_BONUS;
-
-                    detail_lines.push(format!(
-                        "  Evasion: {} +{} (Parry) = {}",
-                        evasion,
-                        bonus_evasion,
-                        evasion + bonus_evasion
-                    ));
-                    evasion += bonus_evasion;
-                    let p_hit =
-                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
-                    detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
-                OnAttackedReactionEffect::SideStep => {
+                OnAttackedReactionId::SideStep => {
                     defender_reacted_with_sidestep = true;
-                    let bonus_evasion = defender.evasion_from_agility();
-                    detail_lines.push(format!(
-                        "  Evasion: {} +{} (Side step) = {}",
-                        evasion,
-                        bonus_evasion,
-                        evasion + bonus_evasion
-                    ));
-                    evasion += bonus_evasion;
-
-                    let p_hit = probability_of_d20_reaching(
-                        evasion.saturating_sub(attack_modifier),
-                        attack_bonus,
-                    );
-                    detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
                 }
             }
         }
@@ -1276,12 +1267,9 @@ pub fn attack_roll_bonus(
     circumstance_advantage: i32,
     enhancements: &[AttackEnhancement],
 ) -> DiceRollBonus {
-    let mut bonus = attacker.attack_roll_bonus(hand);
+    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements);
     bonus.advantage += defender.incoming_attack_advantage();
     bonus.advantage += circumstance_advantage;
-    for enhancement in enhancements {
-        bonus.advantage += enhancement.bonus_advantage as i32;
-    }
     bonus
 }
 
@@ -1303,10 +1291,7 @@ pub fn prob_attack_hit(
     let mut evasion = defender.evasion();
 
     if let Some(reaction) = reaction {
-        match reaction.effect {
-            OnAttackedReactionEffect::Parry => evasion += PARRY_EVASION_BONUS,
-            OnAttackedReactionEffect::SideStep => evasion += defender.evasion_from_agility(),
-        }
+        evasion += reaction.effect.bonus_evasion;
     }
 
     let dice_target = evasion
@@ -1426,20 +1411,25 @@ pub enum ApplyEffect {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnAttackedReaction {
+    pub id: OnAttackedReactionId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
-
     pub must_be_melee: bool,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum OnAttackedReactionEffect {
+pub enum OnAttackedReactionId {
     Parry,
     SideStep,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct OnAttackedReactionEffect {
+    pub bonus_evasion: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1490,45 +1480,52 @@ pub enum Condition {
     Weakened(u32),
     MainHandExertion(u32),
     OffHandExertion(u32),
+    Encumbered(u32),
 }
 
 impl Condition {
     const fn stacks(&mut self) -> Option<&mut u32> {
+        use Condition::*;
         match self {
-            Condition::Protected(n) => Some(n),
-            Condition::Dazed(n) => Some(n),
-            Condition::Bleeding(n) => Some(n),
-            Condition::Braced => None,
-            Condition::Raging => None,
-            Condition::Weakened(n) => Some(n),
-            Condition::MainHandExertion(n) => Some(n),
-            Condition::OffHandExertion(n) => Some(n),
+            Protected(n) => Some(n),
+            Dazed(n) => Some(n),
+            Bleeding(n) => Some(n),
+            Braced => None,
+            Raging => None,
+            Weakened(n) => Some(n),
+            MainHandExertion(n) => Some(n),
+            OffHandExertion(n) => Some(n),
+            Encumbered(n) => Some(n),
         }
     }
 
     pub const fn name(&self) -> &'static str {
+        use Condition::*;
         match self {
-            Condition::Protected(_) => "Protected",
-            Condition::Dazed(_) => "Dazed",
-            Condition::Bleeding(_) => "Bleeding",
-            Condition::Braced => "Braced",
-            Condition::Raging => "Raging",
-            Condition::Weakened(_) => "Weakened",
-            Condition::MainHandExertion(_) => "Exerted (main-hand)",
-            Condition::OffHandExertion(_) => "Exerted (off-hand)",
+            Protected(_) => "Protected",
+            Dazed(_) => "Dazed",
+            Bleeding(_) => "Bleeding",
+            Braced => "Braced",
+            Raging => "Raging",
+            Weakened(_) => "Weakened",
+            MainHandExertion(_) => "Exerted (main-hand)",
+            OffHandExertion(_) => "Exerted (off-hand)",
+            Encumbered(_) => "Encumbered",
         }
     }
 
     pub const fn description(&self) -> &'static str {
+        use Condition::*;
         match self {
-            Condition::Protected(_) => "Gains +3 armor",
-            Condition::Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
-            Condition::Bleeding(_) => "Loses 1 health at end of turn",
-            Condition::Braced => "Gain +3 evasion against the next incoming attack",
-            Condition::Raging => "Gains advantage on the next attack",
-            Condition::Weakened(_) => "-1 to attributes for each stack",
-            Condition::MainHandExertion(_) => "-1 per stack on further similar actions",
-            Condition::OffHandExertion(_) => "-1 per stack on further similar actions",
+            Protected(_) => "Gains +3 armor",
+            Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
+            Bleeding(_) => "Loses 1 health at end of turn",
+            Braced => "Gain +3 evasion against the next incoming attack",
+            Raging => "Gains advantage on melee attacks until end of turn",
+            Weakened(_) => "-1 to attributes for each stack",
+            MainHandExertion(_) => "-1 per stack on further similar actions",
+            OffHandExertion(_) => "-1 per stack on further similar actions",
+            Encumbered(_) => "-1 to Evasion per stack and -1 to all dice rolls per 2 stacks",
         }
     }
 
@@ -1563,6 +1560,7 @@ struct Conditions {
     weakened: u32,
     mainhand_exertion: u32,
     offhand_exertion: u32,
+    encumbered: u32,
 }
 
 impl Conditions {
@@ -1591,6 +1589,9 @@ impl Conditions {
         }
         if self.offhand_exertion > 0 {
             result.push(Condition::OffHandExertion(self.offhand_exertion).info());
+        }
+        if self.encumbered > 0 {
+            result.push(Condition::Encumbered(self.encumbered).info());
         }
 
         result
@@ -2235,7 +2236,9 @@ impl Character {
         } else {
             0
         };
-        10 + from_agi + from_int + from_shield + from_braced
+        let penalty_from_encumbrance = self.conditions.borrow().encumbered;
+        (10 + from_agi + from_int + from_shield + from_braced)
+            .saturating_sub(penalty_from_encumbrance)
     }
 
     fn evasion_from_agility(&self) -> u32 {
@@ -2295,15 +2298,19 @@ impl Character {
         }
     }
 
-    fn attack_roll_bonus(&self, hand_type: HandType) -> DiceRollBonus {
-        let flat_amount = -(self.hand_exertion(hand_type) as i32);
-
+    fn outgoing_attack_roll_bonus(
+        &self,
+        hand_type: HandType,
+        enhancements: &[AttackEnhancement],
+    ) -> DiceRollBonus {
         let mut advantage = 0i32;
-        if self.is_dazed() {
-            advantage -= 1;
-        }
-        if self.conditions.borrow().raging {
-            advantage += 1;
+        let mut flat_amount = 0;
+        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements) {
+            match bonus {
+                AttackBonus::Advantage(n) => advantage += n,
+                AttackBonus::FlatAmount(n) => flat_amount += n,
+                AttackBonus::OtherNegative | AttackBonus::OtherPositive => {}
+            }
         }
 
         DiceRollBonus {
@@ -2312,57 +2319,69 @@ impl Character {
         }
     }
 
-    pub fn explain_attack_bonus(
+    pub fn outgoing_attack_bonuses(
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
-    ) -> Vec<(String, Goodness)> {
-        let mut terms = vec![];
+    ) -> Vec<(&'static str, AttackBonus)> {
+        let mut bonuses = vec![];
         for enhancement in enhancements {
             if enhancement.bonus_advantage > 0 {
-                terms.push((enhancement.name.to_string(), Goodness::Good));
+                bonuses.push((
+                    enhancement.name,
+                    AttackBonus::Advantage(enhancement.bonus_advantage as i32),
+                ));
             }
         }
-        if self.hand_exertion(hand_type) > 0 {
-            terms.push(("Exerted".to_string(), Goodness::Bad));
+        let exertion_penalty = self.hand_exertion(hand_type) as i32;
+        if exertion_penalty > 0 {
+            bonuses.push(("Exerted", AttackBonus::FlatAmount(-exertion_penalty)));
         }
         if self.is_dazed() {
-            terms.push(("Dazed".to_string(), Goodness::Bad));
+            bonuses.push(("Dazed", AttackBonus::Advantage(-1)));
         }
         if self.conditions.borrow().raging {
-            terms.push(("Raging".to_string(), Goodness::Good));
+            if self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
+                bonuses.push(("Raging", AttackBonus::Advantage(1)));
+            }
         }
         if self.conditions.borrow().weakened > 0 {
-            terms.push(("Weakened".to_string(), Goodness::Bad));
+            bonuses.push(("Weakened", AttackBonus::OtherNegative));
         }
-        terms
+
+        let encumbrance_penalty = (self.conditions.borrow().encumbered / 2) as i32;
+        if encumbrance_penalty > 0 {
+            bonuses.push((
+                "Encumbered",
+                AttackBonus::FlatAmount(-(encumbrance_penalty)),
+            ));
+        }
+
+        bonuses
     }
 
     fn incoming_attack_advantage(&self) -> i32 {
         0
     }
 
-    pub fn explain_incoming_attack_circumstances(
+    pub fn incoming_attack_bonuses(
         &self,
         reaction: Option<OnAttackedReaction>,
-    ) -> Vec<(String, Goodness)> {
+    ) -> Vec<(&'static str, AttackBonus)> {
         let mut terms = vec![];
         if self.is_dazed() {
-            terms.push(("Dazed".to_string(), Goodness::Good));
+            terms.push(("Dazed", AttackBonus::OtherPositive));
         }
         if self.conditions.borrow().weakened > 0 {
-            terms.push(("Weakened".to_string(), Goodness::Good));
+            terms.push(("Weakened", AttackBonus::OtherPositive));
         }
         if self.conditions.borrow().braced {
-            terms.push(("Braced".to_string(), Goodness::Bad));
+            terms.push(("Braced", AttackBonus::OtherNegative));
         }
 
         if let Some(reaction) = reaction {
-            match reaction.effect {
-                OnAttackedReactionEffect::Parry => terms.push(("Parry".to_string(), Goodness::Bad)),
-                OnAttackedReactionEffect::SideStep => {
-                    terms.push(("Sidestep".to_string(), Goodness::Bad))
-                }
+            if reaction.effect.bonus_evasion > 0 {
+                terms.push((reaction.name, AttackBonus::OtherNegative));
             }
         }
 
@@ -2371,15 +2390,17 @@ impl Character {
 
     fn receive_condition(&self, condition: Condition) {
         let mut conditions = self.conditions.borrow_mut();
+        use Condition::*;
         match condition {
-            Condition::Protected(n) => conditions.protected += n,
-            Condition::Dazed(n) => conditions.dazed += n,
-            Condition::Bleeding(n) => conditions.bleeding += n,
-            Condition::Braced => conditions.braced = true,
-            Condition::Raging => conditions.raging = true,
-            Condition::Weakened(n) => conditions.weakened += n,
-            Condition::MainHandExertion(n) => conditions.mainhand_exertion += n,
-            Condition::OffHandExertion(n) => conditions.offhand_exertion += n,
+            Protected(n) => conditions.protected += n,
+            Dazed(n) => conditions.dazed += n,
+            Bleeding(n) => conditions.bleeding += n,
+            Braced => conditions.braced = true,
+            Raging => conditions.raging = true,
+            Weakened(n) => conditions.weakened += n,
+            MainHandExertion(n) => conditions.mainhand_exertion += n,
+            OffHandExertion(n) => conditions.offhand_exertion += n,
+            Encumbered(n) => conditions.encumbered += n,
         }
     }
 }
@@ -2596,6 +2617,40 @@ impl From<Range> for f32 {
             Range::Ranged(r) => r as f32,
             Range::ExtendableRanged(r) => r as f32,
             Range::Float(f) => f,
+        }
+    }
+}
+
+pub enum AttackBonus {
+    Advantage(i32),
+    FlatAmount(i32),
+    OtherNegative,
+    OtherPositive,
+}
+
+impl AttackBonus {
+    pub fn goodness(&self) -> Goodness {
+        match self {
+            AttackBonus::Advantage(n) => {
+                if *n > 0 {
+                    Goodness::Good
+                } else if *n < 0 {
+                    Goodness::Bad
+                } else {
+                    unreachable!()
+                }
+            }
+            AttackBonus::FlatAmount(n) => {
+                if *n > 0 {
+                    Goodness::Good
+                } else if *n < 0 {
+                    Goodness::Bad
+                } else {
+                    unreachable!()
+                }
+            }
+            AttackBonus::OtherNegative => Goodness::Bad,
+            AttackBonus::OtherPositive => Goodness::Good,
         }
     }
 }

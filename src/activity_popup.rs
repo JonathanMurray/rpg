@@ -1,15 +1,8 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{
-        BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE,
-        YELLOW,
-    },
+    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -279,10 +272,7 @@ impl ActivityPopup {
     fn are_choice_buttons_mutually_exclusive(&self) -> bool {
         matches!(self.state, UiState::ReactingToAttack { .. })
             || matches!(self.state, UiState::ReactingToHit { .. })
-            || matches!(
-                self.state,
-                UiState::ConfiguringAction(BaseAction::Move)
-            )
+            || matches!(self.state, UiState::ConfiguringAction(BaseAction::Move))
     }
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {

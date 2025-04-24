@@ -412,7 +412,7 @@ impl GameGrid {
         )
     }
 
-    fn fill_cell(&self, (grid_x, grid_y): Position, color: Color, margin:f32) {
+    fn fill_cell(&self, (grid_x, grid_y): Position, color: Color, margin: f32) {
         draw_rectangle(
             self.grid_x_to_screen(grid_x) + margin,
             self.grid_y_to_screen(grid_y) + margin,
@@ -602,10 +602,7 @@ impl GameGrid {
             }
         }
 
-        if matches!(
-            ui_state,
-            UiState::ConfiguringAction(BaseAction::Move)
-        ) {
+        if matches!(ui_state, UiState::ConfiguringAction(BaseAction::Move)) {
             self.draw_movement_path_background();
         }
 
@@ -676,7 +673,6 @@ impl GameGrid {
             }
             _ => {}
         }
-
 
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {

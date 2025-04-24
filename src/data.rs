@@ -3,10 +3,10 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect, OnHitReaction,
-        OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
-        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget, Weapon,
-        WeaponGrip, WeaponRange,
+        AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect,
+        OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield, Spell,
+        SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
+        SpellEnhancementEffect, SpellTarget, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -173,29 +173,28 @@ pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     on_hit_effect: None,
 };
 
-pub const PARRY_EVASION_BONUS: u32 = 3;
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
+    id: OnAttackedReactionId::Parry,
     name: "Parry",
-    description: "Gain +3 evasion against one melee attack",
+    description: "Gain bonus evasion against one melee attack",
     icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 0,
-    effect: OnAttackedReactionEffect::Parry,
+    effect: OnAttackedReactionEffect { bonus_evasion: 4 },
     must_be_melee: true,
 };
 
-// TODO: instead grant a d6 to evasion
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
+    id: OnAttackedReactionId::SideStep,
     name: "Side step",
-    description: "Double your evasion gained from agility",
+    description: "Gain bonus evasion against one attack",
     icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 1,
-    effect: OnAttackedReactionEffect::SideStep,
+    effect: OnAttackedReactionEffect { bonus_evasion: 4 },
     must_be_melee: false,
 };
 
-// TODO: change to "gains advantage on melee attacks until the end of your turn"
 pub const RAGE: OnHitReaction = OnHitReaction {
     name: "Rage",
     description: Condition::Raging.description(),

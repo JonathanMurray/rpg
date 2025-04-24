@@ -17,9 +17,9 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, BaseAction, Character,
-        OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
-        SpellEnemyEffect, SpellEnhancement, SpellTarget,
+        ApplyEffect, AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction,
+        Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
+        SpellTarget,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
