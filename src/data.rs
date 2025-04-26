@@ -123,6 +123,7 @@ pub const BOW: Weapon = Weapon {
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),
+    icon: EquipmentIconId::SmallShield,
     evasion: 3,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",

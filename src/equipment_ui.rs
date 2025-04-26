@@ -117,8 +117,7 @@ pub fn build_inventory_section(
         .map(|slot| Rc::new(RefCell::new(slot)))
         .collect();
 
-    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> =
-        slots.iter().map(Rc::clone).collect();
+    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
 
     let mut rows = vec![];
 
@@ -175,7 +174,7 @@ pub fn build_equipped_section(
     }
     if let Some(shield) = character.shield() {
         let icon_cell = &mut slots[2];
-        let texture = equipment_icons[&EquipmentIconId::SmallShield].clone();
+        let texture = equipment_icons[&shield.icon].clone();
         *icon_cell = Some(EquipmentSlot::new(
             font.clone(),
             Some((texture, EquipmentEntry::Shield(shield))),
@@ -319,6 +318,16 @@ pub struct EquipmentSlotContent {
     tooltip_lines: Vec<String>,
 }
 
+impl EquipmentSlotContent {
+    pub fn new(texture: Texture2D, equipment: EquipmentEntry) -> Self {
+        Self {
+            texture,
+            tooltip_lines: tooltip(&equipment),
+            equipment,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub enum SlotMouseEvent {
     Pressed,
@@ -340,11 +349,8 @@ impl EquipmentSlot {
                 ..Default::default()
             },
             size: (40.0, 40.0),
-            content: content.map(|(texture, equipment)| EquipmentSlotContent {
-                texture,
-                tooltip_lines: tooltip(&equipment),
-                equipment,
-            }),
+            content: content
+                .map(|(texture, equipment)| EquipmentSlotContent::new(texture, equipment)),
             last_drawn_rect: Default::default(),
             role,
         }

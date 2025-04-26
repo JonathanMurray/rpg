@@ -626,6 +626,7 @@ impl GameGrid {
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
                 BaseAction::Move => MouseState::MayInputMovement,
+                BaseAction::ChangeEquipment => MouseState::None,
             },
             _ => MouseState::None,
         };

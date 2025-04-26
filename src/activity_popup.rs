@@ -514,6 +514,7 @@ impl ActivityPopup {
                             popup_buttons.push(btn);
                         }
                     }
+
                     BaseAction::CastSpell(spell) => {
                         for enhancement in spell.possible_enhancements.iter().flatten().copied() {
                             if self
@@ -527,6 +528,7 @@ impl ActivityPopup {
                             }
                         }
                     }
+
                     BaseAction::Move => {
                         let active_char = self.characters.get(active_character_id);
                         let speed = active_char.move_speed;
@@ -537,6 +539,10 @@ impl ActivityPopup {
                                 stamina.current().min(active_char.action_points.current());
                             stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));
                         }
+                    }
+
+                    BaseAction::ChangeEquipment => {
+                        //lines.push("CHANGING EQUIPMENT".to_string());
                     }
                 }
             }

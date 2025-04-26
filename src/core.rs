@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 
 use std::fmt::Display;
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use macroquad::color::Color;
 
@@ -39,7 +39,7 @@ impl CoreGame {
             (1, 5),
         );
         //bob.set_weapon(HandType::MainHand, SWORD);
-        bob.set_shield(SMALL_SHIELD);
+        bob.set_weapon(HandType::MainHand, SWORD);
         bob.armor.set(Some(CHAIN_MAIL));
 
         bob.known_attack_enhancements.push(OVERWHELMING);
@@ -246,6 +246,7 @@ impl CoreGame {
                 self.perform_spell(spell, enhancements, target).await;
                 None
             }
+
             Action::Move {
                 action_point_cost,
                 stamina_cost,
@@ -257,6 +258,17 @@ impl CoreGame {
                 self.perform_movement(positions).await;
                 None
             }
+
+            Action::ChangeEquipment { from, to } => {
+                let character = self.active_character();
+                character.action_points.spend(1);
+                let from_content = character.equipment(from);
+                let to_content = character.equipment(to);
+                character.set_equipment(from_content, to);
+                character.set_equipment(to_content, from);
+
+                None
+            }
         }
     }
 
@@ -266,23 +278,6 @@ impl CoreGame {
 
     async fn ui_select_action(&self) -> Option<Action> {
         self.user_interface.select_action(self).await
-    }
-
-    async fn ui_choose_hit_reaction(
-        &self,
-        victim_id: CharacterId,
-        damage: u32,
-        is_within_melee: bool,
-    ) -> Option<OnHitReaction> {
-        self.user_interface
-            .choose_hit_reaction(
-                self,
-                self.active_character_id,
-                victim_id,
-                damage,
-                is_within_melee,
-            )
-            .await
     }
 
     async fn perform_movement(&self, mut positions: Vec<Position>) {
@@ -1656,6 +1651,10 @@ pub enum Action {
         action_point_cost: u32,
         stamina_cost: u32,
     },
+    ChangeEquipment {
+        from: EquipmentSlotRole,
+        to: EquipmentSlotRole,
+    },
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1673,6 +1672,7 @@ pub enum BaseAction {
     },
     CastSpell(Spell),
     Move,
+    ChangeEquipment,
 }
 
 impl BaseAction {
@@ -1683,6 +1683,7 @@ impl BaseAction {
             } => *action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move => 0,
+            BaseAction::ChangeEquipment => 1,
         }
     }
 
@@ -1691,6 +1692,7 @@ impl BaseAction {
             BaseAction::Attack { .. } => 0,
             BaseAction::CastSpell(spell) => spell.mana_cost,
             BaseAction::Move => 0,
+            BaseAction::ChangeEquipment => 0,
         }
     }
 
@@ -1699,6 +1701,7 @@ impl BaseAction {
             BaseAction::Attack { .. } => 0,
             BaseAction::CastSpell(spell) => spell.stamina_cost,
             BaseAction::Move => 0,
+            BaseAction::ChangeEquipment => 0,
         }
     }
 }
@@ -1908,6 +1911,8 @@ pub struct Character {
     known_actions: Vec<BaseAction>,
     known_attacked_reactions: Vec<OnAttackedReaction>,
     known_on_hit_reactions: Vec<OnHitReaction>,
+
+    changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 }
 
 impl Character {
@@ -1955,10 +1960,19 @@ impl Character {
                 },
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
+                BaseAction::ChangeEquipment,
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
+            changed_equipment_listeners: Default::default(),
         }
+    }
+
+    pub fn listen_to_changed_equipment(&self) -> Rc<Cell<bool>> {
+        let signal = Rc::new(Cell::new(false));
+        let weak = Rc::downgrade(&signal);
+        self.changed_equipment_listeners.borrow_mut().push(weak);
+        signal
     }
 
     pub fn can_equipment_fit(&self, equipment: EquipmentEntry, role: EquipmentSlotRole) -> bool {
@@ -2046,21 +2060,49 @@ impl Character {
         self.hand(hand).get().weapon
     }
 
-    pub fn set_weapon(&self, hand_type: HandType, weapon: Weapon) {
+    pub fn shield(&self) -> Option<Shield> {
+        self.hand(HandType::OffHand).get().shield
+    }
+
+    pub fn equipment(&self, slot_role: EquipmentSlotRole) -> Option<EquipmentEntry> {
+        match slot_role {
+            EquipmentSlotRole::MainHand => self
+                .weapon(HandType::MainHand)
+                .map(|weapon| EquipmentEntry::Weapon(weapon)),
+            EquipmentSlotRole::OffHand => {
+                self.shield().map(|shield| EquipmentEntry::Shield(shield))
+            }
+            EquipmentSlotRole::Armor => self.armor.get().map(|armor| EquipmentEntry::Armor(armor)),
+            EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
+        }
+    }
+
+    fn on_changed_equipment(&self) {
+        self.changed_equipment_listeners
+            .borrow_mut()
+            .retain(|weak| match weak.upgrade() {
+                Some(signal) => {
+                    signal.set(true);
+                    true
+                }
+                // No one is listening on the other end => remove the listener reference
+                None => false,
+            });
+    }
+
+    fn set_weapon(&self, hand_type: HandType, weapon: Weapon) {
         assert!(self.can_equipment_fit(
             EquipmentEntry::Weapon(weapon),
             EquipmentSlotRole::from_hand_type(hand_type)
         ));
         self.hand(hand_type).set(Hand::with_weapon(weapon));
+        self.on_changed_equipment();
     }
 
-    pub fn set_shield(&self, shield: Shield) {
+    fn set_shield(&self, shield: Shield) {
         assert!(self.can_equipment_fit(EquipmentEntry::Shield(shield), EquipmentSlotRole::OffHand));
         self.off_hand.set(Hand::with_shield(shield));
-    }
-
-    pub fn set_armor(&self, armor: ArmorPiece) {
-        self.armor.set(Some(armor));
+        self.on_changed_equipment();
     }
 
     pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
@@ -2086,14 +2128,12 @@ impl Character {
             },
             EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
         }
+
+        self.on_changed_equipment();
     }
 
     pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {
         self.hand(hand).get().weapon.unwrap().action_point_cost
-    }
-
-    pub fn shield(&self) -> Option<Shield> {
-        self.hand(HandType::OffHand).get().shield
     }
 
     pub fn reaches_with_attack(
@@ -2190,6 +2230,7 @@ impl Character {
                     && self.mana.current() >= spell.mana_cost
             }
             BaseAction::Move => ap > 0,
+            BaseAction::ChangeEquipment => ap > 0,
         }
     }
 
@@ -2620,6 +2661,7 @@ pub struct Weapon {
 pub struct Shield {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
+    pub icon: EquipmentIconId,
     pub evasion: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
     pub weight: u32,
@@ -2784,6 +2826,14 @@ pub enum EquipmentEntry {
 }
 
 impl EquipmentEntry {
+    pub fn name(&self) -> &'static str {
+        match self {
+            EquipmentEntry::Weapon(weapon) => weapon.name,
+            EquipmentEntry::Shield(shield) => shield.name,
+            EquipmentEntry::Armor(armor) => armor.name,
+        }
+    }
+
     pub fn icon(&self) -> EquipmentIconId {
         match self {
             EquipmentEntry::Weapon(weapon) => weapon.icon,

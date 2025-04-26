@@ -201,6 +201,7 @@ impl UserInterface {
                     BaseAction::Move => {
                         basic_buttons.push(btn);
                     }
+                    BaseAction::ChangeEquipment => basic_buttons.push(btn),
                 }
             }
 
@@ -460,14 +461,19 @@ impl UserInterface {
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         if self.character_sheet_toggle.shown.get() {
-            let outcome = character_ui.character_sheet.draw();
+            let outcome = character_ui.character_sheet.draw(&self.state);
             self.character_sheet_toggle
                 .shown
                 .set(!outcome.clicked_close);
 
-            if outcome.changed_equipment {
-                self.game_grid.clear_players_action_target();
-                self.set_state(UiState::ChoosingAction);
+            if let Some(requested) = outcome.requested_equipment_change {
+                println!("REQUESTED EQ CHANGE: {}", requested);
+                if requested {
+                    //self.game_grid.clear_players_action_target(); // TODO take care of target clearing from inside the grid instead
+                    self.set_state(UiState::ConfiguringAction(BaseAction::ChangeEquipment));
+                } else {
+                    self.set_state(UiState::ChoosingAction);
+                }
             }
         }
 
@@ -547,12 +553,14 @@ impl UserInterface {
         if let UiState::ConfiguringAction(base_action) = self.state {
             let mut action_is_waiting_for_target_selection = false;
 
+            use BaseAction::*;
+
             match base_action {
-                BaseAction::Attack { .. } => {
+                Attack { .. } => {
                     action_is_waiting_for_target_selection =
                         matches!(self.game_grid.players_action_target(), ActionTarget::None);
                 }
-                BaseAction::CastSpell(spell) => {
+                CastSpell(spell) => {
                     if matches!(
                         spell.target,
                         SpellTarget::Enemy { .. }
@@ -563,7 +571,7 @@ impl UserInterface {
                             matches!(self.game_grid.players_action_target(), ActionTarget::None);
                     }
                 }
-                BaseAction::Move => {}
+                Move | ChangeEquipment => {}
             }
 
             let fully_selected = !action_is_waiting_for_target_selection;
@@ -602,10 +610,6 @@ impl UserInterface {
     }
 
     pub fn set_state(&mut self, state: UiState) {
-        if self.state == state {
-            return;
-        }
-
         dbg!(&state);
 
         self.state = state;
@@ -624,12 +628,27 @@ impl UserInterface {
                     .tracked_action_buttons
                     .get(&button_action_id(ButtonAction::Action(base_action)))
                     .cloned();
+                assert!(
+                    relevant_action_button.is_some(),
+                    "No button found for action: {:?}",
+                    base_action
+                );
 
-                match base_action {
-                    BaseAction::Attack { .. } => {}
-                    BaseAction::CastSpell(..) => {}
-                    BaseAction::Move => {
-                        movement = true;
+                if let BaseAction::Move = base_action {
+                    movement = true;
+                }
+
+                if let BaseAction::ChangeEquipment = base_action {
+                    let drag_description = (&self.character_uis[&self.active_character_id]
+                        .character_sheet)
+                        .describe_requested_equipment_change();
+
+                    if let Some(description) = drag_description {
+                        self.activity_popup.additional_line = Some(description);
+                    } else {
+                        self.activity_popup.additional_line =
+                            Some("Drag something to equip/unequip it".to_string());
+                        self.character_sheet_toggle.shown.set(true);
                     }
                 }
             }
@@ -668,6 +687,7 @@ impl UserInterface {
             .set_move_speed_and_range(speed, max_move_range);
 
         if !movement {
+            // TODO let the grid figure this out by looking at the state it's given, instead
             self.game_grid.remove_movement_path();
         }
 
@@ -1314,6 +1334,12 @@ impl UserInterface {
                 }
             }
 
+            UiState::ConfiguringAction(BaseAction::ChangeEquipment) => {
+                popup_enabled = true;
+                self.target_ui
+                    .set_action("Change equipment".to_string(), vec![], false);
+            }
+
             UiState::ChoosingAction => {
                 self.target_ui
                     .set_action("Select an action".to_string(), vec![], false);
@@ -1403,6 +1429,16 @@ impl UserInterface {
                         stamina_cost: self.activity_popup.movement_stamina_cost(),
                         positions: self.game_grid.take_movement_path(),
                     },
+                    BaseAction::ChangeEquipment => {
+                        let (from, to) = self
+                            .character_uis
+                            .get_mut(&self.active_character_id)
+                            .unwrap()
+                            .character_sheet
+                            .take_requested_equipment_change();
+
+                        Action::ChangeEquipment { from, to }
+                    }
                 };
                 PlayerChose::Action(action)
             }
@@ -1485,6 +1521,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
             BaseAction::Move => "MOVE".to_string(),
+            BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
         },
         _ => unreachable!(),
     }

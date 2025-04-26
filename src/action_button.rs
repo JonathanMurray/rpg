@@ -115,6 +115,11 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
             description: None,
             technical_description: Default::default(),
         },
+        BaseAction::ChangeEquipment => ActionButtonTooltip {
+            header: "Change equipment (1 AP)".to_string(),
+            description: None,
+            technical_description: Default::default(),
+        },
     }
 }
 
@@ -527,6 +532,7 @@ impl ButtonAction {
                 BaseAction::Attack { .. } => IconId::Attack,
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
+                BaseAction::ChangeEquipment => IconId::Equip,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,
