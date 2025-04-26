@@ -1,14 +1,13 @@
 use std::cell::{Cell, RefCell};
-use std::str::FromStr;
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, MAGENTA, RED, SKYBLUE, YELLOW};
+use macroquad::color::{DARKBLUE, DARKGRAY, RED, SKYBLUE, YELLOW};
 
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
     MouseButton,
 };
-use macroquad::shapes::{draw_line, draw_rectangle, draw_rectangle_lines};
+use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
@@ -17,7 +16,7 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::core::{BaseAction, EquipmentEntry, EquipmentSlotRole, HandType};
+use crate::core::{BaseAction, EquipmentSlotRole};
 use crate::drawing::{draw_cross, draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::equipment_ui::{
     build_inventory_section, EquipmentSlot, EquipmentSlotContent, EquipmentStatsTable,
@@ -387,13 +386,6 @@ impl CharacterSheet {
         }
     }
 
-    fn has_requested_equipment_change(&self) -> bool {
-        self.equipment_drag
-            .as_ref()
-            .map(|drag| drag.to_idx.is_some())
-            .unwrap_or(false)
-    }
-
     fn handle_equipment_dragging(&mut self, mouse_pos: (f32, f32)) {
         for idx in 0..self.equipment_slots.len() {
             let slot = self.equipment_slots[idx].borrow_mut();
@@ -557,6 +549,13 @@ impl CharacterSheet {
         hover && is_mouse_button_pressed(MouseButton::Left)
     }
 
+    pub fn has_requested_equipment_change(&self) -> bool {
+        self.equipment_drag
+            .as_ref()
+            .map(|drag| drag.to_idx.is_some())
+            .unwrap_or(false)
+    }
+
     pub fn take_requested_equipment_change(&mut self) -> (EquipmentSlotRole, EquipmentSlotRole) {
         let drag = self.equipment_drag.take().unwrap();
         let from_slot = self.equipment_slots[drag.from_idx].borrow();
@@ -585,12 +584,10 @@ impl CharacterSheet {
                         from_content.equipment.name()
                     )
                 }
+            } else if to.role().is_equipped() {
+                format!("Equip {}", from_content.equipment.name())
             } else {
-                if to.role().is_equipped() {
-                    format!("Equip {}", from_content.equipment.name())
-                } else {
-                    format!("Unequip {}", from_content.equipment.name())
-                }
+                format!("Unequip {}", from_content.equipment.name())
             };
             s
         })

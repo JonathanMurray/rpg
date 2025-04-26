@@ -1,4 +1,4 @@
-use std::{ops::Deref, vec};
+use std::{rc::Rc, vec};
 
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
@@ -17,7 +17,7 @@ use crate::{
 };
 
 pub struct TargetUi {
-    has_target: bool,
+    target: Option<Rc<Character>>,
     big_font: Font,
     simple_font: Font,
 
@@ -29,7 +29,7 @@ pub struct TargetUi {
 impl TargetUi {
     pub fn new(big_font: Font, simple_font: Font) -> Self {
         Self {
-            has_target: true,
+            target: Default::default(),
             big_font,
             simple_font,
             container: Container::default(),
@@ -37,9 +37,15 @@ impl TargetUi {
         }
     }
 
-    pub fn set_character(&mut self, character: Option<impl Deref<Target = Character>>) {
-        if let Some(char) = character.as_deref() {
-            self.has_target = true;
+    pub fn rebuild_character_ui(&mut self) {
+        if let Some(target) = self.target.take() {
+            self.set_character(Some(&target));
+        }
+    }
+
+    pub fn set_character(&mut self, character: Option<&Rc<Character>>) {
+        if let Some(char) = character {
+            self.target = Some(Rc::clone(char));
             let mut name_text_line =
                 TextLine::new(char.name, 16, WHITE, Some(self.big_font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
@@ -126,7 +132,7 @@ impl TargetUi {
                 ..Default::default()
             }
         } else {
-            self.has_target = false;
+            self.target = None;
         }
     }
 
@@ -148,7 +154,7 @@ impl TargetUi {
             return;
         };
 
-        if *only_show_with_target && !self.has_target {
+        if *only_show_with_target && self.target.is_none() {
             return;
         }
 
@@ -276,7 +282,7 @@ impl TargetUi {
 
 impl Drawable for TargetUi {
     fn draw(&self, x: f32, y: f32) {
-        if self.has_target {
+        if self.target.is_some() {
             self.container.draw(x, y);
         }
 

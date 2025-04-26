@@ -1382,6 +1382,10 @@ impl Characters {
     }
 
     pub fn get(&self, character_id: CharacterId) -> &Character {
+        self.get_rc(character_id)
+    }
+
+    pub fn get_rc(&self, character_id: CharacterId) -> &Rc<Character> {
         let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
 
         match entry {
@@ -2068,11 +2072,11 @@ impl Character {
         match slot_role {
             EquipmentSlotRole::MainHand => self
                 .weapon(HandType::MainHand)
-                .map(|weapon| EquipmentEntry::Weapon(weapon)),
+                .map(EquipmentEntry::Weapon),
             EquipmentSlotRole::OffHand => {
-                self.shield().map(|shield| EquipmentEntry::Shield(shield))
+                self.shield().map(EquipmentEntry::Shield)
             }
-            EquipmentSlotRole::Armor => self.armor.get().map(|armor| EquipmentEntry::Armor(armor)),
+            EquipmentSlotRole::Armor => self.armor.get().map(EquipmentEntry::Armor),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
         }
     }

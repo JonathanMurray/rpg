@@ -116,7 +116,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
             technical_description: Default::default(),
         },
         BaseAction::ChangeEquipment => ActionButtonTooltip {
-            header: "Change equipment (1 AP)".to_string(),
+            header: "Equip/unequip (1 AP)".to_string(),
             description: None,
             technical_description: Default::default(),
         },

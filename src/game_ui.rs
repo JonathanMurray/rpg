@@ -499,7 +499,7 @@ impl UserInterface {
 
         if let Some(new_inspect_target) = outcome.switched_inspect_target {
             dbg!(new_inspect_target);
-            let target = new_inspect_target.map(|id| self.characters.get(id));
+            let target = new_inspect_target.map(|id| self.characters.get_rc(id));
             self.target_ui.set_character(target);
         }
 
@@ -639,8 +639,8 @@ impl UserInterface {
                 }
 
                 if let BaseAction::ChangeEquipment = base_action {
-                    let drag_description = (&self.character_uis[&self.active_character_id]
-                        .character_sheet)
+                    let drag_description = self.character_uis[&self.active_character_id]
+                        .character_sheet
                         .describe_requested_equipment_change();
 
                     if let Some(description) = drag_description {
@@ -696,6 +696,8 @@ impl UserInterface {
         }
 
         self.update_selected_action_button();
+
+        self.target_ui.rebuild_character_ui();
     }
 
     fn on_selected_attacked_reaction(&mut self, reaction: Option<OnAttackedReaction>) {
@@ -750,6 +752,9 @@ impl UserInterface {
 
     pub fn handle_game_event(&mut self, event: GameEvent) {
         dbg!(&event);
+
+        self.target_ui.rebuild_character_ui();
+
         match event {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
@@ -1335,7 +1340,9 @@ impl UserInterface {
             }
 
             UiState::ConfiguringAction(BaseAction::ChangeEquipment) => {
-                popup_enabled = true;
+                popup_enabled = self.character_uis[&self.active_character_id]
+                    .character_sheet
+                    .has_requested_equipment_change();
                 self.target_ui
                     .set_action("Change equipment".to_string(), vec![], false);
             }
