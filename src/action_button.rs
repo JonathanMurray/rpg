@@ -1,5 +1,5 @@
 use std::{
-    cell::{Cell, RefCell},
+    cell::{Cell, Ref, RefCell},
     collections::HashMap,
     rc::Rc,
 };
@@ -19,7 +19,7 @@ use crate::{
     core::{
         ApplyEffect, AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction,
         Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellTarget,
+        SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -31,12 +31,9 @@ pub struct ActionButtonTooltip {
     pub technical_description: Vec<String>,
 }
 
-fn button_action_tooltip(
-    action: &ButtonAction,
-    character: Option<&Character>,
-) -> ActionButtonTooltip {
+fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
     match action {
-        ButtonAction::Action(base_action) => base_action_tooltip(base_action, character),
+        ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => ActionButtonTooltip {
             header: format!(
                 "{} ({})",
@@ -105,23 +102,13 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
     }
 }
 
-fn base_action_tooltip(
-    base_action: &BaseAction,
-    character: Option<&Character>,
-) -> ActionButtonTooltip {
+fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
     match base_action {
-        BaseAction::Attack { hand, .. } => {
-            let weapon = character.unwrap().weapon(*hand).unwrap();
-
-            ActionButtonTooltip {
-                header: format!("{} attack ({} AP)", weapon.name, weapon.action_point_cost),
-                description: None,
-                technical_description: vec![
-                    format!("{} damage", weapon.damage),
-                    "vs Evasion".to_string(),
-                ],
-            }
-        }
+        BaseAction::Attack { .. } => ActionButtonTooltip {
+            header: "No weapon equipped".to_string(), // This is replaced on-the-fly if needed
+            description: None,
+            technical_description: vec![],
+        },
         BaseAction::CastSpell(spell) => spell_tooltip(spell),
         BaseAction::Move => ActionButtonTooltip {
             header: "Movement".to_string(),
@@ -246,7 +233,6 @@ fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &m
 
 pub struct ActionButton {
     pub id: u32,
-    pub tooltip: ActionButtonTooltip,
     pub action: ButtonAction,
     pub size: (f32, f32),
     texture_draw_size: (f32, f32),
@@ -258,6 +244,9 @@ pub struct ActionButton {
     pub selected: Cell<ButtonSelected>,
     pub event_sender: Option<EventSender>,
     icon: Texture2D,
+    tooltip: RefCell<ActionButtonTooltip>,
+    character: Option<Rc<Character>>,
+    tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
@@ -273,13 +262,13 @@ impl ActionButton {
         event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
         id: u32,
         icons: &HashMap<IconId, Texture2D>,
-        character: Option<&Character>,
+        character: Option<Rc<Character>>,
     ) -> Self {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
-        let icon = action.icon();
-        let tooltip = button_action_tooltip(&action, character);
+        let icon: IconId = action.icon();
+        let tooltip = button_action_tooltip(&action);
 
         let (size, texture_draw_size) = match action {
             ButtonAction::Proceed => ((64.0, 52.0), (60.0, 48.0)),
@@ -332,8 +321,39 @@ impl ActionButton {
                 queue: Rc::clone(event_queue),
             }),
             icon,
-            tooltip,
+            tooltip: RefCell::new(tooltip),
+            character,
+            tooltip_is_based_on_equipped_weapon: Default::default(),
         }
+    }
+
+    pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
+        if let ButtonAction::Action(BaseAction::Attack { hand, .. }) = self.action {
+            let equipped_weapon = self.character.as_ref().unwrap().weapon(hand);
+
+            if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
+                *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
+                    ActionButtonTooltip {
+                        header: format!("{} attack ({} AP)", weapon.name, weapon.action_point_cost),
+                        description: None,
+                        technical_description: vec![
+                            format!("{} damage", weapon.damage),
+                            "vs Evasion".to_string(),
+                        ],
+                    }
+                } else {
+                    ActionButtonTooltip {
+                        header: "No weapon equipped".to_string(),
+                        description: None,
+                        technical_description: vec![],
+                    }
+                };
+            }
+
+            self.tooltip_is_based_on_equipped_weapon
+                .set(equipped_weapon);
+        }
+        self.tooltip.borrow()
     }
 
     pub fn toggle_selected(&self) {

@@ -60,9 +60,9 @@ impl Element {
             Element::Rect(rect) => rect.draw(x, y),
             Element::TabLink(link) => link.draw(x, y),
             Element::Box(drawable) => drawable.draw(x, y),
-            Element::RcRefCell(drawable) => drawable.borrow_mut().draw(x, y),
+            Element::RcRefCell(drawable) => drawable.borrow().draw(x, y),
             Element::Rc(drawable) => drawable.draw(x, y),
-            Element::WeakRefCell(drawable) => drawable.upgrade().unwrap().borrow_mut().draw(x, y),
+            Element::WeakRefCell(drawable) => drawable.upgrade().unwrap().borrow().draw(x, y),
         }
     }
 
@@ -70,10 +70,10 @@ impl Element {
         match self {
             Element::Container(container) => container.draw_tooltips(x, y),
             Element::Box(drawable) => drawable.draw_tooltips(x, y),
-            Element::RcRefCell(drawable) => drawable.borrow_mut().draw_tooltips(x, y),
+            Element::RcRefCell(drawable) => drawable.borrow().draw_tooltips(x, y),
             Element::Rc(drawable) => drawable.draw_tooltips(x, y),
             Element::WeakRefCell(drawable) => {
-                drawable.upgrade().unwrap().borrow_mut().draw_tooltips(x, y)
+                drawable.upgrade().unwrap().borrow().draw_tooltips(x, y)
             }
             _ => {}
         }
@@ -332,7 +332,7 @@ impl Rectangle {
     }
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct Style {
     pub background_color: Option<Color>,
     pub border_color: Option<Color>,
@@ -614,13 +614,29 @@ impl Container {
     }
 }
 
+impl Drawable for Container {
+    fn draw(&self, x: f32, y: f32) {
+        self.draw(x, y);
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.size()
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        self.draw_tooltips(x, y);
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct TableStyle {
     pub outer_border_color: Option<Color>,
     pub inner_border_color: Option<Color>,
+    pub background_color: Option<Color>,
     pub all_columns_same_width: bool,
     pub row_font_sizes: &'static [u16],
     pub cell_padding: (f32, f32),
+    pub default_text_color: Color,
 }
 
 impl Default for TableStyle {
@@ -628,15 +644,46 @@ impl Default for TableStyle {
         Self {
             outer_border_color: Some(GRAY),
             inner_border_color: Some(GRAY),
+            background_color: None,
             all_columns_same_width: false,
             row_font_sizes: &[],
             cell_padding: (8.0, 8.0),
+            default_text_color: WHITE,
+        }
+    }
+}
+
+pub struct TableCell {
+    text: String,
+    color_override: Option<Color>,
+    depth: Option<Color>,
+}
+
+impl TableCell {
+    pub fn new(text: String, color: Option<Color>, depth: Option<Color>) -> Self {
+        Self {
+            text,
+            color_override: color,
+            depth,
+        }
+    }
+}
+
+impl<T> From<T> for TableCell
+where
+    T: Into<String>,
+{
+    fn from(text: T) -> Self {
+        TableCell {
+            text: text.into(),
+            color_override: None,
+            depth: None,
         }
     }
 }
 
 pub fn table(
-    cells: Vec<impl Into<String>>,
+    cells: Vec<TableCell>,
     column_alignments: Vec<Align>,
     font: Font,
     style: TableStyle,
@@ -657,7 +704,15 @@ pub fn table(
             font_size = *row_font_size;
         }
 
-        let mut text = TextLine::new(cell, font_size, WHITE, Some(font.clone()));
+        let mut text = TextLine::new(
+            cell.text,
+            font_size,
+            cell.color_override.unwrap_or(style.default_text_color),
+            Some(font.clone()),
+        );
+        if let Some(depth) = cell.depth {
+            text = text.with_depth(depth, 1.0);
+        }
         text.set_padding(style.cell_padding.0, style.cell_padding.1);
         max_height_in_row = max_height_in_row.max(text.size().1);
         columns[col_i].push(text);
@@ -701,6 +756,7 @@ pub fn table(
         layout_dir: LayoutDirection::Horizontal,
         style: Style {
             border_color: style.outer_border_color,
+            background_color: style.background_color,
             ..Default::default()
         },
         border_between_children: style.inner_border_color,

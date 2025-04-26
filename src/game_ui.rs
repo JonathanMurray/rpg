@@ -138,7 +138,7 @@ impl UserInterface {
         let event_queue = Rc::new(RefCell::new(vec![]));
         let mut next_button_id = 1;
 
-        let mut new_button = |btn_action, character: Option<&Character>, enabled: bool| {
+        let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
             let btn =
                 ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
             btn.enabled.set(enabled);
@@ -162,23 +162,23 @@ impl UserInterface {
             let mut spell_buttons_for_character_sheet = vec![];
             let mut attack_enhancement_buttons_for_character_sheet = vec![];
 
-            for (_subtext, action) in character.known_actions() {
+            for action in character.known_actions() {
                 let btn_action = ButtonAction::Action(action);
-                let btn = Rc::new(new_button(btn_action, Some(character), true));
+                let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
                 tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
                 hoverable_buttons.push(Rc::clone(&btn));
                 match action {
                     BaseAction::Attack { .. } => {
                         basic_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(character), false));
+                        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
                         attack_button_for_character_sheet = Some(btn.clone());
                         hoverable_buttons.push(btn);
                     }
                     BaseAction::CastSpell(spell) => {
                         spell_buttons.push(btn);
 
-                        let btn = Rc::new(new_button(btn_action, Some(character), false));
+                        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
 
                         let enhancement_buttons: Vec<Rc<ActionButton>> = spell
                             .possible_enhancements
@@ -218,6 +218,8 @@ impl UserInterface {
                 reaction_buttons_for_character_sheet.push(btn);
             }
 
+            // TODO: Only include inherently known enhancements here; not those gained from weapons (since weapons can be unequipped
+            // without the character sheet being updated)
             for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
                 let btn_action = ButtonAction::AttackEnhancement(enhancement);
                 let btn = Rc::new(new_button(btn_action, None, false));
@@ -227,7 +229,7 @@ impl UserInterface {
 
             let character_sheet = CharacterSheet::new(
                 &simple_font,
-                character,
+                Rc::clone(character),
                 &equipment_icons,
                 attack_button_for_character_sheet,
                 reaction_buttons_for_character_sheet,
@@ -458,9 +460,21 @@ impl UserInterface {
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         if self.character_sheet_toggle.shown.get() {
-            let clicked_close = character_ui.character_sheet.draw();
-            self.character_sheet_toggle.shown.set(!clicked_close);
+            let outcome = character_ui.character_sheet.draw();
+            self.character_sheet_toggle
+                .shown
+                .set(!outcome.clicked_close);
+
+            if outcome.changed_equipment {
+                self.game_grid.clear_players_action_target();
+                self.set_state(UiState::ChoosingAction);
+            }
         }
+
+        let character_ui = self
+            .character_uis
+            .get_mut(&self.player_portraits.selected_i.get())
+            .unwrap();
 
         if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
             let btn = character_ui
@@ -469,7 +483,7 @@ impl UserInterface {
                 .find(|btn| btn.id == btn_id)
                 .unwrap();
 
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip);
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
         }
     }
 

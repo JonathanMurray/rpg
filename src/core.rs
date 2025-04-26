@@ -11,7 +11,7 @@ use crate::data::{
     BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, RAGE, SWORD, WAR_HAMMER,
 };
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
-use crate::data::{FIREBALL, LEATHER_ARMOR, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
+use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
@@ -38,8 +38,10 @@ impl CoreGame {
             Attributes::new(3, 1, 10, 10),
             (1, 5),
         );
-        bob.main_hand.weapon = Some(WAR_HAMMER);
-        bob.armor = Some(CHAIN_MAIL);
+        //bob.set_weapon(HandType::MainHand, SWORD);
+        bob.set_shield(SMALL_SHIELD);
+        bob.armor.set(Some(CHAIN_MAIL));
+
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attacked_reactions.push(SIDE_STEP);
@@ -53,6 +55,9 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
         bob.known_actions.push(BaseAction::CastSpell(BRACE));
 
+        bob.inventory[0].set(Some(EquipmentEntry::Weapon(WAR_HAMMER)));
+        bob.inventory[2].set(Some(EquipmentEntry::Weapon(BOW)));
+
         let mut enemy1 = Character::new(
             false,
             "Gremlin Nob",
@@ -61,12 +66,11 @@ impl CoreGame {
             Attributes::new(8, 8, 3, 3),
             (3, 4),
         );
-        enemy1.main_hand.weapon = Some(BOW);
-        enemy1.off_hand.shield = Some(SMALL_SHIELD);
-        enemy1.armor = Some(LEATHER_ARMOR);
+        enemy1.set_shield(SMALL_SHIELD);
+
         enemy1.known_attacked_reactions.push(SIDE_STEP);
 
-        let mut enemy2 = Character::new(
+        let enemy2 = Character::new(
             false,
             "Gromp",
             PortraitId::Portrait3,
@@ -74,9 +78,9 @@ impl CoreGame {
             Attributes::new(8, 8, 1, 5),
             (4, 4),
         );
-        enemy2.main_hand.weapon = Some(BOW);
+        enemy2.set_weapon(HandType::MainHand, BOW);
 
-        let mut david = Character::new(
+        let david = Character::new(
             true,
             "David",
             PortraitId::Portrait1,
@@ -85,8 +89,8 @@ impl CoreGame {
             (5, 7),
         );
 
-        david.main_hand.weapon = Some(SWORD);
-        david.off_hand.shield = Some(SMALL_SHIELD);
+        david.set_weapon(HandType::MainHand, SWORD);
+        david.set_shield(SMALL_SHIELD);
 
         let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
 
@@ -961,7 +965,7 @@ impl CoreGame {
 
             let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, weapon.name);
 
-            if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.is_empty() {
+            if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
                 let bonus_dmg = 1;
                 dmg_str.push_str(&format!(" +{} (two-handed)", bonus_dmg));
                 dmg_calculation += bonus_dmg;
@@ -1477,7 +1481,7 @@ pub enum OnHitReactionEffect {
     ShieldBash,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AttackHitEffect {
     Apply(ApplyEffect),
     SkipExertion,
@@ -1826,15 +1830,33 @@ pub enum SpellContestType {
     Projectile,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+#[derive(Debug, Copy, Clone, Default, PartialEq)]
 pub struct Hand {
     weapon: Option<Weapon>,
     shield: Option<Shield>,
 }
 
 impl Hand {
+    fn empty() -> Self {
+        Self::default()
+    }
+
     fn is_empty(&self) -> bool {
         self.weapon.is_none() && self.shield.is_none()
+    }
+
+    fn with_weapon(weapon: Weapon) -> Self {
+        Self {
+            weapon: Some(weapon),
+            shield: None,
+        }
+    }
+
+    fn with_shield(shield: Shield) -> Self {
+        Self {
+            weapon: None,
+            shield: Some(shield),
+        }
     }
 }
 
@@ -1874,9 +1896,10 @@ pub struct Character {
     pub mana: NumberedResource,
     pub move_speed: f32,
     pub capacity: u32,
-    pub armor: Option<ArmorPiece>,
-    main_hand: Hand,
-    off_hand: Hand,
+    pub inventory: [Cell<Option<EquipmentEntry>>; 6],
+    pub armor: Cell<Option<ArmorPiece>>,
+    main_hand: Cell<Hand>,
+    off_hand: Cell<Hand>,
     conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub max_reactive_action_points: u32,
@@ -1916,7 +1939,8 @@ impl Character {
             mana: NumberedResource::new(max_mana),
             move_speed,
             capacity,
-            armor: None,
+            inventory: Default::default(),
+            armor: Default::default(),
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
@@ -1927,17 +1951,33 @@ impl Character {
             known_actions: vec![
                 BaseAction::Attack {
                     hand: HandType::MainHand,
-                    action_point_cost: 0,
-                },
-                BaseAction::Attack {
-                    hand: HandType::OffHand,
-                    action_point_cost: 0,
+                    action_point_cost: 2,
                 },
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
+        }
+    }
+
+    pub fn can_equipment_fit(&self, equipment: EquipmentEntry, role: EquipmentSlotRole) -> bool {
+        if matches!(role, EquipmentSlotRole::Inventory(..)) {
+            return true;
+        }
+        match equipment {
+            EquipmentEntry::Weapon(weapon) if role == EquipmentSlotRole::MainHand => {
+                weapon.grip != WeaponGrip::TwoHanded || self.off_hand.get().is_empty()
+            }
+            EquipmentEntry::Shield(..) if role == EquipmentSlotRole::OffHand => {
+                if let Some(weapon) = self.weapon(HandType::MainHand) {
+                    weapon.grip != WeaponGrip::TwoHanded
+                } else {
+                    true
+                }
+            }
+            EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
+            _ => false,
         }
     }
 
@@ -1972,8 +2012,13 @@ impl Character {
         } else if let Some(shield) = self.shield() {
             sum += shield.weight;
         }
-        if let Some(armor) = self.armor {
+        if let Some(armor) = self.armor.get() {
             sum += armor.weight;
+        }
+        for entry in &self.inventory {
+            if let Some(entry) = entry.get() {
+                sum += entry.weight()
+            }
         }
         sum
     }
@@ -1990,7 +2035,7 @@ impl Character {
         self.id.unwrap()
     }
 
-    fn hand(&self, hand_type: HandType) -> &Hand {
+    fn hand(&self, hand_type: HandType) -> &Cell<Hand> {
         match hand_type {
             HandType::MainHand => &self.main_hand,
             HandType::OffHand => &self.off_hand,
@@ -1998,15 +2043,57 @@ impl Character {
     }
 
     pub fn weapon(&self, hand: HandType) -> Option<Weapon> {
-        self.hand(hand).weapon
+        self.hand(hand).get().weapon
+    }
+
+    pub fn set_weapon(&self, hand_type: HandType, weapon: Weapon) {
+        assert!(self.can_equipment_fit(
+            EquipmentEntry::Weapon(weapon),
+            EquipmentSlotRole::from_hand_type(hand_type)
+        ));
+        self.hand(hand_type).set(Hand::with_weapon(weapon));
+    }
+
+    pub fn set_shield(&self, shield: Shield) {
+        assert!(self.can_equipment_fit(EquipmentEntry::Shield(shield), EquipmentSlotRole::OffHand));
+        self.off_hand.set(Hand::with_shield(shield));
+    }
+
+    pub fn set_armor(&self, armor: ArmorPiece) {
+        self.armor.set(Some(armor));
+    }
+
+    pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
+        match slot_role {
+            EquipmentSlotRole::MainHand => match entry {
+                Some(EquipmentEntry::Weapon(weapon)) => {
+                    self.set_weapon(HandType::MainHand, weapon);
+                }
+                None => self.main_hand.set(Hand::default()),
+                _ => panic!(),
+            },
+            EquipmentSlotRole::OffHand => match entry {
+                Some(EquipmentEntry::Shield(shield)) => {
+                    self.set_shield(shield);
+                }
+                None => self.off_hand.set(Hand::default()),
+                _ => panic!(),
+            },
+            EquipmentSlotRole::Armor => match entry {
+                Some(EquipmentEntry::Armor(armor)) => self.armor.set(Some(armor)),
+                None => self.armor.set(None),
+                _ => panic!(),
+            },
+            EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
+        }
     }
 
     pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {
-        self.hand(hand).weapon.unwrap().action_point_cost
+        self.hand(hand).get().weapon.unwrap().action_point_cost
     }
 
     pub fn shield(&self) -> Option<Shield> {
-        self.hand(HandType::OffHand).shield
+        self.hand(HandType::OffHand).get().shield
     }
 
     pub fn reaches_with_attack(
@@ -2073,29 +2160,14 @@ impl Character {
         within_range_squared(range.squared(), self.position.get(), target_position)
     }
 
-    pub fn known_actions(&self) -> Vec<(&'static str, BaseAction)> {
-        self.known_actions
-            .iter()
-            .filter_map(|action: &BaseAction| match action {
-                BaseAction::Attack { hand, .. } => self.weapon(*hand).map(|weapon| {
-                    (
-                        weapon.name,
-                        BaseAction::Attack {
-                            hand: *hand,
-                            action_point_cost: weapon.action_point_cost,
-                        },
-                    )
-                }),
-                BaseAction::CastSpell(_spell) => Some(("", *action)),
-                BaseAction::Move => Some(("", *action)),
-            })
-            .collect()
+    pub fn known_actions(&self) -> Vec<BaseAction> {
+        self.known_actions.to_vec()
     }
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {
-        self.known_actions()
+        self.known_actions
             .iter()
-            .filter_map(|(_, action)| {
+            .filter_map(|action| {
                 if self.can_use_action(*action) {
                     Some(*action)
                 } else {
@@ -2125,14 +2197,14 @@ impl Character {
         &self,
         attack_hand: HandType,
     ) -> Vec<(String, AttackEnhancement)> {
-        let weapon = self.weapon(attack_hand).unwrap();
-
         let mut usable = vec![];
-        if let Some(enhancement) = weapon.attack_enhancement {
-            usable.push((weapon.name.to_string(), enhancement))
-        }
-        for enhancement in &self.known_attack_enhancements {
-            usable.push(("".to_owned(), *enhancement))
+        if let Some(weapon) = self.weapon(attack_hand) {
+            if let Some(enhancement) = weapon.attack_enhancement {
+                usable.push((weapon.name.to_string(), enhancement))
+            }
+            for enhancement in &self.known_attack_enhancements {
+                usable.push(("".to_owned(), *enhancement))
+            }
         }
         usable
     }
@@ -2163,7 +2235,7 @@ impl Character {
             known.push(("".to_string(), *reaction));
         }
         // TODO: off-hand reactions?
-        if let Some(weapon) = &self.main_hand.weapon {
+        if let Some(weapon) = &self.weapon(HandType::MainHand) {
             if let Some(reaction) = weapon.on_attacked_reaction {
                 known.push((weapon.name.to_string(), reaction));
             }
@@ -2198,7 +2270,7 @@ impl Character {
         for reaction in &self.known_on_hit_reactions {
             known.push(("".to_string(), *reaction));
         }
-        if let Some(shield) = self.off_hand.shield {
+        if let Some(shield) = self.shield() {
             if let Some(reaction) = shield.on_hit_reaction {
                 known.push((shield.name.to_string(), reaction));
             }
@@ -2263,11 +2335,7 @@ impl Character {
     pub fn evasion(&self) -> u32 {
         let from_agi = self.evasion_from_agility();
         let from_int = self.evasion_from_intellect();
-        let from_shield = self
-            .off_hand
-            .shield
-            .map(|shield| shield.evasion)
-            .unwrap_or(0);
+        let from_shield = self.shield().map(|shield| shield.evasion).unwrap_or(0);
         let from_braced = if self.conditions.borrow().braced {
             BRACED_DEFENSE_BONUS
         } else {
@@ -2280,7 +2348,7 @@ impl Character {
 
     fn evasion_from_agility(&self) -> u32 {
         let mut bonus = if self.is_dazed() { 0 } else { self.agility() };
-        if let Some(armor) = self.armor {
+        if let Some(armor) = self.armor.get() {
             if let Some(limit) = armor.limit_evasion_from_agi {
                 bonus = bonus.min(limit);
             }
@@ -2302,7 +2370,7 @@ impl Character {
 
     pub fn protection_from_armor(&self) -> u32 {
         let mut protection = 0;
-        if let Some(armor) = self.armor {
+        if let Some(armor) = self.armor.get() {
             protection += armor.protection;
         }
 
@@ -2378,10 +2446,8 @@ impl Character {
             bonuses.push(("Dazed", AttackBonus::Advantage(-1)));
         }
         let conditions = self.conditions.borrow();
-        if conditions.raging {
-            if self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
-                bonuses.push(("Raging", AttackBonus::Advantage(1)));
-            }
+        if conditions.raging && self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
+            bonuses.push(("Raging", AttackBonus::Advantage(1)));
         }
         if conditions.weakened > 0 {
             bonuses.push(("Weakened", AttackBonus::OtherNegative));
@@ -2534,7 +2600,7 @@ pub struct ArmorPiece {
     pub weight: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Weapon {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
@@ -2550,7 +2616,7 @@ pub struct Weapon {
     pub weight: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Shield {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
@@ -2559,7 +2625,7 @@ pub struct Shield {
     pub weight: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AttackAttribute {
     Strength,
     Agility,
@@ -2576,7 +2642,7 @@ impl Display for AttackAttribute {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum WeaponGrip {
     Light,
     MainHand,
@@ -2706,6 +2772,56 @@ impl AttackBonus {
             }
             AttackBonus::OtherNegative => Goodness::Bad,
             AttackBonus::OtherPositive => Goodness::Good,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum EquipmentEntry {
+    Weapon(Weapon),
+    Shield(Shield),
+    Armor(ArmorPiece),
+}
+
+impl EquipmentEntry {
+    pub fn icon(&self) -> EquipmentIconId {
+        match self {
+            EquipmentEntry::Weapon(weapon) => weapon.icon,
+            EquipmentEntry::Shield(_shield) => EquipmentIconId::SmallShield,
+            EquipmentEntry::Armor(armor) => armor.icon,
+        }
+    }
+
+    fn weight(&self) -> u32 {
+        match self {
+            EquipmentEntry::Weapon(weapon) => weapon.weight,
+            EquipmentEntry::Shield(shield) => shield.weight,
+            EquipmentEntry::Armor(armor) => armor.weight,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum EquipmentSlotRole {
+    MainHand,
+    OffHand,
+    Armor,
+    Inventory(usize),
+}
+
+impl EquipmentSlotRole {
+    fn from_hand_type(hand: HandType) -> Self {
+        match hand {
+            HandType::MainHand => Self::MainHand,
+            HandType::OffHand => Self::OffHand,
+        }
+    }
+
+    pub fn is_equipped(&self) -> bool {
+        use EquipmentSlotRole::*;
+        match self {
+            MainHand | OffHand | Armor => true,
+            Inventory(_) => false,
         }
     }
 }

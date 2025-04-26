@@ -808,6 +808,7 @@ impl GameGrid {
                     if pressed_left_mouse {
                         if self.active_character_id == hovered_id {
                             outcome.switched_action = Some(GridSwitchedTo::Idle);
+                            self.players_action_target = ActionTarget::None;
                         } else {
                             match mouse_state {
                                 MouseState::RequiresAllyTarget => {
@@ -851,6 +852,15 @@ impl GameGrid {
                             && matches!(mouse_state, MouseState::RequiresAllyTarget)
                         {
                             may_acquire_attack_target = true; // i.e. change action to attack
+                        }
+
+                        if self
+                            .characters
+                            .get(self.active_character_id)
+                            .weapon(HandType::MainHand)
+                            .is_none()
+                        {
+                            may_acquire_attack_target = false;
                         }
 
                         if may_acquire_attack_target {

@@ -57,12 +57,12 @@ impl TargetUi {
 
             let def_table = table(
                 vec![
-                    "Toughness".to_string(),
-                    "Evasion".to_string(),
-                    "Will".to_string(),
-                    char.toughness().to_string(),
-                    char.evasion().to_string(),
-                    char.will().to_string(),
+                    "Toughness".into(),
+                    "Evasion".into(),
+                    "Will".into(),
+                    char.toughness().to_string().into(),
+                    char.evasion().to_string().into(),
+                    char.will().to_string().into(),
                 ],
                 vec![Align::Center, Align::Center, Align::Center],
                 self.simple_font.clone(),
@@ -72,6 +72,7 @@ impl TargetUi {
                     all_columns_same_width: true,
                     row_font_sizes: &[16, 24],
                     cell_padding: (3.0, 5.0),
+                    ..Default::default()
                 },
             );
 

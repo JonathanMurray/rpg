@@ -260,7 +260,7 @@ impl ActivityPopup {
             btn.draw(x_btn, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip);
+                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip());
             }
 
             x_btn += btn.size.0 + button_margin;
@@ -499,7 +499,7 @@ impl ActivityPopup {
 
         match state {
             UiState::ConfiguringAction(base_action) => {
-                let tooltip = &relevant_action_button.unwrap().tooltip;
+                let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
                 lines.extend_from_slice(&tooltip.technical_description);
 

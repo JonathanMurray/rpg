@@ -1,7 +1,11 @@
-use std::collections::HashMap;
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use macroquad::{
-    color::SKYBLUE,
+    color::{BLACK, RED, SKYBLUE},
     math::Rect,
     texture::{draw_texture_ex, DrawTextureParams},
 };
@@ -15,34 +19,21 @@ use macroquad::{
 
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
-    base_ui::{table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle},
-    core::{ArmorPiece, Character, HandType, Shield, Weapon, WeaponRange},
-    data::{BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER},
+    base_ui::{
+        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
+    },
+    core::{
+        ArmorPiece, Character, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon,
+        WeaponGrip, WeaponRange,
+    },
     textures::EquipmentIconId,
 };
 
-#[derive(Copy, Clone, Debug)]
-enum InventorySlot {
-    Weapon(Weapon),
-    Shield(Shield),
-    Armor(ArmorPiece),
-}
-
-impl InventorySlot {
-    fn icon(&self) -> EquipmentIconId {
-        match self {
-            InventorySlot::Weapon(weapon) => weapon.icon,
-            InventorySlot::Shield(_shield) => EquipmentIconId::SmallShield,
-            InventorySlot::Armor(armor) => armor.icon,
-        }
-    }
-}
-
-fn tooltip(inventory_slot: &InventorySlot) -> Vec<String> {
-    match inventory_slot {
-        InventorySlot::Weapon(weapon) => weapon_tooltip(weapon),
-        InventorySlot::Shield(shield) => shield_tooltip(shield),
-        InventorySlot::Armor(armor) => armor_tooltip(armor),
+fn tooltip(entry: &EquipmentEntry) -> Vec<String> {
+    match entry {
+        EquipmentEntry::Weapon(weapon) => weapon_tooltip(weapon),
+        EquipmentEntry::Shield(shield) => shield_tooltip(shield),
+        EquipmentEntry::Armor(armor) => armor_tooltip(armor),
     }
 }
 
@@ -50,8 +41,11 @@ fn weapon_tooltip(weapon: &Weapon) -> Vec<String> {
     let mut lines = vec![
         weapon.name.to_string(),
         format!("{} damage / {} AP", weapon.damage, weapon.action_point_cost),
-        format!("[{}]", weapon.attack_attribute),
     ];
+
+    if weapon.grip == WeaponGrip::TwoHanded {
+        lines.push("Two-handed".to_string());
+    }
 
     if weapon.range != WeaponRange::Melee {
         lines.push(format!("Range: {}", weapon.range));
@@ -99,140 +93,246 @@ pub fn build_inventory_section(
     font: &Font,
     character: &Character,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-) -> Element {
-    let mut icons = vec![EquipmentIcon::new(None, font.clone(), vec![]); 9];
+) -> (Element, Vec<Rc<RefCell<EquipmentSlot>>>) {
+    let mut slots: Vec<Rc<RefCell<EquipmentSlot>>> = character
+        .inventory
+        .iter()
+        .enumerate()
+        .map(|(i, maybe_entry)| {
+            maybe_entry
+                .get()
+                .map(|entry| {
+                    EquipmentSlot::new(
+                        font.clone(),
+                        Some((equipment_icons[&entry.icon()].clone(), entry)),
+                        EquipmentSlotRole::Inventory(i),
+                    )
+                })
+                .unwrap_or(EquipmentSlot::new(
+                    font.clone(),
+                    None,
+                    EquipmentSlotRole::Inventory(i),
+                ))
+        })
+        .map(|slot| Rc::new(RefCell::new(slot)))
+        .collect();
 
-    let inventory_slots = [
-        Some(InventorySlot::Weapon(DAGGER)),
-        Some(InventorySlot::Weapon(SWORD)),
-        Some(InventorySlot::Weapon(RAPIER)),
-        Some(InventorySlot::Weapon(WAR_HAMMER)),
-        Some(InventorySlot::Weapon(BOW)),
-        Some(InventorySlot::Shield(SMALL_SHIELD)),
-        Some(InventorySlot::Armor(CHAIN_MAIL)),
-        Some(InventorySlot::Armor(LEATHER_ARMOR)),
-    ];
-
-    for i in 0..inventory_slots.len() {
-        if let Some(Some(inventory_slot)) = inventory_slots.get(i) {
-            let icon_cell = &mut icons[i];
-            icon_cell.texture = Some(equipment_icons[&inventory_slot.icon()].clone());
-            icon_cell.tooltip_lines = tooltip(inventory_slot);
-        }
-    }
+    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> =
+        slots.iter().map(Rc::clone).collect();
 
     let mut rows = vec![];
 
-    while !icons.is_empty() {
-        rows.push(Element::Container(Container {
+    while !slots.is_empty() {
+        let slots_in_row = slots
+            .drain(0..3)
+            .take(3)
+            .map(|cell| Element::RcRefCell(cell))
+            .collect();
+        let row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            children: icons
-                .drain(0..3)
-                .take(3)
-                .map(|cell| Element::Box(Box::new(cell)))
-                .collect(),
+            children: slots_in_row,
             margin: 2.0,
             ..Default::default()
-        }))
+        };
+        rows.push(Element::Container(row))
     }
 
-    Element::Container(Container {
+    let section = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         children: rows,
         align: Align::Center,
         margin: 5.0,
         ..Default::default()
-    })
+    });
+
+    (section, cloned_slots)
 }
 
 pub fn build_equipped_section(
     font: &Font,
     character: &Character,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-) -> Element {
-    let mut eq_text_cells = vec![];
-    let mut eq_icon_cells = vec![EquipmentIcon::new(None, font.clone(), vec![]); 3];
+) -> (
+    Element,
+    Vec<Rc<RefCell<EquipmentSlot>>>,
+    Rc<RefCell<EquipmentStatsTable>>,
+) {
+    let mut slots: Vec<Option<EquipmentSlot>> = vec![None, None, None];
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
-            eq_text_cells.push("Attack dmg".to_string());
-            eq_text_cells.push(format!("{}", weapon.damage));
-
-            eq_text_cells.push("Attack mod".to_string());
-            eq_text_cells.push(format!("+{}", character.attack_modifier(hand)));
-
-            let texture = Some(equipment_icons[&weapon.icon].clone());
+            let texture = equipment_icons[&weapon.icon].clone();
             let icon_cell = match hand {
-                HandType::MainHand => &mut eq_icon_cells[0],
-                HandType::OffHand => &mut eq_icon_cells[2],
+                HandType::MainHand => &mut slots[0],
+                HandType::OffHand => &mut slots[2],
             };
 
-            icon_cell.texture = texture;
-            icon_cell.tooltip_lines = weapon_tooltip(&weapon);
+            *icon_cell = Some(EquipmentSlot::new(
+                font.clone(),
+                Some((texture, EquipmentEntry::Weapon(weapon))),
+                EquipmentSlotRole::MainHand,
+            ));
         }
     }
     if let Some(shield) = character.shield() {
-        eq_text_cells.push("Evasion bonus".to_string());
-        eq_text_cells.push(format!("{}", shield.evasion));
-        let icon_cell = &mut eq_icon_cells[2];
-        icon_cell.texture = Some(equipment_icons[&EquipmentIconId::SmallShield].clone());
-        icon_cell.tooltip_lines = shield_tooltip(&shield);
+        let icon_cell = &mut slots[2];
+        let texture = equipment_icons[&EquipmentIconId::SmallShield].clone();
+        *icon_cell = Some(EquipmentSlot::new(
+            font.clone(),
+            Some((texture, EquipmentEntry::Shield(shield))),
+            EquipmentSlotRole::OffHand,
+        ));
     }
-    if let Some(armor) = character.armor {
-        eq_text_cells.push("Armor".to_string());
-        eq_text_cells.push(format!("{}", armor.protection));
-        let icon_cell = &mut eq_icon_cells[1];
-        icon_cell.texture = Some(equipment_icons[&armor.icon].clone());
-        icon_cell.tooltip_lines = armor_tooltip(&armor);
+    if let Some(armor) = character.armor.get() {
+        let icon_cell = &mut slots[1];
+        let texture = equipment_icons[&armor.icon].clone();
+        *icon_cell = Some(EquipmentSlot::new(
+            font.clone(),
+            Some((texture, EquipmentEntry::Armor(armor))),
+            EquipmentSlotRole::Armor,
+        ));
     }
 
-    eq_text_cells.push("Weight".to_string());
-    eq_text_cells.push(format!(
-        "{} / {}",
-        character.equipment_weight(),
-        character.capacity
-    ));
+    let roles = [
+        EquipmentSlotRole::MainHand,
+        EquipmentSlotRole::Armor,
+        EquipmentSlotRole::OffHand,
+    ];
 
-    let equipment_icons = Element::Container(Container {
+    let slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots
+        .into_iter()
+        .enumerate()
+        .map(|(i, maybe_slot)| {
+            maybe_slot.unwrap_or_else(|| EquipmentSlot::new(font.clone(), None, roles[i]))
+        })
+        .map(|slot| Rc::new(RefCell::new(slot)))
+        .collect();
+
+    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> =
+        slots.iter().map(|slot| Rc::clone(slot)).collect();
+
+    let slots_container = Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
-        children: eq_icon_cells
+        children: slots
             .into_iter()
-            .map(|cell| Element::Box(Box::new(cell)))
+            .map(|slot| Element::RcRefCell(slot))
             .collect(),
         margin: 2.0,
         ..Default::default()
     });
 
-    let equipment_table = table(
-        eq_text_cells,
-        vec![Align::End, Align::Start],
-        font.clone(),
-        TableStyle::default(),
-    );
+    let stats_table = Rc::new(RefCell::new(EquipmentStatsTable::new(character, font)));
 
-    Element::Container(Container {
+    let container = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
-        children: vec![equipment_icons, Element::Container(equipment_table)],
+        children: vec![slots_container, Element::RcRefCell(stats_table.clone())],
         align: Align::Center,
         margin: 15.0,
         ..Default::default()
-    })
+    });
+
+    (container, cloned_slots, stats_table)
 }
 
-#[derive(Clone)]
-struct EquipmentIcon {
-    texture: Option<Texture2D>,
+pub struct EquipmentStatsTable {
+    element: Element,
+}
+
+impl EquipmentStatsTable {
+    fn new(character: &Character, font: &Font) -> Self {
+        Self {
+            element: Element::Container(Self::build_table(character, font)),
+        }
+    }
+
+    pub fn rebuild(&mut self, character: &Character, font: &Font) {
+        self.element = Element::Container(Self::build_table(character, font));
+    }
+
+    pub fn build_table(character: &Character, font: &Font) -> Container {
+        let mut cells: Vec<TableCell> = vec![];
+        for hand in [HandType::MainHand, HandType::OffHand] {
+            if let Some(weapon) = character.weapon(hand) {
+                cells.push("Attack dmg".into());
+                cells.push(format!("{}", weapon.damage).into());
+
+                cells.push("Attack mod".into());
+                cells.push(format!("+{}", character.attack_modifier(hand)).into());
+            }
+        }
+        if let Some(shield) = character.shield() {
+            cells.push("Evasion bonus".into());
+            cells.push(format!("{}", shield.evasion).into());
+        }
+        if let Some(armor) = character.armor.get() {
+            cells.push("Armor".into());
+            cells.push(format!("{}", armor.protection).into());
+        }
+
+        cells.push("Weight".into());
+
+        let text = format!("{} / {}", character.equipment_weight(), character.capacity);
+        let color_override = if character.equipment_weight() > character.capacity {
+            //Some(Color::new(1.0, 0.0, 0.0, 1.0))
+            Some(RED)
+        } else {
+            None
+        };
+        cells.push(TableCell::new(text, color_override, None));
+
+        table(
+            cells,
+            vec![Align::End, Align::Start],
+            font.clone(),
+            TableStyle {
+                background_color: Some(SKYBLUE),
+                default_text_color: BLACK,
+                ..Default::default()
+            },
+        )
+    }
+}
+
+impl Drawable for EquipmentStatsTable {
+    fn draw(&self, x: f32, y: f32) {
+        self.element.draw(x, y)
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.element.size()
+    }
+}
+
+#[derive(Debug)]
+pub struct EquipmentSlot {
     style: Style,
     size: (f32, f32),
     font: Font,
+    pub content: Option<EquipmentSlotContent>,
+    last_drawn_rect: Cell<Rect>,
+    role: EquipmentSlotRole,
+}
+
+#[derive(Debug)]
+pub struct EquipmentSlotContent {
+    pub equipment: EquipmentEntry,
+    pub texture: Texture2D,
     tooltip_lines: Vec<String>,
 }
 
-impl EquipmentIcon {
-    pub fn new(texture: Option<Texture2D>, font: Font, tooltip_lines: Vec<String>) -> Self {
+#[derive(Copy, Clone, Debug)]
+pub enum SlotMouseEvent {
+    Pressed,
+    Released,
+}
+
+impl EquipmentSlot {
+    pub fn new(
+        font: Font,
+        content: Option<(Texture2D, EquipmentEntry)>,
+        role: EquipmentSlotRole,
+    ) -> Self {
         Self {
-            texture,
             font,
-            tooltip_lines,
             style: Style {
                 background_color: Some(SKYBLUE),
                 border_color: Some(GRAY),
@@ -240,36 +340,56 @@ impl EquipmentIcon {
                 ..Default::default()
             },
             size: (40.0, 40.0),
+            content: content.map(|(texture, equipment)| EquipmentSlotContent {
+                texture,
+                tooltip_lines: tooltip(&equipment),
+                equipment,
+            }),
+            last_drawn_rect: Default::default(),
+            role,
         }
+    }
+
+    pub fn role(&self) -> EquipmentSlotRole {
+        self.role
+    }
+
+    pub fn screen_area(&self) -> Rect {
+        self.last_drawn_rect.get()
     }
 }
 
-impl Drawable for EquipmentIcon {
+impl Drawable for EquipmentSlot {
     fn draw(&self, x: f32, y: f32) {
         self.style.draw(x, y, self.size);
         let params = DrawTextureParams {
             dest_size: Some(self.size.into()),
             ..Default::default()
         };
-        if let Some(texture) = &self.texture {
-            draw_texture_ex(texture, x, y, WHITE, params);
+        if let Some(content) = &self.content {
+            draw_texture_ex(&content.texture, x, y, WHITE, params);
         }
+
+        self.last_drawn_rect
+            .set(Rect::new(x, y, self.size.0, self.size.1));
     }
 
     fn draw_tooltips(&self, x: f32, y: f32) {
-        let (mouse_x, mouse_y) = mouse_position();
-        if (x..x + self.size.0).contains(&mouse_x)
-            && (y..y + self.size.1).contains(&mouse_y)
-            && !self.tooltip_lines.is_empty()
-        {
-            let rect = Rect::new(x, y, self.size.0, self.size.1);
+        if let Some(content) = &self.content {
+            let (mouse_x, mouse_y) = mouse_position();
+            if (x..x + self.size.0).contains(&mouse_x)
+                && (y..y + self.size.1).contains(&mouse_y)
+                && !content.tooltip_lines.is_empty()
+            {
+                let rect = Rect::new(x, y, self.size.0, self.size.1);
 
-            draw_tooltip(
-                &self.font,
-                rect,
-                TooltipPositionPreference::Bottom,
-                &self.tooltip_lines,
-            );
+                draw_tooltip(
+                    &self.font,
+                    rect,
+                    TooltipPositionPreference::Bottom,
+                    &content.tooltip_lines,
+                );
+            }
         }
     }
 

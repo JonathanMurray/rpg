@@ -1,12 +1,14 @@
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
+use macroquad::color::{DARKBLUE, DARKGRAY, RED, SKYBLUE, YELLOW};
 
 use macroquad::input::{
-    is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
+    is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
+    MouseButton,
 };
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
+use macroquad::texture::{draw_texture_ex, DrawTextureParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
@@ -14,8 +16,10 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::drawing::draw_cross;
-use crate::equipment_ui::build_inventory_section;
+use crate::drawing::{draw_cross, draw_dashed_rectangle_lines};
+use crate::equipment_ui::{
+    build_inventory_section, EquipmentSlot, EquipmentStatsTable,
+};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -26,17 +30,22 @@ use crate::{
 };
 
 pub struct CharacterSheet {
-    container: Container,
-    close_button_rect: (f32, f32, f32, f32),
-    top_bar_h: f32,
+    character: Rc<Character>,
+    equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
     screen_position: Cell<(f32, f32)>,
     dragged_offset: Cell<Option<(f32, f32)>>,
+    is_dragging_equipment_from_slot: Option<usize>,
+
+    container: Container,
+    top_bar_h: f32,
+    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
+    font: Font,
 }
 
 impl CharacterSheet {
     pub fn new(
         font: &Font,
-        character: &Character,
+        character: Rc<Character>,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
@@ -85,9 +94,13 @@ impl CharacterSheet {
             ],
         );
 
-        let inventory_section = build_inventory_section(font, character, equipment_icons);
+        let (inventory_section, mut inventory_slots) =
+            build_inventory_section(font, &character, equipment_icons);
 
-        let equipped_section = build_equipped_section(font, character, equipment_icons);
+        let (equipped_section, equipped_slots, equipment_stats_table) =
+            build_equipped_section(font, &character, equipment_icons);
+
+        inventory_slots.extend_from_slice(&equipped_slots);
 
         let mut spell_book_rows = Container {
             layout_dir: LayoutDirection::Vertical,
@@ -250,31 +263,31 @@ impl CharacterSheet {
 
         let top_bar_h = container.children[0].size().1;
 
-        let button_size = (20.0, 20.0);
-        let button_margin = 5.0;
-        let close_button_rect = (
-            container.size().0 - button_margin - button_size.0,
-            button_margin,
-            button_size.0,
-            button_size.1,
-        );
-
         Self {
+            character,
             container,
-            close_button_rect,
             top_bar_h,
             screen_position: Cell::new((100.0, 100.0)),
             dragged_offset: Cell::new(None),
+
+            equipment_slots: inventory_slots,
+            is_dragging_equipment_from_slot: Default::default(),
+            equipment_stats_table,
+            font: font.clone(),
         }
     }
 
-    pub fn draw(&self) -> bool {
+    pub fn draw(&mut self) -> CharacterSheetOutcome {
         let (x, y) = self.screen_position.get();
         let (w, h) = self.container.draw(x, y);
         let clicked_close = self.draw_close_button(x, y);
-        self.container.draw_tooltips(x, y);
 
         let (mouse_x, mouse_y) = mouse_position();
+
+        let changed_equipment = self.handle_equipment_dragging((mouse_x, mouse_y));
+
+        self.container.draw_tooltips(x, y);
+
         if let Some((x_offset, y_offset)) = self.dragged_offset.get() {
             if is_mouse_button_down(MouseButton::Left) {
                 let new_x = (mouse_x - x_offset).max(0.0).min(screen_width() - w);
@@ -296,14 +309,121 @@ impl CharacterSheet {
             self.dragged_offset.set(None);
         }
 
-        clicked_close
+        CharacterSheetOutcome {
+            clicked_close,
+            changed_equipment,
+        }
+    }
+
+    fn handle_equipment_dragging(&mut self, mouse_pos: (f32, f32)) -> bool {
+        let mut did_change_equipment = false;
+
+        for i in 0..self.equipment_slots.len() {
+            let mut slot = self.equipment_slots[i].borrow_mut();
+            let rect = slot.screen_area();
+            let is_hovered = rect.contains(mouse_pos.into());
+
+            let drag_validity = match self.is_dragging_equipment_from_slot {
+                Some(from_i) if from_i != i => {
+                    let dragged_slot = &mut self.equipment_slots[from_i].borrow_mut();
+                    let valid_forward = dragged_slot
+                        .content
+                        .as_ref()
+                        .map(|content| {
+                            self.character
+                                .can_equipment_fit(content.equipment, slot.role())
+                        })
+                        .unwrap_or(true);
+
+                    let valid_reverse = slot
+                        .content
+                        .as_ref()
+                        .map(|content| {
+                            self.character
+                                .can_equipment_fit(content.equipment, dragged_slot.role())
+                        })
+                        .unwrap_or(true);
+
+                    Some(valid_forward && valid_reverse)
+                }
+                _ => None,
+            };
+
+            if is_hovered {
+                if is_mouse_button_pressed(MouseButton::Left) {
+                    if slot.content.is_some() {
+                        self.is_dragging_equipment_from_slot = Some(i);
+                    }
+                } else if is_mouse_button_released(MouseButton::Left) {
+                    if let Some(from_i) = self.is_dragging_equipment_from_slot {
+                        if from_i != i {
+                            let dragged_slot = &mut self.equipment_slots[from_i].borrow_mut();
+
+                            if drag_validity.unwrap() {
+                                let slots = [dragged_slot, &slot];
+                                for i in [0, 1] {
+                                    let entry_a =
+                                        slots[i].content.as_ref().map(|content| content.equipment);
+                                    let role_b = slots[(i + 1) % 2].role();
+
+                                    self.character.set_equipment(entry_a, role_b);
+                                }
+
+                                if slots.iter().any(|slot| slot.role().is_equipped()) {
+                                    did_change_equipment = true;
+                                }
+
+                                std::mem::swap(&mut dragged_slot.content, &mut slot.content);
+
+                                self.equipment_stats_table
+                                    .borrow_mut()
+                                    .rebuild(&self.character, &self.font);
+                            }
+                        }
+                    }
+                    self.is_dragging_equipment_from_slot = None;
+                }
+            }
+
+            if self.is_dragging_equipment_from_slot == Some(i) {
+                draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, YELLOW, 4.0);
+            } else if is_hovered {
+                if let Some(valid) = drag_validity {
+                    let color = if valid { YELLOW } else { RED };
+                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, color);
+                } else if slot.content.is_some() {
+                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+                }
+            }
+        }
+
+        if !is_mouse_button_down(MouseButton::Left) {
+            self.is_dragging_equipment_from_slot = None;
+        }
+
+        if let Some(from_i) = self.is_dragging_equipment_from_slot {
+            let slot = self.equipment_slots[from_i].borrow();
+            let texture = &slot.content.as_ref().unwrap().texture;
+            let params = DrawTextureParams {
+                dest_size: Some((40.0, 40.0).into()),
+                ..Default::default()
+            };
+            draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
+        }
+
+        did_change_equipment
     }
 
     fn draw_close_button(&self, x: f32, y: f32) -> bool {
-        let btn_x = x + self.close_button_rect.0;
-        let btn_y = y + self.close_button_rect.1;
-        let btn_w = self.close_button_rect.2;
-        let btn_h = self.close_button_rect.3;
+        let container_size = self.container.size();
+
+        let button_size = (20.0, 20.0);
+        let button_margin = 5.0;
+
+        let btn_x = x + container_size.0 - button_margin - button_size.0;
+        let btn_y = y + button_margin;
+        let btn_w = button_size.0;
+        let btn_h = button_size.1;
 
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -323,6 +443,11 @@ impl CharacterSheet {
 
         hover && is_mouse_button_pressed(MouseButton::Left)
     }
+}
+
+pub struct CharacterSheetOutcome {
+    pub clicked_close: bool,
+    pub changed_equipment: bool,
 }
 
 fn buttons_row(buttons: Vec<Element>) -> Element {
