@@ -78,7 +78,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
                         }
                     }
                 }
-                BaseAction::ChangeEquipment => {}
+                BaseAction::ChangeEquipment | BaseAction::EndTurn => {}
             }
         }
         if chosen_action.is_some() {

@@ -8,7 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, RAGE, SWORD, WAR_HAMMER,
+    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, KILL, RAGE, SWORD, WAR_HAMMER,
 };
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
@@ -53,7 +53,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
         bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
-        bob.known_actions.push(BaseAction::CastSpell(BRACE));
+        bob.known_actions.push(BaseAction::CastSpell(KILL));
 
         bob.inventory[0].set(Some(EquipmentEntry::Weapon(WAR_HAMMER)));
         bob.inventory[2].set(Some(EquipmentEntry::Weapon(BOW)));
@@ -66,8 +66,7 @@ impl CoreGame {
             Attributes::new(8, 8, 3, 3),
             (3, 4),
         );
-        enemy1.set_shield(SMALL_SHIELD);
-
+        enemy1.set_weapon(HandType::MainHand, BOW);
         enemy1.known_attacked_reactions.push(SIDE_STEP);
 
         let enemy2 = Character::new(
@@ -85,12 +84,11 @@ impl CoreGame {
             "David",
             PortraitId::Portrait1,
             SpriteId::Character4,
-            Attributes::new(2, 10, 10, 5),
+            Attributes::new(1, 1, 1, 1),
             (5, 7),
         );
 
         david.set_weapon(HandType::MainHand, SWORD);
-        david.set_shield(SMALL_SHIELD);
 
         let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
 
@@ -111,9 +109,17 @@ impl CoreGame {
 
         // TODO
         self.perform_losing_health(
-            self.active_character(),
-            self.active_character().health.current() - 1,
+            self.characters.get(0),
+            self.characters.get(0).health.current() - 1,
         );
+        self.log("HELLO 1").await;
+        self.log("HELLO 2").await;
+        self.log("HELLO 3").await;
+        self.log("HELLO 4").await;
+        self.log("HELLO 5").await;
+        self.log("HELLO 6").await;
+        self.log("HELLO 7").await;
+        self.log("HELLO 8").await;
 
         loop {
             let action = self.ui_select_action().await;
@@ -141,7 +147,7 @@ impl CoreGame {
 
                     let is_within_melee =
                         within_meele(character.position.get(), victim.position.get());
-                    let can_react = !victim.has_died.get()
+                    let can_react = !victim.is_dead()
                         && !victim.usable_on_hit_reactions(is_within_melee).is_empty();
 
                     if can_react {
@@ -517,10 +523,10 @@ impl CoreGame {
 
                     if let Some((mut radius, effect)) = self_area {
                         for enhancement in &enhancements {
-                            if let Some(SpellEnhancementEffect::IncreasedRange(n)) =
+                            if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) =
                                 enhancement.effect
                             {
-                                radius = radius.plus(n);
+                                radius = radius.plusf(tenths as f32 *0.1);
                             }
                         }
 
@@ -843,7 +849,8 @@ impl CoreGame {
         //self.log(format!("  {} took {} damage", character.name, amount));
 
         if character.health.current() == 0 {
-            character.has_died.set(true);
+            character.conditions.borrow_mut().near_death = false;
+            character.conditions.borrow_mut().dead = true;
         }
     }
 
@@ -1366,7 +1373,7 @@ impl Characters {
         loop {
             let (id, ch) = &self.0[i];
 
-            if passed_current && !ch.has_died.get() {
+            if passed_current && !ch.is_dead() {
                 return *id;
             }
 
@@ -1405,7 +1412,7 @@ impl Characters {
     pub fn remove_dead(&mut self) -> Vec<CharacterId> {
         let mut removed = vec![];
         self.0.retain(|(_id, ch)| {
-            if ch.has_died.get() {
+            if ch.is_dead() {
                 removed.push(ch.id());
                 false
             } else {
@@ -1514,6 +1521,7 @@ pub enum Condition {
     OffHandExertion(u32),
     Encumbered(u32),
     NearDeath,
+    Dead,
 }
 
 impl Condition {
@@ -1530,6 +1538,7 @@ impl Condition {
             OffHandExertion(n) => Some(n),
             Encumbered(n) => Some(n),
             NearDeath => None,
+            Dead => None,
         }
     }
 
@@ -1546,6 +1555,7 @@ impl Condition {
             OffHandExertion(_) => "Exerted (off-hand)",
             Encumbered(_) => "Encumbered",
             NearDeath => "Near-death",
+            Dead => "Dead",
         }
     }
 
@@ -1562,6 +1572,7 @@ impl Condition {
             OffHandExertion(_) => "-1 per stack on further similar actions",
             Encumbered(_) => "-1 to Evasion per stack and -1 to all dice rolls per 2 stacks",
             NearDeath => "Reduced AP, disadvantage on everything",
+            Dead => "This character has reached 0 HP and is dead",
         }
     }
 
@@ -1598,6 +1609,7 @@ struct Conditions {
     offhand_exertion: u32,
     encumbered: u32,
     near_death: bool,
+    dead: bool,
 }
 
 impl Conditions {
@@ -1632,6 +1644,9 @@ impl Conditions {
         }
         if self.near_death {
             result.push(Condition::NearDeath.info());
+        }
+        if self.dead {
+            result.push(Condition::Dead.info());
         }
 
         result
@@ -1669,6 +1684,7 @@ pub enum ActionTarget {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+
 pub enum BaseAction {
     Attack {
         hand: HandType,
@@ -1677,6 +1693,7 @@ pub enum BaseAction {
     CastSpell(Spell),
     Move,
     ChangeEquipment,
+    EndTurn,
 }
 
 impl BaseAction {
@@ -1688,6 +1705,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
+            BaseAction::EndTurn => 0,
         }
     }
 
@@ -1697,6 +1715,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.mana_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
+            BaseAction::EndTurn => 0,
         }
     }
 
@@ -1706,6 +1725,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.stamina_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
+            BaseAction::EndTurn => 0,
         }
     }
 }
@@ -1798,8 +1818,8 @@ impl SpellTarget {
     pub fn range(&self, enhancements: &[SpellEnhancement]) -> Option<Range> {
         self.base_range().map(|mut range| {
             for enhancement in enhancements {
-                if let Some(SpellEnhancementEffect::IncreasedRange(n)) = enhancement.effect {
-                    range = range.plus(n);
+                if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) = enhancement.effect {
+                    range = range.plusf(tenths as f32 *0.1);
                 }
             }
             range
@@ -1822,7 +1842,7 @@ pub struct SpellEnhancement {
 pub enum SpellEnhancementEffect {
     CastTwice,
     OnHit(ApplyEffect),
-    IncreasedRange(u32),
+    IncreasedRangeTenths(u32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1895,7 +1915,6 @@ pub struct Character {
     pub portrait: PortraitId,
 
     pub sprite: SpriteId,
-    pub has_died: Cell<bool>,
     pub player_controlled: bool,
     pub position: Cell<Position>,
     pub base_attributes: Attributes,
@@ -1939,7 +1958,6 @@ impl Character {
             id: None,
             portrait,
             sprite,
-            has_died: Cell::new(false),
             player_controlled,
             position: Cell::new(position),
             name,
@@ -1965,11 +1983,16 @@ impl Character {
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
                 BaseAction::ChangeEquipment,
+                BaseAction::EndTurn,
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
             changed_equipment_listeners: Default::default(),
         }
+    }
+
+    pub fn is_dead(&self) -> bool {
+        self.conditions.borrow().dead
     }
 
     pub fn listen_to_changed_equipment(&self) -> Rc<Cell<bool>> {
@@ -2070,12 +2093,10 @@ impl Character {
 
     pub fn equipment(&self, slot_role: EquipmentSlotRole) -> Option<EquipmentEntry> {
         match slot_role {
-            EquipmentSlotRole::MainHand => self
-                .weapon(HandType::MainHand)
-                .map(EquipmentEntry::Weapon),
-            EquipmentSlotRole::OffHand => {
-                self.shield().map(EquipmentEntry::Shield)
+            EquipmentSlotRole::MainHand => {
+                self.weapon(HandType::MainHand).map(EquipmentEntry::Weapon)
             }
+            EquipmentSlotRole::OffHand => self.shield().map(EquipmentEntry::Shield),
             EquipmentSlotRole::Armor => self.armor.get().map(EquipmentEntry::Armor),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
         }
@@ -2235,6 +2256,7 @@ impl Character {
             }
             BaseAction::Move => ap > 0,
             BaseAction::ChangeEquipment => ap > 0,
+            BaseAction::EndTurn => true,
         }
     }
 
@@ -2567,6 +2589,7 @@ impl Character {
             OffHandExertion(n) => conditions.offhand_exertion += n,
             Encumbered(n) => conditions.encumbered += n,
             NearDeath => conditions.near_death = true,
+            Dead => conditions.dead = true,
         }
     }
 }
@@ -2772,6 +2795,15 @@ impl Range {
             Range::Melee => Range::Float(2f32.sqrt() + n as f32),
             Range::Ranged(range) => Range::Ranged(range + n),
             Range::ExtendableRanged(range) => Range::Ranged(range + n),
+            Range::Float(range) => Range::Float(range + n as f32),
+        }
+    }
+
+    pub fn plusf(&self, n: f32) -> Range {
+        match self {
+            Range::Melee => Range::Float(2f32.sqrt() + n),
+            Range::Ranged(range) => Range::Float(*range as f32 + n),
+            Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
             Range::Float(range) => Range::Float(range + n as f32),
         }
     }

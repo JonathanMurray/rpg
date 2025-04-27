@@ -85,8 +85,8 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
             crate::core::SpellEnhancementEffect::OnHit(apply_effect) => {
                 describe_apply_effect(apply_effect, &mut technical_description);
             }
-            crate::core::SpellEnhancementEffect::IncreasedRange(n) => {
-                technical_description.push(format!("+ {} range", n));
+            crate::core::SpellEnhancementEffect::IncreasedRangeTenths(tenths) => {
+                technical_description.push(format!("+ {} range", tenths as f32 * 0.1));
             }
         }
     }
@@ -111,12 +111,17 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
         },
         BaseAction::CastSpell(spell) => spell_tooltip(spell),
         BaseAction::Move => ActionButtonTooltip {
-            header: "Movement".to_string(),
+            header: "Move".to_string(),
             description: None,
             technical_description: Default::default(),
         },
         BaseAction::ChangeEquipment => ActionButtonTooltip {
             header: "Equip/unequip (1 AP)".to_string(),
+            description: None,
+            technical_description: Default::default(),
+        },
+        BaseAction::EndTurn => ActionButtonTooltip {
+            header: "End your turn".to_string(),
             description: None,
             technical_description: Default::default(),
         },
@@ -533,6 +538,7 @@ impl ButtonAction {
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
+                BaseAction::EndTurn => IconId::Go,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,

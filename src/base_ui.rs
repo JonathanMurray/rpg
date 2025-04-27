@@ -186,6 +186,7 @@ pub struct TextLine {
     color: Color,
     min_height: f32,
     min_width: f32,
+    max_width: f32,
     right_align: bool,
     hor_padding: f32,
     vert_padding: f32,
@@ -210,6 +211,7 @@ impl TextLine {
             color,
             min_height: 0.0,
             min_width: 0.0,
+            max_width: f32::MAX,
             right_align: false,
             hor_padding: 0.0,
             vert_padding: 0.0,
@@ -230,6 +232,11 @@ impl TextLine {
         self.min_width = min_width;
         self.right_align = right_align;
         self.size.0 = self.size.0.max(min_width);
+    }
+
+    pub fn set_max_width(&mut self, max_width: f32) {
+        self.max_width = max_width;
+        self.size.0 = self.size.0.min(max_width);
     }
 
     pub fn set_depth(&mut self, color: Color, offset: f32) {
@@ -255,6 +262,7 @@ impl TextLine {
     pub fn set_string(&mut self, string: impl Into<String>) {
         let mut string = string.into();
         if string.is_empty() {
+            // Empty strings, when measured, result in bad float values
             string.push_str("~~~");
         }
         self.string = string;
@@ -394,7 +402,6 @@ impl Default for Align {
 
 pub struct ContainerScroll {
     offset: Cell<f32>,
-    draw_overflow: bool,
     pub scroll_speed: f32,
 }
 
@@ -411,7 +418,6 @@ impl Default for ContainerScroll {
     fn default() -> Self {
         Self {
             offset: Default::default(),
-            draw_overflow: Default::default(),
             scroll_speed: 15.0,
         }
     }
@@ -420,6 +426,7 @@ impl Default for ContainerScroll {
 #[derive(Default)]
 pub struct Container {
     pub layout_dir: LayoutDirection,
+    pub reverse_vertical: bool,
     pub align: Align,
     pub margin: f32,
     pub style: Style,
@@ -507,17 +514,15 @@ impl Container {
 
         let mut x0 = x + self.style.padding;
         let mut y0 = y + self.style.padding;
+        if self.reverse_vertical {
+            y0 = y + size.1 - self.style.padding;
+        }
+
         let scroll_offset = self
             .scroll
             .as_ref()
             .map(|scroll| -scroll.offset.get())
             .unwrap_or(0.0);
-
-        let draw_overflow = self
-            .scroll
-            .as_ref()
-            .map(|scroll| scroll.draw_overflow)
-            .unwrap_or(false);
 
         for (i, element) in self.children.iter().enumerate() {
             let (element_w, element_h) = element.size();
@@ -545,11 +550,13 @@ impl Container {
                 }
             };
 
-            let y_element = y0 + offset.1;
+            let mut y_element = y0 + offset.1;
 
-            if (draw_overflow || y_element >= y)
-                && (draw_overflow || y_element + element.size().1 <= y + size.1 + 5.0)
-            {
+            if self.reverse_vertical {
+                y_element -= element_h;
+            }
+
+            if (y_element >= y) && (y_element + element.size().1 <= y + size.1 + 5.0) {
                 if only_tooltips {
                     element.draw_tooltips(x0 + offset.0, y_element);
                 } else {
@@ -559,7 +566,13 @@ impl Container {
 
             match self.layout_dir {
                 LayoutDirection::Horizontal => x0 += element_w + self.margin,
-                LayoutDirection::Vertical => y0 += element_h + self.margin,
+                LayoutDirection::Vertical => {
+                    if self.reverse_vertical {
+                        y0 -= element_h + self.margin;
+                    } else {
+                        y0 += element_h + self.margin
+                    }
+                }
             }
 
             if !(only_tooltips) && i < self.children.len() - 1 {
@@ -574,6 +587,7 @@ impl Container {
                             thickness,
                             border_color,
                         ),
+                        // TODO reverse?
                         LayoutDirection::Vertical => draw_line(
                             x0,
                             y0 - self.margin * 0.5,
@@ -592,8 +606,15 @@ impl Container {
         if !only_tooltips {
             if let Some(scroll) = &self.scroll {
                 let content_size = self.content_size();
-                let bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+                let mut bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+
                 let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
+
+                if self.reverse_vertical {
+                    // bar_y += content_size.1 - bar_h;
+                    bar_y = y + size.1 - bar_h + scroll.offset.get() / content_size.1 * size.1;
+                }
+
                 let bar_w = 7.0;
                 draw_rectangle(x + size.0, bar_y, bar_w, bar_h, GRAY);
 
@@ -601,9 +622,17 @@ impl Container {
                 if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
                     let (_dx, dy) = mouse_wheel();
                     if dy != 0.0 {
-                        let new_offset = (scroll.offset.get() - dy.signum() * scroll.scroll_speed)
-                            .max(0.0)
-                            .min(content_size.1 - size.1);
+                        let mut new_offset = (scroll.offset.get()
+                            - dy.signum() * scroll.scroll_speed)
+                            .min(content_size.1 - size.1)
+                            .max(0.0);
+
+                        if self.reverse_vertical {
+                            new_offset = (scroll.offset.get() - dy.signum() * scroll.scroll_speed)
+                                .min(0.0)
+                                .max(size.1 - content_size.1);
+                        }
+
                         scroll.offset.set(new_offset);
                     }
                 }

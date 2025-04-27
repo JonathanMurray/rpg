@@ -277,6 +277,7 @@ impl ActivityPopup {
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_on_attacked_reaction = None;
+        let mut changed_spell_enhancements = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, _button_action, hovered_pos) => {
@@ -307,12 +308,18 @@ impl ActivityPopup {
                         }
                     }
 
-                    if let ButtonAction::OnAttackedReaction(..) = clicked_btn.action {
-                        let maybe_reaction = self
-                            .selected_choices()
-                            .map(|action| action.unwrap_on_attacked_reaction())
-                            .next();
-                        changed_on_attacked_reaction = Some(maybe_reaction)
+                    match clicked_btn.action {
+                        ButtonAction::OnAttackedReaction(..) => {
+                            let maybe_reaction = self
+                                .selected_choices()
+                                .map(|action| action.unwrap_on_attacked_reaction())
+                                .next();
+                            changed_on_attacked_reaction = Some(maybe_reaction)
+                        }
+                        ButtonAction::SpellEnhancement(..) => {
+                            changed_spell_enhancements = true;
+                        }
+                        _ => {}
                     }
                 }
             };
@@ -328,6 +335,9 @@ impl ActivityPopup {
             return Some(ActivityPopupOutcome::ChangedOnAttackedReaction(
                 maybe_reaction,
             ));
+        }
+        if changed_spell_enhancements {
+            return Some(ActivityPopupOutcome::ChangedSpellEnhancements);
         }
 
         None
@@ -459,6 +469,7 @@ impl ActivityPopup {
     }
 
     pub fn set_enabled(&mut self, mut enabled: bool) {
+        println!("Popup set enabled: {}", enabled);
         if self.movement_ap_cost()
             > self
                 .characters
@@ -541,8 +552,9 @@ impl ActivityPopup {
                         }
                     }
 
-                    BaseAction::ChangeEquipment => {
-                        //lines.push("CHANGING EQUIPMENT".to_string());
+                    BaseAction::ChangeEquipment => {}
+                    BaseAction::EndTurn => {
+                        // TODO do anything here?
                     }
                 }
             }
@@ -637,6 +649,7 @@ impl ActivityPopup {
 pub enum ActivityPopupOutcome {
     ClickedProceed,
     ChangedOnAttackedReaction(Option<OnAttackedReaction>),
+    ChangedSpellEnhancements,
 }
 
 struct MovementStaminaSlider {

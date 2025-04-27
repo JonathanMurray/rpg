@@ -137,7 +137,7 @@ pub struct GameGrid {
     dragging_camera_from: Option<(f32, f32)>,
 
     effects: Vec<ConcreteEffect>,
-    selected_player_character_id: CharacterId,
+    selected_player_character_id: Option<CharacterId>,
     active_character_id: CharacterId,
 
     movement_range: MovementRange,
@@ -172,7 +172,7 @@ impl GameGrid {
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
             effects: vec![],
-            selected_player_character_id: selected_character_id,
+            selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
             movement_range: MovementRange::default(),
             selected_movement_path: Default::default(),
@@ -210,19 +210,37 @@ impl GameGrid {
     }
 
     pub fn remove_dead(&mut self) {
-        self.characters.remove_dead();
+        let removed = self.characters.remove_dead();
+        for id in removed {
+            if self.players_inspect_target == Some(id) {
+                println!("Removed inspect target in grid, since it died");
+                self.players_inspect_target = None;
+            }
+
+            if self.selected_player_character_id == Some(id) {
+                println!("SWITCHED FROM SELECTED {}, since it died", id);
+                // TODO what about when all PC:s have died?
+                self.selected_player_character_id = self
+                    .characters
+                    .iter()
+                    .find(|ch| ch.player_controlled)
+                    .map(|ch| ch.id());
+                println!("SWITCHED TO {:?}", self.selected_player_character_id);
+            }
+        }
     }
 
     pub fn update(
         &mut self,
         active_character_id: CharacterId,
-        selected_player_character_id: CharacterId,
+        selected_player_character_id: Option<CharacterId>,
         characters: &Characters,
         elapsed: f32,
     ) {
         self.pathfind_grid.blocked_positions.clear();
 
         self.active_character_id = active_character_id;
+
         self.selected_player_character_id = selected_player_character_id;
 
         for character in characters.iter() {
@@ -338,9 +356,11 @@ impl GameGrid {
         self.effects.push(concrete_effect);
     }
 
+    /*
     pub fn remove_movement_path(&mut self) {
         self.selected_movement_path = None;
     }
+     */
 
     pub fn has_non_empty_selected_movement_path(&self) -> bool {
         self.selected_movement_path
@@ -426,9 +446,11 @@ impl GameGrid {
         self.players_action_target = ActionTarget::None;
     }
 
+    /*
     pub fn clear_enemys_target(&mut self) {
         self.enemys_target = None;
     }
+     */
 
     pub fn players_action_target(&self) -> ActionTarget {
         self.players_action_target
@@ -530,6 +552,8 @@ impl GameGrid {
         ui_state: &UiState,
     ) -> GridOutcome {
         let previous_inspect_target = self.players_inspect_target;
+        let previous_players_action_target = self.players_action_target;
+        let had_non_empty_movement_path = self.has_non_empty_selected_movement_path();
 
         let (x, y) = self.position_on_screen;
 
@@ -604,6 +628,12 @@ impl GameGrid {
 
         if matches!(ui_state, UiState::ConfiguringAction(BaseAction::Move)) {
             self.draw_movement_path_background();
+        } else {
+            self.selected_movement_path = None;
+        }
+
+        if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
+            self.enemys_target = None;
         }
 
         let pressed_left_mouse = is_mouse_button_pressed(MouseButton::Left);
@@ -627,6 +657,7 @@ impl GameGrid {
                 },
                 BaseAction::Move => MouseState::MayInputMovement,
                 BaseAction::ChangeEquipment => MouseState::None,
+                BaseAction::EndTurn => MouseState::None,
             },
             _ => MouseState::None,
         };
@@ -889,9 +920,8 @@ impl GameGrid {
             }
         }
 
-        {
-            let pos =
-                self.character_screen_pos(self.characters.get(self.selected_player_character_id));
+        if let Some(id) = self.selected_player_character_id {
+            let pos = self.character_screen_pos(self.characters.get(id));
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
 
@@ -939,6 +969,12 @@ impl GameGrid {
 
         if self.players_inspect_target != previous_inspect_target {
             outcome.switched_inspect_target = Some(self.players_inspect_target);
+        }
+        if self.players_action_target != previous_players_action_target {
+            outcome.switched_players_action_target = Some(self.players_action_target);
+        }
+        if self.has_non_empty_selected_movement_path() != had_non_empty_movement_path {
+            outcome.switched_movement_path = true;
         }
 
         outcome
@@ -1361,6 +1397,8 @@ pub struct GridOutcome {
     pub switched_action: Option<GridSwitchedTo>,
     pub hovered_character_id: Option<CharacterId>,
     pub switched_inspect_target: Option<Option<CharacterId>>,
+    pub switched_players_action_target: Option<ActionTarget>,
+    pub switched_movement_path: bool,
 }
 
 #[derive(Debug)]

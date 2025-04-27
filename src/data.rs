@@ -238,7 +238,7 @@ pub const SCREAM: Spell = Spell {
             action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreasedRange(2)),
+            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
         }),
         None,
     ],
@@ -295,9 +295,23 @@ pub const HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    possible_enhancements: [None, None],
+    possible_enhancements: [
+        
+    Some(SpellEnhancement {
+        name: "Far",
+        description: "Increased range",
+        icon: IconId::Plus,
+        action_point_cost: 0,
+        mana_cost: 1,
+        bonus_damage: 0,
+        effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(20)),
+    })
+
+    // TODO add enhancement that heals over time (1 per round for 3 turns?)
+        
+        , None],
     target: SpellTarget::Ally {
-        range: Range::Ranged(5),
+        range: Range::Ranged(3),
         effect: SpellAllyEffect {
             healing: 1,
             apply: None,
@@ -373,15 +387,18 @@ pub const FIREBALL: Spell = Spell {
     stamina_cost: 0,
     possible_enhancements: [
         Some(SpellEnhancement {
-            name: "Big",
+            name: "Far",
             description: "Increased range",
             icon: IconId::Plus,
             action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreasedRange(3)),
+            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
         }),
-        Some(SpellEnhancement {
+        // TODO add one that gives + radius
+
+        // TODO Make this only increase the Impact (AoE) damage (by 1?)
+         Some(SpellEnhancement {
             name: "Massive",
             description: "Greatly increased damage",
             icon: IconId::PlusPlus,
@@ -405,7 +422,7 @@ pub const FIREBALL: Spell = Spell {
                 on_hit: None,
             },
         )),
-        range: Range::Ranged(3),
+        range: Range::Float(3.5),
     },
     animation_color: RED,
 };
@@ -414,7 +431,7 @@ pub const KILL: Spell = Spell {
     name: "Kill",
     description: "Kill an enemy",
     icon: IconId::Fireball,
-    action_point_cost: 5,
+    action_point_cost: 4,
     mana_cost: 0,
     stamina_cost: 0,
     possible_enhancements: [None; 2],

@@ -23,6 +23,7 @@ use crate::{
         Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{Character, CharacterId, Characters, CoreGame, MAX_ACTION_POINTS},
+    drawing::draw_cross,
     textures::PortraitId,
 };
 
@@ -112,7 +113,7 @@ impl CharacterPortraits {
 
     pub fn remove_dead(&mut self) {
         self.portraits
-            .retain(|_id, portrait| !portrait.borrow().character.has_died.get());
+            .retain(|_id, portrait| !portrait.borrow().character.is_dead());
         self.row.remove_dropped_children();
     }
 }
@@ -239,7 +240,7 @@ impl Drawable for CharacterSheetToggle {
 
 pub struct PlayerPortraits {
     row: Container,
-    pub selected_i: Cell<CharacterId>,
+    selected_i: Cell<CharacterId>,
     active_i: Cell<CharacterId>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
 }
@@ -290,11 +291,11 @@ impl PlayerPortraits {
             portraits,
         };
 
-        this.set_selected_character(selected_id);
+        this.set_selected_id(selected_id);
         this
     }
 
-    pub fn set_selected_character(&self, character_id: CharacterId) {
+    pub fn set_selected_id(&self, character_id: CharacterId) {
         self.portraits[&self.selected_i.get()]
             .borrow()
             .shown_character
@@ -304,6 +305,10 @@ impl PlayerPortraits {
             .borrow()
             .shown_character
             .set(true);
+    }
+
+    pub fn selected_id(&self) -> CharacterId {
+        self.selected_i.get()
     }
 
     pub fn set_active_character(&self, character_id: CharacterId) {
@@ -326,10 +331,18 @@ impl PlayerPortraits {
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.get() {
                 portrait.borrow().has_been_clicked.set(false);
-                self.set_selected_character(*i);
+                self.set_selected_id(*i);
                 break;
             }
         }
+    }
+
+    pub fn mark_as_dead(&mut self, character_id: CharacterId) {
+        self.portraits
+            .get(&character_id)
+            .unwrap()
+            .borrow_mut()
+            .is_character_dead = true;
     }
 }
 
@@ -340,6 +353,7 @@ struct PlayerCharacterPortrait {
     padding: f32,
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
+    is_character_dead: bool,
 }
 
 impl PlayerCharacterPortrait {
@@ -353,6 +367,7 @@ impl PlayerCharacterPortrait {
             padding: 10.0,
             has_been_clicked: Cell::new(false),
             texture,
+            is_character_dead: false,
         }
     }
 }
@@ -367,6 +382,13 @@ impl Drawable for PlayerCharacterPortrait {
             ..Default::default()
         };
         draw_texture_ex(&self.texture, x, y, WHITE, params);
+
+        if self.is_character_dead {
+            draw_rectangle(x, y, w, h, Color::new(0.6, 0.0, 0.0, 0.5));
+            draw_cross(x, y, w, h, RED, 2.0, 5.0);
+            //draw_line(x, y, x+w, y+h, 2.0, RED);
+            //draw_line(x, y+h, x+w, y, 2.0, RED);
+        }
 
         if self.shown_character.get() {
             draw_rectangle_lines(x, y, w, h, 3.0, WHITE);
@@ -418,15 +440,17 @@ pub struct Log {
 
 impl Log {
     pub fn new(font: Font) -> Self {
-        let h = 150.0;
+        let h = 130.0;
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
+                reverse_vertical: true,
                 children: vec![],
                 margin: 4.0,
                 align: Align::End,
                 scroll: Some(ContainerScroll::default()),
-                min_width: Some(450.0),
+                //min_width: Some(450.0),
+                min_width: Some(300.0),
                 min_height: Some(h),
                 max_height: Some(h),
                 style: Style {
@@ -450,15 +474,18 @@ impl Log {
     pub fn add_with_details(&mut self, text: impl Into<String>, details: Vec<String>) {
         const MAX_LINES: usize = 50;
         if self.container.children.len() == MAX_LINES {
-            self.container.children.remove(0);
-            self.text_lines.remove(0);
-            self.line_details.remove(0);
+            self.container.children.pop();
+            self.text_lines.pop();
+            self.line_details.pop();
         }
+        // TODO Support setting max width for TextLine, and having it line-wrap to fit inside the given width
         let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
         text_line.set_padding(3.0, 3.0);
+        text_line.set_max_width(self.container.min_width.unwrap());
         let text_line = Rc::new(text_line);
-        self.text_lines.push(text_line.clone());
-        self.container.children.push(Element::Rc(text_line));
+
+        self.text_lines.insert(0, text_line.clone());
+        self.container.children.insert(0, Element::Rc(text_line));
 
         if !details.is_empty() {
             let details_container = Container {
@@ -476,9 +503,9 @@ impl Log {
                     .collect(),
                 ..Default::default()
             };
-            self.line_details.push(Some(details_container));
+            self.line_details.insert(0, Some(details_container));
         } else {
-            self.line_details.push(None);
+            self.line_details.insert(0, None);
         }
     }
 

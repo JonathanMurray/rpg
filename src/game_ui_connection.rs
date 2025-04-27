@@ -219,8 +219,7 @@ impl _GameUserInterfaceConnection {
                     }
                     PlayerChose::Action(action) => {
                         dbg!(&action);
-                        // TODO: Add option in UI to deliberately end turn
-                        return UiOutcome::ChoseAction(Some(action));
+                        return UiOutcome::ChoseAction(action);
                     }
                 }
             }

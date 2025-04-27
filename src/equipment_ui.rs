@@ -206,8 +206,7 @@ pub fn build_equipped_section(
         .map(|slot| Rc::new(RefCell::new(slot)))
         .collect();
 
-    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> =
-        slots.iter().map(Rc::clone).collect();
+    let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
 
     let slots_container = Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
