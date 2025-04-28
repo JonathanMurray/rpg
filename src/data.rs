@@ -212,7 +212,7 @@ pub const BRACE: Spell = Spell {
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 1,
-    possible_enhancements: [None; 2],
+    possible_enhancements: [None; 3],
     target: SpellTarget::None {
         self_area: None,
         self_effect: Some(SpellAllyEffect {
@@ -241,6 +241,7 @@ pub const SCREAM: Spell = Spell {
             effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
         }),
         None,
+        None,
     ],
 
     target: SpellTarget::None {
@@ -249,12 +250,36 @@ pub const SCREAM: Spell = Spell {
             SpellEffect::Enemy(SpellEnemyEffect {
                 contest_type: Some(SpellContestType::Mental),
                 damage: None,
-                on_hit: Some(ApplyEffect::Condition(Condition::Dazed(1))),
+                on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
             }),
         )),
         self_effect: None,
     },
     animation_color: BLUE,
+};
+
+pub const SHACKLED_MIND: Spell = Spell {
+    name: "Shackled Mind",
+    description: "Shackle an enemy's mind, slowing them and lowering their defenses",
+    icon: IconId::ShackledMind,
+    action_point_cost: 3,
+    mana_cost: 1,
+    stamina_cost: 0,
+    possible_enhancements: [None, None, None],
+
+    target: SpellTarget::Enemy {
+        range: Range::Ranged(4),
+        effect: SpellEnemyEffect {
+            contest_type: Some(SpellContestType::Mental),
+            damage: None,
+            on_hit: Some([
+                Some(ApplyEffect::Condition(Condition::Slowed(3))),
+                Some(ApplyEffect::Condition(Condition::Exposed(3))),
+            ]),
+        },
+        impact_area: None,
+    },
+    animation_color: PURPLE,
 };
 
 pub const MIND_BLAST: Spell = Spell {
@@ -275,12 +300,13 @@ pub const MIND_BLAST: Spell = Spell {
             effect: Some(SpellEnhancementEffect::CastTwice),
         }),
         None,
+        None,
     ],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
             contest_type: Some(SpellContestType::Mental),
             damage: Some((1, false)),
-            on_hit: Some(ApplyEffect::RemoveActionPoints(1)),
+            on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         },
         impact_area: None,
         range: Range::Ranged(5),
@@ -296,20 +322,18 @@ pub const HEAL: Spell = Spell {
     mana_cost: 1,
     stamina_cost: 0,
     possible_enhancements: [
-        
-    Some(SpellEnhancement {
-        name: "Far",
-        description: "Increased range",
-        icon: IconId::Plus,
-        action_point_cost: 0,
-        mana_cost: 1,
-        bonus_damage: 0,
-        effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(20)),
-    })
-
-    // TODO add enhancement that heals over time (1 per round for 3 turns?)
-        
-        , None],
+        Some(SpellEnhancement {
+            name: "Far",
+            description: "Increased range",
+            icon: IconId::Extend,
+            action_point_cost: 0,
+            mana_cost: 1,
+            bonus_damage: 0,
+            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(20)),
+        }), // TODO add enhancement that heals over time (1 per round for 3 turns?)
+        None,
+        None,
+    ],
     target: SpellTarget::Ally {
         range: Range::Ranged(3),
         effect: SpellAllyEffect {
@@ -327,7 +351,7 @@ pub const HEALING_NOVA: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    possible_enhancements: [None, None],
+    possible_enhancements: [None, None, None],
     target: SpellTarget::None {
         self_area: Some((
             Range::Ranged(4),
@@ -348,7 +372,7 @@ pub const SELF_HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    possible_enhancements: [None, None],
+    possible_enhancements: [None, None, None],
     target: SpellTarget::None {
         self_area: None,
         self_effect: Some(SpellAllyEffect {
@@ -366,7 +390,7 @@ pub const HEALING_RAIN: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 2,
     stamina_cost: 0,
-    possible_enhancements: [None, None],
+    possible_enhancements: [None, None, None],
     target: SpellTarget::Area {
         range: Range::Ranged(5),
         radius: Range::Float(1.95),
@@ -389,19 +413,26 @@ pub const FIREBALL: Spell = Spell {
         Some(SpellEnhancement {
             name: "Far",
             description: "Increased range",
-            icon: IconId::Plus,
+            icon: IconId::Extend,
             action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 0,
             effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
         }),
-        // TODO add one that gives + radius
-
-        // TODO Make this only increase the Impact (AoE) damage (by 1?)
-         Some(SpellEnhancement {
+        Some(SpellEnhancement {
             name: "Massive",
+            description: "Increased radius",
+            icon: IconId::Radius,
+            action_point_cost: 0,
+            mana_cost: 1,
+            bonus_damage: 0,
+            effect: Some(SpellEnhancementEffect::IncreaseRadiusTenths(10)),
+        }),
+        // TODO Make this only increase the Impact (AoE) damage (by 1?)
+        Some(SpellEnhancement {
+            name: "Scorching",
             description: "Greatly increased damage",
-            icon: IconId::PlusPlus,
+            icon: IconId::Plus,
             action_point_cost: 0,
             mana_cost: 1,
             bonus_damage: 2,
@@ -434,7 +465,7 @@ pub const KILL: Spell = Spell {
     action_point_cost: 4,
     mana_cost: 0,
     stamina_cost: 0,
-    possible_enhancements: [None; 2],
+    possible_enhancements: [None; 3],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
             contest_type: None,

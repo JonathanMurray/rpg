@@ -55,7 +55,10 @@ pub enum IconId {
     X1point5,
     X2,
     X3,
+    Extend,
+    Radius,
     Equip,
+    ShackledMind,
 }
 
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
@@ -81,7 +84,10 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::X1point5, "x1_5.png"),
         (IconId::X2, "x2.png"),
         (IconId::X3, "x3.png"),
+        (IconId::Extend, "extend.png"),
+        (IconId::Radius, "radius.png"),
         (IconId::Equip, "equip.png"),
+        (IconId::ShackledMind, "shackled_mind.png"),
     ])
     .await
 }

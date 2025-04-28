@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::{rand, telemetry::enable};
+use macroquad::rand;
 
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
@@ -27,7 +27,7 @@ use crate::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
         Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction,
-        Spell, SpellTarget, SpellTargetOutcome,
+        Spell, SpellEnhancement, SpellTarget, SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -42,7 +42,7 @@ use crate::{
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum UiState {
+pub enum OldUiState {
     ChoosingAction,
     ConfiguringAction(BaseAction),
     ReactingToAttack {
@@ -58,6 +58,96 @@ pub enum UiState {
         is_within_melee: bool,
     },
     Idle,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum UiState {
+    ChoosingAction,
+    ConfiguringAction(ConfiguredAction),
+    ReactingToAttack {
+        hand: HandType,
+        attacker: CharacterId,
+        reactor: CharacterId,
+        is_within_melee: bool,
+        selected: Option<OnAttackedReaction>,
+    },
+    ReactingToHit {
+        attacker: CharacterId,
+        victim: CharacterId,
+        damage: u32,
+        is_within_melee: bool,
+        selected: Option<OnHitReaction>,
+    },
+    Idle,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ConfiguredAction {
+    // TODO Store targets in here?
+    // TODO Get rid of action_range_indicator and instead use information from here?
+    Attack {
+        hand: HandType,
+        action_point_cost: u32,
+        selected_enhancements: Vec<AttackEnhancement>,
+    },
+    CastSpell {
+        spell: Spell,
+        selected_enhancements: Vec<SpellEnhancement>,
+    },
+    Move,
+    ChangeEquipment,
+    EndTurn,
+}
+
+impl ConfiguredAction {
+    pub fn from_base_action(base_action: BaseAction) -> Self {
+        match base_action {
+            BaseAction::Attack {
+                hand,
+                action_point_cost,
+            } => Self::Attack {
+                hand,
+                action_point_cost,
+                selected_enhancements: vec![],
+            },
+            BaseAction::CastSpell(spell) => Self::CastSpell {
+                spell,
+                selected_enhancements: vec![],
+            },
+            BaseAction::Move => Self::Move,
+            BaseAction::ChangeEquipment => Self::ChangeEquipment,
+            BaseAction::EndTurn => Self::EndTurn,
+        }
+    }
+
+    pub fn base_action(&self) -> BaseAction {
+        match self {
+            ConfiguredAction::Attack {
+                hand,
+                action_point_cost,
+                ..
+            } => BaseAction::Attack {
+                hand: *hand,
+                action_point_cost: *action_point_cost,
+            },
+            ConfiguredAction::CastSpell { spell, .. } => BaseAction::CastSpell(*spell),
+            ConfiguredAction::Move => BaseAction::Move,
+            ConfiguredAction::ChangeEquipment => BaseAction::ChangeEquipment,
+            ConfiguredAction::EndTurn => BaseAction::EndTurn,
+        }
+    }
+
+    pub fn action_point_cost(&self) -> u32 {
+        self.base_action().action_point_cost()
+    }
+
+    pub fn mana_cost(&self) -> u32 {
+        self.base_action().mana_cost()
+    }
+
+    pub fn stamina_cost(&self) -> u32 {
+        self.base_action().stamina_cost()
+    }
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -102,7 +192,7 @@ struct CharacterUi {
 pub struct UserInterface {
     characters: Characters,
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
-    state: UiState,
+    state: Rc<RefCell<UiState>>,
     animation_stopwatch: StopWatch,
 
     font: Font,
@@ -335,7 +425,7 @@ impl UserInterface {
             character_uis.insert(character.id(), character_ui);
         }
 
-        let ui_state = UiState::Idle;
+        let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
         let grid_dimensions = (16, 12);
         let mut cell_backgrounds = vec![];
@@ -386,7 +476,7 @@ impl UserInterface {
 
         let activity_popup = ActivityPopup::new(
             simple_font.clone(),
-            ui_state,
+            ui_state.clone(),
             icons,
             characters.clone(),
             active_character_id,
@@ -422,14 +512,14 @@ impl UserInterface {
         let is_grid_obstructed = popup_rectangle.contains(mouse_pos.into())
             || self.character_sheet_toggle.shown.get()
             || mouse_pos.1 >= ui_y - 1.0;
-        let is_grid_receptive_to_input = !matches!(self.state, UiState::Idle)
+        let is_grid_receptive_to_input = !matches!(&*self.state.borrow(), UiState::Idle)
             && self.active_character().player_controlled
             && !is_grid_obstructed;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
         let grid_outcome = self.game_grid.draw(
             is_grid_receptive_to_input,
             is_grid_receptive_to_dragging,
-            &self.state,
+            &self.state.borrow(),
         );
 
         self.handle_grid_outcome(grid_outcome);
@@ -463,7 +553,7 @@ impl UserInterface {
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         if self.character_sheet_toggle.shown.get() {
-            let outcome = character_ui.character_sheet.draw(&self.state);
+            let outcome = character_ui.character_sheet.draw(&self.state.borrow());
             self.character_sheet_toggle
                 .shown
                 .set(!outcome.clicked_close);
@@ -472,7 +562,9 @@ impl UserInterface {
                 println!("REQUESTED EQ CHANGE: {}", requested);
                 if requested {
                     //self.game_grid.clear_players_action_target();
-                    self.set_state(UiState::ConfiguringAction(BaseAction::ChangeEquipment));
+                    self.set_state(UiState::ConfiguringAction(
+                        ConfiguredAction::ChangeEquipment,
+                    ));
                 } else {
                     self.set_state(UiState::ChoosingAction);
                 }
@@ -526,15 +618,16 @@ impl UserInterface {
 
             match grid_switched_to {
                 GridSwitchedTo::Move { ap_cost } => {
-                    self.set_state(UiState::ConfiguringAction(BaseAction::Move {}));
+                    self.set_state(UiState::ConfiguringAction(ConfiguredAction::Move {}));
                     self.activity_popup.set_movement_ap_cost(ap_cost);
                 }
                 GridSwitchedTo::Attack => {
                     let hand = HandType::MainHand;
                     let action_point_cost = self.active_character().attack_action_point_cost(hand);
-                    self.set_state(UiState::ConfiguringAction(BaseAction::Attack {
+                    self.set_state(UiState::ConfiguringAction(ConfiguredAction::Attack {
                         hand,
                         action_point_cost,
+                        selected_enhancements: vec![],
                     }));
                 }
                 GridSwitchedTo::Idle => {
@@ -549,99 +642,126 @@ impl UserInterface {
 
         self.game_grid.range_indicator = None;
 
-        if let UiState::ConfiguringAction(BaseAction::Attack { hand, .. }) = self.state {
-            match new_target {
-                ActionTarget::Character(target_id) => {
-                    let target_char = self.characters.get(target_id);
-
-                    let enhancements: Vec<AttackEnhancement> =
-                        self.activity_popup.selected_attack_enhancements();
-
-                    let (range, reach) = self
-                        .active_character()
-                        .reaches_with_attack(hand, target_char.position.get());
-
-                    let mut circumstance_advantage = None;
-
-                    let maybe_indicator;
-                    match reach {
-                        ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
-                            self.activity_popup.set_enabled(true);
-                            if let ActionReach::YesButDisadvantage(reason) = reach {
-                                circumstance_advantage = Some((-1, reason, Goodness::Bad));
-                                maybe_indicator = Some(RangeIndicator::CanReachButDisadvantage);
-                            } else {
-                                maybe_indicator = None;
-                            }
-                        }
-                        ActionReach::No => {
-                            self.activity_popup.set_enabled(false);
-                            maybe_indicator = Some(RangeIndicator::CannotReach);
-                        }
-                    }
-
-                    // We cannot know yet if the defender will react
-                    let defender_reaction = None;
-
-                    let chance = as_percentage(prob_attack_hit(
-                        self.active_character(),
-                        hand,
-                        target_char,
-                        circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
-                        &enhancements,
-                        defender_reaction,
-                    ));
-
-                    let mut details = vec![];
-
-                    for (term, bonus) in self
-                        .active_character()
-                        .outgoing_attack_bonuses(hand, &enhancements)
-                    {
-                        details.push((term.to_string(), bonus.goodness()));
-                    }
-                    for (term, bonus) in target_char.incoming_attack_bonuses(defender_reaction) {
-                        details.push((term.to_string(), bonus.goodness()));
-                    }
-
-                    if let Some((_advantage, term, goodness)) = circumstance_advantage {
-                        details.push((term.to_string(), goodness));
-                    }
-
-                    self.target_ui
-                        .set_action(format!("Attack: {}", chance), details, true);
-
-                    self.game_grid.range_indicator =
-                        maybe_indicator.map(|indicator| (range, indicator));
-                }
-
-                ActionTarget::None => {
-                    self.activity_popup.set_enabled(false);
-                    self.target_ui
-                        .set_action("Select an enemy".to_string(), vec![], false);
-
-                    let range = self
-                        .active_character()
-                        .weapon(hand)
-                        .unwrap()
-                        .range
-                        .into_range();
-                    self.game_grid.range_indicator =
-                        Some((range, RangeIndicator::ActionTargetRange));
-                }
-
-                ActionTarget::Position(_) => unreachable!(),
-            }
+        if matches!(
+            &*self.state.borrow(),
+            UiState::ConfiguringAction(ConfiguredAction::Attack { .. })
+        ) {
+            self.refresh_attack_state();
         }
 
-        if let UiState::ConfiguringAction(BaseAction::CastSpell(spell)) = self.state {
-            self.refresh_cast_spell_state(spell);
+        // Potentially change a "partially selected" (that was waiting for a proper target) to "fully selected"
+        self.update_selected_action_button();
+
+        if matches!(
+            &*self.state.borrow(),
+            UiState::ConfiguringAction(ConfiguredAction::CastSpell { .. })
+        ) {
+            self.refresh_cast_spell_state();
         }
     }
 
-    fn refresh_cast_spell_state(&mut self, spell: Spell) {
-        let enhancements = self.activity_popup.selected_spell_enhancements();
+    fn refresh_attack_state(&mut self) {
+        let UiState::ConfiguringAction(ConfiguredAction::Attack {
+            hand,
+            action_point_cost,
+            selected_enhancements,
+        }) = &*self.state.borrow()
+        else {
+            panic!()
+        };
 
+        match self.game_grid.players_action_target() {
+            ActionTarget::Character(target_id) => {
+                let target_char = self.characters.get(target_id);
+
+                let (range, reach) = self
+                    .active_character()
+                    .reaches_with_attack(*hand, target_char.position.get());
+
+                let mut circumstance_advantage = None;
+
+                let maybe_indicator;
+                match reach {
+                    ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
+                        self.activity_popup.set_enabled(true);
+                        if let ActionReach::YesButDisadvantage(reason) = reach {
+                            circumstance_advantage = Some((-1, reason, Goodness::Bad));
+                            maybe_indicator = Some(RangeIndicator::CanReachButDisadvantage);
+                        } else {
+                            maybe_indicator = None;
+                        }
+                    }
+                    ActionReach::No => {
+                        self.activity_popup.set_enabled(false);
+                        maybe_indicator = Some(RangeIndicator::CannotReach);
+                    }
+                }
+
+                // We cannot know yet if the defender will react
+                let defender_reaction = None;
+
+                let chance = as_percentage(prob_attack_hit(
+                    self.active_character(),
+                    *hand,
+                    target_char,
+                    circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
+                    selected_enhancements,
+                    defender_reaction,
+                ));
+
+                let mut details = vec![];
+
+                for (term, bonus) in self
+                    .active_character()
+                    .outgoing_attack_bonuses(*hand, selected_enhancements)
+                {
+                    details.push((term.to_string(), bonus.goodness()));
+                }
+                for (term, bonus) in target_char.incoming_attack_bonuses(defender_reaction) {
+                    details.push((term.to_string(), bonus.goodness()));
+                }
+
+                if let Some((_advantage, term, goodness)) = circumstance_advantage {
+                    details.push((term.to_string(), goodness));
+                }
+
+                self.target_ui
+                    .set_action(format!("Attack: {}", chance), details, true);
+
+                self.game_grid.range_indicator =
+                    maybe_indicator.map(|indicator| (range, indicator));
+            }
+
+            ActionTarget::None => {
+                self.activity_popup.set_enabled(false);
+                self.target_ui
+                    .set_action("Select an enemy".to_string(), vec![], false);
+
+                let range = self
+                    .active_character()
+                    .weapon(*hand)
+                    .unwrap()
+                    .range
+                    .into_range();
+                self.game_grid.range_indicator = Some((range, RangeIndicator::ActionTargetRange));
+            }
+
+            ActionTarget::Position(_) => unreachable!(),
+        }
+    }
+
+    fn refresh_cast_spell_state(&mut self) {
+        let UiState::ConfiguringAction(ConfiguredAction::CastSpell {
+            spell,
+            selected_enhancements,
+        }) = &*self.state.borrow()
+        else {
+            panic!()
+        };
+
+        let spell = *spell;
+
+        // TODO store the target in the UiState instead?
         match self.game_grid.players_action_target() {
             ActionTarget::Character(target_id) => {
                 let target_char = self.characters.get(target_id);
@@ -668,7 +788,7 @@ impl UserInterface {
 
                 let maybe_indicator = if self.active_character().can_reach_with_spell(
                     spell,
-                    &enhancements,
+                    selected_enhancements,
                     target_char.position.get(),
                 ) {
                     self.activity_popup.set_enabled(true);
@@ -677,8 +797,12 @@ impl UserInterface {
                     self.activity_popup.set_enabled(false);
                     Some(RangeIndicator::CannotReach)
                 };
-                self.game_grid.range_indicator = maybe_indicator
-                    .map(|indicator| (spell.target.range(&enhancements).unwrap(), indicator));
+                self.game_grid.range_indicator = maybe_indicator.map(|indicator| {
+                    (
+                        spell.target.range(selected_enhancements).unwrap(),
+                        indicator,
+                    )
+                });
             }
 
             ActionTarget::Position(target_pos) => {
@@ -689,7 +813,7 @@ impl UserInterface {
 
                 let maybe_indicator = if self.active_character().can_reach_with_spell(
                     spell,
-                    &enhancements,
+                    selected_enhancements,
                     target_pos,
                 ) {
                     self.activity_popup.set_enabled(true);
@@ -698,8 +822,12 @@ impl UserInterface {
                     self.activity_popup.set_enabled(false);
                     Some(RangeIndicator::CannotReach)
                 };
-                self.game_grid.range_indicator = maybe_indicator
-                    .map(|indicator| (spell.target.range(&enhancements).unwrap(), indicator));
+                self.game_grid.range_indicator = maybe_indicator.map(|indicator| {
+                    (
+                        spell.target.range(selected_enhancements).unwrap(),
+                        indicator,
+                    )
+                });
             }
 
             ActionTarget::None => {
@@ -729,7 +857,7 @@ impl UserInterface {
                     }
                 };
 
-                if let Some(range) = spell.target.range(&enhancements) {
+                if let Some(range) = spell.target.range(selected_enhancements) {
                     self.game_grid.range_indicator =
                         Some((range, RangeIndicator::ActionTargetRange));
                 } else {
@@ -763,14 +891,14 @@ impl UserInterface {
     }
 
     fn update_selected_action_button(&mut self) {
-        if let UiState::ConfiguringAction(base_action) = self.state {
-            use BaseAction::*;
+        if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
+            use ConfiguredAction::*;
 
-            let action_is_waiting_for_target_selection = match base_action {
+            let action_is_waiting_for_target_selection = match configured_action {
                 Attack { .. } => {
                     matches!(self.game_grid.players_action_target(), ActionTarget::None)
                 }
-                CastSpell(spell) => {
+                CastSpell { spell, .. } => {
                     if matches!(
                         spell.target,
                         SpellTarget::Enemy { .. }
@@ -786,7 +914,10 @@ impl UserInterface {
             };
 
             let fully_selected = !action_is_waiting_for_target_selection;
-            self.set_selected_action(Some((ButtonAction::Action(base_action), fully_selected)));
+            self.set_selected_action(Some((
+                ButtonAction::Action(configured_action.base_action()),
+                fully_selected,
+            )));
         }
     }
 
@@ -824,7 +955,7 @@ impl UserInterface {
     pub fn set_state(&mut self, state: UiState) {
         dbg!(&state);
 
-        self.state = state;
+        *self.state.borrow_mut() = state;
 
         self.activity_popup.additional_line = None;
 
@@ -834,21 +965,23 @@ impl UserInterface {
 
         self.on_new_players_action_target(self.game_grid.players_action_target());
 
-        match state {
-            UiState::ConfiguringAction(base_action) => {
+        match &*self.state.borrow() {
+            UiState::ConfiguringAction(configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
                     .tracked_action_buttons
-                    .get(&button_action_id(ButtonAction::Action(base_action)))
+                    .get(&button_action_id(ButtonAction::Action(
+                        configured_action.base_action(),
+                    )))
                     .cloned();
                 assert!(
                     relevant_action_button.is_some(),
                     "No button found for action: {:?}",
-                    base_action
+                    configured_action
                 );
 
-                if let BaseAction::ChangeEquipment = base_action {
+                if let ConfiguredAction::ChangeEquipment = configured_action {
                     self.target_ui
                         .set_action("Change equipment".to_string(), vec![], false);
 
@@ -898,7 +1031,7 @@ impl UserInterface {
         }
 
         self.activity_popup
-            .set_state(self.active_character_id, state, relevant_action_button);
+            .on_new_state(self.active_character_id, relevant_action_button);
 
         let active_char = self.active_character();
         let speed = active_char.move_speed;
@@ -914,25 +1047,26 @@ impl UserInterface {
         self.target_ui.rebuild_character_ui();
     }
 
-    fn on_selected_attacked_reaction(&mut self, reaction: Option<OnAttackedReaction>) {
+    fn on_selected_attacked_reaction(&self, reaction: Option<OnAttackedReaction>) {
         let UiState::ReactingToAttack {
             hand,
             attacker,
             reactor,
             is_within_melee: _,
-        } = self.state
+            selected,
+        } = &*self.state.borrow()
         else {
             unreachable!()
         };
 
-        let attacker = self.characters.get(attacker);
-        let defender = self.characters.get(reactor);
+        let attacker = self.characters.get(*attacker);
+        let defender = self.characters.get(*reactor);
 
         let attack_enhancements = &[];
 
         let mut explanation = String::new();
 
-        for (term, _bonus) in attacker.outgoing_attack_bonuses(hand, attack_enhancements) {
+        for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements) {
             explanation.push_str(term);
             explanation.push(' ');
         }
@@ -945,7 +1079,7 @@ impl UserInterface {
             "Hit chance: {}",
             as_percentage(prob_attack_hit(
                 attacker,
-                hand,
+                *hand,
                 defender,
                 0,
                 attack_enhancements,
@@ -956,9 +1090,9 @@ impl UserInterface {
             line.push_str(&format!("  {explanation}"));
         }
         // TODO The popup should take care of this internally instead
-        self.activity_popup.additional_line = Some(line);
+        //self.activity_popup.additional_line = Some(line);
 
-        self.game_grid.set_enemys_target(reactor);
+        //self.game_grid.set_enemys_target(*reactor);
     }
 
     pub fn has_ongoing_animation(&self) -> bool {
@@ -1340,10 +1474,7 @@ impl UserInterface {
                 self.on_selected_attacked_reaction(reaction);
             }
             Some(ActivityPopupOutcome::ChangedSpellEnhancements) => {
-                let UiState::ConfiguringAction(BaseAction::CastSpell(spell)) = self.state else {
-                    panic!()
-                };
-                self.refresh_cast_spell_state(spell);
+                self.refresh_cast_spell_state();
             }
             None => {}
         }
@@ -1397,31 +1528,40 @@ impl UserInterface {
         // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
         self.set_selected_action(None);
 
-        match self.state {
-            UiState::ConfiguringAction(base_action) => {
+        match &*self.state.borrow() {
+            UiState::ConfiguringAction(configured_action) => {
                 let target = self.game_grid.players_action_target();
-                let action = match base_action {
-                    BaseAction::Attack { hand, .. } => {
+                // TODO: Store the target inside the state?
+                let action = match &configured_action {
+                    ConfiguredAction::Attack {
+                        hand,
+                        
+                        selected_enhancements,..
+                    } => {
                         let ActionTarget::Character(target_id) = target else {
                             unreachable!();
                         };
                         Some(Action::Attack {
-                            hand,
-                            enhancements: self.activity_popup.selected_attack_enhancements(),
+                            hand: *hand,
+                            enhancements: selected_enhancements.clone(),
                             target: target_id,
                         })
                     }
-                    BaseAction::CastSpell(spell) => Some(Action::CastSpell {
+                    &ConfiguredAction::CastSpell {
                         spell,
-                        enhancements: self.activity_popup.selected_spell_enhancements(),
+                        selected_enhancements,
+                    } => Some(Action::CastSpell {
+                        spell: *spell,
+                        enhancements: selected_enhancements.clone(),
                         target,
                     }),
-                    BaseAction::Move => Some(Action::Move {
+                    &ConfiguredAction::Move => Some(Action::Move {
                         action_point_cost: self.activity_popup.movement_ap_cost(),
                         stamina_cost: self.activity_popup.movement_stamina_cost(),
                         positions: self.game_grid.take_movement_path(),
                     }),
-                    BaseAction::ChangeEquipment => {
+                    // TODO store the equiment change inside the state instead of in the character sheet?
+                    &ConfiguredAction::ChangeEquipment => {
                         let (from, to) = self
                             .character_uis
                             .get_mut(&self.active_character_id)
@@ -1431,18 +1571,14 @@ impl UserInterface {
 
                         Some(Action::ChangeEquipment { from, to })
                     }
-                    BaseAction::EndTurn => None,
+                    &ConfiguredAction::EndTurn => None,
                 };
                 PlayerChose::Action(action)
             }
 
-            UiState::ReactingToAttack { .. } => {
-                PlayerChose::AttackedReaction(self.activity_popup.selected_on_attacked_reaction())
-            }
+            UiState::ReactingToAttack { selected, .. } => PlayerChose::AttackedReaction(*selected),
 
-            UiState::ReactingToHit { .. } => {
-                PlayerChose::HitReaction(self.activity_popup.selected_on_hit_reaction())
-            }
+            UiState::ReactingToHit { selected, .. } => PlayerChose::HitReaction(*selected),
 
             UiState::ChoosingAction | UiState::Idle => unreachable!(),
         }
@@ -1463,7 +1599,7 @@ impl UserInterface {
             InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
                 ButtonAction::Action(base_action) => {
                     let may_choose_action = matches!(
-                        self.state,
+                        &*self.state.borrow(),
                         UiState::ChoosingAction | UiState::ConfiguringAction(..)
                     );
 
@@ -1471,7 +1607,9 @@ impl UserInterface {
                         //self.target_ui.set_character(Option::<&Character>::None);
                         self.game_grid.clear_players_action_target();
 
-                        self.set_state(UiState::ConfiguringAction(base_action));
+                        self.set_state(UiState::ConfiguringAction(
+                            ConfiguredAction::from_base_action(base_action),
+                        ));
                     } else {
                         println!("Cannot choose this action at this time");
                     }

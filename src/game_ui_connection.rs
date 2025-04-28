@@ -170,6 +170,7 @@ impl _GameUserInterfaceConnection {
                         hand,
                         reactor,
                         is_within_melee,
+                        selected: None,
                     });
                 }
             }
@@ -190,6 +191,7 @@ impl _GameUserInterfaceConnection {
                         victim: reactor,
                         damage,
                         is_within_melee,
+                        selected: None,
                     });
                 }
             }

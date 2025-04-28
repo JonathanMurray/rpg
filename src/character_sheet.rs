@@ -16,12 +16,12 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::core::{BaseAction, EquipmentSlotRole};
+use crate::core::EquipmentSlotRole;
 use crate::drawing::{draw_cross, draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::equipment_ui::{
     build_inventory_section, EquipmentSlot, EquipmentSlotContent, EquipmentStatsTable,
 };
-use crate::game_ui::UiState;
+use crate::game_ui::{ConfiguredAction, UiState};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -310,7 +310,7 @@ impl CharacterSheet {
         {
             if !matches!(
                 ui_state,
-                UiState::ConfiguringAction(BaseAction::ChangeEquipment)
+                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment)
             ) {
                 // The drag operation has been cancelled from outside of the character sheet.
                 self.equipment_drag = None;

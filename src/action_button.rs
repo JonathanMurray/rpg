@@ -19,7 +19,7 @@ use crate::{
     core::{
         ApplyEffect, AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction,
         Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellTarget, Weapon,
+        SpellEnhancementEffect, SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -81,12 +81,15 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
 
     if let Some(effect) = enhancement.effect {
         match effect {
-            crate::core::SpellEnhancementEffect::CastTwice => {}
-            crate::core::SpellEnhancementEffect::OnHit(apply_effect) => {
+            SpellEnhancementEffect::CastTwice => {}
+            SpellEnhancementEffect::OnHit(apply_effect) => {
                 describe_apply_effect(apply_effect, &mut technical_description);
             }
-            crate::core::SpellEnhancementEffect::IncreasedRangeTenths(tenths) => {
+            SpellEnhancementEffect::IncreasedRangeTenths(tenths) => {
                 technical_description.push(format!("+ {} range", tenths as f32 * 0.1));
+            }
+            SpellEnhancementEffect::IncreaseRadiusTenths(tenths) => {
+                technical_description.push(format!("+ {} radius", tenths as f32 * 0.1));
             }
         }
     }
@@ -217,9 +220,11 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
         Some((dmg, false)) => technical_description.push(format!("  {} damage", dmg)),
         None => {}
     }
-    if let Some(apply_effect) = effect.on_hit {
-        describe_apply_effect(apply_effect, technical_description);
+
+    for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
+        describe_apply_effect(*apply_effect, technical_description);
     }
+
     match effect.contest_type {
         Some(SpellContestType::Mental) => {
             technical_description.push("  [Will] defense".to_string())

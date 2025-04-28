@@ -23,11 +23,14 @@ use macroquad::{
 };
 
 use crate::{
-    core::{ActionTarget, BaseAction, Character, Goodness, Position, SpellTarget},
+    core::{
+        ActionTarget, Character, Goodness, Position,
+        SpellEnhancementEffect, SpellTarget,
+    },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
-    game_ui::UiState,
+    game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
     textures::SpriteId,
 };
@@ -446,11 +449,6 @@ impl GameGrid {
         self.players_action_target = ActionTarget::None;
     }
 
-    /*
-    pub fn clear_enemys_target(&mut self) {
-        self.enemys_target = None;
-    }
-     */
 
     pub fn players_action_target(&self) -> ActionTarget {
         self.players_action_target
@@ -626,7 +624,7 @@ impl GameGrid {
             }
         }
 
-        if matches!(ui_state, UiState::ConfiguringAction(BaseAction::Move)) {
+        if matches!(ui_state, UiState::ConfiguringAction(ConfiguredAction::Move)) {
             self.draw_movement_path_background();
         } else {
             self.selected_movement_path = None;
@@ -641,23 +639,36 @@ impl GameGrid {
         let mouse_state = match ui_state {
             UiState::ChoosingAction => MouseState::MayInputMovement,
             UiState::ConfiguringAction(base_action) => match base_action {
-                BaseAction::Attack { .. } => MouseState::RequiresEnemyTarget { area_range: None },
-                BaseAction::CastSpell(spell) => match spell.target {
-                    SpellTarget::Enemy {
-                        impact_area: area, ..
-                    } => {
-                        let area_range = area.map(|(range, _effect)| range);
+                ConfiguredAction::Attack { .. } => {
+                    MouseState::RequiresEnemyTarget { area_range: None }
+                }
+                ConfiguredAction::CastSpell {
+                    spell,
+                    selected_enhancements,
+                } => match spell.target {
+                    SpellTarget::Enemy { impact_area, .. } => {
+                        let mut area_range = None;
+
+                        if let Some((mut range, _effect)) = impact_area {
+                            for enhancement in selected_enhancements {
+                                if let Some(SpellEnhancementEffect::IncreaseRadiusTenths(tenths)) =
+                                    enhancement.effect
+                                {
+                                    range = range.plusf(tenths as f32 * 0.1);
+                                }
+                            }
+                            area_range = Some(range);
+                        }
+
                         MouseState::RequiresEnemyTarget { area_range }
                     }
                     SpellTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-
                     SpellTarget::Area { radius, .. } => MouseState::RequiresPositionTarget(radius),
-
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
-                BaseAction::Move => MouseState::MayInputMovement,
-                BaseAction::ChangeEquipment => MouseState::None,
-                BaseAction::EndTurn => MouseState::None,
+                ConfiguredAction::Move => MouseState::MayInputMovement,
+                ConfiguredAction::ChangeEquipment => MouseState::None,
+                ConfiguredAction::EndTurn => MouseState::None,
             },
             _ => MouseState::None,
         };
@@ -876,7 +887,7 @@ impl GameGrid {
                             ui_state,
                             UiState::ChoosingAction
                                 | UiState::ConfiguringAction(
-                                    BaseAction::Move | BaseAction::Attack { .. }
+                                    ConfiguredAction::Move | ConfiguredAction::Attack { .. }
                                 )
                         );
 
@@ -898,7 +909,7 @@ impl GameGrid {
                         if may_acquire_attack_target {
                             let is_configuring_attack = matches!(
                                 ui_state,
-                                UiState::ConfiguringAction(BaseAction::Attack { .. })
+                                UiState::ConfiguringAction(ConfiguredAction::Attack { .. })
                             );
                             if !(is_configuring_attack) {
                                 outcome.switched_action = Some(GridSwitchedTo::Attack);

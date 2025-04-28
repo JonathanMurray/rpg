@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -16,11 +20,10 @@ use crate::{
     },
     base_ui::Drawable,
     core::{
-        AttackEnhancement, BaseAction, CharacterId, Characters, OnAttackedReaction, OnHitReaction,
-        SpellEnhancement,
+        CharacterId, Characters, OnAttackedReaction,
     },
     drawing::{draw_cross, draw_dashed_line},
-    game_ui::UiState,
+    game_ui::{ConfiguredAction, UiState},
     textures::IconId,
 };
 
@@ -30,14 +33,15 @@ pub struct ActivityPopup {
     characters: Characters,
     active_character_id: CharacterId,
     icons: HashMap<IconId, Texture2D>,
-    state: UiState,
+
+    ui_state: Rc<RefCell<UiState>>,
 
     font: Font,
 
     base_lines: Vec<String>,
     pub additional_line: Option<String>,
 
-    next_button_id: u32,
+    next_button_id: Cell<u32>,
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
@@ -45,14 +49,10 @@ pub struct ActivityPopup {
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
-    base_action: Option<BaseAction>,
     selected_choice_button_ids: Vec<u32>,
     hovered_choice_button_id: Option<u32>,
 
     movement_base_ap_cost: u32,
-
-    // TODO remove this and just use the slider's value everywhere
-    movement_stamina_cost: u32,
 
     pub last_drawn_rectangle: Rect,
 }
@@ -60,7 +60,7 @@ pub struct ActivityPopup {
 impl ActivityPopup {
     pub fn new(
         font: Font,
-        state: UiState,
+        state: Rc<RefCell<UiState>>,
         icons: HashMap<IconId, Texture2D>,
         characters: Characters,
         active_character_id: CharacterId,
@@ -81,27 +81,28 @@ impl ActivityPopup {
             characters,
             active_character_id,
             icons,
-            state,
+            ui_state: state,
             font,
             base_lines: vec![],
             additional_line: None,
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
-            next_button_id,
+            next_button_id: Cell::new(next_button_id),
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
             movement_stamina_slider: None,
-            base_action: None,
             hovered_choice_button_id: None,
             movement_base_ap_cost: 0,
-            movement_stamina_cost: 0,
             last_drawn_rectangle: Default::default(),
         }
     }
 
     pub fn draw(&mut self, x: f32, y: f32) {
-        if matches!(self.state, UiState::Idle | UiState::ChoosingAction) {
+        if matches!(
+            &*self.ui_state.borrow(),
+            UiState::Idle | UiState::ChoosingAction
+        ) {
             self.last_drawn_rectangle = Rect {
                 x,
                 y,
@@ -232,10 +233,12 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        if let UiState::ConfiguringAction(BaseAction::Move) = self.state {
+        if let UiState::ConfiguringAction(ConfiguredAction::Move) = &*self.ui_state.borrow() {
             let mut text = format!("{} AP", self.movement_base_ap_cost);
-            if self.movement_stamina_cost > 0 {
-                text.push_str(&format!(" -{}", self.movement_stamina_cost));
+            if let Some(slider) = &self.movement_stamina_slider {
+                if slider.selected_stamina() > 0 {
+                    text.push_str(&format!(" -{}", slider.selected_stamina()));
+                }
             }
 
             draw_text_ex(&text, x0, y0, base_text_params.clone());
@@ -249,7 +252,6 @@ impl ActivityPopup {
                 base_text_params.clone(),
             );
             slider.draw(x_btn, y - slider.size().1 - 5.0);
-            self.movement_stamina_cost = slider.selected_stamina();
             let movement_config_w = slider.size().0.max(text_dimensions.width);
             x_btn += movement_config_w + sprint_stamina_margin;
         }
@@ -270,9 +272,13 @@ impl ActivityPopup {
     }
 
     fn are_choice_buttons_mutually_exclusive(&self) -> bool {
-        matches!(self.state, UiState::ReactingToAttack { .. })
-            || matches!(self.state, UiState::ReactingToHit { .. })
-            || matches!(self.state, UiState::ConfiguringAction(BaseAction::Move))
+        let state: &UiState = &self.ui_state.borrow();
+        matches!(
+            state,
+            UiState::ReactingToAttack { .. }
+                | UiState::ReactingToHit { .. }
+                | UiState::ConfiguringAction(ConfiguredAction::Move)
+        )
     }
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
@@ -301,25 +307,54 @@ impl ActivityPopup {
                         }
                     }
 
+                    let button_actions: Vec<ButtonAction> = self
+                        .choice_buttons
+                        .values()
+                        .filter(|btn| btn.selected.get() == ButtonSelected::Yes)
+                        .map(|btn| btn.action)
+                        .collect();
+
+                    match &mut *self.ui_state.borrow_mut() {
+                        UiState::ConfiguringAction(configured_action) => match configured_action {
+                            ConfiguredAction::Attack {
+                                selected_enhancements,
+                                ..
+                            } => {
+                                *selected_enhancements = button_actions
+                                    .iter()
+                                    .map(|action| action.unwrap_attack_enhancement())
+                                    .collect();
+                            }
+                            ConfiguredAction::CastSpell {
+                                selected_enhancements,
+                                ..
+                            } => {
+                                *selected_enhancements = button_actions
+                                    .iter()
+                                    .map(|action| action.unwrap_spell_enhancement())
+                                    .collect();
+                                changed_spell_enhancements = true;
+                            }
+                            _ => unreachable!(),
+                        },
+                        UiState::ReactingToAttack { selected, .. } => {
+                            *selected = button_actions
+                                .first()
+                                .map(|action| action.unwrap_on_attacked_reaction());
+                            changed_on_attacked_reaction = Some(*selected);
+                        }
+                        UiState::ReactingToHit { selected, .. } => {
+                            *selected =
+                                Some(button_actions.first().unwrap().unwrap_on_hit_reaction());
+                        }
+                        UiState::ChoosingAction | UiState::Idle => unreachable!(),
+                    }
+
                     self.selected_choice_button_ids.clear();
                     for btn in self.choice_buttons.values() {
                         if btn.selected.get() == ButtonSelected::Yes {
                             self.selected_choice_button_ids.push(btn.id);
                         }
-                    }
-
-                    match clicked_btn.action {
-                        ButtonAction::OnAttackedReaction(..) => {
-                            let maybe_reaction = self
-                                .selected_choices()
-                                .map(|action| action.unwrap_on_attacked_reaction())
-                                .next();
-                            changed_on_attacked_reaction = Some(maybe_reaction)
-                        }
-                        ButtonAction::SpellEnhancement(..) => {
-                            changed_spell_enhancements = true;
-                        }
-                        _ => {}
                     }
                 }
             };
@@ -349,34 +384,11 @@ impl ActivityPopup {
             .map(|id| &self.choice_buttons[id].action)
     }
 
-    pub fn selected_attack_enhancements(&self) -> Vec<AttackEnhancement> {
-        self.selected_choices()
-            .map(|action| action.unwrap_attack_enhancement())
-            .collect()
-    }
-
-    pub fn selected_spell_enhancements(&self) -> Vec<SpellEnhancement> {
-        self.selected_choices()
-            .map(|action| action.unwrap_spell_enhancement())
-            .collect()
-    }
-
-    pub fn selected_on_attacked_reaction(&self) -> Option<OnAttackedReaction> {
-        self.selected_choices()
-            .next()
-            .map(|action| action.unwrap_on_attacked_reaction())
-    }
-
-    pub fn selected_on_hit_reaction(&self) -> Option<OnHitReaction> {
-        self.selected_choices()
-            .next()
-            .map(|action| action.unwrap_on_hit_reaction())
-    }
-
+    // TODO
     pub fn set_movement_ap_cost(&mut self, ap_cost: u32) {
         assert!(matches!(
-            self.state,
-            UiState::ConfiguringAction(BaseAction::Move)
+            &*self.ui_state.borrow(),
+            UiState::ConfiguringAction(ConfiguredAction::Move)
         ));
 
         self.movement_base_ap_cost = ap_cost;
@@ -384,16 +396,18 @@ impl ActivityPopup {
         if let Some(slider) = self.movement_stamina_slider.as_mut() {
             // Each AP spent on movement can be accompanied by 1 stamina point
             slider.set_max_allowed(ap_cost / 2);
-            self.movement_stamina_cost = slider.selected_stamina();
         }
     }
 
     pub fn movement_ap_cost(&self) -> u32 {
-        self.movement_base_ap_cost - self.movement_stamina_cost
+        self.movement_base_ap_cost - self.movement_stamina_cost()
     }
 
     pub fn movement_stamina_cost(&self) -> u32 {
-        self.movement_stamina_cost
+        self.movement_stamina_slider
+            .as_ref()
+            .map(|slider| slider.selected_stamina())
+            .unwrap_or(0)
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
@@ -401,8 +415,13 @@ impl ActivityPopup {
             return (self.movement_ap_cost(), 0);
         }
 
-        let reserved_from_action = self
-            .base_action
+        let borrowed_state = self.ui_state.borrow();
+        let base_action = match &*borrowed_state {
+            UiState::ConfiguringAction(configured_action) => Some(configured_action),
+            _ => None,
+        };
+
+        let reserved_from_action = base_action
             .as_ref()
             .map(|action| action.action_point_cost())
             .unwrap_or(0);
@@ -431,8 +450,13 @@ impl ActivityPopup {
     }
 
     pub fn mana_points(&self) -> u32 {
-        let mut mana = self
-            .base_action
+        let borrowed_state = self.ui_state.borrow();
+        let base_action = match &*borrowed_state {
+            UiState::ConfiguringAction(configured_action) => Some(configured_action),
+            _ => None,
+        };
+
+        let mut mana = base_action
             .as_ref()
             .map(|action| action.mana_cost())
             .unwrap_or(0);
@@ -448,12 +472,17 @@ impl ActivityPopup {
     }
 
     pub fn stamina_points(&self) -> u32 {
-        if self.movement_stamina_cost > 0 {
-            return self.movement_stamina_cost;
+        if self.movement_stamina_cost() > 0 {
+            return self.movement_stamina_cost();
         }
 
-        let mut sta = self
-            .base_action
+        let borrowed_state = self.ui_state.borrow();
+        let base_action = match &*borrowed_state {
+            UiState::ConfiguringAction(configured_action) => Some(configured_action),
+            _ => None,
+        };
+
+        let mut sta = base_action
             .as_ref()
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
@@ -483,22 +512,21 @@ impl ActivityPopup {
         self.proceed_button.enabled.set(enabled);
     }
 
-    fn new_button(&mut self, btn_action: ButtonAction) -> ActionButton {
+    fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
             &self.choice_button_events,
-            self.next_button_id,
+            self.next_button_id.get(),
             &self.icons,
             None,
         );
-        self.next_button_id += 1;
+        self.next_button_id.set(self.next_button_id.get() + 1);
         btn
     }
 
-    pub fn set_state(
+    pub fn on_new_state(
         &mut self,
         active_character_id: CharacterId,
-        state: UiState,
         relevant_action_button: Option<Rc<ActionButton>>,
     ) {
         self.active_character_id = active_character_id;
@@ -508,30 +536,30 @@ impl ActivityPopup {
 
         let mut stamina_slider = None;
 
-        match state {
-            UiState::ConfiguringAction(base_action) => {
+        match &*self.ui_state.borrow() {
+            UiState::ConfiguringAction(configured_action) => {
                 let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
                 lines.extend_from_slice(&tooltip.technical_description);
 
-                match base_action {
-                    BaseAction::Attack { hand, .. } => {
+                match configured_action {
+                    ConfiguredAction::Attack { hand, .. } => {
                         for (_subtext, enhancement) in self
                             .characters
                             .get(active_character_id)
-                            .usable_attack_enhancements(hand)
+                            .usable_attack_enhancements(*hand)
                         {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);
                         }
                     }
 
-                    BaseAction::CastSpell(spell) => {
+                    ConfiguredAction::CastSpell { spell, .. } => {
                         for enhancement in spell.possible_enhancements.iter().flatten().copied() {
                             if self
                                 .characters
                                 .get(active_character_id)
-                                .can_use_spell_enhancement(spell, enhancement)
+                                .can_use_spell_enhancement(*spell, enhancement)
                             {
                                 let btn =
                                     self.new_button(ButtonAction::SpellEnhancement(enhancement));
@@ -540,7 +568,7 @@ impl ActivityPopup {
                         }
                     }
 
-                    BaseAction::Move => {
+                    ConfiguredAction::Move => {
                         let active_char = self.characters.get(active_character_id);
                         let speed = active_char.move_speed;
                         lines.push(format!("Speed: {}", speed));
@@ -552,18 +580,19 @@ impl ActivityPopup {
                         }
                     }
 
-                    BaseAction::ChangeEquipment => {}
-                    BaseAction::EndTurn => {
+                    ConfiguredAction::ChangeEquipment => {}
+                    ConfiguredAction::EndTurn => {
                         // TODO do anything here?
                     }
                 }
             }
 
-            UiState::ReactingToAttack {
+            &UiState::ReactingToAttack {
                 attacker: attacker_id,
                 hand,
                 reactor: reactor_id,
                 is_within_melee,
+                ..
             } => {
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
@@ -586,11 +615,12 @@ impl ActivityPopup {
                 }
             }
 
-            UiState::ReactingToHit {
+            &UiState::ReactingToHit {
                 attacker: attacker_id,
                 damage,
                 victim: victim_id,
                 is_within_melee,
+                ..
             } => {
                 let victim = self.characters.get(victim_id);
                 lines.push("React (on hit)".to_string());
@@ -612,6 +642,7 @@ impl ActivityPopup {
             UiState::ChoosingAction | UiState::Idle => {}
         }
 
+        /*
         if self.state != state {
             // Assume that a change in the layout caused all buttons to no longer be hovered
             for btn in self.choice_buttons.values() {
@@ -619,6 +650,7 @@ impl ActivityPopup {
             }
             self.proceed_button.notify_hidden();
         }
+         */
 
         let mut choice_buttons = IndexMap::new();
         for mut btn in popup_buttons {
@@ -630,19 +662,10 @@ impl ActivityPopup {
 
         self.movement_stamina_slider = stamina_slider;
         self.movement_base_ap_cost = 0;
-        self.movement_stamina_cost = 0;
 
-        self.state = state;
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
         self.selected_choice_button_ids.clear();
-
-        // TODO remove this and instead just use self.state
-        self.base_action = if let UiState::ConfiguringAction(base_action) = state {
-            Some(base_action)
-        } else {
-            None
-        };
     }
 }
 

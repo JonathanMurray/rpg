@@ -8,10 +8,11 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, EFFICIENT, HEAL, HEALING_NOVA, HEALING_RAIN, KILL, RAGE, SWORD, WAR_HAMMER,
+    BOW, EFFICIENT, HEAL, RAGE, SHACKLED_MIND, SWORD,
+    WAR_HAMMER,
 };
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
-use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM, SMALL_SHIELD};
+use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
@@ -35,7 +36,7 @@ impl CoreGame {
             "Bob",
             PortraitId::Portrait2,
             SpriteId::Character,
-            Attributes::new(3, 1, 10, 10),
+            Attributes::new(3, 5, 10, 10),
             (1, 5),
         );
         //bob.set_weapon(HandType::MainHand, SWORD);
@@ -51,9 +52,7 @@ impl CoreGame {
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
-        bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
-        bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
-        bob.known_actions.push(BaseAction::CastSpell(KILL));
+        bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
 
         bob.inventory[0].set(Some(EquipmentEntry::Weapon(WAR_HAMMER)));
         bob.inventory[2].set(Some(EquipmentEntry::Weapon(BOW)));
@@ -526,7 +525,7 @@ impl CoreGame {
                             if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) =
                                 enhancement.effect
                             {
-                                radius = radius.plusf(tenths as f32 *0.1);
+                                radius = radius.plusf(tenths as f32 * 0.1);
                             }
                         }
 
@@ -801,7 +800,13 @@ impl CoreGame {
                 None
             };
 
-            if let Some(mut effect) = enemy_effect.on_hit {
+            for mut effect in enemy_effect
+                .on_hit
+                .unwrap_or_default()
+                .iter()
+                .copied()
+                .flatten()
+            {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref mut condition) => {
@@ -1193,17 +1198,33 @@ impl CoreGame {
         }
         if character.conditions.borrow().weakened > 0 {
             character.conditions.borrow_mut().weakened = 0;
-            self.log(format!("{} recovered from Weakened", name)).await;
+            self.log(format!("{} is no longer Weakened", name)).await;
         }
         if character.conditions.borrow().raging {
             character.conditions.borrow_mut().raging = false;
             self.log(format!("{} stopped Raging", name)).await;
         }
+        if character.conditions.borrow().exposed > 0 {
+            character.conditions.borrow_mut().exposed -= 1;
+            if character.conditions.borrow().exposed == 0 {
+                self.log(format!("{} is no longer Exposed", name)).await;
+            }
+        }
 
+        let mut new_ap = MAX_ACTION_POINTS;
         if character.conditions.borrow().near_death {
-            character.action_points.current.set(MAX_ACTION_POINTS - 2);
-        } else {
-            character.action_points.current.set(MAX_ACTION_POINTS);
+            new_ap = new_ap.saturating_sub(2);
+        }
+        if character.conditions.borrow().slowed > 0 {
+            new_ap = new_ap.saturating_sub(2);
+        }
+        character.action_points.current.set(new_ap);
+
+        if character.conditions.borrow().slowed > 0 {
+            character.conditions.borrow_mut().slowed -= 1;
+            if character.conditions.borrow().slowed == 0 {
+                self.log(format!("{} is no longer Slowed", name)).await;
+            }
         }
 
         character.conditions.borrow_mut().mainhand_exertion = 0;
@@ -1522,6 +1543,8 @@ pub enum Condition {
     Encumbered(u32),
     NearDeath,
     Dead,
+    Slowed(u32),
+    Exposed(u32),
 }
 
 impl Condition {
@@ -1539,6 +1562,8 @@ impl Condition {
             Encumbered(n) => Some(n),
             NearDeath => None,
             Dead => None,
+            Slowed(n) => Some(n),
+            Exposed(n) => Some(n),
         }
     }
 
@@ -1556,6 +1581,8 @@ impl Condition {
             Encumbered(_) => "Encumbered",
             NearDeath => "Near-death",
             Dead => "Dead",
+            Slowed(..) => "Slowed",
+            Exposed(..) => "Exposed",
         }
     }
 
@@ -1573,6 +1600,8 @@ impl Condition {
             Encumbered(_) => "-1 to Evasion per stack and -1 to all dice rolls per 2 stacks",
             NearDeath => "Reduced AP, disadvantage on everything",
             Dead => "This character has reached 0 HP and is dead",
+            Slowed(_) => "Gains 2 less AP per turn",
+            Exposed(_) => "-3 to all defenses",
         }
     }
 
@@ -1590,6 +1619,7 @@ impl Condition {
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
 const PROTECTED_ARMOR_BONUS: u32 = 3;
 const BRACED_DEFENSE_BONUS: u32 = 3;
+const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -1610,6 +1640,8 @@ struct Conditions {
     encumbered: u32,
     near_death: bool,
     dead: bool,
+    slowed: u32,
+    exposed: u32,
 }
 
 impl Conditions {
@@ -1647,6 +1679,12 @@ impl Conditions {
         }
         if self.dead {
             result.push(Condition::Dead.info());
+        }
+        if self.slowed > 0 {
+            result.push(Condition::Slowed(self.slowed).info())
+        }
+        if self.exposed > 0 {
+            result.push(Condition::Exposed(self.exposed).info())
         }
 
         result
@@ -1745,7 +1783,7 @@ pub struct Spell {
     pub mana_cost: u32,
     pub stamina_cost: u32,
 
-    pub possible_enhancements: [Option<SpellEnhancement>; 2],
+    pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub target: SpellTarget,
     pub animation_color: Color,
 }
@@ -1760,7 +1798,7 @@ pub enum SpellEffect {
 pub struct SpellEnemyEffect {
     pub contest_type: Option<SpellContestType>,
     pub damage: Option<(u32, bool)>,
-    pub on_hit: Option<ApplyEffect>,
+    pub on_hit: Option<[Option<ApplyEffect>; 2]>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1818,8 +1856,10 @@ impl SpellTarget {
     pub fn range(&self, enhancements: &[SpellEnhancement]) -> Option<Range> {
         self.base_range().map(|mut range| {
             for enhancement in enhancements {
-                if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) = enhancement.effect {
-                    range = range.plusf(tenths as f32 *0.1);
+                if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) =
+                    enhancement.effect
+                {
+                    range = range.plusf(tenths as f32 * 0.1);
                 }
             }
             range
@@ -1843,6 +1883,7 @@ pub enum SpellEnhancementEffect {
     CastTwice,
     OnHit(ApplyEffect),
     IncreasedRangeTenths(u32),
+    IncreaseRadiusTenths(u32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2400,17 +2441,21 @@ impl Character {
     }
 
     pub fn evasion(&self) -> u32 {
-        let from_agi = self.evasion_from_agility();
-        let from_int = self.evasion_from_intellect();
-        let from_shield = self.shield().map(|shield| shield.evasion).unwrap_or(0);
-        let from_braced = if self.conditions.borrow().braced {
-            BRACED_DEFENSE_BONUS
-        } else {
-            0
-        };
-        let penalty_from_encumbrance = self.conditions.borrow().encumbered;
-        (10 + from_agi + from_int + from_shield + from_braced)
-            .saturating_sub(penalty_from_encumbrance)
+        let mut res = 10;
+        res += self.evasion_from_agility();
+        res += self.evasion_from_intellect();
+        res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
+
+        if self.conditions.borrow().braced {
+            res += BRACED_DEFENSE_BONUS;
+        }
+        res = res.saturating_sub(self.conditions.borrow().encumbered);
+
+        if self.conditions.borrow().exposed > 0 {
+            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+
+        res
     }
 
     fn evasion_from_agility(&self) -> u32 {
@@ -2428,11 +2473,19 @@ impl Character {
     }
 
     pub fn will(&self) -> u32 {
-        10 + self.intellect() * 2
+        let mut res = 10 + self.intellect() * 2;
+        if self.conditions.borrow().exposed > 0 {
+            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+        res
     }
 
     pub fn toughness(&self) -> u32 {
-        10 + self.strength() * 2
+        let mut res = 10 + self.strength() * 2;
+        if self.conditions.borrow().exposed > 0 {
+            res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+        res
     }
 
     pub fn protection_from_armor(&self) -> u32 {
@@ -2565,6 +2618,9 @@ impl Character {
         if conditions.near_death {
             terms.push(("Near-death", AttackBonus::Advantage(1)))
         }
+        if conditions.exposed > 0 {
+            terms.push(("Exposed", AttackBonus::OtherPositive));
+        }
 
         if let Some(reaction) = reaction {
             if reaction.effect.bonus_evasion > 0 {
@@ -2590,6 +2646,8 @@ impl Character {
             Encumbered(n) => conditions.encumbered += n,
             NearDeath => conditions.near_death = true,
             Dead => conditions.dead = true,
+            Slowed(n) => conditions.slowed += n,
+            Exposed(n) => conditions.exposed += n,
         }
     }
 }
@@ -2804,7 +2862,7 @@ impl Range {
             Range::Melee => Range::Float(2f32.sqrt() + n),
             Range::Ranged(range) => Range::Float(*range as f32 + n),
             Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
-            Range::Float(range) => Range::Float(range + n as f32),
+            Range::Float(range) => Range::Float(range + n),
         }
     }
 }
