@@ -19,9 +19,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
     },
     base_ui::Drawable,
-    core::{
-        CharacterId, Characters, OnAttackedReaction,
-    },
+    core::{as_percentage, prob_attack_hit, CharacterId, Characters},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,
@@ -282,7 +280,7 @@ impl ActivityPopup {
     }
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
-        let mut changed_on_attacked_reaction = None;
+        let mut changed_on_attacked_reaction = false;
         let mut changed_spell_enhancements = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
@@ -327,12 +325,29 @@ impl ActivityPopup {
                             }
                             ConfiguredAction::CastSpell {
                                 selected_enhancements,
-                                ..
+                                spell,
+                                target,
                             } => {
                                 *selected_enhancements = button_actions
                                     .iter()
                                     .map(|action| action.unwrap_spell_enhancement())
                                     .collect();
+
+                                // TODO Store target in UiState, so that we can access it here?
+                                /*
+                                let maybe_indicator = if self.characters.get(self.active_character_id).can_reach_with_spell(
+                                    *spell,
+                                    selected_enhancements,
+                                    target_char.position.get(),
+                                ) {
+                                    self.activity_popup.set_enabled(true);
+                                    None
+                                } else {
+                                    self.activity_popup.set_enabled(false);
+                                    Some(RangeIndicator::CannotReach)
+                                };
+                                 */
+
                                 changed_spell_enhancements = true;
                             }
                             _ => unreachable!(),
@@ -341,7 +356,7 @@ impl ActivityPopup {
                             *selected = button_actions
                                 .first()
                                 .map(|action| action.unwrap_on_attacked_reaction());
-                            changed_on_attacked_reaction = Some(*selected);
+                            changed_on_attacked_reaction = true;
                         }
                         UiState::ReactingToHit { selected, .. } => {
                             *selected =
@@ -366,10 +381,8 @@ impl ActivityPopup {
             }
         }
 
-        if let Some(maybe_reaction) = changed_on_attacked_reaction {
-            return Some(ActivityPopupOutcome::ChangedOnAttackedReaction(
-                maybe_reaction,
-            ));
+        if changed_on_attacked_reaction {
+            self.refresh_on_attacked_state();
         }
         if changed_spell_enhancements {
             return Some(ActivityPopupOutcome::ChangedSpellEnhancements);
@@ -495,6 +508,53 @@ impl ActivityPopup {
             }
         }
         sta
+    }
+
+    pub fn refresh_on_attacked_state(&mut self) {
+        let UiState::ReactingToAttack {
+            hand,
+            attacker,
+            reactor,
+            is_within_melee: _,
+            selected,
+        } = &*self.ui_state.borrow()
+        else {
+            unreachable!()
+        };
+
+        let reaction = *selected;
+
+        let attacker = self.characters.get(*attacker);
+        let defender = self.characters.get(*reactor);
+
+        let attack_enhancements = &[];
+
+        let mut explanation = String::new();
+
+        for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements) {
+            explanation.push_str(term);
+            explanation.push(' ');
+        }
+        for (term, _bonus) in defender.incoming_attack_bonuses(reaction) {
+            explanation.push_str(term);
+            explanation.push(' ');
+        }
+
+        let mut line = format!(
+            "Hit chance: {}",
+            as_percentage(prob_attack_hit(
+                attacker,
+                *hand,
+                defender,
+                0,
+                attack_enhancements,
+                reaction
+            ))
+        );
+        if !explanation.is_empty() {
+            line.push_str(&format!("  {explanation}"));
+        }
+        self.additional_line = Some(line);
     }
 
     pub fn set_enabled(&mut self, mut enabled: bool) {
@@ -671,7 +731,7 @@ impl ActivityPopup {
 
 pub enum ActivityPopupOutcome {
     ClickedProceed,
-    ChangedOnAttackedReaction(Option<OnAttackedReaction>),
+    //ChangedOnAttackedReaction,
     ChangedSpellEnhancements,
 }
 

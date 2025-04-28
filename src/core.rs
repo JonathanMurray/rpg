@@ -7,10 +7,7 @@ use macroquad::color::Color;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{
-    BOW, EFFICIENT, HEAL, RAGE, SHACKLED_MIND, SWORD,
-    WAR_HAMMER,
-};
+use crate::data::{BOW, EFFICIENT, HEAL, RAGE, SHACKLED_MIND, SWORD, WAR_HAMMER};
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
