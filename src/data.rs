@@ -76,6 +76,18 @@ pub const RAPIER: Weapon = Weapon {
     weight: 2,
 };
 
+const ALL_IN: AttackEnhancement = AttackEnhancement {
+    name: "All-in",
+    description: "Charge up the attack, dealing additional damage",
+    icon: IconId::AllIn,
+    action_point_cost: 1,
+    stamina_cost: 0,
+    action_point_discount: 0,
+    bonus_damage: 1,
+    bonus_advantage: 0,
+    on_hit_effect: None,
+};
+
 pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
@@ -83,17 +95,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
-    attack_enhancement: Some(AttackEnhancement {
-        name: "All-in",
-        description: "+1 damage",
-        icon: IconId::AllIn,
-        action_point_cost: 1,
-        regain_action_points: 0,
-        stamina_cost: 0,
-        bonus_damage: 1,
-        bonus_advantage: 0,
-        on_hit_effect: None,
-    }),
+    attack_enhancement: Some(ALL_IN),
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         Condition::Dazed(1),
@@ -136,25 +138,25 @@ pub const SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
-pub const EFFICIENT: AttackEnhancement = AttackEnhancement {
-    name: "Efficient strike",
-    description: "On hit: regain 1 AP",
+pub const QUICK: AttackEnhancement = AttackEnhancement {
+    name: "Quick strike",
+    description: "Strike more quickly",
     icon: IconId::Plus,
     action_point_cost: 0,
-    regain_action_points: 1,
     stamina_cost: 3,
+    action_point_discount: 1,
     bonus_damage: 0,
     bonus_advantage: 0,
-    on_hit_effect: Some(AttackEnhancementOnHitEffect::RegainActionPoint),
+    on_hit_effect: None,
 };
 
 pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     name: "Overwhelm",
-    description: "Target loses 1 AP",
+    description: "Overwhelm the target",
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
-    regain_action_points: 0,
     stamina_cost: 2,
+    action_point_discount: 0,
     bonus_damage: 0,
     bonus_advantage: 0,
     on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
@@ -164,11 +166,11 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     name: "Carefully aimed",
-    description: "Gain advantage",
+    description: "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
-    regain_action_points: 0,
     stamina_cost: 0,
+    action_point_discount: 0,
     bonus_damage: 0,
     bonus_advantage: 1,
     on_hit_effect: None,

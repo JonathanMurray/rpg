@@ -17,9 +17,9 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction,
-        Spell, SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellEnhancementEffect, SpellTarget, Weapon,
+        ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
+        OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
+        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -34,15 +34,7 @@ pub struct ActionButtonTooltip {
 fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
-        ButtonAction::AttackEnhancement(enhancement) => ActionButtonTooltip {
-            header: format!(
-                "{} ({})",
-                enhancement.name,
-                cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
-            ),
-            description: Some(enhancement.description),
-            technical_description: Default::default(),
-        },
+        ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
 
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
@@ -69,6 +61,42 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
             description: None,
             technical_description: Default::default(),
         },
+    }
+}
+
+fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
+    let mut technical_description = vec![];
+
+    if enhancement.action_point_discount > 0 {
+        technical_description.push(format!("- {} AP cost", enhancement.action_point_discount));
+    }
+    if enhancement.bonus_damage > 0 {
+        technical_description.push(format!("+ {} damage", enhancement.bonus_damage));
+    }
+    if enhancement.bonus_advantage > 0 {
+        technical_description.push(format!("+ {} advantage", enhancement.bonus_damage));
+    }
+
+    if let Some(effect) = enhancement.on_hit_effect {
+        technical_description.push("Target:".to_string());
+        match effect {
+            AttackEnhancementOnHitEffect::RegainActionPoint => {
+                technical_description.push("On hit: regain AP".to_string())
+            }
+            AttackEnhancementOnHitEffect::Target(apply_effect) => {
+                describe_apply_effect(apply_effect, &mut technical_description);
+            }
+        }
+    }
+
+    ActionButtonTooltip {
+        header: format!(
+            "{} ({})",
+            enhancement.name,
+            cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
+        ),
+        description: Some(enhancement.description),
+        technical_description,
     }
 }
 
@@ -561,6 +589,13 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
+        }
+    }
+
+    pub fn action_point_discount(&self) -> u32 {
+        match self {
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_discount,
+            _ => 0,
         }
     }
 

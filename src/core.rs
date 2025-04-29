@@ -7,7 +7,7 @@ use macroquad::color::Color;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{BOW, EFFICIENT, HEAL, RAGE, SHACKLED_MIND, SWORD, WAR_HAMMER};
+use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SWORD, WAR_HAMMER};
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
@@ -43,7 +43,7 @@ impl CoreGame {
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attacked_reactions.push(SIDE_STEP);
-        bob.known_attack_enhancements.push(EFFICIENT);
+        bob.known_attack_enhancements.push(QUICK);
         bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -208,13 +208,15 @@ impl CoreGame {
                         != ActionReach::No
                 );
 
-                attacker
-                    .action_points
-                    .spend(attacker.weapon(hand).unwrap().action_point_cost);
+                let mut action_point_cost = attacker.weapon(hand).unwrap().action_point_cost as i32;
+
                 for enhancement in &enhancements {
-                    attacker.action_points.spend(enhancement.action_point_cost);
+                    action_point_cost += enhancement.action_point_cost as i32;
+                    action_point_cost -= enhancement.action_point_discount as i32;
                     attacker.stamina.spend(enhancement.stamina_cost);
                 }
+
+                attacker.action_points.spend(action_point_cost as u32);
 
                 let is_within_melee =
                     within_meele(attacker.position.get(), defender.position.get());
@@ -1453,8 +1455,9 @@ pub struct AttackEnhancement {
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
-    pub regain_action_points: u32,
     pub stamina_cost: u32,
+
+    pub action_point_discount: u32,
     pub bonus_damage: u32,
     pub bonus_advantage: u32,
     pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
