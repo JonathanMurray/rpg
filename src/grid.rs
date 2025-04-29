@@ -1092,13 +1092,10 @@ impl GameGrid {
                             )
                         })
                     }
-                    ActionTarget::None => {
-                        if let Some(range) = spell.target.range(selected_enhancements) {
-                            Some((range, RangeIndicator::ActionTargetRange))
-                        } else {
-                            None
-                        }
-                    }
+                    ActionTarget::None => spell
+                        .target
+                        .range(selected_enhancements)
+                        .map(|range| (range, RangeIndicator::ActionTargetRange)),
                 },
                 _ => None,
             }

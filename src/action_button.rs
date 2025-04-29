@@ -93,7 +93,11 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
         header: format!(
             "{} ({})",
             enhancement.name,
-            cost_string(enhancement.action_point_cost, enhancement.stamina_cost, 0)
+            cost_string(
+                enhancement.action_point_cost,
+                enhancement.stamina_cost,
+                enhancement.mana_cost
+            )
         ),
         description: Some(enhancement.description),
         technical_description,
@@ -604,7 +608,7 @@ impl ButtonAction {
             ButtonAction::Action(base_action) => base_action.mana_cost(),
             ButtonAction::OnAttackedReaction(..) => 0,
             ButtonAction::OnHitReaction(..) => 0,
-            ButtonAction::AttackEnhancement(..) => 0,
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::Proceed => 0,
         }

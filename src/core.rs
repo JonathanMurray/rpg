@@ -7,7 +7,7 @@ use macroquad::color::Color;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SWORD, WAR_HAMMER};
+use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SMITE, SWORD, WAR_HAMMER};
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
@@ -44,6 +44,7 @@ impl CoreGame {
         bob.known_attack_enhancements.push(OVERWHELMING);
         bob.known_attacked_reactions.push(SIDE_STEP);
         bob.known_attack_enhancements.push(QUICK);
+        bob.known_attack_enhancements.push(SMITE);
         bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SCREAM));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -214,6 +215,7 @@ impl CoreGame {
                     action_point_cost += enhancement.action_point_cost as i32;
                     action_point_cost -= enhancement.action_point_discount as i32;
                     attacker.stamina.spend(enhancement.stamina_cost);
+                    attacker.mana.spend(enhancement.mana_cost);
                 }
 
                 attacker.action_points.spend(action_point_cost as u32);
@@ -1456,6 +1458,7 @@ pub struct AttackEnhancement {
     pub icon: IconId,
     pub action_point_cost: u32,
     pub stamina_cost: u32,
+    pub mana_cost: u32,
 
     pub action_point_discount: u32,
     pub bonus_damage: u32,
@@ -2335,8 +2338,11 @@ impl Character {
         enhancement: &AttackEnhancement,
     ) -> bool {
         let weapon = self.weapon(attack_hand).unwrap();
-        self.action_points.current() >= weapon.action_point_cost + enhancement.action_point_cost
+        self.action_points.current()
+            >= weapon.action_point_cost + enhancement.action_point_cost
+                - enhancement.action_point_discount
             && self.stamina.current() >= enhancement.stamina_cost
+            && self.mana.current() >= enhancement.mana_cost
     }
 
     pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {

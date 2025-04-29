@@ -324,28 +324,12 @@ impl ActivityPopup {
                             }
                             ConfiguredAction::CastSpell {
                                 selected_enhancements,
-                                spell,
-                                target,
+                                ..
                             } => {
                                 *selected_enhancements = button_actions
                                     .iter()
                                     .map(|action| action.unwrap_spell_enhancement())
                                     .collect();
-
-                                // TODO Store target in UiState, so that we can access it here?
-                                /*
-                                let maybe_indicator = if self.characters.get(self.active_character_id).can_reach_with_spell(
-                                    *spell,
-                                    selected_enhancements,
-                                    target_char.position.get(),
-                                ) {
-                                    self.activity_popup.set_enabled(true);
-                                    None
-                                } else {
-                                    self.activity_popup.set_enabled(false);
-                                    Some(RangeIndicator::CannotReach)
-                                };
-                                 */
 
                                 changed_spell_enhancements = true;
                             }
@@ -373,6 +357,8 @@ impl ActivityPopup {
                 }
             };
         }
+
+        self.refresh_afford_state();
 
         for event in self.proceed_button_events.borrow_mut().drain(..) {
             if matches!(event, InternalUiEvent::ButtonClicked(..)) {
@@ -443,7 +429,7 @@ impl ActivityPopup {
 
         let reserved_from_action = base_action
             .as_ref()
-            .map(|action| action.action_point_cost())
+            .map(|action| action.base_action_point_cost())
             .unwrap_or(0);
         let mut reserved_from_choices: i32 = 0;
         for action in self.selected_choices() {
@@ -566,7 +552,6 @@ impl ActivityPopup {
     }
 
     pub fn set_enabled(&mut self, mut enabled: bool) {
-        println!("Popup set enabled: {}", enabled);
         if self.movement_ap_cost()
             > self
                 .characters
@@ -733,6 +718,17 @@ impl ActivityPopup {
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
         self.selected_choice_button_ids.clear();
+    }
+
+    fn refresh_afford_state(&mut self) {
+        let ap_cost = self.reserved_and_hovered_action_points().0;
+        let can_afford = self
+            .characters
+            .get(self.active_character_id)
+            .action_points
+            .current()
+            >= ap_cost;
+        self.set_enabled(can_afford);
     }
 }
 

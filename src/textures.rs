@@ -59,6 +59,9 @@ pub enum IconId {
     Radius,
     Equip,
     ShackledMind,
+    Smite,
+    QuickStrike,
+    Rejuvenate,
 }
 
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
@@ -81,6 +84,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::CarefulAim, "careful_aim_icon.png"),
         (IconId::Plus, "plus_icon.png"),
         (IconId::PlusPlus, "plus_plus_icon.png"),
+        (IconId::Smite, "smite_icon.png"),
         (IconId::X1point5, "x1_5.png"),
         (IconId::X2, "x2.png"),
         (IconId::X3, "x3.png"),
@@ -88,6 +92,8 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Radius, "radius.png"),
         (IconId::Equip, "equip.png"),
         (IconId::ShackledMind, "shackled_mind.png"),
+        (IconId::QuickStrike, "quick_strike_icon.png"),
+        (IconId::Rejuvenate, "rejuvenate_icon.png"),
     ])
     .await
 }

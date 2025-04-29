@@ -35,7 +35,6 @@ use crate::{
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
-        RangeIndicator,
     },
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
@@ -155,8 +154,39 @@ impl ConfiguredAction {
         }
     }
 
-    pub fn action_point_cost(&self) -> u32 {
+    pub fn base_action_point_cost(&self) -> u32 {
         self.base_action().action_point_cost()
+    }
+
+    pub fn enhanced_action_point_cost(&self) -> u32 {
+        match self {
+            ConfiguredAction::Attack {
+                action_point_cost,
+                selected_enhancements,
+                ..
+            } => {
+                let mut ap = *action_point_cost;
+                for enhancement in selected_enhancements {
+                    ap += enhancement.action_point_cost;
+                    ap -= enhancement.action_point_discount;
+                }
+                ap
+            }
+            ConfiguredAction::CastSpell {
+                spell,
+                selected_enhancements,
+                ..
+            } => {
+                let mut ap = spell.action_point_cost;
+                for enhancement in selected_enhancements {
+                    ap += enhancement.action_point_cost;
+                }
+                ap
+            }
+            ConfiguredAction::Move { ap_cost } => *ap_cost,
+            ConfiguredAction::ChangeEquipment => 1,
+            ConfiguredAction::EndTurn => 0,
+        }
     }
 
     pub fn mana_cost(&self) -> u32 {
@@ -615,6 +645,20 @@ impl UserInterface {
             self.target_ui.set_character(target);
         }
 
+        if let Some(grid_switched_to) = outcome.switched_state {
+            dbg!(&grid_switched_to);
+
+            match grid_switched_to {
+                NewState::Move => {
+                    self.on_new_state();
+                    self.activity_popup.on_new_movement_ap_cost();
+                }
+                NewState::Attack | NewState::ChoosingAction => {
+                    self.on_new_state();
+                }
+            }
+        }
+
         if outcome.switched_players_action_target {
             self.on_new_players_action_target();
         }
@@ -628,20 +672,6 @@ impl UserInterface {
                 self.activity_popup.set_enabled(false);
                 self.target_ui
                     .set_action("Select a destination".to_string(), vec![], false);
-            }
-        }
-
-        if let Some(grid_switched_to) = outcome.switched_state {
-            dbg!(&grid_switched_to);
-
-            match grid_switched_to {
-                NewState::Move => {
-                    self.on_new_state();
-                    self.activity_popup.on_new_movement_ap_cost();
-                }
-                NewState::Attack | NewState::ChoosingAction => {
-                    self.on_new_state();
-                }
             }
         }
     }
@@ -686,6 +716,7 @@ impl UserInterface {
 
                 let mut circumstance_advantage = None;
 
+                // TODO also check that we can afford the action
                 match reach {
                     ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
                         self.activity_popup.set_enabled(true);
@@ -930,8 +961,6 @@ impl UserInterface {
 
         let mut on_attacked = false;
 
-        self.on_new_players_action_target();
-
         match &*self.state.borrow() {
             UiState::ConfiguringAction(configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
@@ -1001,6 +1030,8 @@ impl UserInterface {
 
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
+
+        self.on_new_players_action_target();
 
         let active_char = self.active_character();
         let speed = active_char.move_speed;

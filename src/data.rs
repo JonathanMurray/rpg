@@ -82,6 +82,7 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
     icon: IconId::AllIn,
     action_point_cost: 1,
     stamina_cost: 0,
+    mana_cost: 0,
     action_point_discount: 0,
     bonus_damage: 1,
     bonus_advantage: 0,
@@ -141,11 +142,25 @@ pub const SMALL_SHIELD: Shield = Shield {
 pub const QUICK: AttackEnhancement = AttackEnhancement {
     name: "Quick strike",
     description: "Strike more quickly",
-    icon: IconId::Plus,
+    icon: IconId::QuickStrike,
     action_point_cost: 0,
     stamina_cost: 3,
+    mana_cost: 0,
     action_point_discount: 1,
     bonus_damage: 0,
+    bonus_advantage: 0,
+    on_hit_effect: None,
+};
+
+pub const SMITE: AttackEnhancement = AttackEnhancement {
+    name: "Smite",
+    description: "Enhance your strike with magic",
+    icon: IconId::Smite,
+    action_point_cost: 0,
+    stamina_cost: 1,
+    mana_cost: 1,
+    action_point_discount: 0,
+    bonus_damage: 1,
     bonus_advantage: 0,
     on_hit_effect: None,
 };
@@ -156,6 +171,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
     stamina_cost: 2,
+    mana_cost: 0,
     action_point_discount: 0,
     bonus_damage: 0,
     bonus_advantage: 0,
@@ -170,6 +186,7 @@ pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     stamina_cost: 0,
+    mana_cost: 0,
     action_point_discount: 0,
     bonus_damage: 0,
     bonus_advantage: 1,
@@ -319,8 +336,8 @@ pub const MIND_BLAST: Spell = Spell {
 pub const HEAL: Spell = Spell {
     name: "Heal",
     description: "Restore an ally's health",
-    icon: IconId::Plus,
-    action_point_cost: 2,
+    icon: IconId::Rejuvenate,
+    action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
     possible_enhancements: [
@@ -339,7 +356,7 @@ pub const HEAL: Spell = Spell {
     target: SpellTarget::Ally {
         range: Range::Ranged(3),
         effect: SpellAllyEffect {
-            healing: 1,
+            healing: 2,
             apply: None,
         },
     },
