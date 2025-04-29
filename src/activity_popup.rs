@@ -50,8 +50,6 @@ pub struct ActivityPopup {
     selected_choice_button_ids: Vec<u32>,
     hovered_choice_button_id: Option<u32>,
 
-    movement_base_ap_cost: u32,
-
     pub last_drawn_rectangle: Rect,
 }
 
@@ -91,7 +89,6 @@ impl ActivityPopup {
             choice_button_events: Rc::new(RefCell::new(vec![])),
             movement_stamina_slider: None,
             hovered_choice_button_id: None,
-            movement_base_ap_cost: 0,
             last_drawn_rectangle: Default::default(),
         }
     }
@@ -231,8 +228,10 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        if let UiState::ConfiguringAction(ConfiguredAction::Move) = &*self.ui_state.borrow() {
-            let mut text = format!("{} AP", self.movement_base_ap_cost);
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+            &*self.ui_state.borrow()
+        {
+            let mut text = format!("{} AP", ap_cost);
             if let Some(slider) = &self.movement_stamina_slider {
                 if slider.selected_stamina() > 0 {
                     text.push_str(&format!(" -{}", slider.selected_stamina()));
@@ -275,7 +274,7 @@ impl ActivityPopup {
             state,
             UiState::ReactingToAttack { .. }
                 | UiState::ReactingToHit { .. }
-                | UiState::ConfiguringAction(ConfiguredAction::Move)
+                | UiState::ConfiguringAction(ConfiguredAction::Move { .. })
         )
     }
 
@@ -397,14 +396,12 @@ impl ActivityPopup {
             .map(|id| &self.choice_buttons[id].action)
     }
 
-    // TODO
-    pub fn set_movement_ap_cost(&mut self, ap_cost: u32) {
-        assert!(matches!(
-            &*self.ui_state.borrow(),
-            UiState::ConfiguringAction(ConfiguredAction::Move)
-        ));
-
-        self.movement_base_ap_cost = ap_cost;
+    pub fn on_new_movement_ap_cost(&mut self) {
+        let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+            &*self.ui_state.borrow()
+        else {
+            panic!()
+        };
 
         if let Some(slider) = self.movement_stamina_slider.as_mut() {
             // Each AP spent on movement can be accompanied by 1 stamina point
@@ -412,8 +409,18 @@ impl ActivityPopup {
         }
     }
 
-    pub fn movement_ap_cost(&self) -> u32 {
-        self.movement_base_ap_cost - self.movement_stamina_cost()
+    fn movement_base_ap_cost(&self) -> u32 {
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+            &*self.ui_state.borrow()
+        {
+            *ap_cost
+        } else {
+            0
+        }
+    }
+
+    fn movement_ap_cost(&self) -> u32 {
+        self.movement_base_ap_cost() - self.movement_stamina_cost()
     }
 
     pub fn movement_stamina_cost(&self) -> u32 {
@@ -424,7 +431,7 @@ impl ActivityPopup {
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
-        if self.movement_base_ap_cost > 0 {
+        if self.movement_base_ap_cost() > 0 {
             return (self.movement_ap_cost(), 0);
         }
 
@@ -628,7 +635,7 @@ impl ActivityPopup {
                         }
                     }
 
-                    ConfiguredAction::Move => {
+                    ConfiguredAction::Move { .. } => {
                         let active_char = self.characters.get(active_character_id);
                         let speed = active_char.move_speed;
                         lines.push(format!("Speed: {}", speed));
@@ -721,7 +728,6 @@ impl ActivityPopup {
         }
 
         self.movement_stamina_slider = stamina_slider;
-        self.movement_base_ap_cost = 0;
 
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;

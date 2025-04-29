@@ -23,7 +23,10 @@ use macroquad::{
 };
 
 use crate::{
-    core::{ActionTarget, Character, Goodness, Position, SpellEnhancementEffect, SpellTarget},
+    core::{
+        ActionReach, ActionTarget, Character, Goodness, Position, SpellEnhancementEffect,
+        SpellTarget,
+    },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
@@ -143,8 +146,6 @@ pub struct GameGrid {
     movement_range: MovementRange,
     selected_movement_path: Option<Vec<(f32, Position)>>,
 
-    pub range_indicator: Option<(Range, RangeIndicator)>,
-    //players_action_target: ActionTarget,
     players_inspect_target: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
 }
@@ -176,10 +177,8 @@ impl GameGrid {
             active_character_id: 0,
             movement_range: MovementRange::default(),
             selected_movement_path: Default::default(),
-            //players_action_target: ActionTarget::None,
             players_inspect_target: None,
             enemys_target: None,
-            range_indicator: None,
             zoom_index,
             cell_w,
             grid_dimensions,
@@ -355,12 +354,6 @@ impl GameGrid {
 
         self.effects.push(concrete_effect);
     }
-
-    /*
-    pub fn remove_movement_path(&mut self) {
-        self.selected_movement_path = None;
-    }
-     */
 
     pub fn has_non_empty_selected_movement_path(&self) -> bool {
         self.selected_movement_path
@@ -589,7 +582,9 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        if let Some((range, indicator)) = self.range_indicator {
+        let range_indicator = self.determine_range_indicator(ui_state);
+
+        if let Some((range, indicator)) = range_indicator {
             self.draw_range_indicator(active_char_pos, range, indicator);
         }
 
@@ -610,7 +605,10 @@ impl GameGrid {
             }
         }
 
-        if matches!(ui_state, UiState::ConfiguringAction(ConfiguredAction::Move)) {
+        if matches!(
+            ui_state,
+            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
+        ) {
             self.draw_movement_path_background();
         } else {
             self.selected_movement_path = None;
@@ -653,13 +651,15 @@ impl GameGrid {
                     SpellTarget::Area { radius, .. } => MouseState::RequiresPositionTarget(radius),
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
-                ConfiguredAction::Move => MouseState::MayInputMovement,
+                ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
                 ConfiguredAction::ChangeEquipment => MouseState::None,
                 ConfiguredAction::EndTurn => MouseState::None,
             },
             _ => MouseState::None,
         };
 
+        // TODO can this even occur, now that the target is part of the state? It would mean that we carried an invalid target from one
+        // state to another one.
         if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
             if let ActionTarget::Character(id) = ui_state.players_action_target() {
                 if self.characters.get(id).player_controlled {
@@ -667,7 +667,6 @@ impl GameGrid {
                 }
             }
         }
-
         if matches!(mouse_state, MouseState::RequiresAllyTarget) {
             if let ActionTarget::Character(id) = ui_state.players_action_target() {
                 if !self.characters.get(id).player_controlled {
@@ -728,8 +727,8 @@ impl GameGrid {
                     MouseState::RequiresAllyTarget
                     | MouseState::RequiresEnemyTarget { .. }
                     | MouseState::ImplicitTarget => {
-                        //self.players_action_target = ActionTarget::None;
-                        outcome.switched_action = Some(GridSwitchedTo::Idle);
+                        *ui_state = UiState::ChoosingAction;
+                        outcome.switched_state = Some(NewState::ChoosingAction);
                         outcome.switched_players_action_target = true;
                     }
                     _ => {}
@@ -744,7 +743,8 @@ impl GameGrid {
                 if ui_state.players_action_target() == ActionTarget::None {
                     ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                 } else {
-                    outcome.switched_action = Some(GridSwitchedTo::Idle);
+                    *ui_state = UiState::ChoosingAction;
+                    outcome.switched_state = Some(NewState::ChoosingAction);
                 }
             }
 
@@ -756,15 +756,16 @@ impl GameGrid {
             match mouse_state {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
                     if !player_has_action_char_target && hovered_character_id.is_none() {
-                        let mut out_of_range = false;
-                        if let Some((range, _indicator)) = self.range_indicator {
-                            out_of_range = (((mouse_grid_pos.0 - active_char_pos.0).pow(2)
+                        let mut is_mouse_pos_out_of_range = false;
+                        if let Some((range, _indicator)) = range_indicator {
+                            is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
+                                .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
                                 as f32)
                                 > range.squared();
                         }
 
-                        if out_of_range {
+                        if is_mouse_pos_out_of_range {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
                             self.draw_cornered_outline(
@@ -781,15 +782,16 @@ impl GameGrid {
                         ui_state.players_action_target(),
                         ActionTarget::Position { .. }
                     ) {
-                        let mut out_of_range = false;
-                        if let Some((range, _indicator)) = self.range_indicator {
-                            out_of_range = (((mouse_grid_pos.0 - active_char_pos.0).pow(2)
+                        let mut is_mouse_pos_out_of_range = false;
+                        if let Some((range, _indicator)) = range_indicator {
+                            is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
+                                .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
                                 as f32)
                                 > range.squared();
                         }
 
-                        if out_of_range {
+                        if is_mouse_pos_out_of_range {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
                             self.draw_cornered_outline(
@@ -825,7 +827,9 @@ impl GameGrid {
                         let ap_cost = self
                             .movement_range
                             .ap_cost(hovered_route.distance_from_start);
-                        outcome.switched_action = Some(GridSwitchedTo::Move { ap_cost });
+
+                        *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost });
+                        outcome.switched_state = Some(NewState::Move);
 
                         self.selected_movement_path = Some(path);
                     }
@@ -851,7 +855,8 @@ impl GameGrid {
 
                     if pressed_left_mouse {
                         if self.active_character_id == hovered_id {
-                            outcome.switched_action = Some(GridSwitchedTo::Idle);
+                            *ui_state = UiState::ChoosingAction;
+                            outcome.switched_state = Some(NewState::ChoosingAction);
                             outcome.switched_players_action_target = true;
                             //self.players_action_target = ActionTarget::None;
                         } else {
@@ -889,7 +894,7 @@ impl GameGrid {
                             ui_state,
                             UiState::ChoosingAction
                                 | UiState::ConfiguringAction(
-                                    ConfiguredAction::Move | ConfiguredAction::Attack { .. }
+                                    ConfiguredAction::Move { .. } | ConfiguredAction::Attack { .. }
                                 )
                         );
 
@@ -915,7 +920,7 @@ impl GameGrid {
                             );
 
                             if !(is_configuring_attack) {
-                                outcome.switched_action = Some(GridSwitchedTo::Attack);
+                                outcome.switched_state = Some(NewState::Attack);
                             }
 
                             let hand = HandType::MainHand;
@@ -1005,6 +1010,101 @@ impl GameGrid {
         }
 
         outcome
+    }
+
+    fn determine_range_indicator(&self, ui_state: &mut UiState) -> Option<(Range, RangeIndicator)> {
+        if let UiState::ConfiguringAction(configured_action) = ui_state {
+            match configured_action {
+                ConfiguredAction::Attack { hand, target, .. } => match target {
+                    Some(target) => {
+                        let (range, reach) = self
+                            .characters
+                            .get(self.active_character_id)
+                            .reaches_with_attack(
+                                *hand,
+                                self.characters.get(*target).position.get(),
+                            );
+
+                        let maybe_indicator = match reach {
+                            ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
+                                if let ActionReach::YesButDisadvantage(..) = reach {
+                                    Some(RangeIndicator::CanReachButDisadvantage)
+                                } else {
+                                    None
+                                }
+                            }
+                            ActionReach::No => Some(RangeIndicator::CannotReach),
+                        };
+
+                        maybe_indicator.map(|indicator| (range, indicator))
+                    }
+
+                    None => {
+                        let range = self
+                            .characters
+                            .get(self.active_character_id)
+                            .weapon(*hand)
+                            .unwrap()
+                            .range
+                            .into_range();
+                        Some((range, RangeIndicator::ActionTargetRange))
+                    }
+                },
+                ConfiguredAction::CastSpell {
+                    spell,
+                    selected_enhancements,
+                    target,
+                } => match target {
+                    ActionTarget::Character(target_char_id) => {
+                        let maybe_indicator = if self
+                            .characters
+                            .get(self.active_character_id)
+                            .can_reach_with_spell(
+                                *spell,
+                                selected_enhancements,
+                                self.characters.get(*target_char_id).position.get(),
+                            ) {
+                            None
+                        } else {
+                            Some(RangeIndicator::CannotReach)
+                        };
+                        maybe_indicator.map(|indicator| {
+                            (
+                                spell.target.range(selected_enhancements).unwrap(),
+                                indicator,
+                            )
+                        })
+                    }
+                    ActionTarget::Position(target_pos) => {
+                        let maybe_indicator = if self
+                            .characters
+                            .get(self.active_character_id)
+                            .can_reach_with_spell(*spell, selected_enhancements, *target_pos)
+                        {
+                            None
+                        } else {
+                            Some(RangeIndicator::CannotReach)
+                        };
+                        maybe_indicator.map(|indicator| {
+                            (
+                                spell.target.range(selected_enhancements).unwrap(),
+                                indicator,
+                            )
+                        })
+                    }
+                    ActionTarget::None => {
+                        if let Some(range) = spell.target.range(selected_enhancements) {
+                            Some((range, RangeIndicator::ActionTargetRange))
+                        } else {
+                            None
+                        }
+                    }
+                },
+                _ => None,
+            }
+        } else {
+            None
+        }
     }
 
     fn draw_invalid_target_marker(&self, grid_pos: Position) {
@@ -1421,7 +1521,7 @@ impl GameGrid {
 
 #[derive(Debug, Default)]
 pub struct GridOutcome {
-    pub switched_action: Option<GridSwitchedTo>,
+    pub switched_state: Option<NewState>,
     pub hovered_character_id: Option<CharacterId>,
     pub switched_inspect_target: Option<Option<CharacterId>>,
     pub switched_players_action_target: bool,
@@ -1429,10 +1529,10 @@ pub struct GridOutcome {
 }
 
 #[derive(Debug)]
-pub enum GridSwitchedTo {
-    Move { ap_cost: u32 },
+pub enum NewState {
+    Move,
     Attack,
-    Idle,
+    ChoosingAction,
 }
 
 struct ConcreteEffect {

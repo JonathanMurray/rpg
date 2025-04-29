@@ -33,7 +33,7 @@ impl CoreGame {
             "Bob",
             PortraitId::Portrait2,
             SpriteId::Character,
-            Attributes::new(3, 5, 10, 10),
+            Attributes::new(7, 6, 10, 10),
             (1, 5),
         );
         //bob.set_weapon(HandType::MainHand, SWORD);
@@ -1729,6 +1729,8 @@ pub enum BaseAction {
     Move,
     ChangeEquipment,
     EndTurn,
+    // TODO add "DelayTurn" action that lets you put yourself one step later in the
+    // turn order
 }
 
 impl BaseAction {
