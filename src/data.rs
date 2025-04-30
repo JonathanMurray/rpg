@@ -3,10 +3,10 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, OnAttackedReaction, OnAttackedReactionEffect,
+        AttackHitEffect, Condition, DefenseType, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield, Spell,
-        SpellAllyEffect, SpellContestType, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellEnhancementEffect, SpellTarget, Weapon, WeaponGrip, WeaponRange,
+        SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
+        SpellEnhancementEffect, SpellModifier, SpellTarget, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -224,6 +224,30 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     must_be_melee: false,
 };
 
+pub const SWEEP_ATTACK: Spell = Spell {
+    name: "Sweeping attack",
+    description: "Attack all enemies around you",
+    icon: IconId::SweepAttack,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 1,
+
+    modifier: SpellModifier::Attack,
+    possible_enhancements: [None; 3],
+    target: SpellTarget::None {
+        self_area: Some((
+            Range::Melee,
+            SpellEffect::Enemy(SpellEnemyEffect {
+                defense_type: Some(DefenseType::Evasion),
+                damage: Some(SpellDamage::Weapon),
+                on_hit: None,
+            }),
+        )),
+        self_effect: None,
+    },
+    animation_color: MAGENTA,
+};
+
 pub const BRACE: Spell = Spell {
     name: "Brace",
     description: Condition::Braced.description(),
@@ -231,6 +255,8 @@ pub const BRACE: Spell = Spell {
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 1,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None; 3],
     target: SpellTarget::None {
         self_area: None,
@@ -249,6 +275,8 @@ pub const SCREAM: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
@@ -267,7 +295,7 @@ pub const SCREAM: Spell = Spell {
         self_area: Some((
             Range::Ranged(3),
             SpellEffect::Enemy(SpellEnemyEffect {
-                contest_type: Some(SpellContestType::Mental),
+                defense_type: Some(DefenseType::Will),
                 damage: None,
                 on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
             }),
@@ -284,12 +312,14 @@ pub const SHACKLED_MIND: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
 
     target: SpellTarget::Enemy {
         range: Range::Ranged(4),
         effect: SpellEnemyEffect {
-            contest_type: Some(SpellContestType::Mental),
+            defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([
                 Some(ApplyEffect::Condition(Condition::Slowed(3))),
@@ -308,6 +338,8 @@ pub const MIND_BLAST: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Dualcast",
@@ -323,8 +355,8 @@ pub const MIND_BLAST: Spell = Spell {
     ],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
-            contest_type: Some(SpellContestType::Mental),
-            damage: Some((1, false)),
+            defense_type: Some(DefenseType::Will),
+            damage: Some(SpellDamage::Static(1)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         },
         impact_area: None,
@@ -340,6 +372,8 @@ pub const HEAL: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Far",
@@ -370,6 +404,8 @@ pub const HEALING_NOVA: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
     target: SpellTarget::None {
         self_area: Some((
@@ -391,6 +427,8 @@ pub const SELF_HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
     target: SpellTarget::None {
         self_area: None,
@@ -409,6 +447,8 @@ pub const HEALING_RAIN: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 2,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
     target: SpellTarget::Area {
         range: Range::Ranged(5),
@@ -428,6 +468,8 @@ pub const FIREBALL: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Far",
@@ -460,15 +502,15 @@ pub const FIREBALL: Spell = Spell {
     ],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
-            contest_type: Some(SpellContestType::Projectile),
-            damage: Some((2, true)),
+            defense_type: Some(DefenseType::Evasion),
+            damage: Some(SpellDamage::AtLeast(2)),
             on_hit: None,
         },
         impact_area: Some((
             Range::Melee,
             SpellEnemyEffect {
-                contest_type: None,
-                damage: Some((1, false)),
+                defense_type: None,
+                damage: Some(SpellDamage::Static(1)),
                 on_hit: None,
             },
         )),
@@ -484,11 +526,13 @@ pub const KILL: Spell = Spell {
     action_point_cost: 4,
     mana_cost: 0,
     stamina_cost: 0,
+
+    modifier: SpellModifier::Spell,
     possible_enhancements: [None; 3],
     target: SpellTarget::Enemy {
         effect: SpellEnemyEffect {
-            contest_type: None,
-            damage: Some((99, false)),
+            defense_type: None,
+            damage: Some(SpellDamage::Static(99)),
             on_hit: None,
         },
         impact_area: None,

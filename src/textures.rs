@@ -61,6 +61,7 @@ pub enum IconId {
     ShackledMind,
     Smite,
     QuickStrike,
+    SweepAttack,
     Rejuvenate,
 }
 
@@ -94,6 +95,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::ShackledMind, "shackled_mind.png"),
         (IconId::QuickStrike, "quick_strike_icon.png"),
         (IconId::Rejuvenate, "rejuvenate_icon.png"),
+        (IconId::SweepAttack, "sweep_attack_icon.png"),
     ])
     .await
 }

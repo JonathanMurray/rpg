@@ -24,10 +24,7 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
-        ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
-        Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction,
-        Spell, SpellEnhancement, SpellTarget, SpellTargetOutcome,
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach, ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -805,7 +802,7 @@ impl UserInterface {
                 let action_text = match spell.target {
                     SpellTarget::Enemy { effect, .. } => {
                         let prob = effect
-                            .contest_type
+                            .defense_type
                             .map(|contest| {
                                 prob_spell_hit(self.active_character(), contest, target_char)
                             })
@@ -1239,7 +1236,11 @@ impl UserInterface {
                         self.characters.get(target_id).name
                     )
                 } else {
-                    format!("{} cast {}", self.characters.get(caster).name, spell.name,)
+                    if matches!(spell.modifier, SpellModifier::Spell) {
+                        format!("{} cast {}", self.characters.get(caster).name, spell.name,)
+                    } else {
+                        format!("{} used {}", self.characters.get(caster).name, spell.name,)
+                    }
                 };
 
                 if let Some((_target_id, outcome)) = target_outcome {

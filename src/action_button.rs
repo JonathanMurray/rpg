@@ -17,10 +17,7 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
-        HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType,
-        SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget,
-        Weapon,
+        ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellTarget, Weapon
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -252,8 +249,9 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
 
 fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: &mut Vec<String>) {
     match effect.damage {
-        Some((dmg, true)) => technical_description.push(format!("  {}^ damage", dmg)),
-        Some((dmg, false)) => technical_description.push(format!("  {} damage", dmg)),
+        Some(SpellDamage::Static(n)) => technical_description.push(format!("  {} damage", n)),
+        Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}^ damage", n)),
+        Some(SpellDamage::Weapon) => technical_description.push(format!("  (weapon damage)")),
         None => {}
     }
 
@@ -261,13 +259,9 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
         describe_apply_effect(*apply_effect, technical_description);
     }
 
-    match effect.contest_type {
-        Some(SpellContestType::Mental) => {
-            technical_description.push("  [Will] defense".to_string())
-        }
-        Some(SpellContestType::Projectile) => {
-            technical_description.push("  [Evasion] defense".to_string())
-        }
+    match effect.defense_type {
+        Some(DefenseType::Will) => technical_description.push("  [Will] defense".to_string()),
+        Some(DefenseType::Evasion) => technical_description.push("  [Evasion] defense".to_string()),
         None => {}
     };
 }

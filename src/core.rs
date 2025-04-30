@@ -8,7 +8,7 @@ use macroquad::input::is_simulating_mouse_with_touch;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SMITE, SWORD, WAR_HAMMER};
+use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SMITE, SWEEP_ATTACK, SWORD, WAR_HAMMER};
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
@@ -27,7 +27,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 1;
+        let active_character_id = 0;
 
         let mut bob = Character::new(
             true,
@@ -47,7 +47,7 @@ impl CoreGame {
         bob.known_attack_enhancements.push(QUICK);
         bob.known_attack_enhancements.push(SMITE);
         bob.known_on_hit_reactions.push(RAGE);
-        bob.known_actions.push(BaseAction::CastSpell(SCREAM));
+        bob.known_actions.push(BaseAction::CastSpell(SWEEP_ATTACK));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
@@ -446,7 +446,28 @@ impl CoreGame {
             let mut detail_lines = vec![];
 
             let roll = roll_d20_with_advantage(0);
-            let spell_result = roll + caster_ref.spell_modifier();
+            let (spell_result, mut line) = match spell.modifier {
+                SpellModifier::Spell => {
+                    let res = roll + caster_ref.spell_modifier();
+                    let line = format!(
+                        "Rolled: {} (+{} spell mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        res,
+                    );
+                    (res, line)
+                }
+                SpellModifier::Attack => {
+                    let res = roll + caster_ref.attack_modifier(HandType::MainHand);
+                    let line = format!(
+                        "Rolled: {} (+{} attack mod) = {}",
+                        roll,
+                        caster_ref.spell_modifier(),
+                        res,
+                    );
+                    (res, line)
+                }
+            };
 
             let mut target_outcome = None;
             let mut area_outcomes = None;
@@ -467,19 +488,12 @@ impl CoreGame {
                         target.position.get()
                     ));
 
-                    let mut line = format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        spell_result,
-                    );
-
-                    if let Some(contest) = effect.contest_type {
+                    if let Some(contest) = effect.defense_type {
                         match contest {
-                            SpellContestType::Mental => {
+                            DefenseType::Will => {
                                 line.push_str(&format!(", vs will={}", target.will()))
                             }
-                            SpellContestType::Projectile => {
+                            DefenseType::Evasion => {
                                 line.push_str(&format!(", vs evasion={}", target.evasion()))
                             }
                         }
@@ -526,12 +540,8 @@ impl CoreGame {
                         target.position.get()
                     ));
 
-                    detail_lines.push(format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        spell_result,
-                    ));
+                    detail_lines.push(line);
+
                     let degree_of_success = spell_result / 10;
                     if degree_of_success > 0 {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
@@ -557,12 +567,7 @@ impl CoreGame {
                     };
                     assert!(caster.can_reach_with_spell(spell, &enhancements, target_pos));
 
-                    detail_lines.push(format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        spell_result,
-                    ));
+                    detail_lines.push(line);
 
                     let outcomes = self.perform_spell_area_effect(
                         spell.name,
@@ -582,12 +587,7 @@ impl CoreGame {
                     self_area,
                     self_effect,
                 } => {
-                    detail_lines.push(format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        spell_result,
-                    ));
+                    detail_lines.push(line);
 
                     if let Some(effect) = self_effect {
                         let degree_of_success = spell_result / 10;
@@ -786,12 +786,10 @@ impl CoreGame {
 
             if within_range_squared(range.squared(), area_center, other_char.position.get()) {
                 let mut line = other_char.name.to_string();
-                if let Some(contest) = enemy_area.contest_type {
+                if let Some(contest) = enemy_area.defense_type {
                     match contest {
-                        SpellContestType::Mental => {
-                            line.push_str(&format!(" will={}", other_char.will()))
-                        }
-                        SpellContestType::Projectile => {
+                        DefenseType::Will => line.push_str(&format!(" will={}", other_char.will())),
+                        DefenseType::Evasion => {
                             line.push_str(&format!(" evasion={}", other_char.evasion()))
                         }
                     }
@@ -817,18 +815,18 @@ impl CoreGame {
 
     fn perform_spell_enemy_effect(
         &self,
-        name: &'static str,
+        spell_name: &'static str,
         enhancements: &[SpellEnhancement],
         enemy_effect: SpellEnemyEffect,
         spell_result: u32,
         target: &Character,
         detail_lines: &mut Vec<String>,
     ) -> SpellTargetOutcome {
-        let success = match enemy_effect.contest_type {
+        let success = match enemy_effect.defense_type {
             Some(contest) => {
                 let defense = match contest {
-                    SpellContestType::Mental => target.will(),
-                    SpellContestType::Projectile => target.evasion(),
+                    DefenseType::Will => target.will(),
+                    DefenseType::Evasion => target.evasion(),
                 };
 
                 if spell_result >= defense {
@@ -841,7 +839,7 @@ impl CoreGame {
         };
 
         if let Some(degree_of_success) = success {
-            let label = match degree_of_success {
+            let heavy_hit_label = match degree_of_success {
                 0 => "".to_string(),
                 1 => {
                     detail_lines.push("  Heavy hit".to_string());
@@ -853,12 +851,22 @@ impl CoreGame {
                 }
             };
 
-            let damage = if let Some((dmg, is_dmg_increased_by_good_roll)) = enemy_effect.damage {
-                let mut dmg_calculation = dmg as i32;
-                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, name);
+            let damage = if let Some(spell_damage) = enemy_effect.damage {
+                let mut base_damage_label = spell_name;
+                let (mut dmg_calculation, increased_by_good_roll) = match spell_damage {
+                    SpellDamage::Static(n) => (n as i32, false),
+                    SpellDamage::AtLeast(n) => (n as i32, true),
+                    SpellDamage::Weapon => {
+                        let weapon = self.active_character().weapon(HandType::MainHand).unwrap();
+                        base_damage_label = weapon.name;
+                        (weapon.damage as i32, true)
+                    }
+                };
 
-                if is_dmg_increased_by_good_roll && degree_of_success > 0 {
-                    dmg_str.push_str(&format!(" +{degree_of_success} ({label})"));
+                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, base_damage_label);
+
+                if increased_by_good_roll && degree_of_success > 0 {
+                    dmg_str.push_str(&format!(" +{degree_of_success} ({heavy_hit_label})"));
                     dmg_calculation += degree_of_success as i32;
                 }
 
@@ -913,11 +921,11 @@ impl CoreGame {
 
             SpellTargetOutcome::HitEnemy { damage }
         } else {
-            match enemy_effect.contest_type {
-                Some(SpellContestType::Mental) => {
+            match enemy_effect.defense_type {
+                Some(DefenseType::Will) => {
                     detail_lines.push(format!("  {} resisted the spell", target.name))
                 }
-                Some(SpellContestType::Projectile) => {
+                Some(DefenseType::Evasion) => {
                     detail_lines.push(format!("  The spell missed {}", target.name))
                 }
                 None => unreachable!("uncontested effect cannot fail"),
@@ -1441,14 +1449,10 @@ pub fn prob_attack_hit(
     probability_of_d20_reaching(dice_target, bonus)
 }
 
-pub fn prob_spell_hit(
-    caster: &Character,
-    spell_type: SpellContestType,
-    defender: &Character,
-) -> f32 {
+pub fn prob_spell_hit(caster: &Character, spell_type: DefenseType, defender: &Character) -> f32 {
     let defender_value = match spell_type {
-        SpellContestType::Mental => defender.will(),
-        SpellContestType::Projectile => defender.evasion(),
+        DefenseType::Will => defender.will(),
+        DefenseType::Evasion => defender.evasion(),
     };
     let target = defender_value
         .saturating_sub(caster.spell_modifier())
@@ -1872,9 +1876,16 @@ pub struct Spell {
     pub mana_cost: u32,
     pub stamina_cost: u32,
 
+    pub modifier: SpellModifier,
     pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub target: SpellTarget,
     pub animation_color: Color,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellModifier {
+    Spell,
+    Attack,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1883,11 +1894,24 @@ pub enum SpellEffect {
     Ally(SpellAllyEffect),
 }
 
+// enemey effects:
+
+// 1. weapon based (attack contest, optional on_hit)
+// 2. spell contest (mental or projectile); damage optionally scaled by degree of success, optional on hit
+// 3. no contest, damage not scaled
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnemyEffect {
-    pub contest_type: Option<SpellContestType>,
-    pub damage: Option<(u32, bool)>,
+    pub defense_type: Option<DefenseType>,
+    pub damage: Option<SpellDamage>,
     pub on_hit: Option<[Option<ApplyEffect>; 2]>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellDamage {
+    Static(u32),
+    AtLeast(u32),
+    Weapon,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1982,9 +2006,9 @@ pub enum AttackEnhancementOnHitEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum SpellContestType {
-    Mental,
-    Projectile,
+pub enum DefenseType {
+    Will,
+    Evasion,
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
