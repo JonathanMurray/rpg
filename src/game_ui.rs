@@ -4,7 +4,7 @@ use std::{
     rc::Rc,
 };
 
-use macroquad::rand;
+use macroquad::{conf, rand};
 
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
@@ -57,6 +57,12 @@ pub enum UiState {
         damage: u32,
         is_within_melee: bool,
         selected: Option<OnHitReaction>,
+    },
+    ReactingToOpportunity {
+        reactor: CharacterId,
+        target: u32,
+        movement: ((i32, i32), (i32, i32)),
+        selected: bool,
     },
     Idle,
 }
@@ -589,6 +595,8 @@ impl UserInterface {
         character_ui.action_points_row.draw(430.0, ui_y + 5.0);
         character_ui.resource_bars.draw(400.0, ui_y + 40.0);
 
+        // TODO draw both log tooltips and condition tooltips on a higher layer than the other's background
+
         //self.log.draw(800.0, ui_y);
         self.log.draw(950.0, ui_y);
 
@@ -660,11 +668,20 @@ impl UserInterface {
         }
 
         if outcome.switched_players_action_target {
-            self.on_new_players_action_target();
+            self.refresh_target_state();
         }
 
         if outcome.switched_movement_path {
             println!("SWITCHED MOVE PATH");
+            self.refresh_movement_state();
+        }
+    }
+
+    fn refresh_movement_state(&mut self) {
+        if matches!(
+            &*self.state.borrow(),
+            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
+        ) {
             if self.game_grid.has_non_empty_selected_movement_path() {
                 self.activity_popup.set_enabled(true);
                 self.target_ui.clear_action();
@@ -676,7 +693,7 @@ impl UserInterface {
         }
     }
 
-    fn on_new_players_action_target(&mut self) {
+    fn refresh_target_state(&mut self) {
         if matches!(
             &*self.state.borrow(),
             UiState::ConfiguringAction(ConfiguredAction::Attack { .. })
@@ -947,14 +964,14 @@ impl UserInterface {
     }
 
     pub fn set_state(&mut self, state: UiState) {
-        dbg!(&state);
-
         *self.state.borrow_mut() = state;
 
         self.on_new_state();
     }
 
     fn on_new_state(&mut self) {
+        dbg!(&self.state.borrow());
+
         self.activity_popup.additional_line = None;
 
         let mut relevant_action_button = None;
@@ -995,6 +1012,10 @@ impl UserInterface {
                         self.activity_popup.set_enabled(false);
                     }
                 }
+
+                if let ConfiguredAction::EndTurn = configured_action {
+                    self.target_ui.clear_action();
+                }
             }
 
             UiState::ReactingToAttack { .. } => {
@@ -1005,6 +1026,12 @@ impl UserInterface {
             }
 
             UiState::ReactingToHit { .. } => {
+                self.target_ui
+                    .set_action("Select a reaction".to_string(), vec![], false);
+                self.set_allowed_to_use_action_buttons(false);
+            }
+
+            UiState::ReactingToOpportunity { .. } => {
                 self.target_ui
                     .set_action("Select a reaction".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
@@ -1031,19 +1058,10 @@ impl UserInterface {
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
 
-        self.on_new_players_action_target();
-
-        let active_char = self.active_character();
-        let speed = active_char.move_speed;
-        let ap = active_char.action_points.current();
-        let sta = active_char.stamina.current();
-        let max_move_range = ap as f32 * speed + sta.min(ap) as f32 * speed;
-
-        self.game_grid
-            .set_move_speed_and_range(speed, max_move_range);
-
+        self.refresh_target_state();
+        self.refresh_movement_state();
+        self.game_grid.update_move_speed(self.active_character_id);
         self.update_selected_action_button();
-
         self.target_ui.rebuild_character_ui();
     }
 
@@ -1059,6 +1077,33 @@ impl UserInterface {
         match event {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
+            }
+
+            GameEvent::CharacterReactedToAttacked { reactor } => {
+                let reactor_pos = self.characters.get(reactor).pos();
+                self.game_grid.add_text_effect(
+                    reactor_pos,
+                    0.0,
+                    0.5,
+                    "!".to_string(),
+                    Goodness::Neutral,
+                );
+
+                self.animation_stopwatch.set_to_at_least(0.4);
+            }
+
+            GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
+                let reactor = self.characters.get(reactor);
+                self.log.add(format!("Opportunity attack:"));
+                self.game_grid.add_text_effect(
+                    reactor.pos(),
+                    0.0,
+                    0.5,
+                    "!".to_string(),
+                    Goodness::Neutral,
+                );
+
+                self.animation_stopwatch.set_to_at_least(0.4);
             }
 
             GameEvent::CharacterReactedToHit {
@@ -1130,7 +1175,7 @@ impl UserInterface {
 
                 let duration = 0.15 * distance_between(attacker_pos, target_pos);
 
-                self.animation_stopwatch.set_to_at_least(duration + 0.4);
+                self.animation_stopwatch.set_to_at_least(duration + 0.6);
                 let impact_text = match outcome {
                     AttackOutcome::Hit(damage) => format!("{}", damage),
                     AttackOutcome::Dodge => "Dodge".to_string(),
@@ -1352,7 +1397,10 @@ impl UserInterface {
                 }
             }
 
-            GameEvent::CharacterDied { character } => {
+            GameEvent::CharacterDied {
+                character,
+                new_active,
+            } => {
                 self.log
                     .add(format!("{} died", self.characters.get(character).name));
 
@@ -1362,6 +1410,14 @@ impl UserInterface {
                 if self.characters.get(character).player_controlled {
                     self.player_portraits.mark_as_dead(character);
                 }
+
+                if let Some(new_active) = new_active {
+                    self.set_new_active_character_id(new_active);
+                }
+            }
+            GameEvent::NewTurn { new_active } => {
+                self.log.add("End of turn.".to_string());
+                self.set_new_active_character_id(new_active);
             }
             GameEvent::Moved {
                 character,
@@ -1381,7 +1437,23 @@ impl UserInterface {
         }
     }
 
+    fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {
+        if new_active_id != self.active_character_id {
+            // When control switches to a new player controlled character, make the UI show that character
+            println!(
+                "Switching shown char from {} to {}",
+                self.active_character_id, new_active_id
+            );
+            if self.characters.get(new_active_id).player_controlled {
+                self.player_portraits.set_selected_id(new_active_id);
+            }
+        }
+
+        self.active_character_id = new_active_id;
+    }
+
     pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
+        /*
         let active_character_id = game.active_character_id;
 
         if active_character_id != self.active_character_id {
@@ -1396,9 +1468,10 @@ impl UserInterface {
         }
 
         self.active_character_id = active_character_id;
+         */
 
         self.set_allowed_to_use_action_buttons(
-            self.player_portraits.selected_id() == active_character_id,
+            self.player_portraits.selected_id() == self.active_character_id,
         );
 
         let selected_char = self.characters.get(self.player_portraits.selected_id());
@@ -1409,7 +1482,7 @@ impl UserInterface {
         };
 
         self.game_grid.update(
-            active_character_id,
+            self.active_character_id,
             selected_in_grid,
             &self.characters,
             elapsed,
@@ -1527,8 +1600,10 @@ impl UserInterface {
             }
 
             UiState::ReactingToAttack { selected, .. } => PlayerChose::AttackedReaction(*selected),
-
             UiState::ReactingToHit { selected, .. } => PlayerChose::HitReaction(*selected),
+            UiState::ReactingToOpportunity { selected, .. } => {
+                PlayerChose::OpportunityAttack(*selected)
+            }
 
             UiState::ChoosingAction | UiState::Idle => unreachable!(),
         }
@@ -1622,5 +1697,6 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
 pub enum PlayerChose {
     AttackedReaction(Option<OnAttackedReaction>),
     HitReaction(Option<OnHitReaction>),
+    OpportunityAttack(bool),
     Action(Option<Action>),
 }

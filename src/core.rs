@@ -4,6 +4,7 @@ use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
 use macroquad::color::Color;
+use macroquad::input::is_simulating_mouse_with_touch;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
@@ -26,15 +27,15 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 0;
+        let active_character_id = 1;
 
         let mut bob = Character::new(
             true,
             "Bob",
             PortraitId::Portrait2,
             SpriteId::Character,
-            Attributes::new(7, 6, 10, 10),
-            (1, 5),
+            Attributes::new(7, 10, 10, 10),
+            (2, 5),
         );
         //bob.set_weapon(HandType::MainHand, SWORD);
         bob.set_weapon(HandType::MainHand, SWORD);
@@ -60,11 +61,14 @@ impl CoreGame {
             "Gremlin Nob",
             PortraitId::Portrait2,
             SpriteId::Character2,
-            Attributes::new(8, 8, 3, 3),
+            Attributes::new(8, 10, 3, 3),
             (3, 4),
         );
-        enemy1.set_weapon(HandType::MainHand, BOW);
+        enemy1.set_weapon(HandType::MainHand, SWORD);
         enemy1.known_attacked_reactions.push(SIDE_STEP);
+
+        enemy1.receive_condition(Condition::Bleeding(1));
+        enemy1.health.lose(enemy1.health.current() - 1);
 
         let enemy2 = Character::new(
             false,
@@ -72,7 +76,7 @@ impl CoreGame {
             PortraitId::Portrait3,
             SpriteId::Character3,
             Attributes::new(8, 8, 1, 5),
-            (4, 4),
+            (5, 4),
         );
         enemy2.set_weapon(HandType::MainHand, BOW);
 
@@ -82,7 +86,7 @@ impl CoreGame {
             PortraitId::Portrait1,
             SpriteId::Character4,
             Attributes::new(1, 1, 1, 1),
-            (5, 7),
+            (2, 3),
         );
 
         david.set_weapon(HandType::MainHand, SWORD);
@@ -104,21 +108,11 @@ impl CoreGame {
             }
         }
 
-        // TODO
-        self.perform_losing_health(
-            self.characters.get(0),
-            self.characters.get(0).health.current() - 1,
-        );
-        self.log("HELLO 1").await;
-        self.log("HELLO 2").await;
-        self.log("HELLO 3").await;
-        self.log("HELLO 4").await;
-        self.log("HELLO 5").await;
-        self.log("HELLO 6").await;
-        self.log("HELLO 7").await;
-        self.log("HELLO 8").await;
-
         loop {
+            println!(
+                "UI SELECT ACTION ... (active char = {})",
+                self.active_character().name
+            );
             let action = self.ui_select_action().await;
 
             if let Some(action) = action {
@@ -165,23 +159,58 @@ impl CoreGame {
                 }
 
                 {
-                    let character = self.characters.get(self.active_character_id);
-                    if character.action_points.current() == 0 {
+                    if self.active_character().action_points.current() == 0 {
                         self.perform_end_of_turn_character().await;
                         self.active_character_id =
                             self.characters.next_id(self.active_character_id);
+                        self.notify_ui_of_new_turn().await;
                     }
                 }
             } else {
-                let character = self.characters.get(self.active_character_id);
-                let name = character.name;
+                let name = self.active_character().name;
                 self.log(format!("{} ended their turn", name)).await;
                 self.perform_end_of_turn_character().await;
                 self.active_character_id = self.characters.next_id(self.active_character_id);
+                self.notify_ui_of_new_turn().await;
             }
 
-            self.remove_dead().await;
+            // We must make sure to have a valid (alive, existing) active_character_id before handing over control
+            // to the UI, as it may ask us about the active character.
+            let active_character_died = self.active_character().is_dead();
+            if active_character_died {
+                println!("ACTIVE CHAR DIED");
+                dbg!(self.active_character_id);
+                self.active_character_id = self.characters.next_id(self.active_character_id);
+                dbg!(self.active_character_id);
+            }
+
+            for id in self.characters.remove_dead() {
+                println!("HANDLE EVENT DIED: {}", id);
+                let new_active = if active_character_died {
+                    Some(self.active_character_id)
+                } else {
+                    None
+                };
+                self.ui_handle_event(GameEvent::CharacterDied {
+                    character: id,
+                    new_active,
+                })
+                .await;
+            }
+
+            // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
+            // before the character died.
+            if active_character_died {
+                self.notify_ui_of_new_turn().await;
+            }
         }
+    }
+
+    async fn notify_ui_of_new_turn(&self) {
+        self.ui_handle_event(GameEvent::NewTurn {
+            new_active: self.active_character_id,
+        })
+        .await;
     }
 
     pub fn active_character(&self) -> &Character {
@@ -240,8 +269,21 @@ impl CoreGame {
                     None
                 };
 
-                self.perform_attack(hand, enhancements, target, reaction)
-                    .await
+                if reaction.is_some() {
+                    self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
+                        reactor: defender.id(),
+                    })
+                    .await;
+                }
+
+                self.perform_attack(
+                    self.active_character_id,
+                    hand,
+                    enhancements,
+                    target,
+                    reaction,
+                )
+                .await
             }
 
             Action::CastSpell {
@@ -290,13 +332,54 @@ impl CoreGame {
         while !positions.is_empty() {
             let character = self.active_character();
             let new_position = positions.remove(0);
-            for ch in self.characters.iter() {
-                if new_position == ch.position.get() {
-                    panic!(
-                        "Character {} tried to move 0 distance from {:?}",
-                        ch.id(),
-                        ch.position.get()
-                    );
+            if new_position == character.pos() {
+                panic!(
+                    "Character {} tried to move 0 distance from {:?}",
+                    character.id(),
+                    character.pos()
+                );
+            }
+
+            for other_char in self.characters.iter() {
+                if other_char.player_controlled != character.player_controlled
+                    && within_meele(character.pos(), other_char.pos())
+                    && !within_meele(new_position, other_char.pos())
+                {
+                    if other_char.can_use_opportunity_attack() {
+                        let reactor = other_char;
+
+                        let chooses_to_use_opportunity_attack = self
+                            .user_interface
+                            .choose_opportunity_attack(
+                                self,
+                                reactor.id(),
+                                character.id(),
+                                (character.pos(), new_position),
+                            )
+                            .await;
+
+                        dbg!(chooses_to_use_opportunity_attack);
+
+                        if chooses_to_use_opportunity_attack {
+                            self.ui_handle_event(
+                                GameEvent::CharacterReactedWithOpportunityAttack {
+                                    reactor: reactor.id(),
+                                },
+                            )
+                            .await;
+
+                            reactor.action_points.spend(1);
+
+                            self.perform_attack(
+                                reactor.id(),
+                                HandType::MainHand,
+                                vec![],
+                                character.id(),
+                                None,
+                            )
+                            .await;
+                        }
+                    }
                 }
             }
 
@@ -865,13 +948,14 @@ impl CoreGame {
     }
 
     async fn perform_attack(
-        &mut self,
+        &self,
+        attacker_id: CharacterId,
         hand_type: HandType,
         attack_enhancements: Vec<AttackEnhancement>,
         defender_id: CharacterId,
         defender_reaction: Option<OnAttackedReaction>,
     ) -> Option<(CharacterId, u32)> {
-        let attacker = self.active_character();
+        let attacker = self.characters.get(attacker_id);
         let defender = self.characters.get(defender_id);
 
         let circumstance_advantage = match attacker
@@ -1083,7 +1167,7 @@ impl CoreGame {
         }
 
         self.ui_handle_event(GameEvent::Attacked {
-            attacker: self.active_character_id,
+            attacker: attacker_id,
             target: defender_id,
             outcome,
             detail_lines,
@@ -1232,16 +1316,6 @@ impl CoreGame {
         character.conditions.borrow_mut().offhand_exertion = 0;
         let max_stamina = character.stamina.max;
         character.stamina.gain(max_stamina / 2);
-
-        self.log("End of turn.").await;
-    }
-
-    async fn remove_dead(&mut self) {
-        for id in self.characters.remove_dead() {
-            self.user_interface
-                .handle_event(self, GameEvent::CharacterDied { character: id })
-                .await;
-        }
     }
 }
 
@@ -1257,11 +1331,17 @@ pub enum GameEvent {
         from: Position,
         to: Position,
     },
+    CharacterReactedToAttacked {
+        reactor: CharacterId,
+    },
     CharacterReactedToHit {
         main_line: String,
         detail_lines: Vec<String>,
         reactor: CharacterId,
         outcome: HitReactionOutcome,
+    },
+    CharacterReactedWithOpportunityAttack {
+        reactor: CharacterId,
     },
     Attacked {
         attacker: CharacterId,
@@ -1278,6 +1358,10 @@ pub enum GameEvent {
     },
     CharacterDied {
         character: CharacterId,
+        new_active: Option<CharacterId>,
+    },
+    NewTurn {
+        new_active: CharacterId,
     },
 }
 
@@ -1994,7 +2078,7 @@ impl Character {
         position: Position,
     ) -> Self {
         let max_health = 6 + base_attributes.strength;
-        let max_mana = (base_attributes.spirit * 2).saturating_sub(5);
+        let max_mana = (base_attributes.spirit * 2).saturating_sub(3);
 
         let move_speed = 0.5 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
@@ -2330,6 +2414,14 @@ impl Character {
 
         usable.retain(|(_, enhancement)| self.can_use_attack_enhancement(attack_hand, enhancement));
         usable
+    }
+
+    pub fn can_use_opportunity_attack(&self) -> bool {
+        if let Some(weapon) = self.weapon(HandType::MainHand) {
+            weapon.is_melee() && self.action_points.current() >= 1
+        } else {
+            false
+        }
     }
 
     pub fn can_use_attack_enhancement(
@@ -2748,6 +2840,12 @@ pub struct Weapon {
     pub on_attacked_reaction: Option<OnAttackedReaction>,
     pub on_true_hit: Option<AttackHitEffect>,
     pub weight: u32,
+}
+
+impl Weapon {
+    fn is_melee(&self) -> bool {
+        matches!(self.range, WeaponRange::Melee)
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

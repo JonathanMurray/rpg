@@ -7,7 +7,7 @@ use macroquad::{
     window::{clear_background, next_frame},
 };
 
-use crate::core::GameEvent;
+use crate::core::{GameEvent, Position};
 
 use super::bot::bot_choose_action;
 use super::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
@@ -20,6 +20,7 @@ enum UiOutcome {
     ChoseAction(Option<Action>),
     ChoseOnHitReaction(Option<OnHitReaction>),
     ChoseOnAttackedReaction(Option<OnAttackedReaction>),
+    ChoseOpportunityAttack(bool),
     None,
 }
 
@@ -37,6 +38,11 @@ enum MessageFromGame {
         reactor: CharacterId,
         damage: u32,
         is_within_melee: bool,
+    },
+    AwaitingChooseOpportunityAttack {
+        reactor: CharacterId,
+        target: u32,
+        movement: ((i32, i32), (i32, i32)),
     },
     Event(GameEvent),
 }
@@ -124,6 +130,29 @@ impl GameUserInterfaceConnection {
         }
     }
 
+    pub async fn choose_opportunity_attack(
+        &self,
+        game: &CoreGame,
+        reactor: CharacterId,
+        target: CharacterId,
+        movement: (Position, Position),
+    ) -> bool {
+        match self
+            .run_ui(
+                game,
+                MessageFromGame::AwaitingChooseOpportunityAttack {
+                    reactor,
+                    target,
+                    movement,
+                },
+            )
+            .await
+        {
+            UiOutcome::ChoseOpportunityAttack(choice) => choice,
+            _ => unreachable!(),
+        }
+    }
+
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
         let msg = MessageFromGame::Event(event);
         match self.run_ui(game, msg).await {
@@ -196,6 +225,24 @@ impl _GameUserInterfaceConnection {
                 }
             }
 
+            MessageFromGame::AwaitingChooseOpportunityAttack {
+                reactor,
+                target,
+                movement,
+            } => {
+                if players_turn {
+                    // TODO
+                    return UiOutcome::ChoseOpportunityAttack(true);
+                } else {
+                    user_interface.set_state(UiState::ReactingToOpportunity {
+                        reactor,
+                        target,
+                        movement,
+                        selected: false,
+                    });
+                }
+            }
+
             MessageFromGame::Event(event) => {
                 waiting_for_ui_animation_potentially = true;
                 user_interface.handle_game_event(event);
@@ -218,6 +265,9 @@ impl _GameUserInterfaceConnection {
                     }
                     PlayerChose::HitReaction(reaction) => {
                         return UiOutcome::ChoseOnHitReaction(reaction);
+                    }
+                    PlayerChose::OpportunityAttack(choice) => {
+                        return UiOutcome::ChoseOpportunityAttack(choice)
                     }
                     PlayerChose::Action(action) => {
                         dbg!(&action);

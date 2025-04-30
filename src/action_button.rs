@@ -18,8 +18,9 @@ use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
-        OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType, SpellEffect,
-        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget, Weapon,
+        HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect, SpellContestType,
+        SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellTarget,
+        Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -35,7 +36,6 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
-
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
             header: format!(
@@ -55,11 +55,15 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
             description: Some(reaction.description),
             technical_description: Default::default(),
         },
-
         ButtonAction::Proceed => ActionButtonTooltip {
             header: "Proceed".to_string(),
             description: None,
             technical_description: Default::default(),
+        },
+        ButtonAction::OpportunityAttack => ActionButtonTooltip {
+            header: "THIS SHOULD NOT BE SHOWN".to_string(), // This is replaced on-the-fly if needed
+            description: None,
+            technical_description: vec![],
         },
     }
 }
@@ -74,7 +78,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
         technical_description.push(format!("+ {} damage", enhancement.bonus_damage));
     }
     if enhancement.bonus_advantage > 0 {
-        technical_description.push(format!("+ {} advantage", enhancement.bonus_damage));
+        technical_description.push(format!("+ {} advantage", enhancement.bonus_advantage));
     }
 
     if let Some(effect) = enhancement.on_hit_effect {
@@ -400,6 +404,24 @@ impl ActionButton {
             self.tooltip_is_based_on_equipped_weapon
                 .set(equipped_weapon);
         }
+
+        if let ButtonAction::OpportunityAttack = self.action {
+            let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
+            if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
+                *self.tooltip.borrow_mut() = ActionButtonTooltip {
+                    header: format!("Opportunity attack (1 AP)"),
+                    description: None,
+                    technical_description: vec![
+                        format!("{} damage", equipped_weapon.unwrap().damage),
+                        "vs Evasion".to_string(),
+                    ],
+                };
+            }
+
+            self.tooltip_is_based_on_equipped_weapon
+                .set(equipped_weapon);
+        }
+
         self.tooltip.borrow()
     }
 
@@ -564,6 +586,7 @@ pub enum ButtonAction {
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
     SpellEnhancement(SpellEnhancement),
+    OpportunityAttack,
     Proceed,
 }
 
@@ -582,6 +605,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.icon,
             ButtonAction::OnHitReaction(reaction) => reaction.icon,
             ButtonAction::Proceed => IconId::Go,
+            ButtonAction::OpportunityAttack => IconId::Attack,
         }
     }
 
@@ -593,6 +617,7 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
+            ButtonAction::OpportunityAttack => 1,
         }
     }
 
@@ -611,6 +636,7 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::Proceed => 0,
+            ButtonAction::OpportunityAttack => 0,
         }
     }
 
@@ -622,6 +648,7 @@ impl ButtonAction {
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::SpellEnhancement(_enhancement) => 0,
             ButtonAction::Proceed => 0,
+            ButtonAction::OpportunityAttack => 0,
         }
     }
 

@@ -144,6 +144,8 @@ pub struct GameGrid {
     active_character_id: CharacterId,
 
     movement_range: MovementRange,
+
+    // TODO: handle this inside UiState instead? That would let GameUi look at it directly
     selected_movement_path: Option<Vec<(f32, Position)>>,
 
     players_inspect_target: Option<CharacterId>,
@@ -362,7 +364,14 @@ impl GameGrid {
             .unwrap_or(false)
     }
 
-    pub fn set_move_speed_and_range(&mut self, speed: f32, max_range: f32) {
+    pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
+        let active_char = self.characters.get(active_char_id);
+
+        let speed = active_char.move_speed;
+        let ap = active_char.action_points.current();
+        let sta = active_char.stamina.current();
+        let max_range = ap as f32 * speed + sta.min(ap) as f32 * speed;
+
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
@@ -711,6 +720,31 @@ impl GameGrid {
             _ => {}
         }
 
+        if let UiState::ReactingToOpportunity {
+            reactor,
+            target,
+            movement,
+            selected,
+        } = ui_state
+        {
+            let path = [movement.0, movement.1];
+            self.draw_movement_path_arrow(path.iter().copied(), RED, 5.0);
+            self.draw_cornered_outline(
+                self.character_screen_pos(self.characters.get(*reactor)),
+                ACTIVE_CHARACTER_COLOR,
+                5.0,
+                2.0,
+            );
+
+            if *selected {
+                self.draw_target_crosshair(
+                    self.characters.get(*reactor),
+                    self.characters.get(*target).pos(),
+                    PLAYERS_TARGET_CROSSHAIR_COLOR,
+                );
+            }
+        }
+
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {
                 if character.pos() == mouse_grid_pos {
@@ -801,6 +835,7 @@ impl GameGrid {
                                 2.0,
                             );
                             self.draw_target_crosshair(
+                                self.characters.get(self.active_character_id),
                                 mouse_grid_pos,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                             );
@@ -846,6 +881,7 @@ impl GameGrid {
                             4.0,
                         );
                         self.draw_target_crosshair(
+                            self.characters.get(self.active_character_id),
                             mouse_grid_pos,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
@@ -882,6 +918,7 @@ impl GameGrid {
                             3.0,
                         );
                         self.draw_target_crosshair(
+                            self.characters.get(self.active_character_id),
                             mouse_grid_pos,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
@@ -977,22 +1014,36 @@ impl GameGrid {
         match ui_state.players_action_target() {
             ActionTarget::Character(target) => {
                 let target_pos = self.characters.get(target).pos();
-                self.draw_target_crosshair(target_pos, PLAYERS_TARGET_CROSSHAIR_COLOR);
+                self.draw_target_crosshair(
+                    self.characters.get(self.active_character_id),
+                    target_pos,
+                    PLAYERS_TARGET_CROSSHAIR_COLOR,
+                );
             }
             ActionTarget::Position(target_pos) => {
-                self.draw_target_crosshair(target_pos, PLAYERS_TARGET_CROSSHAIR_COLOR);
+                self.draw_target_crosshair(
+                    self.characters.get(self.active_character_id),
+                    target_pos,
+                    PLAYERS_TARGET_CROSSHAIR_COLOR,
+                );
             }
             ActionTarget::None => {}
         }
 
         if let Some(target) = self.enemys_target {
             let target_pos = self.characters.get(target).pos();
-            self.draw_target_crosshair(target_pos, ENEMYS_TARGET_CROSSHAIR_COLOR);
+            self.draw_target_crosshair(
+                self.characters.get(self.active_character_id),
+                target_pos,
+                ENEMYS_TARGET_CROSSHAIR_COLOR,
+            );
         }
 
         self.draw_effects();
 
-        self.draw_character_label(self.characters.get(self.active_character_id));
+        if !matches!(ui_state, UiState::ReactingToOpportunity { .. }) {
+            self.draw_character_label(self.characters.get(self.active_character_id));
+        }
 
         if let Some(id) = hovered_character_id {
             if id != self.active_character_id {
@@ -1258,8 +1309,13 @@ impl GameGrid {
         movement_preview
     }
 
-    fn draw_target_crosshair(&self, target_pos: Position, crosshair_color: Color) {
-        let actor_pos = self.characters.get(self.active_character_id).pos();
+    fn draw_target_crosshair(
+        &self,
+        actor: &Character,
+        target_pos: Position,
+        crosshair_color: Color,
+    ) {
+        let actor_pos = actor.pos();
         let actor_x = self.grid_x_to_screen(actor_pos.0);
         let actor_y = self.grid_y_to_screen(actor_pos.1);
         let target_x = self.grid_x_to_screen(target_pos.0);
@@ -1334,9 +1390,17 @@ impl GameGrid {
 
     fn draw_movement_path(&self, path: &[(f32, Position)], hover: bool) {
         if hover {
-            self.draw_movement_path_arrow(path, HOVER_MOVEMENT_ARROW_COLOR, 3.0);
+            self.draw_movement_path_arrow(
+                path.iter().map(|(_dist, pos)| *pos).rev(),
+                HOVER_MOVEMENT_ARROW_COLOR,
+                3.0,
+            );
         } else {
-            self.draw_movement_path_arrow(path, MOVEMENT_ARROW_COLOR, 5.0);
+            self.draw_movement_path_arrow(
+                path.iter().map(|(_dist, pos)| *pos).rev(),
+                MOVEMENT_ARROW_COLOR,
+                5.0,
+            );
         };
 
         let distance = path[0].0;
@@ -1365,10 +1429,16 @@ impl GameGrid {
         self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
     }
 
-    fn draw_movement_path_arrow(&self, path: &[(f32, Position)], color: Color, thickness: f32) {
-        for i in 0..path.len() - 1 {
-            let a = path[i].1;
-            let b = path[i + 1].1;
+    fn draw_movement_path_arrow(
+        &self,
+        mut path: impl ExactSizeIterator<Item = Position>,
+        color: Color,
+        thickness: f32,
+    ) {
+        let mut a = path.next().unwrap();
+        let mut b = path.next().unwrap();
+
+        loop {
             draw_dashed_line(
                 (
                     self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
@@ -1382,14 +1452,18 @@ impl GameGrid {
                 color,
                 5.0,
             );
+
+            if let Some(next) = path.next() {
+                a = b;
+                b = next;
+            } else {
+                break;
+            }
         }
 
-        let end = path[0].1;
-        if path.len() < 2 {
-            panic!("Expected at least two nodes in path, but got: {:?}", path);
-        }
-        let last_direction = (end.0 - path[1].1 .0, end.1 - path[1].1 .1);
+        let last_direction = (b.0 - a.0, b.1 - a.1);
 
+        let end = b;
         draw_arrow(
             (self.grid_x_to_screen(end.0), self.grid_y_to_screen(end.1)),
             self.cell_w,

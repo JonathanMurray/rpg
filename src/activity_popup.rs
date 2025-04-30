@@ -19,7 +19,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
     },
     base_ui::Drawable,
-    core::{as_percentage, prob_attack_hit, CharacterId, Characters},
+    core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,
@@ -29,7 +29,7 @@ use crate::action_button::ActionButton;
 
 pub struct ActivityPopup {
     characters: Characters,
-    active_character_id: CharacterId,
+    relevant_character_id: CharacterId,
     icons: HashMap<IconId, Texture2D>,
 
     ui_state: Rc<RefCell<UiState>>,
@@ -75,7 +75,7 @@ impl ActivityPopup {
 
         Self {
             characters,
-            active_character_id,
+            relevant_character_id: active_character_id,
             icons,
             ui_state: state,
             font,
@@ -345,6 +345,10 @@ impl ActivityPopup {
                             *selected =
                                 Some(button_actions.first().unwrap().unwrap_on_hit_reaction());
                         }
+                        UiState::ReactingToOpportunity { selected, .. } => {
+                            // It's a binary choice of 'use opportunity attack or not'
+                            *selected = !button_actions.is_empty();
+                        }
                         UiState::ChoosingAction | UiState::Idle => unreachable!(),
                     }
 
@@ -555,7 +559,7 @@ impl ActivityPopup {
         if self.movement_ap_cost()
             > self
                 .characters
-                .get(self.active_character_id)
+                .get(self.relevant_character_id)
                 .action_points
                 .current()
         {
@@ -577,12 +581,28 @@ impl ActivityPopup {
         btn
     }
 
+    fn new_button_with_character_dependency(
+        &self,
+        btn_action: ButtonAction,
+        character: Rc<Character>,
+    ) -> ActionButton {
+        let btn = ActionButton::new(
+            btn_action,
+            &self.choice_button_events,
+            self.next_button_id.get(),
+            &self.icons,
+            Some(character),
+        );
+        self.next_button_id.set(self.next_button_id.get() + 1);
+        btn
+    }
+
     pub fn on_new_state(
         &mut self,
         active_character_id: CharacterId,
         relevant_action_button: Option<Rc<ActionButton>>,
     ) {
-        self.active_character_id = active_character_id;
+        self.relevant_character_id = active_character_id;
 
         let mut lines = vec![];
         let mut popup_buttons = vec![];
@@ -647,6 +667,7 @@ impl ActivityPopup {
                 is_within_melee,
                 ..
             } => {
+                self.relevant_character_id = reactor_id;
                 let attacker = self.characters.get(attacker_id);
                 let defender = self.characters.get(reactor_id);
                 lines.push("React (on attacked)".to_string());
@@ -675,6 +696,7 @@ impl ActivityPopup {
                 is_within_melee,
                 ..
             } => {
+                self.relevant_character_id = victim_id;
                 let victim = self.characters.get(victim_id);
                 lines.push("React (on hit)".to_string());
                 lines.push(format!(
@@ -690,6 +712,26 @@ impl ActivityPopup {
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
                 }
+            }
+
+            &UiState::ReactingToOpportunity {
+                reactor,
+                target,
+                movement,
+                selected,
+            } => {
+                self.relevant_character_id = reactor;
+                lines.push("React (opportunity attack)".to_string());
+                lines.push(format!(
+                    "{} has an attack opportunity",
+                    self.characters.get(reactor).name
+                ));
+
+                let btn = self.new_button_with_character_dependency(
+                    ButtonAction::OpportunityAttack,
+                    self.characters.get_rc(reactor).clone(),
+                );
+                popup_buttons.push(btn);
             }
 
             UiState::ChoosingAction | UiState::Idle => {}
@@ -724,7 +766,7 @@ impl ActivityPopup {
         let ap_cost = self.reserved_and_hovered_action_points().0;
         let can_afford = self
             .characters
-            .get(self.active_character_id)
+            .get(self.relevant_character_id)
             .action_points
             .current()
             >= ap_cost;
