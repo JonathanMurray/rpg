@@ -31,9 +31,10 @@ use crate::{
     textures::EquipmentIconId,
 };
 
-struct EquipmentDrag {
-    from_idx: usize,
-    to_idx: Option<usize>,
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct EquipmentDrag {
+    pub from_idx: usize,
+    pub to_idx: Option<usize>,
 }
 
 const INVENTORY_SIZE: usize = 6;
@@ -43,7 +44,7 @@ pub struct CharacterSheet {
     equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
     screen_position: Cell<(f32, f32)>,
     sheet_dragged_offset: Cell<Option<(f32, f32)>>,
-    equipment_drag: Option<EquipmentDrag>,
+    //equipment_drag: Option<EquipmentDrag>,
     equipment_changed: Rc<Cell<bool>>,
     equipment_icons: HashMap<EquipmentIconId, Texture2D>,
 
@@ -286,13 +287,13 @@ impl CharacterSheet {
             equipment_icons: equipment_icons.clone(),
 
             equipment_slots: inventory_slots,
-            equipment_drag: Default::default(),
+            //equipment_drag: Default::default(),
             equipment_stats_table,
             font: font.clone(),
         }
     }
 
-    pub fn draw(&mut self, ui_state: &UiState) -> CharacterSheetOutcome {
+    pub fn draw(&mut self, ui_state: &mut UiState) -> CharacterSheetOutcome {
         if self.equipment_changed.take() {
             println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER SHEET...");
             self.repopulate_character_equipment();
@@ -304,6 +305,7 @@ impl CharacterSheet {
 
         let (mouse_x, mouse_y) = mouse_position();
 
+        /*
         if let Some(EquipmentDrag {
             to_idx: Some(_), ..
         }) = &self.equipment_drag
@@ -316,10 +318,16 @@ impl CharacterSheet {
                 self.equipment_drag = None;
             }
         }
+         */
 
-        let had_requested_equipment_change_before = self.has_requested_equipment_change();
+        let drag = match ui_state {
+            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => drag,
+            _ => &mut Option::<EquipmentDrag>::None,
+        };
 
-        self.handle_equipment_dragging((mouse_x, mouse_y));
+        let previous_drag = *drag;
+
+        self.handle_equipment_dragging((mouse_x, mouse_y), drag);
 
         self.container.draw_tooltips(x, y);
 
@@ -345,17 +353,16 @@ impl CharacterSheet {
             self.sheet_dragged_offset.set(None);
         }
 
-        let has_requested_now = self.has_requested_equipment_change();
-        let requested_equipment_change =
-            if has_requested_now != had_requested_equipment_change_before {
-                Some(has_requested_now)
-            } else {
-                None
-            };
+        let changed_drag = *drag != previous_drag;
+
+        if drag.is_some() && previous_drag.is_none() {
+            *ui_state =
+                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: *drag });
+        }
 
         CharacterSheetOutcome {
             clicked_close,
-            requested_equipment_change,
+            changed_drag,
         }
     }
 
@@ -386,15 +393,19 @@ impl CharacterSheet {
         }
     }
 
-    fn handle_equipment_dragging(&mut self, mouse_pos: (f32, f32)) {
+    fn handle_equipment_dragging(
+        &mut self,
+        mouse_pos: (f32, f32),
+        equipment_drag: &mut Option<EquipmentDrag>,
+    ) {
         for idx in 0..self.equipment_slots.len() {
             let slot = self.equipment_slots[idx].borrow_mut();
             let rect = slot.screen_area();
             let is_hovered = rect.contains(mouse_pos.into());
 
-            let drag_validity = match self.equipment_drag {
-                Some(EquipmentDrag { from_idx, .. }) if from_idx != idx => {
-                    let dragged_slot = &mut self.equipment_slots[from_idx].borrow_mut();
+            let drag_validity = match equipment_drag {
+                Some(EquipmentDrag { from_idx, .. }) if *from_idx != idx => {
+                    let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
                     let valid_forward = dragged_slot
                         .content
                         .as_ref()
@@ -421,13 +432,13 @@ impl CharacterSheet {
             if is_hovered {
                 if is_mouse_button_pressed(MouseButton::Left) {
                     if slot.content.is_some() {
-                        self.equipment_drag = Some(EquipmentDrag {
+                        *equipment_drag = Some(EquipmentDrag {
                             from_idx: idx,
                             to_idx: None,
                         });
                     }
                 } else if is_mouse_button_released(MouseButton::Left) {
-                    if let Some(EquipmentDrag { from_idx, to_idx }) = &mut self.equipment_drag {
+                    if let Some(EquipmentDrag { from_idx, to_idx }) = equipment_drag {
                         if to_idx.is_none() && *from_idx != idx {
                             let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
 
@@ -455,7 +466,7 @@ impl CharacterSheet {
 
                                     //std::mem::swap(&mut dragged_slot.content, &mut slot.content);
 
-                                    self.equipment_drag = None;
+                                    *equipment_drag = None;
                                 }
 
                                 /*
@@ -468,15 +479,15 @@ impl CharacterSheet {
                         } else {
                             println!("WILL NOT DRAG");
 
-                            self.equipment_drag = None;
+                            *equipment_drag = None;
                         }
                     }
                 }
             }
 
-            if matches!(self.equipment_drag, Some(EquipmentDrag{ from_idx: i, .. }) if i == idx) {
+            if matches!(equipment_drag, Some(EquipmentDrag{ from_idx: i, .. }) if *i == idx) {
                 draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
-            } else if matches!(self.equipment_drag, Some(EquipmentDrag{ to_idx: Some(i), .. }) if i == idx)
+            } else if matches!(equipment_drag, Some(EquipmentDrag{ to_idx: Some(i), .. }) if *i == idx)
             {
                 draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
             } else if is_hovered {
@@ -489,11 +500,14 @@ impl CharacterSheet {
             }
         }
 
-        if let Some(EquipmentDrag { from_idx, to_idx }) = self.equipment_drag {
+        if let Some(EquipmentDrag { from_idx, to_idx }) = equipment_drag {
             match to_idx {
                 Some(to_idx) => {
-                    let to = self.equipment_slots[to_idx].borrow().screen_area().center();
-                    let from = self.equipment_slots[from_idx]
+                    let to = self.equipment_slots[*to_idx]
+                        .borrow()
+                        .screen_area()
+                        .center();
+                    let from = self.equipment_slots[*from_idx]
                         .borrow()
                         .screen_area()
                         .center();
@@ -503,7 +517,7 @@ impl CharacterSheet {
                 }
                 None => {
                     if is_mouse_button_down(MouseButton::Left) {
-                        let slot = self.equipment_slots[from_idx].borrow();
+                        let slot = self.equipment_slots[*from_idx].borrow();
                         let texture = &slot.content.as_ref().unwrap().texture;
                         let params = DrawTextureParams {
                             dest_size: Some((40.0, 40.0).into()),
@@ -512,7 +526,7 @@ impl CharacterSheet {
                         draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
                     } else {
                         println!("NOT DRAGGING ANYMORE");
-                        self.equipment_drag = None;
+                        *equipment_drag = None;
                     }
                 }
             }
@@ -549,54 +563,47 @@ impl CharacterSheet {
         hover && is_mouse_button_pressed(MouseButton::Left)
     }
 
-    pub fn has_requested_equipment_change(&self) -> bool {
-        self.equipment_drag
-            .as_ref()
-            .map(|drag| drag.to_idx.is_some())
-            .unwrap_or(false)
-    }
-
-    pub fn take_requested_equipment_change(&mut self) -> (EquipmentSlotRole, EquipmentSlotRole) {
-        let drag = self.equipment_drag.take().unwrap();
+    pub fn resolve_drag_to_slots(
+        &self,
+        drag: EquipmentDrag,
+    ) -> (EquipmentSlotRole, EquipmentSlotRole) {
         let from_slot = self.equipment_slots[drag.from_idx].borrow();
         let to_slot = self.equipment_slots[drag.to_idx.unwrap()].borrow();
 
         (from_slot.role(), to_slot.role())
     }
 
-    pub fn describe_requested_equipment_change(&self) -> Option<String> {
-        self.equipment_drag.as_ref().map(|drag| {
-            let from = self.equipment_slots[drag.from_idx].borrow();
-            let to = self.equipment_slots[drag.to_idx.unwrap()].borrow();
-            let from_content = from.content.as_ref().unwrap();
+    pub fn describe_requested_equipment_change(&self, drag: EquipmentDrag) -> String {
+        let from = self.equipment_slots[drag.from_idx].borrow();
+        let to = self.equipment_slots[drag.to_idx.unwrap()].borrow();
+        let from_content = from.content.as_ref().unwrap();
 
-            let s = if let Some(to_content) = to.content.as_ref() {
-                if from.role().is_equipped() {
-                    format!(
-                        "Switch from {} to {}",
-                        from_content.equipment.name(),
-                        to_content.equipment.name()
-                    )
-                } else {
-                    format!(
-                        "Switch from {} to {}",
-                        to_content.equipment.name(),
-                        from_content.equipment.name()
-                    )
-                }
-            } else if to.role().is_equipped() {
-                format!("Equip {}", from_content.equipment.name())
+        let s = if let Some(to_content) = to.content.as_ref() {
+            if from.role().is_equipped() {
+                format!(
+                    "Switch from {} to {}",
+                    from_content.equipment.name(),
+                    to_content.equipment.name()
+                )
             } else {
-                format!("Unequip {}", from_content.equipment.name())
-            };
-            s
-        })
+                format!(
+                    "Switch from {} to {}",
+                    to_content.equipment.name(),
+                    from_content.equipment.name()
+                )
+            }
+        } else if to.role().is_equipped() {
+            format!("Equip {}", from_content.equipment.name())
+        } else {
+            format!("Unequip {}", from_content.equipment.name())
+        };
+        s
     }
 }
 
 pub struct CharacterSheetOutcome {
     pub clicked_close: bool,
-    pub requested_equipment_change: Option<bool>,
+    pub changed_drag: bool,
 }
 
 fn buttons_row(buttons: Vec<Element>) -> Element {
@@ -606,4 +613,11 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
         children: buttons,
         ..Default::default()
     })
+}
+
+fn has_drag(ui_state: &UiState) -> bool {
+    matches!(
+        ui_state,
+        UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: Some(_) })
+    )
 }

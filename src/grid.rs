@@ -145,9 +145,6 @@ pub struct GameGrid {
 
     movement_range: MovementRange,
 
-    // TODO: handle this inside UiState instead? That would let GameUi look at it directly
-    selected_movement_path: Option<Vec<(f32, Position)>>,
-
     players_inspect_target: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
 }
@@ -178,7 +175,6 @@ impl GameGrid {
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
             movement_range: MovementRange::default(),
-            selected_movement_path: Default::default(),
             players_inspect_target: None,
             enemys_target: None,
             zoom_index,
@@ -214,19 +210,16 @@ impl GameGrid {
         let removed = self.characters.remove_dead();
         for id in removed {
             if self.players_inspect_target == Some(id) {
-                println!("Removed inspect target in grid, since it died");
                 self.players_inspect_target = None;
             }
 
             if self.selected_player_character_id == Some(id) {
-                println!("SWITCHED FROM SELECTED {}, since it died", id);
                 // TODO what about when all PC:s have died?
                 self.selected_player_character_id = self
                     .characters
                     .iter()
                     .find(|ch| ch.player_controlled)
                     .map(|ch| ch.id());
-                println!("SWITCHED TO {:?}", self.selected_player_character_id);
             }
         }
     }
@@ -235,7 +228,6 @@ impl GameGrid {
         &mut self,
         active_character_id: CharacterId,
         selected_player_character_id: Option<CharacterId>,
-        characters: &Characters,
         elapsed: f32,
     ) {
         self.pathfind_grid.blocked_positions.clear();
@@ -244,7 +236,7 @@ impl GameGrid {
 
         self.selected_player_character_id = selected_player_character_id;
 
-        for character in characters.iter() {
+        for character in self.characters.iter() {
             let pos = character.pos();
 
             self.pathfind_grid.blocked_positions.insert(pos);
@@ -357,13 +349,6 @@ impl GameGrid {
         self.effects.push(concrete_effect);
     }
 
-    pub fn has_non_empty_selected_movement_path(&self) -> bool {
-        self.selected_movement_path
-            .as_ref()
-            .map(|m| !m.is_empty())
-            .unwrap_or(false)
-    }
-
     pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
         let active_char = self.characters.get(active_char_id);
 
@@ -375,19 +360,6 @@ impl GameGrid {
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
-    }
-
-    pub fn take_movement_path(&mut self) -> Vec<Position> {
-        let mut reversed_path = self.selected_movement_path.take().unwrap();
-
-        // Remove the character's current position; it should not be part of the movement path
-        reversed_path.remove(reversed_path.len() - 1);
-
-        reversed_path
-            .into_iter()
-            .rev()
-            .map(|(_dist, (x, y))| (x, y))
-            .collect()
     }
 
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
@@ -539,7 +511,7 @@ impl GameGrid {
     ) -> GridOutcome {
         let previous_inspect_target = self.players_inspect_target;
 
-        let had_non_empty_movement_path = self.has_non_empty_selected_movement_path();
+        let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 
         let (x, y) = self.position_on_screen;
 
@@ -619,8 +591,6 @@ impl GameGrid {
             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
         ) {
             self.draw_movement_path_background();
-        } else {
-            self.selected_movement_path = None;
         }
 
         if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
@@ -661,7 +631,7 @@ impl GameGrid {
                     SpellTarget::None { .. } => MouseState::ImplicitTarget,
                 },
                 ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
-                ConfiguredAction::ChangeEquipment => MouseState::None,
+                ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
                 ConfiguredAction::EndTurn => MouseState::None,
             },
             _ => MouseState::None,
@@ -863,10 +833,11 @@ impl GameGrid {
                             .movement_range
                             .ap_cost(hovered_route.distance_from_start);
 
-                        *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost });
+                        *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
+                            ap_cost,
+                            selected_movement_path: path,
+                        });
                         outcome.switched_state = Some(NewState::Move);
-
-                        self.selected_movement_path = Some(path);
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
@@ -894,14 +865,13 @@ impl GameGrid {
                             *ui_state = UiState::ChoosingAction;
                             outcome.switched_state = Some(NewState::ChoosingAction);
                             outcome.switched_players_action_target = true;
-                            //self.players_action_target = ActionTarget::None;
                         } else {
                             match mouse_state {
                                 MouseState::RequiresAllyTarget => {
                                     ui_state.set_target(ActionTarget::Character(hovered_id));
                                     outcome.switched_players_action_target = true;
                                     self.players_inspect_target = Some(hovered_id);
-                                    self.selected_movement_path = None;
+                                    //self.selected_movement_path = None;
                                 }
                                 _ => {
                                     self.players_inspect_target = Some(hovered_id);
@@ -975,7 +945,6 @@ impl GameGrid {
                             outcome.switched_players_action_target = true;
 
                             self.players_inspect_target = Some(hovered_id);
-                            self.selected_movement_path = None;
                         } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                             ui_state.set_target(ActionTarget::Character(hovered_id));
                             outcome.switched_players_action_target = true;
@@ -986,7 +955,7 @@ impl GameGrid {
                         }
                     }
                 }
-            } else if self.selected_movement_path.is_some() && self.dragging_camera_from.is_none() {
+            } else if had_non_empty_movement_path && self.dragging_camera_from.is_none() {
                 self.draw_cell_outline(mouse_grid_pos, HOVER_INVALID_MOVEMENT_COLOR, 5.0, 2.0);
             }
         }
@@ -996,9 +965,13 @@ impl GameGrid {
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
 
-        if let Some(path) = &self.selected_movement_path {
-            if !path.is_empty() {
-                self.draw_movement_path(path, false);
+        if let UiState::ConfiguringAction(ConfiguredAction::Move {
+            selected_movement_path,
+            ..
+        }) = ui_state
+        {
+            if !selected_movement_path.is_empty() {
+                self.draw_movement_path(&selected_movement_path, false);
             }
         }
 
@@ -1056,7 +1029,7 @@ impl GameGrid {
             outcome.switched_inspect_target = Some(self.players_inspect_target);
         }
 
-        if self.has_non_empty_selected_movement_path() != had_non_empty_movement_path {
+        if has_non_empty_movement_path(ui_state) != had_non_empty_movement_path {
             outcome.switched_movement_path = true;
         }
 
@@ -1293,20 +1266,20 @@ impl GameGrid {
         let route = self.pathfind_grid.routes.get(&destination).unwrap();
         let mut dist = route.distance_from_start;
 
-        let mut movement_preview = vec![(dist, destination)];
+        let mut path = vec![(dist, destination)];
         let mut pos = route.came_from;
 
         loop {
             let route = self.pathfind_grid.routes.get(&pos).unwrap();
             dist = route.distance_from_start;
-            movement_preview.push((dist, pos));
+            path.push((dist, pos));
             if pos == start {
                 break;
             }
             pos = route.came_from;
         }
-        assert!(movement_preview.len() > 1);
-        movement_preview
+        assert!(path.len() > 1);
+        path
     }
 
     fn draw_target_crosshair(
@@ -1754,4 +1727,14 @@ enum MouseState {
     ImplicitTarget,
     MayInputMovement,
     None,
+}
+
+fn has_non_empty_movement_path(ui_state: &UiState) -> bool {
+    match ui_state {
+        UiState::ConfiguringAction(ConfiguredAction::Move {
+            selected_movement_path,
+            ..
+        }) => !selected_movement_path.is_empty(),
+        _ => false,
+    }
 }

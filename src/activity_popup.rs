@@ -228,7 +228,7 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
             &*self.ui_state.borrow()
         {
             let mut text = format!("{} AP", ap_cost);
@@ -362,7 +362,7 @@ impl ActivityPopup {
             };
         }
 
-        self.refresh_afford_state();
+        self.refresh_enabled_state();
 
         for event in self.proceed_button_events.borrow_mut().drain(..) {
             if matches!(event, InternalUiEvent::ButtonClicked(..)) {
@@ -387,7 +387,7 @@ impl ActivityPopup {
     }
 
     pub fn on_new_movement_ap_cost(&mut self) {
-        let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+        let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
             &*self.ui_state.borrow()
         else {
             panic!()
@@ -400,7 +400,7 @@ impl ActivityPopup {
     }
 
     fn movement_base_ap_cost(&self) -> u32 {
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost }) =
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
             &*self.ui_state.borrow()
         {
             *ap_cost
@@ -555,20 +555,6 @@ impl ActivityPopup {
         self.additional_line = Some(line);
     }
 
-    pub fn set_enabled(&mut self, mut enabled: bool) {
-        if self.movement_ap_cost()
-            > self
-                .characters
-                .get(self.relevant_character_id)
-                .action_points
-                .current()
-        {
-            enabled = false;
-        }
-
-        self.proceed_button.enabled.set(enabled);
-    }
-
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
@@ -653,10 +639,8 @@ impl ActivityPopup {
                         }
                     }
 
-                    ConfiguredAction::ChangeEquipment => {}
-                    ConfiguredAction::EndTurn => {
-                        // TODO do anything here?
-                    }
+                    ConfiguredAction::ChangeEquipment { .. } => {}
+                    ConfiguredAction::EndTurn => { }
                 }
             }
 
@@ -716,9 +700,7 @@ impl ActivityPopup {
 
             &UiState::ReactingToOpportunity {
                 reactor,
-                target,
-                movement,
-                selected,
+                ..
             } => {
                 self.relevant_character_id = reactor;
                 lines.push("React (opportunity attack)".to_string());
@@ -737,16 +719,6 @@ impl ActivityPopup {
             UiState::ChoosingAction | UiState::Idle => {}
         }
 
-        /*
-        if self.state != state {
-            // Assume that a change in the layout caused all buttons to no longer be hovered
-            for btn in self.choice_buttons.values() {
-                btn.notify_hidden();
-            }
-            self.proceed_button.notify_hidden();
-        }
-         */
-
         let mut choice_buttons = IndexMap::new();
         for mut btn in popup_buttons {
             btn.event_sender = Some(EventSender {
@@ -762,21 +734,24 @@ impl ActivityPopup {
         self.selected_choice_button_ids.clear();
     }
 
-    fn refresh_afford_state(&mut self) {
-        let ap_cost = self.reserved_and_hovered_action_points().0;
-        let can_afford = self
-            .characters
-            .get(self.relevant_character_id)
-            .action_points
-            .current()
-            >= ap_cost;
-        self.set_enabled(can_afford);
+    fn refresh_enabled_state(&mut self) {
+        let char = self.characters.get(self.relevant_character_id);
+        let enough_ap = char.action_points.current() >= self.reserved_and_hovered_action_points().0;
+        let enough_mana = char.mana.current() >= self.mana_points();
+        let enough_stamina = char.stamina.current() >= self.stamina_points();
+
+        let has_required_input = self.ui_state.borrow().has_required_player_input(
+            self.characters.get(self.relevant_character_id),
+            &self.characters,
+        );
+
+        let enabled = enough_ap && enough_mana && enough_stamina && has_required_input;
+        self.proceed_button.enabled.set(enabled);
     }
 }
 
 pub enum ActivityPopupOutcome {
     ClickedProceed,
-    //ChangedOnAttackedReaction,
     ChangedSpellEnhancements,
 }
 

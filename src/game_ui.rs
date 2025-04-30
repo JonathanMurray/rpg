@@ -21,10 +21,13 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
-    character_sheet::CharacterSheet,
+    character_sheet::{CharacterSheet, EquipmentDrag},
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach, ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome
+        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
+        ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
+        Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction,
+        Position, Spell, SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -65,6 +68,19 @@ pub enum UiState {
 }
 
 impl UiState {
+    pub fn has_required_player_input(
+        &self,
+        relevant_character: &Character,
+        characters: &Characters,
+    ) -> bool {
+        match self {
+            UiState::ConfiguringAction(configured_action) => {
+                configured_action.has_required_player_input(relevant_character, characters)
+            }
+            _ => true,
+        }
+    }
+
     pub fn players_action_target(&self) -> ActionTarget {
         match self {
             UiState::ConfiguringAction(configured_action) => match configured_action {
@@ -111,13 +127,84 @@ pub enum ConfiguredAction {
         target: ActionTarget,
     },
     Move {
+        selected_movement_path: Vec<(f32, Position)>,
         ap_cost: u32,
     },
-    ChangeEquipment,
+    ChangeEquipment {
+        drag: Option<EquipmentDrag>,
+    },
     EndTurn,
 }
 
 impl ConfiguredAction {
+    pub fn has_required_player_input(
+        &self,
+        relevant_character: &Character,
+        characters: &Characters,
+    ) -> bool {
+        match self {
+            ConfiguredAction::Attack { target, hand, .. } => match target {
+                Some(target_id) => {
+                    let target_char = characters.get(*target_id);
+                    let (_range, reach) =
+                        relevant_character.reaches_with_attack(*hand, target_char.position.get());
+                    matches!(
+                        reach,
+                        ActionReach::Yes | ActionReach::YesButDisadvantage(..)
+                    )
+                }
+                None => false,
+            },
+
+            ConfiguredAction::CastSpell {
+                target,
+                spell,
+                selected_enhancements,
+                ..
+            } => match *target {
+                ActionTarget::Character(target_id) => {
+                    let target_char = characters.get(target_id);
+                    relevant_character.can_reach_with_spell(
+                        *spell,
+                        selected_enhancements,
+                        target_char.position.get(),
+                    )
+                }
+
+                ActionTarget::Position(target_pos) => {
+                    assert!(matches!(spell.target, SpellTarget::Area { .. }));
+                    relevant_character.can_reach_with_spell(
+                        *spell,
+                        selected_enhancements,
+                        target_pos,
+                    )
+                }
+
+                ActionTarget::None => match spell.target {
+                    SpellTarget::Enemy { .. } => false,
+                    SpellTarget::Ally { .. } => false,
+                    SpellTarget::None { .. } => true,
+                    SpellTarget::Area { .. } => false,
+                },
+            },
+
+            ConfiguredAction::Move {
+                selected_movement_path,
+                ..
+            } => !selected_movement_path.is_empty(),
+
+            ConfiguredAction::ChangeEquipment { drag } => matches!(
+                drag,
+                Some(EquipmentDrag {
+                    to_idx: Some(_),
+                    ..
+                })
+            ),
+
+            ConfiguredAction::EndTurn => true,
+        }
+    }
+
     pub fn from_base_action(base_action: BaseAction) -> Self {
         match base_action {
             BaseAction::Attack {
@@ -134,8 +221,11 @@ impl ConfiguredAction {
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
             },
-            BaseAction::Move => Self::Move { ap_cost: 0 },
-            BaseAction::ChangeEquipment => Self::ChangeEquipment,
+            BaseAction::Move => Self::Move {
+                ap_cost: 0,
+                selected_movement_path: Default::default(),
+            },
+            BaseAction::ChangeEquipment => Self::ChangeEquipment { drag: None },
             BaseAction::EndTurn => Self::EndTurn,
         }
     }
@@ -152,7 +242,7 @@ impl ConfiguredAction {
             },
             ConfiguredAction::CastSpell { spell, .. } => BaseAction::CastSpell(*spell),
             ConfiguredAction::Move { .. } => BaseAction::Move,
-            ConfiguredAction::ChangeEquipment => BaseAction::ChangeEquipment,
+            ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
             ConfiguredAction::EndTurn => BaseAction::EndTurn,
         }
     }
@@ -186,8 +276,8 @@ impl ConfiguredAction {
                 }
                 ap
             }
-            ConfiguredAction::Move { ap_cost } => *ap_cost,
-            ConfiguredAction::ChangeEquipment => 1,
+            ConfiguredAction::Move { ap_cost, .. } => *ap_cost,
+            ConfiguredAction::ChangeEquipment { .. } => 1,
             ConfiguredAction::EndTurn => 0,
         }
     }
@@ -606,21 +696,17 @@ impl UserInterface {
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         if self.character_sheet_toggle.shown.get() {
-            let outcome = character_ui.character_sheet.draw(&self.state.borrow());
+            let outcome = character_ui
+                .character_sheet
+                .draw(&mut self.state.borrow_mut());
             self.character_sheet_toggle
                 .shown
                 .set(!outcome.clicked_close);
 
-            if let Some(requested) = outcome.requested_equipment_change {
-                println!("REQUESTED EQ CHANGE: {}", requested);
-                if requested {
-                    //self.game_grid.clear_players_action_target();
-                    self.set_state(UiState::ConfiguringAction(
-                        ConfiguredAction::ChangeEquipment,
-                    ));
-                } else {
-                    self.set_state(UiState::ChoosingAction);
-                }
+            if outcome.changed_drag {
+                println!("REQUESTED EQ CHANGE; new state");
+                // Maybe drag was changed, or maybe the entire state; should be fine to assume the latter
+                self.on_new_state();
             }
         }
 
@@ -675,18 +761,19 @@ impl UserInterface {
     }
 
     fn refresh_movement_state(&mut self) {
-        if matches!(
-            &*self.state.borrow(),
-            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
-        ) {
-            if self.game_grid.has_non_empty_selected_movement_path() {
-                self.activity_popup.set_enabled(true);
+        if let UiState::ConfiguringAction(ConfiguredAction::Move {
+            selected_movement_path,
+            ..
+        }) = &*self.state.borrow()
+        {
+            if !selected_movement_path.is_empty() {
                 self.target_ui.clear_action();
             } else {
-                self.activity_popup.set_enabled(false);
                 self.target_ui
                     .set_action("Select a destination".to_string(), vec![], false);
             }
+
+            //self.activity_popup.refresh_enabled_state();
         }
     }
 
@@ -699,7 +786,7 @@ impl UserInterface {
         }
 
         // Potentially change a "partially selected" (that was waiting for a proper target) to "fully selected"
-        self.update_selected_action_button();
+        self.refresh_selected_action_button();
 
         if matches!(
             &*self.state.borrow(),
@@ -730,17 +817,13 @@ impl UserInterface {
 
                 let mut circumstance_advantage = None;
 
-                // TODO also check that we can afford the action
                 match reach {
                     ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
-                        self.activity_popup.set_enabled(true);
                         if let ActionReach::YesButDisadvantage(reason) = reach {
                             circumstance_advantage = Some((-1, reason, Goodness::Bad));
                         }
                     }
-                    ActionReach::No => {
-                        self.activity_popup.set_enabled(false);
-                    }
+                    ActionReach::No => {}
                 }
 
                 // We cannot know yet if the defender will react
@@ -776,11 +859,12 @@ impl UserInterface {
             }
 
             None => {
-                self.activity_popup.set_enabled(false);
                 self.target_ui
                     .set_action("Select an enemy".to_string(), vec![], false);
             }
         }
+
+        //self.activity_popup.refresh_enabled_state();
     }
 
     fn refresh_cast_spell_state(&mut self) {
@@ -818,57 +902,32 @@ impl UserInterface {
                 };
 
                 self.target_ui.set_action(action_text, vec![], true);
-
-                if self.active_character().can_reach_with_spell(
-                    spell,
-                    selected_enhancements,
-                    target_char.position.get(),
-                ) {
-                    self.activity_popup.set_enabled(true);
-                } else {
-                    self.activity_popup.set_enabled(false);
-                }
             }
 
-            ActionTarget::Position(target_pos) => {
+            ActionTarget::Position(..) => {
                 assert!(matches!(spell.target, SpellTarget::Area { .. }));
-
                 self.target_ui
                     .set_action(format!("{} (AoE)", spell.name), vec![], false);
-
-                if self.active_character().can_reach_with_spell(
-                    spell,
-                    selected_enhancements,
-                    target_pos,
-                ) {
-                    self.activity_popup.set_enabled(true);
-                } else {
-                    self.activity_popup.set_enabled(false);
-                };
             }
 
             ActionTarget::None => {
                 match spell.target {
                     SpellTarget::Enemy { .. } => {
-                        self.activity_popup.set_enabled(false);
                         self.target_ui
                             .set_action("Select an enemy".to_string(), vec![], false);
                     }
 
                     SpellTarget::Ally { .. } => {
-                        self.activity_popup.set_enabled(false);
                         self.target_ui
                             .set_action("Select an ally".to_string(), vec![], false);
                     }
 
                     SpellTarget::None { .. } => {
-                        self.activity_popup.set_enabled(true);
                         let header = spell.name.to_string();
                         self.target_ui.set_action(header, vec![], false);
                     }
 
                     SpellTarget::Area { .. } => {
-                        self.activity_popup.set_enabled(false);
                         self.target_ui
                             .set_action("Select an area".to_string(), vec![], false);
                     }
@@ -900,32 +959,16 @@ impl UserInterface {
         self.characters.get(self.active_character_id)
     }
 
-    fn update_selected_action_button(&mut self) {
+    fn refresh_selected_action_button(&mut self) {
         if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
-            use ConfiguredAction::*;
-
-            let action_is_waiting_for_target_selection = match configured_action {
-                Attack { target, .. } => target.is_none(),
-                CastSpell { spell, target, .. } => {
-                    if matches!(
-                        spell.target,
-                        SpellTarget::Enemy { .. }
-                            | SpellTarget::Ally { .. }
-                            | SpellTarget::Area { .. }
-                    ) {
-                        matches!(target, ActionTarget::None)
-                    } else {
-                        false
-                    }
-                }
-                Move { .. } | ChangeEquipment | EndTurn => false,
-            };
-
-            let fully_selected = !action_is_waiting_for_target_selection;
+            let fully_selected = configured_action
+                .has_required_player_input(self.active_character(), &self.characters);
             self.set_selected_action(Some((
                 ButtonAction::Action(configured_action.base_action()),
                 fully_selected,
             )));
+        } else {
+            self.set_selected_action(None);
         }
     }
 
@@ -991,25 +1034,6 @@ impl UserInterface {
                     configured_action
                 );
 
-                if let ConfiguredAction::ChangeEquipment = configured_action {
-                    self.target_ui
-                        .set_action("Change equipment".to_string(), vec![], false);
-
-                    let drag_description = self.character_uis[&self.active_character_id]
-                        .character_sheet
-                        .describe_requested_equipment_change();
-
-                    if let Some(description) = drag_description {
-                        self.activity_popup.additional_line = Some(description);
-                        self.activity_popup.set_enabled(true);
-                    } else {
-                        self.activity_popup.additional_line =
-                            Some("Drag something to equip/unequip it".to_string());
-                        self.character_sheet_toggle.shown.set(true);
-                        self.activity_popup.set_enabled(false);
-                    }
-                }
-
                 if let ConfiguredAction::EndTurn = configured_action {
                     self.target_ui.clear_action();
                 }
@@ -1039,7 +1063,6 @@ impl UserInterface {
                     .set_action("Select an action".to_string(), vec![], false);
 
                 self.set_allowed_to_use_action_buttons(true);
-                self.set_selected_action(None);
             }
 
             UiState::Idle => {
@@ -1055,11 +1078,39 @@ impl UserInterface {
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
 
+        self.maybe_refresh_equipment_drag_state();
+
         self.refresh_target_state();
         self.refresh_movement_state();
         self.game_grid.update_move_speed(self.active_character_id);
-        self.update_selected_action_button();
+        self.refresh_selected_action_button();
         self.target_ui.rebuild_character_ui();
+    }
+
+    fn maybe_refresh_equipment_drag_state(&mut self) {
+        let change_eq_state = match &*self.state.borrow() {
+            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => Some(*drag),
+            _ => None,
+        };
+
+        if let Some(maybe_drag) = change_eq_state {
+            self.target_ui
+                .set_action("Change equipment".to_string(), vec![], false);
+
+            if let Some(EquipmentDrag {
+                to_idx: Some(_), ..
+            }) = maybe_drag
+            {
+                let description = self.character_uis[&self.active_character_id]
+                    .character_sheet
+                    .describe_requested_equipment_change(maybe_drag.unwrap());
+                self.activity_popup.additional_line = Some(description);
+            } else {
+                self.activity_popup.additional_line =
+                    Some("Drag something to equip/unequip it".to_string());
+                self.character_sheet_toggle.shown.set(true);
+            }
+        }
     }
 
     pub fn has_ongoing_animation(&self) -> bool {
@@ -1454,23 +1505,6 @@ impl UserInterface {
     }
 
     pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
-        /*
-        let active_character_id = game.active_character_id;
-
-        if active_character_id != self.active_character_id {
-            // When control switches to a new player controlled character, make the UI show that character
-            println!(
-                "Switching shown char from {} to {}",
-                self.active_character_id, active_character_id
-            );
-            if self.characters.get(active_character_id).player_controlled {
-                self.player_portraits.set_selected_id(active_character_id);
-            }
-        }
-
-        self.active_character_id = active_character_id;
-         */
-
         self.set_allowed_to_use_action_buttons(
             self.player_portraits.selected_id() == self.active_character_id,
         );
@@ -1482,12 +1516,8 @@ impl UserInterface {
             Some(selected_char.id())
         };
 
-        self.game_grid.update(
-            self.active_character_id,
-            selected_in_grid,
-            &self.characters,
-            elapsed,
-        );
+        self.game_grid
+            .update(self.active_character_id, selected_in_grid, elapsed);
 
         let popup_outcome = self.activity_popup.update();
 
@@ -1496,11 +1526,6 @@ impl UserInterface {
             Some(ActivityPopupOutcome::ClickedProceed) => {
                 player_choice = Some(self.handle_popup_proceed());
             }
-            /*
-            Some(ActivityPopupOutcome::ChangedOnAttackedReaction) => {
-                // TODO just do it internally
-                self.activity_popup.refresh_on_attacked_state();
-            } */
             Some(ActivityPopupOutcome::ChangedSpellEnhancements) => {
                 self.refresh_cast_spell_state();
             }
@@ -1554,6 +1579,7 @@ impl UserInterface {
 
     fn handle_popup_proceed(&mut self) -> PlayerChose {
         // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
+        // TODO shouldn't we rather change the state, and rely on refresh_selected_action_button to clear this?
         self.set_selected_action(None);
 
         match &*self.state.borrow() {
@@ -1561,10 +1587,9 @@ impl UserInterface {
                 let action = match &configured_action {
                     ConfiguredAction::Attack {
                         hand,
-
                         selected_enhancements,
-                        action_point_cost,
                         target,
+                        ..
                     } => Some(Action::Attack {
                         hand: *hand,
                         enhancements: selected_enhancements.clone(),
@@ -1579,19 +1604,34 @@ impl UserInterface {
                         enhancements: selected_enhancements.clone(),
                         target: *target,
                     }),
-                    &ConfiguredAction::Move { ap_cost } => Some(Action::Move {
-                        action_point_cost: *ap_cost - self.activity_popup.movement_stamina_cost(),
-                        stamina_cost: self.activity_popup.movement_stamina_cost(),
-                        positions: self.game_grid.take_movement_path(),
-                    }),
-                    // TODO store the equiment change inside the state instead of in the character sheet?
-                    &ConfiguredAction::ChangeEquipment => {
+                    &ConfiguredAction::Move {
+                        ap_cost,
+                        selected_movement_path,
+                    } => {
+                        let mut reversed_path = selected_movement_path.clone();
+                        // Remove the character's current position; it should not be part of the movement path
+                        reversed_path.remove(reversed_path.len() - 1);
+
+                        let positions = reversed_path
+                            .into_iter()
+                            .rev()
+                            .map(|(_dist, (x, y))| (x, y))
+                            .collect();
+
+                        let stamina_cost = self.activity_popup.movement_stamina_cost();
+                        Some(Action::Move {
+                            action_point_cost: *ap_cost - stamina_cost,
+                            stamina_cost,
+                            positions,
+                        })
+                    }
+                    &ConfiguredAction::ChangeEquipment { drag } => {
                         let (from, to) = self
                             .character_uis
                             .get_mut(&self.active_character_id)
                             .unwrap()
                             .character_sheet
-                            .take_requested_equipment_change();
+                            .resolve_drag_to_slots(drag.unwrap());
 
                         Some(Action::ChangeEquipment { from, to })
                     }
@@ -1630,9 +1670,6 @@ impl UserInterface {
                     );
 
                     if may_choose_action && self.active_character().can_use_action(base_action) {
-                        //self.target_ui.set_character(Option::<&Character>::None);
-                        //self.game_grid.clear_players_action_target();
-
                         self.set_state(UiState::ConfiguringAction(
                             ConfiguredAction::from_base_action(base_action),
                         ));
