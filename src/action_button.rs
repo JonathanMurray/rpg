@@ -111,30 +111,53 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
 fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
-    if enhancement.bonus_damage > 0 {
-        technical_description.push(format!("+ {} damage", enhancement.bonus_damage));
+    let effect = enhancement.effect;
+
+    if effect.roll_bonus > 0 {
+        technical_description.push(format!("+ {} to dice roll", effect.roll_bonus));
     }
 
-    if let Some(effect) = enhancement.effect {
-        match effect {
-            SpellEnhancementEffect::CastTwice => {}
-            SpellEnhancementEffect::OnHit(apply_effect) => {
-                describe_apply_effect(apply_effect, &mut technical_description);
-            }
-            SpellEnhancementEffect::IncreasedRangeTenths(tenths) => {
-                technical_description.push(format!("+ {} range", tenths as f32 * 0.1));
-            }
-            SpellEnhancementEffect::IncreaseRadiusTenths(tenths) => {
-                technical_description.push(format!("+ {} radius", tenths as f32 * 0.1));
-            }
-        }
+    if effect.bonus_advantage > 0 {
+        technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
+    }
+
+    if effect.bonus_target_damage > 0 {
+        technical_description.push(format!("+ {} damage (target)", effect.bonus_target_damage));
+    }
+
+    if effect.bonus_area_damage > 0 {
+        technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
+    }
+
+    if effect.cast_twice {}
+
+    if let Some(apply_effect) = effect.on_hit {
+        describe_apply_effect(apply_effect, &mut technical_description);
+    }
+
+    if effect.increased_range_tenths > 0 {
+        technical_description.push(format!(
+            "+ {} range",
+            effect.increased_range_tenths as f32 * 0.1
+        ));
+    }
+
+    if effect.increased_radius_tenths > 0 {
+        technical_description.push(format!(
+            "+ {} radius",
+            effect.increased_radius_tenths as f32 * 0.1
+        ));
     }
 
     ActionButtonTooltip {
         header: format!(
             "{} ({})",
             enhancement.name,
-            cost_string(enhancement.action_point_cost, 0, enhancement.mana_cost)
+            cost_string(
+                enhancement.action_point_cost,
+                enhancement.stamina_cost,
+                enhancement.mana_cost
+            )
         ),
         description: Some(enhancement.description),
         technical_description,
@@ -172,8 +195,16 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
         ApplyEffect::RemoveActionPoints(n) => {
             technical_description.push(format!("  Loses {}^ AP", n))
         }
-        ApplyEffect::Condition(condition) => {
-            technical_description.push(format!("  {}", condition.name()))
+        ApplyEffect::GainStamina(n) => {
+            technical_description.push(format!("  Gains {}^ stamina", n))
+        }
+        ApplyEffect::Condition(mut condition) => {
+            let line = if let Some(stacks) = condition.stacks().copied() {
+                format!("  {} ({})", condition.name(), stacks)
+            } else {
+                format!("  {}", condition.name())
+            };
+            technical_description.push(line);
         }
     }
 }
@@ -185,6 +216,18 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
         cost_string(spell.action_point_cost, spell.stamina_cost, spell.mana_cost)
     );
     let mut technical_description = vec![];
+
+    match spell.modifier {
+        SpellModifier::Spell => technical_description.push("[ spell ]".to_string()),
+        SpellModifier::Attack(bonus) if bonus < 0 => {
+            technical_description.push(format!("[ attack - {} ]", -bonus))
+        }
+        SpellModifier::Attack(bonus) if bonus > 0 => {
+            technical_description.push(format!("[ attack + {} ]", bonus))
+        }
+        SpellModifier::Attack(_) => technical_description.push("[ attack ]".to_string()),
+    }
+
     match spell.target {
         SpellTarget::Enemy {
             effect,
@@ -258,22 +301,22 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
 }
 
 fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: &mut Vec<String>) {
+    match effect.defense_type {
+        Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
+        Some(DefenseType::Evasion) => technical_description.push("  [ evasion ]".to_string()),
+        None => {}
+    };
+
     match effect.damage {
         Some(SpellDamage::Static(n)) => technical_description.push(format!("  {} damage", n)),
         Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}^ damage", n)),
-        Some(SpellDamage::Weapon) => technical_description.push(format!("  (weapon damage)")),
+        Some(SpellDamage::Weapon) => technical_description.push(format!("  weapon damage")),
         None => {}
     }
 
     for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
         describe_apply_effect(*apply_effect, technical_description);
     }
-
-    match effect.defense_type {
-        Some(DefenseType::Will) => technical_description.push("  [Will] defense".to_string()),
-        Some(DefenseType::Evasion) => technical_description.push("  [Evasion] defense".to_string()),
-        None => {}
-    };
 }
 
 fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &mut Vec<String>) {
@@ -519,7 +562,7 @@ impl Drawable for ActionButton {
 
         let params = DrawTextureParams {
             dest_size: Some(self.texture_draw_size.into()),
-            //dest_size: Some((48.0, 38.4).into()),
+            //dest_size: Some((240.0, 192.0).into()),
             //dest_size: Some((24.0, 19.2).into()),
             ..Default::default()
         };
@@ -650,7 +693,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
             ButtonAction::OnHitReaction(_reaction) => 0,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
-            ButtonAction::SpellEnhancement(_enhancement) => 0,
+            ButtonAction::SpellEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 0,
         }
@@ -714,7 +757,9 @@ pub fn draw_button_tooltip(
 ) {
     let mut lines = vec![tooltip.header.to_string()];
     if let Some(description) = tooltip.description {
-        lines.push(description.to_string());
+        if !description.is_empty() {
+            lines.push(description.to_string());
+        }
     }
     lines.extend_from_slice(&tooltip.technical_description);
 

@@ -886,15 +886,32 @@ impl UserInterface {
         let spell = *spell;
 
         match target {
-            ActionTarget::Character(target_id, movement) => {
+            ActionTarget::Character(target_id, ..) => {
                 let target_char = self.characters.get(*target_id);
+
+                let mut details = vec![];
+
+                for (term, bonus) in self
+                    .active_character()
+                    .outgoing_spell_bonuses(selected_enhancements)
+                {
+                    details.push((term.to_string(), bonus.goodness()));
+                }
+                for (term, bonus) in target_char.incoming_spell_bonuses() {
+                    details.push((term.to_string(), bonus.goodness()));
+                }
 
                 let action_text = match spell.target {
                     SpellTarget::Enemy { effect, .. } => {
                         let prob = effect
                             .defense_type
-                            .map(|contest| {
-                                prob_spell_hit(self.active_character(), contest, target_char)
+                            .map(|def| {
+                                prob_spell_hit(
+                                    self.active_character(),
+                                    def,
+                                    target_char,
+                                    selected_enhancements,
+                                )
                             })
                             .unwrap_or(1.0);
                         let chance = as_percentage(prob);
@@ -907,7 +924,7 @@ impl UserInterface {
                     }
                 };
 
-                self.target_ui.set_action(action_text, vec![], true);
+                self.target_ui.set_action(action_text, details, true);
             }
 
             ActionTarget::Position(..) => {
@@ -1504,6 +1521,10 @@ impl UserInterface {
             );
             if self.characters.get(new_active_id).player_controlled {
                 self.player_portraits.set_selected_id(new_active_id);
+
+                // In case we're hovering a button that will no longer be shown due to the character switch,
+                // we need to clear it, so that we don't panic trying to render its tooltip for example
+                self.hovered_button = None;
             }
         }
 
@@ -1533,6 +1554,7 @@ impl UserInterface {
                 player_choice = Some(self.handle_popup_proceed());
             }
             Some(ActivityPopupOutcome::ChangedSpellEnhancements) => {
+                // TODO update hit chance?
                 self.refresh_cast_spell_state();
             }
             None => {}

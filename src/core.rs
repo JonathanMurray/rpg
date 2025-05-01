@@ -9,8 +9,8 @@ use macroquad::input::is_simulating_mouse_with_touch;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, HEAL, LUNGE_ATTACK, QUICK, RAGE, SHACKLED_MIND, SMITE, SWEEP_ATTACK, SWORD,
-    WAR_HAMMER,
+    BOW, BRACE, DAGGER, HEAL, LEATHER_ARMOR, LUNGE_ATTACK, QUICK, RAGE, SHACKLED_MIND, SHIRT,
+    SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWORD, WAR_HAMMER,
 };
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
@@ -30,72 +30,70 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 0;
+        let active_character_id = 1;
 
         let mut bob = Character::new(
             true,
             "Bob",
             PortraitId::Portrait2,
-            SpriteId::Character,
-            Attributes::new(7, 10, 10, 10),
+            SpriteId::Character5,
+            Attributes::new(3, 3, 5, 5),
             (1, 6),
         );
-        //bob.set_weapon(HandType::MainHand, SWORD);
-        bob.set_weapon(HandType::MainHand, SWORD);
-        bob.armor.set(Some(CHAIN_MAIL));
+        bob.set_weapon(HandType::MainHand, DAGGER);
+        bob.armor.set(Some(SHIRT));
 
-        bob.known_attack_enhancements.push(OVERWHELMING);
-        bob.known_attack_enhancements.push(OVERWHELMING);
-        bob.known_attacked_reactions.push(SIDE_STEP);
-        bob.known_attack_enhancements.push(QUICK);
-        bob.known_attack_enhancements.push(SMITE);
-        bob.known_on_hit_reactions.push(RAGE);
-        bob.known_actions.push(BaseAction::CastSpell(SWEEP_ATTACK));
-        bob.known_actions.push(BaseAction::CastSpell(LUNGE_ATTACK));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
-        bob.known_actions.push(BaseAction::CastSpell(HEAL));
-        bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
+        //bob.known_actions.push(BaseAction::CastSpell(HEAL));
+        //bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
 
-        bob.inventory[0].set(Some(EquipmentEntry::Weapon(WAR_HAMMER)));
-        bob.inventory[2].set(Some(EquipmentEntry::Weapon(BOW)));
-
-        let mut enemy1 = Character::new(
-            false,
-            "Gremlin Nob",
-            PortraitId::Portrait2,
-            SpriteId::Character2,
-            Attributes::new(8, 10, 3, 3),
-            (3, 4),
-        );
-        enemy1.set_weapon(HandType::MainHand, SWORD);
-        enemy1.known_attacked_reactions.push(SIDE_STEP);
-
-        enemy1.receive_condition(Condition::Bleeding(1));
-        enemy1.health.lose(enemy1.health.current() - 1);
-
-        let enemy2 = Character::new(
-            false,
-            "Gromp",
-            PortraitId::Portrait3,
-            SpriteId::Character3,
-            Attributes::new(8, 8, 1, 5),
-            (5, 4),
-        );
-        enemy2.set_weapon(HandType::MainHand, BOW);
-
-        let david = Character::new(
+        let mut alice = Character::new(
             true,
-            "David",
+            "Alice",
             PortraitId::Portrait1,
             SpriteId::Character4,
-            Attributes::new(1, 1, 1, 1),
-            (2, 5),
+            Attributes::new(5, 5, 1, 1),
+            (2, 6),
         );
+        alice.known_attack_enhancements.push(OVERWHELMING);
+        alice.known_attack_enhancements.push(OVERWHELMING);
+        alice.known_attacked_reactions.push(SIDE_STEP);
+        //alice.known_attack_enhancements.push(QUICK);
+        //alice.known_attack_enhancements.push(SMITE);
+        alice.known_on_hit_reactions.push(RAGE);
+        alice
+            .known_actions
+            .push(BaseAction::CastSpell(SWEEP_ATTACK));
+        alice
+            .known_actions
+            .push(BaseAction::CastSpell(LUNGE_ATTACK));
+        alice.armor.set(Some(LEATHER_ARMOR));
+        alice.set_weapon(HandType::MainHand, SWORD);
+        alice.set_shield(SMALL_SHIELD);
 
-        david.set_weapon(HandType::MainHand, SWORD);
+        let skeleton1 = Character::new(
+            false,
+            "Skeleton",
+            PortraitId::Skeleton,
+            SpriteId::Skeleton,
+            Attributes::new(2, 2, 1, 1),
+            (5, 4),
+        );
+        skeleton1.set_weapon(HandType::MainHand, BOW);
 
-        let characters = Characters::new(vec![bob, enemy1, david, enemy2]);
+        let skeleton2 = Character::new(
+            false,
+            "Skeleton",
+            PortraitId::Skeleton,
+            SpriteId::Skeleton,
+            Attributes::new(2, 2, 1, 1),
+            (7, 4),
+        );
+        skeleton2.set_weapon(HandType::MainHand, DAGGER);
+        skeleton2.set_shield(SMALL_SHIELD);
+
+        let characters = Characters::new(vec![alice, bob, skeleton1, skeleton2]);
 
         Self {
             characters,
@@ -407,6 +405,10 @@ impl CoreGame {
                 receiver.action_points.lose(n);
                 format!("  {} lost {} AP", receiver.name, n)
             }
+            ApplyEffect::GainStamina(n) => {
+                let amount_gained = receiver.stamina.gain(n);
+                format!("  {} gained {} stamina", receiver.name, amount_gained)
+            }
             ApplyEffect::Condition(mut condition) => {
                 receiver.receive_condition(condition);
                 let mut line = format!("  {} received {}", receiver.name, condition.name());
@@ -435,11 +437,12 @@ impl CoreGame {
         for enhancement in &enhancements {
             caster.action_points.spend(enhancement.action_point_cost);
             caster.mana.spend(enhancement.mana_cost);
+            caster.stamina.spend(enhancement.stamina_cost);
         }
 
         let mut cast_n_times = 1;
         for enhancement in &enhancements {
-            if enhancement.effect == Some(SpellEnhancementEffect::CastTwice) {
+            if enhancement.effect.cast_twice {
                 cast_n_times = 2;
             }
         }
@@ -449,29 +452,54 @@ impl CoreGame {
 
             let mut detail_lines = vec![];
 
-            let roll = roll_d20_with_advantage(0);
-            let (spell_result, mut line) = match spell.modifier {
-                SpellModifier::Spell => {
-                    let res = roll + caster_ref.spell_modifier();
-                    let line = format!(
-                        "Rolled: {} (+{} spell mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        res,
-                    );
-                    (res, line)
+            let mut advantange_level = 0 as i32;
+
+            for enhancement in &enhancements {
+                let bonus = enhancement.effect.bonus_advantage;
+                if bonus > 0 {
+                    advantange_level += bonus as i32;
                 }
-                SpellModifier::Attack => {
-                    let res = roll + caster_ref.attack_modifier(HandType::MainHand);
-                    let line = format!(
-                        "Rolled: {} (+{} attack mod) = {}",
-                        roll,
-                        caster_ref.spell_modifier(),
-                        res,
-                    );
-                    (res, line)
+            }
+
+            let roll = roll_d20_with_advantage(advantange_level);
+
+            detail_lines.push(roll_description(advantange_level));
+
+            let mut line = format!("Rolled: {}", roll);
+            let mut spell_roll_calculation = roll as i32;
+            match spell.modifier {
+                SpellModifier::Spell => {
+                    spell_roll_calculation += caster_ref.spell_modifier() as i32;
+                    line.push_str(&format!(" (+{} spell mod)", caster_ref.spell_modifier()));
+                }
+                SpellModifier::Attack(bonus) => {
+                    spell_roll_calculation +=
+                        caster_ref.attack_modifier(HandType::MainHand) as i32 + bonus;
+                    let bonus_str = if bonus < 0 {
+                        format!(" -{}", -bonus)
+                    } else if bonus > 0 {
+                        format!(" +{}", bonus)
+                    } else {
+                        "".to_string()
+                    };
+                    line.push_str(&format!(
+                        " (+{} attack mod{})",
+                        caster_ref.attack_modifier(HandType::MainHand),
+                        bonus_str,
+                    ));
                 }
             };
+
+            for enhancement in &enhancements {
+                let bonus = enhancement.effect.roll_bonus;
+                if bonus > 0 {
+                    spell_roll_calculation += bonus as i32;
+                    line.push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                }
+            }
+
+            let spell_result = spell_roll_calculation as u32;
+            line.push_str(&format!(" = {}", spell_result));
 
             let mut target_outcome = None;
             let mut area_outcomes = None;
@@ -520,14 +548,15 @@ impl CoreGame {
                         spell_result,
                         target,
                         &mut detail_lines,
+                        true,
                     );
                     target_outcome = Some((*target_id, outcome));
 
-                    if let Some((area_range, area_effect)) = impact_area {
+                    if let Some((radius, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
 
                         let area_target_outcomes = self.perform_spell_area_enemy_effect(
-                            area_range,
+                            radius,
                             "AoE",
                             &enhancements,
                             caster,
@@ -560,6 +589,7 @@ impl CoreGame {
                     }
                     let outcome = self.perform_spell_ally_effect(
                         spell.name,
+                        &enhancements,
                         effect,
                         target,
                         &mut detail_lines,
@@ -608,6 +638,7 @@ impl CoreGame {
                         }
                         let outcome = self.perform_spell_ally_effect(
                             spell.name,
+                            &enhancements,
                             effect,
                             caster,
                             &mut detail_lines,
@@ -617,14 +648,6 @@ impl CoreGame {
                     }
 
                     if let Some((mut radius, effect)) = self_area {
-                        for enhancement in &enhancements {
-                            if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) =
-                                enhancement.effect
-                            {
-                                radius = radius.plusf(tenths as f32 * 0.1);
-                            }
-                        }
-
                         let outcomes = self.perform_spell_area_effect(
                             spell.name,
                             &enhancements,
@@ -683,6 +706,7 @@ impl CoreGame {
             SpellEffect::Ally(ally_area) => self.perform_spell_area_ally_effect(
                 radius,
                 name,
+                enhancements,
                 caster,
                 area_center,
                 detail_lines,
@@ -694,8 +718,9 @@ impl CoreGame {
 
     fn perform_spell_area_ally_effect(
         &self,
-        range: Range,
+        mut radius: Range,
         name: &'static str,
+        enhancements: &[SpellEnhancement],
         caster: &Character,
         area_center: Position,
         detail_lines: &mut Vec<String>,
@@ -703,6 +728,12 @@ impl CoreGame {
         ally_area: SpellAllyEffect,
     ) -> Vec<(u32, SpellTargetOutcome)> {
         let mut target_outcomes = vec![];
+
+        for enhancement in enhancements {
+            if enhancement.effect.increased_radius_tenths > 0 {
+                radius = radius.plusf(enhancement.effect.increased_radius_tenths as f32 * 0.1);
+            }
+        }
 
         let degree_of_success = spell_result / 10;
         if degree_of_success > 0 {
@@ -714,11 +745,12 @@ impl CoreGame {
                 continue;
             }
 
-            if within_range_squared(range.squared(), area_center, other_char.position.get()) {
+            if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
                 detail_lines.push(other_char.name.to_string());
 
                 let outcome = self.perform_spell_ally_effect(
                     name,
+                    enhancements,
                     ally_area,
                     other_char,
                     detail_lines,
@@ -735,6 +767,7 @@ impl CoreGame {
     fn perform_spell_ally_effect(
         &self,
         name: &'static str,
+        enhancements: &[SpellEnhancement],
         ally_effect: SpellAllyEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
@@ -764,6 +797,7 @@ impl CoreGame {
         if let Some(mut effect) = ally_effect.apply {
             match effect {
                 ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                 ApplyEffect::Condition(ref mut condition) => {
                     if let Some(stacks) = condition.stacks() {
                         *stacks += degree_of_success;
@@ -771,8 +805,17 @@ impl CoreGame {
                 }
             }
 
+            dbg!(effect);
+
             let log_line = self.perform_effect_application(effect, target);
             detail_lines.push(log_line);
+        }
+
+        for enhancement in enhancements {
+            if let Some(effect) = enhancement.effect.on_hit {
+                let log_line = self.perform_effect_application(effect, target);
+                detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+            }
         }
 
         SpellTargetOutcome::HealedAlly(health_gained)
@@ -780,7 +823,7 @@ impl CoreGame {
 
     fn perform_spell_area_enemy_effect(
         &self,
-        range: Range,
+        mut radius: Range,
         name: &'static str,
         enhancements: &[SpellEnhancement],
         caster: &Character,
@@ -791,12 +834,18 @@ impl CoreGame {
     ) -> Vec<(u32, SpellTargetOutcome)> {
         let mut target_outcomes = vec![];
 
+        for enhancement in enhancements {
+            if enhancement.effect.increased_radius_tenths > 0 {
+                radius = radius.plusf(enhancement.effect.increased_radius_tenths as f32 * 0.1);
+            }
+        }
+
         for other_char in self.characters.iter() {
             if other_char.player_controlled == caster.player_controlled {
                 continue;
             }
 
-            if within_range_squared(range.squared(), area_center, other_char.position.get()) {
+            if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
                 let mut line = other_char.name.to_string();
                 if let Some(contest) = enemy_area.defense_type {
                     match contest {
@@ -816,6 +865,7 @@ impl CoreGame {
                     spell_result,
                     other_char,
                     detail_lines,
+                    false,
                 );
 
                 target_outcomes.push((other_char.id(), outcome));
@@ -833,6 +883,7 @@ impl CoreGame {
         spell_result: u32,
         target: &Character,
         detail_lines: &mut Vec<String>,
+        is_direct_target: bool,
     ) -> SpellTargetOutcome {
         let success = match enemy_effect.defense_type {
             Some(contest) => {
@@ -866,7 +917,7 @@ impl CoreGame {
             let damage = if let Some(spell_damage) = enemy_effect.damage {
                 let mut dmg_calculation;
                 let mut increased_by_good_roll = true;
-                let mut dmg_str = "Damage: ".to_string();
+                let mut dmg_str = "  Damage: ".to_string();
 
                 match spell_damage {
                     SpellDamage::Static(n) => {
@@ -900,12 +951,14 @@ impl CoreGame {
                 }
 
                 for enhancement in enhancements {
-                    if enhancement.bonus_damage > 0 {
-                        dmg_str.push_str(&format!(
-                            " +{} ({})",
-                            enhancement.bonus_damage, enhancement.name
-                        ));
-                        dmg_calculation += enhancement.bonus_damage as i32;
+                    let bonus_dmg = if is_direct_target {
+                        enhancement.effect.bonus_target_damage
+                    } else {
+                        enhancement.effect.bonus_area_damage
+                    };
+                    if bonus_dmg > 0 {
+                        dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
+                        dmg_calculation += bonus_dmg as i32;
                     }
                 }
 
@@ -930,6 +983,7 @@ impl CoreGame {
             {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref mut condition) => {
                         if let Some(stacks) = condition.stacks() {
                             *stacks += degree_of_success;
@@ -942,7 +996,7 @@ impl CoreGame {
             }
 
             for enhancement in enhancements {
-                if let Some(SpellEnhancementEffect::OnHit(effect)) = enhancement.effect {
+                if let Some(effect) = enhancement.effect.on_hit {
                     let log_line = self.perform_effect_application(effect, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
@@ -1058,17 +1112,9 @@ impl CoreGame {
 
         let roll = roll_d20_with_advantage(attack_bonus.advantage);
         let attack_result = ((roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
-        match attack_bonus.advantage.cmp(&0) {
-            std::cmp::Ordering::Less => detail_lines.push(format!(
-                "Rolled {} dice with disadvantage...",
-                attack_bonus.advantage.abs() + 1
-            )),
-            std::cmp::Ordering::Equal => detail_lines.push("Rolled 1 die...".to_string()),
-            std::cmp::Ordering::Greater => detail_lines.push(format!(
-                "Rolled {} dice with advantage...",
-                attack_bonus.advantage + 1
-            )),
-        }
+
+        detail_lines.push(roll_description(attack_bonus.advantage));
+
         detail_lines.push(format!(
             "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}, armor={}",
             roll,
@@ -1351,8 +1397,18 @@ impl CoreGame {
 
         character.conditions.borrow_mut().mainhand_exertion = 0;
         character.conditions.borrow_mut().offhand_exertion = 0;
-        let max_stamina = character.stamina.max;
-        character.stamina.gain(max_stamina / 2);
+        let stamina_gain = (character.stamina.max as f32 / 3.0).ceil() as u32;
+        character.stamina.gain(stamina_gain);
+    }
+}
+
+fn roll_description(advantage: i32) -> String {
+    match advantage.cmp(&0) {
+        std::cmp::Ordering::Less => {
+            format!("Rolled {} dice with disadvantage...", advantage.abs() + 1)
+        }
+        std::cmp::Ordering::Equal => "Rolled 1 die...".to_string(),
+        std::cmp::Ordering::Greater => format!("Rolled {} dice with advantage...", advantage + 1),
     }
 }
 
@@ -1436,6 +1492,16 @@ pub fn as_percentage(probability: f32) -> String {
     }
 }
 
+pub fn spell_roll_bonus(
+    caster: &Character,
+    defender: &Character,
+    enhancements: &[SpellEnhancement],
+) -> DiceRollBonus {
+    let mut bonus = caster.outgoing_spell_roll_bonus(enhancements);
+    bonus.advantage += defender.incoming_spell_advantage();
+    bonus
+}
+
 pub fn attack_roll_bonus(
     attacker: &Character,
     hand: HandType,
@@ -1478,15 +1544,20 @@ pub fn prob_attack_hit(
     probability_of_d20_reaching(dice_target, bonus)
 }
 
-pub fn prob_spell_hit(caster: &Character, spell_type: DefenseType, defender: &Character) -> f32 {
-    let defender_value = match spell_type {
+pub fn prob_spell_hit(
+    caster: &Character,
+    defense_type: DefenseType,
+    defender: &Character,
+    enhancements: &[SpellEnhancement],
+) -> f32 {
+    let bonus = spell_roll_bonus(caster, defender, enhancements);
+
+    let def = match defense_type {
         DefenseType::Will => defender.will(),
         DefenseType::Evasion => defender.evasion(),
     };
-    let target = defender_value
-        .saturating_sub(caster.spell_modifier())
-        .max(1);
-    probability_of_d20_reaching(target, DiceRollBonus::default())
+    let target = def.saturating_sub(caster.spell_modifier()).max(1);
+    probability_of_d20_reaching(target, bonus)
 }
 
 pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
@@ -1587,6 +1658,7 @@ pub struct AttackEnhancement {
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(Condition),
+    GainStamina(u32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1641,6 +1713,9 @@ impl Display for AttackHitEffect {
                 ApplyEffect::RemoveActionPoints(n) => {
                     f.write_fmt(format_args!("Target loses {n} AP"))
                 }
+                ApplyEffect::GainStamina(n) => {
+                    f.write_fmt(format_args!("Target gains {n} stamina"))
+                }
                 ApplyEffect::Condition(condition) => {
                     f.write_fmt(format_args!("Target receives {condition:?}"))
                 }
@@ -1668,7 +1743,7 @@ pub enum Condition {
 }
 
 impl Condition {
-    const fn stacks(&mut self) -> Option<&mut u32> {
+    pub const fn stacks(&mut self) -> Option<&mut u32> {
         use Condition::*;
         match self {
             Protected(n) => Some(n),
@@ -1914,7 +1989,7 @@ pub struct Spell {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellModifier {
     Spell,
-    Attack,
+    Attack(i32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -1999,6 +2074,7 @@ impl SpellTarget {
             SpellTarget::Ally { range, .. } => Some(*range),
             SpellTarget::Area { range, .. } => Some(*range),
             SpellTarget::None { self_area, .. } => {
+                // TODO This is actually radius, not range; is this misused somewhere (with enahcenements for example)
                 self_area.as_ref().map(|(radius, _effect)| *radius)
             }
         }
@@ -2007,10 +2083,8 @@ impl SpellTarget {
     pub fn range(&self, enhancements: &[SpellEnhancement]) -> Option<Range> {
         self.base_range().map(|mut range| {
             for enhancement in enhancements {
-                if let Some(SpellEnhancementEffect::IncreasedRangeTenths(tenths)) =
-                    enhancement.effect
-                {
-                    range = range.plusf(tenths as f32 * 0.1);
+                if enhancement.effect.increased_range_tenths > 0 {
+                    range = range.plusf(enhancement.effect.increased_range_tenths as f32 * 0.1);
                 }
             }
             range
@@ -2028,17 +2102,37 @@ pub struct SpellEnhancement {
     pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
+    pub stamina_cost: u32,
 
-    pub bonus_damage: u32,
-    pub effect: Option<SpellEnhancementEffect>,
+    pub effect: SpellEnhancementEffect,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum SpellEnhancementEffect {
-    CastTwice,
-    OnHit(ApplyEffect),
-    IncreasedRangeTenths(u32),
-    IncreaseRadiusTenths(u32),
+pub struct SpellEnhancementEffect {
+    pub roll_bonus: u32,
+    pub bonus_advantage: u32,
+    pub bonus_target_damage: u32,
+    pub bonus_area_damage: u32,
+    pub cast_twice: bool,
+    pub on_hit: Option<ApplyEffect>,
+    pub increased_range_tenths: u32,
+    pub increased_radius_tenths: u32,
+}
+
+impl SpellEnhancementEffect {
+    // the impl from #[derive(Default)] is not const
+    pub const fn default() -> Self {
+        Self {
+            roll_bonus: 0,
+            bonus_advantage: 0,
+            bonus_target_damage: 0,
+            bonus_area_damage: 0,
+            cast_twice: false,
+            on_hit: None,
+            increased_range_tenths: 0,
+            increased_radius_tenths: 0,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2146,7 +2240,7 @@ impl Character {
         let max_health = 6 + base_attributes.strength;
         let max_mana = (base_attributes.spirit * 2).saturating_sub(3);
 
-        let move_speed = 0.5 + base_attributes.agility as f32 * 0.1;
+        let move_speed = 0.9 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
         let max_reactive_action_points = base_attributes.intellect / 2;
         let capacity = base_attributes.strength * 2;
@@ -2576,6 +2670,7 @@ impl Character {
         //let enhancement = spell.possible_enhancements[enhancement_index].unwrap();
         self.action_points.current() >= spell.action_point_cost + enhancement.action_point_cost
             && self.mana.current() >= spell.mana_cost + enhancement.mana_cost
+            && self.stamina.current() >= spell.stamina_cost + enhancement.stamina_cost
     }
 
     fn strength(&self) -> u32 {
@@ -2689,6 +2784,23 @@ impl Character {
         }
     }
 
+    fn outgoing_spell_roll_bonus(&self, enhancements: &[SpellEnhancement]) -> DiceRollBonus {
+        let mut advantage = 0i32;
+        let mut flat_amount = 0;
+        for (_label, bonus) in self.outgoing_spell_bonuses(enhancements) {
+            match bonus {
+                RollBonusContributor::Advantage(n) => advantage += n,
+                RollBonusContributor::FlatAmount(n) => flat_amount += n,
+                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
+            }
+        }
+
+        DiceRollBonus {
+            advantage,
+            flat_amount,
+        }
+    }
+
     fn outgoing_attack_roll_bonus(
         &self,
         hand_type: HandType,
@@ -2698,9 +2810,9 @@ impl Character {
         let mut flat_amount = 0;
         for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements) {
             match bonus {
-                AttackBonus::Advantage(n) => advantage += n,
-                AttackBonus::FlatAmount(n) => flat_amount += n,
-                AttackBonus::OtherNegative | AttackBonus::OtherPositive => {}
+                RollBonusContributor::Advantage(n) => advantage += n,
+                RollBonusContributor::FlatAmount(n) => flat_amount += n,
+                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
             }
         }
 
@@ -2714,41 +2826,77 @@ impl Character {
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
-    ) -> Vec<(&'static str, AttackBonus)> {
+    ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut bonuses = vec![];
         for enhancement in enhancements {
             if enhancement.bonus_advantage > 0 {
                 bonuses.push((
                     enhancement.name,
-                    AttackBonus::Advantage(enhancement.bonus_advantage as i32),
+                    RollBonusContributor::Advantage(enhancement.bonus_advantage as i32),
                 ));
             }
         }
         let exertion_penalty = self.hand_exertion(hand_type) as i32;
         if exertion_penalty > 0 {
-            bonuses.push(("Exerted", AttackBonus::FlatAmount(-exertion_penalty)));
+            bonuses.push((
+                "Exerted",
+                RollBonusContributor::FlatAmount(-exertion_penalty),
+            ));
         }
         if self.is_dazed() {
-            bonuses.push(("Dazed", AttackBonus::Advantage(-1)));
+            bonuses.push(("Dazed", RollBonusContributor::Advantage(-1)));
         }
         let conditions = self.conditions.borrow();
         if conditions.raging && self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
-            bonuses.push(("Raging", AttackBonus::Advantage(1)));
+            bonuses.push(("Raging", RollBonusContributor::Advantage(1)));
         }
         if conditions.weakened > 0 {
-            bonuses.push(("Weakened", AttackBonus::OtherNegative));
+            bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
         }
 
         let encumbrance_penalty = (conditions.encumbered / 2) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",
-                AttackBonus::FlatAmount(-(encumbrance_penalty)),
+                RollBonusContributor::FlatAmount(-(encumbrance_penalty)),
             ));
         }
 
         if conditions.near_death {
-            bonuses.push(("Near-death", AttackBonus::Advantage(-1)));
+            bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
+        }
+
+        bonuses
+    }
+
+    pub fn outgoing_spell_bonuses(
+        &self,
+        enhancements: &[SpellEnhancement],
+    ) -> Vec<(&'static str, RollBonusContributor)> {
+        let mut bonuses = vec![];
+        for enhancement in enhancements {
+            if enhancement.effect.bonus_advantage > 0 {
+                bonuses.push((
+                    enhancement.name,
+                    RollBonusContributor::Advantage(enhancement.effect.bonus_advantage as i32),
+                ));
+            }
+        }
+        let conditions = self.conditions.borrow();
+        if conditions.weakened > 0 {
+            bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
+        }
+
+        let encumbrance_penalty = (conditions.encumbered / 2) as i32;
+        if encumbrance_penalty > 0 {
+            bonuses.push((
+                "Encumbered",
+                RollBonusContributor::FlatAmount(-(encumbrance_penalty)),
+            ));
+        }
+
+        if conditions.near_death {
+            bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
 
         bonuses
@@ -2758,9 +2906,21 @@ impl Character {
         let mut advantage = 0;
         for (_label, bonus) in self.incoming_attack_bonuses(reaction) {
             match bonus {
-                AttackBonus::Advantage(n) => advantage += n,
-                AttackBonus::OtherNegative | AttackBonus::OtherPositive => {}
-                AttackBonus::FlatAmount(_) => unreachable!(),
+                RollBonusContributor::Advantage(n) => advantage += n,
+                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
+                RollBonusContributor::FlatAmount(_) => unreachable!(),
+            }
+        }
+        advantage
+    }
+
+    fn incoming_spell_advantage(&self) -> i32 {
+        let mut advantage = 0;
+        for (_label, bonus) in self.incoming_spell_bonuses() {
+            match bonus {
+                RollBonusContributor::Advantage(n) => advantage += n,
+                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
+                RollBonusContributor::FlatAmount(_) => unreachable!(),
             }
         }
         advantage
@@ -2769,31 +2929,46 @@ impl Character {
     pub fn incoming_attack_bonuses(
         &self,
         reaction: Option<OnAttackedReaction>,
-    ) -> Vec<(&'static str, AttackBonus)> {
+    ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut terms = vec![];
         if self.is_dazed() {
-            terms.push(("Dazed", AttackBonus::OtherPositive));
+            terms.push(("Dazed", RollBonusContributor::OtherPositive));
         }
         let conditions = self.conditions.borrow();
         if conditions.weakened > 0 {
-            terms.push(("Weakened", AttackBonus::OtherPositive));
+            terms.push(("Weakened", RollBonusContributor::OtherPositive));
         }
         if conditions.braced {
-            terms.push(("Braced", AttackBonus::OtherNegative));
+            terms.push(("Braced", RollBonusContributor::OtherNegative));
         }
         if conditions.near_death {
-            terms.push(("Near-death", AttackBonus::Advantage(1)))
+            terms.push(("Near-death", RollBonusContributor::Advantage(1)))
         }
         if conditions.exposed > 0 {
-            terms.push(("Exposed", AttackBonus::OtherPositive));
+            terms.push(("Exposed", RollBonusContributor::OtherPositive));
         }
 
         if let Some(reaction) = reaction {
             if reaction.effect.bonus_evasion > 0 {
-                terms.push((reaction.name, AttackBonus::OtherNegative));
+                terms.push((reaction.name, RollBonusContributor::OtherNegative));
             }
         }
 
+        terms
+    }
+
+    pub fn incoming_spell_bonuses(&self) -> Vec<(&'static str, RollBonusContributor)> {
+        let mut terms = vec![];
+        let conditions = self.conditions.borrow();
+        if conditions.weakened > 0 {
+            terms.push(("Weakened", RollBonusContributor::OtherPositive));
+        }
+        if conditions.near_death {
+            terms.push(("Near-death", RollBonusContributor::Advantage(1)))
+        }
+        if conditions.exposed > 0 {
+            terms.push(("Exposed", RollBonusContributor::OtherPositive));
+        }
         terms
     }
 
@@ -3050,17 +3225,17 @@ impl From<Range> for f32 {
     }
 }
 
-pub enum AttackBonus {
+pub enum RollBonusContributor {
     Advantage(i32),
     FlatAmount(i32),
     OtherNegative,
     OtherPositive,
 }
 
-impl AttackBonus {
+impl RollBonusContributor {
     pub fn goodness(&self) -> Goodness {
         match self {
-            AttackBonus::Advantage(n) => {
+            RollBonusContributor::Advantage(n) => {
                 if *n > 0 {
                     Goodness::Good
                 } else if *n < 0 {
@@ -3069,7 +3244,7 @@ impl AttackBonus {
                     unreachable!()
                 }
             }
-            AttackBonus::FlatAmount(n) => {
+            RollBonusContributor::FlatAmount(n) => {
                 if *n > 0 {
                     Goodness::Good
                 } else if *n < 0 {
@@ -3078,8 +3253,8 @@ impl AttackBonus {
                     unreachable!()
                 }
             }
-            AttackBonus::OtherNegative => Goodness::Bad,
-            AttackBonus::OtherPositive => Goodness::Good,
+            RollBonusContributor::OtherNegative => Goodness::Bad,
+            RollBonusContributor::OtherPositive => Goodness::Good,
         }
     }
 }

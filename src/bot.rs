@@ -22,9 +22,6 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
         if character.can_use_action(action) {
             match action {
                 BaseAction::Attack { hand, .. } => {
-                    // TODO
-                    continue;
-
                     for (id, other_character) in game.characters.iter_with_ids() {
                         if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed

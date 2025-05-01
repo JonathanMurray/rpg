@@ -17,7 +17,7 @@ pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     protection: 3,
     limit_evasion_from_agi: None,
     icon: EquipmentIconId::LeatherArmor,
-    weight: 1,
+    weight: 2,
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
@@ -26,6 +26,14 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     limit_evasion_from_agi: Some(4),
     icon: EquipmentIconId::ChainMail,
     weight: 3,
+};
+
+pub const SHIRT: ArmorPiece = ArmorPiece {
+    name: "Shirt",
+    protection: 1,
+    limit_evasion_from_agi: None,
+    icon: EquipmentIconId::Shirt,
+    weight: 1,
 };
 
 pub const DAGGER: Weapon = Weapon {
@@ -233,15 +241,28 @@ pub const SWEEP_ATTACK: Spell = Spell {
     mana_cost: 0,
     stamina_cost: 1,
 
-    modifier: SpellModifier::Attack,
-    possible_enhancements: [None; 3],
+    modifier: SpellModifier::Attack(-3),
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Precise",
+            description: "Increase your precision",
+            icon: IconId::Precision,
+            action_point_cost: 0,
+            mana_cost: 0,
+            stamina_cost: 2,
+            effect: SpellEnhancementEffect {
+                roll_bonus: 3,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        None,
+        None,
+    ],
     target: SpellTarget::None {
         self_area: Some((
             Range::Melee,
             SpellEffect::Enemy(SpellEnemyEffect {
                 defense_type: Some(DefenseType::Evasion),
-                // TODO instead deal weapon_damage - 1, and then offer an enhancement that gives +1 damage?
-                // or alternatively, give -3 (or -5) to the roll, and enhancement removes that penalty?
                 damage: Some(SpellDamage::Weapon),
                 on_hit: None,
             }),
@@ -253,16 +274,30 @@ pub const SWEEP_ATTACK: Spell = Spell {
 
 pub const LUNGE_ATTACK: Spell = Spell {
     name: "Lunge attack",
-    description: "Lunge at an enemy",
-    icon: IconId::PlusPlus,
+    description: "Lunge at an enemy in an unobstructed path, and attack",
+    icon: IconId::LungeAttack,
     action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 2,
 
-    modifier: SpellModifier::Attack,
+    modifier: SpellModifier::Attack(0),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
-    // TODO enhancement that either applies dazed or takes 1 AP?
-    possible_enhancements: [None; 3],
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Heavy impact",
+            description: "Apply more force on impact",
+            icon: IconId::CrushingStrike,
+            action_point_cost: 0,
+            mana_cost: 0,
+            stamina_cost: 2,
+            effect: SpellEnhancementEffect {
+                on_hit: Some(ApplyEffect::RemoveActionPoints(1)),
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        None,
+        None,
+    ],
     target: SpellTarget::Enemy {
         reach: SpellReach::MoveIntoMelee(Range::Float(2.99)),
         effect: SpellEnemyEffect {
@@ -311,8 +346,11 @@ pub const SCREAM: Spell = Spell {
             icon: IconId::Banshee,
             action_point_cost: 0,
             mana_cost: 1,
-            bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                increased_range_tenths: 15,
+                ..SpellEnhancementEffect::default()
+            },
         }),
         None,
         None,
@@ -341,20 +379,46 @@ pub const SHACKLED_MIND: Spell = Spell {
     stamina_cost: 0,
 
     modifier: SpellModifier::Spell,
-    possible_enhancements: [None, None, None],
-
     target: SpellTarget::Enemy {
-        reach: SpellReach::Range(Range::Ranged(4)),
+        reach: SpellReach::Range(Range::Float(4.0)),
         effect: SpellEnemyEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([
-                Some(ApplyEffect::Condition(Condition::Slowed(3))),
-                Some(ApplyEffect::Condition(Condition::Exposed(3))),
+                Some(ApplyEffect::Condition(Condition::Slowed(2))),
+                Some(ApplyEffect::Condition(Condition::Exposed(1))),
             ]),
         },
         impact_area: None,
     },
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Reach",
+            description: "",
+            icon: IconId::Extend,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                increased_range_tenths: 20,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        Some(SpellEnhancement {
+            name: "Focus",
+            description: "",
+            icon: IconId::SpellAdvantage,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                bonus_advantage: 1,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        None,
+    ],
+
     animation_color: PURPLE,
 };
 
@@ -374,8 +438,11 @@ pub const MIND_BLAST: Spell = Spell {
             icon: IconId::Dualcast,
             action_point_cost: 1,
             mana_cost: 1,
-            bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::CastTwice),
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                cast_twice: true,
+                ..SpellEnhancementEffect::default()
+            },
         }),
         None,
         None,
@@ -395,7 +462,7 @@ pub const MIND_BLAST: Spell = Spell {
 pub const HEAL: Spell = Spell {
     name: "Heal",
     description: "Restore an ally's health",
-    icon: IconId::Rejuvenate,
+    icon: IconId::Heal,
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
@@ -403,21 +470,36 @@ pub const HEAL: Spell = Spell {
     modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
-            name: "Far",
-            description: "Increased range",
+            name: "Reach",
+            description: "",
             icon: IconId::Extend,
             action_point_cost: 0,
             mana_cost: 1,
-            bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(20)),
-        }), // TODO add enhancement that heals over time (1 per round for 3 turns?)
-        None,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                increased_range_tenths: 20,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        // TODO add enhancement that heals over time (1 per round for 3 turns?)
+        Some(SpellEnhancement {
+            name: "Energize",
+            description: "",
+            icon: IconId::Energize,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                on_hit: Some(ApplyEffect::GainStamina(2)),
+                ..SpellEnhancementEffect::default()
+            },
+        }),
         None,
     ],
     target: SpellTarget::Ally {
         range: Range::Ranged(3),
         effect: SpellAllyEffect {
-            healing: 2,
+            healing: 3,
             apply: None,
         },
     },
@@ -497,37 +579,8 @@ pub const FIREBALL: Spell = Spell {
     stamina_cost: 0,
 
     modifier: SpellModifier::Spell,
-    possible_enhancements: [
-        Some(SpellEnhancement {
-            name: "Far",
-            description: "Increased range",
-            icon: IconId::Extend,
-            action_point_cost: 0,
-            mana_cost: 1,
-            bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreasedRangeTenths(15)),
-        }),
-        Some(SpellEnhancement {
-            name: "Massive",
-            description: "Increased radius",
-            icon: IconId::Radius,
-            action_point_cost: 0,
-            mana_cost: 1,
-            bonus_damage: 0,
-            effect: Some(SpellEnhancementEffect::IncreaseRadiusTenths(10)),
-        }),
-        // TODO Make this only increase the Impact (AoE) damage (by 1?)
-        Some(SpellEnhancement {
-            name: "Scorching",
-            description: "Greatly increased damage",
-            icon: IconId::Plus,
-            action_point_cost: 0,
-            mana_cost: 1,
-            bonus_damage: 2,
-            effect: None,
-        }),
-    ],
     target: SpellTarget::Enemy {
+        reach: SpellReach::Range(Range::Float(4.0)),
         effect: SpellEnemyEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(SpellDamage::AtLeast(2)),
@@ -541,8 +594,46 @@ pub const FIREBALL: Spell = Spell {
                 on_hit: None,
             },
         )),
-        reach: SpellReach::Range(Range::Float(3.5)),
     },
+    possible_enhancements: [
+        Some(SpellEnhancement {
+            name: "Reach",
+            description: "",
+            icon: IconId::Extend,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                increased_range_tenths: 20,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        Some(SpellEnhancement {
+            name: "Massive",
+            description: "",
+            icon: IconId::Radius,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                increased_radius_tenths: 10,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+        Some(SpellEnhancement {
+            name: "Inferno",
+            description: "More deadly impact",
+            icon: IconId::Inferno,
+            action_point_cost: 0,
+            mana_cost: 1,
+            stamina_cost: 0,
+            effect: SpellEnhancementEffect {
+                bonus_area_damage: 1,
+                ..SpellEnhancementEffect::default()
+            },
+        }),
+    ],
+
     animation_color: RED,
 };
 

@@ -8,6 +8,8 @@ pub enum SpriteId {
     Character2,
     Character3,
     Character4,
+    Character5,
+    Skeleton,
     Warhammer,
     Bow,
     Sword,
@@ -22,6 +24,8 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::Character2, "character2.png"),
         (SpriteId::Character3, "character3.png"),
         (SpriteId::Character4, "character4.png"),
+        (SpriteId::Character5, "character5.png"),
+        (SpriteId::Skeleton, "skeleton.png"),
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
@@ -46,6 +50,7 @@ pub enum IconId {
     Rage,
     CrushingStrike,
     CarefulAim,
+    SpellAdvantage,
     Banshee,
     Dualcast,
     AllIn,
@@ -57,12 +62,16 @@ pub enum IconId {
     X3,
     Extend,
     Radius,
+    Precision,
     Equip,
     ShackledMind,
     Smite,
     QuickStrike,
     SweepAttack,
-    Rejuvenate,
+    LungeAttack,
+    Heal,
+    Inferno,
+    Energize,
 }
 
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
@@ -83,6 +92,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Dualcast, "dualcast_icon.png"),
         (IconId::AllIn, "all_in_icon.png"),
         (IconId::CarefulAim, "careful_aim_icon.png"),
+        (IconId::SpellAdvantage, "spell_adv_icon.png"),
         (IconId::Plus, "plus_icon.png"),
         (IconId::PlusPlus, "plus_plus_icon.png"),
         (IconId::Smite, "smite_icon.png"),
@@ -91,11 +101,15 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::X3, "x3.png"),
         (IconId::Extend, "extend.png"),
         (IconId::Radius, "radius.png"),
+        (IconId::Precision, "precision_icon.png"),
         (IconId::Equip, "equip.png"),
         (IconId::ShackledMind, "shackled_mind.png"),
         (IconId::QuickStrike, "quick_strike_icon.png"),
-        (IconId::Rejuvenate, "rejuvenate_icon.png"),
+        (IconId::Heal, "heal_icon.png"),
         (IconId::SweepAttack, "sweep_attack_icon.png"),
+        (IconId::LungeAttack, "lunge_attack_icon.png"),
+        (IconId::Inferno, "inferno_icon.png"),
+        (IconId::Energize, "energize_icon.png"),
     ])
     .await
 }
@@ -105,6 +119,7 @@ pub enum PortraitId {
     Portrait1,
     Portrait2,
     Portrait3,
+    Skeleton,
 }
 
 pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
@@ -112,6 +127,7 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
         (PortraitId::Portrait1, "portrait_1.png"),
         (PortraitId::Portrait2, "portrait_2.png"),
         (PortraitId::Portrait3, "portrait_3.png"),
+        (PortraitId::Skeleton, "portrait_skeleton.png"),
     ])
     .await
 }
@@ -126,6 +142,7 @@ pub enum EquipmentIconId {
     SmallShield,
     LeatherArmor,
     ChainMail,
+    Shirt,
 }
 
 pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
@@ -138,6 +155,7 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::SmallShield, "eq_small_shield.png"),
         (EquipmentIconId::LeatherArmor, "eq_leather_armor.png"),
         (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
+        (EquipmentIconId::Shirt, "eq_shirt.png"),
     ])
     .await
 }

@@ -230,16 +230,21 @@ impl GameGrid {
         selected_player_character_id: Option<CharacterId>,
         elapsed: f32,
     ) {
-        self.pathfind_grid.blocked_positions.clear();
-
         self.active_character_id = active_character_id;
 
         self.selected_player_character_id = selected_player_character_id;
 
+        self.pathfind_grid.blocked_positions.clear();
         for character in self.characters.iter() {
-            let pos = character.pos();
-
-            self.pathfind_grid.blocked_positions.insert(pos);
+            assert!(
+                !self
+                    .pathfind_grid
+                    .blocked_positions
+                    .contains(&character.pos()),
+                "blocked position: {}",
+                character.name
+            );
+            self.pathfind_grid.blocked_positions.insert(character.pos());
         }
 
         let pos = self.characters.get(self.active_character_id).pos();
@@ -571,6 +576,24 @@ impl GameGrid {
 
         self.draw_active_character_highlight();
 
+        if matches!(
+            ui_state,
+            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
+        ) {
+            self.draw_movement_path_background();
+        }
+
+        // TODO
+        if let UiState::ConfiguringAction(ConfiguredAction::Move {
+            selected_movement_path,
+            ..
+        }) = ui_state
+        {
+            if !selected_movement_path.is_empty() {
+                self.draw_movement_path(&selected_movement_path, false);
+            }
+        }
+
         for character in self.characters.iter() {
             self.draw_character(character);
         }
@@ -584,13 +607,6 @@ impl GameGrid {
                 outcome.hovered_character_id = Some(id);
                 hovered_character_id = Some(id);
             }
-        }
-
-        if matches!(
-            ui_state,
-            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
-        ) {
-            self.draw_movement_path_background();
         }
 
         if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
@@ -617,10 +633,10 @@ impl GameGrid {
                         let mut area_range = None;
                         if let Some((mut range, _effect)) = impact_area {
                             for enhancement in selected_enhancements {
-                                if let Some(SpellEnhancementEffect::IncreaseRadiusTenths(tenths)) =
-                                    enhancement.effect
-                                {
-                                    range = range.plusf(tenths as f32 * 0.1);
+                                if enhancement.effect.increased_radius_tenths > 0 {
+                                    range = range.plusf(
+                                        enhancement.effect.increased_radius_tenths as f32 * 0.1,
+                                    );
                                 }
                             }
                             area_range = Some(range);
@@ -889,18 +905,31 @@ impl GameGrid {
                         }
                     }
                 } else {
-                    if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                        self.draw_cornered_outline(
-                            self.grid_pos_to_screen(mouse_grid_pos),
-                            HOVER_ENEMY_COLOR,
-                            5.0,
-                            3.0,
-                        );
-                        self.draw_target_crosshair(
-                            self.characters.get(self.active_character_id).pos(),
-                            mouse_grid_pos,
-                            HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        );
+                    if let MouseState::RequiresEnemyTarget {
+                        move_into_melee, ..
+                    } = mouse_state
+                    {
+                        if move_into_melee {
+                            let positions = self
+                                .try_find_path_to_action_target(mouse_grid_pos, active_char_pos);
+                            self.draw_movement_to_target(
+                                active_char_pos,
+                                mouse_grid_pos,
+                                positions,
+                            );
+                        } else {
+                            self.draw_cornered_outline(
+                                self.grid_pos_to_screen(mouse_grid_pos),
+                                HOVER_ENEMY_COLOR,
+                                5.0,
+                                3.0,
+                            );
+                            self.draw_target_crosshair(
+                                active_char_pos,
+                                mouse_grid_pos,
+                                HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+                            );
+                        }
                     } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                     }
@@ -958,35 +987,14 @@ impl GameGrid {
                             move_into_melee, ..
                         } = mouse_state
                         {
-                            let mut movement = None;
-
-                            if move_into_melee {
-                                movement = Some(vec![]);
-                                for (dx, dy) in [
-                                    (-1, 0),
-                                    (0, -1),
-                                    (1, 0),
-                                    (0, 1),
-                                    (-1, -1),
-                                    (1, -1),
-                                    (1, 1),
-                                    (-1, 1),
-                                ] {
-                                    let x = active_char_pos.0 + dx;
-                                    let y = active_char_pos.1 + dy;
-                                    let blocked =
-                                        self.pathfind_grid.blocked_positions.contains(&(x, y));
-
-                                    if !blocked
-                                        && (x - mouse_grid_pos.0).abs() <= 1
-                                        && (y - mouse_grid_pos.1).abs() <= 1
-                                    {
-                                        println!("FOUND GOOD DESTINATION: {}, {}", x, y);
-                                        movement = Some(vec![(x, y)]);
-                                        break;
-                                    }
-                                }
-                            }
+                            let movement = if move_into_melee {
+                                Some(self.try_find_path_to_action_target(
+                                    mouse_grid_pos,
+                                    active_char_pos,
+                                ))
+                            } else {
+                                None
+                            };
 
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
@@ -1007,6 +1015,8 @@ impl GameGrid {
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
 
+        // TODO
+        /*
         if let UiState::ConfiguringAction(ConfiguredAction::Move {
             selected_movement_path,
             ..
@@ -1016,6 +1026,7 @@ impl GameGrid {
                 self.draw_movement_path(&selected_movement_path, false);
             }
         }
+         */
 
         if let Some(target) = self.players_inspect_target {
             self.draw_cornered_outline(
@@ -1030,37 +1041,8 @@ impl GameGrid {
             ActionTarget::Character(target, movement) => {
                 let target_pos = self.characters.get(target).pos();
                 if let Some(positions) = movement {
-                    if positions.is_empty() {
-                        // Has target, but no valid path to it
-                        /*
-                        self.draw_target_crosshair(
-                            active_char_pos,
-                            target_pos,
-                            RED,
-                        );
-                         */
-
-                        let invalid_path = vec![active_char_pos, target_pos];
-                        self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 5.0);
-                    } else {
-                        // Has target and a valid path
-                        self.draw_target_crosshair(
-                            *positions.first().unwrap(),
-                            target_pos,
-                            PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        );
-                        let mut path = vec![active_char_pos];
-                        for pos in positions.iter().rev() {
-                            path.push(*pos);
-                        }
-                        self.draw_movement_path_arrow(
-                            path.iter().copied(),
-                            MOVEMENT_ARROW_COLOR,
-                            5.0,
-                        );
-                    }
+                    self.draw_movement_to_target(active_char_pos, target_pos, positions);
                 } else {
-                    // Has target for a non-moving action
                     self.draw_target_crosshair(
                         active_char_pos,
                         target_pos,
@@ -1109,6 +1091,57 @@ impl GameGrid {
         }
 
         outcome
+    }
+
+    fn draw_movement_to_target(
+        &self,
+        actor_pos: (i32, i32),
+        target_pos: (i32, i32),
+        movement_to_target: Vec<(i32, i32)>,
+    ) {
+        if movement_to_target.is_empty() {
+            let invalid_path = vec![actor_pos, target_pos];
+            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 5.0);
+        } else {
+            self.draw_target_crosshair(
+                *movement_to_target.first().unwrap(),
+                target_pos,
+                PLAYERS_TARGET_CROSSHAIR_COLOR,
+            );
+            let mut path = vec![actor_pos];
+            for pos in movement_to_target.iter().rev() {
+                path.push(*pos);
+            }
+            self.draw_movement_path_arrow(path.iter().copied(), MOVEMENT_ARROW_COLOR, 5.0);
+        }
+    }
+
+    fn try_find_path_to_action_target(
+        &mut self,
+        target_pos: (i32, i32),
+        actor_pos: (i32, i32),
+    ) -> Vec<Position> {
+        let mut movement = vec![];
+        for (dx, dy) in [
+            (-1, 0),
+            (0, -1),
+            (1, 0),
+            (0, 1),
+            (-1, -1),
+            (1, -1),
+            (1, 1),
+            (-1, 1),
+        ] {
+            let x = actor_pos.0 + dx;
+            let y = actor_pos.1 + dy;
+            let blocked = self.pathfind_grid.blocked_positions.contains(&(x, y));
+
+            if !blocked && (x - target_pos.0).abs() <= 1 && (y - target_pos.1).abs() <= 1 {
+                movement = vec![(x, y)];
+                break;
+            }
+        }
+        movement
     }
 
     fn determine_range_indicator(&self, ui_state: &mut UiState) -> Option<(Range, RangeIndicator)> {
