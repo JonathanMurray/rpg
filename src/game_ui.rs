@@ -85,9 +85,9 @@ impl UiState {
         match self {
             UiState::ConfiguringAction(configured_action) => match configured_action {
                 ConfiguredAction::Attack { target, .. } => target
-                    .map(ActionTarget::Character)
+                    .map(|id| ActionTarget::Character(id, None))
                     .unwrap_or(ActionTarget::None),
-                ConfiguredAction::CastSpell { target, .. } => *target,
+                ConfiguredAction::CastSpell { target, .. } => target.clone(),
                 _ => ActionTarget::None,
             },
             _ => ActionTarget::None,
@@ -99,7 +99,7 @@ impl UiState {
             UiState::ConfiguringAction(configured_action) => match configured_action {
                 ConfiguredAction::Attack { target, .. } => {
                     *target = match new_target {
-                        ActionTarget::Character(id) => Some(id),
+                        ActionTarget::Character(id, None) => Some(id),
                         ActionTarget::None => None,
                         _ => panic!(),
                     };
@@ -137,7 +137,7 @@ pub enum ConfiguredAction {
 }
 
 impl ConfiguredAction {
-    pub fn has_required_player_input(
+    fn has_required_player_input(
         &self,
         relevant_character: &Character,
         characters: &Characters,
@@ -161,14 +161,20 @@ impl ConfiguredAction {
                 spell,
                 selected_enhancements,
                 ..
-            } => match *target {
-                ActionTarget::Character(target_id) => {
-                    let target_char = characters.get(target_id);
-                    relevant_character.can_reach_with_spell(
+            } => match target {
+                ActionTarget::Character(target_id, movement) => {
+                    if let Some(positions) = movement {
+                        if positions.is_empty() {
+                            return false;
+                        }
+                    }
+                    let target_char = characters.get(*target_id);
+                    let can_reach = relevant_character.can_reach_with_spell(
                         *spell,
                         selected_enhancements,
                         target_char.position.get(),
-                    )
+                    );
+                    can_reach
                 }
 
                 ActionTarget::Position(target_pos) => {
@@ -176,7 +182,7 @@ impl ConfiguredAction {
                     relevant_character.can_reach_with_spell(
                         *spell,
                         selected_enhancements,
-                        target_pos,
+                        *target_pos,
                     )
                 }
 
@@ -879,9 +885,9 @@ impl UserInterface {
 
         let spell = *spell;
 
-        match *target {
-            ActionTarget::Character(target_id) => {
-                let target_char = self.characters.get(target_id);
+        match target {
+            ActionTarget::Character(target_id, movement) => {
+                let target_char = self.characters.get(*target_id);
 
                 let action_text = match spell.target {
                     SpellTarget::Enemy { effect, .. } => {
@@ -1602,7 +1608,7 @@ impl UserInterface {
                     } => Some(Action::CastSpell {
                         spell: *spell,
                         enhancements: selected_enhancements.clone(),
-                        target: *target,
+                        target: target.clone(),
                     }),
                     &ConfiguredAction::Move {
                         ap_cost,

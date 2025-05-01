@@ -25,7 +25,7 @@ use macroquad::{
 use crate::{
     core::{
         ActionReach, ActionTarget, Character, Goodness, Position, SpellEnhancementEffect,
-        SpellTarget,
+        SpellReach, SpellTarget,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
@@ -602,17 +602,19 @@ impl GameGrid {
         let mouse_state = match ui_state {
             UiState::ChoosingAction => MouseState::MayInputMovement,
             UiState::ConfiguringAction(base_action) => match base_action {
-                ConfiguredAction::Attack { .. } => {
-                    MouseState::RequiresEnemyTarget { area_range: None }
-                }
+                ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
+                    area_range: None,
+                    move_into_melee: false,
+                },
                 ConfiguredAction::CastSpell {
                     spell,
                     selected_enhancements,
                     target,
                 } => match spell.target {
-                    SpellTarget::Enemy { impact_area, .. } => {
+                    SpellTarget::Enemy {
+                        impact_area, reach, ..
+                    } => {
                         let mut area_range = None;
-
                         if let Some((mut range, _effect)) = impact_area {
                             for enhancement in selected_enhancements {
                                 if let Some(SpellEnhancementEffect::IncreaseRadiusTenths(tenths)) =
@@ -623,8 +625,11 @@ impl GameGrid {
                             }
                             area_range = Some(range);
                         }
-
-                        MouseState::RequiresEnemyTarget { area_range }
+                        let move_into_melee = matches!(reach, SpellReach::MoveIntoMelee(..));
+                        MouseState::RequiresEnemyTarget {
+                            area_range,
+                            move_into_melee,
+                        }
                     }
                     SpellTarget::Ally { .. } => MouseState::RequiresAllyTarget,
                     SpellTarget::Area { radius, .. } => MouseState::RequiresPositionTarget(radius),
@@ -640,14 +645,14 @@ impl GameGrid {
         // TODO can this even occur, now that the target is part of the state? It would mean that we carried an invalid target from one
         // state to another one.
         if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-            if let ActionTarget::Character(id) = ui_state.players_action_target() {
+            if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
                 if self.characters.get(id).player_controlled {
                     ui_state.set_target(ActionTarget::None);
                 }
             }
         }
         if matches!(mouse_state, MouseState::RequiresAllyTarget) {
-            if let ActionTarget::Character(id) = ui_state.players_action_target() {
+            if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
                 if !self.characters.get(id).player_controlled {
                     ui_state.set_target(ActionTarget::None);
                 }
@@ -657,8 +662,12 @@ impl GameGrid {
         match mouse_state {
             MouseState::RequiresEnemyTarget {
                 area_range: Some(range),
+                move_into_melee,
             } => {
-                if let ActionTarget::Character(target_id) = ui_state.players_action_target() {
+                if let ActionTarget::Character(target_id, movement) =
+                    ui_state.players_action_target()
+                {
+                    // TODO draw movement?
                     self.draw_range_indicator(
                         self.characters.get(target_id).pos(),
                         range,
@@ -708,7 +717,7 @@ impl GameGrid {
 
             if *selected {
                 self.draw_target_crosshair(
-                    self.characters.get(*reactor),
+                    self.characters.get(*reactor).pos(),
                     self.characters.get(*target).pos(),
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
                 );
@@ -805,7 +814,7 @@ impl GameGrid {
                                 2.0,
                             );
                             self.draw_target_crosshair(
-                                self.characters.get(self.active_character_id),
+                                self.characters.get(self.active_character_id).pos(),
                                 mouse_grid_pos,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                             );
@@ -852,7 +861,7 @@ impl GameGrid {
                             4.0,
                         );
                         self.draw_target_crosshair(
-                            self.characters.get(self.active_character_id),
+                            self.characters.get(self.active_character_id).pos(),
                             mouse_grid_pos,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
@@ -868,7 +877,7 @@ impl GameGrid {
                         } else {
                             match mouse_state {
                                 MouseState::RequiresAllyTarget => {
-                                    ui_state.set_target(ActionTarget::Character(hovered_id));
+                                    ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                     outcome.switched_players_action_target = true;
                                     self.players_inspect_target = Some(hovered_id);
                                     //self.selected_movement_path = None;
@@ -888,7 +897,7 @@ impl GameGrid {
                             3.0,
                         );
                         self.draw_target_crosshair(
-                            self.characters.get(self.active_character_id),
+                            self.characters.get(self.active_character_id).pos(),
                             mouse_grid_pos,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                         );
@@ -945,8 +954,41 @@ impl GameGrid {
                             outcome.switched_players_action_target = true;
 
                             self.players_inspect_target = Some(hovered_id);
-                        } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                            ui_state.set_target(ActionTarget::Character(hovered_id));
+                        } else if let MouseState::RequiresEnemyTarget {
+                            move_into_melee, ..
+                        } = mouse_state
+                        {
+                            let mut movement = None;
+
+                            if move_into_melee {
+                                movement = Some(vec![]);
+                                for (dx, dy) in [
+                                    (-1, 0),
+                                    (0, -1),
+                                    (1, 0),
+                                    (0, 1),
+                                    (-1, -1),
+                                    (1, -1),
+                                    (1, 1),
+                                    (-1, 1),
+                                ] {
+                                    let x = active_char_pos.0 + dx;
+                                    let y = active_char_pos.1 + dy;
+                                    let blocked =
+                                        self.pathfind_grid.blocked_positions.contains(&(x, y));
+
+                                    if !blocked
+                                        && (x - mouse_grid_pos.0).abs() <= 1
+                                        && (y - mouse_grid_pos.1).abs() <= 1
+                                    {
+                                        println!("FOUND GOOD DESTINATION: {}, {}", x, y);
+                                        movement = Some(vec![(x, y)]);
+                                        break;
+                                    }
+                                }
+                            }
+
+                            ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
 
                             self.players_inspect_target = Some(hovered_id);
@@ -985,17 +1027,50 @@ impl GameGrid {
         }
 
         match ui_state.players_action_target() {
-            ActionTarget::Character(target) => {
+            ActionTarget::Character(target, movement) => {
                 let target_pos = self.characters.get(target).pos();
-                self.draw_target_crosshair(
-                    self.characters.get(self.active_character_id),
-                    target_pos,
-                    PLAYERS_TARGET_CROSSHAIR_COLOR,
-                );
+                if let Some(positions) = movement {
+                    if positions.is_empty() {
+                        // Has target, but no valid path to it
+                        /*
+                        self.draw_target_crosshair(
+                            active_char_pos,
+                            target_pos,
+                            RED,
+                        );
+                         */
+
+                        let invalid_path = vec![active_char_pos, target_pos];
+                        self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 5.0);
+                    } else {
+                        // Has target and a valid path
+                        self.draw_target_crosshair(
+                            *positions.first().unwrap(),
+                            target_pos,
+                            PLAYERS_TARGET_CROSSHAIR_COLOR,
+                        );
+                        let mut path = vec![active_char_pos];
+                        for pos in positions.iter().rev() {
+                            path.push(*pos);
+                        }
+                        self.draw_movement_path_arrow(
+                            path.iter().copied(),
+                            MOVEMENT_ARROW_COLOR,
+                            5.0,
+                        );
+                    }
+                } else {
+                    // Has target for a non-moving action
+                    self.draw_target_crosshair(
+                        active_char_pos,
+                        target_pos,
+                        PLAYERS_TARGET_CROSSHAIR_COLOR,
+                    );
+                }
             }
             ActionTarget::Position(target_pos) => {
                 self.draw_target_crosshair(
-                    self.characters.get(self.active_character_id),
+                    active_char_pos,
                     target_pos,
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
                 );
@@ -1006,7 +1081,7 @@ impl GameGrid {
         if let Some(target) = self.enemys_target {
             let target_pos = self.characters.get(target).pos();
             self.draw_target_crosshair(
-                self.characters.get(self.active_character_id),
+                self.characters.get(self.active_character_id).pos(),
                 target_pos,
                 ENEMYS_TARGET_CROSSHAIR_COLOR,
             );
@@ -1079,7 +1154,7 @@ impl GameGrid {
                     selected_enhancements,
                     target,
                 } => match target {
-                    ActionTarget::Character(target_char_id) => {
+                    ActionTarget::Character(target_char_id, movement) => {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
@@ -1284,11 +1359,10 @@ impl GameGrid {
 
     fn draw_target_crosshair(
         &self,
-        actor: &Character,
+        actor_pos: Position,
         target_pos: Position,
         crosshair_color: Color,
     ) {
-        let actor_pos = actor.pos();
         let actor_x = self.grid_x_to_screen(actor_pos.0);
         let actor_y = self.grid_y_to_screen(actor_pos.1);
         let target_x = self.grid_x_to_screen(target_pos.0);
@@ -1408,8 +1482,8 @@ impl GameGrid {
         color: Color,
         thickness: f32,
     ) {
-        let mut a = path.next().unwrap();
-        let mut b = path.next().unwrap();
+        let mut a = path.next().expect("First cell in path");
+        let mut b = path.next().expect("Second cell in path");
 
         loop {
             draw_dashed_line(
@@ -1721,7 +1795,10 @@ impl EffectGraphics {
 }
 
 enum MouseState {
-    RequiresEnemyTarget { area_range: Option<Range> },
+    RequiresEnemyTarget {
+        area_range: Option<Range>,
+        move_into_melee: bool,
+    },
     RequiresAllyTarget,
     RequiresPositionTarget(Range),
     ImplicitTarget,

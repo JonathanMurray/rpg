@@ -8,7 +8,10 @@ use macroquad::input::is_simulating_mouse_with_touch;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{BOW, HEAL, QUICK, RAGE, SHACKLED_MIND, SMITE, SWEEP_ATTACK, SWORD, WAR_HAMMER};
+use crate::data::{
+    BOW, BRACE, HEAL, LUNGE_ATTACK, QUICK, RAGE, SHACKLED_MIND, SMITE, SWEEP_ATTACK, SWORD,
+    WAR_HAMMER,
+};
 use crate::data::{CHAIN_MAIL, SIDE_STEP};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
 
@@ -35,7 +38,7 @@ impl CoreGame {
             PortraitId::Portrait2,
             SpriteId::Character,
             Attributes::new(7, 10, 10, 10),
-            (2, 5),
+            (1, 6),
         );
         //bob.set_weapon(HandType::MainHand, SWORD);
         bob.set_weapon(HandType::MainHand, SWORD);
@@ -48,6 +51,7 @@ impl CoreGame {
         bob.known_attack_enhancements.push(SMITE);
         bob.known_on_hit_reactions.push(RAGE);
         bob.known_actions.push(BaseAction::CastSpell(SWEEP_ATTACK));
+        bob.known_actions.push(BaseAction::CastSpell(LUNGE_ATTACK));
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
         bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
         bob.known_actions.push(BaseAction::CastSpell(HEAL));
@@ -86,12 +90,12 @@ impl CoreGame {
             PortraitId::Portrait1,
             SpriteId::Character4,
             Attributes::new(1, 1, 1, 1),
-            (2, 3),
+            (2, 5),
         );
 
         david.set_weapon(HandType::MainHand, SWORD);
 
-        let characters = Characters::new(vec![bob, enemy1, enemy2, david]);
+        let characters = Characters::new(vec![bob, enemy1, david, enemy2]);
 
         Self {
             characters,
@@ -476,12 +480,20 @@ impl CoreGame {
                 SpellTarget::Enemy {
                     effect,
                     impact_area,
-                    range: _,
+                    ..
                 } => {
-                    let ActionTarget::Character(target_id) = selected_target else {
+                    let ActionTarget::Character(target_id, movement) = &selected_target else {
                         unreachable!()
                     };
-                    let target = self.characters.get(target_id);
+
+                    // TODO (is it ok to perform movement right inside perform_spell? No weird state interactions?)
+                    if let Some(positions) = movement {
+                        println!("WILL PERFORM MOVEMENT {positions:?}");
+                        self.perform_movement(positions.clone()).await;
+                        println!("PERFORMED MOVEMENT {positions:?}");
+                    }
+
+                    let target = self.characters.get(*target_id);
                     assert!(caster.can_reach_with_spell(
                         spell,
                         &enhancements,
@@ -509,7 +521,7 @@ impl CoreGame {
                         target,
                         &mut detail_lines,
                     );
-                    target_outcome = Some((target_id, outcome));
+                    target_outcome = Some((*target_id, outcome));
 
                     if let Some((area_range, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
@@ -530,10 +542,10 @@ impl CoreGame {
                 }
 
                 SpellTarget::Ally { range: _, effect } => {
-                    let ActionTarget::Character(target_id) = selected_target else {
+                    let ActionTarget::Character(target_id, movement) = &selected_target else {
                         unreachable!()
                     };
-                    let target = self.characters.get(target_id);
+                    let target = self.characters.get(*target_id);
                     assert!(caster.can_reach_with_spell(
                         spell,
                         &enhancements,
@@ -554,7 +566,7 @@ impl CoreGame {
                         degree_of_success,
                     );
 
-                    target_outcome = Some((target_id, outcome));
+                    target_outcome = Some((*target_id, outcome));
                 }
 
                 SpellTarget::Area {
@@ -852,18 +864,35 @@ impl CoreGame {
             };
 
             let damage = if let Some(spell_damage) = enemy_effect.damage {
-                let mut base_damage_label = spell_name;
-                let (mut dmg_calculation, increased_by_good_roll) = match spell_damage {
-                    SpellDamage::Static(n) => (n as i32, false),
-                    SpellDamage::AtLeast(n) => (n as i32, true),
+                let mut dmg_calculation;
+                let mut increased_by_good_roll = true;
+                let mut dmg_str = "Damage: ".to_string();
+
+                match spell_damage {
+                    SpellDamage::Static(n) => {
+                        dmg_calculation = n as i32;
+                        increased_by_good_roll = false;
+
+                        dmg_str.push_str(&format!("{} ({})", dmg_calculation, spell_name));
+                    }
+                    SpellDamage::AtLeast(n) => {
+                        dmg_calculation = n as i32;
+                        dmg_str.push_str(&format!("{} ({})", dmg_calculation, spell_name));
+                    }
                     SpellDamage::Weapon => {
                         let weapon = self.active_character().weapon(HandType::MainHand).unwrap();
-                        base_damage_label = weapon.name;
-                        (weapon.damage as i32, true)
+                        dmg_calculation = weapon.damage as i32;
+                        dmg_str.push_str(&format!("{} ({})", dmg_calculation, weapon.name));
+
+                        if matches!(weapon.grip, WeaponGrip::Versatile)
+                            && self.active_character().off_hand.get().is_empty()
+                        {
+                            let bonus_dmg = 1;
+                            dmg_str.push_str(&format!(" +{} (two-handed)", bonus_dmg));
+                            dmg_calculation += bonus_dmg;
+                        }
                     }
                 };
-
-                let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, base_damage_label);
 
                 if increased_by_good_roll && degree_of_success > 0 {
                     dmg_str.push_str(&format!(" +{degree_of_success} ({heavy_hit_label})"));
@@ -1805,9 +1834,9 @@ pub enum Action {
     },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Clone, PartialEq, Hash)]
 pub enum ActionTarget {
-    Character(CharacterId),
+    Character(CharacterId, Option<Vec<Position>>),
     Position(Position),
     None,
 }
@@ -1923,7 +1952,7 @@ pub struct SpellAllyEffect {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum SpellTarget {
     Enemy {
-        range: Range,
+        reach: SpellReach,
         effect: SpellEnemyEffect,
         impact_area: Option<(Range, SpellEnemyEffect)>,
     },
@@ -1945,6 +1974,12 @@ pub enum SpellTarget {
     },
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellReach {
+    Range(Range),
+    MoveIntoMelee(Range),
+}
+
 impl SpellTarget {
     pub fn single_target(&self) -> bool {
         match self {
@@ -1955,9 +1990,12 @@ impl SpellTarget {
         }
     }
 
-    pub fn base_range(&self) -> Option<Range> {
+    fn base_range(&self) -> Option<Range> {
         match self {
-            SpellTarget::Enemy { range, .. } => Some(*range),
+            SpellTarget::Enemy { reach, .. } => match reach {
+                SpellReach::Range(range) => Some(*range),
+                SpellReach::MoveIntoMelee(range) => Some(*range),
+            },
             SpellTarget::Ally { range, .. } => Some(*range),
             SpellTarget::Area { range, .. } => Some(*range),
             SpellTarget::None { self_area, .. } => {
@@ -1980,6 +2018,9 @@ impl SpellTarget {
     }
 }
 
+// TODO Merge SpellEnhancement and AttackEnhancement? (There may be AttackEnhancements that should also be
+// usable for attack abilities (like Lunge attack / Sweeping attack))
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellEnhancement {
     pub name: &'static str,
@@ -1987,6 +2028,7 @@ pub struct SpellEnhancement {
     pub icon: IconId,
     pub action_point_cost: u32,
     pub mana_cost: u32,
+
     pub bonus_damage: u32,
     pub effect: Option<SpellEnhancementEffect>,
 }

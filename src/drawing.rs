@@ -13,6 +13,8 @@ pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: 
     let space = width * 0.3;
     let thickness = 2.0;
 
+    let direction = (direction.0.signum(), direction.1.signum());
+
     match direction {
         (1, 0) => {
             draw_line(w + space, n + space, mid.0, mid.1, thickness, color);

@@ -50,7 +50,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
                             chosen_action = Some(Action::CastSpell {
                                 spell,
                                 enhancements: vec![],
-                                target: ActionTarget::Character(*id),
+                                target: ActionTarget::Character(*id, None),
                             });
                             break;
                         }

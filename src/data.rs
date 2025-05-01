@@ -6,7 +6,8 @@ use crate::{
         AttackHitEffect, Condition, DefenseType, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield, Spell,
         SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellEnhancementEffect, SpellModifier, SpellTarget, Weapon, WeaponGrip, WeaponRange,
+        SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon, WeaponGrip,
+        WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -239,11 +240,37 @@ pub const SWEEP_ATTACK: Spell = Spell {
             Range::Melee,
             SpellEffect::Enemy(SpellEnemyEffect {
                 defense_type: Some(DefenseType::Evasion),
+                // TODO instead deal weapon_damage - 1, and then offer an enhancement that gives +1 damage?
+                // or alternatively, give -3 (or -5) to the roll, and enhancement removes that penalty?
                 damage: Some(SpellDamage::Weapon),
                 on_hit: None,
             }),
         )),
         self_effect: None,
+    },
+    animation_color: MAGENTA,
+};
+
+pub const LUNGE_ATTACK: Spell = Spell {
+    name: "Lunge attack",
+    description: "Lunge at an enemy",
+    icon: IconId::PlusPlus,
+    action_point_cost: 2,
+    mana_cost: 0,
+    stamina_cost: 2,
+
+    modifier: SpellModifier::Attack,
+    // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
+    // TODO enhancement that either applies dazed or takes 1 AP?
+    possible_enhancements: [None; 3],
+    target: SpellTarget::Enemy {
+        reach: SpellReach::MoveIntoMelee(Range::Float(2.99)),
+        effect: SpellEnemyEffect {
+            defense_type: Some(DefenseType::Evasion),
+            damage: Some(SpellDamage::Weapon),
+            on_hit: None,
+        },
+        impact_area: None,
     },
     animation_color: MAGENTA,
 };
@@ -317,7 +344,7 @@ pub const SHACKLED_MIND: Spell = Spell {
     possible_enhancements: [None, None, None],
 
     target: SpellTarget::Enemy {
-        range: Range::Ranged(4),
+        reach: SpellReach::Range(Range::Ranged(4)),
         effect: SpellEnemyEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
@@ -360,7 +387,7 @@ pub const MIND_BLAST: Spell = Spell {
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         },
         impact_area: None,
-        range: Range::Ranged(5),
+        reach: SpellReach::Range(Range::Ranged(5)),
     },
     animation_color: PURPLE,
 };
@@ -514,7 +541,7 @@ pub const FIREBALL: Spell = Spell {
                 on_hit: None,
             },
         )),
-        range: Range::Float(3.5),
+        reach: SpellReach::Range(Range::Float(3.5)),
     },
     animation_color: RED,
 };
@@ -536,7 +563,7 @@ pub const KILL: Spell = Spell {
             on_hit: None,
         },
         impact_area: None,
-        range: Range::Ranged(10),
+        reach: SpellReach::Range(Range::Ranged(10)),
     },
     animation_color: BLACK,
 };

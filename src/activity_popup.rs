@@ -640,7 +640,7 @@ impl ActivityPopup {
                     }
 
                     ConfiguredAction::ChangeEquipment { .. } => {}
-                    ConfiguredAction::EndTurn => { }
+                    ConfiguredAction::EndTurn => {}
                 }
             }
 
@@ -698,10 +698,7 @@ impl ActivityPopup {
                 }
             }
 
-            &UiState::ReactingToOpportunity {
-                reactor,
-                ..
-            } => {
+            &UiState::ReactingToOpportunity { reactor, .. } => {
                 self.relevant_character_id = reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(

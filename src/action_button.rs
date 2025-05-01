@@ -20,7 +20,7 @@ use crate::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
         DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
         SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect,
-        SpellModifier, SpellTarget, Weapon,
+        SpellModifier, SpellReach, SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -189,9 +189,16 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
         SpellTarget::Enemy {
             effect,
             impact_area: area,
-            range,
+            reach,
         } => {
-            technical_description.push(format!("Target enemy (range {})", range));
+            match reach {
+                SpellReach::Range(range) => {
+                    technical_description.push(format!("Target enemy (range {})", range));
+                }
+                SpellReach::MoveIntoMelee(range) => {
+                    technical_description.push(format!("Engage enemy (range {})", range));
+                }
+            }
             describe_spell_enemy_effect(effect, &mut technical_description);
 
             if let Some((range, effect)) = area {
