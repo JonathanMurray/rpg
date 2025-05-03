@@ -2,12 +2,12 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 
 use crate::{
     core::{
-        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementOnHitEffect,
-        AttackHitEffect, Condition, DefenseType, OnAttackedReaction, OnAttackedReactionEffect,
-        OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield, Spell,
-        SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon, WeaponGrip,
-        WeaponRange,
+        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, AttackHitEffect, Condition, DefenseType, OnAttackedReaction,
+        OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect,
+        SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon,
+        WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -36,6 +36,20 @@ pub const SHIRT: ArmorPiece = ArmorPiece {
     weight: 1,
 };
 
+pub const STABBING: AttackEnhancement = AttackEnhancement {
+    name: "Stabbing",
+    description: "",
+    icon: IconId::Plus,
+    action_point_cost: 0,
+    stamina_cost: 0,
+    mana_cost: 0,
+    effect: AttackEnhancementEffect {
+        roll_modifier: -3,
+        inflict_condition_per_damage: Some(Condition::Weakened(1)),
+        ..AttackEnhancementEffect::default()
+    },
+};
+
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: WeaponRange::Melee,
@@ -43,14 +57,26 @@ pub const DAGGER: Weapon = Weapon {
     damage: 2,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: None,
+    attack_enhancement: Some(STABBING),
     on_attacked_reaction: None,
-    on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Weakened(1),
-    ))),
+    on_true_hit: None,
     sprite: Some(SpriteId::Dagger),
     icon: EquipmentIconId::Dagger,
     weight: 1,
+};
+
+pub const SLASHING: AttackEnhancement = AttackEnhancement {
+    name: "Slashing",
+    description: "",
+    icon: IconId::Plus,
+    action_point_cost: 0,
+    stamina_cost: 0,
+    mana_cost: 0,
+    effect: AttackEnhancementEffect {
+        roll_modifier: -3,
+        inflict_condition_per_damage: Some(Condition::Bleeding(1)),
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const SWORD: Weapon = Weapon {
@@ -60,14 +86,26 @@ pub const SWORD: Weapon = Weapon {
     damage: 2,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: None,
+    attack_enhancement: Some(SLASHING),
     on_attacked_reaction: Some(PARRY),
-    on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Bleeding(1),
-    ))),
+    on_true_hit: None,
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
     weight: 2,
+};
+
+const DECEPTIVE: AttackEnhancement = AttackEnhancement {
+    name: "Deceptive",
+    description: "Reduce the target's defense by 6 against the next attack",
+    icon: IconId::Plus,
+    action_point_cost: 0,
+    stamina_cost: 0,
+    mana_cost: 0,
+    effect: AttackEnhancementEffect {
+        roll_modifier: -3,
+        on_target: Some(ApplyEffect::Condition(Condition::Distracted)),
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const RAPIER: Weapon = Weapon {
@@ -77,9 +115,9 @@ pub const RAPIER: Weapon = Weapon {
     damage: 2,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: None,
+    attack_enhancement: Some(DECEPTIVE),
     on_attacked_reaction: Some(PARRY),
-    on_true_hit: Some(AttackHitEffect::SkipExertion),
+    on_true_hit: None,
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
     weight: 2,
@@ -87,15 +125,16 @@ pub const RAPIER: Weapon = Weapon {
 
 const ALL_IN: AttackEnhancement = AttackEnhancement {
     name: "All-in",
-    description: "Charge up the attack, dealing additional damage",
+    description: "Deal additional damage and bypass target's armor",
     icon: IconId::AllIn,
     action_point_cost: 1,
     stamina_cost: 0,
     mana_cost: 0,
-    action_point_discount: 0,
-    bonus_damage: 1,
-    bonus_advantage: 0,
-    on_hit_effect: None,
+    effect: AttackEnhancementEffect {
+        bonus_damage: 1,
+        armor_penetration: 2,
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
@@ -107,9 +146,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
     on_attacked_reaction: Some(PARRY),
-    on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Dazed(1),
-    ))),
+    on_true_hit: None,
     sprite: Some(SpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
     weight: 5,
@@ -124,9 +161,7 @@ pub const BOW: Weapon = Weapon {
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFULLY_AIMED),
     on_attacked_reaction: None,
-    on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Weakened(1),
-    ))),
+    on_true_hit: None,
     sprite: Some(SpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
@@ -155,10 +190,10 @@ pub const QUICK: AttackEnhancement = AttackEnhancement {
     action_point_cost: 0,
     stamina_cost: 3,
     mana_cost: 0,
-    action_point_discount: 1,
-    bonus_damage: 0,
-    bonus_advantage: 0,
-    on_hit_effect: None,
+    effect: AttackEnhancementEffect {
+        action_point_discount: 1,
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const SMITE: AttackEnhancement = AttackEnhancement {
@@ -168,10 +203,10 @@ pub const SMITE: AttackEnhancement = AttackEnhancement {
     action_point_cost: 0,
     stamina_cost: 1,
     mana_cost: 1,
-    action_point_discount: 0,
-    bonus_damage: 1,
-    bonus_advantage: 0,
-    on_hit_effect: None,
+    effect: AttackEnhancementEffect {
+        bonus_damage: 1,
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
@@ -181,12 +216,13 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     action_point_cost: 0,
     stamina_cost: 2,
     mana_cost: 0,
-    action_point_discount: 0,
-    bonus_damage: 0,
-    bonus_advantage: 0,
-    on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
-        ApplyEffect::RemoveActionPoints(1),
-    )),
+
+    effect: AttackEnhancementEffect {
+        on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
+            ApplyEffect::RemoveActionPoints(1),
+        )),
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
@@ -196,10 +232,11 @@ pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     action_point_cost: 1,
     stamina_cost: 0,
     mana_cost: 0,
-    action_point_discount: 0,
-    bonus_damage: 0,
-    bonus_advantage: 1,
-    on_hit_effect: None,
+
+    effect: AttackEnhancementEffect {
+        bonus_advantage: 1,
+        ..AttackEnhancementEffect::default()
+    },
 };
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
@@ -235,7 +272,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
 
 pub const SWEEP_ATTACK: Spell = Spell {
     name: "Sweeping attack",
-    description: "Attack all enemies around you",
+    description: "Target all enemies around you",
     icon: IconId::SweepAttack,
     action_point_cost: 3,
     mana_cost: 0,
@@ -274,7 +311,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
 
 pub const LUNGE_ATTACK: Spell = Spell {
     name: "Lunge attack",
-    description: "Lunge at an enemy in an unobstructed path, and attack",
+    description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
     action_point_cost: 2,
     mana_cost: 0,

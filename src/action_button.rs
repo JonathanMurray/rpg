@@ -19,8 +19,8 @@ use crate::{
     core::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
         DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
-        SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellModifier, SpellReach, SpellTarget, Weapon,
+        SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellModifier, SpellReach,
+        SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -39,7 +39,7 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
             header: format!(
-                "{} ({})",
+                "{} {}",
                 reaction.name,
                 cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
             ),
@@ -48,7 +48,7 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
         },
         ButtonAction::OnHitReaction(reaction) => ActionButtonTooltip {
             header: format!(
-                "{} ({})",
+                "{} {}",
                 reaction.name,
                 cost_string(reaction.action_point_cost, 0, 0)
             ),
@@ -71,23 +71,50 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
-    if enhancement.action_point_discount > 0 {
-        technical_description.push(format!("- {} AP cost", enhancement.action_point_discount));
-    }
-    if enhancement.bonus_damage > 0 {
-        technical_description.push(format!("+ {} damage", enhancement.bonus_damage));
-    }
-    if enhancement.bonus_advantage > 0 {
-        technical_description.push(format!("+ {} advantage", enhancement.bonus_advantage));
+    let effect = enhancement.effect;
+
+    if effect.roll_modifier != 0 {
+        if effect.roll_modifier > 0 {
+            technical_description.push(format!("+ {} to attack roll", effect.roll_modifier));
+        } else {
+            technical_description.push(format!("- {} to attack roll", -effect.roll_modifier));
+        }
     }
 
-    if let Some(effect) = enhancement.on_hit_effect {
+    if effect.action_point_discount > 0 {
+        technical_description.push(format!("- {} AP cost", effect.action_point_discount));
+    }
+    if effect.bonus_damage > 0 {
+        technical_description.push(format!("+ {} damage", effect.bonus_damage));
+    }
+    if effect.bonus_advantage > 0 {
+        technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
+    }
+    if let Some(mut condition) = effect.inflict_condition_per_damage {
+        let stacks = *condition.stacks().unwrap();
+        technical_description.push(format!(
+            "inflicts {} {} per damage dealt",
+            stacks,
+            condition.name()
+        ));
+    }
+
+    if effect.armor_penetration > 0 {
+        technical_description.push(format!("{} armor penetration", effect.armor_penetration));
+    }
+
+    if let Some(effect) = effect.on_target {
         technical_description.push("Target:".to_string());
+        describe_apply_effect(effect, &mut technical_description);
+    }
+
+    if let Some(effect) = effect.on_hit_effect {
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
-                technical_description.push("On hit: regain AP".to_string())
+                technical_description.push("Regain AP".to_string())
             }
             AttackEnhancementOnHitEffect::Target(apply_effect) => {
+                technical_description.push("Target (on hit):".to_string());
                 describe_apply_effect(apply_effect, &mut technical_description);
             }
         }
@@ -95,7 +122,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
 
     ActionButtonTooltip {
         header: format!(
-            "{} ({})",
+            "{} {}",
             enhancement.name,
             cost_string(
                 enhancement.action_point_cost,
@@ -129,8 +156,6 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
         technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
     }
 
-    
-
     if let Some(apply_effect) = effect.on_hit {
         describe_apply_effect(apply_effect, &mut technical_description);
     }
@@ -151,7 +176,7 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
 
     ActionButtonTooltip {
         header: format!(
-            "{} ({})",
+            "{} {}",
             enhancement.name,
             cost_string(
                 enhancement.action_point_cost,
@@ -211,7 +236,7 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
 
 fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
     let header = format!(
-        "{} ({})",
+        "{} {}",
         spell.name,
         cost_string(spell.action_point_cost, spell.stamina_cost, spell.mana_cost)
     );
@@ -520,6 +545,10 @@ fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
         }
         s.push_str(&format!("{mana} mana"));
     }
+
+    if !s.is_empty() {
+        s = format!("({s})");
+    }
     s
 }
 
@@ -670,7 +699,9 @@ impl ButtonAction {
 
     pub fn action_point_discount(&self) -> u32 {
         match self {
-            ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_discount,
+            ButtonAction::AttackEnhancement(enhancement) => {
+                enhancement.effect.action_point_discount
+            }
             _ => 0,
         }
     }
@@ -759,6 +790,7 @@ pub fn draw_button_tooltip(
     if let Some(description) = tooltip.description {
         if !description.is_empty() {
             lines.push(description.to_string());
+            lines.push("".to_string());
         }
     }
     lines.extend_from_slice(&tooltip.technical_description);

@@ -8,10 +8,9 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, DAGGER, LEATHER_ARMOR, LUNGE_ATTACK, RAGE, SHIRT,
-    SMALL_SHIELD, SWEEP_ATTACK, SWORD,
+    BOW, DAGGER, LEATHER_ARMOR, LUNGE_ATTACK, RAGE, SHIRT, SMALL_SHIELD, SWEEP_ATTACK, SWORD,
 };
-use crate::data::SIDE_STEP;
+use crate::data::{CHAIN_MAIL, RAPIER, SIDE_STEP, WAR_HAMMER};
 use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
@@ -39,7 +38,8 @@ impl CoreGame {
             Attributes::new(3, 3, 5, 5),
             (1, 8),
         );
-        bob.set_weapon(HandType::MainHand, DAGGER);
+        bob.set_weapon(HandType::MainHand, SWORD);
+        bob.set_weapon(HandType::MainHand, BOW);
         bob.armor.set(Some(SHIRT));
 
         bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
@@ -56,7 +56,6 @@ impl CoreGame {
             (2, 8),
         );
         alice.known_attack_enhancements.push(OVERWHELMING);
-        alice.known_attack_enhancements.push(OVERWHELMING);
         alice.known_attacked_reactions.push(SIDE_STEP);
         //alice.known_attack_enhancements.push(QUICK);
         //alice.known_attack_enhancements.push(SMITE);
@@ -68,8 +67,8 @@ impl CoreGame {
             .known_actions
             .push(BaseAction::CastSpell(LUNGE_ATTACK));
         alice.armor.set(Some(LEATHER_ARMOR));
-        alice.set_weapon(HandType::MainHand, SWORD);
-        alice.set_shield(SMALL_SHIELD);
+        alice.set_weapon(HandType::MainHand, DAGGER);
+        //alice.set_shield(SMALL_SHIELD);
 
         let skeleton1 = Character::new(
             false,
@@ -79,6 +78,7 @@ impl CoreGame {
             Attributes::new(2, 2, 1, 1),
             (5, 7),
         );
+        skeleton1.armor.set(Some(CHAIN_MAIL));
         skeleton1.set_weapon(HandType::MainHand, BOW);
 
         let skeleton2 = Character::new(
@@ -243,7 +243,7 @@ impl CoreGame {
 
                 for enhancement in &enhancements {
                     action_point_cost += enhancement.action_point_cost as i32;
-                    action_point_cost -= enhancement.action_point_discount as i32;
+                    action_point_cost -= enhancement.effect.action_point_discount as i32;
                     attacker.stamina.spend(enhancement.stamina_cost);
                     attacker.mana.spend(enhancement.mana_cost);
                 }
@@ -343,7 +343,10 @@ impl CoreGame {
 
             for other_char in self.characters.iter() {
                 if other_char.player_controlled != character.player_controlled
-                    && within_meele(character.pos(), other_char.pos()) && !within_meele(new_position, other_char.pos()) && other_char.can_use_opportunity_attack() {
+                    && within_meele(character.pos(), other_char.pos())
+                    && !within_meele(new_position, other_char.pos())
+                    && other_char.can_use_opportunity_attack()
+                {
                     let reactor = other_char;
 
                     let chooses_to_use_opportunity_attack = self
@@ -359,11 +362,9 @@ impl CoreGame {
                     dbg!(chooses_to_use_opportunity_attack);
 
                     if chooses_to_use_opportunity_attack {
-                        self.ui_handle_event(
-                            GameEvent::CharacterReactedWithOpportunityAttack {
-                                reactor: reactor.id(),
-                            },
-                        )
+                        self.ui_handle_event(GameEvent::CharacterReactedWithOpportunityAttack {
+                            reactor: reactor.id(),
+                        })
                         .await;
 
                         reactor.action_points.spend(1);
@@ -404,15 +405,19 @@ impl CoreGame {
                 let amount_gained = receiver.stamina.gain(n);
                 format!("  {} gained {} stamina", receiver.name, amount_gained)
             }
-            ApplyEffect::Condition(mut condition) => {
-                receiver.receive_condition(condition);
-                let mut line = format!("  {} received {}", receiver.name, condition.name());
-                if let Some(stacks) = condition.stacks() {
-                    line.push_str(&format!(" ({})", stacks));
-                }
-                line
+            ApplyEffect::Condition(condition) => {
+                self.perform_receive_condition(condition, receiver)
             }
         }
+    }
+
+    fn perform_receive_condition(&self, mut condition: Condition, receiver: &Character) -> String {
+        receiver.receive_condition(condition);
+        let mut line = format!("  {} received {}", receiver.name, condition.name());
+        if let Some(stacks) = condition.stacks() {
+            line.push_str(&format!(" ({})", stacks));
+        }
+        line
     }
 
     async fn perform_spell(
@@ -1050,7 +1055,7 @@ impl CoreGame {
         &self,
         attacker_id: CharacterId,
         hand_type: HandType,
-        attack_enhancements: Vec<AttackEnhancement>,
+        enhancements: Vec<AttackEnhancement>,
         defender_id: CharacterId,
         defender_reaction: Option<OnAttackedReaction>,
     ) -> Option<(CharacterId, u32)> {
@@ -1071,7 +1076,7 @@ impl CoreGame {
             hand_type,
             defender,
             circumstance_advantage,
-            &attack_enhancements,
+            &enhancements,
             defender_reaction,
         );
 
@@ -1123,6 +1128,16 @@ impl CoreGame {
 
         detail_lines.push(roll_description(attack_bonus.advantage));
 
+        let mut armor_value = defender.protection_from_armor();
+        let mut armor_str = armor_value.to_string();
+        for enhancement in &enhancements {
+            let armor_pentration = enhancement.effect.armor_penetration;
+            if armor_pentration > 0 {
+                armor_value = armor_value.saturating_sub(armor_pentration);
+                armor_str.push_str(&format!(" -{} ({})", armor_pentration, enhancement.name));
+            }
+        }
+
         detail_lines.push(format!(
             "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}, armor={}",
             roll,
@@ -1136,7 +1151,7 @@ impl CoreGame {
             },
             attack_result,
             evasion,
-            defender.protection_from_armor()
+            armor_str
         ));
 
         let hit = attack_result >= evasion;
@@ -1154,7 +1169,7 @@ impl CoreGame {
                 dmg_calculation += bonus_dmg;
             }
 
-            let armored_defense = evasion + defender.protection_from_armor();
+            let armored_defense = evasion + armor_value;
             if attack_result < armored_defense {
                 let mitigated = armored_defense - attack_result;
 
@@ -1179,13 +1194,11 @@ impl CoreGame {
                 }
             }
 
-            for enhancement in &attack_enhancements {
-                if enhancement.bonus_damage > 0 {
-                    dmg_str.push_str(&format!(
-                        " +{} ({})",
-                        enhancement.bonus_damage, enhancement.name
-                    ));
-                    dmg_calculation += enhancement.bonus_damage as i32;
+            for enhancement in &enhancements {
+                let bonus_dmg = enhancement.effect.bonus_damage;
+                if bonus_dmg > 0 {
+                    dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
+                    dmg_calculation += bonus_dmg as i32;
                 }
             }
 
@@ -1209,8 +1222,8 @@ impl CoreGame {
                 }
             }
 
-            for enhancement in &attack_enhancements {
-                if let Some(effect) = enhancement.on_hit_effect {
+            for enhancement in &enhancements {
+                if let Some(effect) = enhancement.effect.on_hit_effect {
                     let log_line = match effect {
                         AttackEnhancementOnHitEffect::RegainActionPoint => {
                             attacker.action_points.gain(1);
@@ -1222,6 +1235,14 @@ impl CoreGame {
                     };
 
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name))
+                }
+
+                if let Some(mut condition) = enhancement.effect.inflict_condition_per_damage {
+                    if damage > 0 {
+                        *condition.stacks().unwrap() = damage;
+                        let line = self.perform_receive_condition(condition, defender);
+                        detail_lines.push(format!("{} ({})", line, enhancement.name))
+                    }
                 }
             }
 
@@ -1237,6 +1258,20 @@ impl CoreGame {
             AttackOutcome::Miss
         };
 
+        if defender.lose_braced() {
+            detail_lines.push(format!("{} lost Braced", defender.name));
+        }
+        if defender.lose_deceived() {
+            detail_lines.push(format!("{} lost Deceived", defender.name));
+        }
+
+        for enhancement in &enhancements {
+            if let Some(effect) = enhancement.effect.on_target {
+                let log_line = self.perform_effect_application(effect, defender);
+                detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+            }
+        }
+
         if skip_attack_exertion {
             detail_lines.push("  The attack did not lead to exertion (true hit)".to_string());
         } else {
@@ -1251,10 +1286,6 @@ impl CoreGame {
                 }
             };
             detail_lines.push(format!("  The attack led to exertion ({})", exertion));
-        }
-
-        if defender.lose_braced() {
-            detail_lines.push(format!("{} lost Braced", defender.name));
         }
 
         self.ui_handle_event(GameEvent::Attacked {
@@ -1656,10 +1687,7 @@ pub struct AttackEnhancement {
     pub stamina_cost: u32,
     pub mana_cost: u32,
 
-    pub action_point_discount: u32,
-    pub bonus_damage: u32,
-    pub bonus_advantage: u32,
-    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
+    pub effect: AttackEnhancementEffect,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1740,6 +1768,7 @@ pub enum Condition {
     Bleeding(u32),
     Braced,
     Raging,
+    Distracted,
     Weakened(u32),
     MainHandExertion(u32),
     OffHandExertion(u32),
@@ -1759,6 +1788,7 @@ impl Condition {
             Bleeding(n) => Some(n),
             Braced => None,
             Raging => None,
+            Distracted => None,
             Weakened(n) => Some(n),
             MainHandExertion(n) => Some(n),
             OffHandExertion(n) => Some(n),
@@ -1778,6 +1808,7 @@ impl Condition {
             Bleeding(_) => "Bleeding",
             Braced => "Braced",
             Raging => "Raging",
+            Distracted => "Distracted",
             Weakened(_) => "Weakened",
             MainHandExertion(_) => "Exerted (main-hand)",
             OffHandExertion(_) => "Exerted (off-hand)",
@@ -1797,10 +1828,11 @@ impl Condition {
             Bleeding(_) => "Loses 1 health at end of turn",
             Braced => "Gain +3 evasion against the next incoming attack",
             Raging => "Gains advantage on melee attacks until end of turn",
-            Weakened(_) => "-1 to attributes for each stack",
-            MainHandExertion(_) => "-1 per stack on further similar actions",
-            OffHandExertion(_) => "-1 per stack on further similar actions",
-            Encumbered(_) => "-1 to Evasion per stack and -1 to all dice rolls per 2 stacks",
+            Distracted => "-6 evasion against the next incoming attack",
+            Weakened(_) => "-x to all defenses and dice rolls",
+            MainHandExertion(_) => "-x on further similar actions",
+            OffHandExertion(_) => "-x on further similar actions",
+            Encumbered(_) => "-x to Evasion and -x/2 to dice rolls",
             NearDeath => "Reduced AP, disadvantage on everything",
             Dead => "This character has reached 0 HP and is dead",
             Slowed(_) => "Gains 2 less AP per turn",
@@ -1822,6 +1854,7 @@ impl Condition {
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
 const PROTECTED_ARMOR_BONUS: u32 = 3;
 const BRACED_DEFENSE_BONUS: u32 = 3;
+const DECEIVED_DEFENSE_PENALTY: u32 = 6;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1837,6 +1870,7 @@ struct Conditions {
     bleeding: u32,
     braced: bool,
     raging: bool,
+    deceived: bool,
     weakened: u32,
     mainhand_exertion: u32,
     offhand_exertion: u32,
@@ -1864,6 +1898,9 @@ impl Conditions {
         }
         if self.raging {
             result.push(Condition::Raging.info());
+        }
+        if self.deceived {
+            result.push(Condition::Distracted.info());
         }
         if self.weakened > 0 {
             result.push(Condition::Weakened(self.weakened).info());
@@ -2116,6 +2153,38 @@ pub struct SpellEnhancement {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct AttackEnhancementEffect {
+    pub action_point_discount: u32,
+    pub bonus_damage: u32,
+    pub bonus_advantage: u32,
+    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
+    pub roll_modifier: i32,
+    pub inflict_condition_per_damage: Option<Condition>,
+    pub armor_penetration: u32,
+    // TODO Actually handle this
+    pub on_self: Option<ApplyEffect>,
+
+    pub on_target: Option<ApplyEffect>,
+}
+
+impl AttackEnhancementEffect {
+    // the impl from #[derive(Default)] is not const
+    pub const fn default() -> Self {
+        Self {
+            action_point_discount: 0,
+            bonus_damage: 0,
+            bonus_advantage: 0,
+            on_hit_effect: None,
+            roll_modifier: 0,
+            inflict_condition_per_damage: None,
+            armor_penetration: 0,
+            on_self: None,
+            on_target: None,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellEnhancementEffect {
     pub roll_bonus: u32,
     pub bonus_advantage: u32,
@@ -2324,6 +2393,16 @@ impl Character {
         let mut conditions = self.conditions.borrow_mut();
         if conditions.braced {
             conditions.braced = false;
+            true
+        } else {
+            false
+        }
+    }
+
+    fn lose_deceived(&self) -> bool {
+        let mut conditions = self.conditions.borrow_mut();
+        if conditions.deceived {
+            conditions.deceived = false;
             true
         } else {
             false
@@ -2600,7 +2679,7 @@ impl Character {
         let weapon = self.weapon(attack_hand).unwrap();
         self.action_points.current()
             >= weapon.action_point_cost + enhancement.action_point_cost
-                - enhancement.action_point_discount
+                - enhancement.effect.action_point_discount
             && self.stamina.current() >= enhancement.stamina_cost
             && self.mana.current() >= enhancement.mana_cost
     }
@@ -2682,23 +2761,19 @@ impl Character {
     }
 
     fn strength(&self) -> u32 {
-        (self.base_attributes.strength as i32 - self.conditions.borrow().weakened as i32).max(1)
-            as u32
+        (self.base_attributes.strength as i32).max(1) as u32
     }
 
     fn agility(&self) -> u32 {
-        (self.base_attributes.agility as i32 - self.conditions.borrow().weakened as i32).max(1)
-            as u32
+        (self.base_attributes.agility as i32).max(1) as u32
     }
 
     fn intellect(&self) -> u32 {
-        (self.base_attributes.intellect as i32 - self.conditions.borrow().weakened as i32).max(1)
-            as u32
+        (self.base_attributes.intellect as i32).max(1) as u32
     }
 
     fn spirit(&self) -> u32 {
-        (self.base_attributes.spirit as i32 - self.conditions.borrow().weakened as i32).max(1)
-            as u32
+        (self.base_attributes.spirit as i32).max(1) as u32
     }
 
     pub fn spell_modifier(&self) -> u32 {
@@ -2715,13 +2790,21 @@ impl Character {
         res += self.evasion_from_intellect();
         res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
 
-        if self.conditions.borrow().braced {
+        let conditions = self.conditions.borrow();
+        if conditions.braced {
             res += BRACED_DEFENSE_BONUS;
         }
-        res = res.saturating_sub(self.conditions.borrow().encumbered);
+        if conditions.deceived {
+            res -= DECEIVED_DEFENSE_PENALTY;
+        }
+        res = res.saturating_sub(conditions.encumbered);
 
-        if self.conditions.borrow().exposed > 0 {
+        if conditions.exposed > 0 {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+
+        if conditions.weakened > 0 {
+            res = res.saturating_sub(conditions.weakened)
         }
 
         res
@@ -2743,17 +2826,26 @@ impl Character {
 
     pub fn will(&self) -> u32 {
         let mut res = 10 + self.intellect() * 2;
-        if self.conditions.borrow().exposed > 0 {
+        let conditions = self.conditions.borrow();
+        if conditions.exposed > 0 {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+        if conditions.weakened > 0 {
+            res = res.saturating_sub(conditions.weakened)
         }
         res
     }
 
     pub fn toughness(&self) -> u32 {
         let mut res = 10 + self.strength() * 2;
-        if self.conditions.borrow().exposed > 0 {
+        let conditions = self.conditions.borrow();
+        if conditions.exposed > 0 {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
+        if conditions.weakened > 0 {
+            res = res.saturating_sub(conditions.weakened)
+        }
+
         res
     }
 
@@ -2836,11 +2928,21 @@ impl Character {
         enhancements: &[AttackEnhancement],
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut bonuses = vec![];
+        dbg!(enhancements);
         for enhancement in enhancements {
-            if enhancement.bonus_advantage > 0 {
+            dbg!(enhancement);
+            if enhancement.effect.bonus_advantage > 0 {
                 bonuses.push((
                     enhancement.name,
-                    RollBonusContributor::Advantage(enhancement.bonus_advantage as i32),
+                    RollBonusContributor::Advantage(enhancement.effect.bonus_advantage as i32),
+                ));
+            }
+
+            if enhancement.effect.roll_modifier != 0 {
+                dbg!(enhancement); // TODO
+                bonuses.push((
+                    enhancement.name,
+                    RollBonusContributor::FlatAmount(enhancement.effect.roll_modifier as i32),
                 ));
             }
         }
@@ -2892,7 +2994,10 @@ impl Character {
         }
         let conditions = self.conditions.borrow();
         if conditions.weakened > 0 {
-            bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
+            bonuses.push((
+                "Weakened",
+                RollBonusContributor::FlatAmount(-(conditions.weakened as i32)),
+            ));
         }
 
         let encumbrance_penalty = (conditions.encumbered / 2) as i32;
@@ -2949,6 +3054,9 @@ impl Character {
         if conditions.braced {
             terms.push(("Braced", RollBonusContributor::OtherNegative));
         }
+        if conditions.deceived {
+            terms.push(("Deceived", RollBonusContributor::OtherPositive));
+        }
         if conditions.near_death {
             terms.push(("Near-death", RollBonusContributor::Advantage(1)))
         }
@@ -2989,6 +3097,7 @@ impl Character {
             Bleeding(n) => conditions.bleeding += n,
             Braced => conditions.braced = true,
             Raging => conditions.raging = true,
+            Distracted => conditions.deceived = true,
             Weakened(n) => conditions.weakened += n,
             MainHandExertion(n) => conditions.mainhand_exertion += n,
             OffHandExertion(n) => conditions.offhand_exertion += n,

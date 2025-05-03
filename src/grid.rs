@@ -23,10 +23,7 @@ use macroquad::{
 };
 
 use crate::{
-    core::{
-        ActionReach, ActionTarget, Character, Goodness, Position,
-        SpellReach, SpellTarget,
-    },
+    core::{ActionReach, ActionTarget, Character, Goodness, Position, SpellReach, SpellTarget},
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },

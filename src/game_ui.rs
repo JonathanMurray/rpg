@@ -170,7 +170,7 @@ impl ConfiguredAction {
                         }
                     }
                     let target_char = characters.get(*target_id);
-                    
+
                     relevant_character.can_reach_with_spell(
                         *spell,
                         selected_enhancements,
@@ -268,7 +268,7 @@ impl ConfiguredAction {
                 let mut ap = *action_point_cost;
                 for enhancement in selected_enhancements {
                     ap += enhancement.action_point_cost;
-                    ap -= enhancement.action_point_discount;
+                    ap -= enhancement.effect.action_point_discount;
                 }
                 ap
             }
@@ -1621,6 +1621,9 @@ impl UserInterface {
             Some(ActivityPopupOutcome::ChangedSpellEnhancements) => {
                 // TODO update hit chance?
                 self.refresh_cast_spell_state();
+            }
+            Some(ActivityPopupOutcome::ChangedAttackEnhancements) => {
+                self.refresh_attack_state();
             }
             None => {}
         }

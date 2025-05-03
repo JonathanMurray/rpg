@@ -281,6 +281,7 @@ impl ActivityPopup {
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_on_attacked_reaction = false;
         let mut changed_spell_enhancements = false;
+        let mut changed_attack_enhancements = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, _button_action, hovered_pos) => {
@@ -321,6 +322,7 @@ impl ActivityPopup {
                                     .iter()
                                     .map(|action| action.unwrap_attack_enhancement())
                                     .collect();
+                                changed_attack_enhancements = true;
                             }
                             ConfiguredAction::CastSpell {
                                 selected_enhancements,
@@ -375,6 +377,9 @@ impl ActivityPopup {
         }
         if changed_spell_enhancements {
             return Some(ActivityPopupOutcome::ChangedSpellEnhancements);
+        }
+        if changed_attack_enhancements {
+            return Some(ActivityPopupOutcome::ChangedAttackEnhancements);
         }
 
         None
@@ -750,6 +755,7 @@ impl ActivityPopup {
 pub enum ActivityPopupOutcome {
     ClickedProceed,
     ChangedSpellEnhancements,
+    ChangedAttackEnhancements,
 }
 
 struct MovementStaminaSlider {
