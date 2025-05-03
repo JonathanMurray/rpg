@@ -39,7 +39,7 @@ pub const SHIRT: ArmorPiece = ArmorPiece {
 pub const STABBING: AttackEnhancement = AttackEnhancement {
     name: "Stabbing",
     description: "",
-    icon: IconId::Plus,
+    icon: IconId::Stabbing,
     action_point_cost: 0,
     stamina_cost: 0,
     mana_cost: 0,
@@ -68,7 +68,7 @@ pub const DAGGER: Weapon = Weapon {
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
     name: "Slashing",
     description: "",
-    icon: IconId::Plus,
+    icon: IconId::Slashing,
     action_point_cost: 0,
     stamina_cost: 0,
     mana_cost: 0,
@@ -97,7 +97,7 @@ pub const SWORD: Weapon = Weapon {
 const DECEPTIVE: AttackEnhancement = AttackEnhancement {
     name: "Deceptive",
     description: "Reduce the target's defense by 6 against the next attack",
-    icon: IconId::Plus,
+    icon: IconId::Deceptive,
     action_point_cost: 0,
     stamina_cost: 0,
     mana_cost: 0,

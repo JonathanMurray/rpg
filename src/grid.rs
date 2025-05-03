@@ -272,6 +272,13 @@ impl GameGrid {
 
     fn refresh_pathfind_grid_blocked_positions(&mut self) {
         self.pathfind_grid.blocked_positions.clear();
+        for (pos, terrain) in &self.terrain_objects {
+            assert!(
+                !self.pathfind_grid.blocked_positions.contains(pos),
+                "blocked position: {:?}, {:?}", pos, terrain,
+            );
+            self.pathfind_grid.blocked_positions.insert(*pos);
+        }
         for character in self.characters.iter() {
             assert!(
                 !self
@@ -283,13 +290,7 @@ impl GameGrid {
             );
             self.pathfind_grid.blocked_positions.insert(character.pos());
         }
-        for (pos, terrain) in &self.terrain_objects {
-            assert!(
-                !self.pathfind_grid.blocked_positions.contains(pos),
-                "blocked position: {pos:?}, {terrain:?}",
-            );
-            self.pathfind_grid.blocked_positions.insert(*pos);
-        }
+
     }
 
     fn zoom(&mut self, i: isize) {

@@ -1557,6 +1557,7 @@ impl UserInterface {
             }
             GameEvent::NewTurn { new_active } => {
                 self.log.add("End of turn.".to_string());
+                self.animation_stopwatch.set_to_at_least(0.5);
                 self.set_new_active_character_id(new_active);
             }
             GameEvent::Moved {

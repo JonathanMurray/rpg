@@ -53,7 +53,7 @@ impl CoreGame {
             PortraitId::Portrait1,
             SpriteId::Character4,
             Attributes::new(5, 5, 1, 1),
-            (2, 8),
+            (4, 8),
         );
         alice.known_attack_enhancements.push(OVERWHELMING);
         alice.known_attacked_reactions.push(SIDE_STEP);
@@ -67,7 +67,7 @@ impl CoreGame {
             .known_actions
             .push(BaseAction::CastSpell(LUNGE_ATTACK));
         alice.armor.set(Some(LEATHER_ARMOR));
-        alice.set_weapon(HandType::MainHand, DAGGER);
+        alice.set_weapon(HandType::MainHand, RAPIER);
         //alice.set_shield(SMALL_SHIELD);
 
         let skeleton1 = Character::new(
@@ -1030,8 +1030,8 @@ impl CoreGame {
         }
     }
 
-    fn perform_losing_health(&self, character: &Character, amount: u32) {
-        character.health.lose(amount);
+    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32{
+        let amount_lost = character.health.lose(amount);
 
         if character.health.current() <= character.health.max / 3 {
             character.receive_condition(Condition::NearDeath);
@@ -1045,6 +1045,8 @@ impl CoreGame {
             character.conditions.borrow_mut().near_death = false;
             character.conditions.borrow_mut().dead = true;
         }
+
+        amount_lost
     }
 
     async fn log(&self, line: impl Into<String>) {
@@ -1395,47 +1397,52 @@ impl CoreGame {
     async fn perform_end_of_turn_character(&mut self) {
         let character = self.active_character();
         let name = character.name;
+        let conditions = &character.conditions;
 
-        if character.conditions.borrow().bleeding > 0 {
-            self.perform_losing_health(character, BLEEDING_DAMAGE_AMOUNT);
-            character.conditions.borrow_mut().bleeding -= 1;
-            if character.conditions.borrow().bleeding == 0 {
+        let bleed_stacks = conditions.borrow().bleeding;
+        if bleed_stacks > 0 {
+
+            let decay = (bleed_stacks / 2).max(1);
+            let damage = self.perform_losing_health(character, decay);
+            self.log(format!("{} took {} damage from Bleeding", name, damage)).await;
+            conditions.borrow_mut().bleeding -= decay;
+            if conditions.borrow().bleeding == 0 {
                 self.log(format!("{} stopped Bleeding", name)).await;
             }
         }
-        if character.conditions.borrow().weakened > 0 {
-            character.conditions.borrow_mut().weakened = 0;
+        if conditions.borrow().weakened > 0 {
+            conditions.borrow_mut().weakened = 0;
             self.log(format!("{} is no longer Weakened", name)).await;
         }
-        if character.conditions.borrow().raging {
-            character.conditions.borrow_mut().raging = false;
+        if conditions.borrow().raging {
+            conditions.borrow_mut().raging = false;
             self.log(format!("{} stopped Raging", name)).await;
         }
-        if character.conditions.borrow().exposed > 0 {
-            character.conditions.borrow_mut().exposed -= 1;
-            if character.conditions.borrow().exposed == 0 {
+        if conditions.borrow().exposed > 0 {
+            conditions.borrow_mut().exposed -= 1;
+            if conditions.borrow().exposed == 0 {
                 self.log(format!("{} is no longer Exposed", name)).await;
             }
         }
 
         let mut new_ap = MAX_ACTION_POINTS;
-        if character.conditions.borrow().near_death {
+        if conditions.borrow().near_death {
             new_ap = new_ap.saturating_sub(2);
         }
-        if character.conditions.borrow().slowed > 0 {
+        if conditions.borrow().slowed > 0 {
             new_ap = new_ap.saturating_sub(2);
         }
         character.action_points.current.set(new_ap);
 
-        if character.conditions.borrow().slowed > 0 {
-            character.conditions.borrow_mut().slowed -= 1;
-            if character.conditions.borrow().slowed == 0 {
+        if conditions.borrow().slowed > 0 {
+            conditions.borrow_mut().slowed -= 1;
+            if conditions.borrow().slowed == 0 {
                 self.log(format!("{} is no longer Slowed", name)).await;
             }
         }
 
-        character.conditions.borrow_mut().mainhand_exertion = 0;
-        character.conditions.borrow_mut().offhand_exertion = 0;
+        conditions.borrow_mut().mainhand_exertion = 0;
+        conditions.borrow_mut().offhand_exertion = 0;
         let stamina_gain = (character.stamina.max as f32 / 3.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
     }
@@ -1825,7 +1832,7 @@ impl Condition {
         match self {
             Protected(_) => "Gains +3 armor",
             Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
-            Bleeding(_) => "Loses 1 health at end of turn",
+            Bleeding(_) => "End of turn: 50% stacks decay, 1 damage for each decayed",
             Braced => "Gain +3 evasion against the next incoming attack",
             Raging => "Gains advantage on melee attacks until end of turn",
             Distracted => "-6 evasion against the next incoming attack",
@@ -3155,8 +3162,11 @@ impl NumberedResource {
         self.current.get()
     }
 
-    fn lose(&self, amount: u32) {
-        self.current.set(self.current.get().saturating_sub(amount));
+    fn lose(&self, amount: u32) -> u32{
+        let prev = self.current.get();
+        let new = self.current.get().saturating_sub(amount);
+        self.current.set(new);
+        prev - new
     }
 
     fn spend(&self, amount: u32) {

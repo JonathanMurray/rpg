@@ -54,6 +54,7 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
                     }
                 }
                 BaseAction::Move => {
+                    // TODO account for terrain
                     let mut pathfind_grid = PathfindGrid::new(grid_dimensions);
                     for (id, character) in game.characters.iter_with_ids() {
                         if *id == game.active_character_id {
