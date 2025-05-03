@@ -339,6 +339,17 @@ pub const SCREAM: Spell = Spell {
     stamina_cost: 0,
 
     modifier: SpellModifier::Spell,
+    target: SpellTarget::None {
+        self_area: Some((
+            Range::Ranged(3),
+            SpellEffect::Enemy(SpellEnemyEffect {
+                defense_type: Some(DefenseType::Will),
+                damage: None,
+                on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
+            }),
+        )),
+        self_effect: None,
+    },
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Shriek",
@@ -356,17 +367,6 @@ pub const SCREAM: Spell = Spell {
         None,
     ],
 
-    target: SpellTarget::None {
-        self_area: Some((
-            Range::Ranged(3),
-            SpellEffect::Enemy(SpellEnemyEffect {
-                defense_type: Some(DefenseType::Will),
-                damage: None,
-                on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
-            }),
-        )),
-        self_effect: None,
-    },
     animation_color: BLUE,
 };
 
@@ -400,7 +400,7 @@ pub const SHACKLED_MIND: Spell = Spell {
             mana_cost: 1,
             stamina_cost: 0,
             effect: SpellEnhancementEffect {
-                increased_range_tenths: 20,
+                increased_range_tenths: 30,
                 ..SpellEnhancementEffect::default()
             },
         }),
@@ -468,6 +468,13 @@ pub const HEAL: Spell = Spell {
     stamina_cost: 0,
 
     modifier: SpellModifier::Spell,
+    target: SpellTarget::Ally {
+        range: Range::Ranged(3),
+        effect: SpellAllyEffect {
+            healing: 3,
+            apply: None,
+        },
+    },
     possible_enhancements: [
         Some(SpellEnhancement {
             name: "Reach",
@@ -496,13 +503,7 @@ pub const HEAL: Spell = Spell {
         }),
         None,
     ],
-    target: SpellTarget::Ally {
-        range: Range::Ranged(3),
-        effect: SpellAllyEffect {
-            healing: 3,
-            apply: None,
-        },
-    },
+
     animation_color: GREEN,
 };
 
@@ -604,7 +605,7 @@ pub const FIREBALL: Spell = Spell {
             mana_cost: 1,
             stamina_cost: 0,
             effect: SpellEnhancementEffect {
-                increased_range_tenths: 20,
+                increased_range_tenths: 30,
                 ..SpellEnhancementEffect::default()
             },
         }),

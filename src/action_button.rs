@@ -19,7 +19,7 @@ use crate::{
     core::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
         DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
-        SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect,
+        SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
         SpellModifier, SpellReach, SpellTarget, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
@@ -129,7 +129,7 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
         technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
     }
 
-    if effect.cast_twice {}
+    
 
     if let Some(apply_effect) = effect.on_hit {
         describe_apply_effect(apply_effect, &mut technical_description);
@@ -310,7 +310,7 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
     match effect.damage {
         Some(SpellDamage::Static(n)) => technical_description.push(format!("  {} damage", n)),
         Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}^ damage", n)),
-        Some(SpellDamage::Weapon) => technical_description.push(format!("  weapon damage")),
+        Some(SpellDamage::Weapon) => technical_description.push("  weapon damage".to_string()),
         None => {}
     }
 
@@ -456,7 +456,7 @@ impl ActionButton {
             let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = ActionButtonTooltip {
-                    header: format!("Opportunity attack (1 AP)"),
+                    header: "Opportunity attack (1 AP)".to_string(),
                     description: None,
                     technical_description: vec![
                         format!("{} damage", equipped_weapon.unwrap().damage),

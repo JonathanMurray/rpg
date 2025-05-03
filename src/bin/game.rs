@@ -84,12 +84,15 @@ async fn main() {
         empty_grass.clone(),
     ];
 
+    let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
+
     let gfx_user_interface = UserInterface::new(
         &core_game,
         sprites,
         icons,
         equipment_icons,
         portrait_textures,
+        terrain_atlas,
         font,
         decorative_font,
         grid_big_font,

@@ -1,6 +1,10 @@
 use std::{collections::HashMap, hash::Hash};
 
-use macroquad::texture::{load_texture, FilterMode, Texture2D};
+use macroquad::{
+    color::WHITE,
+    math::Rect,
+    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
+};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
@@ -158,6 +162,80 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::Shirt, "eq_shirt.png"),
     ])
     .await
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum TerrainId {
+    Bush,
+    Boulder2,
+    TreeStump,
+    Water,
+    WaterBeachNorth,
+    WaterBeachEast,
+    WaterBeachSouth,
+    WaterBeachWest,
+    WaterBeachNorthEast,
+    WaterBeachSouthEast,
+    WaterBeachSouthWest,
+    WaterBeachNorthWest,
+    WaterBeachWestNorthEast,
+    WaterBeachNorthEastSouth,
+    WaterBeachEastSouthWest,
+    WaterBeachSouthWestNorth,
+}
+
+pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: f32, y: f32) {
+    let (w, h) = (32.0, 32.0);
+
+    let (col, row, overflow) = match terrain_id {
+        TerrainId::Bush => (0, 6, false),
+        TerrainId::Boulder2 => (1, 5, false),
+        TerrainId::TreeStump => (1, 6, false),
+
+        TerrainId::Water => (2, 3, true),
+        TerrainId::WaterBeachNorth => (2, 1, true),
+        TerrainId::WaterBeachEast => (4, 3, true),
+        TerrainId::WaterBeachSouth => (2, 4, true),
+        TerrainId::WaterBeachWest => (1, 3, true),
+
+        TerrainId::WaterBeachNorthEast => (4, 1, true),
+        TerrainId::WaterBeachSouthEast => (4, 4, true),
+        TerrainId::WaterBeachSouthWest => (1, 4, true),
+        TerrainId::WaterBeachNorthWest => (1, 1, true),
+
+        TerrainId::WaterBeachNorthEastSouth => (5, 2, true),
+        TerrainId::WaterBeachEastSouthWest => (3, 5, true),
+        TerrainId::WaterBeachSouthWestNorth => (0, 2, true),
+        TerrainId::WaterBeachWestNorthEast => (3, 0, true),
+    };
+
+    let source_rect = if overflow {
+        let margin = 2.0;
+        Rect::new(
+            col as f32 * w - margin,
+            row as f32 * h - margin,
+            w + 2.0 * margin,
+            h + 2.0 * margin,
+        )
+    } else {
+        Rect::new(col as f32 * w, row as f32 * h, w, h)
+    };
+
+    let size = source_rect.size();
+
+    let dest_size = (cell_w * size.x / 32.0, cell_w * size.y / 32.0);
+
+    let offset = ((cell_w - dest_size.0) / 2.0, (cell_w - dest_size.1) / 2.0);
+
+    let params = DrawTextureParams {
+        dest_size: Some(dest_size.into()),
+
+        source: Some(source_rect),
+
+        ..Default::default()
+    };
+
+    draw_texture_ex(texture, x + offset.0, y + offset.1, WHITE, params);
 }
 
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {

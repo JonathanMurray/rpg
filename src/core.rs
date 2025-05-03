@@ -4,16 +4,15 @@ use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
 use macroquad::color::Color;
-use macroquad::input::is_simulating_mouse_with_touch;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{
-    BOW, BRACE, DAGGER, HEAL, LEATHER_ARMOR, LUNGE_ATTACK, QUICK, RAGE, SHACKLED_MIND, SHIRT,
-    SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWORD, WAR_HAMMER,
+    BOW, DAGGER, LEATHER_ARMOR, LUNGE_ATTACK, RAGE, SHIRT,
+    SMALL_SHIELD, SWEEP_ATTACK, SWORD,
 };
-use crate::data::{CHAIN_MAIL, SIDE_STEP};
-use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING, SCREAM};
+use crate::data::SIDE_STEP;
+use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
@@ -30,7 +29,7 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 1;
+        let active_character_id = 0;
 
         let mut bob = Character::new(
             true,
@@ -38,7 +37,7 @@ impl CoreGame {
             PortraitId::Portrait2,
             SpriteId::Character5,
             Attributes::new(3, 3, 5, 5),
-            (1, 6),
+            (1, 8),
         );
         bob.set_weapon(HandType::MainHand, DAGGER);
         bob.armor.set(Some(SHIRT));
@@ -54,7 +53,7 @@ impl CoreGame {
             PortraitId::Portrait1,
             SpriteId::Character4,
             Attributes::new(5, 5, 1, 1),
-            (2, 6),
+            (2, 8),
         );
         alice.known_attack_enhancements.push(OVERWHELMING);
         alice.known_attack_enhancements.push(OVERWHELMING);
@@ -78,7 +77,7 @@ impl CoreGame {
             PortraitId::Skeleton,
             SpriteId::Skeleton,
             Attributes::new(2, 2, 1, 1),
-            (5, 4),
+            (5, 7),
         );
         skeleton1.set_weapon(HandType::MainHand, BOW);
 
@@ -88,7 +87,7 @@ impl CoreGame {
             PortraitId::Skeleton,
             SpriteId::Skeleton,
             Attributes::new(2, 2, 1, 1),
-            (7, 4),
+            (7, 7),
         );
         skeleton2.set_weapon(HandType::MainHand, DAGGER);
         skeleton2.set_shield(SMALL_SHIELD);
@@ -344,43 +343,39 @@ impl CoreGame {
 
             for other_char in self.characters.iter() {
                 if other_char.player_controlled != character.player_controlled
-                    && within_meele(character.pos(), other_char.pos())
-                    && !within_meele(new_position, other_char.pos())
-                {
-                    if other_char.can_use_opportunity_attack() {
-                        let reactor = other_char;
+                    && within_meele(character.pos(), other_char.pos()) && !within_meele(new_position, other_char.pos()) && other_char.can_use_opportunity_attack() {
+                    let reactor = other_char;
 
-                        let chooses_to_use_opportunity_attack = self
-                            .user_interface
-                            .choose_opportunity_attack(
-                                self,
-                                reactor.id(),
-                                character.id(),
-                                (character.pos(), new_position),
-                            )
-                            .await;
+                    let chooses_to_use_opportunity_attack = self
+                        .user_interface
+                        .choose_opportunity_attack(
+                            self,
+                            reactor.id(),
+                            character.id(),
+                            (character.pos(), new_position),
+                        )
+                        .await;
 
-                        dbg!(chooses_to_use_opportunity_attack);
+                    dbg!(chooses_to_use_opportunity_attack);
 
-                        if chooses_to_use_opportunity_attack {
-                            self.ui_handle_event(
-                                GameEvent::CharacterReactedWithOpportunityAttack {
-                                    reactor: reactor.id(),
-                                },
-                            )
-                            .await;
+                    if chooses_to_use_opportunity_attack {
+                        self.ui_handle_event(
+                            GameEvent::CharacterReactedWithOpportunityAttack {
+                                reactor: reactor.id(),
+                            },
+                        )
+                        .await;
 
-                            reactor.action_points.spend(1);
+                        reactor.action_points.spend(1);
 
-                            self.perform_attack(
-                                reactor.id(),
-                                HandType::MainHand,
-                                vec![],
-                                character.id(),
-                                None,
-                            )
-                            .await;
-                        }
+                        self.perform_attack(
+                            reactor.id(),
+                            HandType::MainHand,
+                            vec![],
+                            character.id(),
+                            None,
+                        )
+                        .await;
                     }
                 }
             }
@@ -452,7 +447,7 @@ impl CoreGame {
 
             let mut detail_lines = vec![];
 
-            let mut advantange_level = 0 as i32;
+            let mut advantange_level = 0_i32;
 
             for enhancement in &enhancements {
                 let bonus = enhancement.effect.bonus_advantage;
@@ -543,6 +538,7 @@ impl CoreGame {
 
                     let outcome = self.perform_spell_enemy_effect(
                         spell.name,
+                        spell.modifier,
                         &enhancements,
                         effect,
                         spell_result,
@@ -558,6 +554,7 @@ impl CoreGame {
                         let area_target_outcomes = self.perform_spell_area_enemy_effect(
                             radius,
                             "AoE",
+                            spell.modifier,
                             &enhancements,
                             caster,
                             target.position.get(),
@@ -613,6 +610,7 @@ impl CoreGame {
 
                     let outcomes = self.perform_spell_area_effect(
                         spell.name,
+                        spell.modifier,
                         &enhancements,
                         caster,
                         target_pos,
@@ -647,9 +645,10 @@ impl CoreGame {
                         target_outcome = Some((caster_id, outcome));
                     }
 
-                    if let Some((mut radius, effect)) = self_area {
+                    if let Some((radius, effect)) = self_area {
                         let outcomes = self.perform_spell_area_effect(
                             spell.name,
+                            spell.modifier,
                             &enhancements,
                             caster,
                             caster.position.get(),
@@ -683,6 +682,7 @@ impl CoreGame {
     fn perform_spell_area_effect(
         &self,
         name: &'static str,
+        modifier: SpellModifier,
         enhancements: &[SpellEnhancement],
         caster: &Character,
         area_center: Position,
@@ -695,6 +695,7 @@ impl CoreGame {
             SpellEffect::Enemy(enemy_area) => self.perform_spell_area_enemy_effect(
                 radius,
                 name,
+                modifier,
                 enhancements,
                 caster,
                 area_center,
@@ -825,6 +826,7 @@ impl CoreGame {
         &self,
         mut radius: Range,
         name: &'static str,
+        modifier: SpellModifier,
         enhancements: &[SpellEnhancement],
         caster: &Character,
         area_center: Position,
@@ -860,6 +862,7 @@ impl CoreGame {
 
                 let outcome = self.perform_spell_enemy_effect(
                     name,
+                    modifier,
                     enhancements,
                     enemy_area,
                     spell_result,
@@ -878,6 +881,7 @@ impl CoreGame {
     fn perform_spell_enemy_effect(
         &self,
         spell_name: &'static str,
+        modifier: SpellModifier,
         enhancements: &[SpellEnhancement],
         enemy_effect: SpellEnemyEffect,
         spell_result: u32,
@@ -1004,15 +1008,19 @@ impl CoreGame {
 
             SpellTargetOutcome::HitEnemy { damage }
         } else {
-            match enemy_effect.defense_type {
-                Some(DefenseType::Will) => {
-                    detail_lines.push(format!("  {} resisted the spell", target.name))
+            let line = match (modifier, enemy_effect.defense_type) {
+                (_, None) => unreachable!("uncontested effect cannot fail"),
+                (SpellModifier::Spell, Some(DefenseType::Will)) => {
+                    format!("  {} resisted the spell", target.name)
                 }
-                Some(DefenseType::Evasion) => {
-                    detail_lines.push(format!("  The spell missed {}", target.name))
+                (SpellModifier::Spell, Some(DefenseType::Evasion)) => {
+                    format!("  The spell missed {}", target.name)
                 }
-                None => unreachable!("uncontested effect cannot fail"),
-            }
+                (SpellModifier::Attack(_), Some(_)) => {
+                    format!("  The ability missed {}", target.name)
+                }
+            };
+            detail_lines.push(line);
             SpellTargetOutcome::Resist
         }
     }
@@ -1981,8 +1989,8 @@ pub struct Spell {
     pub stamina_cost: u32,
 
     pub modifier: SpellModifier,
-    pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub target: SpellTarget,
+    pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub animation_color: Color,
 }
 

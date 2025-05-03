@@ -1,10 +1,11 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
+    fs,
     rc::Rc,
 };
 
-use macroquad::{conf, rand};
+use macroquad::rand;
 
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
@@ -37,7 +38,7 @@ use crate::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
     },
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, TerrainId},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -169,12 +170,12 @@ impl ConfiguredAction {
                         }
                     }
                     let target_char = characters.get(*target_id);
-                    let can_reach = relevant_character.can_reach_with_spell(
+                    
+                    relevant_character.can_reach_with_spell(
                         *spell,
                         selected_enhancements,
                         target_char.position.get(),
-                    );
-                    can_reach
+                    )
                 }
 
                 ActionTarget::Position(target_pos) => {
@@ -364,6 +365,7 @@ impl UserInterface {
         icons: HashMap<IconId, Texture2D>,
         equipment_icons: HashMap<EquipmentIconId, Texture2D>,
         portrait_textures: HashMap<PortraitId, Texture2D>,
+        terrain_atlas: Texture2D,
         simple_font: Font,
         decorative_font: Font,
         big_font: Font,
@@ -574,7 +576,7 @@ impl UserInterface {
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
-        let grid_dimensions = (16, 12);
+        let grid_dimensions = (25, 20);
         let mut cell_backgrounds = vec![];
         for _ in 0..(grid_dimensions.0 * grid_dimensions.1) {
             let i = rand::gen_range(0, background_textures.len());
@@ -587,6 +589,67 @@ impl UserInterface {
             .unwrap()
             .0;
 
+        let map_str = fs::read_to_string("map.txt").unwrap();
+
+        dbg!(&map_str);
+
+        let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
+
+        let mut water_grid: HashSet<Position> = Default::default();
+
+        let mut row = 0;
+        for line in map_str.lines() {
+            if line.starts_with('+') {
+                continue;
+            }
+
+            for (col, ch) in line.chars().enumerate() {
+                let pos = (col as i32, row);
+                match ch {
+                    'W' => {
+                        water_grid.insert(pos);
+                    }
+                    'B' => {
+                        terrain_objects.insert(pos, TerrainId::Bush);
+                    }
+                    'R' => {
+                        terrain_objects.insert(pos, TerrainId::Boulder2);
+                    }
+                    'S' => {
+                        terrain_objects.insert(pos, TerrainId::TreeStump);
+                    }
+                    ' ' => {}
+                    _ => panic!("Unhandled map object: {}", ch),
+                }
+            }
+            row += 1;
+        }
+
+        for (x, y) in water_grid.iter().copied() {
+            let id = match (
+                water_grid.contains(&(x, y - 1)),
+                water_grid.contains(&(x + 1, y)),
+                water_grid.contains(&(x, y + 1)),
+                water_grid.contains(&(x - 1, y)),
+            ) {
+                (false, false, false, _) => TerrainId::WaterBeachNorthEastSouth,
+                (_, false, false, false) => TerrainId::WaterBeachEastSouthWest,
+                (false, _, false, false) => TerrainId::WaterBeachSouthWestNorth,
+                (false, false, _, false) => TerrainId::WaterBeachWestNorthEast,
+                (false, false, _, _) => TerrainId::WaterBeachNorthEast,
+                (_, false, false, _) => TerrainId::WaterBeachSouthEast,
+                (_, _, false, false) => TerrainId::WaterBeachSouthWest,
+                (false, _, _, false) => TerrainId::WaterBeachNorthWest,
+                (false, _, _, _) => TerrainId::WaterBeachNorth,
+                (_, false, _, _) => TerrainId::WaterBeachEast,
+                (_, _, false, _) => TerrainId::WaterBeachSouth,
+                (_, _, _, false) => TerrainId::WaterBeachWest,
+                _ => TerrainId::Water,
+            };
+
+            terrain_objects.insert((x, y), id);
+        }
+
         let game_grid = GameGrid::new(
             first_player_character_id,
             characters.clone(),
@@ -594,8 +657,10 @@ impl UserInterface {
             big_font.clone(),
             simple_font.clone(),
             background_textures,
+            terrain_atlas,
             grid_dimensions,
             cell_backgrounds,
+            terrain_objects,
         );
 
         let player_portraits = PlayerPortraits::new(
@@ -823,13 +888,17 @@ impl UserInterface {
 
                 let mut circumstance_advantage = None;
 
+                let mut details = vec![];
+
                 match reach {
                     ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
                         if let ActionReach::YesButDisadvantage(reason) = reach {
                             circumstance_advantage = Some((-1, reason, Goodness::Bad));
                         }
                     }
-                    ActionReach::No => {}
+                    ActionReach::No => {
+                        details.push(("Can not reach!".to_string(), Goodness::Bad));
+                    }
                 }
 
                 // We cannot know yet if the defender will react
@@ -843,8 +912,6 @@ impl UserInterface {
                     selected_enhancements,
                     defender_reaction,
                 ));
-
-                let mut details = vec![];
 
                 for (term, bonus) in self
                     .active_character()
@@ -1165,7 +1232,7 @@ impl UserInterface {
 
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
-                self.log.add(format!("Opportunity attack:"));
+                self.log.add("Opportunity attack:".to_string());
                 self.game_grid.add_text_effect(
                     reactor.pos(),
                     0.0,
@@ -1309,12 +1376,10 @@ impl UserInterface {
                         spell.name,
                         self.characters.get(target_id).name
                     )
+                } else if matches!(spell.modifier, SpellModifier::Spell) {
+                    format!("{} cast {}", self.characters.get(caster).name, spell.name,)
                 } else {
-                    if matches!(spell.modifier, SpellModifier::Spell) {
-                        format!("{} cast {}", self.characters.get(caster).name, spell.name,)
-                    } else {
-                        format!("{} used {}", self.characters.get(caster).name, spell.name,)
-                    }
+                    format!("{} used {}", self.characters.get(caster).name, spell.name,)
                 };
 
                 if let Some((_target_id, outcome)) = target_outcome {

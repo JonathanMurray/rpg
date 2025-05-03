@@ -1,0 +1,9 @@
++----------------------------
+B     W
+  S  WWWW
+     WWWWWWWW W
+SSS WWWWWWWWWWWW
+  BB  WWWWW WWW
+ BBB    WW    W
+   R    W
++----------------------------

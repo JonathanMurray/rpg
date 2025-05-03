@@ -24,7 +24,7 @@ use macroquad::{
 
 use crate::{
     core::{
-        ActionReach, ActionTarget, Character, Goodness, Position, SpellEnhancementEffect,
+        ActionReach, ActionTarget, Character, Goodness, Position,
         SpellReach, SpellTarget,
     },
     drawing::{
@@ -32,7 +32,7 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
-    textures::SpriteId,
+    textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -43,6 +43,7 @@ const BACKGROUND_COLOR: Color = GRAY;
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.04);
+const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
 const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
 const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
@@ -125,7 +126,9 @@ pub struct GameGrid {
     simple_font: Font,
     cell_w: f32,
     background_textures: Vec<Texture2D>,
+    terrain_atlas: Texture2D,
     cell_backgrounds: Vec<usize>,
+    terrain_objects: HashMap<(i32, i32), TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: PathfindGrid,
     characters: Characters,
@@ -159,8 +162,10 @@ impl GameGrid {
         big_font: Font,
         simple_font: Font,
         background_textures: Vec<Texture2D>,
+        terrain_atlas: Texture2D,
         grid_dimensions: (u32, u32),
         cell_backgrounds: Vec<usize>,
+        terrain_objects: HashMap<Position, TerrainId>,
     ) -> Self {
         let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
@@ -185,7 +190,9 @@ impl GameGrid {
             big_font,
             simple_font,
             background_textures,
+            terrain_atlas,
             cell_backgrounds,
+            terrain_objects,
         }
     }
 
@@ -234,18 +241,7 @@ impl GameGrid {
 
         self.selected_player_character_id = selected_player_character_id;
 
-        self.pathfind_grid.blocked_positions.clear();
-        for character in self.characters.iter() {
-            assert!(
-                !self
-                    .pathfind_grid
-                    .blocked_positions
-                    .contains(&character.pos()),
-                "blocked position: {}",
-                character.name
-            );
-            self.pathfind_grid.blocked_positions.insert(character.pos());
-        }
+        self.refresh_pathfind_grid_blocked_positions();
 
         let pos = self.characters.get(self.active_character_id).pos();
         self.pathfind_grid.run(pos, self.movement_range.max());
@@ -274,6 +270,28 @@ impl GameGrid {
         }
         if is_key_down(KeyCode::Down) {
             self.pan_camera(0.0, camera_speed);
+        }
+    }
+
+    fn refresh_pathfind_grid_blocked_positions(&mut self) {
+        self.pathfind_grid.blocked_positions.clear();
+        for character in self.characters.iter() {
+            assert!(
+                !self
+                    .pathfind_grid
+                    .blocked_positions
+                    .contains(&character.pos()),
+                "blocked position: {}",
+                character.name
+            );
+            self.pathfind_grid.blocked_positions.insert(character.pos());
+        }
+        for (pos, terrain) in &self.terrain_objects {
+            assert!(
+                !self.pathfind_grid.blocked_positions.contains(pos),
+                "blocked position: {pos:?}, {terrain:?}",
+            );
+            self.pathfind_grid.blocked_positions.insert(*pos);
         }
     }
 
@@ -421,20 +439,6 @@ impl GameGrid {
         )
     }
 
-    /*
-    pub fn clear_players_action_target(&mut self) {
-        self.players_action_target = ActionTarget::None;
-    }
-
-
-
-    fn players_action_target(&self) -> ActionTarget {
-
-
-        self.players_action_target
-    }
-     */
-
     pub fn set_enemys_target(&mut self, target_character_id: CharacterId) {
         self.enemys_target = Some(target_character_id);
     }
@@ -442,38 +446,34 @@ impl GameGrid {
     fn draw_background(&self) {
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
-            /*
-            draw_line(
-                x0,
-                self.grid_y_to_screen(0),
-                x0,
-                self.grid_y_to_screen(self.grid_dimensions.1 as i32),
-                1.0,
-                GRID_COLOR,
-            );
-             */
+
             for row in 0..self.grid_dimensions.1 as i32 + 1 {
                 let y0 = self.grid_y_to_screen(row);
-                /*
-                draw_line(
-                    self.grid_x_to_screen(0),
-                    y0,
-                    self.grid_x_to_screen(self.grid_dimensions.0 as i32),
-                    y0,
-                    1.0,
-                    GRID_COLOR,
-                );
-                 */
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    let dest_size = Vec2::new(self.cell_w, self.cell_w);
                     let params = DrawTextureParams {
-                        dest_size: Some(Vec2::new(self.cell_w, self.cell_w)),
+                        dest_size: Some(dest_size),
                         ..Default::default()
                     };
                     let i =
                         self.cell_backgrounds[(row * self.grid_dimensions.0 as i32 + col) as usize];
                     let texture = &self.background_textures[i];
                     draw_texture_ex(texture, x0, y0, WHITE, params);
+                }
+            }
+        }
+
+        for col in 0..self.grid_dimensions.0 as i32 + 1 {
+            let x0 = self.grid_x_to_screen(col);
+
+            for row in 0..self.grid_dimensions.1 as i32 + 1 {
+                let y0 = self.grid_y_to_screen(row);
+
+                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    if let Some(terrain_id) = self.terrain_objects.get(&(col, row)) {
+                        draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                    }
                 }
             }
         }
@@ -590,7 +590,7 @@ impl GameGrid {
         }) = ui_state
         {
             if !selected_movement_path.is_empty() {
-                self.draw_movement_path(&selected_movement_path, false);
+                self.draw_movement_path(selected_movement_path, false);
             }
         }
 
@@ -1100,7 +1100,7 @@ impl GameGrid {
         movement_to_target: Vec<(i32, i32)>,
     ) {
         if movement_to_target.is_empty() {
-            let invalid_path = vec![actor_pos, target_pos];
+            let invalid_path = [actor_pos, target_pos];
             self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 5.0);
         } else {
             self.draw_target_crosshair(
@@ -1458,7 +1458,8 @@ impl GameGrid {
 
         for pos in self.pathfind_grid.routes.keys() {
             if self.is_within_grid(*pos) && *pos != active_char_pos {
-                self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+                self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 3.0, 2.0);
+                //self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
             }
         }
     }
