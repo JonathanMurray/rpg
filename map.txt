@@ -1,12 +1,17 @@
 +----------------------------
-B     W
-  S  WWWW
-     WWWWWWWW W
-SSS WWWWWWWWWWWW
-  BB  WWWWW WWW
- BBB    WW    W
-   R  WWW
-        W
-      WWW
-       WW
+BBBBBBBBBBBBBBBBBBBB
+B    WWWW          B
+B    WWWWWWWW W    B
+B   WWWWWWWWWWWW   B
+B      WWWW WWW    B
+BBB     WW    W    B
+BRR   WWW          B
+BR                 B
+B                  B
+B       W     S    B
+B     WWW     SS   B
+B     WWW          B
+B     WWW          B
+B                  B
+BBBBBBBBBBBBBBBBBBBB
 +----------------------------

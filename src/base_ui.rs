@@ -621,7 +621,7 @@ impl Container {
                 let (mouse_x, mouse_y) = mouse_position();
                 if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
                     let (_dx, dy) = mouse_wheel();
-                    if dy != 0.0 {
+                    if dy != 0.0 && content_size.1 > size.1 {
                         let mut new_offset = (scroll.offset.get()
                             - dy.signum() * scroll.scroll_speed)
                             .min(content_size.1 - size.1)

@@ -3,7 +3,7 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, AttackHitEffect, Condition, DefenseType, OnAttackedReaction,
+        AttackEnhancementOnHitEffect, Condition, DefenseType, OnAttackedReaction,
         OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
         Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect,
         SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon,
@@ -94,10 +94,10 @@ pub const SWORD: Weapon = Weapon {
     weight: 2,
 };
 
-const DECEPTIVE: AttackEnhancement = AttackEnhancement {
-    name: "Deceptive",
+const FEINT: AttackEnhancement = AttackEnhancement {
+    name: "Feint",
     description: "Reduce the target's defense by 6 against the next attack",
-    icon: IconId::Deceptive,
+    icon: IconId::Feint,
     action_point_cost: 0,
     stamina_cost: 0,
     mana_cost: 0,
@@ -115,7 +115,7 @@ pub const RAPIER: Weapon = Weapon {
     damage: 2,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
-    attack_enhancement: Some(DECEPTIVE),
+    attack_enhancement: Some(FEINT),
     on_attacked_reaction: Some(PARRY),
     on_true_hit: None,
     sprite: Some(SpriteId::Rapier),

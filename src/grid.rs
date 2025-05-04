@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -28,7 +28,7 @@ use crate::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
     game_ui::{ConfiguredAction, UiState},
-    pathfind::PathfindGrid,
+    pathfind::{PathfindGrid, Route},
     textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
@@ -36,7 +36,7 @@ use crate::{
     drawing::{draw_arrow, draw_dashed_line},
 };
 
-const BACKGROUND_COLOR: Color = GRAY;
+const BACKGROUND_COLOR: Color = Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.04);
@@ -122,12 +122,12 @@ pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
     cell_w: f32,
-    background_textures: Vec<Texture2D>,
     terrain_atlas: Texture2D,
-    cell_backgrounds: Vec<usize>,
-    terrain_objects: HashMap<(i32, i32), TerrainId>,
+    background: HashMap<Position, TerrainId>,
+    terrain_objects: HashMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
-    pathfind_grid: PathfindGrid,
+    pathfind_grid: Rc<PathfindGrid>,
+    routes: HashMap<Position, Route>,
     characters: Characters,
 
     character_motion: Option<CharacterMotion>,
@@ -158,18 +158,19 @@ impl GameGrid {
         sprites: HashMap<SpriteId, Texture2D>,
         big_font: Font,
         simple_font: Font,
-        background_textures: Vec<Texture2D>,
         terrain_atlas: Texture2D,
-        grid_dimensions: (u32, u32),
-        cell_backgrounds: Vec<usize>,
+        pathfind_grid: Rc<PathfindGrid>,
+        background: HashMap<Position, TerrainId>,
         terrain_objects: HashMap<Position, TerrainId>,
     ) -> Self {
         let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
 
+        let grid_dimensions = pathfind_grid.dimensions();
         Self {
             sprites,
-            pathfind_grid: PathfindGrid::new(grid_dimensions),
+            pathfind_grid,
+            routes: Default::default(),
             dragging_camera_from: None,
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
@@ -186,9 +187,8 @@ impl GameGrid {
             character_motion: None,
             big_font,
             simple_font,
-            background_textures,
             terrain_atlas,
-            cell_backgrounds,
+            background,
             terrain_objects,
         }
     }
@@ -238,10 +238,8 @@ impl GameGrid {
 
         self.selected_player_character_id = selected_player_character_id;
 
-        self.refresh_pathfind_grid_blocked_positions();
-
         let pos = self.characters.get(self.active_character_id).pos();
-        self.pathfind_grid.run(pos, self.movement_range.max());
+        self.routes = self.pathfind_grid.run(pos, self.movement_range.max());
 
         for effect in &mut self.effects {
             effect.age += elapsed;
@@ -268,29 +266,6 @@ impl GameGrid {
         if is_key_down(KeyCode::Down) {
             self.pan_camera(0.0, camera_speed);
         }
-    }
-
-    fn refresh_pathfind_grid_blocked_positions(&mut self) {
-        self.pathfind_grid.blocked_positions.clear();
-        for (pos, terrain) in &self.terrain_objects {
-            assert!(
-                !self.pathfind_grid.blocked_positions.contains(pos),
-                "blocked position: {:?}, {:?}", pos, terrain,
-            );
-            self.pathfind_grid.blocked_positions.insert(*pos);
-        }
-        for character in self.characters.iter() {
-            assert!(
-                !self
-                    .pathfind_grid
-                    .blocked_positions
-                    .contains(&character.pos()),
-                "blocked position: {}",
-                character.name
-            );
-            self.pathfind_grid.blocked_positions.insert(character.pos());
-        }
-
     }
 
     fn zoom(&mut self, i: isize) {
@@ -380,15 +355,20 @@ impl GameGrid {
 
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
-        self.pathfind_grid.run(pos, self.movement_range.max());
+        self.routes = self.pathfind_grid.run(pos, self.movement_range.max());
     }
 
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
-        self.position_on_screen.0 + grid_x as f32 * self.cell_w - self.camera_position.0.get()
+        let x =
+            self.position_on_screen.0 + grid_x as f32 * self.cell_w - self.camera_position.0.get();
+
+        x.round()
     }
 
     fn grid_y_to_screen(&self, grid_y: i32) -> f32 {
-        self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get()
+        let y =
+            self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get();
+        y.round()
     }
 
     fn grid_pos_to_screen(&self, pos: Position) -> (f32, f32) {
@@ -449,15 +429,21 @@ impl GameGrid {
                 let y0 = self.grid_y_to_screen(row);
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    let terrain_id = self.background.get(&(col, row)).unwrap();
+                    draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+
+                    /*
                     let dest_size = Vec2::new(self.cell_w, self.cell_w);
                     let params = DrawTextureParams {
                         dest_size: Some(dest_size),
                         ..Default::default()
                     };
+
                     let i =
                         self.cell_backgrounds[(row * self.grid_dimensions.0 as i32 + col) as usize];
                     let texture = &self.background_textures[i];
                     draw_texture_ex(texture, x0, y0, WHITE, params);
+                     */
                 }
             }
         }
@@ -473,6 +459,12 @@ impl GameGrid {
                         draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
                     }
                 }
+            }
+        }
+
+        for pos in self.pathfind_grid.blocked_positions().iter() {
+            if false {
+                self.draw_cell_outline(*pos, MAGENTA, 0.0, 5.0);
             }
         }
     }
@@ -841,7 +833,7 @@ impl GameGrid {
             let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement)
                 && hovered_character_id.is_none()
             {
-                self.pathfind_grid.routes.get(&mouse_grid_pos)
+                self.routes.get(&mouse_grid_pos)
             } else {
                 None
             };
@@ -1004,7 +996,9 @@ impl GameGrid {
                     }
                 }
             } else if had_non_empty_movement_path && self.dragging_camera_from.is_none() {
-                self.draw_cell_outline(mouse_grid_pos, HOVER_INVALID_MOVEMENT_COLOR, 5.0, 2.0);
+                self.fill_cell(mouse_grid_pos, Color::new(1.0, 0.0, 0.0, 0.2), 4.0);
+                //self.draw_invalid_target_marker(mouse_grid_pos);
+                //self.draw_cell_outline(mouse_grid_pos, HOVER_INVALID_MOVEMENT_COLOR, 0.0, 1.0);
             }
         }
 
@@ -1012,19 +1006,6 @@ impl GameGrid {
             let pos = self.character_screen_pos(self.characters.get(id));
             self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
         }
-
-        // TODO
-        /*
-        if let UiState::ConfiguringAction(ConfiguredAction::Move {
-            selected_movement_path,
-            ..
-        }) = ui_state
-        {
-            if !selected_movement_path.is_empty() {
-                self.draw_movement_path(&selected_movement_path, false);
-            }
-        }
-         */
 
         if let Some(target) = self.players_inspect_target {
             self.draw_cornered_outline(
@@ -1132,7 +1113,7 @@ impl GameGrid {
         ] {
             let x = actor_pos.0 + dx;
             let y = actor_pos.1 + dy;
-            let blocked = self.pathfind_grid.blocked_positions.contains(&(x, y));
+            let blocked = self.pathfind_grid.blocked_positions().contains(&(x, y));
 
             if !blocked && (x - target_pos.0).abs() <= 1 && (y - target_pos.1).abs() <= 1 {
                 movement = vec![(x, y)];
@@ -1369,14 +1350,14 @@ impl GameGrid {
         start: Position,
         destination: Position,
     ) -> Vec<(f32, Position)> {
-        let route = self.pathfind_grid.routes.get(&destination).unwrap();
+        let route = self.routes.get(&destination).unwrap();
         let mut dist = route.distance_from_start;
 
         let mut path = vec![(dist, destination)];
         let mut pos = route.came_from;
 
         loop {
-            let route = self.pathfind_grid.routes.get(&pos).unwrap();
+            let route = self.routes.get(&pos).unwrap();
             dist = route.distance_from_start;
             path.push((dist, pos));
             if pos == start {
@@ -1454,9 +1435,9 @@ impl GameGrid {
         // TODO: Keep this or not?
         self.draw_move_range_indicator(active_char_pos);
 
-        for pos in self.pathfind_grid.routes.keys() {
+        for pos in self.routes.keys() {
             if self.is_within_grid(*pos) && *pos != active_char_pos {
-                self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 3.0, 2.0);
+                self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 1.0, 2.0);
                 //self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
             }
         }
@@ -1556,8 +1537,7 @@ impl GameGrid {
         let range_ceil = range.ceil() as i32;
 
         let within = |x: i32, y: i32| {
-            self.pathfind_grid
-                .routes
+            self.routes
                 .get(&(x, y))
                 .map(|route| route.distance_from_start <= range)
                 .unwrap_or(false)

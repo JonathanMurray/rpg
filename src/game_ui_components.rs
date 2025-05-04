@@ -510,9 +510,10 @@ impl Log {
     }
 
     pub fn draw(&self, x: f32, y: f32) {
-        //draw_line(x, y, x, y + 350.0, 1.0, DARKGRAY);
         self.container.draw(x + self.padding, y + self.padding);
+    }
 
+    pub fn draw_tooltips(&self, x: f32, y: f32) {
         let size = self.size();
         for (i, text_line) in self.text_lines.iter().enumerate() {
             if let Some(line_pos) = text_line.has_been_hovered.take() {

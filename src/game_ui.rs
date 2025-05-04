@@ -1,11 +1,9 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::{HashMap, HashSet},
-    fs,
+    collections::HashMap,
     rc::Rc,
 };
 
-use macroquad::rand;
 
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
@@ -37,8 +35,9 @@ use crate::{
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
     },
+    init::{GameInitState},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, TerrainId},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -369,7 +368,7 @@ impl UserInterface {
         simple_font: Font,
         decorative_font: Font,
         big_font: Font,
-        background_textures: Vec<Texture2D>,
+        init_state: GameInitState,
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -576,12 +575,7 @@ impl UserInterface {
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
-        let grid_dimensions = (25, 20);
-        let mut cell_backgrounds = vec![];
-        for _ in 0..(grid_dimensions.0 * grid_dimensions.1) {
-            let i = rand::gen_range(0, background_textures.len());
-            cell_backgrounds.push(i);
-        }
+        let grid_dimensions = init_state.pathfind_grid.dimensions();
 
         let first_player_character_id = characters
             .iter_with_ids()
@@ -589,66 +583,8 @@ impl UserInterface {
             .unwrap()
             .0;
 
-        let map_str = fs::read_to_string("map.txt").unwrap();
-
-        dbg!(&map_str);
-
-        let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
-
-        let mut water_grid: HashSet<Position> = Default::default();
-
-        let mut row = 0;
-        for line in map_str.lines() {
-            if line.starts_with('+') {
-                continue;
-            }
-
-            for (col, ch) in line.chars().enumerate() {
-                let pos = (col as i32, row);
-                match ch {
-                    'W' => {
-                        water_grid.insert(pos);
-                    }
-                    'B' => {
-                        terrain_objects.insert(pos, TerrainId::Bush);
-                    }
-                    'R' => {
-                        terrain_objects.insert(pos, TerrainId::Boulder2);
-                    }
-                    'S' => {
-                        terrain_objects.insert(pos, TerrainId::TreeStump);
-                    }
-                    ' ' => {}
-                    _ => panic!("Unhandled map object: {}", ch),
-                }
-            }
-            row += 1;
-        }
-
-        for (x, y) in water_grid.iter().copied() {
-            let id = match (
-                water_grid.contains(&(x, y - 1)),
-                water_grid.contains(&(x + 1, y)),
-                water_grid.contains(&(x, y + 1)),
-                water_grid.contains(&(x - 1, y)),
-            ) {
-                (false, false, false, _) => TerrainId::WaterBeachNorthEastSouth,
-                (_, false, false, false) => TerrainId::WaterBeachEastSouthWest,
-                (false, _, false, false) => TerrainId::WaterBeachSouthWestNorth,
-                (false, false, _, false) => TerrainId::WaterBeachWestNorthEast,
-                (false, false, _, _) => TerrainId::WaterBeachNorthEast,
-                (_, false, false, _) => TerrainId::WaterBeachSouthEast,
-                (_, _, false, false) => TerrainId::WaterBeachSouthWest,
-                (false, _, _, false) => TerrainId::WaterBeachNorthWest,
-                (false, _, _, _) => TerrainId::WaterBeachNorth,
-                (_, false, _, _) => TerrainId::WaterBeachEast,
-                (_, _, false, _) => TerrainId::WaterBeachSouth,
-                (_, _, _, false) => TerrainId::WaterBeachWest,
-                _ => TerrainId::Water,
-            };
-
-            terrain_objects.insert((x, y), id);
-        }
+        let terrain_objects = init_state.terrain_objects;
+        let background = init_state.background;
 
         let game_grid = GameGrid::new(
             first_player_character_id,
@@ -656,10 +592,9 @@ impl UserInterface {
             sprites,
             big_font.clone(),
             simple_font.clone(),
-            background_textures,
             terrain_atlas,
-            grid_dimensions,
-            cell_backgrounds,
+            init_state.pathfind_grid.clone(),
+            background,
             terrain_objects,
         );
 
@@ -753,13 +688,14 @@ impl UserInterface {
         character_ui.action_points_row.draw(430.0, ui_y + 5.0);
         character_ui.resource_bars.draw(400.0, ui_y + 40.0);
 
-        // TODO draw both log tooltips and condition tooltips on a higher layer than the other's background
-
         //self.log.draw(800.0, ui_y);
-        self.log.draw(950.0, ui_y);
+        let log_x = 950.0;
+        self.log.draw(log_x, ui_y);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
         character_ui.conditions_list.draw(800.0, ui_y + 5.0);
+
+        self.log.draw_tooltips(log_x, ui_y);
 
         self.character_portraits.draw(10.0, 10.0);
 

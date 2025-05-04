@@ -179,7 +179,7 @@ impl _GameUserInterfaceConnection {
                 if players_turn {
                     user_interface.set_state(UiState::ChoosingAction);
                 } else {
-                    let action = bot_choose_action(game, user_interface.game_grid.grid_dimensions);
+                    let action = bot_choose_action(game);
                     return UiOutcome::ChoseAction(action);
                 }
             }

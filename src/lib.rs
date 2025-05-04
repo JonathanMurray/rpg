@@ -13,6 +13,7 @@ pub mod game_ui;
 mod game_ui_components;
 pub mod game_ui_connection;
 pub mod grid;
+pub mod init;
 pub mod pathfind;
 pub mod stats_ui;
 pub mod target_ui;

@@ -75,7 +75,7 @@ pub enum IconId {
     LungeAttack,
     Slashing,
     Stabbing,
-    Deceptive,
+    Feint,
     Heal,
     Inferno,
     Energize,
@@ -117,7 +117,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::LungeAttack, "lunge_attack_icon.png"),
         (IconId::Slashing, "slashing_icon.png"),
         (IconId::Stabbing, "stabbing_icon.png"),
-        (IconId::Deceptive, "deceptive_icon.png"),
+        (IconId::Feint, "deceptive_icon.png"),
         (IconId::Inferno, "inferno_icon.png"),
         (IconId::Energize, "energize_icon.png"),
     ])
@@ -172,6 +172,11 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum TerrainId {
+    Grass,
+    Grass2,
+    Grass3,
+    Grass4,
+
     Bush,
     Boulder2,
     TreeStump,
@@ -188,60 +193,115 @@ pub enum TerrainId {
     WaterBeachNorthEastSouth,
     WaterBeachEastSouthWest,
     WaterBeachSouthWestNorth,
+    WaterBeachWestEast,
+    WaterBeachNorthSouth,
 }
 
-pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: f32, y: f32) {
+pub fn draw_terrain(
+    texture: &Texture2D,
+    terrain_id: TerrainId,
+    cell_w: f32,
+    mut x: f32,
+    mut y: f32,
+) {
     let (w, h) = (32.0, 32.0);
 
-    let (col, row, overflow) = match terrain_id {
-        TerrainId::Bush => (0, 6, false),
-        TerrainId::Boulder2 => (1, 5, false),
-        TerrainId::TreeStump => (1, 6, false),
+    let src_margin = 2.0;
+    let dst_margin = src_margin * cell_w / 32.0;
+    let mut top_margin = false;
+    let mut right_margin = false;
+    let mut bot_margin = false;
+    let mut left_margin = false;
+    let (col, row) = match terrain_id {
+        TerrainId::Grass => (0, 8),
+        TerrainId::Grass2 => (1, 8),
+        TerrainId::Grass3 => (2, 8),
+        TerrainId::Grass4 => (3, 8),
 
-        TerrainId::Water => (2, 3, true),
-        TerrainId::WaterBeachNorth => (2, 1, true),
-        TerrainId::WaterBeachEast => (4, 3, true),
-        TerrainId::WaterBeachSouth => (2, 4, true),
-        TerrainId::WaterBeachWest => (1, 3, true),
+        TerrainId::Bush => (0, 7),
+        TerrainId::Boulder2 => (0, 6),
+        TerrainId::TreeStump => (1, 6),
 
-        TerrainId::WaterBeachNorthEast => (4, 1, true),
-        TerrainId::WaterBeachSouthEast => (4, 4, true),
-        TerrainId::WaterBeachSouthWest => (1, 4, true),
-        TerrainId::WaterBeachNorthWest => (1, 1, true),
+        TerrainId::Water => (2, 3),
+        TerrainId::WaterBeachNorth => {
+            top_margin = true;
+            (2, 1)
+        }
+        TerrainId::WaterBeachEast => {
+            right_margin = true;
+            (4, 3)
+        }
+        TerrainId::WaterBeachSouth => {
+            bot_margin = true;
+            (2, 4)
+        }
+        TerrainId::WaterBeachWest => {
+            left_margin = true;
+            (1, 3)
+        }
 
-        TerrainId::WaterBeachNorthEastSouth => (5, 2, true),
-        TerrainId::WaterBeachEastSouthWest => (3, 5, true),
-        TerrainId::WaterBeachSouthWestNorth => (0, 2, true),
-        TerrainId::WaterBeachWestNorthEast => (3, 0, true),
+        TerrainId::WaterBeachNorthEast => (4, 1),
+        TerrainId::WaterBeachSouthEast => (4, 4),
+        TerrainId::WaterBeachSouthWest => (1, 4),
+        TerrainId::WaterBeachNorthWest => (1, 1),
+
+        TerrainId::WaterBeachNorthEastSouth => (5, 2),
+        TerrainId::WaterBeachEastSouthWest => (3, 5),
+        TerrainId::WaterBeachSouthWestNorth => (0, 2),
+        TerrainId::WaterBeachWestNorthEast => (3, 0),
+
+        TerrainId::WaterBeachWestEast => {
+            left_margin = true;
+            right_margin = true;
+            (6, 1)
+        }
+        TerrainId::WaterBeachNorthSouth => {
+            top_margin = true;
+            bot_margin = true;
+            (6, 3)
+        }
     };
 
-    let source_rect = if overflow {
-        let margin = 2.0;
-        Rect::new(
-            col as f32 * w - margin,
-            row as f32 * h - margin,
-            w + 2.0 * margin,
-            h + 2.0 * margin,
-        )
-    } else {
-        Rect::new(col as f32 * w, row as f32 * h, w, h)
-    };
+    let mut src_sides = [
+        col as f32 * w,
+        row as f32 * h,
+        col as f32 * w + w,
+        row as f32 * h + h,
+    ];
 
-    let size = source_rect.size();
-
-    let dest_size = (cell_w * size.x / 32.0, cell_w * size.y / 32.0);
-
-    let offset = ((cell_w - dest_size.0) / 2.0, (cell_w - dest_size.1) / 2.0);
+    if top_margin {
+        src_sides[1] -= src_margin;
+        y -= dst_margin;
+    }
+    if right_margin {
+        src_sides[2] += src_margin;
+    }
+    if bot_margin {
+        src_sides[3] += src_margin;
+    }
+    if left_margin {
+        src_sides[0] -= src_margin;
+        x -= dst_margin;
+    }
+    let src_rect = Rect::new(
+        src_sides[0],
+        src_sides[1],
+        src_sides[2] - src_sides[0],
+        src_sides[3] - src_sides[1],
+    );
+    let src_rect_size = src_rect.size();
+    let dst_size = (
+        cell_w * src_rect_size.x / 32.0,
+        cell_w * src_rect_size.y / 32.0,
+    );
 
     let params = DrawTextureParams {
-        dest_size: Some(dest_size.into()),
-
-        source: Some(source_rect),
-
+        source: Some(src_rect),
+        dest_size: Some(dst_size.into()),
         ..Default::default()
     };
 
-    draw_texture_ex(texture, x + offset.0, y + offset.1, WHITE, params);
+    draw_texture_ex(texture, x, y, WHITE, params);
 }
 
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {

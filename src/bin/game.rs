@@ -16,12 +16,12 @@ use macroquad::{
     window::{clear_background, next_frame, Conf},
 };
 
-use rpg::bot::bot_choose_action;
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
+use rpg::init::init;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture,
@@ -48,9 +48,11 @@ async fn main() {
         window::high_dpi()
     );
 
+    let init_state = init();
+
     let mut game_ui = GameUserInterfaceConnection::uninitialized();
 
-    let core_game = CoreGame::new(game_ui.clone());
+    let core_game = CoreGame::new(game_ui.clone(), &init_state);
 
     let sprites = load_all_sprites().await;
 
@@ -75,6 +77,7 @@ async fn main() {
 
     let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
 
+    /*
     let empty_grass = load_and_init_texture("grass3.png").await;
     let background_textures = vec![
         load_and_init_texture("grass1.png").await,
@@ -83,6 +86,7 @@ async fn main() {
         empty_grass.clone(),
         empty_grass.clone(),
     ];
+     */
 
     let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
 
@@ -96,7 +100,7 @@ async fn main() {
         font,
         decorative_font,
         grid_big_font,
-        background_textures,
+        init_state,
     );
 
     game_ui.init(gfx_user_interface);

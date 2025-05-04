@@ -7,13 +7,9 @@ use macroquad::color::Color;
 
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{
-    BOW, DAGGER, LEATHER_ARMOR, LUNGE_ATTACK, RAGE, SHIRT, SMALL_SHIELD, SWEEP_ATTACK, SWORD,
-};
-use crate::data::{CHAIN_MAIL, RAPIER, SIDE_STEP, WAR_HAMMER};
-use crate::data::{FIREBALL, MIND_BLAST, OVERWHELMING};
-
 use crate::game_ui_connection::GameUserInterfaceConnection;
+use crate::init::GameInitState;
+use crate::pathfind::PathfindGrid;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 
 pub type Position = (i32, i32);
@@ -24,80 +20,16 @@ pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
     user_interface: GameUserInterfaceConnection,
+    pub pathfind_grid: Rc<PathfindGrid>,
 }
 
 impl CoreGame {
-    pub fn new(user_interface: GameUserInterfaceConnection) -> Self {
-        let active_character_id = 0;
-
-        let mut bob = Character::new(
-            true,
-            "Bob",
-            PortraitId::Portrait2,
-            SpriteId::Character5,
-            Attributes::new(3, 3, 5, 5),
-            (1, 8),
-        );
-        bob.set_weapon(HandType::MainHand, SWORD);
-        bob.set_weapon(HandType::MainHand, BOW);
-        bob.armor.set(Some(SHIRT));
-
-        bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
-        bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
-        //bob.known_actions.push(BaseAction::CastSpell(HEAL));
-        //bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
-
-        let mut alice = Character::new(
-            true,
-            "Alice",
-            PortraitId::Portrait1,
-            SpriteId::Character4,
-            Attributes::new(5, 5, 1, 1),
-            (4, 8),
-        );
-        alice.known_attack_enhancements.push(OVERWHELMING);
-        alice.known_attacked_reactions.push(SIDE_STEP);
-        //alice.known_attack_enhancements.push(QUICK);
-        //alice.known_attack_enhancements.push(SMITE);
-        alice.known_on_hit_reactions.push(RAGE);
-        alice
-            .known_actions
-            .push(BaseAction::CastSpell(SWEEP_ATTACK));
-        alice
-            .known_actions
-            .push(BaseAction::CastSpell(LUNGE_ATTACK));
-        alice.armor.set(Some(LEATHER_ARMOR));
-        alice.set_weapon(HandType::MainHand, RAPIER);
-        //alice.set_shield(SMALL_SHIELD);
-
-        let skeleton1 = Character::new(
-            false,
-            "Skeleton",
-            PortraitId::Skeleton,
-            SpriteId::Skeleton,
-            Attributes::new(2, 2, 1, 1),
-            (5, 7),
-        );
-        skeleton1.armor.set(Some(CHAIN_MAIL));
-        skeleton1.set_weapon(HandType::MainHand, BOW);
-
-        let skeleton2 = Character::new(
-            false,
-            "Skeleton",
-            PortraitId::Skeleton,
-            SpriteId::Skeleton,
-            Attributes::new(2, 2, 1, 1),
-            (7, 7),
-        );
-        skeleton2.set_weapon(HandType::MainHand, DAGGER);
-        skeleton2.set_shield(SMALL_SHIELD);
-
-        let characters = Characters::new(vec![alice, bob, skeleton1, skeleton2]);
-
+    pub fn new(user_interface: GameUserInterfaceConnection, init_state: &GameInitState) -> Self {
         Self {
-            characters,
-            active_character_id,
+            characters: init_state.characters.clone(),
+            active_character_id: init_state.active_character_id,
             user_interface,
+            pathfind_grid: init_state.pathfind_grid.clone(),
         }
     }
 
@@ -185,8 +117,12 @@ impl CoreGame {
                 dbg!(self.active_character_id);
             }
 
+            for ch in self.characters.iter() {
+                if ch.is_dead() {
+                    self.pathfind_grid.set_blocked(ch.pos(), false);
+                }
+            }
             for id in self.characters.remove_dead() {
-                println!("HANDLE EVENT DIED: {}", id);
                 let new_active = if active_character_died {
                     Some(self.active_character_id)
                 } else {
@@ -383,6 +319,9 @@ impl CoreGame {
 
             let prev_position = character.position.get();
             let id = character.id();
+
+            self.pathfind_grid.set_blocked(prev_position, false);
+            self.pathfind_grid.set_blocked(new_position, true);
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
@@ -1030,7 +969,7 @@ impl CoreGame {
         }
     }
 
-    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32{
+    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
 
         if character.health.current() <= character.health.max / 3 {
@@ -1401,10 +1340,10 @@ impl CoreGame {
 
         let bleed_stacks = conditions.borrow().bleeding;
         if bleed_stacks > 0 {
-
             let decay = (bleed_stacks / 2).max(1);
             let damage = self.perform_losing_health(character, decay);
-            self.log(format!("{} took {} damage from Bleeding", name, damage)).await;
+            self.log(format!("{} took {} damage from Bleeding", name, damage))
+                .await;
             conditions.borrow_mut().bleeding -= decay;
             if conditions.borrow().bleeding == 0 {
                 self.log(format!("{} stopped Bleeding", name)).await;
@@ -1606,10 +1545,11 @@ pub fn prob_spell_hit(
     probability_of_d20_reaching(target, bonus)
 }
 
+#[derive(Clone)]
 pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
 
 impl Characters {
-    fn new(characters: Vec<Character>) -> Self {
+    pub fn new(characters: Vec<Character>) -> Self {
         Self(
             characters
                 .into_iter()
@@ -1676,12 +1616,6 @@ impl Characters {
             }
         });
         removed
-    }
-}
-
-impl Clone for Characters {
-    fn clone(&self) -> Self {
-        Characters(self.0.clone())
     }
 }
 
@@ -2272,7 +2206,7 @@ pub struct Attributes {
 }
 
 impl Attributes {
-    fn new(str: u32, agi: u32, intel: u32, spi: u32) -> Self {
+    pub fn new(str: u32, agi: u32, intel: u32, spi: u32) -> Self {
         Self {
             strength: str,
             agility: agi,
@@ -2305,15 +2239,15 @@ pub struct Character {
     pub max_reactive_action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
-    known_actions: Vec<BaseAction>,
-    known_attacked_reactions: Vec<OnAttackedReaction>,
-    known_on_hit_reactions: Vec<OnHitReaction>,
+    pub known_actions: Vec<BaseAction>,
+    pub known_attacked_reactions: Vec<OnAttackedReaction>,
+    pub known_on_hit_reactions: Vec<OnHitReaction>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 }
 
 impl Character {
-    fn new(
+    pub fn new(
         player_controlled: bool,
         name: &'static str,
         portrait: PortraitId,
@@ -2499,7 +2433,7 @@ impl Character {
             });
     }
 
-    fn set_weapon(&self, hand_type: HandType, weapon: Weapon) {
+    pub fn set_weapon(&self, hand_type: HandType, weapon: Weapon) {
         assert!(self.can_equipment_fit(
             EquipmentEntry::Weapon(weapon),
             EquipmentSlotRole::from_hand_type(hand_type)
@@ -2508,7 +2442,7 @@ impl Character {
         self.on_changed_equipment();
     }
 
-    fn set_shield(&self, shield: Shield) {
+    pub fn set_shield(&self, shield: Shield) {
         assert!(self.can_equipment_fit(EquipmentEntry::Shield(shield), EquipmentSlotRole::OffHand));
         self.off_hand.set(Hand::with_shield(shield));
         self.on_changed_equipment();
@@ -2949,7 +2883,7 @@ impl Character {
                 dbg!(enhancement); // TODO
                 bonuses.push((
                     enhancement.name,
-                    RollBonusContributor::FlatAmount(enhancement.effect.roll_modifier as i32),
+                    RollBonusContributor::FlatAmount(enhancement.effect.roll_modifier),
                 ));
             }
         }
@@ -3162,7 +3096,7 @@ impl NumberedResource {
         self.current.get()
     }
 
-    fn lose(&self, amount: u32) -> u32{
+    fn lose(&self, amount: u32) -> u32 {
         let prev = self.current.get();
         let new = self.current.get().saturating_sub(amount);
         self.current.set(new);

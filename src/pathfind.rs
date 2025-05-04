@@ -1,11 +1,13 @@
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::{Ref, RefCell},
+    collections::{HashMap, HashSet},
+};
 
 use crate::core::Position;
 
 pub struct PathfindGrid {
     dimensions: (u32, u32),
-    pub blocked_positions: HashSet<Position>,
-    pub routes: HashMap<Position, Route>,
+    blocked_positions: RefCell<HashSet<Position>>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -19,12 +21,30 @@ impl PathfindGrid {
         Self {
             dimensions,
             blocked_positions: Default::default(),
-            routes: Default::default(),
         }
     }
 
-    pub fn run(&mut self, (start_x, start_y): Position, range: f32) {
-        self.routes.clear();
+    pub fn blocked_positions(&self) -> Ref<HashSet<Position>> {
+        self.blocked_positions.borrow()
+    }
+
+    pub fn set_blocked(&self, pos: Position, blocked: bool) {
+        let mut positions = self.blocked_positions.borrow_mut();
+        if blocked {
+            assert!(!positions.contains(&pos));
+            positions.insert(pos);
+        } else {
+            assert!(positions.contains(&pos));
+            positions.remove(&pos);
+        }
+    }
+
+    pub fn dimensions(&self) -> (u32, u32) {
+        self.dimensions
+    }
+
+    pub fn run(&self, (start_x, start_y): Position, range: f32) -> HashMap<Position, Route> {
+        let mut routes: HashMap<Position, Route> = Default::default();
 
         let mut next: Vec<(Position, Route)> = vec![(
             (start_x, start_y),
@@ -37,7 +57,7 @@ impl PathfindGrid {
         while !next.is_empty() {
             let (node, route) = next.remove(0);
 
-            if let Some(prev_route) = self.routes.get(&node) {
+            if let Some(prev_route) = routes.get(&node) {
                 if prev_route.distance_from_start <= route.distance_from_start {
                     // We already know another shorter route to this node
                     continue;
@@ -45,7 +65,7 @@ impl PathfindGrid {
             }
 
             assert!(node.0 >= 0 && node.1 >= 0);
-            self.routes.insert(node, route);
+            routes.insert(node, route);
             let (x, y) = node;
 
             let dist = route.distance_from_start;
@@ -66,7 +86,7 @@ impl PathfindGrid {
                     && (0..self.dimensions.1 as i32).contains(&neighbor_node.1);
                 if neighbor_dist <= range
                     && within_grid
-                    && !self.blocked_positions.contains(&neighbor_node)
+                    && !self.blocked_positions.borrow().contains(&neighbor_node)
                 {
                     next.push((
                         neighbor_node,
@@ -78,5 +98,7 @@ impl PathfindGrid {
                 }
             }
         }
+
+        routes
     }
 }

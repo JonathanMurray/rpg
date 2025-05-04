@@ -1,13 +1,10 @@
-use crate::{
-    core::{
+use crate::core::{
         Action, ActionReach, ActionTarget, BaseAction, CharacterId, CoreGame, OnAttackedReaction,
         OnHitReaction,
-    },
-    pathfind::PathfindGrid,
-};
+    };
 use macroquad::rand;
 
-pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option<Action> {
+pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
 
     assert!(!character.player_controlled);
@@ -54,19 +51,10 @@ pub fn bot_choose_action(game: &CoreGame, grid_dimensions: (u32, u32)) -> Option
                     }
                 }
                 BaseAction::Move => {
-                    // TODO account for terrain
-                    let mut pathfind_grid = PathfindGrid::new(grid_dimensions);
-                    for (id, character) in game.characters.iter_with_ids() {
-                        if *id == game.active_character_id {
-                            continue; // Avoid borrowing already borrowed active character
-                        }
-                        let pos = character.position.get();
-                        pathfind_grid.blocked_positions.insert((pos.0, pos.1));
-                    }
                     let pos = character.position.get();
-                    pathfind_grid.run((pos.0, pos.1), character.move_speed);
+                    let routes = game.pathfind_grid.run((pos.0, pos.1), character.move_speed);
 
-                    for (destination, route) in pathfind_grid.routes {
+                    for (destination, route) in routes {
                         if route.came_from == (pos.0, pos.1) && route.distance_from_start > 0.0 {
                             let destination = (destination.0, destination.1);
                             assert!(destination != pos);
