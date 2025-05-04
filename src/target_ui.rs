@@ -95,12 +95,22 @@ impl TargetUi {
             let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (80.0, 10.0));
             health_bar.current = char.health.current();
 
+            let mut health_text_line = TextLine::new(
+                format!("{} / {}", char.health.current(), char.health.max),
+                18,
+                WHITE,
+                Some(self.simple_font.clone()),
+            );
+            //health_text_line.set_depth(BLACK, 2.0);
+            //health_text_line.set_min_height(20.0);
+
             let centered_list = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Center,
                 children: vec![
                     Element::Text(name_text_line),
                     Element::Box(Box::new(health_bar)),
+                    Element::Text(health_text_line),
                     Element::Box(Box::new(action_points_row)),
                     Element::Empty(1.0, 4.0),
                     Element::Container(def_table),
@@ -160,8 +170,8 @@ impl TargetUi {
 
         let (mut x, y) = container_pos;
 
-        let header_font_size = 16;
-        let detail_font_size = 18;
+        let header_font_size = 18;
+        let detail_font_size = 20;
         let params = TextParams {
             font: Some(&self.big_font),
             font_size: header_font_size,

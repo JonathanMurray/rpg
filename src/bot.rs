@@ -1,7 +1,7 @@
 use crate::core::{
-        Action, ActionReach, ActionTarget, BaseAction, CharacterId, CoreGame, OnAttackedReaction,
-        OnHitReaction,
-    };
+    Action, ActionReach, ActionTarget, BaseAction, CharacterId, CoreGame, OnAttackedReaction,
+    OnHitReaction,
+};
 use macroquad::rand;
 
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {

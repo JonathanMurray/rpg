@@ -4,7 +4,6 @@ use std::{
     rc::Rc,
 };
 
-
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
     input::mouse_position,
@@ -35,7 +34,7 @@ use crate::{
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
     },
-    init::{GameInitState},
+    init::GameInitState,
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
 };
@@ -170,7 +169,7 @@ impl ConfiguredAction {
                     }
                     let target_char = characters.get(*target_id);
 
-                    relevant_character.can_reach_with_spell(
+                    relevant_character.reaches_with_spell(
                         *spell,
                         selected_enhancements,
                         target_char.position.get(),
@@ -179,7 +178,7 @@ impl ConfiguredAction {
 
                 ActionTarget::Position(target_pos) => {
                     assert!(matches!(spell.target, SpellTarget::Area { .. }));
-                    relevant_character.can_reach_with_spell(
+                    relevant_character.reaches_with_spell(
                         *spell,
                         selected_enhancements,
                         *target_pos,
@@ -575,8 +574,6 @@ impl UserInterface {
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
-        let grid_dimensions = init_state.pathfind_grid.dimensions();
-
         let first_player_character_id = characters
             .iter_with_ids()
             .find(|(_id, ch)| ch.player_controlled)
@@ -603,7 +600,7 @@ impl UserInterface {
             first_player_character_id,
             active_character_id,
             decorative_font.clone(),
-            portrait_textures,
+            portrait_textures.clone(),
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
@@ -617,6 +614,7 @@ impl UserInterface {
             game.active_character_id,
             simple_font.clone(),
             //decorative_font.clone(),
+            portrait_textures,
         );
 
         let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
@@ -667,6 +665,7 @@ impl UserInterface {
             is_grid_receptive_to_input,
             is_grid_receptive_to_dragging,
             &mut self.state.borrow_mut(),
+            is_grid_obstructed,
         );
 
         self.handle_grid_outcome(grid_outcome);
@@ -697,7 +696,7 @@ impl UserInterface {
 
         self.log.draw_tooltips(log_x, ui_y);
 
-        self.character_portraits.draw(10.0, 10.0);
+        self.character_portraits.draw(0.0, 0.0);
 
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
@@ -822,19 +821,10 @@ impl UserInterface {
                     .active_character()
                     .reaches_with_attack(*hand, target_char.position.get());
 
-                let mut circumstance_advantage = None;
-
                 let mut details = vec![];
 
-                match reach {
-                    ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
-                        if let ActionReach::YesButDisadvantage(reason) = reach {
-                            circumstance_advantage = Some((-1, reason, Goodness::Bad));
-                        }
-                    }
-                    ActionReach::No => {
-                        details.push(("Can not reach!".to_string(), Goodness::Bad));
-                    }
+                if matches!(reach, ActionReach::No) {
+                    details.push(("Can not reach!".to_string(), Goodness::Bad));
                 }
 
                 // We cannot know yet if the defender will react
@@ -844,23 +834,20 @@ impl UserInterface {
                     self.active_character(),
                     *hand,
                     target_char,
-                    circumstance_advantage.map(|entry| entry.0).unwrap_or(0),
+                    0,
                     selected_enhancements,
                     defender_reaction,
                 ));
 
-                for (term, bonus) in self
-                    .active_character()
-                    .outgoing_attack_bonuses(*hand, selected_enhancements)
-                {
+                for (term, bonus) in self.active_character().outgoing_attack_bonuses(
+                    *hand,
+                    selected_enhancements,
+                    target_char.pos(),
+                ) {
                     details.push((term.to_string(), bonus.goodness()));
                 }
                 for (term, bonus) in target_char.incoming_attack_bonuses(defender_reaction) {
                     details.push((term.to_string(), bonus.goodness()));
-                }
-
-                if let Some((_advantage, term, goodness)) = circumstance_advantage {
-                    details.push((term.to_string(), goodness));
                 }
 
                 self.target_ui
@@ -893,6 +880,16 @@ impl UserInterface {
                 let target_char = self.characters.get(*target_id);
 
                 let mut details = vec![];
+
+                let reaches = self.active_character().reaches_with_spell(
+                    spell,
+                    &selected_enhancements,
+                    target_char.pos(),
+                );
+
+                if !reaches {
+                    details.push(("Can not reach!".to_string(), Goodness::Bad));
+                }
 
                 for (term, bonus) in self
                     .active_character()

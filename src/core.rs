@@ -461,11 +461,7 @@ impl CoreGame {
                     }
 
                     let target = self.characters.get(*target_id);
-                    assert!(caster.can_reach_with_spell(
-                        spell,
-                        &enhancements,
-                        target.position.get()
-                    ));
+                    assert!(caster.reaches_with_spell(spell, &enhancements, target.position.get()));
 
                     if let Some(contest) = effect.defense_type {
                         match contest {
@@ -516,11 +512,7 @@ impl CoreGame {
                         unreachable!()
                     };
                     let target = self.characters.get(*target_id);
-                    assert!(caster.can_reach_with_spell(
-                        spell,
-                        &enhancements,
-                        target.position.get()
-                    ));
+                    assert!(caster.reaches_with_spell(spell, &enhancements, target.position.get()));
 
                     detail_lines.push(line);
 
@@ -548,7 +540,7 @@ impl CoreGame {
                     let ActionTarget::Position(target_pos) = selected_target else {
                         unreachable!()
                     };
-                    assert!(caster.can_reach_with_spell(spell, &enhancements, target_pos));
+                    assert!(caster.reaches_with_spell(spell, &enhancements, target_pos));
 
                     detail_lines.push(line);
 
@@ -1495,7 +1487,7 @@ pub fn attack_roll_bonus(
     enhancements: &[AttackEnhancement],
     reaction: Option<OnAttackedReaction>,
 ) -> DiceRollBonus {
-    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements);
+    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements, defender.pos());
     bonus.advantage += defender.incoming_attack_advantage(reaction);
     bonus.advantage += circumstance_advantage;
     bonus
@@ -2533,7 +2525,7 @@ impl Character {
         }
     }
 
-    pub fn can_reach_with_spell(
+    pub fn reaches_with_spell(
         &self,
         spell: Spell,
         enhancements: &[SpellEnhancement],
@@ -2846,10 +2838,11 @@ impl Character {
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
+        target_pos: Position,
     ) -> DiceRollBonus {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
-        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements) {
+        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target_pos) {
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::FlatAmount(n) => flat_amount += n,
@@ -2867,9 +2860,19 @@ impl Character {
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
+        target_pos: Position,
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut bonuses = vec![];
-        dbg!(enhancements);
+
+        let (_range, reach) = self.reaches_with_attack(hand_type, target_pos);
+
+        match reach {
+            ActionReach::YesButDisadvantage(reason) => {
+                bonuses.push((reason, RollBonusContributor::Advantage(-1)));
+            }
+            _ => {}
+        }
+
         for enhancement in enhancements {
             dbg!(enhancement);
             if enhancement.effect.bonus_advantage > 0 {
@@ -3353,7 +3356,7 @@ impl EquipmentEntry {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum EquipmentSlotRole {
     MainHand,
     OffHand,

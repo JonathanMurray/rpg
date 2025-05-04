@@ -3,7 +3,13 @@ use macroquad::{
     shapes::{draw_circle_lines, draw_line},
 };
 
-pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: Color) {
+pub fn draw_arrow(
+    (x, y): (f32, f32),
+    width: f32,
+    direction: (i32, i32),
+    color: Color,
+    thickness: f32,
+) {
     let w = x;
     let n = y;
     let e = w + width;
@@ -11,7 +17,6 @@ pub fn draw_arrow((x, y): (f32, f32), width: f32, direction: (i32, i32), color: 
     let mid = (w + width * 0.5, n + width * 0.5);
 
     let space = width * 0.3;
-    let thickness = 2.0;
 
     let direction = (direction.0.signum(), direction.1.signum());
 
@@ -58,7 +63,19 @@ pub fn draw_dashed_line(
     thickness: f32,
     color: Color,
     segment_len: f32,
+    depth: Option<(Color, f32)>,
 ) {
+    if let Some((color, offset)) = depth {
+        draw_dashed_line(
+            (from.0 + offset, from.1 + offset),
+            (to.0 + offset, to.1 + offset),
+            thickness,
+            color,
+            segment_len,
+            None,
+        );
+    }
+
     let line_len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
 
     // "Segments" alternate between "drawn" and "skipped over" to create the dash effect
@@ -88,16 +105,30 @@ pub fn draw_dashed_rectangle_lines(
     segment_len: f32,
 ) {
     // top
-    draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len);
+    draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len, None);
 
     // right
-    draw_dashed_line((x + w, y), (x + w, y + h), thickness, color, segment_len);
+    draw_dashed_line(
+        (x + w, y),
+        (x + w, y + h),
+        thickness,
+        color,
+        segment_len,
+        None,
+    );
 
     // bottom
-    draw_dashed_line((x + w, y + h), (x, y + h), thickness, color, segment_len);
+    draw_dashed_line(
+        (x + w, y + h),
+        (x, y + h),
+        thickness,
+        color,
+        segment_len,
+        None,
+    );
 
     // left
-    draw_dashed_line((x, y + h), (x, y), thickness, color, segment_len);
+    draw_dashed_line((x, y + h), (x, y), thickness, color, segment_len, None);
 }
 
 pub fn draw_cornered_rectangle_lines(
@@ -139,16 +170,30 @@ pub fn draw_dashed_rectangle_sides(
     bottom: bool,
 ) {
     if left {
-        draw_dashed_line((x, y), (x, y + h), thickness, color, segment_len);
+        draw_dashed_line((x, y), (x, y + h), thickness, color, segment_len, None);
     }
     if right {
-        draw_dashed_line((x + w, y), (x + w, y + h), thickness, color, segment_len);
+        draw_dashed_line(
+            (x + w, y),
+            (x + w, y + h),
+            thickness,
+            color,
+            segment_len,
+            None,
+        );
     }
     if top {
-        draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len);
+        draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len, None);
     }
     if bottom {
-        draw_dashed_line((x, y + h), (x + w, y + h), thickness, color, segment_len);
+        draw_dashed_line(
+            (x, y + h),
+            (x + w, y + h),
+            thickness,
+            color,
+            segment_len,
+            None,
+        );
     }
 }
 
@@ -160,8 +205,8 @@ pub fn draw_crosshair((x, y): (f32, f32), width: f32, crosshair_color: Color) {
         3.0,
         crosshair_color,
     );
-    draw_arrow((x, y), width, (1, 1), crosshair_color);
-    draw_arrow((x, y), width, (-1, -1), crosshair_color);
+    draw_arrow((x, y), width, (1, 1), crosshair_color, 2.0);
+    draw_arrow((x, y), width, (-1, -1), crosshair_color, 2.0);
 }
 
 pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, margin: f32) {

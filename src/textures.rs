@@ -61,6 +61,7 @@ pub enum IconId {
     Plus,
     PlusPlus,
     Go,
+    EndTurn,
     X1point5,
     X2,
     X3,
@@ -90,6 +91,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Scream, "scream_icon.png"),
         (IconId::Mindblast, "mindblast_icon.png"),
         (IconId::Go, "go_icon.png"),
+        (IconId::EndTurn, "endturn_icon.png"),
         (IconId::Parry, "parry_icon.png"),
         (IconId::Sidestep, "sidestep_icon.png"),
         (IconId::ShieldBash, "shieldbash_icon.png"),
@@ -153,6 +155,10 @@ pub enum EquipmentIconId {
     LeatherArmor,
     ChainMail,
     Shirt,
+
+    PlaceholderOffhand,
+    PlaceholderMainhand,
+    PlaceholderArmor,
 }
 
 pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
@@ -166,6 +172,18 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::LeatherArmor, "eq_leather_armor.png"),
         (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
         (EquipmentIconId::Shirt, "eq_shirt.png"),
+        (
+            EquipmentIconId::PlaceholderOffhand,
+            "eq_placeholder_offhand.png",
+        ),
+        (
+            EquipmentIconId::PlaceholderMainhand,
+            "eq_placeholder_mainhand.png",
+        ),
+        (
+            EquipmentIconId::PlaceholderArmor,
+            "eq_placeholder_armor.png",
+        ),
     ])
     .await
 }

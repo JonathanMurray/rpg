@@ -41,8 +41,8 @@ pub fn init() -> GameInitState {
         "Alice",
         PortraitId::Portrait1,
         SpriteId::Character4,
-        Attributes::new(5, 5, 1, 1),
-        (4, 8),
+        Attributes::new(5, 5, 5, 1),
+        (1, 10),
     );
     alice.known_actions.push(BaseAction::CastSpell(KILL)); //TODO
     alice.known_attack_enhancements.push(OVERWHELMING);
@@ -57,7 +57,7 @@ pub fn init() -> GameInitState {
         .known_actions
         .push(BaseAction::CastSpell(LUNGE_ATTACK));
     alice.armor.set(Some(LEATHER_ARMOR));
-    alice.set_weapon(HandType::MainHand, RAPIER);
+    alice.set_weapon(HandType::MainHand, BOW);
     //alice.set_shield(SMALL_SHIELD);
 
     let skeleton1 = Character::new(
@@ -65,7 +65,7 @@ pub fn init() -> GameInitState {
         "Skeleton",
         PortraitId::Skeleton,
         SpriteId::Skeleton,
-        Attributes::new(2, 2, 1, 1),
+        Attributes::new(4, 2, 1, 1),
         (5, 7),
     );
     skeleton1.armor.set(Some(CHAIN_MAIL));

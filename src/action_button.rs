@@ -37,15 +37,7 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
-        ButtonAction::OnAttackedReaction(reaction) => ActionButtonTooltip {
-            header: format!(
-                "{} {}",
-                reaction.name,
-                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
-            ),
-            description: Some(reaction.description),
-            technical_description: Default::default(),
-        },
+        ButtonAction::OnAttackedReaction(reaction) => on_attacked_reaction_tooltip(reaction),
         ButtonAction::OnHitReaction(reaction) => ActionButtonTooltip {
             header: format!(
                 "{} {}",
@@ -65,6 +57,24 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
             description: None,
             technical_description: vec![],
         },
+    }
+}
+
+fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTooltip {
+    let mut technical_description = vec![];
+
+    if reaction.effect.bonus_evasion > 0 {
+        technical_description.push(format!("+ {} evasion", reaction.effect.bonus_evasion));
+    }
+
+    ActionButtonTooltip {
+        header: format!(
+            "{} {}",
+            reaction.name,
+            cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+        ),
+        description: Some(reaction.description),
+        technical_description,
     }
 }
 
@@ -674,7 +684,7 @@ impl ButtonAction {
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
-                BaseAction::EndTurn => IconId::Go,
+                BaseAction::EndTurn => IconId::EndTurn,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,

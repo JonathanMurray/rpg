@@ -201,7 +201,7 @@ impl ActivityPopup {
             upper_border_color,
         );
 
-        draw_dashed_line((x, y), (x + width, y), 1.0, GRAY, 5.0);
+        draw_dashed_line((x, y), (x + width, y), 1.0, GRAY, 5.0, None);
 
         self.last_drawn_rectangle = Rect {
             x,
@@ -534,7 +534,9 @@ impl ActivityPopup {
 
         let mut explanation = String::new();
 
-        for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements) {
+        for (term, _bonus) in
+            attacker.outgoing_attack_bonuses(*hand, attack_enhancements, defender.pos())
+        {
             explanation.push_str(term);
             explanation.push(' ');
         }

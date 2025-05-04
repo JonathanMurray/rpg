@@ -3,6 +3,7 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -19,6 +20,7 @@ pub trait Drawable {
 
 pub enum Element {
     Empty(f32, f32),
+    Texture(Texture2D, Option<(f32, f32)>),
     Container(Container),
     Text(TextLine),
     Circle(Circle),
@@ -34,6 +36,7 @@ impl Element {
     pub fn size(&self) -> (f32, f32) {
         let size = match self {
             Element::Empty(w, h) => (*w, *h),
+            Element::Texture(texture, dest_size) => dest_size.unwrap_or(texture.size().into()),
             Element::Container(container) => container.size(),
             Element::Text(text) => text.size(),
             Element::Circle(circle) => circle.size(),
@@ -52,6 +55,14 @@ impl Element {
     pub fn draw(&self, x: f32, y: f32) {
         match self {
             Element::Empty(..) => {}
+            Element::Texture(texture, dest_size) => {
+                let dest_size = dest_size.map(|s| s.into());
+                let params = DrawTextureParams {
+                    dest_size,
+                    ..Default::default()
+                };
+                draw_texture_ex(texture, x, y, WHITE, params);
+            }
             Element::Container(container) => {
                 container.draw(x, y);
             }

@@ -5,8 +5,9 @@ use std::{
 };
 
 use macroquad::{
-    color::{BLACK, RED, SKYBLUE},
+    color::{Color, BLACK, RED, SKYBLUE},
     math::Rect,
+    shapes::draw_rectangle,
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -106,12 +107,14 @@ pub fn build_inventory_section(
                         font.clone(),
                         Some((equipment_icons[&entry.icon()].clone(), entry)),
                         EquipmentSlotRole::Inventory(i),
+                        None,
                     )
                 })
                 .unwrap_or(EquipmentSlot::new(
                     font.clone(),
                     None,
                     EquipmentSlotRole::Inventory(i),
+                    None,
                 ))
         })
         .map(|slot| Rc::new(RefCell::new(slot)))
@@ -156,53 +159,63 @@ pub fn build_equipped_section(
     Vec<Rc<RefCell<EquipmentSlot>>>,
     Rc<RefCell<EquipmentStatsTable>>,
 ) {
-    let mut slots: Vec<Option<EquipmentSlot>> = vec![None, None, None];
+    let placeholder_text = "Draw something from your inventory to equip it";
+    let mut slots = [
+        EquipmentSlot::new(
+            font.clone(),
+            None,
+            EquipmentSlotRole::MainHand,
+            Some((
+                equipment_icons[&EquipmentIconId::PlaceholderMainhand].clone(),
+                vec!["(Main-hand)".to_string(), placeholder_text.to_string()],
+            )),
+        ),
+        EquipmentSlot::new(
+            font.clone(),
+            None,
+            EquipmentSlotRole::Armor,
+            Some((
+                equipment_icons[&EquipmentIconId::PlaceholderArmor].clone(),
+                vec!["(Armor)".to_string(), placeholder_text.to_string()],
+            )),
+        ),
+        EquipmentSlot::new(
+            font.clone(),
+            None,
+            EquipmentSlotRole::OffHand,
+            Some((
+                equipment_icons[&EquipmentIconId::PlaceholderOffhand].clone(),
+                vec!["(Off-hand)".to_string(), placeholder_text.to_string()],
+            )),
+        ),
+    ];
+
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
             let texture = equipment_icons[&weapon.icon].clone();
-            let icon_cell = match hand {
-                HandType::MainHand => &mut slots[0],
-                HandType::OffHand => &mut slots[2],
-            };
-
-            *icon_cell = Some(EquipmentSlot::new(
-                font.clone(),
-                Some((texture, EquipmentEntry::Weapon(weapon))),
-                EquipmentSlotRole::MainHand,
+            slots[0].content = Some(EquipmentSlotContent::new(
+                texture,
+                EquipmentEntry::Weapon(weapon),
             ));
         }
     }
     if let Some(shield) = character.shield() {
-        let icon_cell = &mut slots[2];
         let texture = equipment_icons[&shield.icon].clone();
-        *icon_cell = Some(EquipmentSlot::new(
-            font.clone(),
-            Some((texture, EquipmentEntry::Shield(shield))),
-            EquipmentSlotRole::OffHand,
+        slots[2].content = Some(EquipmentSlotContent::new(
+            texture,
+            EquipmentEntry::Shield(shield),
         ));
     }
     if let Some(armor) = character.armor.get() {
-        let icon_cell = &mut slots[1];
         let texture = equipment_icons[&armor.icon].clone();
-        *icon_cell = Some(EquipmentSlot::new(
-            font.clone(),
-            Some((texture, EquipmentEntry::Armor(armor))),
-            EquipmentSlotRole::Armor,
+        slots[1].content = Some(EquipmentSlotContent::new(
+            texture,
+            EquipmentEntry::Armor(armor),
         ));
     }
 
-    let roles = [
-        EquipmentSlotRole::MainHand,
-        EquipmentSlotRole::Armor,
-        EquipmentSlotRole::OffHand,
-    ];
-
     let slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots
         .into_iter()
-        .enumerate()
-        .map(|(i, maybe_slot)| {
-            maybe_slot.unwrap_or_else(|| EquipmentSlot::new(font.clone(), None, roles[i]))
-        })
         .map(|slot| Rc::new(RefCell::new(slot)))
         .collect();
 
@@ -308,6 +321,7 @@ pub struct EquipmentSlot {
     pub content: Option<EquipmentSlotContent>,
     last_drawn_rect: Cell<Rect>,
     role: EquipmentSlotRole,
+    placeholder: Option<(Texture2D, Vec<String>)>,
 }
 
 #[derive(Debug)]
@@ -338,6 +352,7 @@ impl EquipmentSlot {
         font: Font,
         content: Option<(Texture2D, EquipmentEntry)>,
         role: EquipmentSlotRole,
+        placeholder: Option<(Texture2D, Vec<String>)>,
     ) -> Self {
         Self {
             font,
@@ -352,6 +367,7 @@ impl EquipmentSlot {
                 .map(|(texture, equipment)| EquipmentSlotContent::new(texture, equipment)),
             last_drawn_rect: Default::default(),
             role,
+            placeholder,
         }
     }
 
@@ -373,6 +389,15 @@ impl Drawable for EquipmentSlot {
         };
         if let Some(content) = &self.content {
             draw_texture_ex(&content.texture, x, y, WHITE, params);
+        } else if let Some((texture, _tooltip)) = &self.placeholder {
+            draw_rectangle(
+                x,
+                y,
+                self.size.0,
+                self.size.1,
+                Color::new(0.0, 0.0, 0.0, 0.4),
+            );
+            draw_texture_ex(texture, x, y, WHITE, params);
         }
 
         self.last_drawn_rect
@@ -380,19 +405,26 @@ impl Drawable for EquipmentSlot {
     }
 
     fn draw_tooltips(&self, x: f32, y: f32) {
+        let (mouse_x, mouse_y) = mouse_position();
+        let hover =
+            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
+        let rect = Rect::new(x, y, self.size.0, self.size.1);
         if let Some(content) = &self.content {
-            let (mouse_x, mouse_y) = mouse_position();
-            if (x..x + self.size.0).contains(&mouse_x)
-                && (y..y + self.size.1).contains(&mouse_y)
-                && !content.tooltip_lines.is_empty()
-            {
-                let rect = Rect::new(x, y, self.size.0, self.size.1);
-
+            if hover && !content.tooltip_lines.is_empty() {
                 draw_tooltip(
                     &self.font,
                     rect,
                     TooltipPositionPreference::Bottom,
                     &content.tooltip_lines,
+                );
+            }
+        } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
+            if hover {
+                draw_tooltip(
+                    &self.font,
+                    rect,
+                    TooltipPositionPreference::Bottom,
+                    &tooltip_lines,
                 );
             }
         }

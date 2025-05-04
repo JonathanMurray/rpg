@@ -52,7 +52,7 @@ const HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR: Color = LIGHTGRAY;
 const HOVER_ENEMY_COLOR: Color = Color::new(0.8, 0.2, 0.2, 1.0);
 const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
 const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
-const INSPECTING_TARGET_COLOR: Color = GRAY;
+const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
@@ -503,7 +503,11 @@ impl GameGrid {
         receptive_to_input: bool,
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
+        obstructed: bool,
     ) -> GridOutcome {
+        // TODO
+        let receptive_to_input = !obstructed;
+
         let previous_inspect_target = self.players_inspect_target;
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
@@ -591,13 +595,6 @@ impl GameGrid {
         let mut outcome = GridOutcome::default();
 
         let mut hovered_character_id = None;
-        for character in self.characters.iter() {
-            if character.pos() == mouse_grid_pos {
-                let id = character.id();
-                outcome.hovered_character_id = Some(id);
-                hovered_character_id = Some(id);
-            }
-        }
 
         if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
             self.enemys_target = None;
@@ -713,7 +710,7 @@ impl GameGrid {
         } = ui_state
         {
             let path = [movement.0, movement.1];
-            self.draw_movement_path_arrow(path.iter().copied(), RED, 5.0);
+            self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0);
             self.draw_cornered_outline(
                 self.character_screen_pos(self.characters.get(*reactor)),
                 ACTIVE_CHARACTER_COLOR,
@@ -726,6 +723,7 @@ impl GameGrid {
                     self.characters.get(*reactor).pos(),
                     self.characters.get(*target).pos(),
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
+                    4.0,
                 );
             }
         }
@@ -823,6 +821,7 @@ impl GameGrid {
                                 self.characters.get(self.active_character_id).pos(),
                                 mouse_grid_pos,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+                                4.0,
                             );
                         }
                     }
@@ -870,6 +869,7 @@ impl GameGrid {
                             self.characters.get(self.active_character_id).pos(),
                             mouse_grid_pos,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+                            4.0,
                         );
                     } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
@@ -918,6 +918,7 @@ impl GameGrid {
                                 active_char_pos,
                                 mouse_grid_pos,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
+                                4.0,
                             );
                         }
                     } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
@@ -1026,6 +1027,7 @@ impl GameGrid {
                         active_char_pos,
                         target_pos,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
+                        7.0,
                     );
                 }
             }
@@ -1034,6 +1036,7 @@ impl GameGrid {
                     active_char_pos,
                     target_pos,
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
+                    7.0,
                 );
             }
             ActionTarget::None => {}
@@ -1045,6 +1048,7 @@ impl GameGrid {
                 self.characters.get(self.active_character_id).pos(),
                 target_pos,
                 ENEMYS_TARGET_CROSSHAIR_COLOR,
+                7.0,
             );
         }
 
@@ -1080,18 +1084,19 @@ impl GameGrid {
     ) {
         if movement_to_target.is_empty() {
             let invalid_path = [actor_pos, target_pos];
-            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 5.0);
+            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0);
         } else {
             self.draw_target_crosshair(
                 *movement_to_target.first().unwrap(),
                 target_pos,
                 PLAYERS_TARGET_CROSSHAIR_COLOR,
+                7.0,
             );
             let mut path = vec![actor_pos];
             for pos in movement_to_target.iter().rev() {
                 path.push(*pos);
             }
-            self.draw_movement_path_arrow(path.iter().copied(), MOVEMENT_ARROW_COLOR, 5.0);
+            self.draw_movement_path_arrow(path.iter().copied(), MOVEMENT_ARROW_COLOR, 7.0);
         }
     }
 
@@ -1170,7 +1175,7 @@ impl GameGrid {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
-                            .can_reach_with_spell(
+                            .reaches_with_spell(
                                 *spell,
                                 selected_enhancements,
                                 self.characters.get(*target_char_id).position.get(),
@@ -1190,7 +1195,7 @@ impl GameGrid {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
-                            .can_reach_with_spell(*spell, selected_enhancements, *target_pos)
+                            .reaches_with_spell(*spell, selected_enhancements, *target_pos)
                         {
                             None
                         } else {
@@ -1374,19 +1379,25 @@ impl GameGrid {
         actor_pos: Position,
         target_pos: Position,
         crosshair_color: Color,
+        thickness: f32,
     ) {
         let actor_x = self.grid_x_to_screen(actor_pos.0);
         let actor_y = self.grid_y_to_screen(actor_pos.1);
         let target_x = self.grid_x_to_screen(target_pos.0);
         let target_y = self.grid_y_to_screen(target_pos.1);
-        draw_crosshair((target_x, target_y), self.cell_w, crosshair_color);
+        let depth = 2.0;
+
         draw_dashed_line(
             (actor_x + self.cell_w / 2.0, actor_y + self.cell_w / 2.0),
             (target_x + self.cell_w / 2.0, target_y + self.cell_w / 2.0),
-            4.0,
+            thickness,
             crosshair_color,
             5.0,
+            Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
         );
+
+        draw_crosshair((target_x + depth, target_y + depth), self.cell_w, BLACK);
+        draw_crosshair((target_x, target_y), self.cell_w, crosshair_color);
     }
 
     fn draw_static_text(
@@ -1459,7 +1470,7 @@ impl GameGrid {
             self.draw_movement_path_arrow(
                 path.iter().map(|(_dist, pos)| *pos).rev(),
                 MOVEMENT_ARROW_COLOR,
-                5.0,
+                7.0,
             );
         };
 
@@ -1511,6 +1522,7 @@ impl GameGrid {
                 thickness,
                 color,
                 5.0,
+                Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0)),
             );
 
             if let Some(next) = path.next() {
@@ -1525,10 +1537,21 @@ impl GameGrid {
 
         let end = b;
         draw_arrow(
+            (
+                self.grid_x_to_screen(end.0) + 2.0,
+                self.grid_y_to_screen(end.1) + 2.0,
+            ),
+            self.cell_w,
+            last_direction,
+            Color::new(0.0, 0.0, 0.0, 0.5),
+            4.0,
+        );
+        draw_arrow(
             (self.grid_x_to_screen(end.0), self.grid_y_to_screen(end.1)),
             self.cell_w,
             last_direction,
             color,
+            4.0,
         );
     }
 
@@ -1644,8 +1667,12 @@ impl GameGrid {
         let max_space = 450.0;
         let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - screen_width();
         let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - screen_height();
-        self.camera_position.0.set(new_x.max(-max_space).min(max_x));
-        self.camera_position.1.set(new_y.max(-max_space).min(max_y));
+        self.camera_position
+            .0
+            .set(new_x.max(-max_space).min(max_x).round());
+        self.camera_position
+            .1
+            .set(new_y.max(-max_space).min(max_y).round());
     }
 }
 

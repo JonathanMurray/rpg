@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::SKYBLUE,
+    color::{MAGENTA, SKYBLUE},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -35,16 +35,24 @@ pub struct CharacterPortraits {
 }
 
 impl CharacterPortraits {
-    pub fn new(characters: &Characters, active_id: CharacterId, font: Font) -> Self {
+    pub fn new(
+        characters: &Characters,
+        active_id: CharacterId,
+        font: Font,
+        portrait_textures: HashMap<PortraitId, Texture2D>,
+    ) -> Self {
         let mut portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>> =
             Default::default();
 
         let mut elements = vec![];
 
         for (id, character) in characters.iter_with_ids() {
+            let texture = portrait_textures[&character.portrait].clone();
+
             let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(
                 character,
                 font.clone(),
+                texture,
             )));
             let cloned = Rc::downgrade(&portrait);
             portraits.insert(*id, portrait);
@@ -53,9 +61,13 @@ impl CharacterPortraits {
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            margin: 4.0,
+            margin: 2.0,
             children: elements,
             style: Style {
+                padding: 2.0,
+                background_color: Some(Color::new(0.0, 0.0, 0.0, 0.5)),
+                border_color: Some(BLACK),
+                //background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
                 ..Default::default()
             },
             ..Default::default()
@@ -129,11 +141,11 @@ struct TopCharacterPortrait {
 }
 
 impl TopCharacterPortrait {
-    fn new(character: &Rc<Character>, font: Font) -> Self {
+    fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
             character.max_reactive_action_points,
             (10.0, 10.0),
-            0.25,
+            0.2,
             Style::default(),
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
@@ -146,20 +158,6 @@ impl TopCharacterPortrait {
 
         let mut name_text_line = TextLine::new(character.name, 16, name_color, Some(font.clone()));
         name_text_line.set_min_height(13.0);
-        let mut container = Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
-            children: vec![
-                Element::Text(name_text_line),
-                Element::RcRefCell(cloned_ap_row),
-            ],
-            margin: 1.0,
-            style: Style {
-                padding: 1.0,
-                ..Default::default()
-            },
-            ..Default::default()
-        };
 
         let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
             character.health.max,
@@ -167,16 +165,37 @@ impl TopCharacterPortrait {
             (action_points_row.borrow().size().0, 8.0),
         )));
 
-        container
-            .children
-            .push(Element::RcRefCell(health_bar.clone()));
+        let container = Container {
+            layout_dir: LayoutDirection::Vertical,
+            align: Align::Center,
+            children: vec![
+                //Element::Text(name_text_line),
+                Element::Container(Container {
+                    style: Style {
+                        background_color: Some(DARKGRAY),
+                        ..Default::default()
+                    },
+                    children: vec![Element::Texture(texture, Some((48.0, 60.0)))],
+                    ..Default::default()
+                }),
+                Element::RcRefCell(cloned_ap_row),
+                Element::RcRefCell(health_bar.clone()),
+            ],
+            margin: 1.0,
+            style: Style {
+                padding: 0.0,
+
+                ..Default::default()
+            },
+            ..Default::default()
+        };
 
         Self {
             strong_highlight: false,
             weak_highlight: false,
             action_points_row,
             health_bar,
-            padding: 5.0,
+            padding: 0.0,
             container,
             character: character.clone(),
         }
@@ -185,16 +204,36 @@ impl TopCharacterPortrait {
 
 impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
-        let (w, h) = self.size();
-        draw_rectangle(x, y, w, h, BLACK);
-        draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 3.0, DARKGRAY);
+        let (w, _h) = self.size();
+        let (portrait_w, portrait_h) = self.container.children[0].size();
+        self.container.draw(x + self.padding, y + self.padding);
+
+        let x0 = x + (w - portrait_w) / 2.0;
+
+        draw_rectangle_lines(x0, y, portrait_w, portrait_h, 1.0, BLACK);
+
         if self.strong_highlight {
-            draw_rectangle_lines(x, y, w, h, 5.0, GOLD);
+            let margin = 1.0;
+
+            draw_rectangle_lines(
+                x0 - margin,
+                y - margin,
+                portrait_w + 2.0 * margin,
+                portrait_h + 2.0 * margin,
+                5.0,
+                GOLD,
+            );
         }
         if self.weak_highlight {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 2.0, LIGHTGRAY);
+            draw_rectangle_lines(
+                x0 + 1.0,
+                y + 1.0,
+                portrait_w - 2.0,
+                portrait_h - 2.0,
+                2.0,
+                LIGHTGRAY,
+            );
         }
-        self.container.draw(x + self.padding, y + self.padding);
     }
 
     fn size(&self) -> (f32, f32) {

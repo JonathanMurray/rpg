@@ -512,7 +512,7 @@ impl CharacterSheet {
                         .screen_area()
                         .center();
 
-                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0);
+                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0, None);
                     //draw_line(from.x, from.y, to.x, to.y, 5.0, MAGENTA);
                 }
                 None => {
