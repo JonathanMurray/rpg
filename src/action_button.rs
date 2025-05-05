@@ -377,6 +377,7 @@ pub struct ActionButton {
     pub selected: Cell<ButtonSelected>,
     pub event_sender: Option<EventSender>,
     icon: Texture2D,
+    dynamic_icons: HashMap<IconId, Texture2D>,
     tooltip: RefCell<ActionButtonTooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
@@ -400,7 +401,7 @@ impl ActionButton {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
-        let icon: IconId = action.icon();
+        let icon: IconId = action.icon(character.as_deref());
         let tooltip = button_action_tooltip(&action);
 
         let (size, texture_draw_size) = match action {
@@ -438,6 +439,14 @@ impl ActionButton {
             ..Default::default()
         };
 
+        let mut dynamic_icons: HashMap<IconId, Texture2D> = Default::default();
+        if matches!(action, ButtonAction::Action(BaseAction::Attack(..))) {
+            for icon_id in [IconId::MeleeAttack, IconId::RangedAttack] {
+                dynamic_icons.insert(icon_id, icons[&icon_id].clone());
+            }
+            dynamic_icons.insert(IconId::RangedAttack, icons[&IconId::RangedAttack].clone());
+        }
+
         let icon = icons[&icon].clone();
         Self {
             id,
@@ -454,6 +463,7 @@ impl ActionButton {
                 queue: Rc::clone(event_queue),
             }),
             icon,
+            dynamic_icons,
             tooltip: RefCell::new(tooltip),
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
@@ -461,13 +471,14 @@ impl ActionButton {
     }
 
     pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
-        if let ButtonAction::Action(BaseAction::Attack { hand, .. }) = self.action {
-            let equipped_weapon = self.character.as_ref().unwrap().weapon(hand);
+        if let ButtonAction::Action(BaseAction::Attack(attack)) = self.action {
+            let equipped_weapon = self.character.as_ref().unwrap().weapon(attack.hand);
 
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
+                    let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
                     ActionButtonTooltip {
-                        header: format!("{} attack ({} AP)", weapon.name, weapon.action_point_cost),
+                        header: format!("{} attack ({} AP)", attack_type, weapon.action_point_cost),
                         description: None,
                         technical_description: vec![
                             format!("{} damage", weapon.damage),
@@ -605,7 +616,24 @@ impl Drawable for ActionButton {
             //dest_size: Some((24.0, 19.2).into()),
             ..Default::default()
         };
-        draw_texture_ex(&self.icon, x + 2.0, y + 2.0, WHITE, params);
+
+        let icon = if matches!(self.action, ButtonAction::Action(BaseAction::Attack(..))) {
+            let icon_id = if self
+                .character
+                .as_ref()
+                .unwrap()
+                .has_equipped_ranged_weapon()
+            {
+                IconId::RangedAttack
+            } else {
+                IconId::MeleeAttack
+            };
+            &self.dynamic_icons[&icon_id]
+        } else {
+            &self.icon
+        };
+
+        draw_texture_ex(icon, x + 2.0, y + 2.0, WHITE, params);
 
         match self.selected.get() {
             ButtonSelected::Yes => {
@@ -677,10 +705,16 @@ pub enum ButtonAction {
 }
 
 impl ButtonAction {
-    fn icon(&self) -> IconId {
+    fn icon(&self, character: Option<&Character>) -> IconId {
         match self {
             ButtonAction::Action(base_action) => match base_action {
-                BaseAction::Attack { .. } => IconId::Attack,
+                BaseAction::Attack(..) => {
+                    if character.unwrap().has_equipped_ranged_weapon() {
+                        IconId::RangedAttack
+                    } else {
+                        IconId::MeleeAttack
+                    }
+                }
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
@@ -691,7 +725,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.icon,
             ButtonAction::OnHitReaction(reaction) => reaction.icon,
             ButtonAction::Proceed => IconId::Go,
-            ButtonAction::OpportunityAttack => IconId::Attack,
+            ButtonAction::OpportunityAttack => IconId::MeleeAttack,
         }
     }
 

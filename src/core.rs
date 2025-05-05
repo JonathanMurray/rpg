@@ -1897,10 +1897,7 @@ pub enum ActionTarget {
 #[derive(Debug, Copy, Clone, PartialEq)]
 
 pub enum BaseAction {
-    Attack {
-        hand: HandType,
-        action_point_cost: u32,
-    },
+    Attack(AttackAction),
     CastSpell(Spell),
     Move,
     ChangeEquipment,
@@ -1909,12 +1906,16 @@ pub enum BaseAction {
     // turn order
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct AttackAction {
+    pub hand: HandType,
+    pub action_point_cost: u32,
+}
+
 impl BaseAction {
     pub fn action_point_cost(&self) -> u32 {
         match self {
-            BaseAction::Attack {
-                action_point_cost, ..
-            } => *action_point_cost,
+            BaseAction::Attack(attack) => attack.action_point_cost,
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
@@ -2276,10 +2277,10 @@ impl Character {
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
             known_actions: vec![
-                BaseAction::Attack {
+                BaseAction::Attack(AttackAction {
                     hand: HandType::MainHand,
                     action_point_cost: 2,
-                },
+                }),
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
                 BaseAction::ChangeEquipment,
@@ -2395,6 +2396,14 @@ impl Character {
 
     pub fn weapon(&self, hand: HandType) -> Option<Weapon> {
         self.hand(hand).get().weapon
+    }
+
+    pub fn has_equipped_ranged_weapon(&self) -> bool {
+        if let Some(weapon) = self.weapon(HandType::MainHand) {
+            !weapon.is_melee()
+        } else {
+            false
+        }
     }
 
     pub fn shield(&self) -> Option<Shield> {
@@ -2555,10 +2564,9 @@ impl Character {
     pub fn can_use_action(&self, action: BaseAction) -> bool {
         let ap = self.action_points.current();
         match action {
-            BaseAction::Attack {
-                hand,
-                action_point_cost: _,
-            } => matches!(self.weapon(hand), Some(weapon) if ap >= weapon.action_point_cost),
+            BaseAction::Attack(attack) => {
+                matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
+            }
             BaseAction::CastSpell(spell) => {
                 ap >= spell.action_point_cost
                     && self.stamina.current() >= spell.stamina_cost
@@ -2710,7 +2718,13 @@ impl Character {
     }
 
     pub fn spell_modifier(&self) -> u32 {
-        self.intellect() + self.spirit()
+        let mut res = self.intellect() + self.spirit();
+
+        if let Some(armor) = self.armor.get() {
+            res += armor.equip.bonus_spell_modifier;
+        }
+
+        res
     }
 
     fn is_dazed(&self) -> bool {
@@ -3129,6 +3143,12 @@ pub struct ArmorPiece {
     pub limit_evasion_from_agi: Option<u32>,
     pub icon: EquipmentIconId,
     pub weight: u32,
+    pub equip: EquipEffect,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct EquipEffect {
+    pub bonus_spell_modifier: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -3148,7 +3168,7 @@ pub struct Weapon {
 }
 
 impl Weapon {
-    fn is_melee(&self) -> bool {
+    pub fn is_melee(&self) -> bool {
         matches!(self.range, WeaponRange::Melee)
     }
 }

@@ -7,10 +7,13 @@ use std::{
 use rand::distr::{Distribution, Uniform};
 
 use crate::{
-    core::{Attributes, BaseAction, Character, CharacterId, Characters, HandType, Position},
+    core::{
+        Attributes, BaseAction, Character, CharacterId, Characters, EquipmentEntry, HandType,
+        Position,
+    },
     data::{
         BOW, CHAIN_MAIL, DAGGER, FIREBALL, KILL, LEATHER_ARMOR, LUNGE_ATTACK, MIND_BLAST,
-        OVERWHELMING, RAGE, RAPIER, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWORD,
+        OVERWHELMING, RAGE, RAPIER, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWORD,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -56,8 +59,9 @@ pub fn init() -> GameInitState {
     alice
         .known_actions
         .push(BaseAction::CastSpell(LUNGE_ATTACK));
-    alice.armor.set(Some(LEATHER_ARMOR));
+    alice.armor.set(Some(ROBE));
     alice.set_weapon(HandType::MainHand, BOW);
+    alice.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
     //alice.set_shield(SMALL_SHIELD);
 
     let skeleton1 = Character::new(

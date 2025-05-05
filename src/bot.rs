@@ -18,19 +18,19 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 
         if character.can_use_action(action) {
             match action {
-                BaseAction::Attack { hand, .. } => {
+                BaseAction::Attack(attack) => {
                     for (id, other_character) in game.characters.iter_with_ids() {
                         if *id == game.active_character_id {
                             continue; //Avoid borrowing already borrowed
                         }
                         if other_character.player_controlled
                             && character
-                                .reaches_with_attack(hand, other_character.position.get())
+                                .reaches_with_attack(attack.hand, other_character.position.get())
                                 .1
                                 != ActionReach::No
                         {
                             chosen_action = Some(Action::Attack {
-                                hand,
+                                hand: attack.hand,
                                 enhancements: vec![],
                                 target: *id,
                             });

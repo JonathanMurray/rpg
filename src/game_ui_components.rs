@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{MAGENTA, SKYBLUE},
+    color::{MAGENTA, PURPLE, SKYBLUE},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -644,9 +644,9 @@ impl Drawable for ActionPointsRow {
                         x0 + self.cell_size.0 / 2.0,
                         y0 + self.cell_size.1 / 2.0,
                         r,
-                        GOLD,
+                        Color::new(0.78, 0.48, 1.00, 0.7),
                     );
-                    draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);
+                    //draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);
                 } else {
                     draw_circle(
                         x0 + self.cell_size.0 / 2.0,

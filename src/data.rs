@@ -3,7 +3,7 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, Condition, DefenseType, OnAttackedReaction,
+        AttackEnhancementOnHitEffect, Condition, DefenseType, EquipEffect, OnAttackedReaction,
         OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
         Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect,
         SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon,
@@ -18,6 +18,7 @@ pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     limit_evasion_from_agi: None,
     icon: EquipmentIconId::LeatherArmor,
     weight: 2,
+    equip: EquipEffect::default(),
 };
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
@@ -26,6 +27,7 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     limit_evasion_from_agi: Some(4),
     icon: EquipmentIconId::ChainMail,
     weight: 3,
+    equip: EquipEffect::default(),
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {
@@ -34,7 +36,28 @@ pub const SHIRT: ArmorPiece = ArmorPiece {
     limit_evasion_from_agi: None,
     icon: EquipmentIconId::Shirt,
     weight: 1,
+    equip: EquipEffect::default(),
 };
+
+pub const ROBE: ArmorPiece = ArmorPiece {
+    name: "Robe",
+    protection: 1,
+    limit_evasion_from_agi: None,
+    icon: EquipmentIconId::Robe,
+    weight: 1,
+    equip: EquipEffect {
+        bonus_spell_modifier: 1,
+        ..EquipEffect::default()
+    },
+};
+
+impl EquipEffect {
+    const fn default() -> Self {
+        Self {
+            bonus_spell_modifier: 0,
+        }
+    }
+}
 
 pub const STABBING: AttackEnhancement = AttackEnhancement {
     name: "Stabbing",
@@ -270,6 +293,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     must_be_melee: false,
 };
 
+// TODO Should require holding a melee weapon
 pub const SWEEP_ATTACK: Spell = Spell {
     name: "Sweeping attack",
     description: "Target all enemies around you",
@@ -309,6 +333,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
     animation_color: MAGENTA,
 };
 
+// TODO Should require holding a melee weapon
 pub const LUNGE_ATTACK: Spell = Spell {
     name: "Lunge attack",
     description: "Move to target in an unobstructed path, before attacking",

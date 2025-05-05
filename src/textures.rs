@@ -43,7 +43,8 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,
-    Attack,
+    MeleeAttack,
+    RangedAttack,
     Brace,
     Move,
     Scream,
@@ -85,7 +86,8 @@ pub enum IconId {
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
     load_and_init_textures(vec![
         (IconId::Fireball, "fireball_icon.png"),
-        (IconId::Attack, "attack_icon.png"),
+        (IconId::MeleeAttack, "attack_icon.png"),
+        (IconId::RangedAttack, "ranged_attack_icon.png"),
         (IconId::Brace, "brace_icon.png"),
         (IconId::Move, "move_icon.png"),
         (IconId::Scream, "scream_icon.png"),
@@ -155,6 +157,7 @@ pub enum EquipmentIconId {
     LeatherArmor,
     ChainMail,
     Shirt,
+    Robe,
 
     PlaceholderOffhand,
     PlaceholderMainhand,
@@ -172,6 +175,7 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::LeatherArmor, "eq_leather_armor.png"),
         (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
         (EquipmentIconId::Shirt, "eq_shirt.png"),
+        (EquipmentIconId::Robe, "eq_robe.png"),
         (
             EquipmentIconId::PlaceholderOffhand,
             "eq_placeholder_offhand.png",

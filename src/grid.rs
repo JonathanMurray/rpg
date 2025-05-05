@@ -23,7 +23,10 @@ use macroquad::{
 };
 
 use crate::{
-    core::{ActionReach, ActionTarget, Character, Goodness, Position, SpellReach, SpellTarget},
+    core::{
+        ActionReach, ActionTarget, AttackAction, Character, Goodness, Position, SpellReach,
+        SpellTarget,
+    },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
@@ -965,8 +968,10 @@ impl GameGrid {
                                 .get(self.active_character_id)
                                 .attack_action_point_cost(hand);
                             *ui_state = UiState::ConfiguringAction(ConfiguredAction::Attack {
-                                hand,
-                                action_point_cost,
+                                attack: AttackAction {
+                                    hand,
+                                    action_point_cost,
+                                },
                                 selected_enhancements: vec![],
                                 target: Some(hovered_id),
                             });
@@ -1131,13 +1136,13 @@ impl GameGrid {
     fn determine_range_indicator(&self, ui_state: &mut UiState) -> Option<(Range, RangeIndicator)> {
         if let UiState::ConfiguringAction(configured_action) = ui_state {
             match configured_action {
-                ConfiguredAction::Attack { hand, target, .. } => match target {
+                ConfiguredAction::Attack { attack, target, .. } => match target {
                     Some(target) => {
                         let (range, reach) = self
                             .characters
                             .get(self.active_character_id)
                             .reaches_with_attack(
-                                *hand,
+                                attack.hand,
                                 self.characters.get(*target).position.get(),
                             );
 
@@ -1159,7 +1164,7 @@ impl GameGrid {
                         let range = self
                             .characters
                             .get(self.active_character_id)
-                            .weapon(*hand)
+                            .weapon(attack.hand)
                             .unwrap()
                             .range
                             .into_range();

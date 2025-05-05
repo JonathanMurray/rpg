@@ -609,11 +609,11 @@ impl ActivityPopup {
                 lines.extend_from_slice(&tooltip.technical_description);
 
                 match configured_action {
-                    ConfiguredAction::Attack { hand, .. } => {
+                    ConfiguredAction::Attack { attack, .. } => {
                         for (_subtext, enhancement) in self
                             .characters
                             .get(active_character_id)
-                            .usable_attack_enhancements(*hand)
+                            .usable_attack_enhancements(attack.hand)
                         {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             popup_buttons.push(btn);

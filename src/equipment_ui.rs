@@ -86,6 +86,9 @@ fn armor_tooltip(armor: &ArmorPiece) -> Vec<String> {
     if let Some(limit) = armor.limit_evasion_from_agi {
         lines.push(format!("Max {} evasion from agi", limit));
     }
+    if armor.equip.bonus_spell_modifier > 0 {
+        lines.push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
+    }
     lines.push(format!("Weight: {}", armor.weight));
     lines
 }

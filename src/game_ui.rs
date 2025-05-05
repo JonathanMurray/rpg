@@ -23,9 +23,10 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
-        ActionTarget, AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId,
-        Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction,
-        Position, Spell, SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome,
+        ActionTarget, AttackAction, AttackEnhancement, AttackOutcome, BaseAction, Character,
+        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction,
+        OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier, SpellTarget,
+        SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -115,8 +116,7 @@ impl UiState {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ConfiguredAction {
     Attack {
-        hand: HandType,
-        action_point_cost: u32,
+        attack: AttackAction,
         selected_enhancements: Vec<AttackEnhancement>,
         target: Option<CharacterId>,
     },
@@ -142,11 +142,11 @@ impl ConfiguredAction {
         characters: &Characters,
     ) -> bool {
         match self {
-            ConfiguredAction::Attack { target, hand, .. } => match target {
+            ConfiguredAction::Attack { target, attack, .. } => match target {
                 Some(target_id) => {
                     let target_char = characters.get(*target_id);
-                    let (_range, reach) =
-                        relevant_character.reaches_with_attack(*hand, target_char.position.get());
+                    let (_range, reach) = relevant_character
+                        .reaches_with_attack(attack.hand, target_char.position.get());
                     matches!(
                         reach,
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..)
@@ -212,12 +212,8 @@ impl ConfiguredAction {
 
     pub fn from_base_action(base_action: BaseAction) -> Self {
         match base_action {
-            BaseAction::Attack {
-                hand,
-                action_point_cost,
-            } => Self::Attack {
-                hand,
-                action_point_cost,
+            BaseAction::Attack(attack) => Self::Attack {
+                attack,
                 selected_enhancements: vec![],
                 target: None,
             },
@@ -237,14 +233,7 @@ impl ConfiguredAction {
 
     pub fn base_action(&self) -> BaseAction {
         match self {
-            ConfiguredAction::Attack {
-                hand,
-                action_point_cost,
-                ..
-            } => BaseAction::Attack {
-                hand: *hand,
-                action_point_cost: *action_point_cost,
-            },
+            ConfiguredAction::Attack { attack, .. } => BaseAction::Attack(*attack),
             ConfiguredAction::CastSpell { spell, .. } => BaseAction::CastSpell(*spell),
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
@@ -259,11 +248,11 @@ impl ConfiguredAction {
     pub fn enhanced_action_point_cost(&self) -> u32 {
         match self {
             ConfiguredAction::Attack {
-                action_point_cost,
+                attack,
                 selected_enhancements,
                 ..
             } => {
-                let mut ap = *action_point_cost;
+                let mut ap = attack.action_point_cost;
                 for enhancement in selected_enhancements {
                     ap += enhancement.action_point_cost;
                     ap -= enhancement.effect.action_point_discount;
@@ -804,8 +793,7 @@ impl UserInterface {
 
     fn refresh_attack_state(&mut self) {
         let UiState::ConfiguringAction(ConfiguredAction::Attack {
-            hand,
-            action_point_cost,
+            attack,
             selected_enhancements,
             target,
         }) = &*self.state.borrow()
@@ -819,7 +807,7 @@ impl UserInterface {
 
                 let (_range, reach) = self
                     .active_character()
-                    .reaches_with_attack(*hand, target_char.position.get());
+                    .reaches_with_attack(attack.hand, target_char.position.get());
 
                 let mut details = vec![];
 
@@ -832,7 +820,7 @@ impl UserInterface {
 
                 let chance = as_percentage(prob_attack_hit(
                     self.active_character(),
-                    *hand,
+                    attack.hand,
                     target_char,
                     0,
                     selected_enhancements,
@@ -840,7 +828,7 @@ impl UserInterface {
                 ));
 
                 for (term, bonus) in self.active_character().outgoing_attack_bonuses(
-                    *hand,
+                    attack.hand,
                     selected_enhancements,
                     target_char.pos(),
                 ) {
@@ -1616,12 +1604,12 @@ impl UserInterface {
             UiState::ConfiguringAction(configured_action) => {
                 let action = match &configured_action {
                     ConfiguredAction::Attack {
-                        hand,
+                        attack,
                         selected_enhancements,
                         target,
                         ..
                     } => Some(Action::Attack {
-                        hand: *hand,
+                        hand: attack.hand,
                         enhancements: selected_enhancements.clone(),
                         target: target.unwrap(),
                     }),
@@ -1742,7 +1730,7 @@ impl UserInterface {
 fn button_action_id(btn_action: ButtonAction) -> String {
     match btn_action {
         ButtonAction::Action(base_action) => match base_action {
-            BaseAction::Attack { hand, .. } => format!("ATTACK_{:?}", hand),
+            BaseAction::Attack(attack) => format!("ATTACK_{:?}", attack.hand),
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
             BaseAction::Move => "MOVE".to_string(),
             BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
