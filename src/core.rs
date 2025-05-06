@@ -1913,6 +1913,16 @@ pub struct AttackAction {
 }
 
 impl BaseAction {
+    pub fn requires_equipped_melee_weapon(&self) -> bool {
+        match self {
+            BaseAction::CastSpell(spell) => matches!(
+                spell.weapon_requirement,
+                Some(SpellWeaponRequirement::Melee)
+            ),
+            _ => false,
+        }
+    }
+
     pub fn action_point_cost(&self) -> u32 {
         match self {
             BaseAction::Attack(attack) => attack.action_point_cost,
@@ -1958,11 +1968,17 @@ pub struct Spell {
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub stamina_cost: u32,
+    pub weapon_requirement: Option<SpellWeaponRequirement>,
 
     pub modifier: SpellModifier,
     pub target: SpellTarget,
     pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub animation_color: Color,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SpellWeaponRequirement {
+    Melee,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2406,6 +2422,14 @@ impl Character {
         }
     }
 
+    pub fn has_equipped_melee_weapon(&self) -> bool {
+        if let Some(weapon) = self.weapon(HandType::MainHand) {
+            weapon.is_melee()
+        } else {
+            false
+        }
+    }
+
     pub fn shield(&self) -> Option<Shield> {
         self.hand(HandType::OffHand).get().shield
     }
@@ -2568,6 +2592,13 @@ impl Character {
                 matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
             }
             BaseAction::CastSpell(spell) => {
+                if matches!(
+                    spell.weapon_requirement,
+                    Some(SpellWeaponRequirement::Melee)
+                ) && !self.has_equipped_melee_weapon()
+                {
+                    return false;
+                }
                 ap >= spell.action_point_cost
                     && self.stamina.current() >= spell.stamina_cost
                     && self.mana.current() >= spell.mana_cost

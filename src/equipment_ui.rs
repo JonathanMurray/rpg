@@ -418,7 +418,9 @@ impl Drawable for EquipmentSlot {
                     &self.font,
                     rect,
                     TooltipPositionPreference::Bottom,
-                    &content.tooltip_lines,
+                    content.tooltip_lines[0].as_ref(),
+                    None,
+                    &content.tooltip_lines[1..],
                 );
             }
         } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
@@ -427,7 +429,9 @@ impl Drawable for EquipmentSlot {
                     &self.font,
                     rect,
                     TooltipPositionPreference::Bottom,
-                    &tooltip_lines,
+                    tooltip_lines[0].as_ref(),
+                    None,
+                    &tooltip_lines[1..],
                 );
             }
         }

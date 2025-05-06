@@ -100,10 +100,9 @@ fn draw_conditions(
             font,
             rect,
             TooltipPositionPreference::Right,
-            &[
-                condition.name.to_string(),
-                condition.description.to_string(),
-            ],
+            condition.name,
+            None,
+            &[condition.description.to_string()],
         );
     }
 

@@ -1,11 +1,12 @@
 use std::{
     cell::{Cell, Ref, RefCell},
     collections::HashMap,
+    default,
     rc::Rc,
 };
 
 use macroquad::{
-    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, SKYBLUE, WHITE, YELLOW},
+    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, RED, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -20,15 +21,17 @@ use crate::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
         DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
         SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellModifier, SpellReach,
-        SpellTarget, Weapon,
+        SpellTarget, SpellWeaponRequirement, Weapon,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
 };
 
+#[derive(Default)]
 pub struct ActionButtonTooltip {
     pub header: String,
     pub description: Option<&'static str>,
+    pub error: Option<&'static str>,
     pub technical_description: Vec<String>,
 }
 
@@ -45,17 +48,15 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
                 cost_string(reaction.action_point_cost, 0, 0)
             ),
             description: Some(reaction.description),
-            technical_description: Default::default(),
+            ..Default::default()
         },
         ButtonAction::Proceed => ActionButtonTooltip {
             header: "Proceed".to_string(),
-            description: None,
-            technical_description: Default::default(),
+            ..Default::default()
         },
         ButtonAction::OpportunityAttack => ActionButtonTooltip {
             header: "THIS SHOULD NOT BE SHOWN".to_string(), // This is replaced on-the-fly if needed
-            description: None,
-            technical_description: vec![],
+            ..Default::default()
         },
     }
 }
@@ -74,6 +75,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
             cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
         ),
         description: Some(reaction.description),
+        error: None,
         technical_description,
     }
 }
@@ -141,6 +143,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
             )
         ),
         description: Some(enhancement.description),
+        error: None,
         technical_description,
     }
 }
@@ -195,6 +198,7 @@ fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTool
             )
         ),
         description: Some(enhancement.description),
+        error: None,
         technical_description,
     }
 }
@@ -203,24 +207,20 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
     match base_action {
         BaseAction::Attack { .. } => ActionButtonTooltip {
             header: "No weapon equipped".to_string(), // This is replaced on-the-fly if needed
-            description: None,
-            technical_description: vec![],
+            ..Default::default()
         },
         BaseAction::CastSpell(spell) => spell_tooltip(spell),
         BaseAction::Move => ActionButtonTooltip {
             header: "Move".to_string(),
-            description: None,
-            technical_description: Default::default(),
+            ..Default::default()
         },
         BaseAction::ChangeEquipment => ActionButtonTooltip {
             header: "Equip/unequip (1 AP)".to_string(),
-            description: None,
-            technical_description: Default::default(),
+            ..Default::default()
         },
         BaseAction::EndTurn => ActionButtonTooltip {
             header: "End your turn".to_string(),
-            description: None,
-            technical_description: Default::default(),
+            ..Default::default()
         },
     }
 }
@@ -331,6 +331,7 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
     ActionButtonTooltip {
         header,
         description: Some(spell.description),
+        error: None,
         technical_description,
     }
 }
@@ -471,6 +472,24 @@ impl ActionButton {
     }
 
     pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
+        // TODO: if action requires melee weapon and none is equipped, add error message to tooltip
+        if let ButtonAction::Action(BaseAction::CastSpell(spell)) = self.action {
+            if spell.weapon_requirement == Some(SpellWeaponRequirement::Melee) {
+                let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
+
+                if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
+                    if self.character.as_ref().unwrap().has_equipped_melee_weapon() {
+                        self.tooltip.borrow_mut().error = None;
+                    } else {
+                        self.tooltip.borrow_mut().error = Some("Requires melee weapon!");
+                    }
+
+                    self.tooltip_is_based_on_equipped_weapon
+                        .set(equipped_weapon);
+                }
+            }
+        }
+
         if let ButtonAction::Action(BaseAction::Attack(attack)) = self.action {
             let equipped_weapon = self.character.as_ref().unwrap().weapon(attack.hand);
 
@@ -479,17 +498,17 @@ impl ActionButton {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
                     ActionButtonTooltip {
                         header: format!("{} attack ({} AP)", attack_type, weapon.action_point_cost),
-                        description: None,
+
                         technical_description: vec![
                             format!("{} damage", weapon.damage),
                             "vs Evasion".to_string(),
                         ],
+                        ..Default::default()
                     }
                 } else {
                     ActionButtonTooltip {
                         header: "No weapon equipped".to_string(),
-                        description: None,
-                        technical_description: vec![],
+                        ..Default::default()
                     }
                 };
             }
@@ -503,11 +522,11 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = ActionButtonTooltip {
                     header: "Opportunity attack (1 AP)".to_string(),
-                    description: None,
                     technical_description: vec![
                         format!("{} damage", equipped_weapon.unwrap().damage),
                         "vs Evasion".to_string(),
                     ],
+                    ..Default::default()
                 };
             }
 
@@ -830,12 +849,15 @@ pub fn draw_button_tooltip(
     button_position: (f32, f32),
     tooltip: &ActionButtonTooltip,
 ) {
-    let mut lines = vec![tooltip.header.to_string()];
+    let mut lines = vec![];
     if let Some(description) = tooltip.description {
         if !description.is_empty() {
             lines.push(description.to_string());
             lines.push("".to_string());
         }
+    }
+    if let Some(error) = tooltip.error {
+        lines.push(error.to_string());
     }
     lines.extend_from_slice(&tooltip.technical_description);
 
@@ -851,14 +873,10 @@ pub fn draw_button_tooltip(
             button_size.1,
         ),
         TooltipPositionPreference::Top,
+        &tooltip.header,
+        tooltip.error,
         &lines,
     );
-}
-
-pub enum TooltipPosition {
-    TopLeft((f32, f32)),
-    BottomLeft((f32, f32)),
-    TopRight((f32, f32)),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -873,22 +891,38 @@ pub fn draw_tooltip(
     font: &Font,
     rect: Rect,
     mut pos_preference: TooltipPositionPreference,
-    lines: &[String],
+    header: &str,
+    error: Option<&'static str>,
+    content_lines: &[String],
 ) {
     let font_size = 18;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
-    for line in lines {
+
+    let mut measure_width = |line| {
         let dimensions = measure_text(line, Some(font), font_size, 1.0);
         if dimensions.width > max_line_w {
             max_line_w = dimensions.width;
         }
+    };
+
+    measure_width(&header);
+    error.as_ref().map(|error| measure_width(error));
+    for line in content_lines {
+        measure_width(line);
     }
 
     let tooltip_w = max_line_w + text_margin * 2.0;
 
+    let empty_line_h = 12.0;
+
     let line_h = 22.0;
-    let tooltip_h = lines.len() as f32 * line_h + text_margin * 2.0;
+    let num_real_lines = 1
+        + content_lines.iter().filter(|line| !line.is_empty()).count()
+        + error.map(|_| 1).unwrap_or(0);
+    let num_empty_lines = content_lines.iter().filter(|line| line.is_empty()).count();
+    let tooltip_h =
+        num_real_lines as f32 * line_h + text_margin * 2.0 + num_empty_lines as f32 * empty_line_h;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -949,12 +983,23 @@ pub fn draw_tooltip(
     };
 
     let mut line_y = tooltip_rect.1 + text_margin * 2.0 + 5.0;
-    for (i, line) in lines.iter().enumerate() {
+
+    let mut draw_line = |line, color: Option<Color>| {
         let mut params = text_params.clone();
-        if i == 0 {
-            params.color = YELLOW;
+        if let Some(c) = color {
+            params.color = c;
         }
         draw_text_ex(line, tooltip_rect.0 + text_margin, line_y, params);
-        line_y += line_h;
+        if line.is_empty() {
+            line_y += empty_line_h;
+        } else {
+            line_y += line_h;
+        }
+    };
+
+    draw_line(header, Some(YELLOW));
+    error.map(|error| draw_line(error, Some(RED)));
+    for line in content_lines {
+        draw_line(line, None)
     }
 }

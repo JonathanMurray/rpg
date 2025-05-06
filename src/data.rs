@@ -6,8 +6,8 @@ use crate::{
         AttackEnhancementOnHitEffect, Condition, DefenseType, EquipEffect, OnAttackedReaction,
         OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
         Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect,
-        SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget, Weapon,
-        WeaponGrip, WeaponRange,
+        SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget,
+        SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -293,7 +293,6 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     must_be_melee: false,
 };
 
-// TODO Should require holding a melee weapon
 pub const SWEEP_ATTACK: Spell = Spell {
     name: "Sweeping attack",
     description: "Target all enemies around you",
@@ -301,6 +300,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 1,
+    weapon_requirement: Some(SpellWeaponRequirement::Melee),
 
     modifier: SpellModifier::Attack(-3),
     possible_enhancements: [
@@ -333,7 +333,6 @@ pub const SWEEP_ATTACK: Spell = Spell {
     animation_color: MAGENTA,
 };
 
-// TODO Should require holding a melee weapon
 pub const LUNGE_ATTACK: Spell = Spell {
     name: "Lunge attack",
     description: "Move to target in an unobstructed path, before attacking",
@@ -341,6 +340,7 @@ pub const LUNGE_ATTACK: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 2,
+    weapon_requirement: Some(SpellWeaponRequirement::Melee),
 
     modifier: SpellModifier::Attack(0),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
@@ -379,6 +379,7 @@ pub const BRACE: Spell = Spell {
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 1,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [None; 3],
@@ -399,6 +400,7 @@ pub const SCREAM: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     target: SpellTarget::None {
@@ -439,6 +441,7 @@ pub const SHACKLED_MIND: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     target: SpellTarget::Enemy {
@@ -491,6 +494,7 @@ pub const MIND_BLAST: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [
@@ -528,6 +532,7 @@ pub const HEAL: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     target: SpellTarget::Ally {
@@ -576,6 +581,7 @@ pub const HEALING_NOVA: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
@@ -599,6 +605,7 @@ pub const SELF_HEAL: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
@@ -619,6 +626,7 @@ pub const HEALING_RAIN: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 2,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [None, None, None],
@@ -640,6 +648,7 @@ pub const FIREBALL: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     target: SpellTarget::Enemy {
@@ -707,6 +716,7 @@ pub const KILL: Spell = Spell {
     action_point_cost: 4,
     mana_cost: 0,
     stamina_cost: 0,
+    weapon_requirement: None,
 
     modifier: SpellModifier::Spell,
     possible_enhancements: [None; 3],
