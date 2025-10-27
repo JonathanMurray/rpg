@@ -883,7 +883,7 @@ impl LabelledResourceBar {
             children: vec![
                 Element::RcRefCell(cloned_bar),
                 Element::RcRefCell(cloned_value_text),
-                Element::Text(label_text),
+                //Element::Text(label_text),
             ],
             min_width: Some(40.0),
             ..Default::default()
@@ -912,10 +912,16 @@ impl LabelledResourceBar {
 
 impl Drawable for LabelledResourceBar {
     fn draw(&self, x: f32, y: f32) {
-        self.list.draw(x, y);
+        if self.max_value > 0 {
+            self.list.draw(x, y);
+        }
     }
 
     fn size(&self) -> (f32, f32) {
-        self.list.size()
+        if self.max_value > 0 {
+            self.list.size()
+        } else {
+            (0.0, 0.0)
+        }
     }
 }

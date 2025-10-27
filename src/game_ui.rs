@@ -674,7 +674,10 @@ impl UserInterface {
 
         character_ui.actions_section.draw(10.0, ui_y + 10.0);
         character_ui.action_points_row.draw(430.0, ui_y + 5.0);
-        character_ui.resource_bars.draw(400.0, ui_y + 40.0);
+        character_ui.resource_bars.draw(
+            480.0 - character_ui.resource_bars.size().0 / 2.0,
+            ui_y + 40.0,
+        );
 
         //self.log.draw(800.0, ui_y);
         let log_x = 950.0;

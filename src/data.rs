@@ -51,7 +51,6 @@ pub const ROBE: ArmorPiece = ArmorPiece {
     },
 };
 
-
 pub const STABBING: AttackEnhancement = AttackEnhancement {
     name: "Stabbing",
     description: "",
