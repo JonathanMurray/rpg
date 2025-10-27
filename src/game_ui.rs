@@ -1468,6 +1468,8 @@ impl UserInterface {
                 self.log
                     .add(format!("{} died", self.characters.get(character).name));
 
+                self.target_ui.clear_character_if_dead();
+
                 self.game_grid.remove_dead();
                 self.character_portraits.remove_dead();
 

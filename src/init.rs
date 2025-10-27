@@ -75,8 +75,8 @@ pub fn init() -> GameInitState {
     let skeleton1 = Character::new(
         true,
         "Skeleton",
-        PortraitId::Portrait3,
-        SpriteId::Character3,
+        PortraitId::Skeleton,
+        SpriteId::Skeleton,
         Attributes::new(4, 2, 1, 1),
         (5, 7),
     );
@@ -89,12 +89,12 @@ pub fn init() -> GameInitState {
         PortraitId::Skeleton,
         SpriteId::Skeleton,
         Attributes::new(2, 2, 1, 1),
-        (5, 9),
+        (8, 8),
     );
     skeleton2.set_weapon(HandType::MainHand, DAGGER);
     skeleton2.set_shield(SMALL_SHIELD);
 
-    let characters = vec![alice, bob, skeleton2];
+    let characters = vec![alice, skeleton2];
 
     let map_str = fs::read_to_string("map.txt").unwrap();
 

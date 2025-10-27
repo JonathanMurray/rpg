@@ -12,7 +12,7 @@ use crate::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{Character, Goodness},
+    core::{Character, CharacterId, Goodness},
     game_ui_components::{ActionPointsRow, ResourceBar},
 };
 
@@ -40,6 +40,14 @@ impl TargetUi {
     pub fn rebuild_character_ui(&mut self) {
         if let Some(target) = self.target.take() {
             self.set_character(Some(&target));
+        }
+    }
+
+    pub fn clear_character_if_dead(&mut self) {
+        if let Some(character) = &self.target {
+            if character.is_dead() {
+                self.target = None;
+            }
         }
     }
 

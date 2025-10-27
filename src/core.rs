@@ -2247,6 +2247,7 @@ pub struct Character {
     pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
+    // How many cells you can move per AP
     pub move_speed: f32,
     pub capacity: u32,
     pub inventory: [Cell<Option<EquipmentEntry>>; 6],

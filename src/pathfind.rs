@@ -47,7 +47,7 @@ impl PathfindGrid {
         &self,
         start: Position,
         target: Position,
-    ) -> Option<(f32, Vec<Position>)> {
+    ) -> Option<(f32, Vec<(f32, Position)>)> {
         let routes = self.explore_outward(start, 10.0);
         let mut shortest_path: Option<Vec<(f32, (i32, i32))>> = None;
         for (end, route) in &routes {
@@ -76,7 +76,7 @@ impl PathfindGrid {
 
         shortest_path.map(|path| {
             let total_dist = path[0].0;
-            let positions = path.iter().rev().map(|(_dist, pos)| *pos).collect();
+            let positions = path.iter().rev().copied().collect();
             (total_dist, positions)
         })
     }

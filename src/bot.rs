@@ -1,4 +1,6 @@
-use crate::core::{Action, ActionReach, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction};
+use crate::core::{
+    Action, ActionReach, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction, Position,
+};
 
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
@@ -27,7 +29,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 
     let bot_pos = character.position.get();
 
-    let mut shortest_path_to_some_player: Option<(f32, Vec<(i32, i32)>)> = None;
+    let mut shortest_path_to_some_player: Option<(f32, Vec<(f32, Position)>)> = None;
 
     for player_pos in &game.player_positions() {
         let maybe_path = game
@@ -46,10 +48,21 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     }
 
     if let Some(path) = shortest_path_to_some_player {
-        let positions = path.1;
+        let all_positions = path.1;
+
+        let mut positions = vec![];
+        let mut ap_cost = 0;
+        for (dist, pos) in all_positions {
+            if dist <= character.action_points.current() as f32 {
+                positions.push(pos);
+                ap_cost = dist.ceil() as u32;
+            }
+        }
+
+        assert!(ap_cost > 0);
 
         return Some(Action::Move {
-            action_point_cost: 1,
+            action_point_cost: ap_cost,
             positions: positions,
             stamina_cost: 0,
         });
