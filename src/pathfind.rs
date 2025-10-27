@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use crate::core::Position;
+use crate::{core::Position, util::are_adjacent};
 
 pub struct PathfindGrid {
     dimensions: (u32, u32),
@@ -43,14 +43,52 @@ impl PathfindGrid {
         self.dimensions
     }
 
-    pub fn run(&self, (start_x, start_y): Position, range: f32) -> HashMap<Position, Route> {
+    pub fn find_path_to_adjacent(
+        &self,
+        start: Position,
+        target: Position,
+    ) -> Option<(f32, Vec<Position>)> {
+        let routes = self.explore_outward(start, 10.0);
+        let mut shortest_path: Option<Vec<(f32, (i32, i32))>> = None;
+        for (end, route) in &routes {
+            if are_adjacent(*end, target) {
+                let mut path = build_path_from_route(&routes, start, *end);
+
+                dbg!("before popping start pos from path: ", &path);
+
+                if path[0].1 == start {
+                    // The "path" doesn't make it beyond the start position. Discard it.
+                    continue;
+                }
+
+                // Pop the start position
+                path.pop();
+
+                if let Some(shortest) = &shortest_path {
+                    if route.distance_from_start < shortest[0].0 {
+                        shortest_path = Some(path);
+                    }
+                } else {
+                    shortest_path = Some(path);
+                }
+            }
+        }
+
+        shortest_path.map(|path| {
+            let total_dist = path[0].0;
+            let positions = path.iter().rev().map(|(_dist, pos)| *pos).collect();
+            (total_dist, positions)
+        })
+    }
+
+    pub fn explore_outward(&self, start: Position, range: f32) -> HashMap<Position, Route> {
         let mut routes: HashMap<Position, Route> = Default::default();
 
         let mut next: Vec<(Position, Route)> = vec![(
-            (start_x, start_y),
+            start,
             Route {
                 distance_from_start: 0.0,
-                came_from: (start_x, start_y),
+                came_from: start,
             },
         )];
 
@@ -101,4 +139,28 @@ impl PathfindGrid {
 
         routes
     }
+}
+
+pub fn build_path_from_route(
+    routes: &HashMap<Position, Route>,
+    start: Position,
+    destination: Position,
+) -> Vec<(f32, Position)> {
+    let route = routes.get(&destination).unwrap();
+    let mut dist = route.distance_from_start;
+
+    let mut path = vec![(dist, destination)];
+    let mut pos = route.came_from;
+
+    loop {
+        let route = routes.get(&pos).unwrap();
+        dist = route.distance_from_start;
+        path.push((dist, pos));
+        if pos == start {
+            break;
+        }
+        pos = route.came_from;
+    }
+    assert!(path.len() > 1);
+    path
 }

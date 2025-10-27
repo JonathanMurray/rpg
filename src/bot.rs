@@ -1,82 +1,62 @@
-use crate::core::{
-    Action, ActionReach, ActionTarget, BaseAction, CharacterId, CoreGame, OnAttackedReaction,
-    OnHitReaction,
-};
-use macroquad::rand;
+use crate::core::{Action, ActionReach, CharacterId, CoreGame, OnAttackedReaction, OnHitReaction};
 
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
 
     assert!(!character.player_controlled);
 
-    let mut actions = character.usable_actions();
-    let mut chosen_action = None;
-
-    while !actions.is_empty() {
-        let i = rand::gen_range(0, actions.len());
-        let action = actions.swap_remove(i);
-
-        if character.can_use_action(action) {
-            match action {
-                BaseAction::Attack(attack) => {
-                    for (id, other_character) in game.characters.iter_with_ids() {
-                        if *id == game.active_character_id {
-                            continue; //Avoid borrowing already borrowed
-                        }
-                        if other_character.player_controlled
-                            && character
-                                .reaches_with_attack(attack.hand, other_character.position.get())
-                                .1
-                                != ActionReach::No
-                        {
-                            chosen_action = Some(Action::Attack {
-                                hand: attack.hand,
-                                enhancements: vec![],
-                                target: *id,
-                            });
-                            break;
-                        }
-                    }
-                }
-                BaseAction::CastSpell(spell) => {
-                    for (id, other_character) in game.characters.iter_with_ids() {
-                        if other_character.player_controlled {
-                            chosen_action = Some(Action::CastSpell {
-                                spell,
-                                enhancements: vec![],
-                                target: ActionTarget::Character(*id, None),
-                            });
-                            break;
-                        }
-                    }
-                }
-                BaseAction::Move => {
-                    let pos = character.position.get();
-                    let routes = game.pathfind_grid.run((pos.0, pos.1), character.move_speed);
-
-                    for (destination, route) in routes {
-                        if route.came_from == (pos.0, pos.1) && route.distance_from_start > 0.0 {
-                            let destination = (destination.0, destination.1);
-                            assert!(destination != pos);
-                            chosen_action = Some(Action::Move {
-                                action_point_cost: 1,
-                                positions: vec![destination],
-                                stamina_cost: 0,
-                            });
-                            break;
-                        }
-                    }
-                }
-                BaseAction::ChangeEquipment | BaseAction::EndTurn => {}
+    if let Some(attack) = character.usable_attack_action() {
+        for (id, other_character) in game.characters.iter_with_ids() {
+            if *id == game.active_character_id {
+                continue; //Avoid borrowing already borrowed
             }
-        }
-        if chosen_action.is_some() {
-            break;
+            if other_character.player_controlled
+                && character
+                    .reaches_with_attack(attack.hand, other_character.position.get())
+                    .1
+                    != ActionReach::No
+            {
+                return Some(Action::Attack {
+                    hand: attack.hand,
+                    enhancements: vec![],
+                    target: *id,
+                });
+            }
         }
     }
 
+    let bot_pos = character.position.get();
+
+    let mut shortest_path_to_some_player: Option<(f32, Vec<(i32, i32)>)> = None;
+
+    for player_pos in &game.player_positions() {
+        let maybe_path = game
+            .pathfind_grid
+            .find_path_to_adjacent(bot_pos, *player_pos);
+        if let Some(path) = maybe_path {
+            dbg!(bot_pos, player_pos, &path);
+            if let Some(shortest) = &shortest_path_to_some_player {
+                if path.0 < shortest.0 {
+                    shortest_path_to_some_player = Some(path);
+                }
+            } else {
+                shortest_path_to_some_player = Some(path);
+            }
+        }
+    }
+
+    if let Some(path) = shortest_path_to_some_player {
+        let positions = path.1;
+
+        return Some(Action::Move {
+            action_point_cost: 1,
+            positions: positions,
+            stamina_cost: 0,
+        });
+    }
+
     // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
-    chosen_action
+    return None;
 }
 
 pub fn bot_choose_attack_reaction(

@@ -18,3 +18,4 @@ pub mod pathfind;
 pub mod stats_ui;
 pub mod target_ui;
 pub mod textures;
+mod util;

@@ -67,10 +67,10 @@ pub fn init() -> GameInitState {
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
     //alice.set_shield(SMALL_SHIELD);
 
-    alice.receive_condition(Condition::Braced);
-    alice.receive_condition(Condition::Distracted);
-    alice.receive_condition(Condition::NearDeath);
-    alice.receive_condition(Condition::Protected(2));
+    //alice.receive_condition(Condition::Braced);
+    //alice.receive_condition(Condition::Distracted);
+    //alice.receive_condition(Condition::NearDeath);
+    //alice.receive_condition(Condition::Protected(2));
 
     let skeleton1 = Character::new(
         true,
@@ -87,18 +87,16 @@ pub fn init() -> GameInitState {
         false,
         "Skeleton",
         PortraitId::Skeleton,
-        SpriteId::Character2,
+        SpriteId::Skeleton,
         Attributes::new(2, 2, 1, 1),
-        (7, 7),
+        (5, 9),
     );
     skeleton2.set_weapon(HandType::MainHand, DAGGER);
     skeleton2.set_shield(SMALL_SHIELD);
 
-    let characters = vec![alice, bob, skeleton1, skeleton2];
+    let characters = vec![alice, bob, skeleton2];
 
     let map_str = fs::read_to_string("map.txt").unwrap();
-
-    dbg!(&map_str);
 
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
 

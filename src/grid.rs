@@ -31,7 +31,7 @@ use crate::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
     game_ui::{ConfiguredAction, UiState},
-    pathfind::{PathfindGrid, Route},
+    pathfind::{build_path_from_route, PathfindGrid, Route},
     textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
@@ -242,7 +242,9 @@ impl GameGrid {
         self.selected_player_character_id = selected_player_character_id;
 
         let pos = self.characters.get(self.active_character_id).pos();
-        self.routes = self.pathfind_grid.run(pos, self.movement_range.max());
+        self.routes = self
+            .pathfind_grid
+            .explore_outward(pos, self.movement_range.max());
 
         for effect in &mut self.effects {
             effect.age += elapsed;
@@ -358,7 +360,9 @@ impl GameGrid {
 
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
-        self.routes = self.pathfind_grid.run(pos, self.movement_range.max());
+        self.routes = self
+            .pathfind_grid
+            .explore_outward(pos, self.movement_range.max());
     }
 
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
@@ -842,7 +846,7 @@ impl GameGrid {
 
             if let Some(hovered_route) = hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
-                    let path = self.build_path_from_route(active_char_pos, mouse_grid_pos);
+                    let path = build_path_from_route(&self.routes, active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path, true);
 
                     if pressed_left_mouse {
@@ -1355,6 +1359,7 @@ impl GameGrid {
         }
     }
 
+    // TODO remove, replaced by func in pathfind.rs
     fn build_path_from_route(
         &self,
         start: Position,

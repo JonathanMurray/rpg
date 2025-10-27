@@ -158,6 +158,16 @@ impl CoreGame {
         self.active_character().player_controlled
     }
 
+    pub fn player_positions(&self) -> Vec<Position> {
+        let mut positions = vec![];
+        for character in self.characters.iter() {
+            if character.player_controlled {
+                positions.push(character.pos());
+            }
+        }
+        positions
+    }
+
     async fn perform_action(&mut self, action: Action) -> Option<(CharacterId, u32)> {
         match action {
             Action::Attack {
@@ -964,7 +974,7 @@ impl CoreGame {
     fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
 
-        if character.health.current() <= character.health.max / 3 {
+        if character.health.current() as f32 <= character.health.max as f32 * 0.3 {
             character.receive_condition(Condition::NearDeath);
         } else {
             character.conditions.borrow_mut().near_death = false;
@@ -1194,8 +1204,8 @@ impl CoreGame {
         if defender.lose_braced() {
             detail_lines.push(format!("{} lost Braced", defender.name));
         }
-        if defender.lose_deceived() {
-            detail_lines.push(format!("{} lost Deceived", defender.name));
+        if defender.lose_distracted() {
+            detail_lines.push(format!("{} lost Distracted", defender.name));
         }
 
         for enhancement in &enhancements {
@@ -1766,7 +1776,7 @@ impl Condition {
             MainHandExertion(_) => "-x on further similar actions",
             OffHandExertion(_) => "-x on further similar actions",
             Encumbered(_) => "-x to Evasion and -x/2 to dice rolls",
-            NearDeath => "Reduced AP, disadvantage on everything",
+            NearDeath => "< 30% HP: Reduced AP, disadvantage on everything",
             Dead => "This character has reached 0 HP and is dead",
             Slowed(_) => "Gains 2 less AP per turn",
             Exposed(_) => "-3 to all defenses",
@@ -1787,7 +1797,7 @@ impl Condition {
 const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
 const PROTECTED_ARMOR_BONUS: u32 = 3;
 const BRACED_DEFENSE_BONUS: u32 = 3;
-const DECEIVED_DEFENSE_PENALTY: u32 = 6;
+const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1803,7 +1813,7 @@ struct Conditions {
     bleeding: u32,
     braced: bool,
     raging: bool,
-    deceived: bool,
+    distracted: bool,
     weakened: u32,
     mainhand_exertion: u32,
     offhand_exertion: u32,
@@ -1832,7 +1842,7 @@ impl Conditions {
         if self.raging {
             result.push(Condition::Raging.info());
         }
-        if self.deceived {
+        if self.distracted {
             result.push(Condition::Distracted.info());
         }
         if self.weakened > 0 {
@@ -2349,10 +2359,10 @@ impl Character {
         }
     }
 
-    fn lose_deceived(&self) -> bool {
+    fn lose_distracted(&self) -> bool {
         let mut conditions = self.conditions.borrow_mut();
-        if conditions.deceived {
-            conditions.deceived = false;
+        if conditions.distracted {
+            conditions.distracted = false;
             true
         } else {
             false
@@ -2572,6 +2582,17 @@ impl Character {
         self.known_actions.to_vec()
     }
 
+    pub fn usable_attack_action(&self) -> Option<AttackAction> {
+        for action in &self.known_actions {
+            if self.can_use_action(*action) {
+                if let BaseAction::Attack(attack_action) = action {
+                    return Some(*attack_action);
+                }
+            }
+        }
+        return None;
+    }
+
     pub fn usable_actions(&self) -> Vec<BaseAction> {
         self.known_actions
             .iter()
@@ -2772,8 +2793,8 @@ impl Character {
         if conditions.braced {
             res += BRACED_DEFENSE_BONUS;
         }
-        if conditions.deceived {
-            res -= DECEIVED_DEFENSE_PENALTY;
+        if conditions.distracted {
+            res -= DISTRACTED_DEFENSE_PENALTY;
         }
         res = res.saturating_sub(conditions.encumbered);
 
@@ -3043,8 +3064,8 @@ impl Character {
         if conditions.braced {
             terms.push(("Braced", RollBonusContributor::OtherNegative));
         }
-        if conditions.deceived {
-            terms.push(("Deceived", RollBonusContributor::OtherPositive));
+        if conditions.distracted {
+            terms.push(("Distracted", RollBonusContributor::OtherPositive));
         }
         if conditions.near_death {
             terms.push(("Near-death", RollBonusContributor::Advantage(1)))
@@ -3086,7 +3107,7 @@ impl Character {
             Bleeding(n) => conditions.bleeding += n,
             Braced => conditions.braced = true,
             Raging => conditions.raging = true,
-            Distracted => conditions.deceived = true,
+            Distracted => conditions.distracted = true,
             Weakened(n) => conditions.weakened += n,
             MainHandExertion(n) => conditions.mainhand_exertion += n,
             OffHandExertion(n) => conditions.offhand_exertion += n,
