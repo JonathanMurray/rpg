@@ -2269,7 +2269,7 @@ impl Character {
 
         let move_speed = 0.9 + base_attributes.agility as f32 * 0.1;
         let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
-        let max_reactive_action_points = base_attributes.intellect / 2;
+        let max_reactive_action_points = 1 + base_attributes.intellect / 2;
         let capacity = base_attributes.strength * 2;
         Self {
             id: None,
@@ -3180,6 +3180,14 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone)]
 pub struct EquipEffect {
     pub bonus_spell_modifier: u32,
+}
+
+impl EquipEffect {
+    pub const fn default() -> Self {
+        Self {
+            bonus_spell_modifier: 0,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

@@ -51,13 +51,6 @@ pub const ROBE: ArmorPiece = ArmorPiece {
     },
 };
 
-impl EquipEffect {
-    const fn default() -> Self {
-        Self {
-            bonus_spell_modifier: 0,
-        }
-    }
-}
 
 pub const STABBING: AttackEnhancement = AttackEnhancement {
     name: "Stabbing",
@@ -77,7 +70,7 @@ pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: WeaponRange::Melee,
     action_point_cost: 2,
-    damage: 2,
+    damage: 3,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
@@ -106,7 +99,7 @@ pub const SWORD: Weapon = Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
     action_point_cost: 2,
-    damage: 2,
+    damage: 3,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -135,7 +128,7 @@ pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
     range: WeaponRange::Melee,
     action_point_cost: 2,
-    damage: 2,
+    damage: 3,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(FEINT),
@@ -164,7 +157,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
     action_point_cost: 2,
-    damage: 3,
+    damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
@@ -179,7 +172,7 @@ pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(5),
     action_point_cost: 2,
-    damage: 3,
+    damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFULLY_AIMED),

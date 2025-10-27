@@ -12,8 +12,7 @@ use crate::{
         Position,
     },
     data::{
-        BOW, CHAIN_MAIL, DAGGER, FIREBALL, KILL, LEATHER_ARMOR, LUNGE_ATTACK, MIND_BLAST,
-        OVERWHELMING, RAGE, RAPIER, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWORD,
+        BOW, CHAIN_MAIL, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, KILL, LEATHER_ARMOR, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, RAGE, RAPIER, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWORD
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -36,6 +35,8 @@ pub fn init() -> GameInitState {
 
     bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
     bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
+    bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
+    bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
     //bob.known_actions.push(BaseAction::CastSpell(HEAL));
     //bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
 
@@ -65,10 +66,10 @@ pub fn init() -> GameInitState {
     //alice.set_shield(SMALL_SHIELD);
 
     let skeleton1 = Character::new(
-        false,
+        true,
         "Skeleton",
-        PortraitId::Skeleton,
-        SpriteId::Skeleton,
+        PortraitId::Portrait3,
+        SpriteId::Character3,
         Attributes::new(4, 2, 1, 1),
         (5, 7),
     );
@@ -79,7 +80,7 @@ pub fn init() -> GameInitState {
         false,
         "Skeleton",
         PortraitId::Skeleton,
-        SpriteId::Skeleton,
+        SpriteId::Character2,
         Attributes::new(2, 2, 1, 1),
         (7, 7),
     );
