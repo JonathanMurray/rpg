@@ -253,14 +253,14 @@ fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
     match spell.modifier {
-        SpellModifier::Spell => technical_description.push("[ spell ]".to_string()),
+        SpellModifier::Spell => technical_description.push("[ spell roll ]".to_string()),
         SpellModifier::Attack(bonus) if bonus < 0 => {
-            technical_description.push(format!("[ attack - {} ]", -bonus))
+            technical_description.push(format!("[ attack roll - {} ]", -bonus))
         }
         SpellModifier::Attack(bonus) if bonus > 0 => {
-            technical_description.push(format!("[ attack + {} ]", bonus))
+            technical_description.push(format!("[ attack roll + {} ]", bonus))
         }
-        SpellModifier::Attack(_) => technical_description.push("[ attack ]".to_string()),
+        SpellModifier::Attack(_) => technical_description.push("[ attack roll ]".to_string()),
     }
 
     match spell.target {
@@ -496,13 +496,19 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
+                    let mut technical_description = vec!["[ attack roll ]".to_string()];
+                    let range = if weapon.is_melee() {
+                        "melee".to_string()
+                    } else {
+                        format!("range {}", weapon.range.into_range())
+                    };
+                    technical_description.push(format!("Target enemy ({})", range));
+                    technical_description.push("  [ evasion ]".to_string());
+                    technical_description.push(format!("  {} damage", weapon.damage));
                     ActionButtonTooltip {
                         header: format!("{} attack ({} AP)", attack_type, weapon.action_point_cost),
 
-                        technical_description: vec![
-                            format!("{} damage", weapon.damage),
-                            "vs Evasion".to_string(),
-                        ],
+                        technical_description,
                         ..Default::default()
                     }
                 } else {

@@ -3077,7 +3077,7 @@ impl Character {
         terms
     }
 
-    fn receive_condition(&self, condition: Condition) {
+    pub fn receive_condition(&self, condition: Condition) {
         let mut conditions = self.conditions.borrow_mut();
         use Condition::*;
         match condition {

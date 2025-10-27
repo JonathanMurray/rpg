@@ -8,8 +8,8 @@ use rand::distr::{Distribution, Uniform};
 
 use crate::{
     core::{
-        Attributes, BaseAction, Character, CharacterId, Characters, EquipmentEntry, HandType,
-        Position,
+        Attributes, BaseAction, Character, CharacterId, Characters, Condition, EquipmentEntry,
+        HandType, Position,
     },
     data::{
         BOW, CHAIN_MAIL, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, KILL, LEATHER_ARMOR,
@@ -66,6 +66,11 @@ pub fn init() -> GameInitState {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
     //alice.set_shield(SMALL_SHIELD);
+
+    alice.receive_condition(Condition::Braced);
+    alice.receive_condition(Condition::Distracted);
+    alice.receive_condition(Condition::NearDeath);
+    alice.receive_condition(Condition::Protected(2));
 
     let skeleton1 = Character::new(
         true,
