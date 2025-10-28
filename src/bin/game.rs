@@ -1,8 +1,8 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use macroquad::color::MAGENTA;
-use macroquad::input::mouse_position;
+use macroquad::color::{Color, MAGENTA, WHITE};
+use macroquad::input::{get_keys_pressed, mouse_position};
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
 
 use macroquad::shapes::draw_rectangle;
@@ -22,6 +22,7 @@ use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnH
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
 use rpg::init::init;
+use rpg::map_scene::run_map_loop;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture,
@@ -97,13 +98,15 @@ async fn main() {
         equipment_icons,
         portrait_textures,
         terrain_atlas,
-        font,
+        font.clone(),
         decorative_font,
         grid_big_font,
         init_state,
     );
 
     game_ui.init(gfx_user_interface);
+
+    run_map_loop(font).await;
 
     core_game.run().await;
 }
