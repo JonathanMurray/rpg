@@ -1,7 +1,6 @@
 use std::{
     cell::{Cell, Ref, RefCell},
     collections::HashMap,
-    default,
     rc::Rc,
 };
 
@@ -912,8 +911,8 @@ pub fn draw_tooltip(
         }
     };
 
-    measure_width(&header);
-    error.as_ref().map(|error| measure_width(error));
+    measure_width(header);
+    if let Some(error) = error.as_ref() { measure_width(error) }
     for line in content_lines {
         measure_width(line);
     }
@@ -1004,7 +1003,7 @@ pub fn draw_tooltip(
     };
 
     draw_line(header, Some(YELLOW));
-    error.map(|error| draw_line(error, Some(RED)));
+    if let Some(error) = error { draw_line(error, Some(RED)) }
     for line in content_lines {
         draw_line(line, None)
     }

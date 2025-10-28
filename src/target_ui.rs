@@ -12,7 +12,7 @@ use crate::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{Character, CharacterId, Goodness},
+    core::{Character, Goodness},
     game_ui_components::{ActionPointsRow, ResourceBar},
 };
 
@@ -103,7 +103,7 @@ impl TargetUi {
             let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (80.0, 10.0));
             health_bar.current = char.health.current();
 
-            let mut health_text_line = TextLine::new(
+            let health_text_line = TextLine::new(
                 format!("{} / {}", char.health.current(), char.health.max),
                 18,
                 WHITE,

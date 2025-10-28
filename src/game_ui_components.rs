@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{MAGENTA, PURPLE, SKYBLUE},
+    color::SKYBLUE,
     texture::{draw_texture_ex, DrawTextureParams},
 };
 

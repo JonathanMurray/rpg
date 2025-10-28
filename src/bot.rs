@@ -63,13 +63,13 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 
         return Some(Action::Move {
             action_point_cost: ap_cost,
-            positions: positions,
+            positions,
             stamina_cost: 0,
         });
     }
 
     // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
-    return None;
+    None
 }
 
 pub fn bot_choose_attack_reaction(

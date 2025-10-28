@@ -874,7 +874,7 @@ impl UserInterface {
 
                 let reaches = self.active_character().reaches_with_spell(
                     spell,
-                    &selected_enhancements,
+                    selected_enhancements,
                     target_char.pos(),
                 );
 

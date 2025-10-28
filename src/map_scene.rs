@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{BLACK, Color, GRAY, RED, WHITE, YELLOW}, input::{MouseButton, is_mouse_button_pressed, mouse_position}, math::{Rect, Vec2}, miniquad::window::screen_size, shapes::{DrawRectangleParams, draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex, draw_rectangle_lines}, text::{Font, draw_text, measure_text}, time::get_frame_time, window::{clear_background, next_frame}
+    color::{BLACK, Color, GRAY, RED, WHITE, YELLOW}, input::{MouseButton, is_mouse_button_pressed, mouse_position}, math::Rect, miniquad::window::screen_size, shapes::{DrawRectangleParams, draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, draw_rectangle_lines}, text::{Font, draw_text, measure_text}, time::get_frame_time, window::{clear_background, next_frame}
 };
 
 use crate::{drawing::draw_dashed_line};
@@ -26,10 +26,8 @@ pub async fn run_map_loop(font: Font) {
     let radius = 50.0;
     let mut selected_node_i = None;
     let margin = 25.0;
-    let nodes = vec![
-        Node::new((x0, y_mid - radius - margin), "Fight"),
-        Node::new((x0, y_mid + radius + margin), "Ditto"),
-    ];
+    let nodes = [Node::new((x0, y_mid - radius - margin), "Fight"),
+        Node::new((x0, y_mid + radius + margin), "Ditto")];
 
     let transition_duration = 0.5;
     let mut transition_countdown = None;

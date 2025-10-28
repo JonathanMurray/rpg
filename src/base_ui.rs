@@ -3,7 +3,7 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},

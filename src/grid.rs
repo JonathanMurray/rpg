@@ -16,7 +16,7 @@ use macroquad::input::is_key_down;
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
-    color::{GRAY, GREEN, RED, WHITE, YELLOW},
+    color::{GREEN, RED, WHITE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::measure_text,

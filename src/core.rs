@@ -2591,7 +2591,7 @@ impl Character {
                 }
             }
         }
-        return None;
+        None
     }
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {
@@ -2933,11 +2933,8 @@ impl Character {
 
         let (_range, reach) = self.reaches_with_attack(hand_type, target_pos);
 
-        match reach {
-            ActionReach::YesButDisadvantage(reason) => {
-                bonuses.push((reason, RollBonusContributor::Advantage(-1)));
-            }
-            _ => {}
+        if let ActionReach::YesButDisadvantage(reason) = reach {
+            bonuses.push((reason, RollBonusContributor::Advantage(-1)));
         }
 
         for enhancement in enhancements {

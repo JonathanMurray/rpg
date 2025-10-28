@@ -8,12 +8,12 @@ use rand::distr::{Distribution, Uniform};
 
 use crate::{
     core::{
-        Attributes, BaseAction, Character, CharacterId, Characters, Condition, EquipmentEntry,
+        Attributes, BaseAction, Character, CharacterId, Characters, EquipmentEntry,
         HandType, Position,
     },
     data::{
-        BOW, CHAIN_MAIL, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, KILL, LEATHER_ARMOR,
-        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, RAGE, RAPIER, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD,
+        BOW, CHAIN_MAIL, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, KILL,
+        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, RAGE, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD,
         SWEEP_ATTACK, SWORD,
     },
     pathfind::PathfindGrid,
