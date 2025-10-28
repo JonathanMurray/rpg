@@ -33,12 +33,14 @@ impl CoreGame {
         }
     }
 
-    pub async fn run(mut self) {
+    pub async fn run(mut self) -> Character {
         for char in self.characters.iter() {
             let encumbrance = char.equipment_weight() as i32 - char.capacity as i32;
             if encumbrance > 0 {
                 char.receive_condition(Condition::Encumbered(encumbrance as u32));
             }
+
+            char.action_points.set_to_max();
         }
 
         loop {
@@ -46,6 +48,22 @@ impl CoreGame {
                 "UI SELECT ACTION ... (active char = {})",
                 self.active_character().name
             );
+
+            let enemies_remaining = self
+                .characters
+                .iter()
+                .any(|character| !character.player_controlled);
+
+            if !enemies_remaining {
+                println!("No enemies remaining. Exiting game loop");
+
+                // If the active character is player controlled, it's important that it runs end-of-turn
+                // to let debuffs decay.
+                self.perform_end_of_turn_character().await;
+
+                return self.characters.player_character();
+            }
+
             let action = self.ui_select_action().await;
 
             if let Some(action) = action {
@@ -412,7 +430,9 @@ impl CoreGame {
 
             let roll = roll_d20_with_advantage(advantange_level);
 
-            detail_lines.push(roll_description(advantange_level));
+            if let Some(description) = roll_description(advantange_level) {
+                detail_lines.push(description);
+            }
 
             let mut line = format!("Rolled: {}", roll);
             let mut spell_roll_calculation = roll as i32;
@@ -1069,7 +1089,9 @@ impl CoreGame {
         let roll = roll_d20_with_advantage(attack_bonus.advantage);
         let attack_result = ((roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
 
-        detail_lines.push(roll_description(attack_bonus.advantage));
+        if let Some(description) = roll_description(attack_bonus.advantage) {
+            detail_lines.push(description);
+        }
 
         let mut armor_value = defender.protection_from_armor();
         let mut armor_str = armor_value.to_string();
@@ -1389,13 +1411,16 @@ impl CoreGame {
     }
 }
 
-fn roll_description(advantage: i32) -> String {
+fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
-        std::cmp::Ordering::Less => {
-            format!("Rolled {} dice with disadvantage...", advantage.abs() + 1)
+        std::cmp::Ordering::Less => Some(format!(
+            "Rolled {} dice with disadvantage...",
+            advantage.abs() + 1
+        )),
+        std::cmp::Ordering::Equal => None,
+        std::cmp::Ordering::Greater => {
+            Some(format!("Rolled {} dice with advantage...", advantage + 1))
         }
-        std::cmp::Ordering::Equal => "Rolled 1 die...".to_string(),
-        std::cmp::Ordering::Greater => format!("Rolled {} dice with advantage...", advantage + 1),
     }
 }
 
@@ -1601,6 +1626,13 @@ impl Characters {
 
     pub fn iter(&self) -> impl Iterator<Item = &Rc<Character>> {
         self.0.iter().map(|(_id, ch)| ch)
+    }
+
+    pub fn player_character(self) -> Character {
+        let rc_player_char = self
+            .iter().find(|ch| ch.player_controlled)
+            .unwrap();
+        Character::clone(rc_player_char)
     }
 
     pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<Character>)> {
@@ -2235,7 +2267,7 @@ impl Attributes {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Character {
     id: Option<CharacterId>,
     pub name: &'static str,
@@ -2509,6 +2541,19 @@ impl Character {
         }
 
         self.on_changed_equipment();
+    }
+
+    pub fn try_gain_equipment(&self, entry: EquipmentEntry) -> bool {
+        dbg!(self.name, entry);
+        for slot in &self.inventory {
+            if slot.get().is_none() {
+                slot.set(Some(entry));
+                self.on_changed_equipment();
+                return true;
+            }
+        }
+
+        false
     }
 
     pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {

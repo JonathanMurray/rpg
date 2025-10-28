@@ -305,7 +305,7 @@ impl ActivityPopup {
                         }
                     }
 
-                    let button_actions: Vec<ButtonAction> = self
+                    let selected_button_actions: Vec<ButtonAction> = self
                         .choice_buttons
                         .values()
                         .filter(|btn| btn.selected.get() == ButtonSelected::Yes)
@@ -318,7 +318,7 @@ impl ActivityPopup {
                                 selected_enhancements,
                                 ..
                             } => {
-                                *selected_enhancements = button_actions
+                                *selected_enhancements = selected_button_actions
                                     .iter()
                                     .map(|action| action.unwrap_attack_enhancement())
                                     .collect();
@@ -328,7 +328,7 @@ impl ActivityPopup {
                                 selected_enhancements,
                                 ..
                             } => {
-                                *selected_enhancements = button_actions
+                                *selected_enhancements = selected_button_actions
                                     .iter()
                                     .map(|action| action.unwrap_spell_enhancement())
                                     .collect();
@@ -338,18 +338,19 @@ impl ActivityPopup {
                             _ => unreachable!(),
                         },
                         UiState::ReactingToAttack { selected, .. } => {
-                            *selected = button_actions
+                            *selected = selected_button_actions
                                 .first()
                                 .map(|action| action.unwrap_on_attacked_reaction());
                             changed_on_attacked_reaction = true;
                         }
                         UiState::ReactingToHit { selected, .. } => {
-                            *selected =
-                                Some(button_actions.first().unwrap().unwrap_on_hit_reaction());
+                            *selected = selected_button_actions
+                                .first()
+                                .map(|action| action.unwrap_on_hit_reaction());
                         }
                         UiState::ReactingToOpportunity { selected, .. } => {
                             // It's a binary choice of 'use opportunity attack or not'
-                            *selected = !button_actions.is_empty();
+                            *selected = !selected_button_actions.is_empty();
                         }
                         UiState::ChoosingAction | UiState::Idle => unreachable!(),
                     }

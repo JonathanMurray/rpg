@@ -8,77 +8,26 @@ use rand::distr::{Distribution, Uniform};
 
 use crate::{
     core::{
-        Attributes, BaseAction, Character, CharacterId, Characters, EquipmentEntry,
-        HandType, Position,
+        Attributes, Character, CharacterId, Characters, HandType,
+        Position,
     },
     data::{
-        BOW, CHAIN_MAIL, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, KILL,
-        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, RAGE, ROBE, SHIRT, SIDE_STEP, SMALL_SHIELD,
-        SWEEP_ATTACK, SWORD,
+        BOW, CHAIN_MAIL, DAGGER,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
 };
 
-pub fn init() -> GameInitState {
+pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
     let active_character_id = 0;
 
-    let mut bob = Character::new(
-        true,
-        "Bob",
-        PortraitId::Portrait2,
-        SpriteId::Character5,
-        Attributes::new(3, 3, 5, 5),
-        (1, 8),
-    );
-    bob.set_weapon(HandType::MainHand, SWORD);
-    bob.set_weapon(HandType::MainHand, BOW);
-    bob.armor.set(Some(SHIRT));
-
-    bob.known_actions.push(BaseAction::CastSpell(MIND_BLAST));
-    bob.known_actions.push(BaseAction::CastSpell(FIREBALL));
-    bob.known_actions.push(BaseAction::CastSpell(HEALING_RAIN));
-    bob.known_actions.push(BaseAction::CastSpell(HEALING_NOVA));
-    //bob.known_actions.push(BaseAction::CastSpell(HEAL));
-    //bob.known_actions.push(BaseAction::CastSpell(SHACKLED_MIND));
-
-    let mut alice = Character::new(
-        true,
-        "Alice",
-        PortraitId::Portrait1,
-        SpriteId::Character4,
-        Attributes::new(5, 5, 5, 1),
-        (1, 10),
-    );
-    alice.known_actions.push(BaseAction::CastSpell(KILL)); //TODO
-    alice.known_attack_enhancements.push(OVERWHELMING);
-    alice.known_attacked_reactions.push(SIDE_STEP);
-    //alice.known_attack_enhancements.push(QUICK);
-    //alice.known_attack_enhancements.push(SMITE);
-    alice.known_on_hit_reactions.push(RAGE);
-    alice
-        .known_actions
-        .push(BaseAction::CastSpell(SWEEP_ATTACK));
-    alice
-        .known_actions
-        .push(BaseAction::CastSpell(LUNGE_ATTACK));
-    alice.armor.set(Some(ROBE));
-    alice.set_weapon(HandType::MainHand, BOW);
-    alice.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
-    //alice.set_shield(SMALL_SHIELD);
-
-    //alice.receive_condition(Condition::Braced);
-    //alice.receive_condition(Condition::Distracted);
-    //alice.receive_condition(Condition::NearDeath);
-    //alice.receive_condition(Condition::Protected(2));
-
     let skeleton1 = Character::new(
-        true,
+        false,
         "Skeleton",
         PortraitId::Skeleton,
         SpriteId::Skeleton,
         Attributes::new(4, 2, 1, 1),
-        (5, 7),
+        (0, 0),
     );
     skeleton1.armor.set(Some(CHAIN_MAIL));
     skeleton1.set_weapon(HandType::MainHand, BOW);
@@ -88,19 +37,25 @@ pub fn init() -> GameInitState {
         "Skeleton",
         PortraitId::Skeleton,
         SpriteId::Skeleton,
-        Attributes::new(2, 2, 1, 1),
-        (8, 8),
+        Attributes::new(1, 1, 1, 1),
+        (0, 0),
     );
     skeleton2.set_weapon(HandType::MainHand, DAGGER);
-    skeleton2.set_shield(SMALL_SHIELD);
+    //skeleton2.set_shield(SMALL_SHIELD);
 
-    let characters = vec![alice, skeleton2];
+    let map_filename = match fight_id {
+        FightId::First => "map1.txt",
+        FightId::Second => "map2.txt",
+    };
 
-    let map_str = fs::read_to_string("map.txt").unwrap();
+    let map_str = fs::read_to_string(map_filename).unwrap();
 
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
 
     let mut water_grid: HashSet<Position> = Default::default();
+
+    let mut player_pos = None;
+    let mut enemy_positions = HashMap::new();
 
     let mut row = 0;
     for line in map_str.lines() {
@@ -123,12 +78,32 @@ pub fn init() -> GameInitState {
                 'S' => {
                     terrain_objects.insert(pos, TerrainId::TreeStump);
                 }
+                'P' => {
+                    player_pos = Some(pos);
+                }
+                '0' => {
+                    enemy_positions.insert(0, pos);
+                }
+                '1' => {
+                    enemy_positions.insert(1, pos);
+                }
                 ' ' => {}
                 _ => panic!("Unhandled map object: {}", ch),
             }
         }
         row += 1;
     }
+
+    player_character.position.set(player_pos.unwrap());
+
+    let characters = if fight_id == FightId::First {
+        skeleton2.position.set(enemy_positions[&0]);
+        vec![player_character, skeleton2]
+    } else {
+        skeleton1.position.set(enemy_positions[&0]);
+        skeleton2.position.set(enemy_positions[&1]);
+        vec![player_character, skeleton1, skeleton2]
+    };
 
     for (x, y) in water_grid.iter().copied() {
         let id = match (
@@ -203,4 +178,10 @@ pub struct GameInitState {
     pub pathfind_grid: Rc<PathfindGrid>,
     pub background: HashMap<Position, TerrainId>,
     pub terrain_objects: HashMap<Position, TerrainId>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum FightId {
+    First,
+    Second,
 }

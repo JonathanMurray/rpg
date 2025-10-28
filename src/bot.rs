@@ -59,13 +59,14 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
             }
         }
 
-        assert!(ap_cost > 0);
-
-        return Some(Action::Move {
-            action_point_cost: ap_cost,
-            positions,
-            stamina_cost: 0,
-        });
+        // It's possible that no affordable path was found, if the best path would be diagonal and that costs more than 1 AP
+        if ap_cost > 0 {
+            return Some(Action::Move {
+                action_point_cost: ap_cost,
+                positions,
+                stamina_cost: 0,
+            });
+        }
     }
 
     // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here

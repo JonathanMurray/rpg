@@ -320,6 +320,11 @@ impl CharacterSheet {
         }
          */
 
+        let is_allowed_to_change_equipment = matches!(
+            ui_state,
+            UiState::ConfiguringAction(..) | UiState::ChoosingAction
+        );
+
         let drag = match ui_state {
             UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => drag,
             _ => &mut Option::<EquipmentDrag>::None,
@@ -355,7 +360,9 @@ impl CharacterSheet {
 
         let changed_drag = *drag != previous_drag;
 
-        if drag.is_some() && previous_drag.is_none() {
+        if drag.is_some() && previous_drag.is_none() && is_allowed_to_change_equipment {
+            // TODO: currently it's not possible to move around items even in the inventory on another character's
+            // turn. Ideally that should be possible.
             *ui_state =
                 UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: *drag });
         }

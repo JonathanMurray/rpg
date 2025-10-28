@@ -17,16 +17,24 @@ use macroquad::{
 };
 
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
-use rpg::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
+use rpg::chest_scene::run_chest_loop;
+use rpg::core::{
+    Action, Attributes, BaseAction, Character, CharacterId, CoreGame, EquipmentEntry, HandType,
+    OnAttackedReaction, OnHitReaction,
+};
 
+use rpg::data::{
+    BOW, KILL, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SIDE_STEP, SWEEP_ATTACK, SWORD,
+};
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
-use rpg::init::init;
-use rpg::map_scene::run_map_loop;
+use rpg::init::{init, FightId};
+use rpg::map_scene::{MapChoice, MapScene};
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-    load_and_init_texture,
+    load_and_init_texture, PortraitId, SpriteId,
 };
+use rpg::victory_scene::run_victory_loop;
 
 async fn load_font(path: &str) -> Font {
     let path = format!("fonts/{path}");
@@ -49,7 +57,62 @@ async fn main() {
         window::high_dpi()
     );
 
-    let init_state = init();
+    let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
+    let font = load_font(font_path).await;
+
+    let mut map_scene = MapScene::new();
+
+    let mut player_character = init_player_character();
+
+    loop {
+        let map_choice = map_scene.run_map_loop(font.clone()).await;
+        match map_choice {
+            MapChoice::Fight(fight_id) => {
+                let core_game = init_fight_scene(player_character, fight_id).await;
+
+                player_character = core_game.run().await;
+
+                run_victory_loop(font.clone()).await;
+            }
+            MapChoice::Chest(reward) => {
+                run_chest_loop(font.clone(), reward).await;
+                let success = player_character.try_gain_equipment(reward);
+                assert!(success); // TODO Allow discarding inventory items to make space, from within reward screen?
+            }
+        }
+    }
+}
+
+fn init_player_character() -> Character {
+    let mut character = Character::new(
+        true,
+        "Alice",
+        PortraitId::Portrait1,
+        SpriteId::Character4,
+        Attributes::new(5, 5, 5, 1),
+        (1, 10),
+    );
+    character.known_actions.push(BaseAction::CastSpell(KILL)); //TODO
+    character.known_attack_enhancements.push(OVERWHELMING);
+    character.known_attacked_reactions.push(SIDE_STEP);
+    //alice.known_attack_enhancements.push(QUICK);
+    //alice.known_attack_enhancements.push(SMITE);
+    character.known_on_hit_reactions.push(RAGE);
+    character
+        .known_actions
+        .push(BaseAction::CastSpell(SWEEP_ATTACK));
+    character
+        .known_actions
+        .push(BaseAction::CastSpell(LUNGE_ATTACK));
+    character.armor.set(Some(ROBE));
+    character.set_weapon(HandType::MainHand, BOW);
+    character.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
+
+    character
+}
+
+async fn init_fight_scene(player_character: Character, fight_id: FightId) -> CoreGame {
+    let init_state = init(player_character, fight_id);
 
     let mut game_ui = GameUserInterfaceConnection::uninitialized();
 
@@ -106,9 +169,7 @@ async fn main() {
 
     game_ui.init(gfx_user_interface);
 
-    run_map_loop(font).await;
-
-    core_game.run().await;
+    core_game
 }
 
 fn window_conf() -> Conf {

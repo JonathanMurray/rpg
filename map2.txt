@@ -1,16 +1,11 @@
 +----------------------------
 BBBBBBBBBBBBBBBBBBBB
-B    WWWW          B
-B    WWWWWWWW W    B
-B   WWWWWWWWWWWW   B
-B      WWWW WWW    B
-BBB     WW    W    B
 BRR   WWW          B
 BR                 B
+B     0            B
+B             S    B
+BP      1     SS   B
 B                  B
-B       W     S    B
-B     WWW     SS   B
-B     WWW          B
 B     WWW          B
 B                  B
 BBBBBBBBBBBBBBBBBBBB

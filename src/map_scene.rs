@@ -1,17 +1,36 @@
+use std::collections::HashMap;
+
 use macroquad::{
-    color::{BLACK, Color, GRAY, RED, WHITE, YELLOW}, input::{MouseButton, is_mouse_button_pressed, mouse_position}, math::Rect, miniquad::window::screen_size, shapes::{DrawRectangleParams, draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, draw_rectangle_lines}, text::{Font, draw_text, measure_text}, time::get_frame_time, window::{clear_background, next_frame}
+    color::{Color, BLACK, GRAY, RED, WHITE, YELLOW},
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    math::Rect,
+    miniquad::window::screen_size,
+    shapes::{
+        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex,
+        DrawRectangleParams,
+    },
+    text::{draw_text, measure_text, Font},
+    time::get_frame_time,
+    window::{clear_background, next_frame},
 };
 
-use crate::{drawing::draw_dashed_line};
+use crate::{
+    core::EquipmentEntry,
+    data::CHAIN_MAIL,
+    drawing::draw_dashed_line,
+    init::FightId,
+};
 
+#[derive(Copy, Clone, Debug)]
 struct Node {
     pos: (f32, f32),
     text: &'static str,
+    choice: MapChoice,
 }
 
 impl Node {
-    fn new(pos: (f32, f32), text: &'static str) -> Self {
-        Self { pos, text }
+    fn new(pos: (f32, f32), text: &'static str, choice: MapChoice) -> Self {
+        Self { pos, text, choice }
     }
 
     fn within_distance(&self, pos: (f32, f32), distance: f32) -> bool {
@@ -19,118 +38,257 @@ impl Node {
     }
 }
 
-pub async fn run_map_loop(font: Font) {
-    let (screen_w, screen_h) = screen_size();
-    let x0 = 300.0;
-    let y_mid = screen_h / 2.0;
-    let radius = 50.0;
-    let mut selected_node_i = None;
-    let margin = 25.0;
-    let nodes = [Node::new((x0, y_mid - radius - margin), "Fight"),
-        Node::new((x0, y_mid + radius + margin), "Ditto")];
+#[derive(Copy, Clone, Debug)]
+pub enum MapChoice {
+    Fight(FightId),
+    Chest(EquipmentEntry),
+}
 
-    let transition_duration = 0.5;
-    let mut transition_countdown = None;
+#[derive(Debug)]
+pub struct MapScene {
+    player_node_i: Option<usize>,
+    visited_nodes: Vec<usize>,
+}
 
-    let start_size = 30.0;
-    let start_pos = Rect::new(
-        100.0 - start_size / 2.0,
-        y_mid - start_size / 2.0,
-        start_size,
-        start_size,
-    );
+impl Default for MapScene {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
-    loop {
+impl MapScene {
+    pub fn new() -> Self {
+        Self {
+            player_node_i: None,
+            visited_nodes: vec![],
+        }
+    }
 
-        let elapsed = get_frame_time();
+    pub async fn run_map_loop(&mut self, font: Font) -> MapChoice {
+        let (screen_w, screen_h) = screen_size();
+        let x0 = 300.0;
+        let y_mid = screen_h / 2.0;
+        let radius = 50.0;
+        let mut selected_node_i = None;
+        let margin = 25.0;
+        let nodes = [
+            Node::new(
+                (x0, y_mid - radius - margin),
+                "Fight",
+                MapChoice::Fight(FightId::First),
+            ),
+            Node::new(
+                (x0, y_mid + radius + margin),
+                "Elite",
+                MapChoice::Fight(FightId::Second),
+            ),
+            Node::new(
+                (x0 + 200.0, y_mid),
+                "Chest",
+                MapChoice::Chest(EquipmentEntry::Armor(CHAIN_MAIL)),
+            ),
+            Node::new(
+                (x0 + 400.0, y_mid),
+                "Boss?",
+                MapChoice::Fight(FightId::Second),
+            ),
+        ];
 
-        let mouse_pos = mouse_position();
-        clear_background(BLACK);
+        let current_pos_color = Color::new(0.2, 0.0, 0.0, 1.0);
 
-        let text = "Choose!";
-        let font_size = 32;
-        let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-        draw_text(
-            text,
-            screen_w / 2.0 - text_dim.width / 2.0,
-            50.0 + (text_dim.height) / 2.0,
-            font_size.into(),
-            WHITE,
+        let edges: HashMap<Option<usize>, Vec<usize>> = [
+            (None, vec![0, 1]),
+            (Some(0), vec![2]),
+            (Some(1), vec![2]),
+            (Some(2), vec![3]),
+        ]
+        .into();
+
+        let transition_duration = 0.3;
+        let mut transition_countdown = None;
+
+        let start_size = 30.0;
+        let start_pos = Rect::new(
+            100.0 - start_size / 2.0,
+            y_mid - start_size / 2.0,
+            start_size,
+            start_size,
         );
 
-        draw_rectangle_lines(start_pos.x, start_pos.y, start_size, start_size, 2.0, WHITE);
-        let padding = 5.0;
-        let cross_thickness = 3.0;
-        draw_line(
-            start_pos.x + padding,
-            start_pos.y + padding,
-            start_pos.right() - padding,
-            start_pos.bottom() - padding,
-            cross_thickness,
-            RED,
-        );
-        draw_line(
-            start_pos.x + padding,
-            start_pos.bottom() - padding,
-            start_pos.right() - padding,
-            start_pos.y + padding,
-            cross_thickness,
-            RED,
-        );
+        loop {
+            let elapsed = get_frame_time();
 
-        for (node_i, node) in nodes.iter().enumerate() {
-            let hovered = node.within_distance(mouse_pos, radius);
+            let mouse_pos = mouse_position();
+            clear_background(BLACK);
 
-            let line_color = if hovered { WHITE } else { GRAY };
-            draw_dashed_line(
-                start_pos.center().into(),
-                node.pos,
-                2.0,
-                line_color,
-                15.0,
-                None,
-            );
-
-             if transition_countdown.is_none() && is_mouse_button_pressed(MouseButton::Left) && hovered {
-                selected_node_i = Some(node_i);
-                transition_countdown = Some(transition_duration);
-            }
-
-            let outline_color = if selected_node_i == Some(node_i) {
-                YELLOW
-            } else if hovered {
-                WHITE
-            } else {
-                GRAY
-            };
-
-            draw_circle(node.pos.0, node.pos.1, radius, BLACK);
-            draw_circle_lines(node.pos.0, node.pos.1, radius, 2.0, outline_color);
-            let font_size = 28;
-            let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
+            let text = "Choose!";
+            let font_size = 32;
+            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
             draw_text(
-                node.text,
-                node.pos.0 - text_dim.width / 2.0,
-                node.pos.1 + (text_dim.height) / 2.0,
+                text,
+                screen_w / 2.0 - text_dim.width / 2.0,
+                50.0 + (text_dim.height) / 2.0,
                 font_size.into(),
                 WHITE,
             );
-        }
 
-        // Transition to other scene
-        if let Some(countdown) = &mut transition_countdown {
-            let hypothenuse = (screen_w.powf(2.0) + screen_h.powf(2.0)).sqrt();
-            let w = hypothenuse * (transition_duration - *countdown) / transition_duration;
-            let color = Color::new(1.0, 0.5, 0.5, 0.3);
-            let params = DrawRectangleParams { offset: Default::default(), rotation: 1.0, color};
-            draw_rectangle_ex(screen_w, -screen_h, w, screen_h + screen_w,  params);
+            let mut hovered_i = None;
 
-            *countdown -= elapsed;
-            if *countdown < 0.0 {
-                return;
+            for (node_i, node) in nodes.iter().enumerate() {
+                if let Some(valid_next) = edges.get(&self.player_node_i) {
+                    if valid_next.contains(&node_i) && node.within_distance(mouse_pos, radius) {
+                        hovered_i = Some(node_i);
+                    }
+                }
             }
-        }
 
-        next_frame().await;
+            // Draw edges
+            for (from_i, to) in &edges {
+                let from_pos = match from_i {
+                    Some(from_i) => nodes[*from_i].pos,
+                    None => start_pos.center().into(),
+                };
+                for to_i in to {
+                    let to_node = nodes[*to_i];
+
+                    let visited_from = match from_i {
+                        Some(from_i) => self.visited_nodes.contains(from_i),
+                        None => true,
+                    };
+
+                    let line_color = if hovered_i == Some(*to_i) && self.player_node_i == *from_i {
+                        WHITE
+                    } else if visited_from && self.visited_nodes.contains(to_i) {
+                        RED
+                    } else {
+                        GRAY
+                    };
+                    draw_dashed_line(from_pos, to_node.pos, 2.0, line_color, 15.0, None);
+                }
+            }
+
+            // Start position
+            //draw_rectangle_lines(start_pos.x, start_pos.y, start_size, start_size, 2.0, RED);
+            //if self.player_node_i.is_none() {
+            //draw_cross(start_pos.center().into(), start_pos.w / 2.0 - 5.0);
+            //}
+            let fill_color = current_pos_color;
+            draw_circle(start_pos.center().x, start_pos.center().y, 20.0, fill_color);
+            let start_color = GRAY;
+            draw_circle_lines(
+                start_pos.center().x,
+                start_pos.center().y,
+                20.0,
+                2.0,
+                start_color,
+            );
+
+            // Draw nodes
+            for (node_i, node) in nodes.iter().enumerate() {
+                let hovered = hovered_i == Some(node_i);
+
+                if transition_countdown.is_none()
+                    && is_mouse_button_pressed(MouseButton::Left)
+                    && hovered
+                {
+                    selected_node_i = Some(node_i);
+                    transition_countdown = Some(transition_duration);
+                }
+
+                let outline_color = if self.player_node_i == Some(node_i) {
+                    Some(GRAY)
+                } else if selected_node_i == Some(node_i) {
+                    Some(YELLOW)
+                } else if self.visited_nodes.contains(&node_i) {
+                    Some(GRAY)
+                } else if hovered {
+                    Some(WHITE)
+                } else {
+                    None
+                };
+
+                let fill_color = if self.visited_nodes.contains(&node_i) {
+                    current_pos_color
+                } else {
+                    BLACK
+                };
+
+                draw_circle(node.pos.0, node.pos.1, radius, fill_color);
+                if let Some(outline_color) = outline_color {
+                    draw_circle_lines(node.pos.0, node.pos.1, radius, 2.0, outline_color);
+                }
+                let font_size = 28;
+                let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
+
+                let mut text_color = GRAY;
+                if let Some(valid_next) = edges.get(&self.player_node_i) {
+                    if valid_next.contains(&node_i) {
+                        text_color = WHITE;
+                    }
+                }
+
+                draw_text(
+                    node.text,
+                    node.pos.0 - text_dim.width / 2.0,
+                    node.pos.1 + (text_dim.height) / 2.0,
+                    font_size.into(),
+                    text_color,
+                );
+
+                if self.player_node_i == Some(node_i) {
+                    //draw_cross((node.pos.0, node.pos.1 - 15.0), 15.0);
+                }
+            }
+
+            // Transition to other scene
+            if let Some(countdown) = &mut transition_countdown {
+                *countdown -= elapsed;
+
+                let color = Color::new(
+                    0.0,
+                    0.0,
+                    0.0,
+                    1.0 * (transition_duration - *countdown) / transition_duration,
+                );
+                let params = DrawRectangleParams {
+                    offset: Default::default(),
+                    rotation: 0.0,
+                    color,
+                };
+                draw_rectangle_ex(0.0, 0.0, screen_w, screen_h, params);
+
+                if *countdown < 0.0 {
+                    let node_i = selected_node_i.unwrap();
+                    self.player_node_i = Some(node_i);
+                    self.visited_nodes.push(node_i);
+
+                    // Make sure to show the last drawn frame
+                    next_frame().await;
+                    return nodes[selected_node_i.unwrap()].choice;
+                }
+            }
+
+            next_frame().await;
+        }
     }
+}
+
+fn draw_cross(pos: (f32, f32), w: f32) {
+    let cross_thickness = 3.0;
+    draw_line(
+        pos.0 - w,
+        pos.1 - w,
+        pos.0 + w,
+        pos.1 + w,
+        cross_thickness,
+        RED,
+    );
+    draw_line(
+        pos.0 - w,
+        pos.1 + w,
+        pos.0 + w,
+        pos.1 - w,
+        cross_thickness,
+        RED,
+    );
 }

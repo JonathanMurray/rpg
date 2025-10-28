@@ -550,15 +550,6 @@ impl ActionButton {
         }
     }
 
-    pub fn set_selected(&self, value: bool) {
-        let selected = if value {
-            ButtonSelected::Yes
-        } else {
-            ButtonSelected::No
-        };
-        self.selected.set(selected);
-    }
-
     pub fn deselect(&self) {
         self.selected.set(ButtonSelected::No);
     }
@@ -829,7 +820,7 @@ impl ButtonAction {
     pub fn unwrap_on_hit_reaction(&self) -> OnHitReaction {
         match self {
             ButtonAction::OnHitReaction(reaction) => *reaction,
-            _ => panic!(),
+            other => panic!("Expected on hit reaction, but got: {:?}", other),
         }
     }
 }
@@ -912,7 +903,9 @@ pub fn draw_tooltip(
     };
 
     measure_width(header);
-    if let Some(error) = error.as_ref() { measure_width(error) }
+    if let Some(error) = error.as_ref() {
+        measure_width(error)
+    }
     for line in content_lines {
         measure_width(line);
     }
@@ -1003,7 +996,9 @@ pub fn draw_tooltip(
     };
 
     draw_line(header, Some(YELLOW));
-    if let Some(error) = error { draw_line(error, Some(RED)) }
+    if let Some(error) = error {
+        draw_line(error, Some(RED))
+    }
     for line in content_lines {
         draw_line(line, None)
     }
