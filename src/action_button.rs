@@ -720,6 +720,24 @@ pub enum ButtonAction {
 }
 
 impl ButtonAction {
+    pub fn name(&self) -> &'static str {
+        match self {
+            ButtonAction::Action(base_action) => match base_action {
+                BaseAction::Attack(..) => "Attack",
+                BaseAction::CastSpell(spell) => spell.name,
+                BaseAction::Move => "Move",
+                BaseAction::ChangeEquipment => "Change equipment",
+                BaseAction::EndTurn => "End turn",
+            },
+            ButtonAction::OnAttackedReaction(reaction) => reaction.name,
+            ButtonAction::OnHitReaction(reaction) => reaction.name,
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.name,
+            ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
+            ButtonAction::OpportunityAttack => "Opportunity attack",
+            ButtonAction::Proceed => "Proceed",
+        }
+    }
+
     fn icon(&self, character: Option<&Character>) -> IconId {
         match self {
             ButtonAction::Action(base_action) => match base_action {
@@ -835,6 +853,7 @@ impl EventSender {
     }
 }
 
+#[derive(Debug)]
 pub enum InternalUiEvent {
     ButtonHovered(u32, ButtonAction, Option<(f32, f32)>),
     ButtonClicked(u32, ButtonAction),

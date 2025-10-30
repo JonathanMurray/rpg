@@ -1,27 +1,33 @@
+use std::collections::HashMap;
+
 use macroquad::{
-    color::{Color, BLACK, GRAY, WHITE, YELLOW},
+    color::{Color, BLACK, BLUE, WHITE},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
-    shapes::{
-        draw_rectangle_ex, draw_rectangle_lines,
-        DrawRectangleParams,
-    },
+    shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
     text::{draw_text, measure_text, Font},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
 
-use crate::core::EquipmentEntry;
+use crate::{core::EquipmentEntry, textures::EquipmentIconId};
 
-pub async fn run_chest_loop(font: Font, reward: EquipmentEntry) {
+pub async fn run_chest_loop(
+    font: Font,
+    reward: EquipmentEntry,
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+) {
     let (screen_w, screen_h) = screen_size();
     let y_mid = screen_h / 2.0;
     let x_mid = screen_w / 2.0;
 
+    let texture = equipment_icons[&reward.icon()].clone();
+
     let reward_text = reward.name();
     let reward_size = 100.0;
-    let reward_rect = Rect::new(
+    let rect = Rect::new(
         x_mid - reward_size / 2.0,
         y_mid - reward_size / 2.0,
         reward_size,
@@ -48,34 +54,28 @@ pub async fn run_chest_loop(font: Font, reward: EquipmentEntry) {
             WHITE,
         );
 
-        let hovered = reward_rect.contains(mouse_pos.into());
+        let hovered = rect.contains(mouse_pos.into());
 
         if transition_countdown.is_none() && is_mouse_button_pressed(MouseButton::Left) && hovered {
             transition_countdown = Some(transition_duration);
         }
 
-        let outline_color = if transition_countdown.is_some() {
-            YELLOW
-        } else if hovered {
-            WHITE
-        } else {
-            GRAY
+        draw_rectangle(rect.x, rect.y, rect.w, rect.h, BLUE);
+        let params = DrawTextureParams {
+            dest_size: Some(rect.size()),
+            ..Default::default()
         };
+        draw_texture_ex(&texture, rect.x, rect.y, WHITE, params);
+        if hovered {
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
+        }
 
-        draw_rectangle_lines(
-            reward_rect.x,
-            reward_rect.y,
-            reward_rect.w,
-            reward_rect.h,
-            2.0,
-            outline_color,
-        );
         let font_size = 28;
         let text_dim = measure_text(reward_text, Some(&font), font_size, 1.0);
         draw_text(
             reward_text,
-            reward_rect.center().x - text_dim.width / 2.0,
-            reward_rect.center().y + (text_dim.height) / 2.0,
+            rect.center().x - text_dim.width / 2.0,
+            rect.bottom() + 10.0 + text_dim.height + (text_dim.height - text_dim.offset_y),
             font_size.into(),
             WHITE,
         );

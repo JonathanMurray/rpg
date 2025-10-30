@@ -42,7 +42,7 @@ const INVENTORY_SIZE: usize = 6;
 pub struct CharacterSheet {
     character: Rc<Character>,
     equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
-    screen_position: Cell<(f32, f32)>,
+    pub screen_position: Cell<(f32, f32)>,
     sheet_dragged_offset: Cell<Option<(f32, f32)>>,
     //equipment_drag: Option<EquipmentDrag>,
     equipment_changed: Rc<Cell<bool>>,
@@ -305,21 +305,6 @@ impl CharacterSheet {
 
         let (mouse_x, mouse_y) = mouse_position();
 
-        /*
-        if let Some(EquipmentDrag {
-            to_idx: Some(_), ..
-        }) = &self.equipment_drag
-        {
-            if !matches!(
-                ui_state,
-                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment)
-            ) {
-                // The drag operation has been cancelled from outside of the character sheet.
-                self.equipment_drag = None;
-            }
-        }
-         */
-
         let is_allowed_to_change_equipment = matches!(
             ui_state,
             UiState::ConfiguringAction(..) | UiState::ChoosingAction
@@ -538,6 +523,10 @@ impl CharacterSheet {
                 }
             }
         }
+    }
+
+    pub fn container_size(&self) -> (f32, f32) {
+        self.container.size()
     }
 
     fn draw_close_button(&self, x: f32, y: f32) -> bool {

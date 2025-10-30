@@ -1629,9 +1629,7 @@ impl Characters {
     }
 
     pub fn player_character(self) -> Character {
-        let rc_player_char = self
-            .iter().find(|ch| ch.player_controlled)
-            .unwrap();
+        let rc_player_char = self.iter().find(|ch| ch.player_controlled).unwrap();
         Character::clone(rc_player_char)
     }
 
@@ -2294,6 +2292,7 @@ pub struct Character {
     pub known_actions: Vec<BaseAction>,
     pub known_attacked_reactions: Vec<OnAttackedReaction>,
     pub known_on_hit_reactions: Vec<OnHitReaction>,
+    pub known_spell_enhancements: Vec<SpellEnhancement>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 }
@@ -2347,6 +2346,7 @@ impl Character {
             ],
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
+            known_spell_enhancements: Default::default(),
             changed_equipment_listeners: Default::default(),
         }
     }
@@ -2792,8 +2792,21 @@ impl Character {
             && (!reaction.must_be_melee || is_within_melee)
     }
 
+    pub fn known_spells(&self) -> Vec<Spell> {
+        self.known_actions
+            .iter()
+            .filter_map(|action| match action {
+                BaseAction::CastSpell(spell) => Some(*spell),
+                _ => None,
+            })
+            .collect()
+    }
+
+    pub fn knows_spell_enhancement(&self, enhancement: SpellEnhancement) -> bool {
+        self.known_spell_enhancements.contains(&enhancement)
+    }
+
     pub fn can_use_spell_enhancement(&self, spell: Spell, enhancement: SpellEnhancement) -> bool {
-        //let enhancement = spell.possible_enhancements[enhancement_index].unwrap();
         self.action_points.current() >= spell.action_point_cost + enhancement.action_point_cost
             && self.mana.current() >= spell.mana_cost + enhancement.mana_cost
             && self.stamina.current() >= spell.stamina_cost + enhancement.stamina_cost

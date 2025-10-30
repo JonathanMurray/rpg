@@ -5,21 +5,13 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
-    shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex,
-        DrawRectangleParams,
-    },
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, DrawRectangleParams},
     text::{draw_text, measure_text, Font},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
 
-use crate::{
-    core::EquipmentEntry,
-    data::CHAIN_MAIL,
-    drawing::draw_dashed_line,
-    init::FightId,
-};
+use crate::{core::EquipmentEntry, data::CHAIN_MAIL, drawing::draw_dashed_line, init::FightId};
 
 #[derive(Copy, Clone, Debug)]
 struct Node {

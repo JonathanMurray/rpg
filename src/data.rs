@@ -633,6 +633,43 @@ pub const HEALING_RAIN: Spell = Spell {
     animation_color: GREEN,
 };
 
+pub const FIREBALL_REACH: SpellEnhancement = SpellEnhancement {
+    name: "Reach",
+    description: "",
+    icon: IconId::Extend,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    effect: SpellEnhancementEffect {
+        increased_range_tenths: 30,
+        ..SpellEnhancementEffect::default()
+    },
+};
+
+pub const FIREBALL_MASSIVE: SpellEnhancement = SpellEnhancement {
+    name: "Massive",
+    description: "",
+    icon: IconId::Radius,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    effect: SpellEnhancementEffect {
+        increased_radius_tenths: 10,
+        ..SpellEnhancementEffect::default()
+    },
+};
+pub const FIREBALL_INFERNO: SpellEnhancement = SpellEnhancement {
+    name: "Inferno",
+    description: "More deadly impact",
+    icon: IconId::Inferno,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    effect: SpellEnhancementEffect {
+        bonus_area_damage: 1,
+        ..SpellEnhancementEffect::default()
+    },
+};
 pub const FIREBALL: Spell = Spell {
     name: "Fireball",
     description: "Hurl fire at an enemy, damaging them",
@@ -660,42 +697,9 @@ pub const FIREBALL: Spell = Spell {
         )),
     },
     possible_enhancements: [
-        Some(SpellEnhancement {
-            name: "Reach",
-            description: "",
-            icon: IconId::Extend,
-            action_point_cost: 0,
-            mana_cost: 1,
-            stamina_cost: 0,
-            effect: SpellEnhancementEffect {
-                increased_range_tenths: 30,
-                ..SpellEnhancementEffect::default()
-            },
-        }),
-        Some(SpellEnhancement {
-            name: "Massive",
-            description: "",
-            icon: IconId::Radius,
-            action_point_cost: 0,
-            mana_cost: 1,
-            stamina_cost: 0,
-            effect: SpellEnhancementEffect {
-                increased_radius_tenths: 10,
-                ..SpellEnhancementEffect::default()
-            },
-        }),
-        Some(SpellEnhancement {
-            name: "Inferno",
-            description: "More deadly impact",
-            icon: IconId::Inferno,
-            action_point_cost: 0,
-            mana_cost: 1,
-            stamina_cost: 0,
-            effect: SpellEnhancementEffect {
-                bonus_area_damage: 1,
-                ..SpellEnhancementEffect::default()
-            },
-        }),
+        Some(FIREBALL_REACH),
+        Some(FIREBALL_MASSIVE),
+        Some(FIREBALL_INFERNO),
     ],
 
     animation_color: RED,

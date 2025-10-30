@@ -623,10 +623,9 @@ impl ActivityPopup {
 
                     ConfiguredAction::CastSpell { spell, .. } => {
                         for enhancement in spell.possible_enhancements.iter().flatten().copied() {
-                            if self
-                                .characters
-                                .get(active_character_id)
-                                .can_use_spell_enhancement(*spell, enhancement)
+                            let character = self.characters.get(active_character_id);
+                            if character.knows_spell_enhancement(enhancement)
+                                && character.can_use_spell_enhancement(*spell, enhancement)
                             {
                                 let btn =
                                     self.new_button(ButtonAction::SpellEnhancement(enhancement));

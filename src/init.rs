@@ -7,13 +7,8 @@ use std::{
 use rand::distr::{Distribution, Uniform};
 
 use crate::{
-    core::{
-        Attributes, Character, CharacterId, Characters, HandType,
-        Position,
-    },
-    data::{
-        BOW, CHAIN_MAIL, DAGGER,
-    },
+    core::{Attributes, Character, CharacterId, Characters, HandType, Position},
+    data::{BOW, CHAIN_MAIL, DAGGER},
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
 };

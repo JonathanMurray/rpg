@@ -311,17 +311,26 @@ impl StopWatch {
     }
 }
 
-struct CharacterUi {
+pub struct CharacterUi {
     tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
     action_points_row: ActionPointsRow,
-    hoverable_buttons: Vec<Rc<ActionButton>>,
+    pub hoverable_buttons: Vec<Rc<ActionButton>>,
     actions_section: Container,
-    character_sheet: CharacterSheet,
+    pub character_sheet: CharacterSheet,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     resource_bars: Container,
     conditions_list: ConditionsList,
+}
+
+impl CharacterUi {
+    pub fn draw(&self, y: f32) {
+        self.actions_section.draw(10.0, y + 5.0);
+        self.action_points_row.draw(430.0, y);
+        self.resource_bars
+            .draw(480.0 - self.resource_bars.size().0 / 2.0, y + 40.0);
+    }
 }
 
 pub struct UserInterface {
@@ -350,7 +359,7 @@ impl UserInterface {
         game: &CoreGame,
         sprites: HashMap<SpriteId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
-        equipment_icons: HashMap<EquipmentIconId, Texture2D>,
+        equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         portrait_textures: HashMap<PortraitId, Texture2D>,
         terrain_atlas: Texture2D,
         simple_font: Font,
@@ -362,204 +371,14 @@ impl UserInterface {
         let active_character_id = game.active_character_id;
 
         let event_queue = Rc::new(RefCell::new(vec![]));
-        let mut next_button_id = 1;
 
-        let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
-            let btn =
-                ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
-            btn.enabled.set(enabled);
-            next_button_id += 1;
-            btn
-        };
-
-        let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
-
-        for character in characters.iter() {
-            if !character.player_controlled {
-                continue;
-            }
-
-            let mut tracked_action_buttons = HashMap::new();
-            let mut hoverable_buttons = vec![];
-            let mut basic_buttons = vec![];
-            let mut spell_buttons = vec![];
-
-            let mut attack_button_for_character_sheet = None;
-            let mut spell_buttons_for_character_sheet = vec![];
-            let mut attack_enhancement_buttons_for_character_sheet = vec![];
-
-            for action in character.known_actions() {
-                let btn_action = ButtonAction::Action(action);
-                let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
-                tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
-                hoverable_buttons.push(Rc::clone(&btn));
-                match action {
-                    BaseAction::Attack { .. } => {
-                        basic_buttons.push(btn);
-
-                        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
-                        attack_button_for_character_sheet = Some(btn.clone());
-                        hoverable_buttons.push(btn);
-                    }
-                    BaseAction::CastSpell(spell) => {
-                        spell_buttons.push(btn);
-
-                        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
-
-                        let enhancement_buttons: Vec<Rc<ActionButton>> = spell
-                            .possible_enhancements
-                            .iter()
-                            .filter_map(|maybe_enhancement| *maybe_enhancement)
-                            .map(|enhancement| {
-                                let enhancement_btn = Rc::new(new_button(
-                                    ButtonAction::SpellEnhancement(enhancement),
-                                    None,
-                                    false,
-                                ));
-                                hoverable_buttons.push(enhancement_btn.clone());
-                                enhancement_btn
-                            })
-                            .collect();
-                        spell_buttons_for_character_sheet.push((btn.clone(), enhancement_buttons));
-
-                        hoverable_buttons.push(btn);
-                    }
-                    BaseAction::Move => {
-                        basic_buttons.push(btn);
-                    }
-                    BaseAction::ChangeEquipment => basic_buttons.push(btn),
-                    BaseAction::EndTurn => basic_buttons.push(btn),
-                }
-            }
-
-            let mut reaction_buttons_for_character_sheet = vec![];
-            for (_subtext, reaction) in character.known_on_attacked_reactions() {
-                let btn_action = ButtonAction::OnAttackedReaction(reaction);
-                let btn = Rc::new(new_button(btn_action, None, false));
-                hoverable_buttons.push(Rc::clone(&btn));
-                reaction_buttons_for_character_sheet.push(btn);
-            }
-            for (_subtext, reaction) in character.known_on_hit_reactions() {
-                let btn_action = ButtonAction::OnHitReaction(reaction);
-                let btn = Rc::new(new_button(btn_action, None, false));
-                hoverable_buttons.push(Rc::clone(&btn));
-                reaction_buttons_for_character_sheet.push(btn);
-            }
-
-            // TODO: Only include inherently known enhancements here; not those gained from weapons (since weapons can be unequipped
-            // without the character sheet being updated)
-            for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
-                let btn_action = ButtonAction::AttackEnhancement(enhancement);
-                let btn = Rc::new(new_button(btn_action, None, false));
-                hoverable_buttons.push(Rc::clone(&btn));
-                attack_enhancement_buttons_for_character_sheet.push(btn);
-            }
-
-            let character_sheet = CharacterSheet::new(
-                &simple_font,
-                Rc::clone(character),
-                &equipment_icons,
-                attack_button_for_character_sheet,
-                reaction_buttons_for_character_sheet,
-                attack_enhancement_buttons_for_character_sheet,
-                spell_buttons_for_character_sheet,
-            );
-
-            let mut upper_buttons = basic_buttons;
-            let mut lower_buttons = spell_buttons;
-            while lower_buttons.len() > upper_buttons.len() + 1 {
-                upper_buttons.push(lower_buttons.pop().unwrap());
-            }
-
-            let upper_row = buttons_row(
-                upper_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-            let lower_row = buttons_row(
-                lower_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-
-            let actions_section = Container {
-                layout_dir: LayoutDirection::Vertical,
-                margin: 5.0,
-                children: vec![upper_row, lower_row],
-                ..Default::default()
-            };
-
-            let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character.health.current(),
-                character.health.max,
-                "Health",
-                RED,
-                simple_font.clone(),
-            )));
-            let cloned_health_bar = Rc::clone(&health_bar);
-
-            let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character.mana.current(),
-                character.mana.max,
-                "Mana",
-                BLUE,
-                simple_font.clone(),
-            )));
-            let cloned_mana_bar = Rc::clone(&mana_bar);
-
-            let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-                character.stamina.current(),
-                character.stamina.max,
-                "Stamina",
-                GREEN,
-                simple_font.clone(),
-            )));
-            let cloned_stamina_bar = Rc::clone(&stamina_bar);
-
-            let resource_bars = Container {
-                layout_dir: LayoutDirection::Horizontal,
-                margin: 9.0,
-                align: Align::End,
-                children: vec![
-                    Element::RcRefCell(cloned_health_bar),
-                    Element::RcRefCell(cloned_mana_bar),
-                    Element::RcRefCell(cloned_stamina_bar),
-                ],
-                style: Style {
-                    border_color: Some(DARKGRAY),
-                    padding: 5.0,
-                    ..Default::default()
-                },
-                ..Default::default()
-            };
-
-            let action_points_row = ActionPointsRow::new(
-                character.max_reactive_action_points,
-                (20.0, 20.0),
-                0.3,
-                Style {
-                    border_color: Some(WHITE),
-                    ..Default::default()
-                },
-            );
-
-            let character_ui = CharacterUi {
-                tracked_action_buttons,
-                action_points_row,
-                actions_section,
-                character_sheet,
-                health_bar,
-                mana_bar,
-                stamina_bar,
-                resource_bars,
-                conditions_list: ConditionsList::new(simple_font.clone(), vec![]),
-                hoverable_buttons,
-            };
-
-            character_uis.insert(character.id(), character_ui);
-        }
+        let character_uis = build_character_uis(
+            equipment_icons,
+            &icons,
+            &event_queue,
+            &simple_font,
+            characters.iter(),
+        );
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
@@ -672,12 +491,16 @@ impl UserInterface {
             .get_mut(&self.player_portraits.selected_id())
             .unwrap();
 
+        character_ui.draw(ui_y + 5.0);
+
+        /*
         character_ui.actions_section.draw(10.0, ui_y + 10.0);
         character_ui.action_points_row.draw(430.0, ui_y + 5.0);
         character_ui.resource_bars.draw(
             480.0 - character_ui.resource_bars.size().0 / 2.0,
             ui_y + 40.0,
         );
+         */
 
         //self.log.draw(800.0, ui_y);
         let log_x = 950.0;
@@ -1731,6 +1554,236 @@ impl UserInterface {
                 ui.action_points_row.is_characters_turn = *id == self.active_character_id;
             }
         }
+    }
+}
+
+fn build_character_uis<'a>(
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+    icons: &HashMap<IconId, Texture2D>,
+    event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
+    simple_font: &Font,
+    characters: impl Iterator<Item = &'a Rc<Character>>,
+) -> HashMap<u32, CharacterUi> {
+    let mut next_button_id = 1;
+
+    let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
+
+    for character in characters {
+        if !character.player_controlled {
+            continue;
+        }
+
+        let character_ui = build_character_ui(
+            equipment_icons,
+            icons,
+            event_queue,
+            simple_font,
+            character,
+            &mut next_button_id,
+        );
+
+        character_uis.insert(character.id(), character_ui);
+    }
+    character_uis
+}
+
+pub fn build_character_ui(
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+    icons: &HashMap<IconId, Texture2D>,
+    event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
+    simple_font: &Font,
+    character: &Rc<Character>,
+    next_button_id: &mut u32,
+) -> CharacterUi {
+    let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
+        let btn = ActionButton::new(btn_action, event_queue, *next_button_id, icons, character);
+        btn.enabled.set(enabled);
+        *next_button_id += 1;
+        btn
+    };
+
+    let mut tracked_action_buttons = HashMap::new();
+    let mut hoverable_buttons = vec![];
+    let mut basic_buttons = vec![];
+    let mut spell_buttons = vec![];
+
+    let mut attack_button_for_character_sheet = None;
+    let mut spell_buttons_for_character_sheet = vec![];
+    let mut attack_enhancement_buttons_for_character_sheet = vec![];
+
+    for action in character.known_actions() {
+        let btn_action = ButtonAction::Action(action);
+        let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
+        tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
+        hoverable_buttons.push(Rc::clone(&btn));
+        match action {
+            BaseAction::Attack { .. } => {
+                basic_buttons.push(btn);
+
+                let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+                attack_button_for_character_sheet = Some(btn.clone());
+                hoverable_buttons.push(btn);
+            }
+            BaseAction::CastSpell(spell) => {
+                spell_buttons.push(btn);
+
+                let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+
+                let enhancement_buttons: Vec<Rc<ActionButton>> = spell
+                    .possible_enhancements
+                    .iter()
+                    .filter_map(|maybe_enhancement| *maybe_enhancement)
+                    .filter_map(|enhancement| {
+                        if character.knows_spell_enhancement(enhancement) {
+                            let enhancement_btn = Rc::new(new_button(
+                                ButtonAction::SpellEnhancement(enhancement),
+                                None,
+                                false,
+                            ));
+                            hoverable_buttons.push(enhancement_btn.clone());
+                            Some(enhancement_btn)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect();
+                spell_buttons_for_character_sheet.push((btn.clone(), enhancement_buttons));
+
+                hoverable_buttons.push(btn);
+            }
+            BaseAction::Move => {
+                basic_buttons.push(btn);
+            }
+            BaseAction::ChangeEquipment => basic_buttons.push(btn),
+            BaseAction::EndTurn => basic_buttons.push(btn),
+        }
+    }
+
+    let mut reaction_buttons_for_character_sheet = vec![];
+    for (_subtext, reaction) in character.known_on_attacked_reactions() {
+        let btn_action = ButtonAction::OnAttackedReaction(reaction);
+        let btn = Rc::new(new_button(btn_action, None, false));
+        hoverable_buttons.push(Rc::clone(&btn));
+        reaction_buttons_for_character_sheet.push(btn);
+    }
+    for (_subtext, reaction) in character.known_on_hit_reactions() {
+        let btn_action = ButtonAction::OnHitReaction(reaction);
+        let btn = Rc::new(new_button(btn_action, None, false));
+        hoverable_buttons.push(Rc::clone(&btn));
+        reaction_buttons_for_character_sheet.push(btn);
+    }
+
+    // TODO: Only include inherently known enhancements here; not those gained from weapons (since weapons can be unequipped
+    // without the character sheet being updated)
+    for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
+        let btn_action = ButtonAction::AttackEnhancement(enhancement);
+        let btn = Rc::new(new_button(btn_action, None, false));
+        hoverable_buttons.push(Rc::clone(&btn));
+        attack_enhancement_buttons_for_character_sheet.push(btn);
+    }
+
+    let character_sheet = CharacterSheet::new(
+        simple_font,
+        Rc::clone(character),
+        equipment_icons,
+        attack_button_for_character_sheet,
+        reaction_buttons_for_character_sheet,
+        attack_enhancement_buttons_for_character_sheet,
+        spell_buttons_for_character_sheet,
+    );
+
+    let mut upper_buttons = basic_buttons;
+    let mut lower_buttons = spell_buttons;
+    while lower_buttons.len() > upper_buttons.len() + 1 {
+        upper_buttons.push(lower_buttons.pop().unwrap());
+    }
+
+    let upper_row = buttons_row(
+        upper_buttons
+            .into_iter()
+            .map(|btn| Element::Rc(btn))
+            .collect(),
+    );
+    let lower_row = buttons_row(
+        lower_buttons
+            .into_iter()
+            .map(|btn| Element::Rc(btn))
+            .collect(),
+    );
+
+    let actions_section = Container {
+        layout_dir: LayoutDirection::Vertical,
+        margin: 5.0,
+        children: vec![upper_row, lower_row],
+        ..Default::default()
+    };
+
+    let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character.health.current(),
+        character.health.max,
+        "Health",
+        RED,
+        simple_font.clone(),
+    )));
+    let cloned_health_bar = Rc::clone(&health_bar);
+
+    let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character.mana.current(),
+        character.mana.max,
+        "Mana",
+        BLUE,
+        simple_font.clone(),
+    )));
+    let cloned_mana_bar = Rc::clone(&mana_bar);
+
+    let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+        character.stamina.current(),
+        character.stamina.max,
+        "Stamina",
+        GREEN,
+        simple_font.clone(),
+    )));
+    let cloned_stamina_bar = Rc::clone(&stamina_bar);
+
+    let resource_bars = Container {
+        layout_dir: LayoutDirection::Horizontal,
+        margin: 9.0,
+        align: Align::End,
+        children: vec![
+            Element::RcRefCell(cloned_health_bar),
+            Element::RcRefCell(cloned_mana_bar),
+            Element::RcRefCell(cloned_stamina_bar),
+        ],
+        style: Style {
+            border_color: Some(DARKGRAY),
+            padding: 5.0,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let action_points_row = ActionPointsRow::new(
+        character.max_reactive_action_points,
+        (20.0, 20.0),
+        0.3,
+        Style {
+            border_color: Some(WHITE),
+            ..Default::default()
+        },
+    );
+
+    
+    CharacterUi {
+        tracked_action_buttons,
+        action_points_row,
+        hoverable_buttons,
+        actions_section,
+        character_sheet,
+        health_bar,
+        mana_bar,
+        stamina_bar,
+        resource_bars,
+        conditions_list: ConditionsList::new(simple_font.clone(), vec![]),
     }
 }
 
