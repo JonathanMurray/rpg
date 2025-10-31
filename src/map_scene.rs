@@ -10,8 +10,14 @@ use macroquad::{
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
+use rand::Rng;
 
-use crate::{core::EquipmentEntry, data::CHAIN_MAIL, drawing::draw_dashed_line, init::FightId};
+use crate::{
+    core::EquipmentEntry,
+    data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
+    drawing::draw_dashed_line,
+    init::FightId,
+};
 
 #[derive(Copy, Clone, Debug)]
 struct Node {
@@ -32,6 +38,8 @@ impl Node {
 
 #[derive(Copy, Clone, Debug)]
 pub enum MapChoice {
+    Rest,
+    Shop,
     Fight(FightId),
     Chest(EquipmentEntry),
 }
@@ -60,10 +68,24 @@ impl MapScene {
         let (screen_w, screen_h) = screen_size();
         let x0 = 300.0;
         let y_mid = screen_h / 2.0;
-        let radius = 50.0;
+        let radius = 40.0;
         let mut selected_node_i = None;
         let margin = 25.0;
+
+        let candidate_chest_rewards = vec![
+            EquipmentEntry::Armor(CHAIN_MAIL),
+            EquipmentEntry::Armor(LEATHER_ARMOR),
+            EquipmentEntry::Weapon(DAGGER),
+            EquipmentEntry::Weapon(SWORD),
+            EquipmentEntry::Weapon(RAPIER),
+            EquipmentEntry::Shield(SMALL_SHIELD),
+        ];
+        let mut rng = rand::rng();
+        let chest_reward =
+            candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())];
+
         let nodes = [
+            Node::new((x0, y_mid - radius * 4.0 - margin), "Rest", MapChoice::Rest),
             Node::new(
                 (x0, y_mid - radius - margin),
                 "Fight",
@@ -71,14 +93,11 @@ impl MapScene {
             ),
             Node::new(
                 (x0, y_mid + radius + margin),
-                "Elite",
-                MapChoice::Fight(FightId::Second),
-            ),
-            Node::new(
-                (x0 + 200.0, y_mid),
                 "Chest",
-                MapChoice::Chest(EquipmentEntry::Armor(CHAIN_MAIL)),
+                MapChoice::Chest(chest_reward),
             ),
+            Node::new((x0, y_mid + radius * 4.0 + margin), "Shop", MapChoice::Shop),
+            Node::new((x0 + 200.0, y_mid), "Rest", MapChoice::Rest),
             Node::new(
                 (x0 + 400.0, y_mid),
                 "Boss?",
@@ -89,10 +108,12 @@ impl MapScene {
         let current_pos_color = Color::new(0.2, 0.0, 0.0, 1.0);
 
         let edges: HashMap<Option<usize>, Vec<usize>> = [
-            (None, vec![0, 1]),
-            (Some(0), vec![2]),
-            (Some(1), vec![2]),
-            (Some(2), vec![3]),
+            (None, vec![0, 1, 2, 3]),
+            (Some(0), vec![4]),
+            (Some(1), vec![4]),
+            (Some(2), vec![4]),
+            (Some(4), vec![5]),
+            (Some(3), vec![5]),
         ]
         .into();
 
@@ -113,6 +134,7 @@ impl MapScene {
             let mouse_pos = mouse_position();
             clear_background(BLACK);
 
+            /*
             let text = "Choose!";
             let font_size = 32;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
@@ -123,6 +145,7 @@ impl MapScene {
                 font_size.into(),
                 WHITE,
             );
+             */
 
             let mut hovered_i = None;
 

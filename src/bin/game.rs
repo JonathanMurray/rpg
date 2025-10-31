@@ -32,6 +32,8 @@ use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
 use rpg::init::{init, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
+use rpg::rest_scene::run_rest_loop;
+use rpg::shop_scene::run_shop_loop;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
@@ -69,28 +71,40 @@ async fn main() {
     let mut map_scene = MapScene::new();
 
     let mut player_character = init_player_character();
+    player_character.health.lose(10);
+    player_character.mana.lose(10);
 
-    let learning = run_victory_loop(
-        &player_character,
+    player_character = run_chest_loop( player_character, font.clone(),  &equipment_icons, icons.clone()).await;
+
+    player_character = run_shop_loop(
+        player_character,
         font.clone(),
         &equipment_icons,
         icons.clone(),
     )
     .await;
-    learn(&mut player_character, learning);
 
-    let core_game = init_fight_scene(
-        player_character,
-        FightId::First,
-        &equipment_icons,
-        icons.clone(),
-    )
-    .await;
-    player_character = core_game.run().await;
+    dbg!(&player_character);
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
         match map_choice {
+            MapChoice::Rest => {
+                player_character
+                    .health
+                    .gain(player_character.health.max / 2);
+                player_character.mana.set_to_max();
+                run_rest_loop(font.clone()).await;
+            }
+            MapChoice::Shop => {
+                player_character = run_shop_loop(
+                    player_character,
+                    font.clone(),
+                    &equipment_icons,
+                    icons.clone(),
+                )
+                .await;
+            }
             MapChoice::Fight(fight_id) => {
                 let core_game =
                     init_fight_scene(player_character, fight_id, &equipment_icons, icons.clone())
@@ -107,9 +121,8 @@ async fn main() {
                 learn(&mut player_character, learning);
             }
             MapChoice::Chest(reward) => {
-                run_chest_loop(font.clone(), reward, &equipment_icons).await;
-                let success = player_character.try_gain_equipment(reward);
-                assert!(success); // TODO Allow discarding inventory items to make space, from within reward screen?
+                
+                player_character = run_chest_loop( player_character, font.clone(),  &equipment_icons, icons.clone()).await;
             }
         }
     }

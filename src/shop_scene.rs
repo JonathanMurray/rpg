@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
+    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{
         is_mouse_button_pressed, mouse_position,
         MouseButton,
@@ -28,7 +28,7 @@ use crate::{
         Character, EquipmentEntry,
     },
     data::{
-        DAGGER, LEATHER_ARMOR, WAR_HAMMER,
+        BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip_lines,
     game_ui::{build_character_ui, UiState},
@@ -37,7 +37,7 @@ use crate::{
     util::select_n_random,
 };
 
-pub async fn run_chest_loop(
+pub async fn run_shop_loop(
     player_character: Character,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
@@ -64,12 +64,17 @@ pub async fn run_chest_loop(
     );
 
     let candidate_items = vec![
-        EquipmentEntry::Weapon(WAR_HAMMER),
-        EquipmentEntry::Weapon(DAGGER),
-        EquipmentEntry::Armor(LEATHER_ARMOR),
+        (EquipmentEntry::Weapon(WAR_HAMMER), 3),
+        (EquipmentEntry::Weapon(DAGGER), 3),
+        (EquipmentEntry::Weapon(SWORD), 8),
+        (EquipmentEntry::Weapon(RAPIER), 8),
+        (EquipmentEntry::Weapon(BOW), 11),
+        (EquipmentEntry::Armor(LEATHER_ARMOR), 4),
+        (EquipmentEntry::Armor(CHAIN_MAIL), 12),
+        (EquipmentEntry::Shield(SMALL_SHIELD), 5),
     ];
 
-    let mut items: Vec<Option<EquipmentEntry>> = select_n_random(candidate_items, 1)
+    let mut items: Vec<Option<(EquipmentEntry, u32)>> = select_n_random(candidate_items, 5)
         .into_iter()
         .map(Some)
         .collect();
@@ -89,18 +94,18 @@ pub async fn run_chest_loop(
 
         clear_background(BLACK);
 
-        let text = "Up for grabs:";
+        let text = "Buy something?";
         let font_size = 32;
         let text_dim = measure_text(text, Some(&font), font_size, 1.0);
         draw_text(
             text,
             screen_w / 2.0 - text_dim.width / 2.0,
-            60.0 + (text_dim.height) / 2.0,
+            40.0 + (text_dim.height) / 2.0,
             font_size.into(),
             WHITE,
         );
 
-        let text = "Leave";
+        let text = "Leave shop";
         let font_size = 30;
         let margin = 25.0;
         let padding = 15.0;
@@ -155,7 +160,7 @@ pub async fn run_chest_loop(
         for item_slot in &mut items {
             let rect = Rect::new(icon_x, icon_y, icon_w, icon_w);
 
-            if let Some(equipment_entry) = item_slot {
+            if let Some((equipment_entry, cost)) = item_slot {
                 draw_rectangle(rect.x, rect.y, rect.w, rect.h, BLUE);
                 let texture = &equipment_icons[&equipment_entry.icon()];
                 draw_texture_ex(
@@ -169,6 +174,20 @@ pub async fn run_chest_loop(
                     },
                 );
 
+                let can_afford = player_character.money.get() >= *cost;
+
+                let cost_color = if can_afford { WHITE } else { RED };
+                let text = format!("{cost}");
+                let font_size = 24;
+                let text_dim = measure_text(&text, Some(&font), font_size, 1.0);
+                TextLine::new(
+                    format!("{}", cost),
+                    font_size,
+                    cost_color,
+                    Some(font.clone()),
+                )
+                .with_depth(DARKGRAY, 1.0)
+                .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
                 let tooltip_lines = equipment_tooltip_lines(equipment_entry);
                 draw_tooltip(
@@ -185,12 +204,17 @@ pub async fn run_chest_loop(
                 draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
 
                 if rect.contains(mouse_position().into()) {
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
+                    if can_afford {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
 
-                    if is_mouse_button_pressed(MouseButton::Left) {
-                        let success = player_character.try_gain_equipment(*equipment_entry);
-                        assert!(success);
-                        *item_slot = None;
+                        if is_mouse_button_pressed(MouseButton::Left) {
+                            let success = player_character.try_gain_equipment(*equipment_entry);
+                            assert!(success);
+                            player_character.spend_money(*cost);
+                            *item_slot = None;
+                        }
+                    } else {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, RED);
                     }
                 }
             } else {

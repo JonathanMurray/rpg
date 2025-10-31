@@ -1772,7 +1772,6 @@ pub fn build_character_ui(
         },
     );
 
-    
     CharacterUi {
         tracked_action_buttons,
         action_points_row,

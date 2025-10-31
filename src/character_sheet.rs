@@ -8,6 +8,7 @@ use macroquad::input::{
     MouseButton,
 };
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
+use macroquad::text::{draw_text_ex, measure_text, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
@@ -16,6 +17,7 @@ use macroquad::{
     texture::Texture2D,
 };
 
+use crate::base_ui::Drawable;
 use crate::core::EquipmentSlotRole;
 use crate::drawing::{draw_cross, draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::equipment_ui::{
@@ -234,11 +236,17 @@ impl CharacterSheet {
                                 ..Default::default()
                             },
                             children: vec![
+                                /*
                                 Element::Text(
                                     TextLine::new("Attributes", 22, WHITE, Some(font.clone()))
                                         .with_depth(BLACK, 2.0),
                                 ),
+                                 */
                                 stats_table,
+                                Element::Box(Box::new(MoneyText {
+                                    character: Rc::clone(&character),
+                                    font: font.clone(),
+                                })),
                             ],
 
                             ..Default::default()
@@ -348,6 +356,7 @@ impl CharacterSheet {
         if drag.is_some() && previous_drag.is_none() && is_allowed_to_change_equipment {
             // TODO: currently it's not possible to move around items even in the inventory on another character's
             // turn. Ideally that should be possible.
+            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
             *ui_state =
                 UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: *drag });
         }
@@ -594,6 +603,41 @@ impl CharacterSheet {
             format!("Unequip {}", from_content.equipment.name())
         };
         s
+    }
+}
+
+struct MoneyText {
+    character: Rc<Character>,
+    font: Font,
+}
+
+impl MoneyText {
+    fn text(&self) -> String {
+        format!("gold: {}", self.character.money.get())
+    }
+}
+
+const MONEY_FONT_SIZE: u16 = 18;
+
+impl Drawable for MoneyText {
+    fn draw(&self, x: f32, y: f32) {
+        let text_dim = measure_text(&self.text(), Some(&self.font), MONEY_FONT_SIZE, 1.0);
+        draw_text_ex(
+            &self.text(),
+            x,
+            y + text_dim.offset_y,
+            TextParams {
+                font: Some(&self.font),
+                font_size: MONEY_FONT_SIZE,
+                color: WHITE,
+                ..Default::default()
+            },
+        );
+    }
+
+    fn size(&self) -> (f32, f32) {
+        let text_dim = measure_text(&self.text(), Some(&self.font), MONEY_FONT_SIZE, 1.0);
+        (text_dim.width, text_dim.height)
     }
 }
 

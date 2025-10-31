@@ -2295,6 +2295,8 @@ pub struct Character {
     pub known_spell_enhancements: Vec<SpellEnhancement>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
+
+    pub money: Cell<u32>,
 }
 
 impl Character {
@@ -2348,6 +2350,7 @@ impl Character {
             known_on_hit_reactions: Default::default(),
             known_spell_enhancements: Default::default(),
             changed_equipment_listeners: Default::default(),
+            money: Cell::new(5),
         }
     }
 
@@ -2380,6 +2383,11 @@ impl Character {
             EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
             _ => false,
         }
+    }
+
+    pub fn spend_money(&self, amount: u32) {
+        assert!(self.money.get() >= amount);
+        self.money.set(self.money.get() - amount);
     }
 
     fn lose_braced(&self) -> bool {
@@ -3221,7 +3229,7 @@ impl NumberedResource {
         self.current.get()
     }
 
-    fn lose(&self, amount: u32) -> u32 {
+    pub fn lose(&self, amount: u32) -> u32 {
         let prev = self.current.get();
         let new = self.current.get().saturating_sub(amount);
         self.current.set(new);
@@ -3232,14 +3240,14 @@ impl NumberedResource {
         self.current.set(self.current.get() - amount);
     }
 
-    fn gain(&self, amount: u32) -> u32 {
+    pub fn gain(&self, amount: u32) -> u32 {
         let prev = self.current.get();
         let new = (prev + amount).min(self.max);
         self.current.set(new);
         new - prev
     }
 
-    fn set_to_max(&self) {
+    pub fn set_to_max(&self) {
         self.current.set(self.max);
     }
 }

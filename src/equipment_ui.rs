@@ -19,7 +19,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPositionPreference},
+    action_button::{draw_tooltip, Side, TooltipPositionPreference},
     base_ui::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
     },
@@ -30,7 +30,7 @@ use crate::{
     textures::EquipmentIconId,
 };
 
-fn tooltip(entry: &EquipmentEntry) -> Vec<String> {
+pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
     match entry {
         EquipmentEntry::Weapon(weapon) => weapon_tooltip(weapon),
         EquipmentEntry::Shield(shield) => shield_tooltip(shield),
@@ -338,7 +338,7 @@ impl EquipmentSlotContent {
     pub fn new(texture: Texture2D, equipment: EquipmentEntry) -> Self {
         Self {
             texture,
-            tooltip_lines: tooltip(&equipment),
+            tooltip_lines: equipment_tooltip_lines(&equipment),
             equipment,
         }
     }
@@ -416,8 +416,7 @@ impl Drawable for EquipmentSlot {
             if hover && !content.tooltip_lines.is_empty() {
                 draw_tooltip(
                     &self.font,
-                    rect,
-                    TooltipPositionPreference::Bottom,
+                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     content.tooltip_lines[0].as_ref(),
                     None,
                     &content.tooltip_lines[1..],
@@ -427,8 +426,7 @@ impl Drawable for EquipmentSlot {
             if hover {
                 draw_tooltip(
                     &self.font,
-                    rect,
-                    TooltipPositionPreference::Bottom,
+                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     tooltip_lines[0].as_ref(),
                     None,
                     &tooltip_lines[1..],

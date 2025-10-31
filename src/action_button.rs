@@ -738,6 +738,16 @@ impl ButtonAction {
         }
     }
 
+    pub fn context_explanation(&self) -> Option<String> {
+        match self {
+            ButtonAction::AttackEnhancement(_enhancement) => Some("Attack enhancement".to_string()),
+            ButtonAction::SpellEnhancement(enhancement) => {
+                Some(format!("{} enhancement", enhancement.name))
+            }
+            _ => None,
+        }
+    }
+
     fn icon(&self, character: Option<&Character>) -> IconId {
         match self {
             ButtonAction::Action(base_action) => match base_action {
@@ -881,21 +891,29 @@ pub fn draw_button_tooltip(
 
     draw_tooltip(
         font,
-        Rect::new(
-            button_position.0,
-            button_position.1,
-            button_size.0,
-            button_size.1,
+        TooltipPositionPreference::RelativeToRect(
+            Rect::new(
+                button_position.0,
+                button_position.1,
+                button_size.0,
+                button_size.1,
+            ),
+            Side::Top,
         ),
-        TooltipPositionPreference::Top,
         &tooltip.header,
         tooltip.error,
         &lines,
     );
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TooltipPositionPreference {
+    RelativeToRect(Rect, Side),
+    HorCenteredAt((f32, f32)),
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Side {
     Top,
     Right,
     Bottom,
@@ -904,8 +922,7 @@ pub enum TooltipPositionPreference {
 
 pub fn draw_tooltip(
     font: &Font,
-    rect: Rect,
-    mut pos_preference: TooltipPositionPreference,
+    pos_preference: TooltipPositionPreference,
     header: &str,
     error: Option<&'static str>,
     content_lines: &[String],
@@ -943,36 +960,37 @@ pub fn draw_tooltip(
 
     let (screen_w, screen_h) = screen_size();
 
-    if pos_preference == TooltipPositionPreference::Top && rect.top() - tooltip_h < 0.0 {
-        pos_preference = TooltipPositionPreference::Bottom;
-    }
-    if pos_preference == TooltipPositionPreference::Bottom && rect.bottom() + tooltip_h > screen_h {
-        pos_preference = TooltipPositionPreference::Top;
-    }
-    if pos_preference == TooltipPositionPreference::Left && rect.left() - tooltip_w < 0.0 {
-        pos_preference = TooltipPositionPreference::Right;
-    }
-    if pos_preference == TooltipPositionPreference::Right && rect.right() + tooltip_w > screen_w {
-        pos_preference = TooltipPositionPreference::Left;
-    }
-
-    let space = 3.0;
-
     let (x, y) = match pos_preference {
-        TooltipPositionPreference::Top => (
-            rect.left().min(screen_w - tooltip_w),
-            rect.top() - space - tooltip_h,
-        ),
-        TooltipPositionPreference::Right => {
-            (rect.right() + space, rect.top().min(screen_h - tooltip_h))
+        TooltipPositionPreference::RelativeToRect(rect, mut pos_preference) => {
+            if pos_preference == Side::Top && rect.top() - tooltip_h < 0.0 {
+                pos_preference = Side::Bottom;
+            }
+            if pos_preference == Side::Bottom && rect.bottom() + tooltip_h > screen_h {
+                pos_preference = Side::Top;
+            }
+            if pos_preference == Side::Left && rect.left() - tooltip_w < 0.0 {
+                pos_preference = Side::Right;
+            }
+            if pos_preference == Side::Right && rect.right() + tooltip_w > screen_w {
+                pos_preference = Side::Left;
+            }
+
+            let space = 3.0;
+
+            match pos_preference {
+                Side::Top => (
+                    rect.left().min(screen_w - tooltip_w),
+                    rect.top() - space - tooltip_h,
+                ),
+                Side::Right => (rect.right() + space, rect.top().min(screen_h - tooltip_h)),
+                Side::Bottom => (rect.left().min(screen_w - tooltip_w), rect.bottom() + space),
+                Side::Left => (
+                    rect.left() - space - tooltip_w,
+                    rect.top().min(screen_h - tooltip_h),
+                ),
+            }
         }
-        TooltipPositionPreference::Bottom => {
-            (rect.left().min(screen_w - tooltip_w), rect.bottom() + space)
-        }
-        TooltipPositionPreference::Left => (
-            rect.left() - space - tooltip_w,
-            rect.top().min(screen_h - tooltip_h),
-        ),
+        TooltipPositionPreference::HorCenteredAt((x, y)) => (x - tooltip_w / 2.0, y),
     };
 
     let tooltip_rect = (x, y, tooltip_w, tooltip_h);

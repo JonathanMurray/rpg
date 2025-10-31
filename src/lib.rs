@@ -17,6 +17,8 @@ pub mod grid;
 pub mod init;
 pub mod map_scene;
 pub mod pathfind;
+pub mod rest_scene;
+pub mod shop_scene;
 pub mod stats_ui;
 pub mod target_ui;
 pub mod textures;
