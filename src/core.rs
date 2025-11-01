@@ -275,11 +275,7 @@ impl CoreGame {
             Action::ChangeEquipment { from, to } => {
                 let character = self.active_character();
                 character.action_points.spend(1);
-                let from_content = character.equipment(from);
-                let to_content = character.equipment(to);
-                character.set_equipment(from_content, to);
-                character.set_equipment(to_content, from);
-
+                character.swap_equipment_slots(from, to);
                 None
             }
 
@@ -2594,6 +2590,13 @@ impl Character {
         }
 
         self.on_changed_equipment();
+    }
+
+    pub fn swap_equipment_slots(&self, from: EquipmentSlotRole, to: EquipmentSlotRole) {
+        let from_content = self.equipment(from);
+        let to_content = self.equipment(to);
+        self.set_equipment(from_content, to);
+        self.set_equipment(to_content, from);
     }
 
     pub fn try_gain_equipment(&self, entry: EquipmentEntry) -> bool {

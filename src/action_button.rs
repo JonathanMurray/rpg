@@ -368,6 +368,13 @@ fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &m
     }
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ButtonSelected {
+    No,
+    Partially,
+    Yes,
+}
+
 pub struct ActionButton {
     pub id: u32,
     pub action: ButtonAction,
@@ -385,13 +392,6 @@ pub struct ActionButton {
     tooltip: RefCell<ActionButtonTooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
-}
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq)]
-pub enum ButtonSelected {
-    No,
-    Partially,
-    Yes,
 }
 
 impl ActionButton {

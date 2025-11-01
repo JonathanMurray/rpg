@@ -5,9 +5,10 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, RED, SKYBLUE},
+    color::{Color, BLACK, RED, SKYBLUE, YELLOW},
+    input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
-    shapes::draw_rectangle,
+    shapes::{draw_rectangle, draw_rectangle_lines},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -22,13 +23,17 @@ use crate::{
     action_button::{draw_tooltip, Side, TooltipPositionPreference},
     base_ui::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
+        TextLine,
     },
     core::{
         ArmorPiece, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType, Shield,
         Weapon, WeaponGrip, WeaponRange,
     },
+    drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     textures::EquipmentIconId,
 };
+
+const INVENTORY_SIZE: usize = 6;
 
 pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
     match entry {
@@ -107,6 +112,331 @@ fn armor_tooltip(armor: &ArmorPiece) -> Vec<String> {
     }
     lines.push(format!("Weight: {}", armor.weight));
     lines
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct EquipmentDrag {
+    pub from_idx: usize,
+    pub to_idx: Option<usize>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct EquipmentConsumption {
+    pub equipment_idx: usize,
+    pub consumable: Consumable,
+}
+
+pub struct EquipmentSection {
+    pub element: Element,
+    pub equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
+    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
+    font: Font,
+    character: Rc<Character>,
+    equipment_icons: HashMap<EquipmentIconId, Texture2D>,
+}
+
+impl EquipmentSection {
+    pub fn new(
+        font: &Font,
+        character: &Rc<Character>,
+        equipment_icons: HashMap<EquipmentIconId, Texture2D>,
+    ) -> Self {
+        let (inventory_section, mut equipment_slots) =
+            build_inventory_section(font, character, &equipment_icons);
+        let (slots_container, equipped_slots, equipment_stats_table) =
+            build_equipped_section(font, character, &equipment_icons);
+
+        equipment_slots.extend_from_slice(&equipped_slots);
+
+        let element = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 15.0,
+            align: Align::Center,
+            style: Style {
+                padding: 10.0,
+                ..Default::default()
+            },
+            children: vec![
+                Element::Text(
+                    TextLine::new("Inventory", 22, WHITE, Some(font.clone()))
+                        .with_depth(BLACK, 2.0),
+                ),
+                inventory_section,
+                Element::Text(
+                    TextLine::new("Equipped", 22, WHITE, Some(font.clone())).with_depth(BLACK, 2.0),
+                ),
+                Element::Container(Container {
+                    // TODO
+                    layout_dir: LayoutDirection::Horizontal,
+                    children: vec![
+                        slots_container,
+                        //Element::RcRefCell(equipment_stats_table.clone()),
+                    ],
+                    align: Align::Center,
+                    margin: 15.0,
+                    ..Default::default()
+                }),
+            ],
+            ..Default::default()
+        });
+
+        let outer = Element::Container(Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 5.0,
+            align: Align::Center,
+            children: vec![element, Element::RcRefCell(equipment_stats_table.clone())],
+            ..Default::default()
+        });
+
+        Self {
+            element: outer,
+            equipment_slots,
+            equipment_stats_table,
+            font: font.clone(),
+            character: Rc::clone(character),
+            equipment_icons,
+        }
+    }
+
+    pub fn repopulate_character_equipment(&mut self) {
+        self.equipment_stats_table
+            .borrow_mut()
+            .rebuild(&self.character, &self.font);
+
+        for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
+            self.equipment_slots[i].borrow_mut().content = maybe_entry.get().map(|entry| {
+                let texture = self.equipment_icons[&entry.icon()].clone();
+                EquipmentSlotContent::new(texture, entry)
+            });
+        }
+
+        let roles = [
+            EquipmentSlotRole::MainHand,
+            EquipmentSlotRole::Armor,
+            EquipmentSlotRole::OffHand,
+        ];
+        for (i, role) in roles.iter().enumerate() {
+            self.equipment_slots[INVENTORY_SIZE + i]
+                .borrow_mut()
+                .content = self.character.equipment(*role).map(|entry| {
+                let texture = self.equipment_icons[&entry.icon()].clone();
+                EquipmentSlotContent::new(texture, entry)
+            });
+        }
+    }
+
+    pub fn resolve_drag_to_slots(
+        &self,
+        drag: EquipmentDrag,
+    ) -> (EquipmentSlotRole, EquipmentSlotRole) {
+        let from_slot = self.equipment_slots[drag.from_idx].borrow();
+        let to_slot = self.equipment_slots[drag.to_idx.unwrap()].borrow();
+
+        (from_slot.role(), to_slot.role())
+    }
+
+    pub fn describe_requested_equipment_change(&self, drag: EquipmentDrag) -> String {
+        let from = self.equipment_slots[drag.from_idx].borrow();
+        let to = self.equipment_slots[drag.to_idx.unwrap()].borrow();
+        let from_content = from.content.as_ref().unwrap();
+
+        let s = if let Some(to_content) = to.content.as_ref() {
+            if from.role().is_equipped() {
+                format!(
+                    "Switch from {} to {}",
+                    from_content.equipment.name(),
+                    to_content.equipment.name()
+                )
+            } else {
+                format!(
+                    "Switch from {} to {}",
+                    to_content.equipment.name(),
+                    from_content.equipment.name()
+                )
+            }
+        } else if to.role().is_equipped() {
+            format!("Equip {}", from_content.equipment.name())
+        } else {
+            format!("Unequip {}", from_content.equipment.name())
+        };
+        s
+    }
+
+    pub fn handle_equipment_drag_and_consumption(
+        &mut self,
+        mut drag: Option<EquipmentDrag>,
+        mut requested_consumption: Option<EquipmentConsumption>,
+    ) -> EquipmentSectionOutcome {
+        let (mouse_x, mouse_y) = mouse_position();
+
+        let previous_requested_consumption = requested_consumption;
+        let previous_drag = drag;
+
+        let mouse_pos = (mouse_x, mouse_y);
+
+        for idx in 0..self.equipment_slots.len() {
+            let slot = self.equipment_slots[idx].borrow_mut();
+            let rect = slot.screen_area();
+            let is_hovered = rect.contains(mouse_pos.into());
+
+            let drag_validity = match drag {
+                Some(EquipmentDrag { from_idx, .. }) if from_idx != idx => {
+                    let dragged_slot = &mut self.equipment_slots[from_idx].borrow_mut();
+                    let valid_forward = dragged_slot
+                        .content
+                        .as_ref()
+                        .map(|content| {
+                            self.character
+                                .can_equipment_fit(content.equipment, slot.role())
+                        })
+                        .unwrap_or(true);
+
+                    let valid_reverse = slot
+                        .content
+                        .as_ref()
+                        .map(|content| {
+                            self.character
+                                .can_equipment_fit(content.equipment, dragged_slot.role())
+                        })
+                        .unwrap_or(true);
+
+                    Some(valid_forward && valid_reverse)
+                }
+                _ => None,
+            };
+
+            if is_hovered {
+                if is_mouse_button_pressed(MouseButton::Right) {
+                    if let Some(content) = &slot.content {
+                        if let EquipmentEntry::Consumable(consumable) = content.equipment {
+                            requested_consumption = Some(EquipmentConsumption {
+                                equipment_idx: idx,
+                                consumable,
+                            });
+                        }
+                    }
+                } else if is_mouse_button_pressed(MouseButton::Left) {
+                    if slot.content.is_some() {
+                        drag = Some(EquipmentDrag {
+                            from_idx: idx,
+                            to_idx: None,
+                        });
+                    }
+                } else if is_mouse_button_released(MouseButton::Left) {
+                    if let Some(EquipmentDrag { from_idx, to_idx }) = &mut drag {
+                        if to_idx.is_none() && *from_idx != idx {
+                            let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
+
+                            if drag_validity.unwrap() {
+                                let slots = [dragged_slot, &slot];
+
+                                if slots.iter().any(|slot| slot.role().is_equipped()) {
+                                    println!("PREVIEW DRAG");
+
+                                    *to_idx = Some(idx);
+                                } else {
+                                    println!("PERFORM DRAG");
+
+                                    for i in [0, 1] {
+                                        let entry_a = slots[i]
+                                            .content
+                                            .as_ref()
+                                            .map(|content| content.equipment);
+                                        let role_b = slots[(i + 1) % 2].role();
+
+                                        self.character.set_equipment(entry_a, role_b);
+                                    }
+                                    drag = None;
+                                }
+                            }
+                        } else {
+                            println!("WILL NOT DRAG");
+
+                            drag = None;
+                        }
+                    }
+                }
+            }
+
+            if let Some(consumption) = requested_consumption {
+                if consumption.equipment_idx == idx {
+                    draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
+                }
+            }
+
+            if matches!(drag, Some(EquipmentDrag{ from_idx, .. }) if from_idx == idx) {
+                draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
+            } else if matches!(drag, Some(EquipmentDrag{ to_idx: Some(to_idx), .. }) if to_idx == idx)
+            {
+                draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
+            } else if is_hovered {
+                if let Some(valid) = drag_validity {
+                    let color = if valid { YELLOW } else { RED };
+                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, color);
+                } else if slot.content.is_some() {
+                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+                }
+            }
+        }
+
+        if let Some(EquipmentDrag { from_idx, to_idx }) = drag {
+            match to_idx {
+                Some(to_idx) => {
+                    let to = self.equipment_slots[to_idx].borrow().screen_area().center();
+                    let from = self.equipment_slots[from_idx]
+                        .borrow()
+                        .screen_area()
+                        .center();
+
+                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0, None);
+                }
+                None => {
+                    if is_mouse_button_down(MouseButton::Left) {
+                        let slot = self.equipment_slots[from_idx].borrow();
+                        let texture = &slot.content.as_ref().unwrap().texture;
+                        let params = DrawTextureParams {
+                            dest_size: Some((40.0, 40.0).into()),
+                            ..Default::default()
+                        };
+                        draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
+                    } else {
+                        println!("NOT DRAGGING ANYMORE");
+                        drag = None;
+                    }
+                }
+            }
+        }
+
+        let changed =
+            drag != previous_drag || requested_consumption != previous_requested_consumption;
+
+        EquipmentSectionOutcome {
+            changed,
+            equipment_drag: drag,
+            requested_consumption,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct EquipmentSectionOutcome {
+    pub changed: bool,
+    pub equipment_drag: Option<EquipmentDrag>,
+    pub requested_consumption: Option<EquipmentConsumption>,
+}
+
+impl Drawable for EquipmentSection {
+    fn draw(&self, x: f32, y: f32) {
+        self.element.draw(x, y)
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        self.element.draw_tooltips(x, y)
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.element.size()
+    }
 }
 
 pub fn build_inventory_section(
@@ -252,15 +582,9 @@ pub fn build_equipped_section(
 
     let stats_table = Rc::new(RefCell::new(EquipmentStatsTable::new(character, font)));
 
-    let container = Element::Container(Container {
-        layout_dir: LayoutDirection::Vertical,
-        children: vec![slots_container, Element::RcRefCell(stats_table.clone())],
-        align: Align::Center,
-        margin: 15.0,
-        ..Default::default()
-    });
+    (slots_container, cloned_slots, stats_table)
 
-    (container, cloned_slots, stats_table)
+    //(container, cloned_slots, stats_table)
 }
 
 pub struct EquipmentStatsTable {

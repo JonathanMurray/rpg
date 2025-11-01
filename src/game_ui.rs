@@ -19,7 +19,7 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
-    character_sheet::{CharacterSheet, EquipmentConsumption, EquipmentDrag},
+    character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
@@ -28,6 +28,7 @@ use crate::{
         OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier, SpellTarget,
         SpellTargetOutcome,
     },
+    equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
         PlayerPortraits,
@@ -1749,49 +1750,7 @@ pub fn build_character_ui(
         ..Default::default()
     };
 
-    let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character.health.current(),
-        character.health.max,
-        "Health",
-        RED,
-        simple_font.clone(),
-    )));
-    let cloned_health_bar = Rc::clone(&health_bar);
-
-    let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character.mana.current(),
-        character.mana.max,
-        "Mana",
-        BLUE,
-        simple_font.clone(),
-    )));
-    let cloned_mana_bar = Rc::clone(&mana_bar);
-
-    let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
-        character.stamina.current(),
-        character.stamina.max,
-        "Stamina",
-        GREEN,
-        simple_font.clone(),
-    )));
-    let cloned_stamina_bar = Rc::clone(&stamina_bar);
-
-    let resource_bars = Container {
-        layout_dir: LayoutDirection::Horizontal,
-        margin: 9.0,
-        align: Align::End,
-        children: vec![
-            Element::RcRefCell(cloned_health_bar),
-            Element::RcRefCell(cloned_mana_bar),
-            Element::RcRefCell(cloned_stamina_bar),
-        ],
-        style: Style {
-            border_color: Some(DARKGRAY),
-            padding: 5.0,
-            ..Default::default()
-        },
-        ..Default::default()
-    };
+    let resource_bars = ResourceBars::new(character, simple_font);
 
     let action_points_row = ActionPointsRow::new(
         character.max_reactive_action_points,
@@ -1809,11 +1768,70 @@ pub fn build_character_ui(
         hoverable_buttons,
         actions_section,
         character_sheet,
-        health_bar,
-        mana_bar,
-        stamina_bar,
-        resource_bars,
+        health_bar: resource_bars.health_bar,
+        mana_bar: resource_bars.mana_bar,
+        stamina_bar: resource_bars.stamina_bar,
+        resource_bars: resource_bars.container,
         conditions_list: ConditionsList::new(simple_font.clone(), vec![]),
+    }
+}
+
+pub struct ResourceBars {
+    pub container: Container,
+    health_bar: Rc<RefCell<LabelledResourceBar>>,
+    mana_bar: Rc<RefCell<LabelledResourceBar>>,
+    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
+}
+
+impl ResourceBars {
+    pub fn new(character: &Character, font: &Font) -> Self {
+        let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character.health.current(),
+            character.health.max,
+            "Health",
+            RED,
+            font.clone(),
+        )));
+
+        let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character.mana.current(),
+            character.mana.max,
+            "Mana",
+            BLUE,
+            font.clone(),
+        )));
+
+        let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
+            character.stamina.current(),
+            character.stamina.max,
+            "Stamina",
+            GREEN,
+            font.clone(),
+        )));
+
+        let container = Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 9.0,
+            align: Align::End,
+            children: vec![
+                Element::RcRefCell(health_bar.clone()),
+                Element::RcRefCell(mana_bar.clone()),
+                Element::RcRefCell(stamina_bar.clone()),
+            ],
+            style: Style {
+                border_color: Some(DARKGRAY),
+                padding: 5.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        Self {
+            container,
+            health_bar,
+            mana_bar,
+            stamina_bar,
+        }
     }
 }
 

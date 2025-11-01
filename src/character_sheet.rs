@@ -1,15 +1,14 @@
 use std::cell::{Cell, RefCell};
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, RED, SKYBLUE, YELLOW};
+use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 
 use macroquad::input::{
-    is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, mouse_position,
+    is_mouse_button_down, is_mouse_button_pressed, mouse_position,
     MouseButton,
 };
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
 use macroquad::text::{draw_text_ex, measure_text, TextParams};
-use macroquad::texture::{draw_texture_ex, DrawTextureParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
@@ -18,34 +17,17 @@ use macroquad::{
 };
 
 use crate::base_ui::Drawable;
-use crate::core::{Consumable, EquipmentEntry, EquipmentSlotRole};
-use crate::drawing::{draw_cross, draw_dashed_line, draw_dashed_rectangle_lines};
-use crate::equipment_ui::{
-    build_inventory_section, EquipmentSlot, EquipmentSlotContent, EquipmentStatsTable,
-};
+use crate::core::EquipmentSlotRole;
+use crate::drawing::draw_cross;
+use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
 use crate::game_ui::{ConfiguredAction, UiState};
 use crate::stats_ui::build_character_stats_table;
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
     core::Character,
-    equipment_ui::build_equipped_section,
     textures::EquipmentIconId,
 };
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct EquipmentDrag {
-    pub from_idx: usize,
-    pub to_idx: Option<usize>,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub struct EquipmentConsumption {
-    pub equipment_idx: usize,
-    pub consumable: Consumable,
-}
-
-const INVENTORY_SIZE: usize = 6;
 
 pub struct CharacterSheet {
     pub screen_position: Cell<(f32, f32)>,
@@ -86,7 +68,7 @@ impl CharacterSheet {
 
         let contents = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
-            margin: 3.0,
+            margin: 5.0,
             style: Style {
                 background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
                 padding: 10.0,
@@ -116,7 +98,7 @@ impl CharacterSheet {
                     margin: 15.0,
                     align: Align::Center,
                     style: Style {
-                        padding: 10.0,
+                        padding: 0.0,
                         ..Default::default()
                     },
                     children: vec![
@@ -212,14 +194,51 @@ impl CharacterSheet {
             self.sheet_dragged_offset.set(None);
         }
 
-        let changed_state = self
+        let is_allowed_to_change_equipment = matches!(
+            ui_state,
+            UiState::ConfiguringAction(..) | UiState::ChoosingAction
+        );
+        let is_allowed_to_use_consumable = matches!(
+            ui_state,
+            UiState::ConfiguringAction(..) | UiState::ChoosingAction
+        );
+
+        let mut equipment_drag = None;
+        let mut requested_consumption = None;
+        match ui_state {
+            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
+                equipment_drag = *drag
+            }
+            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
+                requested_consumption = *consumption
+            }
+            _ => {}
+        };
+
+        let outcome = self
             .equipment_section
             .borrow_mut()
-            .handle_equipment_drag_and_consumption(ui_state);
+            .handle_equipment_drag_and_consumption(equipment_drag, requested_consumption);
+
+        if outcome.equipment_drag != equipment_drag && is_allowed_to_change_equipment {
+            // TODO: currently it's not possible to move around items even in the inventory on another character's
+            // turn. Ideally that should be possible.
+            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
+            *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
+                drag: outcome.equipment_drag,
+            });
+        } else if requested_consumption.is_none()
+            && outcome.requested_consumption.is_some()
+            && is_allowed_to_use_consumable
+        {
+            *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
+                outcome.requested_consumption,
+            ));
+        }
 
         CharacterSheetOutcome {
             clicked_close,
-            changed_state,
+            changed_state: outcome.changed,
         }
     }
 
@@ -271,325 +290,7 @@ impl CharacterSheet {
     }
 }
 
-pub struct EquipmentSection {
-    pub element: Element,
-    pub equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
-    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
-    font: Font,
-    character: Rc<Character>,
-    equipment_icons: HashMap<EquipmentIconId, Texture2D>,
-}
-
-impl EquipmentSection {
-    pub fn new(
-        font: &Font,
-        character: &Rc<Character>,
-        equipment_icons: HashMap<EquipmentIconId, Texture2D>,
-    ) -> Self {
-        let (inventory_section, mut equipment_slots) =
-            build_inventory_section(font, character, &equipment_icons);
-        let (equipped_section, equipped_slots, equipment_stats_table) =
-            build_equipped_section(font, character, &equipment_icons);
-        equipment_slots.extend_from_slice(&equipped_slots);
-
-        let element = Element::Container(Container {
-            layout_dir: LayoutDirection::Vertical,
-            margin: 15.0,
-            align: Align::Center,
-            style: Style {
-                padding: 10.0,
-                ..Default::default()
-            },
-            children: vec![
-                Element::Text(
-                    TextLine::new("Inventory", 22, WHITE, Some(font.clone()))
-                        .with_depth(BLACK, 2.0),
-                ),
-                inventory_section,
-                Element::Text(
-                    TextLine::new("Equipped", 22, WHITE, Some(font.clone())).with_depth(BLACK, 2.0),
-                ),
-                equipped_section,
-            ],
-            ..Default::default()
-        });
-        Self {
-            element,
-            equipment_slots,
-            equipment_stats_table,
-            font: font.clone(),
-            character: Rc::clone(character),
-            equipment_icons,
-        }
-    }
-
-    fn repopulate_character_equipment(&mut self) {
-        self.equipment_stats_table
-            .borrow_mut()
-            .rebuild(&self.character, &self.font);
-
-        for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
-            self.equipment_slots[i].borrow_mut().content = maybe_entry.get().map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
-        }
-
-        let roles = [
-            EquipmentSlotRole::MainHand,
-            EquipmentSlotRole::Armor,
-            EquipmentSlotRole::OffHand,
-        ];
-        for (i, role) in roles.iter().enumerate() {
-            self.equipment_slots[INVENTORY_SIZE + i]
-                .borrow_mut()
-                .content = self.character.equipment(*role).map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
-        }
-    }
-
-    pub fn resolve_drag_to_slots(
-        &self,
-        drag: EquipmentDrag,
-    ) -> (EquipmentSlotRole, EquipmentSlotRole) {
-        let from_slot = self.equipment_slots[drag.from_idx].borrow();
-        let to_slot = self.equipment_slots[drag.to_idx.unwrap()].borrow();
-
-        (from_slot.role(), to_slot.role())
-    }
-
-    pub fn describe_requested_equipment_change(&self, drag: EquipmentDrag) -> String {
-        let from = self.equipment_slots[drag.from_idx].borrow();
-        let to = self.equipment_slots[drag.to_idx.unwrap()].borrow();
-        let from_content = from.content.as_ref().unwrap();
-
-        let s = if let Some(to_content) = to.content.as_ref() {
-            if from.role().is_equipped() {
-                format!(
-                    "Switch from {} to {}",
-                    from_content.equipment.name(),
-                    to_content.equipment.name()
-                )
-            } else {
-                format!(
-                    "Switch from {} to {}",
-                    to_content.equipment.name(),
-                    from_content.equipment.name()
-                )
-            }
-        } else if to.role().is_equipped() {
-            format!("Equip {}", from_content.equipment.name())
-        } else {
-            format!("Unequip {}", from_content.equipment.name())
-        };
-        s
-    }
-
-    pub fn handle_equipment_drag_and_consumption(&mut self, ui_state: &mut UiState) -> bool {
-        let (mouse_x, mouse_y) = mouse_position();
-        let is_allowed_to_change_equipment = matches!(
-            ui_state,
-            UiState::ConfiguringAction(..) | UiState::ChoosingAction
-        );
-        let is_allowed_to_use_consumable = matches!(
-            ui_state,
-            UiState::ConfiguringAction(..) | UiState::ChoosingAction
-        );
-        let mut requested_consumption = None;
-
-        let mut equipment_drag = &mut None;
-
-        match ui_state {
-            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
-                equipment_drag = drag
-            }
-            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
-                requested_consumption = *consumption
-            }
-            _ => {}
-        };
-        let previous_requested_consumption = requested_consumption;
-        let previous_drag = *equipment_drag;
-
-        let mouse_pos = (mouse_x, mouse_y);
-
-        for idx in 0..self.equipment_slots.len() {
-            let slot = self.equipment_slots[idx].borrow_mut();
-            let rect = slot.screen_area();
-            let is_hovered = rect.contains(mouse_pos.into());
-
-            let drag_validity = match equipment_drag {
-                Some(EquipmentDrag { from_idx, .. }) if *from_idx != idx => {
-                    let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
-                    let valid_forward = dragged_slot
-                        .content
-                        .as_ref()
-                        .map(|content| {
-                            self.character
-                                .can_equipment_fit(content.equipment, slot.role())
-                        })
-                        .unwrap_or(true);
-
-                    let valid_reverse = slot
-                        .content
-                        .as_ref()
-                        .map(|content| {
-                            self.character
-                                .can_equipment_fit(content.equipment, dragged_slot.role())
-                        })
-                        .unwrap_or(true);
-
-                    Some(valid_forward && valid_reverse)
-                }
-                _ => None,
-            };
-
-            if is_hovered {
-                if is_mouse_button_pressed(MouseButton::Right) {
-                    if let Some(content) = &slot.content {
-                        if let EquipmentEntry::Consumable(consumable) = content.equipment {
-                            requested_consumption = Some(EquipmentConsumption {
-                                equipment_idx: idx,
-                                consumable,
-                            });
-                        }
-                    }
-                } else if is_mouse_button_pressed(MouseButton::Left) {
-                    if slot.content.is_some() {
-                        *equipment_drag = Some(EquipmentDrag {
-                            from_idx: idx,
-                            to_idx: None,
-                        });
-                    }
-                } else if is_mouse_button_released(MouseButton::Left) {
-                    if let Some(EquipmentDrag { from_idx, to_idx }) = equipment_drag {
-                        if to_idx.is_none() && *from_idx != idx {
-                            let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
-
-                            if drag_validity.unwrap() {
-                                let slots = [dragged_slot, &slot];
-
-                                if slots.iter().any(|slot| slot.role().is_equipped()) {
-                                    println!("PREVIEW DRAG");
-
-                                    *to_idx = Some(idx);
-                                } else {
-                                    println!("PERFORM DRAG");
-
-                                    for i in [0, 1] {
-                                        let entry_a = slots[i]
-                                            .content
-                                            .as_ref()
-                                            .map(|content| content.equipment);
-                                        let role_b = slots[(i + 1) % 2].role();
-
-                                        self.character.set_equipment(entry_a, role_b);
-                                    }
-                                    *equipment_drag = None;
-                                }
-                            }
-                        } else {
-                            println!("WILL NOT DRAG");
-
-                            *equipment_drag = None;
-                        }
-                    }
-                }
-            }
-
-            if let Some(consumption) = requested_consumption {
-                if consumption.equipment_idx == idx {
-                    draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
-                }
-            }
-
-            if matches!(equipment_drag, Some(EquipmentDrag{ from_idx, .. }) if *from_idx == idx) {
-                draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
-            } else if matches!(equipment_drag, Some(EquipmentDrag{ to_idx: Some(to_idx), .. }) if *to_idx == idx)
-            {
-                draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
-            } else if is_hovered {
-                if let Some(valid) = drag_validity {
-                    let color = if valid { YELLOW } else { RED };
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, color);
-                } else if slot.content.is_some() {
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
-                }
-            }
-        }
-
-        if let Some(EquipmentDrag { from_idx, to_idx }) = equipment_drag {
-            match to_idx {
-                Some(to_idx) => {
-                    let to = self.equipment_slots[*to_idx]
-                        .borrow()
-                        .screen_area()
-                        .center();
-                    let from = self.equipment_slots[*from_idx]
-                        .borrow()
-                        .screen_area()
-                        .center();
-
-                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0, None);
-                    //draw_line(from.x, from.y, to.x, to.y, 5.0, MAGENTA);
-                }
-                None => {
-                    if is_mouse_button_down(MouseButton::Left) {
-                        let slot = self.equipment_slots[*from_idx].borrow();
-                        let texture = &slot.content.as_ref().unwrap().texture;
-                        let params = DrawTextureParams {
-                            dest_size: Some((40.0, 40.0).into()),
-                            ..Default::default()
-                        };
-                        draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
-                    } else {
-                        println!("NOT DRAGGING ANYMORE");
-                        *equipment_drag = None;
-                    }
-                }
-            }
-        }
-
-        let changed = *equipment_drag != previous_drag
-            || requested_consumption != previous_requested_consumption;
-
-        if equipment_drag.is_some() && previous_drag.is_none() && is_allowed_to_change_equipment {
-            // TODO: currently it's not possible to move around items even in the inventory on another character's
-            // turn. Ideally that should be possible.
-            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
-            *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
-                drag: *equipment_drag,
-            });
-
-            changed
-        } else if requested_consumption.is_some() && is_allowed_to_use_consumable {
-            *ui_state =
-                UiState::ConfiguringAction(ConfiguredAction::UseConsumable(requested_consumption));
-
-            changed
-        } else {
-            changed
-        }
-    }
-}
-
-impl Drawable for EquipmentSection {
-    fn draw(&self, x: f32, y: f32) {
-        self.element.draw(x, y)
-    }
-
-    fn draw_tooltips(&self, x: f32, y: f32) {
-        self.element.draw_tooltips(x, y)
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.element.size()
-    }
-}
-
-fn build_spell_book(
+pub fn build_spell_book(
     font: &Font,
     attack_button: Option<Rc<ActionButton>>,
     reaction_buttons: Vec<Rc<ActionButton>>,
