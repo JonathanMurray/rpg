@@ -24,9 +24,9 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackAction, AttackEnhancement, AttackOutcome, BaseAction, Character,
-        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType,
-        OnAttackedReaction, OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier,
-        SpellTarget, SpellTargetOutcome,
+        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction,
+        OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier, SpellTarget,
+        SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,

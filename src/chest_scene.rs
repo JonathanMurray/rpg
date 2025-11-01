@@ -19,10 +19,11 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{Drawable, TextLine},
+    character_sheet::EquipmentSection,
     core::{Character, EquipmentEntry},
     data::{HEALTH_POTION, MANA_POTION},
     equipment_ui::{build_equipped_section, build_inventory_section, equipment_tooltip_lines},
-    game_ui::{build_character_ui, UiState},
+    game_ui::{build_character_ui, ConfiguredAction, UiState},
     game_ui_components::CharacterSheetToggle,
     stats_ui::build_character_stats_table,
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -85,11 +86,17 @@ pub async fn run_chest_loop(
 
     let stats_table = build_character_stats_table(&font, &character);
 
-    let (inventory_section, equipment_slots) =
-        build_inventory_section(&font, &character, equipment_icons);
+    let mut equipment_section = EquipmentSection::new(&font, &character, equipment_icons.clone());
 
-    let (equipped_section, equipped_slots, equipment_stats_table) =
-        build_equipped_section(&font, &character, equipment_icons);
+    /*
+       let (inventory_section, equipment_slots) =
+           build_inventory_section(&font, &character, equipment_icons);
+
+       let (equipped_section, equipped_slots, equipment_stats_table) =
+           build_equipped_section(&font, &character, equipment_icons);
+    */
+
+    let mut ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: None });
 
     loop {
         let elapsed = get_frame_time();
@@ -98,10 +105,9 @@ pub async fn run_chest_loop(
 
         stats_table.draw(10.0, 10.0); //TODO
 
-        inventory_section.draw(10.0, 400.0); //TODO
-        equipped_section.draw(10.0, 500.0);
-        inventory_section.draw_tooltips(10.0, 400.0);
-        equipped_section.draw_tooltips(10.0, 500.0);
+        equipment_section.draw(10.0, 300.0);
+        equipment_section.draw_tooltips(10.0, 300.0);
+        equipment_section.handle_equipment_drag_and_consumption(&mut ui_state);
 
         let text = "You find:";
         let font_size = 32;
