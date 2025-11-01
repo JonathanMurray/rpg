@@ -25,8 +25,8 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, FIREBALL, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND,
-    SIDE_STEP, SWEEP_ATTACK, SWORD,
+    BOW, FIREBALL, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE,
+    SHACKLED_MIND, SIDE_STEP, SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -68,23 +68,23 @@ async fn main() {
 
     let icons = load_all_icons().await;
 
+    let portrait_textures = load_all_portraits().await;
+
     let mut map_scene = MapScene::new();
 
     let mut player_character = init_player_character();
     player_character.health.lose(10);
     player_character.mana.lose(10);
+    player_character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
-    player_character = run_chest_loop( player_character, font.clone(),  &equipment_icons, icons.clone()).await;
-
-    player_character = run_shop_loop(
+    player_character = run_chest_loop(
         player_character,
         font.clone(),
         &equipment_icons,
         icons.clone(),
+        &portrait_textures,
     )
     .await;
-
-    dbg!(&player_character);
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
@@ -102,27 +102,40 @@ async fn main() {
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
+                    &portrait_textures,
                 )
                 .await;
             }
             MapChoice::Fight(fight_id) => {
-                let core_game =
-                    init_fight_scene(player_character, fight_id, &equipment_icons, icons.clone())
-                        .await;
+                let core_game = init_fight_scene(
+                    player_character,
+                    fight_id,
+                    &equipment_icons,
+                    icons.clone(),
+                    portrait_textures.clone(),
+                )
+                .await;
                 player_character = core_game.run().await;
 
-                let learning = run_victory_loop(
+                let reward = run_victory_loop(
                     &player_character,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
                 )
                 .await;
-                learn(&mut player_character, learning);
+                player_character.gain_money(reward.money);
+                learn(&mut player_character, reward.learning);
             }
             MapChoice::Chest(reward) => {
-                
-                player_character = run_chest_loop( player_character, font.clone(),  &equipment_icons, icons.clone()).await;
+                player_character = run_chest_loop(
+                    player_character,
+                    font.clone(),
+                    &equipment_icons,
+                    icons.clone(),
+                    &portrait_textures,
+                )
+                .await;
             }
         }
     }
@@ -184,6 +197,7 @@ async fn init_fight_scene(
     fight_id: FightId,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
+    portrait_textures: HashMap<PortraitId, Texture2D>,
 ) -> CoreGame {
     let init_state = init(player_character, fight_id);
 
@@ -192,8 +206,6 @@ async fn init_fight_scene(
     let core_game = CoreGame::new(game_ui.clone(), &init_state);
 
     let sprites = load_all_sprites().await;
-
-    let portrait_textures = load_all_portraits().await;
 
     //let font_path = "manaspace/manaspc.ttf";
     //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable

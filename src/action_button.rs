@@ -217,6 +217,10 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
             header: "Equip/unequip (1 AP)".to_string(),
             ..Default::default()
         },
+        BaseAction::UseConsumable => ActionButtonTooltip {
+            header: "Use consumable (1 AP)".to_string(),
+            ..Default::default()
+        },
         BaseAction::EndTurn => ActionButtonTooltip {
             header: "End your turn".to_string(),
             ..Default::default()
@@ -727,6 +731,7 @@ impl ButtonAction {
                 BaseAction::CastSpell(spell) => spell.name,
                 BaseAction::Move => "Move",
                 BaseAction::ChangeEquipment => "Change equipment",
+                BaseAction::UseConsumable => "Use consumable",
                 BaseAction::EndTurn => "End turn",
             },
             ButtonAction::OnAttackedReaction(reaction) => reaction.name,
@@ -761,6 +766,7 @@ impl ButtonAction {
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
+                BaseAction::UseConsumable => IconId::Equip, //TODO
                 BaseAction::EndTurn => IconId::EndTurn,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,

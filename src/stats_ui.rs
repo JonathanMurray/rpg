@@ -5,9 +5,56 @@ use macroquad::{
     text::Font,
 };
 
-use crate::base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine};
+use crate::{
+    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    core::Character,
+};
 
 type AttributeCell = (&'static str, u32);
+
+pub fn build_character_stats_table(font: &Font, character: &Character) -> Element {
+    build_stats_table(
+        font,
+        20,
+        &[
+            (
+                Some(("Strength", character.base_attributes.strength)),
+                &[
+                    ("Health", StatValue::U32(character.health.max)),
+                    ("Toughness", StatValue::U32(character.toughness())),
+                    ("Capacity", StatValue::U32(character.capacity)),
+                ],
+            ),
+            (None, &[("Stamina", StatValue::U32(character.stamina.max))]),
+            (
+                Some(("Agility", character.base_attributes.agility)),
+                &[("Movement", StatValue::F32(character.move_speed))],
+            ),
+            (None, &[("Evasion", StatValue::U32(character.evasion()))]),
+            (
+                Some(("Intellect", character.base_attributes.intellect)),
+                &[
+                    ("Will", StatValue::U32(character.will())),
+                    (
+                        "Reaction AP",
+                        StatValue::String(format!("{}", character.max_reactive_action_points)),
+                    ),
+                ],
+            ),
+            (
+                None,
+                &[(
+                    "Spell mod",
+                    StatValue::String(format!("+{}", character.spell_modifier())),
+                )],
+            ),
+            (
+                Some(("Spirit", character.base_attributes.spirit)),
+                &[("Mana", StatValue::U32(character.mana.max))],
+            ),
+        ],
+    )
+}
 
 pub fn build_stats_table(
     font: &Font,

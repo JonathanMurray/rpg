@@ -19,14 +19,14 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
-    character_sheet::{CharacterSheet, EquipmentDrag},
+    character_sheet::{CharacterSheet, EquipmentConsumption, EquipmentDrag},
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
         ActionTarget, AttackAction, AttackEnhancement, AttackOutcome, BaseAction, Character,
-        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction,
-        OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier, SpellTarget,
-        SpellTargetOutcome,
+        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType,
+        OnAttackedReaction, OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier,
+        SpellTarget, SpellTargetOutcome,
     },
     game_ui_components::{
         ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
@@ -132,6 +132,7 @@ pub enum ConfiguredAction {
     ChangeEquipment {
         drag: Option<EquipmentDrag>,
     },
+    UseConsumable(Option<EquipmentConsumption>),
     EndTurn,
 }
 
@@ -206,6 +207,8 @@ impl ConfiguredAction {
                 })
             ),
 
+            ConfiguredAction::UseConsumable(consumable) => consumable.is_some(),
+
             ConfiguredAction::EndTurn => true,
         }
     }
@@ -227,6 +230,7 @@ impl ConfiguredAction {
                 selected_movement_path: Default::default(),
             },
             BaseAction::ChangeEquipment => Self::ChangeEquipment { drag: None },
+            BaseAction::UseConsumable => Self::UseConsumable(None),
             BaseAction::EndTurn => Self::EndTurn,
         }
     }
@@ -237,6 +241,7 @@ impl ConfiguredAction {
             ConfiguredAction::CastSpell { spell, .. } => BaseAction::CastSpell(*spell),
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
+            ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
             ConfiguredAction::EndTurn => BaseAction::EndTurn,
         }
     }
@@ -272,6 +277,7 @@ impl ConfiguredAction {
             }
             ConfiguredAction::Move { ap_cost, .. } => *ap_cost,
             ConfiguredAction::ChangeEquipment { .. } => 1,
+            ConfiguredAction::UseConsumable { .. } => 1,
             ConfiguredAction::EndTurn => 0,
         }
     }
@@ -320,7 +326,7 @@ pub struct CharacterUi {
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
-    resource_bars: Container,
+    pub resource_bars: Container,
     conditions_list: ConditionsList,
 }
 
@@ -525,7 +531,7 @@ impl UserInterface {
                 .shown
                 .set(!outcome.clicked_close);
 
-            if outcome.changed_drag {
+            if outcome.changed_state {
                 println!("REQUESTED EQ CHANGE; new state");
                 // Maybe drag was changed, or maybe the entire state; should be fine to assume the latter
                 self.on_new_state();
@@ -917,7 +923,7 @@ impl UserInterface {
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
 
-        self.maybe_refresh_equipment_drag_state();
+        self.maybe_refresh_equipment_state();
 
         self.refresh_target_state();
         self.refresh_movement_state();
@@ -926,30 +932,43 @@ impl UserInterface {
         self.target_ui.rebuild_character_ui();
     }
 
-    fn maybe_refresh_equipment_drag_state(&mut self) {
-        let change_eq_state = match &*self.state.borrow() {
-            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => Some(*drag),
-            _ => None,
-        };
+    fn maybe_refresh_equipment_state(&mut self) {
+        match &*self.state.borrow() {
+            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
+                self.target_ui
+                    .set_action("Change equipment".to_string(), vec![], false);
 
-        if let Some(maybe_drag) = change_eq_state {
-            self.target_ui
-                .set_action("Change equipment".to_string(), vec![], false);
-
-            if let Some(EquipmentDrag {
-                to_idx: Some(_), ..
-            }) = maybe_drag
-            {
-                let description = self.character_uis[&self.active_character_id]
-                    .character_sheet
-                    .describe_requested_equipment_change(maybe_drag.unwrap());
-                self.activity_popup.additional_line = Some(description);
-            } else {
-                self.activity_popup.additional_line =
-                    Some("Drag something to equip/unequip it".to_string());
-                self.character_sheet_toggle.shown.set(true);
+                if let Some(EquipmentDrag {
+                    to_idx: Some(_), ..
+                }) = drag
+                {
+                    let description = self.character_uis[&self.active_character_id]
+                        .character_sheet
+                        .describe_requested_equipment_change(drag.unwrap());
+                    self.activity_popup.additional_line = Some(description);
+                } else {
+                    self.activity_popup.additional_line =
+                        Some("Drag something to equip/unequip it".to_string());
+                    self.character_sheet_toggle.shown.set(true);
+                }
             }
-        }
+
+            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
+                self.target_ui
+                    .set_action("Use consumable".to_string(), vec![], false);
+
+                if let Some(consumption) = consumption {
+                    self.activity_popup.additional_line =
+                        Some(format!("Use {}", consumption.consumable.name));
+                } else {
+                    self.activity_popup.additional_line =
+                        Some("Right click a consumable in your inventory to use it".to_string());
+                    self.character_sheet_toggle.shown.set(true);
+                }
+            }
+
+            _ => {}
+        };
     }
 
     pub fn has_ongoing_animation(&self) -> bool {
@@ -1286,6 +1305,14 @@ impl UserInterface {
                 }
             }
 
+            GameEvent::ConsumableWasUsed { user, consumable } => {
+                self.log.add(format!(
+                    "{} used {}",
+                    self.characters.get(user).name,
+                    consumable.name
+                ));
+            }
+
             GameEvent::CharacterDied {
                 character,
                 new_active,
@@ -1483,6 +1510,9 @@ impl UserInterface {
 
                         Some(Action::ChangeEquipment { from, to })
                     }
+                    &ConfiguredAction::UseConsumable(consumption) => Some(Action::UseConsumable {
+                        inventory_equipment_index: consumption.unwrap().equipment_idx,
+                    }),
                     &ConfiguredAction::EndTurn => None,
                 };
                 PlayerChose::Action(action)
@@ -1655,6 +1685,7 @@ pub fn build_character_ui(
                 basic_buttons.push(btn);
             }
             BaseAction::ChangeEquipment => basic_buttons.push(btn),
+            BaseAction::UseConsumable => basic_buttons.push(btn),
             BaseAction::EndTurn => basic_buttons.push(btn),
         }
     }
@@ -1793,6 +1824,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
             BaseAction::Move => "MOVE".to_string(),
             BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
+            BaseAction::UseConsumable => "USING_CONSUMABLE".to_string(),
             BaseAction::EndTurn => "END_TURN".to_string(),
         },
         _ => unreachable!(),

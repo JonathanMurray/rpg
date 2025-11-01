@@ -647,6 +647,7 @@ impl GameGrid {
                 },
                 ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
                 ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
+                ConfiguredAction::UseConsumable { .. } => MouseState::None,
                 ConfiguredAction::EndTurn => MouseState::None,
             },
             _ => MouseState::None,

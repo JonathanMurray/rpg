@@ -869,7 +869,7 @@ impl LabelledResourceBar {
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
             format!("{}/{}", current, max),
-            17,
+            20,
             WHITE,
             Some(font.clone()),
         )));

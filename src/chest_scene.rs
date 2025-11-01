@@ -6,10 +6,7 @@ use std::{
 
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
-    input::{
-        is_mouse_button_pressed, mouse_position,
-        MouseButton,
-    },
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
@@ -20,20 +17,15 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        draw_tooltip, TooltipPositionPreference,
-    },
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{Drawable, TextLine},
-    core::{
-        Character, EquipmentEntry,
-    },
-    data::{
-        DAGGER, LEATHER_ARMOR, WAR_HAMMER,
-    },
-    equipment_ui::equipment_tooltip_lines,
+    core::{Character, EquipmentEntry},
+    data::{HEALTH_POTION, MANA_POTION},
+    equipment_ui::{build_equipped_section, build_inventory_section, equipment_tooltip_lines},
     game_ui::{build_character_ui, UiState},
     game_ui_components::CharacterSheetToggle,
-    textures::{EquipmentIconId, IconId},
+    stats_ui::build_character_stats_table,
+    textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
 
@@ -42,6 +34,7 @@ pub async fn run_chest_loop(
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
+    portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Character {
     let (screen_w, screen_h) = screen_size();
     let x_mid = screen_w / 2.0;
@@ -51,7 +44,7 @@ pub async fn run_chest_loop(
 
     let event_queue = Rc::new(RefCell::new(vec![]));
 
-    let player_character = Rc::new(player_character);
+    let character = Rc::new(player_character);
 
     let mut next_button_id = 0;
     let mut character_ui = build_character_ui(
@@ -59,14 +52,18 @@ pub async fn run_chest_loop(
         &icons,
         &event_queue,
         &font,
-        &player_character,
+        &character,
         &mut next_button_id,
     );
 
     let candidate_items = vec![
+        /*
         EquipmentEntry::Weapon(WAR_HAMMER),
         EquipmentEntry::Weapon(DAGGER),
         EquipmentEntry::Armor(LEATHER_ARMOR),
+         */
+        EquipmentEntry::Consumable(HEALTH_POTION),
+        EquipmentEntry::Consumable(MANA_POTION),
     ];
 
     let mut items: Vec<Option<EquipmentEntry>> = select_n_random(candidate_items, 1)
@@ -84,12 +81,29 @@ pub async fn run_chest_loop(
         padding: 10.0,
     };
 
+    let portrait = portrait_textures[&character.portrait].clone();
+
+    let stats_table = build_character_stats_table(&font, &character);
+
+    let (inventory_section, equipment_slots) =
+        build_inventory_section(&font, &character, equipment_icons);
+
+    let (equipped_section, equipped_slots, equipment_stats_table) =
+        build_equipped_section(&font, &character, equipment_icons);
+
     loop {
         let elapsed = get_frame_time();
 
         clear_background(BLACK);
 
-        let text = "Up for grabs:";
+        stats_table.draw(10.0, 10.0); //TODO
+
+        inventory_section.draw(10.0, 400.0); //TODO
+        equipped_section.draw(10.0, 500.0);
+        inventory_section.draw_tooltips(10.0, 400.0);
+        equipped_section.draw_tooltips(10.0, 500.0);
+
+        let text = "You find:";
         let font_size = 32;
         let text_dim = measure_text(text, Some(&font), font_size, 1.0);
         draw_text(
@@ -149,6 +163,29 @@ pub async fn run_chest_loop(
             character_ui.character_sheet.draw(&mut UiState::Idle);
         }
 
+        let portrait_rect = Rect::new(40.0, 700.0, 64.0, 80.0);
+        draw_rectangle_lines(
+            portrait_rect.x,
+            portrait_rect.y,
+            portrait_rect.w,
+            portrait_rect.h,
+            1.0,
+            GRAY,
+        );
+        draw_texture_ex(
+            &portrait,
+            portrait_rect.x,
+            portrait_rect.y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(portrait_rect.size()),
+                ..Default::default()
+            },
+        );
+        character_ui
+            .resource_bars
+            .draw(10.0, portrait_rect.bottom() + 10.0);
+
         let mut icon_x = x_mid - row_w / 2.0;
         let icon_y = 150.0;
 
@@ -169,7 +206,6 @@ pub async fn run_chest_loop(
                     },
                 );
 
-
                 let tooltip_lines = equipment_tooltip_lines(equipment_entry);
                 draw_tooltip(
                     &font,
@@ -188,7 +224,7 @@ pub async fn run_chest_loop(
                     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
 
                     if is_mouse_button_pressed(MouseButton::Left) {
-                        let success = player_character.try_gain_equipment(*equipment_entry);
+                        let success = character.try_gain_equipment(*equipment_entry);
                         assert!(success);
                         *item_slot = None;
                     }
@@ -220,7 +256,7 @@ pub async fn run_chest_loop(
             *countdown -= elapsed;
             if *countdown < 0.0 {
                 drop(character_ui); // Release Rc<Character> held by the UI, so that we can unwrap and return the inner value
-                return Rc::into_inner(player_character).unwrap();
+                return Rc::into_inner(character).unwrap();
             }
         }
 

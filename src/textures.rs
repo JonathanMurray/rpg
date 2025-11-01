@@ -159,6 +159,9 @@ pub enum EquipmentIconId {
     Shirt,
     Robe,
 
+    HealthPotion,
+    ManaPotion,
+
     PlaceholderOffhand,
     PlaceholderMainhand,
     PlaceholderArmor,
@@ -176,6 +179,8 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
         (EquipmentIconId::Shirt, "eq_shirt.png"),
         (EquipmentIconId::Robe, "eq_robe.png"),
+        (EquipmentIconId::HealthPotion, "eq_health_potion.png"),
+        (EquipmentIconId::ManaPotion, "eq_mana_potion.png"),
         (
             EquipmentIconId::PlaceholderOffhand,
             "eq_placeholder_offhand.png",

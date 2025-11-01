@@ -18,18 +18,18 @@ use macroquad::{
 };
 
 use crate::base_ui::Drawable;
-use crate::core::EquipmentSlotRole;
+use crate::core::{Consumable, EquipmentEntry, EquipmentSlotRole};
 use crate::drawing::{draw_cross, draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::equipment_ui::{
     build_inventory_section, EquipmentSlot, EquipmentSlotContent, EquipmentStatsTable,
 };
 use crate::game_ui::{ConfiguredAction, UiState};
+use crate::stats_ui::build_character_stats_table;
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
     core::Character,
     equipment_ui::build_equipped_section,
-    stats_ui::{build_stats_table, StatValue},
     textures::EquipmentIconId,
 };
 
@@ -39,20 +39,27 @@ pub struct EquipmentDrag {
     pub to_idx: Option<usize>,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct EquipmentConsumption {
+    pub equipment_idx: usize,
+    pub consumable: Consumable,
+}
+
 const INVENTORY_SIZE: usize = 6;
 
 pub struct CharacterSheet {
     character: Rc<Character>,
-    equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
     pub screen_position: Cell<(f32, f32)>,
     sheet_dragged_offset: Cell<Option<(f32, f32)>>,
     //equipment_drag: Option<EquipmentDrag>,
     equipment_changed: Rc<Cell<bool>>,
     equipment_icons: HashMap<EquipmentIconId, Texture2D>,
+    equipment_slots: Vec<Rc<RefCell<EquipmentSlot>>>,
+    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
 
     container: Container,
     top_bar_h: f32,
-    equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
+
     font: Font,
 }
 
@@ -66,124 +73,102 @@ impl CharacterSheet {
         attack_enhancement_buttons: Vec<Rc<ActionButton>>,
         spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
     ) -> Self {
-        let stats_table = build_stats_table(
-            font,
-            20,
-            &[
-                (
-                    Some(("Strength", character.base_attributes.strength)),
-                    &[
-                        ("Health", StatValue::U32(character.health.max)),
-                        ("Toughness", StatValue::U32(character.toughness())),
-                        ("Capacity", StatValue::U32(character.capacity)),
-                    ],
-                ),
-                (None, &[("Stamina", StatValue::U32(character.stamina.max))]),
-                (
-                    Some(("Agility", character.base_attributes.agility)),
-                    &[("Movement", StatValue::F32(character.move_speed))],
-                ),
-                (None, &[("Evasion", StatValue::U32(character.evasion()))]),
-                (
-                    Some(("Intellect", character.base_attributes.intellect)),
-                    &[
-                        ("Will", StatValue::U32(character.will())),
-                        (
-                            "Reaction AP",
-                            StatValue::String(format!("{}", character.max_reactive_action_points)),
-                        ),
-                    ],
-                ),
-                (
-                    None,
-                    &[(
-                        "Spell mod",
-                        StatValue::String(format!("+{}", character.spell_modifier())),
-                    )],
-                ),
-                (
-                    Some(("Spirit", character.base_attributes.spirit)),
-                    &[("Mana", StatValue::U32(character.mana.max))],
-                ),
-            ],
-        );
+        let stats_table = build_character_stats_table(font, &character);
 
-        let (inventory_section, mut inventory_slots) =
+        let (inventory_section, mut equipment_slots) =
             build_inventory_section(font, &character, equipment_icons);
 
         let (equipped_section, equipped_slots, equipment_stats_table) =
             build_equipped_section(font, &character, equipment_icons);
 
-        inventory_slots.extend_from_slice(&equipped_slots);
+        equipment_slots.extend_from_slice(&equipped_slots);
 
-        let mut spell_book_rows = Container {
+        let equipment_section = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
-            margin: 5.0,
-            children: vec![],
-            scroll: Some(ContainerScroll::new(40.0)),
-            max_height: Some(450.0),
+            margin: 15.0,
+            align: Align::Center,
             style: Style {
                 padding: 10.0,
-                border_color: Some(LIGHTGRAY),
                 ..Default::default()
             },
+            children: vec![
+                Element::Text(
+                    TextLine::new("Inventory", 22, WHITE, Some(font.clone()))
+                        .with_depth(BLACK, 2.0),
+                ),
+                inventory_section,
+                Element::Text(
+                    TextLine::new("Equipped", 22, WHITE, Some(font.clone())).with_depth(BLACK, 2.0),
+                ),
+                equipped_section,
+            ],
+
             ..Default::default()
-        };
+        });
 
-        if !reaction_buttons.is_empty() {
-            let row = buttons_row(
-                reaction_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
+        let spell_book_rows = build_spell_book(
+            font,
+            attack_button,
+            reaction_buttons,
+            attack_enhancement_buttons,
+            spell_buttons,
+        );
 
-            spell_book_rows.children.push(Element::Text(TextLine::new(
-                "Reactions",
-                16,
-                WHITE,
-                Some(font.clone()),
-            )));
-            spell_book_rows.children.push(row);
-        }
+        let contents = Element::Container(Container {
+            layout_dir: LayoutDirection::Horizontal,
+            margin: 3.0,
+            style: Style {
+                background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
+                padding: 10.0,
+                ..Default::default()
+            },
+            children: vec![
+                Element::Container(Container {
+                    layout_dir: LayoutDirection::Vertical,
+                    margin: 10.0,
+                    align: Align::Center,
+                    style: Style {
+                        padding: 10.0,
 
-        if let Some(attack_button) = attack_button {
-            spell_book_rows.children.push(Element::Text(TextLine::new(
-                "Attack",
-                16,
-                WHITE,
-                Some(font.clone()),
-            )));
+                        ..Default::default()
+                    },
+                    children: vec![
+                        Element::Text(
+                            TextLine::new("Spell book", 22, WHITE, Some(font.clone()))
+                                .with_depth(BLACK, 2.0),
+                        ),
+                        Element::Container(spell_book_rows),
+                    ],
+                    ..Default::default()
+                }),
+                Element::Container(Container {
+                    layout_dir: LayoutDirection::Vertical,
+                    margin: 15.0,
+                    align: Align::Center,
+                    style: Style {
+                        padding: 10.0,
+                        ..Default::default()
+                    },
+                    children: vec![
+                        /*
+                        Element::Text(
+                            TextLine::new("Attributes", 22, WHITE, Some(font.clone()))
+                                .with_depth(BLACK, 2.0),
+                        ),
+                         */
+                        stats_table,
+                        Element::Box(Box::new(MoneyText {
+                            character: Rc::clone(&character),
+                            font: font.clone(),
+                        })),
+                    ],
 
-            let mut buttons = attack_enhancement_buttons;
-            buttons.insert(0, attack_button);
-
-            let row = buttons_row(buttons.into_iter().map(|btn| Element::Rc(btn)).collect());
-
-            spell_book_rows.children.push(row);
-        }
-
-        for (spell_btn, enhancement_buttons) in spell_buttons.into_iter() {
-            let spell = spell_btn.action.unwrap_spell();
-            spell_book_rows.children.push(Element::Text(TextLine::new(
-                spell.name,
-                16,
-                WHITE,
-                Some(font.clone()),
-            )));
-
-            let mut row_buttons = vec![spell_btn.clone()];
-            for enhancement_btn in enhancement_buttons {
-                row_buttons.push(Rc::clone(&enhancement_btn));
-            }
-            let spell_row = buttons_row(
-                row_buttons
-                    .into_iter()
-                    .map(|btn| Element::Rc(btn))
-                    .collect(),
-            );
-            spell_book_rows.children.push(spell_row);
-        }
+                    ..Default::default()
+                }),
+                equipment_section,
+            ],
+            ..Default::default()
+        });
 
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
@@ -200,83 +185,7 @@ impl CharacterSheet {
                         .with_depth(DARKBLUE, 1.0)
                         .with_padding(10.0, 10.0),
                 ),
-                Element::Container(Container {
-                    layout_dir: LayoutDirection::Horizontal,
-                    margin: 3.0,
-                    style: Style {
-                        background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
-                        padding: 10.0,
-                        ..Default::default()
-                    },
-                    children: vec![
-                        Element::Container(Container {
-                            layout_dir: LayoutDirection::Vertical,
-                            margin: 10.0,
-                            align: Align::Center,
-                            style: Style {
-                                padding: 10.0,
-
-                                ..Default::default()
-                            },
-                            children: vec![
-                                Element::Text(
-                                    TextLine::new("Spell book", 22, WHITE, Some(font.clone()))
-                                        .with_depth(BLACK, 2.0),
-                                ),
-                                Element::Container(spell_book_rows),
-                            ],
-                            ..Default::default()
-                        }),
-                        Element::Container(Container {
-                            layout_dir: LayoutDirection::Vertical,
-                            margin: 15.0,
-                            align: Align::Center,
-                            style: Style {
-                                padding: 10.0,
-                                ..Default::default()
-                            },
-                            children: vec![
-                                /*
-                                Element::Text(
-                                    TextLine::new("Attributes", 22, WHITE, Some(font.clone()))
-                                        .with_depth(BLACK, 2.0),
-                                ),
-                                 */
-                                stats_table,
-                                Element::Box(Box::new(MoneyText {
-                                    character: Rc::clone(&character),
-                                    font: font.clone(),
-                                })),
-                            ],
-
-                            ..Default::default()
-                        }),
-                        Element::Container(Container {
-                            layout_dir: LayoutDirection::Vertical,
-                            margin: 15.0,
-                            align: Align::Center,
-                            style: Style {
-                                padding: 10.0,
-                                ..Default::default()
-                            },
-                            children: vec![
-                                Element::Text(
-                                    TextLine::new("Inventory", 22, WHITE, Some(font.clone()))
-                                        .with_depth(BLACK, 2.0),
-                                ),
-                                inventory_section,
-                                Element::Text(
-                                    TextLine::new("Equipped", 22, WHITE, Some(font.clone()))
-                                        .with_depth(BLACK, 2.0),
-                                ),
-                                equipped_section,
-                            ],
-
-                            ..Default::default()
-                        }),
-                    ],
-                    ..Default::default()
-                }),
+                contents,
             ],
             ..Default::default()
         };
@@ -294,7 +203,7 @@ impl CharacterSheet {
             equipment_changed,
             equipment_icons: equipment_icons.clone(),
 
-            equipment_slots: inventory_slots,
+            equipment_slots,
             //equipment_drag: Default::default(),
             equipment_stats_table,
             font: font.clone(),
@@ -313,20 +222,6 @@ impl CharacterSheet {
 
         let (mouse_x, mouse_y) = mouse_position();
 
-        let is_allowed_to_change_equipment = matches!(
-            ui_state,
-            UiState::ConfiguringAction(..) | UiState::ChoosingAction
-        );
-
-        let drag = match ui_state {
-            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => drag,
-            _ => &mut Option::<EquipmentDrag>::None,
-        };
-
-        let previous_drag = *drag;
-
-        self.handle_equipment_dragging((mouse_x, mouse_y), drag);
-
         self.container.draw_tooltips(x, y);
 
         if let Some((x_offset, y_offset)) = self.sheet_dragged_offset.get() {
@@ -338,7 +233,6 @@ impl CharacterSheet {
                 self.sheet_dragged_offset.set(None);
             }
         }
-
         if is_mouse_button_pressed(MouseButton::Left)
             && (x..x + w).contains(&mouse_x)
             && (y..y + self.top_bar_h).contains(&mouse_y)
@@ -351,54 +245,42 @@ impl CharacterSheet {
             self.sheet_dragged_offset.set(None);
         }
 
-        let changed_drag = *drag != previous_drag;
-
-        if drag.is_some() && previous_drag.is_none() && is_allowed_to_change_equipment {
-            // TODO: currently it's not possible to move around items even in the inventory on another character's
-            // turn. Ideally that should be possible.
-            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
-            *ui_state =
-                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: *drag });
-        }
+        let changed_state = self.handle_equipment_drag_and_consumption(ui_state);
 
         CharacterSheetOutcome {
             clicked_close,
-            changed_drag,
+            changed_state,
         }
     }
 
-    fn repopulate_character_equipment(&mut self) {
-        self.equipment_stats_table
-            .borrow_mut()
-            .rebuild(&self.character, &self.font);
+    fn handle_equipment_drag_and_consumption(&mut self, ui_state: &mut UiState) -> bool {
+        let (mouse_x, mouse_y) = mouse_position();
+        let is_allowed_to_change_equipment = matches!(
+            ui_state,
+            UiState::ConfiguringAction(..) | UiState::ChoosingAction
+        );
+        let is_allowed_to_use_consumable = matches!(
+            ui_state,
+            UiState::ConfiguringAction(..) | UiState::ChoosingAction
+        );
+        let mut requested_consumption = None;
 
-        for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
-            self.equipment_slots[i].borrow_mut().content = maybe_entry.get().map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
-        }
+        let mut equipment_drag = &mut None;
 
-        let roles = [
-            EquipmentSlotRole::MainHand,
-            EquipmentSlotRole::Armor,
-            EquipmentSlotRole::OffHand,
-        ];
-        for (i, role) in roles.iter().enumerate() {
-            self.equipment_slots[INVENTORY_SIZE + i]
-                .borrow_mut()
-                .content = self.character.equipment(*role).map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
-        }
-    }
+        match ui_state {
+            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
+                equipment_drag = drag
+            }
+            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
+                requested_consumption = *consumption
+            }
+            _ => {}
+        };
+        let previous_requested_consumption = requested_consumption;
+        let previous_drag = *equipment_drag;
 
-    fn handle_equipment_dragging(
-        &mut self,
-        mouse_pos: (f32, f32),
-        equipment_drag: &mut Option<EquipmentDrag>,
-    ) {
+        let mouse_pos = (mouse_x, mouse_y);
+
         for idx in 0..self.equipment_slots.len() {
             let slot = self.equipment_slots[idx].borrow_mut();
             let rect = slot.screen_area();
@@ -431,7 +313,16 @@ impl CharacterSheet {
             };
 
             if is_hovered {
-                if is_mouse_button_pressed(MouseButton::Left) {
+                if is_mouse_button_pressed(MouseButton::Right) {
+                    if let Some(content) = &slot.content {
+                        if let EquipmentEntry::Consumable(consumable) = content.equipment {
+                            requested_consumption = Some(EquipmentConsumption {
+                                equipment_idx: idx,
+                                consumable,
+                            });
+                        }
+                    }
+                } else if is_mouse_button_pressed(MouseButton::Left) {
                     if slot.content.is_some() {
                         *equipment_drag = Some(EquipmentDrag {
                             from_idx: idx,
@@ -486,9 +377,17 @@ impl CharacterSheet {
                 }
             }
 
-            if matches!(equipment_drag, Some(EquipmentDrag{ from_idx: i, .. }) if *i == idx) {
+            // TODO draw dashed rectangle for consumed item
+
+            if let Some(consumption) = requested_consumption {
+                if consumption.equipment_idx == idx {
+                    draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
+                }
+            }
+
+            if matches!(equipment_drag, Some(EquipmentDrag{ from_idx, .. }) if *from_idx == idx) {
                 draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
-            } else if matches!(equipment_drag, Some(EquipmentDrag{ to_idx: Some(i), .. }) if *i == idx)
+            } else if matches!(equipment_drag, Some(EquipmentDrag{ to_idx: Some(to_idx), .. }) if *to_idx == idx)
             {
                 draw_dashed_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW, 4.0);
             } else if is_hovered {
@@ -531,6 +430,54 @@ impl CharacterSheet {
                     }
                 }
             }
+        }
+
+        let changed = *equipment_drag != previous_drag
+            || requested_consumption != previous_requested_consumption;
+
+        if equipment_drag.is_some() && previous_drag.is_none() && is_allowed_to_change_equipment {
+            // TODO: currently it's not possible to move around items even in the inventory on another character's
+            // turn. Ideally that should be possible.
+            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
+            *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
+                drag: *equipment_drag,
+            });
+
+            changed
+        } else if requested_consumption.is_some() && is_allowed_to_use_consumable {
+            *ui_state =
+                UiState::ConfiguringAction(ConfiguredAction::UseConsumable(requested_consumption));
+
+            changed
+        } else {
+            changed
+        }
+    }
+
+    fn repopulate_character_equipment(&mut self) {
+        self.equipment_stats_table
+            .borrow_mut()
+            .rebuild(&self.character, &self.font);
+
+        for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
+            self.equipment_slots[i].borrow_mut().content = maybe_entry.get().map(|entry| {
+                let texture = self.equipment_icons[&entry.icon()].clone();
+                EquipmentSlotContent::new(texture, entry)
+            });
+        }
+
+        let roles = [
+            EquipmentSlotRole::MainHand,
+            EquipmentSlotRole::Armor,
+            EquipmentSlotRole::OffHand,
+        ];
+        for (i, role) in roles.iter().enumerate() {
+            self.equipment_slots[INVENTORY_SIZE + i]
+                .borrow_mut()
+                .content = self.character.equipment(*role).map(|entry| {
+                let texture = self.equipment_icons[&entry.icon()].clone();
+                EquipmentSlotContent::new(texture, entry)
+            });
         }
     }
 
@@ -606,6 +553,84 @@ impl CharacterSheet {
     }
 }
 
+fn build_spell_book(
+    font: &Font,
+    attack_button: Option<Rc<ActionButton>>,
+    reaction_buttons: Vec<Rc<ActionButton>>,
+    attack_enhancement_buttons: Vec<Rc<ActionButton>>,
+    spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+) -> Container {
+    let mut spell_book_rows = Container {
+        layout_dir: LayoutDirection::Vertical,
+        margin: 5.0,
+        children: vec![],
+        scroll: Some(ContainerScroll::new(40.0)),
+        max_height: Some(450.0),
+        style: Style {
+            padding: 10.0,
+            border_color: Some(LIGHTGRAY),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    if !reaction_buttons.is_empty() {
+        let row = buttons_row(
+            reaction_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
+
+        spell_book_rows.children.push(Element::Text(TextLine::new(
+            "Reactions",
+            16,
+            WHITE,
+            Some(font.clone()),
+        )));
+        spell_book_rows.children.push(row);
+    }
+
+    if let Some(attack_button) = attack_button {
+        spell_book_rows.children.push(Element::Text(TextLine::new(
+            "Attack",
+            16,
+            WHITE,
+            Some(font.clone()),
+        )));
+
+        let mut buttons = attack_enhancement_buttons;
+        buttons.insert(0, attack_button);
+
+        let row = buttons_row(buttons.into_iter().map(|btn| Element::Rc(btn)).collect());
+
+        spell_book_rows.children.push(row);
+    }
+
+    for (spell_btn, enhancement_buttons) in spell_buttons.into_iter() {
+        let spell = spell_btn.action.unwrap_spell();
+        spell_book_rows.children.push(Element::Text(TextLine::new(
+            spell.name,
+            16,
+            WHITE,
+            Some(font.clone()),
+        )));
+
+        let mut row_buttons = vec![spell_btn.clone()];
+        for enhancement_btn in enhancement_buttons {
+            row_buttons.push(Rc::clone(&enhancement_btn));
+        }
+        let spell_row = buttons_row(
+            row_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
+        spell_book_rows.children.push(spell_row);
+    }
+    spell_book_rows
+}
+
 struct MoneyText {
     character: Rc<Character>,
     font: Font,
@@ -643,7 +668,7 @@ impl Drawable for MoneyText {
 
 pub struct CharacterSheetOutcome {
     pub clicked_close: bool,
-    pub changed_drag: bool,
+    pub changed_state: bool,
 }
 
 fn buttons_row(buttons: Vec<Element>) -> Element {

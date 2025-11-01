@@ -282,6 +282,35 @@ impl CoreGame {
 
                 None
             }
+
+            Action::UseConsumable {
+                inventory_equipment_index,
+            } => {
+                let character = self.active_character();
+                character.action_points.spend(1);
+                let slot_role = EquipmentSlotRole::Inventory(inventory_equipment_index);
+                let consumable = match character.equipment(slot_role).unwrap() {
+                    EquipmentEntry::Consumable(consumable) => consumable,
+                    unexpected => unreachable!("Not consumable: {:?}", unexpected),
+                };
+
+                if consumable.health_gain > 0 {
+                    character.health.gain(consumable.health_gain);
+                }
+                if consumable.mana_gain > 0 {
+                    character.mana.gain(consumable.mana_gain);
+                }
+
+                character.set_equipment(None, slot_role);
+
+                self.ui_handle_event(GameEvent::ConsumableWasUsed {
+                    user: character.id(),
+                    consumable,
+                })
+                .await;
+
+                None
+            }
         }
     }
 
@@ -1461,6 +1490,10 @@ pub enum GameEvent {
         spell: Spell,
         detail_lines: Vec<String>,
     },
+    ConsumableWasUsed {
+        user: CharacterId,
+        consumable: Consumable,
+    },
     CharacterDied {
         character: CharacterId,
         new_active: Option<CharacterId>,
@@ -1925,6 +1958,9 @@ pub enum Action {
         from: EquipmentSlotRole,
         to: EquipmentSlotRole,
     },
+    UseConsumable {
+        inventory_equipment_index: usize,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]
@@ -1941,6 +1977,7 @@ pub enum BaseAction {
     CastSpell(Spell),
     Move,
     ChangeEquipment,
+    UseConsumable,
     EndTurn,
     // TODO add "DelayTurn" action that lets you put yourself one step later in the
     // turn order
@@ -1969,6 +2006,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.action_point_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
+            BaseAction::UseConsumable => 1,
             BaseAction::EndTurn => 0,
         }
     }
@@ -1979,6 +2017,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.mana_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
+            BaseAction::UseConsumable => 0,
             BaseAction::EndTurn => 0,
         }
     }
@@ -1989,6 +2028,7 @@ impl BaseAction {
             BaseAction::CastSpell(spell) => spell.stamina_cost,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
+            BaseAction::UseConsumable => 0,
             BaseAction::EndTurn => 0,
         }
     }
@@ -2344,6 +2384,7 @@ impl Character {
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
                 BaseAction::ChangeEquipment,
+                BaseAction::UseConsumable,
                 BaseAction::EndTurn,
             ],
             known_attacked_reactions: Default::default(),
@@ -2383,6 +2424,10 @@ impl Character {
             EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
             _ => false,
         }
+    }
+
+    pub fn gain_money(&self, amount: u32) {
+        self.money.set(self.money.get() + amount);
     }
 
     pub fn spend_money(&self, amount: u32) {
@@ -2679,7 +2724,8 @@ impl Character {
                     && self.mana.current() >= spell.mana_cost
             }
             BaseAction::Move => ap > 0,
-            BaseAction::ChangeEquipment => ap > 0,
+            BaseAction::ChangeEquipment => ap >= BaseAction::ChangeEquipment.action_point_cost(),
+            BaseAction::UseConsumable => ap >= BaseAction::UseConsumable.action_point_cost(),
             BaseAction::EndTurn => true,
         }
     }
@@ -3472,6 +3518,16 @@ pub enum EquipmentEntry {
     Weapon(Weapon),
     Shield(Shield),
     Armor(ArmorPiece),
+    Consumable(Consumable),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Consumable {
+    pub name: &'static str,
+    pub health_gain: u32,
+    pub mana_gain: u32,
+    pub icon: EquipmentIconId,
+    pub weight: u32,
 }
 
 impl EquipmentEntry {
@@ -3480,6 +3536,7 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.name,
             EquipmentEntry::Shield(shield) => shield.name,
             EquipmentEntry::Armor(armor) => armor.name,
+            EquipmentEntry::Consumable(consumable) => consumable.name,
         }
     }
 
@@ -3488,6 +3545,7 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.icon,
             EquipmentEntry::Shield(_shield) => EquipmentIconId::SmallShield,
             EquipmentEntry::Armor(armor) => armor.icon,
+            EquipmentEntry::Consumable(consumable) => consumable.icon,
         }
     }
 
@@ -3496,6 +3554,7 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.weight,
             EquipmentEntry::Shield(shield) => shield.weight,
             EquipmentEntry::Armor(armor) => armor.weight,
+            EquipmentEntry::Consumable(consumable) => consumable.weight,
         }
     }
 }

@@ -42,6 +42,12 @@ pub enum Learning {
     SpellEnhancement(SpellEnhancement),
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Reward {
+    pub learning: Learning,
+    pub money: u32,
+}
+
 struct RewardButton {
     action_button: ActionButton,
     context: Option<&'static str>,
@@ -52,7 +58,7 @@ pub async fn run_victory_loop(
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
-) -> Learning {
+) -> Reward {
     let (screen_w, screen_h) = screen_size();
     let x_mid = screen_w / 2.0;
 
@@ -144,7 +150,7 @@ pub async fn run_victory_loop(
         + button_margin * (reward_buttons.len() - 1) as f32;
 
     let mut hovered_btn = None;
-    let mut selected_reward = None;
+    let mut selected_learning = None;
 
     let character_sheet_toggle = CharacterSheetToggle {
         shown: Cell::new(false),
@@ -154,12 +160,14 @@ pub async fn run_victory_loop(
 
     let mut ui_state = UiState::Idle;
 
+    let money_amount = 3;
+
     loop {
         let elapsed = get_frame_time();
 
         clear_background(BLACK);
 
-        let text = "Spoils of war:";
+        let text = "You receive";
         let font_size = 32;
         let text_dim = measure_text(text, Some(&font), font_size, 1.0);
         draw_text(
@@ -175,7 +183,7 @@ pub async fn run_victory_loop(
 
         draw_rectangle(x_mid - card_w / 2.0, 125.0, card_w, 60.0, card_color);
 
-        let text = "3 gold coins";
+        let text = &format!("{} gold coins", money_amount);
         let font_size = 32;
         let text_dim = measure_text(text, Some(&font), font_size, 1.0);
         draw_text(
@@ -275,7 +283,7 @@ pub async fn run_victory_loop(
                         if transition_countdown.is_none() {
                             transition_countdown = Some(transition_duration);
                             btn.action_button.selected.set(ButtonSelected::Yes);
-                            selected_reward = Some(action_to_reward_choice(btn_action));
+                            selected_learning = Some(action_to_reward_choice(btn_action));
                         }
                     }
                 }
@@ -312,7 +320,11 @@ pub async fn run_victory_loop(
 
             *countdown -= elapsed;
             if *countdown < 0.0 {
-                return selected_reward.unwrap();
+                let learning = selected_learning.unwrap();
+                return Reward {
+                    learning,
+                    money: money_amount,
+                };
             }
         }
 

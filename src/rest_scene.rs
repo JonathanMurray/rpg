@@ -1,4 +1,3 @@
-
 use macroquad::{
     color::{Color, BLACK, WHITE},
     input::{get_keys_pressed, is_mouse_button_pressed, MouseButton},
@@ -8,7 +7,6 @@ use macroquad::{
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
-
 
 pub async fn run_rest_loop(font: Font) {
     let (screen_w, screen_h) = screen_size();

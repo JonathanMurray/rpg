@@ -24,8 +24,8 @@ use crate::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
     },
     core::{
-        ArmorPiece, Character, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon,
-        WeaponGrip, WeaponRange,
+        ArmorPiece, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType, Shield,
+        Weapon, WeaponGrip, WeaponRange,
     },
     textures::EquipmentIconId,
 };
@@ -35,7 +35,23 @@ pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
         EquipmentEntry::Weapon(weapon) => weapon_tooltip(weapon),
         EquipmentEntry::Shield(shield) => shield_tooltip(shield),
         EquipmentEntry::Armor(armor) => armor_tooltip(armor),
+        EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
     }
+}
+
+fn consumable_tooltip(consumable: &Consumable) -> Vec<String> {
+    let mut lines = vec![consumable.name.to_string()];
+
+    if consumable.health_gain > 0 {
+        lines.push(format!("Restores {} health", consumable.health_gain));
+    }
+    if consumable.mana_gain > 0 {
+        lines.push(format!("Restores {} mana", consumable.mana_gain));
+    }
+    //lines.push("<Right-click to use>".to_string());
+    lines.push(format!("Weight: {}", consumable.weight));
+
+    lines
 }
 
 fn weapon_tooltip(weapon: &Weapon) -> Vec<String> {

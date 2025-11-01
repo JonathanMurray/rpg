@@ -6,10 +6,7 @@ use std::{
 
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
-    input::{
-        is_mouse_button_pressed, mouse_position,
-        MouseButton,
-    },
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
@@ -20,20 +17,17 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        draw_tooltip, TooltipPositionPreference,
-    },
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{Drawable, TextLine},
-    core::{
-        Character, EquipmentEntry,
-    },
+    core::{Character, EquipmentEntry},
     data::{
-        BOW, CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
+        BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, RAPIER, SMALL_SHIELD,
+        SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip_lines,
     game_ui::{build_character_ui, UiState},
     game_ui_components::CharacterSheetToggle,
-    textures::{EquipmentIconId, IconId},
+    textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
 
@@ -42,6 +36,7 @@ pub async fn run_shop_loop(
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
+    portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Character {
     let (screen_w, screen_h) = screen_size();
     let x_mid = screen_w / 2.0;
@@ -72,6 +67,8 @@ pub async fn run_shop_loop(
         (EquipmentEntry::Armor(LEATHER_ARMOR), 4),
         (EquipmentEntry::Armor(CHAIN_MAIL), 12),
         (EquipmentEntry::Shield(SMALL_SHIELD), 5),
+        (EquipmentEntry::Consumable(HEALTH_POTION), 4),
+        (EquipmentEntry::Consumable(MANA_POTION), 4),
     ];
 
     let mut items: Vec<Option<(EquipmentEntry, u32)>> = select_n_random(candidate_items, 5)

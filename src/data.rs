@@ -3,11 +3,11 @@ use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, Condition, DefenseType, EquipEffect, OnAttackedReaction,
-        OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect,
-        SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach, SpellTarget,
-        SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
+        AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect,
+        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
+        OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect,
+        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach,
+        SpellTarget, SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -726,4 +726,20 @@ pub const KILL: Spell = Spell {
         reach: SpellReach::Range(Range::Ranged(10)),
     },
     animation_color: BLACK,
+};
+
+pub const HEALTH_POTION: Consumable = Consumable {
+    name: "Health potion",
+    health_gain: 4,
+    mana_gain: 0,
+    icon: EquipmentIconId::HealthPotion,
+    weight: 1,
+};
+
+pub const MANA_POTION: Consumable = Consumable {
+    name: "Mana potion",
+    health_gain: 0,
+    mana_gain: 5,
+    icon: EquipmentIconId::ManaPotion,
+    weight: 1,
 };
