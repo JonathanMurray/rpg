@@ -100,11 +100,11 @@ impl TargetUi {
                 },
             );
             action_points_row.current_ap = char.action_points.current();
-            let mut health_bar = ResourceBar::horizontal(char.health.max, RED, (80.0, 10.0));
+            let mut health_bar = ResourceBar::horizontal(char.health.max(), RED, (80.0, 10.0));
             health_bar.current = char.health.current();
 
             let health_text_line = TextLine::new(
-                format!("{} / {}", char.health.current(), char.health.max),
+                format!("{} / {}", char.health.current(), char.health.max()),
                 18,
                 WHITE,
                 Some(self.simple_font.clone()),

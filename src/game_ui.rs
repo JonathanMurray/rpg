@@ -1783,11 +1783,21 @@ pub struct ResourceBars {
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
 }
 
+impl Drawable for ResourceBars {
+    fn draw(&self, x: f32, y: f32) {
+        self.container.draw(x, y);
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.container.size()
+    }
+}
+
 impl ResourceBars {
     pub fn new(character: &Character, font: &Font) -> Self {
         let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.health.current(),
-            character.health.max,
+            character.health.max(),
             "Health",
             RED,
             font.clone(),
@@ -1795,7 +1805,7 @@ impl ResourceBars {
 
         let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.mana.current(),
-            character.mana.max,
+            character.mana.max(),
             "Mana",
             BLUE,
             font.clone(),
@@ -1803,7 +1813,7 @@ impl ResourceBars {
 
         let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.stamina.current(),
-            character.stamina.max,
+            character.stamina.max(),
             "Stamina",
             GREEN,
             font.clone(),

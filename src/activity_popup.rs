@@ -172,7 +172,7 @@ impl ActivityPopup {
         }
 
         //let sprint_stamina_text = "Sprint (stamina)";
-        let sprint_stamina_text = "Spend stamina:";
+        let sprint_stamina_text = "Sprint:";
         let sprint_stamina_margin = 15.0;
         if let Some(slider) = &self.movement_stamina_slider {
             let text_dimensions = measure_text(
@@ -636,10 +636,10 @@ impl ActivityPopup {
 
                     ConfiguredAction::Move { .. } => {
                         let active_char = self.characters.get(active_character_id);
-                        let speed = active_char.move_speed;
+                        let speed = active_char.move_speed.get();
                         lines.push(format!("Speed: {}", speed));
                         let stamina = &active_char.stamina;
-                        if stamina.max > 0 {
+                        if stamina.max() > 0 {
                             let max_stamina_spend =
                                 stamina.current().min(active_char.action_points.current());
                             stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));

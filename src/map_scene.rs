@@ -21,18 +21,25 @@ use crate::{
 
 #[derive(Copy, Clone, Debug)]
 struct Node {
-    pos: (f32, f32),
+    map_pos: (u32, u32),
+    screen_pos: (f32, f32),
     text: &'static str,
     choice: MapChoice,
 }
 
 impl Node {
-    fn new(pos: (f32, f32), text: &'static str, choice: MapChoice) -> Self {
-        Self { pos, text, choice }
+    fn new(map_pos: (u32, u32), choice: MapChoice) -> Self {
+        Self {
+            map_pos,
+            screen_pos: Default::default(),
+            text: Default::default(),
+            choice,
+        }
     }
 
     fn within_distance(&self, pos: (f32, f32), distance: f32) -> bool {
-        (pos.0 - self.pos.0).powf(2.0) + (pos.1 - self.pos.1).powf(2.0) < distance.powf(2.0)
+        (pos.0 - self.screen_pos.0).powf(2.0) + (pos.1 - self.screen_pos.1).powf(2.0)
+            < distance.powf(2.0)
     }
 }
 
@@ -66,11 +73,9 @@ impl MapScene {
 
     pub async fn run_map_loop(&mut self, font: Font) -> MapChoice {
         let (screen_w, screen_h) = screen_size();
-        let x0 = 300.0;
         let y_mid = screen_h / 2.0;
-        let radius = 40.0;
+        let radius = 60.0;
         let mut selected_node_i = None;
-        let margin = 25.0;
 
         let candidate_chest_rewards = vec![
             EquipmentEntry::Armor(CHAIN_MAIL),
@@ -84,38 +89,59 @@ impl MapScene {
         let chest_reward =
             candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())];
 
-        let nodes = [
-            Node::new((x0, y_mid - radius * 4.0 - margin), "Rest", MapChoice::Rest),
-            Node::new(
-                (x0, y_mid - radius - margin),
-                "Fight",
-                MapChoice::Fight(FightId::First),
-            ),
-            Node::new(
-                (x0, y_mid + radius + margin),
-                "Chest",
-                MapChoice::Chest(chest_reward),
-            ),
-            Node::new((x0, y_mid + radius * 4.0 + margin), "Shop", MapChoice::Shop),
-            Node::new((x0 + 200.0, y_mid), "Rest", MapChoice::Rest),
-            Node::new(
-                (x0 + 400.0, y_mid),
-                "Boss?",
-                MapChoice::Fight(FightId::Second),
-            ),
+        let mut nodes = [
+            Node::new((0, 0), MapChoice::Chest(chest_reward)),
+            Node::new((0, 1), MapChoice::Fight(FightId::Easy)),
+            Node::new((1, 0), MapChoice::Fight(FightId::Easy)),
+            Node::new((1, 1), MapChoice::Fight(FightId::Easy)),
+            Node::new((1, 2), MapChoice::Shop),
+            Node::new((2, 0), MapChoice::Fight(FightId::Easy)),
+            Node::new((2, 1), MapChoice::Chest(chest_reward)),
+            Node::new((2, 2), MapChoice::Fight(FightId::Hard)),
+            Node::new((3, 0), MapChoice::Rest),
+            Node::new((3, 1), MapChoice::Chest(chest_reward)),
+            Node::new((4, 0), MapChoice::Fight(FightId::Hard)),
+            Node::new((5, 0), MapChoice::Shop),
         ];
-
-        let current_pos_color = Color::new(0.2, 0.0, 0.0, 1.0);
-
         let edges: HashMap<Option<usize>, Vec<usize>> = [
-            (None, vec![0, 1, 2, 3]),
-            (Some(0), vec![4]),
-            (Some(1), vec![4]),
-            (Some(2), vec![4]),
-            (Some(4), vec![5]),
-            (Some(3), vec![5]),
+            (None, vec![0, 1]),
+            (Some(0), vec![2]),
+            (Some(1), vec![3, 4]),
+            (Some(2), vec![5]),
+            (Some(3), vec![6]),
+            (Some(4), vec![7]),
+            (Some(5), vec![8]),
+            (Some(6), vec![8]),
+            (Some(7), vec![9]),
+            (Some(8), vec![10]),
+            (Some(9), vec![10]),
+            (Some(10), vec![11]),
         ]
         .into();
+
+        let mut column_sizes: HashMap<u32, u32> = HashMap::new();
+        for node in &mut nodes {
+            let n = column_sizes.get(&node.map_pos.0).copied().unwrap_or(0);
+            column_sizes.insert(node.map_pos.0, n + 1);
+            node.text = match node.choice {
+                MapChoice::Rest => "Rest",
+                MapChoice::Shop => "Shop",
+                MapChoice::Fight(FightId::Easy) => "Fight",
+                MapChoice::Fight(FightId::Hard) => "Fight!",
+                MapChoice::Chest(equipment_entry) => "Chest",
+            };
+        }
+        for node in &mut nodes {
+            let col_size = column_sizes[&node.map_pos.0];
+            let vert_dist = 200.0;
+            let hor_dist = 190.0;
+            node.screen_pos = (
+                200.0 + node.map_pos.0 as f32 * hor_dist,
+                y_mid - (col_size - 1) as f32 / 2.0 * vert_dist + node.map_pos.1 as f32 * vert_dist,
+            )
+        }
+
+        let current_pos_color = Color::new(0.2, 0.0, 0.0, 1.0);
 
         let transition_duration = 0.3;
         let mut transition_countdown = None;
@@ -134,19 +160,6 @@ impl MapScene {
             let mouse_pos = mouse_position();
             clear_background(BLACK);
 
-            /*
-            let text = "Choose!";
-            let font_size = 32;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            draw_text(
-                text,
-                screen_w / 2.0 - text_dim.width / 2.0,
-                50.0 + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
-            );
-             */
-
             let mut hovered_i = None;
 
             for (node_i, node) in nodes.iter().enumerate() {
@@ -160,7 +173,7 @@ impl MapScene {
             // Draw edges
             for (from_i, to) in &edges {
                 let from_pos = match from_i {
-                    Some(from_i) => nodes[*from_i].pos,
+                    Some(from_i) => nodes[*from_i].screen_pos,
                     None => start_pos.center().into(),
                 };
                 for to_i in to {
@@ -178,7 +191,7 @@ impl MapScene {
                     } else {
                         GRAY
                     };
-                    draw_dashed_line(from_pos, to_node.pos, 2.0, line_color, 15.0, None);
+                    draw_dashed_line(from_pos, to_node.screen_pos, 2.0, line_color, 15.0, None);
                 }
             }
 
@@ -228,9 +241,15 @@ impl MapScene {
                     BLACK
                 };
 
-                draw_circle(node.pos.0, node.pos.1, radius, fill_color);
+                draw_circle(node.screen_pos.0, node.screen_pos.1, radius, fill_color);
                 if let Some(outline_color) = outline_color {
-                    draw_circle_lines(node.pos.0, node.pos.1, radius, 2.0, outline_color);
+                    draw_circle_lines(
+                        node.screen_pos.0,
+                        node.screen_pos.1,
+                        radius,
+                        2.0,
+                        outline_color,
+                    );
                 }
                 let font_size = 28;
                 let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
@@ -244,8 +263,8 @@ impl MapScene {
 
                 draw_text(
                     node.text,
-                    node.pos.0 - text_dim.width / 2.0,
-                    node.pos.1 + (text_dim.height) / 2.0,
+                    node.screen_pos.0 - text_dim.width / 2.0,
+                    node.screen_pos.1 + (text_dim.height) / 2.0,
                     font_size.into(),
                     text_color,
                 );

@@ -65,6 +65,21 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
     },
 };
 
+pub const BAD_DAGGER: Weapon = Weapon {
+    name: "Bad dagger",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 2,
+    grip: WeaponGrip::Light,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(STABBING),
+    on_attacked_reaction: None,
+    on_true_hit: None,
+    sprite: Some(SpriteId::Dagger),
+    icon: EquipmentIconId::Dagger,
+    weight: 1,
+};
+
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: WeaponRange::Melee,
@@ -92,6 +107,21 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
         inflict_condition_per_damage: Some(Condition::Bleeding(1)),
         ..AttackEnhancementEffect::default()
     },
+};
+
+pub const BAD_SWORD: Weapon = Weapon {
+    name: "Bad Sword",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 2,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(SLASHING),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Sword),
+    icon: EquipmentIconId::Sword,
+    weight: 2,
 };
 
 pub const SWORD: Weapon = Weapon {
@@ -171,7 +201,7 @@ pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(5),
     action_point_cost: 2,
-    damage: 4,
+    damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFULLY_AIMED),
@@ -200,7 +230,7 @@ pub const SMALL_SHIELD: Shield = Shield {
 
 pub const QUICK: AttackEnhancement = AttackEnhancement {
     name: "Quick strike",
-    description: "Strike more quickly",
+    description: "", //"Strike more quickly",
     icon: IconId::QuickStrike,
     action_point_cost: 0,
     stamina_cost: 3,
@@ -213,7 +243,7 @@ pub const QUICK: AttackEnhancement = AttackEnhancement {
 
 pub const SMITE: AttackEnhancement = AttackEnhancement {
     name: "Smite",
-    description: "Enhance your strike with magic",
+    description: "", //"Enhance your strike with magic",
     icon: IconId::Smite,
     action_point_cost: 0,
     stamina_cost: 1,
@@ -226,7 +256,7 @@ pub const SMITE: AttackEnhancement = AttackEnhancement {
 
 pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     name: "Overwhelm",
-    description: "Overwhelm the target",
+    description: "", //"Overwhelm the target",
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
     stamina_cost: 2,
@@ -242,7 +272,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
     name: "Carefully aimed",
-    description: "Spend more time on the attack, aiming carefully",
+    description: "", // "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     stamina_cost: 0,
@@ -443,7 +473,7 @@ pub const SHACKLED_MIND: Spell = Spell {
             damage: None,
             on_hit: Some([
                 Some(ApplyEffect::Condition(Condition::Slowed(2))),
-                Some(ApplyEffect::Condition(Condition::Exposed(1))),
+                Some(ApplyEffect::Condition(Condition::Exposed(2))),
             ]),
         },
         impact_area: None,
@@ -691,7 +721,7 @@ pub const FIREBALL: Spell = Spell {
             Range::Melee,
             SpellEnemyEffect {
                 defense_type: None,
-                damage: Some(SpellDamage::Static(1)),
+                damage: Some(SpellDamage::Static(2)),
                 on_hit: None,
             },
         )),

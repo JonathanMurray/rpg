@@ -13,10 +13,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        draw_tooltip,
-        TooltipPositionPreference,
-    },
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::Drawable,
     core::{Character, EquipmentEntry},
     data::{HEALTH_POTION, MANA_POTION},

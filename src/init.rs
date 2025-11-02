@@ -8,7 +8,7 @@ use rand::distr::{Distribution, Uniform};
 
 use crate::{
     core::{Attributes, Character, CharacterId, Characters, HandType, Position},
-    data::{BOW, CHAIN_MAIL, DAGGER},
+    data::{BAD_DAGGER, BAD_SWORD, SHIRT},
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
 };
@@ -16,7 +16,7 @@ use crate::{
 pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
     let active_character_id = 0;
 
-    let skeleton1 = Character::new(
+    let skeleton_str = Character::new(
         false,
         "Skeleton",
         PortraitId::Skeleton,
@@ -24,23 +24,23 @@ pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
         Attributes::new(4, 2, 1, 1),
         (0, 0),
     );
-    skeleton1.armor.set(Some(CHAIN_MAIL));
-    skeleton1.set_weapon(HandType::MainHand, BOW);
+    skeleton_str.armor.set(Some(SHIRT));
+    skeleton_str.set_weapon(HandType::MainHand, BAD_SWORD);
 
-    let skeleton2 = Character::new(
+    let skeleton_agi = Character::new(
         false,
         "Skeleton",
         PortraitId::Skeleton,
         SpriteId::Skeleton,
-        Attributes::new(1, 1, 1, 1),
+        Attributes::new(1, 3, 1, 1),
         (0, 0),
     );
-    skeleton2.set_weapon(HandType::MainHand, DAGGER);
+    skeleton_agi.set_weapon(HandType::MainHand, BAD_DAGGER);
     //skeleton2.set_shield(SMALL_SHIELD);
 
     let map_filename = match fight_id {
-        FightId::First => "map1.txt",
-        FightId::Second => "map2.txt",
+        FightId::Easy => "map1.txt",
+        FightId::Hard => "map3.txt",
     };
 
     let map_str = fs::read_to_string(map_filename).unwrap();
@@ -91,13 +91,13 @@ pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
 
     player_character.position.set(player_pos.unwrap());
 
-    let characters = if fight_id == FightId::First {
-        skeleton2.position.set(enemy_positions[&0]);
-        vec![player_character, skeleton2]
+    let characters = if fight_id == FightId::Easy {
+        skeleton_agi.position.set(enemy_positions[&0]);
+        vec![player_character, skeleton_agi]
     } else {
-        skeleton1.position.set(enemy_positions[&0]);
-        skeleton2.position.set(enemy_positions[&1]);
-        vec![player_character, skeleton1, skeleton2]
+        skeleton_str.position.set(enemy_positions[&0]);
+        skeleton_agi.position.set(enemy_positions[&1]);
+        vec![player_character, skeleton_str, skeleton_agi]
     };
 
     for (x, y) in water_grid.iter().copied() {
@@ -177,6 +177,6 @@ pub struct GameInitState {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FightId {
-    First,
-    Second,
+    Easy,
+    Hard,
 }

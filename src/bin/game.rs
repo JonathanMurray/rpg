@@ -25,8 +25,8 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, FIREBALL, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE,
-    SHACKLED_MIND, SIDE_STEP, SWEEP_ATTACK, SWORD,
+    BOW, DAGGER, FIREBALL, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE,
+    ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -73,9 +73,27 @@ async fn main() {
     let mut map_scene = MapScene::new();
 
     let mut player_character = init_player_character();
-    player_character.health.lose(10);
-    player_character.mana.lose(10);
-    player_character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+
+    loop {
+        let core_game = init_fight_scene(
+            player_character,
+            FightId::Hard,
+            &equipment_icons,
+            icons.clone(),
+            portrait_textures.clone(),
+        )
+        .await;
+        player_character = core_game.run().await;
+
+        player_character = run_victory_loop(
+            player_character,
+            font.clone(),
+            &equipment_icons,
+            icons.clone(),
+            &portrait_textures,
+        )
+        .await;
+    }
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
@@ -83,7 +101,7 @@ async fn main() {
             MapChoice::Rest => {
                 player_character
                     .health
-                    .gain(player_character.health.max / 2);
+                    .gain(player_character.health.max() / 2);
                 player_character.mana.set_to_max();
                 player_character = run_rest_loop(
                     player_character,
@@ -115,15 +133,14 @@ async fn main() {
                 .await;
                 player_character = core_game.run().await;
 
-                let reward = run_victory_loop(
-                    &player_character,
+                player_character = run_victory_loop(
+                    player_character,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
+                    &portrait_textures,
                 )
                 .await;
-                player_character.gain_money(reward.money);
-                learn(&mut player_character, reward.learning);
             }
             MapChoice::Chest(reward) => {
                 player_character = run_chest_loop(
@@ -139,36 +156,19 @@ async fn main() {
     }
 }
 
-fn learn(player_character: &mut Character, learning: Learning) {
-    match learning {
-        Learning::Spell(spell) => player_character
-            .known_actions
-            .push(BaseAction::CastSpell(spell)),
-        Learning::OnAttackedReaction(reaction) => {
-            player_character.known_attacked_reactions.push(reaction)
-        }
-        Learning::OnHitReaction(reaction) => player_character.known_on_hit_reactions.push(reaction),
-        Learning::AttackEnhancement(enhancement) => {
-            player_character.known_attack_enhancements.push(enhancement)
-        }
-        Learning::SpellEnhancement(enhancement) => {
-            player_character.known_spell_enhancements.push(enhancement)
-        }
-    }
-}
-
 fn init_player_character() -> Character {
     let mut character = Character::new(
         true,
         "Alice",
         PortraitId::Portrait1,
         SpriteId::Character4,
-        Attributes::new(5, 5, 5, 5),
+        Attributes::new(3, 5, 3, 2),
         (1, 10),
     );
+
     character
         .known_actions
-        .push(BaseAction::CastSpell(SHACKLED_MIND));
+        .push(BaseAction::CastSpell(FIREBALL));
     /*
     character.known_actions.push(BaseAction::CastSpell(KILL)); //TODO
     character.known_attack_enhancements.push(OVERWHELMING);
@@ -183,9 +183,10 @@ fn init_player_character() -> Character {
         .known_actions
         .push(BaseAction::CastSpell(LUNGE_ATTACK));
      */
-    character.armor.set(Some(ROBE));
+    character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     character.set_weapon(HandType::MainHand, BOW);
-    character.inventory[0].set(Some(EquipmentEntry::Weapon(SWORD)));
+    character.armor.set(Some(SHIRT));
+    character.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
 
     character
 }

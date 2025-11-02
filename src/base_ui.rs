@@ -195,6 +195,7 @@ pub struct TextLine {
     offset_y: f32,
     font_size: u16,
     color: Color,
+    hover_color: Option<Color>,
     min_height: f32,
     min_width: f32,
     max_width: f32,
@@ -220,6 +221,7 @@ impl TextLine {
             offset_y: 0.0,
             font_size,
             color,
+            hover_color: None,
             min_height: 0.0,
             min_width: 0.0,
             max_width: f32::MAX,
@@ -265,8 +267,17 @@ impl TextLine {
         self.measure();
     }
 
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
+
     pub fn with_padding(mut self, hor: f32, vert: f32) -> Self {
         self.set_padding(hor, vert);
+        self
+    }
+
+    pub fn with_hover_color(mut self, color: Color) -> Self {
+        self.hover_color = Some(color);
         self
     }
 
@@ -319,9 +330,20 @@ impl Drawable for TextLine {
             );
         }
 
+        let (mouse_x, mouse_y) = mouse_position();
+        let hovered =
+            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
+
+        let mut color = self.color;
+        if let Some(hover_color) = self.hover_color {
+            if hovered {
+                color = hover_color;
+            }
+        }
+
         let params = TextParams {
             font_size: self.font_size,
-            color: self.color,
+            color,
             font: self.font.as_ref(),
             ..Default::default()
         };
@@ -329,8 +351,7 @@ impl Drawable for TextLine {
 
         draw_debug(x, y, self.size.0, self.size.1);
 
-        let (mouse_x, mouse_y) = mouse_position();
-        if (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y) {
+        if hovered {
             self.has_been_hovered.set(Some((x, y)));
         }
     }

@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{fmt, rc::Rc};
 
 use macroquad::{
     color::{GRAY, WHITE},
@@ -12,27 +12,58 @@ use crate::{
 
 type AttributeCell = (&'static str, u32);
 
-pub fn build_character_stats_table(font: &Font, character: &Character) -> Element {
-    build_stats_table(
+pub struct CharacterStatsTable {
+    element: Element,
+    font: Font,
+    character: Rc<Character>,
+}
+
+impl Drawable for CharacterStatsTable {
+    fn draw(&self, x: f32, y: f32) {
+        self.element.draw(x, y)
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        self.element.draw_tooltips(x, y);
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.element.size()
+    }
+}
+
+impl CharacterStatsTable {
+    pub fn rebuild(&mut self) {
+        let font = self.font.clone();
+        let character = self.character.clone();
+        *self = build_character_stats_table(&font, character)
+    }
+}
+
+pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> CharacterStatsTable {
+    let element = build_stats_table(
         font,
         20,
         &[
             (
-                Some(("Strength", character.base_attributes.strength)),
+                Some(("Strength", character.base_attributes.strength.get())),
                 &[
-                    ("Health", StatValue::U32(character.health.max)),
+                    ("Health", StatValue::U32(character.health.max())),
                     ("Toughness", StatValue::U32(character.toughness())),
-                    ("Capacity", StatValue::U32(character.capacity)),
+                    ("Capacity", StatValue::U32(character.capacity.get())),
                 ],
             ),
-            (None, &[("Stamina", StatValue::U32(character.stamina.max))]),
             (
-                Some(("Agility", character.base_attributes.agility)),
-                &[("Movement", StatValue::F32(character.move_speed))],
+                None,
+                &[("Stamina", StatValue::U32(character.stamina.max()))],
+            ),
+            (
+                Some(("Agility", character.base_attributes.agility.get())),
+                &[("Movement", StatValue::F32(character.move_speed.get()))],
             ),
             (None, &[("Evasion", StatValue::U32(character.evasion()))]),
             (
-                Some(("Intellect", character.base_attributes.intellect)),
+                Some(("Intellect", character.base_attributes.intellect.get())),
                 &[
                     ("Will", StatValue::U32(character.will())),
                     (
@@ -49,11 +80,17 @@ pub fn build_character_stats_table(font: &Font, character: &Character) -> Elemen
                 )],
             ),
             (
-                Some(("Spirit", character.base_attributes.spirit)),
-                &[("Mana", StatValue::U32(character.mana.max))],
+                Some(("Spirit", character.base_attributes.spirit.get())),
+                &[("Mana", StatValue::U32(character.mana.max()))],
             ),
         ],
-    )
+    );
+
+    CharacterStatsTable {
+        element,
+        font: font.clone(),
+        character,
+    }
 }
 
 pub fn build_stats_table(

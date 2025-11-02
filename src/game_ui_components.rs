@@ -160,7 +160,7 @@ impl TopCharacterPortrait {
         name_text_line.set_min_height(13.0);
 
         let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
-            character.health.max,
+            character.health.max(),
             RED,
             (action_points_row.borrow().size().0, 8.0),
         )));

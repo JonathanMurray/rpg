@@ -34,13 +34,9 @@ impl CoreGame {
     }
 
     pub async fn run(mut self) -> Character {
-        for char in self.characters.iter() {
-            let encumbrance = char.equipment_weight() as i32 - char.capacity as i32;
-            if encumbrance > 0 {
-                char.receive_condition(Condition::Encumbered(encumbrance as u32));
-            }
-
-            char.action_points.set_to_max();
+        for character in self.characters.iter() {
+            character.update_encumbrance();
+            character.action_points.set_to_max();
         }
 
         loop {
@@ -60,6 +56,10 @@ impl CoreGame {
                 // If the active character is player controlled, it's important that it runs end-of-turn
                 // to let debuffs decay.
                 self.perform_end_of_turn_character().await;
+
+                for character in self.characters.iter() {
+                    character.stamina.set_to_max();
+                }
 
                 return self.characters.player_character();
             }
@@ -291,7 +291,7 @@ impl CoreGame {
                 };
 
                 if consumable.health_gain > 0 {
-                    character.health.gain(consumable.health_gain);
+                    self.perform_gain_health(character, consumable.health_gain);
                 }
                 if consumable.mana_gain > 0 {
                     character.mana.gain(consumable.mana_gain);
@@ -779,7 +779,7 @@ impl CoreGame {
             line.push_str(&format!(" = {}", healing));
             detail_lines.push(line);
 
-            health_gained = target.health.gain(healing);
+            health_gained = self.perform_gain_health(target, healing);
             detail_lines.push(format!(
                 "  {} was healed for {}",
                 target.name, health_gained
@@ -1018,21 +1018,25 @@ impl CoreGame {
 
     fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
+        self.on_character_health_changed(character);
+        amount_lost
+    }
 
-        if character.health.current() as f32 <= character.health.max as f32 * 0.3 {
-            character.receive_condition(Condition::NearDeath);
-        } else {
+    fn perform_gain_health(&self, character: &Character, amount: u32) -> u32 {
+        let amount_gained = character.health.gain(amount);
+        self.on_character_health_changed(character);
+        amount_gained
+    }
+
+    fn on_character_health_changed(&self, character: &Character) {
+        if character.health.current() as f32 > character.health.max() as f32 * 0.3 {
             character.conditions.borrow_mut().near_death = false;
         }
-
-        //self.log(format!("  {} took {} damage", character.name, amount));
 
         if character.health.current() == 0 {
             character.conditions.borrow_mut().near_death = false;
             character.conditions.borrow_mut().dead = true;
         }
-
-        amount_lost
     }
 
     async fn log(&self, line: impl Into<String>) {
@@ -1050,6 +1054,8 @@ impl CoreGame {
         let attacker = self.characters.get(attacker_id);
         let defender = self.characters.get(defender_id);
 
+        /*
+        // Remove this, it's already checked from inside attack_roll_bonus
         let circumstance_advantage = match attacker
             .reaches_with_attack(hand_type, defender.position.get())
             .1
@@ -1058,12 +1064,13 @@ impl CoreGame {
             ActionReach::YesButDisadvantage(..) => -1,
             ActionReach::No => unreachable!(),
         };
+         */
 
         let attack_bonus = attack_roll_bonus(
             attacker,
             hand_type,
             defender,
-            circumstance_advantage,
+            /*circumstance_advantage,*/
             &enhancements,
             defender_reaction,
         );
@@ -1431,7 +1438,7 @@ impl CoreGame {
 
         conditions.borrow_mut().mainhand_exertion = 0;
         conditions.borrow_mut().offhand_exertion = 0;
-        let stamina_gain = (character.stamina.max as f32 / 3.0).ceil() as u32;
+        let stamina_gain = (character.stamina.max() as f32 / 3.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
     }
 }
@@ -1547,13 +1554,14 @@ pub fn attack_roll_bonus(
     attacker: &Character,
     hand: HandType,
     defender: &Character,
-    circumstance_advantage: i32,
+    //circumstance_advantage: i32,
     enhancements: &[AttackEnhancement],
     reaction: Option<OnAttackedReaction>,
 ) -> DiceRollBonus {
     let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements, defender.pos());
     bonus.advantage += defender.incoming_attack_advantage(reaction);
-    bonus.advantage += circumstance_advantage;
+    //dbg!(circumstance_advantage);
+    //bonus.advantage += circumstance_advantage;
     bonus
 }
 
@@ -1569,7 +1577,7 @@ pub fn prob_attack_hit(
         attacker,
         hand,
         defender,
-        circumstance_advantage,
+        //circumstance_advantage,
         enhancements,
         reaction,
     );
@@ -2282,22 +2290,42 @@ impl Hand {
 
 pub type CharacterId = u32;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct Attributes {
-    pub strength: u32,
-    pub agility: u32,
-    pub intellect: u32,
-    pub spirit: u32,
+    pub strength: Cell<u32>,
+    pub agility: Cell<u32>,
+    pub intellect: Cell<u32>,
+    pub spirit: Cell<u32>,
 }
 
 impl Attributes {
     pub fn new(str: u32, agi: u32, intel: u32, spi: u32) -> Self {
         Self {
-            strength: str,
-            agility: agi,
-            intellect: intel,
-            spirit: spi,
+            strength: Cell::new(str),
+            agility: Cell::new(agi),
+            intellect: Cell::new(intel),
+            spirit: Cell::new(spi),
         }
+    }
+
+    fn move_speed(&self) -> f32 {
+        0.9 + self.agility.get() as f32 * 0.1
+    }
+
+    fn max_health(&self) -> u32 {
+        8 + self.strength.get()
+    }
+
+    fn max_mana(&self) -> u32 {
+        (self.spirit.get() * 2).saturating_sub(3)
+    }
+
+    fn max_stamina(&self) -> u32 {
+        (self.strength.get() + self.agility.get()).saturating_sub(5)
+    }
+
+    fn capacity(&self) -> u32 {
+        self.strength.get() * 2
     }
 }
 
@@ -2314,8 +2342,8 @@ pub struct Character {
     pub health: NumberedResource,
     pub mana: NumberedResource,
     // How many cells you can move per AP
-    pub move_speed: f32,
-    pub capacity: u32,
+    pub move_speed: Cell<f32>,
+    pub capacity: Cell<u32>,
     pub inventory: [Cell<Option<EquipmentEntry>>; 6],
     pub armor: Cell<Option<ArmorPiece>>,
     main_hand: Cell<Hand>,
@@ -2344,13 +2372,13 @@ impl Character {
         base_attributes: Attributes,
         position: Position,
     ) -> Self {
-        let max_health = 6 + base_attributes.strength;
-        let max_mana = (base_attributes.spirit * 2).saturating_sub(3);
+        let max_health = base_attributes.max_health();
+        let max_mana = base_attributes.max_mana();
 
-        let move_speed = 0.9 + base_attributes.agility as f32 * 0.1;
-        let max_stamina = (base_attributes.strength + base_attributes.agility).saturating_sub(5);
-        let max_reactive_action_points = 1 + base_attributes.intellect / 2;
-        let capacity = base_attributes.strength * 2;
+        let move_speed = base_attributes.move_speed();
+        let max_stamina = base_attributes.max_stamina();
+        let max_reactive_action_points = 1 + base_attributes.intellect.get() / 2;
+        let capacity = base_attributes.capacity();
         Self {
             id: None,
             portrait,
@@ -2361,8 +2389,8 @@ impl Character {
             base_attributes,
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
-            move_speed,
-            capacity,
+            move_speed: Cell::new(move_speed),
+            capacity: Cell::new(capacity),
             inventory: Default::default(),
             armor: Default::default(),
             main_hand: Default::default(),
@@ -2389,6 +2417,51 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
         }
+    }
+
+    pub fn add_to_strength(&self, amount: i32) {
+        let current = self.base_attributes.strength.get();
+        let new = current as i32 + amount;
+        assert!(new >= 0);
+        self.base_attributes.strength.set(new as u32);
+
+        self.on_attributes_changed();
+    }
+
+    pub fn add_to_agility(&self, amount: i32) {
+        let current = self.base_attributes.agility.get();
+        let new = current as i32 + amount;
+        assert!(new >= 0);
+        self.base_attributes.agility.set(new as u32);
+
+        self.on_attributes_changed();
+    }
+
+    pub fn add_to_intellect(&self, amount: i32) {
+        let current = self.base_attributes.intellect.get();
+        let new = current as i32 + amount;
+        assert!(new >= 0);
+        self.base_attributes.intellect.set(new as u32);
+
+        self.on_attributes_changed();
+    }
+
+    pub fn add_to_spirit(&self, amount: i32) {
+        let current = self.base_attributes.spirit.get();
+        let new = current as i32 + amount;
+        assert!(new >= 0);
+        self.base_attributes.spirit.set(new as u32);
+
+        self.on_attributes_changed();
+    }
+
+    fn on_attributes_changed(&self) {
+        let attr = &self.base_attributes;
+        self.health.change_max_value_to(attr.max_health());
+        self.stamina.change_max_value_to(attr.max_stamina());
+        self.mana.change_max_value_to(attr.max_mana());
+        self.capacity.set(attr.capacity());
+        self.move_speed.set(attr.move_speed());
     }
 
     pub fn is_dead(&self) -> bool {
@@ -2537,7 +2610,19 @@ impl Character {
         }
     }
 
+    fn update_encumbrance(&self) {
+        let encumbrance = self.equipment_weight() as i32 - self.capacity.get() as i32;
+        dbg!(encumbrance);
+        if encumbrance > 0 {
+            self.conditions.borrow_mut().encumbered = encumbrance as u32;
+        } else {
+            self.conditions.borrow_mut().encumbered = 0;
+        }
+    }
+
     fn on_changed_equipment(&self) {
+        self.update_encumbrance();
+
         self.changed_equipment_listeners
             .borrow_mut()
             .retain(|weak| match weak.upgrade() {
@@ -2737,16 +2822,16 @@ impl Character {
         &self,
         attack_hand: HandType,
     ) -> Vec<(String, AttackEnhancement)> {
-        let mut usable = vec![];
+        let mut known = vec![];
         if let Some(weapon) = self.weapon(attack_hand) {
             if let Some(enhancement) = weapon.attack_enhancement {
-                usable.push((weapon.name.to_string(), enhancement))
+                known.push((weapon.name.to_string(), enhancement))
             }
             for enhancement in &self.known_attack_enhancements {
-                usable.push(("".to_owned(), *enhancement))
+                known.push(("".to_owned(), *enhancement))
             }
         }
-        usable
+        known
     }
 
     pub fn usable_attack_enhancements(
@@ -2870,19 +2955,19 @@ impl Character {
     }
 
     fn strength(&self) -> u32 {
-        (self.base_attributes.strength as i32).max(1) as u32
+        (self.base_attributes.strength.get() as i32).max(1) as u32
     }
 
     fn agility(&self) -> u32 {
-        (self.base_attributes.agility as i32).max(1) as u32
+        (self.base_attributes.agility.get() as i32).max(1) as u32
     }
 
     fn intellect(&self) -> u32 {
-        (self.base_attributes.intellect as i32).max(1) as u32
+        (self.base_attributes.intellect.get() as i32).max(1) as u32
     }
 
     fn spirit(&self) -> u32 {
-        (self.base_attributes.spirit as i32).max(1) as u32
+        (self.base_attributes.spirit.get() as i32).max(1) as u32
     }
 
     pub fn spell_modifier(&self) -> u32 {
@@ -3024,7 +3109,8 @@ impl Character {
     ) -> DiceRollBonus {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
-        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target_pos) {
+        for (label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target_pos) {
+            dbg!(label, bonus);
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::FlatAmount(n) => flat_amount += n,
@@ -3140,7 +3226,8 @@ impl Character {
 
     fn incoming_attack_advantage(&self, reaction: Option<OnAttackedReaction>) -> i32 {
         let mut advantage = 0;
-        for (_label, bonus) in self.incoming_attack_bonuses(reaction) {
+        for (label, bonus) in self.incoming_attack_bonuses(reaction) {
+            dbg!(label, bonus);
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
@@ -3263,19 +3350,23 @@ pub fn distance_between(source: Position, destination: Position) -> f32 {
 #[derive(Debug, Clone)]
 pub struct NumberedResource {
     current: Cell<u32>,
-    pub max: u32,
+    max: Cell<u32>,
 }
 
 impl NumberedResource {
     fn new(max: u32) -> Self {
         Self {
             current: Cell::new(max),
-            max,
+            max: Cell::new(max),
         }
     }
 
     pub fn current(&self) -> u32 {
         self.current.get()
+    }
+
+    pub fn max(&self) -> u32 {
+        self.max.get()
     }
 
     pub fn lose(&self, amount: u32) -> u32 {
@@ -3291,13 +3382,28 @@ impl NumberedResource {
 
     pub fn gain(&self, amount: u32) -> u32 {
         let prev = self.current.get();
-        let new = (prev + amount).min(self.max);
+        let new = (prev + amount).min(self.max.get());
         self.current.set(new);
         new - prev
     }
 
     pub fn set_to_max(&self) {
-        self.current.set(self.max);
+        self.current.set(self.max.get());
+    }
+
+    pub fn change_max_value_to(&self, new_max: u32) {
+        assert!(new_max > 0);
+        let diff = new_max as i32 - self.max() as i32;
+        self.max.set(new_max);
+        let new_value = self.current() as i32 + diff;
+        assert!(
+            new_value >= 0 && new_value <= new_max as i32,
+            "{new_value}, {new_max}"
+        );
+        self.current.set(new_value as u32);
+        if self.current.get() > new_max {
+            self.current.set(new_max);
+        }
     }
 }
 
@@ -3482,6 +3588,7 @@ impl From<Range> for f32 {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
 pub enum RollBonusContributor {
     Advantage(i32),
     FlatAmount(i32),

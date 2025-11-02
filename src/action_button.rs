@@ -231,10 +231,10 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
 fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<String>) {
     match effect {
         ApplyEffect::RemoveActionPoints(n) => {
-            technical_description.push(format!("  Loses {}^ AP", n))
+            technical_description.push(format!("  Loses {}+ AP", n))
         }
         ApplyEffect::GainStamina(n) => {
-            technical_description.push(format!("  Gains {}^ stamina", n))
+            technical_description.push(format!("  Gains {}+ stamina", n))
         }
         ApplyEffect::Condition(mut condition) => {
             let line = if let Some(stacks) = condition.stacks().copied() {
@@ -348,7 +348,7 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
 
     match effect.damage {
         Some(SpellDamage::Static(n)) => technical_description.push(format!("  {} damage", n)),
-        Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}^ damage", n)),
+        Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}+ damage", n)),
         Some(SpellDamage::Weapon) => technical_description.push("  weapon damage".to_string()),
         None => {}
     }
@@ -360,7 +360,7 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
 
 fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &mut Vec<String>) {
     if effect.healing > 0 {
-        technical_description.push(format!("  {}^ healing", effect.healing));
+        technical_description.push(format!("  {}+ healing", effect.healing));
     }
 
     if let Some(apply) = effect.apply {
@@ -887,12 +887,9 @@ pub fn draw_button_tooltip(
             lines.push("".to_string());
         }
     }
-    if let Some(error) = tooltip.error {
-        lines.push(error.to_string());
-    }
+
     lines.extend_from_slice(&tooltip.technical_description);
 
-    // TODO
     let button_size = (64.0, 64.0);
 
     draw_tooltip(

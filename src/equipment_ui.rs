@@ -604,8 +604,10 @@ impl EquipmentStatsTable {
 
     pub fn build_table(character: &Character, font: &Font) -> Container {
         let mut cells: Vec<TableCell> = vec![];
+        let mut has_weapon = false;
         for hand in [HandType::MainHand, HandType::OffHand] {
             if let Some(weapon) = character.weapon(hand) {
+                has_weapon = true;
                 cells.push("Attack dmg".into());
                 cells.push(format!("{}", weapon.damage).into());
 
@@ -613,25 +615,49 @@ impl EquipmentStatsTable {
                 cells.push(format!("+{}", character.attack_modifier(hand)).into());
             }
         }
+        if !has_weapon {
+            cells.push("Attack dmg".into());
+            cells.push("".into());
+
+            cells.push("Attack mod".into());
+            cells.push("".into());
+        }
+
         if let Some(shield) = character.shield() {
             cells.push("Evasion bonus".into());
             cells.push(format!("{}", shield.evasion).into());
         }
-        if let Some(armor) = character.armor.get() {
-            cells.push("Armor".into());
-            cells.push(format!("{}", armor.protection).into());
-        }
+        cells.push("Armor".into());
+        cells.push(
+            format!(
+                "{}",
+                character
+                    .armor
+                    .get()
+                    .map(|armor| armor.protection)
+                    .unwrap_or(0)
+            )
+            .into(),
+        );
 
         cells.push("Weight".into());
 
-        let text = format!("{} / {}", character.equipment_weight(), character.capacity);
-        let color_override = if character.equipment_weight() > character.capacity {
+        let text = format!(
+            "{} / {}",
+            character.equipment_weight(),
+            character.capacity.get()
+        );
+        let color_override = if character.equipment_weight() > character.capacity.get() {
             //Some(Color::new(1.0, 0.0, 0.0, 1.0))
             Some(RED)
         } else {
             None
         };
+
         cells.push(TableCell::new(text, color_override, None));
+
+        cells.push("Gold".into());
+        cells.push(format!("{}", character.money.get()).into());
 
         table(
             cells,

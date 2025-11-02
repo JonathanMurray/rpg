@@ -1,16 +1,9 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use macroquad::{
-    color::Color,
-    miniquad::window::screen_size,
-    text::Font,
-    texture::Texture2D,
-};
+use macroquad::{color::Color, miniquad::window::screen_size, text::Font, texture::Texture2D};
 
 use crate::{
-    action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent,
-    },
+    action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
     character_sheet::build_spell_book,
     core::{BaseAction, Character, HandType},
@@ -22,6 +15,8 @@ use crate::{
 
 pub struct NonCombatUi {
     bottom_panel: Element,
+    stats_table: Rc<RefCell<crate::stats_ui::CharacterStatsTable>>,
+    resource_bars: Rc<RefCell<ResourceBars>>,
     equipment_section: Rc<RefCell<EquipmentSection>>,
     equipment_drag: Option<EquipmentDrag>,
     character: Rc<Character>,
@@ -44,7 +39,7 @@ impl NonCombatUi {
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let resource_bars = ResourceBars::new(&character, font);
+        let resource_bars = Rc::new(RefCell::new(ResourceBars::new(&character, font)));
 
         let mut next_button_id = 0;
 
@@ -126,7 +121,10 @@ impl NonCombatUi {
             spell_buttons,
         );
 
-        let stats_table = build_character_stats_table(font, &character);
+        let stats_table = Rc::new(RefCell::new(build_character_stats_table(
+            font,
+            Rc::clone(&character),
+        )));
 
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
             font,
@@ -149,14 +147,14 @@ impl NonCombatUi {
                     layout_dir: LayoutDirection::Vertical,
                     children: vec![
                         Element::Texture(portrait, Some((64.0, 80.0))),
-                        Element::Container(resource_bars.container),
+                        Element::RcRefCell(resource_bars.clone()),
                     ],
                     align: Align::Center,
                     margin: 5.0,
                     ..Default::default()
                 }),
                 Element::Container(spell_book),
-                stats_table,
+                Element::RcRefCell(stats_table.clone()),
                 Element::RcRefCell(equipment_section.clone()),
             ],
             margin: 20.0,
@@ -165,6 +163,8 @@ impl NonCombatUi {
 
         Self {
             bottom_panel,
+            stats_table,
+            resource_bars,
             equipment_section,
             equipment_drag: None,
             character,
@@ -176,10 +176,20 @@ impl NonCombatUi {
         }
     }
 
+    pub fn on_character_stats_changed(&mut self) {
+        self.stats_table.borrow_mut().rebuild();
+
+        *self.resource_bars.borrow_mut() = ResourceBars::new(&self.character, &self.font);
+
+        self.equipment_section
+            .borrow_mut()
+            .repopulate_character_equipment();
+    }
+
     pub fn draw_and_handle_input(&mut self) {
         let (_screen_w, screen_h) = screen_size();
 
-        let pos = (0.0, screen_h - 270.0);
+        let pos = (0.0, screen_h - 290.0);
         self.bottom_panel.draw(pos.0, pos.1);
         self.bottom_panel.draw_tooltips(pos.0, pos.1);
 

@@ -57,7 +57,7 @@ impl CharacterSheet {
             spell_buttons,
         );
 
-        let stats_table = build_character_stats_table(font, &character);
+        let stats_table = build_character_stats_table(font, Rc::clone(&character));
 
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
             font,
@@ -92,30 +92,7 @@ impl CharacterSheet {
                     ],
                     ..Default::default()
                 }),
-                Element::Container(Container {
-                    layout_dir: LayoutDirection::Vertical,
-                    margin: 15.0,
-                    align: Align::Center,
-                    style: Style {
-                        padding: 0.0,
-                        ..Default::default()
-                    },
-                    children: vec![
-                        /*
-                        Element::Text(
-                            TextLine::new("Attributes", 22, WHITE, Some(font.clone()))
-                                .with_depth(BLACK, 2.0),
-                        ),
-                         */
-                        stats_table,
-                        Element::Box(Box::new(MoneyText {
-                            character: Rc::clone(&character),
-                            font: font.clone(),
-                        })),
-                    ],
-
-                    ..Default::default()
-                }),
+                Element::Box(Box::new(stats_table)),
                 Element::RcRefCell(equipment_section.clone()),
             ],
             ..Default::default()
@@ -367,9 +344,9 @@ pub fn build_spell_book(
     spell_book_rows
 }
 
-struct MoneyText {
-    character: Rc<Character>,
-    font: Font,
+pub struct MoneyText {
+    pub character: Rc<Character>,
+    pub font: Font,
 }
 
 impl MoneyText {
