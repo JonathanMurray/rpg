@@ -77,15 +77,6 @@ async fn main() {
     player_character.mana.lose(10);
     player_character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
-    player_character = run_chest_loop(
-        player_character,
-        font.clone(),
-        &equipment_icons,
-        icons.clone(),
-        &portrait_textures,
-    )
-    .await;
-
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
         match map_choice {
@@ -94,7 +85,14 @@ async fn main() {
                     .health
                     .gain(player_character.health.max / 2);
                 player_character.mana.set_to_max();
-                run_rest_loop(font.clone()).await;
+                player_character = run_rest_loop(
+                    player_character,
+                    font.clone(),
+                    &equipment_icons,
+                    icons.clone(),
+                    &portrait_textures,
+                )
+                .await;
             }
             MapChoice::Shop => {
                 player_character = run_shop_loop(

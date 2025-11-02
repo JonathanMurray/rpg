@@ -4,8 +4,7 @@ use std::{collections::HashMap, rc::Rc};
 use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 
 use macroquad::input::{
-    is_mouse_button_down, is_mouse_button_pressed, mouse_position,
-    MouseButton,
+    is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
 };
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
 use macroquad::text::{draw_text_ex, measure_text, TextParams};

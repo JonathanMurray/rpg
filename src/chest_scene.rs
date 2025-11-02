@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, BLUE, GRAY, LIGHTGRAY, WHITE, YELLOW},
@@ -18,15 +14,14 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        ActionButton, ButtonAction, InternalUiEvent, TooltipPositionPreference, draw_button_tooltip, draw_tooltip
+        draw_tooltip,
+        TooltipPositionPreference,
     },
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
-    character_sheet::build_spell_book,
-    core::{BaseAction, Character, EquipmentEntry, HandType},
+    base_ui::Drawable,
+    core::{Character, EquipmentEntry},
     data::{HEALTH_POTION, MANA_POTION},
-    equipment_ui::{EquipmentSection, equipment_tooltip_lines},
-    game_ui::ResourceBars,
-    stats_ui::build_character_stats_table,
+    equipment_ui::equipment_tooltip_lines,
+    non_combat_ui::NonCombatUi,
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
@@ -44,12 +39,16 @@ pub async fn run_chest_loop(
         let (screen_w, screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
 
+        let mut bottom_panel = NonCombatUi::new(
+            character.clone(),
+            &font,
+            equipment_icons,
+            &icons,
+            portrait_textures,
+        );
+
         let transition_duration = 0.5;
         let mut transition_countdown = None;
-
-        let event_queue = Rc::new(RefCell::new(vec![]));
-
-        let resource_bars = ResourceBars::new(&character, &font);
 
         let candidate_items = vec![
             /*
@@ -70,170 +69,12 @@ pub async fn run_chest_loop(
         let icon_w = 40.0;
         let row_w: f32 = items.len() as f32 * icon_w + (items.len() - 1) as f32 * icon_margin;
 
-        let portrait = portrait_textures[&character.portrait].clone();
-
-        let mut next_button_id = 0;
-
-        let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
-            let btn =
-                ActionButton::new(btn_action, &event_queue, next_button_id, &icons, character);
-            btn.enabled.set(enabled);
-            next_button_id += 1;
-            btn
-        };
-
-        let mut hovered_button = None;
-
-        let mut hoverable_buttons = vec![];
-        let mut attack_button = None;
-        let mut spell_buttons = vec![];
-        let mut attack_enhancement_buttons = vec![];
-
-        for action in character.known_actions() {
-            let btn_action = ButtonAction::Action(action);
-            let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
-            hoverable_buttons.push(Rc::clone(&btn));
-            match action {
-                BaseAction::Attack { .. } => {
-                    attack_button = Some(btn.clone());
-                }
-                BaseAction::CastSpell(spell) => {
-                    let enhancement_buttons: Vec<Rc<ActionButton>> = spell
-                        .possible_enhancements
-                        .iter()
-                        .filter_map(|maybe_enhancement| *maybe_enhancement)
-                        .filter_map(|enhancement| {
-                            if character.knows_spell_enhancement(enhancement) {
-                                let enhancement_btn = Rc::new(new_button(
-                                    ButtonAction::SpellEnhancement(enhancement),
-                                    None,
-                                    false,
-                                ));
-                                hoverable_buttons.push(Rc::clone(&enhancement_btn));
-                                Some(enhancement_btn)
-                            } else {
-                                None
-                            }
-                        })
-                        .collect();
-                    spell_buttons.push((btn.clone(), enhancement_buttons));
-                }
-                _ => {}
-            }
-        }
-
-        let mut reaction_buttons = vec![];
-        for (_subtext, reaction) in character.known_on_attacked_reactions() {
-            let btn_action = ButtonAction::OnAttackedReaction(reaction);
-            let btn = Rc::new(new_button(btn_action, None, false));
-            hoverable_buttons.push(Rc::clone(&btn));
-            reaction_buttons.push(btn);
-        }
-        for (_subtext, reaction) in character.known_on_hit_reactions() {
-            let btn_action = ButtonAction::OnHitReaction(reaction);
-            let btn = Rc::new(new_button(btn_action, None, false));
-            hoverable_buttons.push(Rc::clone(&btn));
-            reaction_buttons.push(btn);
-        }
-
-        // TODO: Only include inherently known enhancements here; not those gained from weapons (since weapons can be unequipped
-        // without the character sheet being updated)
-        for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
-            let btn_action = ButtonAction::AttackEnhancement(enhancement);
-            let btn = Rc::new(new_button(btn_action, None, false));
-            hoverable_buttons.push(Rc::clone(&btn));
-            attack_enhancement_buttons.push(btn);
-        }
-
-        let spell_book = build_spell_book(
-            &font,
-            attack_button,
-            reaction_buttons,
-            attack_enhancement_buttons,
-            spell_buttons,
-        );
-
-        let stats_table = build_character_stats_table(&font, &character);
-
-        let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
-            &font,
-            &character,
-            equipment_icons.clone(),
-        )));
-
-        let equipment_changed = character.listen_to_changed_equipment();
-        let mut equipment_drag = None;
-
-        //
-        // ---------------------------
-        // TODO:
-        //
-        // Extract the bottom_panel UI to a new module, and re-use it across all non-combat scenes
-        //
-        // "NonFightCharacterUi" ? 
-        //
-        // ---------------------------
-
-
-
-
-        let bottom_panel = Element::Container(Container {
-            layout_dir: LayoutDirection::Horizontal,
-               style: Style {
-                background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
-                padding: 10.0,
-                ..Default::default()
-            },
-            min_width: Some(screen_w),
-            children: vec![
-                Element::Container(Container {
-                    layout_dir: LayoutDirection::Vertical,
-                    children: vec![
-                        Element::Texture(portrait, Some((64.0, 80.0))),
-                        Element::Container(resource_bars.container),
-                    ],
-                    align: Align::Center,
-                    margin: 5.0,
-                    ..Default::default()
-                }),
-                Element::Container(spell_book),
-                stats_table,
-                Element::RcRefCell(equipment_section.clone()),
-            ],
-            margin: 20.0,
-            ..Default::default()
-        });
-
         loop {
             let elapsed = get_frame_time();
 
             clear_background(BLACK);
 
-            let bottom_panel_pos = (0.0,  screen_h - 270.0);
-            bottom_panel.draw(bottom_panel_pos.0, bottom_panel_pos.1);
-            bottom_panel.draw_tooltips(bottom_panel_pos.0, bottom_panel_pos.1);
-
-            let outcome = equipment_section
-                .borrow_mut()
-                .handle_equipment_drag_and_consumption(equipment_drag, None);
-            equipment_drag = outcome.equipment_drag;
-            //requested_consumption = outcome.requested_consumption;
-            if let Some(drag) = equipment_drag {
-                dbg!(&outcome);
-
-                if drag.to_idx.is_some() {
-                    let (from, to) = equipment_section.borrow().resolve_drag_to_slots(drag);
-                    character.swap_equipment_slots(from, to);
-                    equipment_drag = None;
-                }
-            }
-
-            if equipment_changed.take() {
-                println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER SHEET...");
-                equipment_section
-                    .borrow_mut()
-                    .repopulate_character_equipment();
-            }
+            bottom_panel.draw_and_handle_input();
 
             let text = "You find:";
             let font_size = 32;
@@ -246,46 +87,15 @@ pub async fn run_chest_loop(
                 WHITE,
             );
 
-            let text = "Leave";
-            let font_size = 30;
-            let margin = 25.0;
-            let padding = 15.0;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            let rect = Rect::new(
-                screen_w - margin - text_dim.width - padding * 2.0,
-                bottom_panel_pos.1 - margin - text_dim.height - padding * 2.0,
-                text_dim.width + padding * 2.0,
-                text_dim.height + padding * 2.0,
-            );
-            let rect_color = if rect.contains(mouse_position().into()) {
-                LIGHTGRAY
-            } else {
-                GRAY
-            };
-            draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_ex(
-                text,
-                rect.x + padding,
-                rect.y + padding + text_dim.offset_y,
-                TextParams {
-                    font: Some(&font),
-                    font_size,
-                    color: YELLOW,
-                    ..Default::default()
-                },
-            );
-            if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
-            {
-                transition_countdown = Some(transition_duration);
-            }
-
             let mut icon_x = x_mid - row_w / 2.0;
             let icon_y = 150.0;
 
+            let mut some_remaining_rewards = false;
             for item_slot in &mut items {
                 let rect = Rect::new(icon_x, icon_y, icon_w, icon_w);
 
                 if let Some(equipment_entry) = item_slot {
+                    some_remaining_rewards = true;
                     draw_rectangle(rect.x, rect.y, rect.w, rect.h, BLUE);
                     let texture = &equipment_icons[&equipment_entry.icon()];
                     draw_texture_ex(
@@ -329,27 +139,41 @@ pub async fn run_chest_loop(
                 icon_x += icon_w + icon_margin;
             }
 
-            // Note: we have to drain the UI events, to prevent memory leak
-            for event in event_queue.borrow_mut().drain(..) {
-                match event {
-                    InternalUiEvent::ButtonHovered(button_id, _button_action, btn_pos) => {
-                        if let Some(btn_pos) = btn_pos {
-                            hovered_button = Some((button_id, btn_pos));
-                        } else if let Some(previously_hovered_button) = hovered_button {
-                            if button_id == previously_hovered_button.0 {
-                                hovered_button = None
-                            }
-                        }
-                    }
-                    _ => {
-                        dbg!(event);
-                    }
-                }
-            }
-
-            if let Some((id, btn_pos)) = hovered_button {
-                let btn = hoverable_buttons.iter().find(|btn| btn.id == id).unwrap();
-                draw_button_tooltip(&font, btn_pos, &btn.tooltip());
+            let text = if some_remaining_rewards {
+                "Skip rewards"
+            } else {
+                "Proceed"
+            };
+            let font_size = 30;
+            let margin = 25.0;
+            let padding = 15.0;
+            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+            let rect = Rect::new(
+                screen_w - margin - text_dim.width - padding * 2.0,
+                screen_h - 270.0 - margin - text_dim.height - padding * 2.0,
+                text_dim.width + padding * 2.0,
+                text_dim.height + padding * 2.0,
+            );
+            let rect_color = if rect.contains(mouse_position().into()) {
+                LIGHTGRAY
+            } else {
+                GRAY
+            };
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
+            draw_text_ex(
+                text,
+                rect.x + padding,
+                rect.y + padding + text_dim.offset_y,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: YELLOW,
+                    ..Default::default()
+                },
+            );
+            if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
+            {
+                transition_countdown = Some(transition_duration);
             }
 
             // Transition to other scene

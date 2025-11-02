@@ -16,6 +16,7 @@ pub mod game_ui_connection;
 pub mod grid;
 pub mod init;
 pub mod map_scene;
+mod non_combat_ui;
 pub mod pathfind;
 pub mod rest_scene;
 pub mod shop_scene;
