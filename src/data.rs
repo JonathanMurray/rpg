@@ -69,7 +69,7 @@ pub const BAD_DAGGER: Weapon = Weapon {
     name: "Bad dagger",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 2,
+    damage: 1,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
@@ -113,7 +113,7 @@ pub const BAD_SWORD: Weapon = Weapon {
     name: "Bad Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 2,
+    damage: 1,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -197,6 +197,21 @@ pub const WAR_HAMMER: Weapon = Weapon {
     weight: 5,
 };
 
+pub const BAD_BOW: Weapon = Weapon {
+    name: "Bad bow",
+    range: WeaponRange::Ranged(5),
+    action_point_cost: 3,
+    damage: 1,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Agility,
+    attack_enhancement: Some(CAREFULLY_AIMED),
+    on_attacked_reaction: None,
+    on_true_hit: None,
+    sprite: Some(SpriteId::Bow),
+    icon: EquipmentIconId::Bow,
+    weight: 2,
+};
+
 pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(5),
@@ -209,6 +224,15 @@ pub const BOW: Weapon = Weapon {
     on_true_hit: None,
     sprite: Some(SpriteId::Bow),
     icon: EquipmentIconId::Bow,
+    weight: 2,
+};
+
+pub const BAD_SMALL_SHIELD: Shield = Shield {
+    name: "Bad small shield",
+    sprite: Some(SpriteId::Shield),
+    icon: EquipmentIconId::SmallShield,
+    evasion: 1,
+    on_hit_reaction: None,
     weight: 2,
 };
 

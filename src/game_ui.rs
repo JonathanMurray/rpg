@@ -36,7 +36,7 @@ use crate::{
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
     },
-    init::GameInitState,
+    init_fight_map::GameInitState,
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
 };

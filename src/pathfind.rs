@@ -31,7 +31,7 @@ impl PathfindGrid {
     pub fn set_blocked(&self, pos: Position, blocked: bool) {
         let mut positions = self.blocked_positions.borrow_mut();
         if blocked {
-            assert!(!positions.contains(&pos));
+            assert!(!positions.contains(&pos), "{positions:?}, {pos:?}");
             positions.insert(pos);
         } else {
             assert!(positions.contains(&pos));
@@ -48,13 +48,13 @@ impl PathfindGrid {
         start: Position,
         target: Position,
     ) -> Option<(f32, Vec<(f32, Position)>)> {
-        let routes = self.explore_outward(start, 10.0);
+        let routes = self.explore_outward(start, 20.0);
         let mut shortest_path: Option<Vec<(f32, (i32, i32))>> = None;
         for (end, route) in &routes {
             if are_adjacent(*end, target) {
                 let mut path = build_path_from_route(&routes, start, *end);
 
-                dbg!("before popping start pos from path: ", &path);
+                //dbg!("before popping start pos from path: ", &path);
 
                 if path[0].1 == start {
                     // The "path" doesn't make it beyond the start position. Discard it.

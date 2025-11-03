@@ -53,9 +53,10 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
         let mut positions = vec![];
         let mut ap_cost = 0;
         for (dist, pos) in all_positions {
-            if dist <= character.action_points.current() as f32 {
+            let cost = dist / character.move_speed.get();
+            if cost <= character.action_points.current() as f32 {
                 positions.push(pos);
-                ap_cost = dist.ceil() as u32;
+                ap_cost = cost.ceil() as u32;
             }
         }
 

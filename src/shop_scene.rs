@@ -21,31 +21,40 @@ use crate::{
         SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip_lines,
-    non_combat_ui::NonCombatUi,
+    non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
 
 pub async fn run_shop_loop(
-    player_character: Character,
+    player_characters: Vec<Character>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
-) -> Character {
-    let character = Rc::new(player_character);
+) -> Vec<Character> {
+    let characters: Vec<Rc<Character>> = player_characters
+        .into_iter()
+        .map(Rc::new)
+        .collect();
 
     {
         let (screen_w, screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
 
-        let mut bottom_panel = NonCombatUi::new(
-            character.clone(),
-            &font,
-            equipment_icons,
-            &icons,
-            portrait_textures,
-        );
+        let mut portrait_row = PortraitRow::new(&characters[..], portrait_textures);
+        let mut bottom_panels: Vec<NonCombatUi> = characters
+            .iter()
+            .map(|character| {
+                NonCombatUi::new(
+                    character.clone(),
+                    &font,
+                    equipment_icons,
+                    &icons,
+                    portrait_textures,
+                )
+            })
+            .collect();
 
         let transition_duration = 0.5;
         let mut transition_countdown = None;
@@ -76,8 +85,8 @@ pub async fn run_shop_loop(
             let elapsed = get_frame_time();
 
             clear_background(BLACK);
-
-            bottom_panel.draw_and_handle_input();
+            portrait_row.draw_and_handle_input();
+            bottom_panels[portrait_row.selected_idx].draw_and_handle_input();
 
             let text = "Buy something?";
             let font_size = 32;
@@ -142,6 +151,8 @@ pub async fn run_shop_loop(
                             ..Default::default()
                         },
                     );
+
+                    let character = &characters[portrait_row.selected_idx];
 
                     let can_afford = character.money.get() >= *cost;
 
@@ -215,5 +226,8 @@ pub async fn run_shop_loop(
         }
     }
 
-    Rc::into_inner(character).unwrap()
+    characters
+        .into_iter()
+        .map(|character| Rc::into_inner(character).unwrap())
+        .collect()
 }

@@ -8,48 +8,23 @@ use rand::distr::{Distribution, Uniform};
 
 use crate::{
     core::{Attributes, Character, CharacterId, Characters, HandType, Position},
-    data::{BAD_DAGGER, BAD_SWORD, SHIRT},
+    data::{BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, CHAIN_MAIL, SHIRT, WAR_HAMMER},
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
 };
 
-pub fn init(player_char1: Character, player_char2: Character, fight_id: FightId) -> GameInitState {
-    let active_character_id = 0;
-
-    let skeleton_str = Character::new(
-        false,
-        "Skeleton",
-        PortraitId::Skeleton,
-        SpriteId::Skeleton,
-        Attributes::new(4, 2, 1, 1),
-        (0, 0),
-    );
-    skeleton_str.armor.set(Some(SHIRT));
-    skeleton_str.set_weapon(HandType::MainHand, BAD_SWORD);
-
-    let skeleton_agi = Character::new(
-        false,
-        "Skeleton",
-        PortraitId::Skeleton,
-        SpriteId::Skeleton,
-        Attributes::new(1, 3, 1, 1),
-        (0, 0),
-    );
-    skeleton_agi.set_weapon(HandType::MainHand, BAD_DAGGER);
-    //skeleton2.set_shield(SMALL_SHIELD);
-
+pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> GameInitState {
     let map_filename = match fight_id {
-        FightId::Easy => "map1.txt",
-        FightId::Hard => "map3.txt",
+        FightId::Easy1 => "map1.txt",
+        FightId::Easy2 => "map2.txt",
+        FightId::Easy3 => "map3.txt",
+        FightId::Elite => "map_elite.txt",
     };
-
     let map_str = fs::read_to_string(map_filename).unwrap();
-
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
-
     let mut water_grid: HashSet<Position> = Default::default();
 
-    let mut player_pos = None;
+    let mut player_positions = vec![];
     let mut enemy_positions = HashMap::new();
 
     let mut row = 0;
@@ -74,13 +49,22 @@ pub fn init(player_char1: Character, player_char2: Character, fight_id: FightId)
                     terrain_objects.insert(pos, TerrainId::TreeStump);
                 }
                 'P' => {
-                    player_pos = Some(pos);
+                    player_positions.push(pos);
                 }
                 '0' => {
                     enemy_positions.insert(0, pos);
                 }
                 '1' => {
                     enemy_positions.insert(1, pos);
+                }
+                '2' => {
+                    enemy_positions.insert(2, pos);
+                }
+                '3' => {
+                    enemy_positions.insert(3, pos);
+                }
+                 '4' => {
+                    enemy_positions.insert(4, pos);
                 }
                 ' ' => {}
                 _ => panic!("Unhandled map object: {}", ch),
@@ -89,18 +73,103 @@ pub fn init(player_char1: Character, player_char2: Character, fight_id: FightId)
         row += 1;
     }
 
-    let player_pos = player_pos.unwrap();
-    player_char1.position.set(player_pos);
-    player_char2.position.set((player_pos.0 + 1, player_pos.1));
+    for character in &player_characters {
+        character.position.set(player_positions.remove(0));
+    }
 
-    let characters = if fight_id == FightId::Easy {
-        skeleton_agi.position.set(enemy_positions[&0]);
-        vec![player_char1, player_char2, skeleton_agi]
-    } else {
-        skeleton_str.position.set(enemy_positions[&0]);
-        skeleton_agi.position.set(enemy_positions[&1]);
-        vec![player_char1, player_char2, skeleton_str, skeleton_agi]
-    };
+    let mut characters = player_characters;
+    match fight_id {
+        FightId::Easy1 => {
+            let melee = Character::new(
+                false,
+                "Shambler",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(3, 2, 2, 2),
+                enemy_positions[&0],
+            );
+            melee.set_weapon(HandType::MainHand, BAD_DAGGER);
+
+            let ranged = Character::new(
+                false,
+                "Archer",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(1, 3, 3, 1),
+                enemy_positions[&1],
+            );
+            ranged.set_weapon(HandType::MainHand, BAD_BOW);
+
+            characters.extend_from_slice(&[melee, ranged]);
+        }
+
+        FightId::Easy2 => {
+            let tanky = Character::new(
+                false,
+                "Guard",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(4, 3, 2, 2),
+                enemy_positions[&0],
+            );
+            tanky.health.change_max_value_to(20);
+            tanky.armor.set(Some(CHAIN_MAIL));
+            tanky.set_shield(BAD_SMALL_SHIELD);
+            tanky.set_weapon(HandType::MainHand, BAD_DAGGER);
+
+            characters.extend_from_slice(&[tanky]);
+        }
+
+        FightId::Easy3 => {
+            for i in 0..4 {
+                let enemy = Character::new(
+                    false,
+                    "Ghoul",
+                    PortraitId::Skeleton,
+                    SpriteId::Skeleton,
+                    Attributes::new(2, 1, 1, 1),
+                    enemy_positions[&i],
+                );
+                if i % 2 == 0 {
+                    enemy.armor.set(Some(SHIRT));
+                } else {
+                    enemy.set_shield(BAD_SMALL_SHIELD);
+                }
+                enemy.set_weapon(HandType::MainHand, BAD_DAGGER);
+                characters.push(enemy);
+            }
+        }
+
+        FightId::Elite => {
+
+            let tanky = Character::new(
+                    false,
+                    "Ogre",
+                    PortraitId::Skeleton,
+                    SpriteId::Skeleton,
+                    Attributes::new(4, 1, 1, 1),
+                    enemy_positions[&0],
+                );
+            tanky.health.change_max_value_to(25);
+            tanky.armor.set(Some(CHAIN_MAIL));
+            tanky.set_weapon(HandType::MainHand, WAR_HAMMER);
+            tanky.move_speed.set(0.5);
+            characters.push(tanky);
+
+                  for i in 1..5 {
+                let archer = Character::new(
+                    false,
+                    "Archer",
+                    PortraitId::Skeleton,
+                    SpriteId::Skeleton,
+                    Attributes::new(1, 1, 2, 1),
+                    enemy_positions[&i],
+                );
+                archer.set_weapon(HandType::MainHand, BAD_BOW);
+                characters.push(archer);
+            }
+        }
+    }
 
     for (x, y) in water_grid.iter().copied() {
         let id = match (
@@ -162,7 +231,7 @@ pub fn init(player_char1: Character, player_char2: Character, fight_id: FightId)
 
     GameInitState {
         characters: Characters::new(characters),
-        active_character_id,
+        active_character_id: 0,
         pathfind_grid,
         background,
         terrain_objects,
@@ -179,6 +248,8 @@ pub struct GameInitState {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FightId {
-    Easy,
-    Hard,
+    Easy1,
+    Easy2,
+    Easy3,
+    Elite,
 }

@@ -8,8 +8,6 @@ use macroquad::{
     shapes::draw_rectangle_lines,
     text::Font,
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
-    time::get_frame_time,
-    window::clear_background,
 };
 
 use crate::{
@@ -30,15 +28,14 @@ pub struct PortraitRow {
 
 impl PortraitRow {
     pub fn new(
-        char1: &Character,
-        char2: &Character,
+        characters: &[impl AsRef<Character>],
         portrait_textures: &HashMap<PortraitId, Texture2D>,
     ) -> Self {
         let selected_idx = 0;
-        let portraits = vec![
-            portrait_textures[&char1.portrait].clone(),
-            portrait_textures[&char2.portrait].clone(),
-        ];
+        let portraits = characters
+            .iter()
+            .map(|char| portrait_textures[&char.as_ref().portrait].clone())
+            .collect();
         Self {
             selected_idx,
             portraits,
@@ -57,7 +54,7 @@ impl PortraitRow {
             let y = screen_h - 400.0;
             let rect = Rect::new(x, y, w, h);
             draw_texture_ex(
-                &portrait,
+                portrait,
                 x,
                 y,
                 WHITE,

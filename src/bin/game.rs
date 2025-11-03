@@ -30,7 +30,7 @@ use rpg::data::{
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
-use rpg::init::{init, FightId};
+use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::run_shop_loop;
@@ -78,18 +78,30 @@ async fn main() {
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(3, 3, 3, 3),
+        Attributes::new(4, 2, 2, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.armor.set(Some(LEATHER_ARMOR));
 
+    let mut player_characters = vec![alice, bob];
+
+           player_characters = run_fight_loop(
+                    player_characters,
+                    FightId::Elite,
+                    &equipment_icons,
+                    icons.clone(),
+                    portrait_textures.clone(),
+                )
+                .await;
+
+
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
         match map_choice {
             MapChoice::Rest => {
-                alice = run_rest_loop(
-                    alice,
+                player_characters = run_rest_loop(
+                    player_characters,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -98,8 +110,8 @@ async fn main() {
                 .await;
             }
             MapChoice::Shop => {
-                alice = run_shop_loop(
-                    alice,
+                player_characters = run_shop_loop(
+                    player_characters,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -108,22 +120,17 @@ async fn main() {
                 .await;
             }
             MapChoice::Fight(fight_id) => {
-                let core_game = init_fight_scene(
-                    alice,
-                    bob,
+                player_characters = run_fight_loop(
+                    player_characters,
                     fight_id,
                     &equipment_icons,
                     icons.clone(),
                     portrait_textures.clone(),
                 )
                 .await;
-                let mut player_chars = core_game.run().await;
-                alice = player_chars.remove(0);
-                bob = player_chars.remove(0);
 
-                (alice, bob) = run_victory_loop(
-                    alice,
-                    bob,
+                player_characters = run_victory_loop(
+                    player_characters,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -132,8 +139,8 @@ async fn main() {
                 .await;
             }
             MapChoice::Chest(reward) => {
-                alice = run_chest_loop(
-                    alice,
+                player_characters = run_chest_loop(
+                    player_characters,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -151,10 +158,11 @@ fn init_player_character() -> Character {
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
-        Attributes::new(3, 5, 3, 2),
+        Attributes::new(2, 4, 3, 2),
         (1, 10),
     );
 
+    /*
     character
         .known_actions
         .push(BaseAction::CastSpell(FIREBALL));
@@ -162,6 +170,7 @@ fn init_player_character() -> Character {
     character
         .known_actions
         .push(BaseAction::CastSpell(LUNGE_ATTACK));
+     */
     character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     character.set_weapon(HandType::MainHand, BOW);
     character.armor.set(Some(SHIRT));
@@ -170,15 +179,32 @@ fn init_player_character() -> Character {
     character
 }
 
+async fn run_fight_loop(
+    player_characters: Vec<Character>,
+    fight_id: FightId,
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+    icons: HashMap<IconId, Texture2D>,
+    portrait_textures: HashMap<PortraitId, Texture2D>,
+) -> Vec<Character> {
+    let core_game = init_fight_scene(
+        player_characters,
+        fight_id,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
+    core_game.run().await
+}
+
 async fn init_fight_scene(
-    char1: Character,
-    char2: Character,
+    player_characters: Vec<Character>,
     fight_id: FightId,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: HashMap<PortraitId, Texture2D>,
 ) -> CoreGame {
-    let init_state = init(char1, char2, fight_id);
+    let init_state = init_fight_map(player_characters, fight_id);
 
     let mut game_ui = GameUserInterfaceConnection::uninitialized();
 

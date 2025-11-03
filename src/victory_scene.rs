@@ -5,9 +5,9 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
+    shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
     text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::Texture2D,
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
@@ -178,6 +178,10 @@ impl RewardSelectionUi {
             font,
             event_queue,
         }
+    }
+
+    fn has_remaining_rewards(&self) -> bool {
+        self.selected_btn.is_none() || self.selected_attribute.is_none()
     }
 
     fn draw(&mut self) {
@@ -370,23 +374,24 @@ impl RewardSelectionUi {
 }
 
 pub async fn run_victory_loop(
-    player_char1: Character,
-    player_char2: Character,
+    player_characters: Vec<Character>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
-) -> (Character, Character) {
-    let char1 = Rc::new(player_char1);
-    let char2 = Rc::new(player_char2);
-    let selected_learning1;
-    let selected_learning2;
+) -> Vec<Character> {
+    let characters: Vec<Rc<Character>> = player_characters
+        .into_iter()
+        .map(Rc::new)
+        .collect();
+    let mut selected_learnings: Vec<Option<Learning>> = vec![];
     {
-        let mut portrait_row = PortraitRow::new(&char1, &char2, portrait_textures);
+        let mut portrait_row = PortraitRow::new(&characters, portrait_textures);
 
         let money_amount = 3;
 
-        char1.gain_money(money_amount);
+        // TODO: money should probably be on a whole-party level, and not per character
+        characters[0].gain_money(money_amount);
 
         let (screen_w, screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
@@ -412,80 +417,66 @@ pub async fn run_victory_loop(
         ] {
             candidate_rewards.push((ButtonAction::Action(BaseAction::CastSpell(spell)), None));
         }
-        for spell in &char1.known_spells() {
-            for enhancement in spell.possible_enhancements {
-                if let Some(enhancement) = enhancement {
-                    candidate_rewards.push((
-                        ButtonAction::SpellEnhancement(enhancement),
-                        Some(spell.name),
-                    ));
+        for character in &characters {
+            for spell in character.known_spells() {
+                for enhancement in spell.possible_enhancements {
+                    if let Some(enhancement) = enhancement {
+                        candidate_rewards.push((
+                            ButtonAction::SpellEnhancement(enhancement),
+                            Some(spell.name),
+                        ));
+                    }
                 }
             }
         }
-        for reaction in vec![SIDE_STEP] {
+        for reaction in [SIDE_STEP] {
             candidate_rewards.push((
                 ButtonAction::OnAttackedReaction(reaction),
                 Some("On attacked"),
             ));
         }
-        for reaction in vec![RAGE] {
+        for reaction in [RAGE] {
             candidate_rewards.push((ButtonAction::OnHitReaction(reaction), Some("On hit")));
         }
-        let mut rewards = select_n_random(
-            candidate_rewards
-                .iter()
-                .filter(|reward| can_learn(&char1, action_to_reward_choice(reward.0)))
-                .copied()
-                .collect(),
-            2,
-        );
-        let rewards2 = select_n_random(
-            candidate_rewards
-                .iter()
-                .filter(|reward| {
-                    !rewards.contains(reward)
-                        && can_learn(&char2, action_to_reward_choice(reward.0))
-                })
-                .copied()
-                .collect(),
-            2,
-        );
-        rewards.extend_from_slice(&rewards2);
-        let rewards: Vec<(ButtonAction, Option<&'static str>)> = select_n_random(rewards, 4);
+        let mut rewards: Vec<(ButtonAction, Option<&'static str>)> = vec![];
+        for character in &characters {
+            let applicable = select_n_random(
+                candidate_rewards
+                    .iter()
+                    .filter(|reward| {
+                        !rewards.contains(reward)
+                            && can_learn(character, action_to_reward_choice(reward.0))
+                    })
+                    .copied()
+                    .collect(),
+                2,
+            );
+            rewards.extend_from_slice(&applicable);
+        }
 
         let mut next_button_id = 0;
 
-        let mut ui_1 = RewardSelectionUi::new(
-            Rc::clone(&char1),
-            font.clone(),
-            equipment_icons,
-            icons.clone(),
-            portrait_textures,
-            rewards.clone(),
-            &mut next_button_id,
-        );
-        let mut ui_2 = RewardSelectionUi::new(
-            Rc::clone(&char2),
-            font.clone(),
-            equipment_icons,
-            icons,
-            portrait_textures,
-            rewards,
-            &mut next_button_id,
-        );
+        let mut reward_selection_uis: Vec<RewardSelectionUi> = characters
+            .iter()
+            .map(|char| {
+                RewardSelectionUi::new(
+                    Rc::clone(char),
+                    font.clone(),
+                    equipment_icons,
+                    icons.clone(),
+                    portrait_textures,
+                    rewards.clone(),
+                    &mut next_button_id,
+                )
+            })
+            .collect();
 
         loop {
             let elapsed = get_frame_time();
 
             clear_background(BLACK);
-
             portrait_row.draw_and_handle_input();
-
-            if portrait_row.selected_idx == 0 {
-                ui_1.draw();
-            } else {
-                ui_2.draw();
-            }
+            reward_selection_uis[portrait_row.selected_idx].draw();
 
             let text = "Rewards!";
             let font_size = 32;
@@ -515,12 +506,10 @@ pub async fn run_victory_loop(
                 WHITE,
             );
 
-            let some_remaining_rewards = ui_1.selected_btn.is_none()
-                || ui_1.selected_attribute.is_none()
-                || ui_2.selected_btn.is_none()
-                || ui_2.selected_attribute.is_none();
-
-            let text = if some_remaining_rewards {
+            let text = if reward_selection_uis
+                .iter()
+                .any(|ui| ui.has_remaining_rewards())
+            {
                 "Skip rewards"
             } else {
                 "Proceed"
@@ -571,13 +560,16 @@ pub async fn run_victory_loop(
 
                 *countdown -= elapsed;
                 if *countdown < 0.0 {
-                    selected_learning1 = ui_1
-                        .selected_btn
-                        .map(|btn| action_to_reward_choice(btn.action_button.action));
-                    selected_learning2 = ui_2
-                        .selected_btn
-                        .map(|btn| action_to_reward_choice(btn.action_button.action));
-
+                    dbg!(selected_learnings.len());
+                    dbg!(reward_selection_uis.len());
+                    for ui in &reward_selection_uis {
+                        let learning: Option<Learning> = ui
+                            .selected_btn
+                            .as_ref()
+                            .map(|btn| action_to_reward_choice(btn.action_button.action));
+                        selected_learnings.push(learning);
+                    }
+                    dbg!(selected_learnings.len());
                     break;
                 }
             }
@@ -586,17 +578,20 @@ pub async fn run_victory_loop(
         }
     }
 
-    let mut char1 = Rc::into_inner(char1).unwrap();
-    let mut char2 = Rc::into_inner(char2).unwrap();
+    let mut characters: Vec<Character> = characters
+        .into_iter()
+        .map(|character| Rc::into_inner(character).unwrap())
+        .collect();
 
-    if let Some(learning) = selected_learning1 {
-        apply_learning(learning, &mut char1);
-    }
-    if let Some(learning) = selected_learning2 {
-        apply_learning(learning, &mut char2);
+    assert_eq!(characters.len(), selected_learnings.len());
+
+    for (i, character) in characters.iter_mut().enumerate() {
+        if let Some(learning) = selected_learnings[i] {
+            apply_learning(learning, character);
+        }
     }
 
-    (char1, char2)
+    characters
 }
 
 fn can_learn(character: &Character, learning: Learning) -> bool {

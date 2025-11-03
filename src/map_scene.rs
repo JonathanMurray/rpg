@@ -16,7 +16,7 @@ use crate::{
     core::EquipmentEntry,
     data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
     drawing::draw_dashed_line,
-    init::FightId,
+    init_fight_map::FightId,
 };
 
 #[derive(Copy, Clone, Debug)]
@@ -90,17 +90,17 @@ impl MapScene {
             candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())];
 
         let mut nodes = [
-            Node::new((0, 0), MapChoice::Chest(chest_reward)),
-            Node::new((0, 1), MapChoice::Fight(FightId::Easy)),
-            Node::new((1, 0), MapChoice::Fight(FightId::Easy)),
-            Node::new((1, 1), MapChoice::Fight(FightId::Easy)),
+            Node::new((0, 0), MapChoice::Fight(FightId::Easy3)),
+            Node::new((0, 1), MapChoice::Fight(FightId::Easy1)),
+            Node::new((1, 0), MapChoice::Fight(FightId::Easy2)),
+            Node::new((1, 1), MapChoice::Fight(FightId::Easy3)),
             Node::new((1, 2), MapChoice::Shop),
-            Node::new((2, 0), MapChoice::Fight(FightId::Easy)),
+            Node::new((2, 0), MapChoice::Fight(FightId::Easy1)),
             Node::new((2, 1), MapChoice::Chest(chest_reward)),
-            Node::new((2, 2), MapChoice::Fight(FightId::Hard)),
+            Node::new((2, 2), MapChoice::Fight(FightId::Elite)),
             Node::new((3, 0), MapChoice::Rest),
             Node::new((3, 1), MapChoice::Chest(chest_reward)),
-            Node::new((4, 0), MapChoice::Fight(FightId::Hard)),
+            Node::new((4, 0), MapChoice::Fight(FightId::Elite)),
             Node::new((5, 0), MapChoice::Shop),
         ];
         let edges: HashMap<Option<usize>, Vec<usize>> = [
@@ -126,8 +126,7 @@ impl MapScene {
             node.text = match node.choice {
                 MapChoice::Rest => "Rest",
                 MapChoice::Shop => "Shop",
-                MapChoice::Fight(FightId::Easy) => "Fight",
-                MapChoice::Fight(FightId::Hard) => "Fight!",
+                MapChoice::Fight(fight_id) => format!("{:?}", fight_id).leak(),
                 MapChoice::Chest(equipment_entry) => "Chest",
             };
         }

@@ -46,24 +46,26 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         20,
         &[
             (
-                Some(("Strength", character.base_attributes.strength.get())),
+                Some(("Str", character.base_attributes.strength.get())),
                 &[
-                    ("Health", StatValue::U32(character.health.max())),
+                    //("Health", StatValue::U32(character.health.max())),
                     ("Toughness", StatValue::U32(character.toughness())),
-                    ("Capacity", StatValue::U32(character.capacity.get())),
+                    //("Capacity", StatValue::U32(character.capacity.get())),
                 ],
             ),
             (
                 None,
-                &[("Stamina", StatValue::U32(character.stamina.max()))],
+                &[
+                    //("Stamina", StatValue::U32(character.stamina.max()))
+                ],
             ),
             (
-                Some(("Agility", character.base_attributes.agility.get())),
+                Some(("Agi", character.base_attributes.agility.get())),
                 &[("Movement", StatValue::F32(character.move_speed.get()))],
             ),
             (None, &[("Evasion", StatValue::U32(character.evasion()))]),
             (
-                Some(("Intellect", character.base_attributes.intellect.get())),
+                Some(("Int", character.base_attributes.intellect.get())),
                 &[
                     ("Will", StatValue::U32(character.will())),
                     (
@@ -80,8 +82,10 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
                 )],
             ),
             (
-                Some(("Spirit", character.base_attributes.spirit.get())),
-                &[("Mana", StatValue::U32(character.mana.max()))],
+                Some(("Spi", character.base_attributes.spirit.get())),
+                &[
+                //    ("Mana", StatValue::U32(character.mana.max()))
+                ],
             ),
         ],
     );
@@ -136,7 +140,7 @@ pub fn build_stats_table(
         layout_dir: LayoutDirection::Vertical,
         children: attribute_rows,
         //border_between_children: Some(DARKGRAY),
-        margin: 5.0,
+        margin: 7.0,
         style: Style {
             border_color: Some(GRAY),
             padding: 5.0,

@@ -79,7 +79,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Vec<String> {
         lines.push(format!("[attacked?] {}", reaction.name));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
-        lines.push(format!("[+] {}", enhancement.name));
+        lines.push(format!("~ {}", enhancement.name));
     }
     lines.push(format!("Weight: {}", weapon.weight));
 

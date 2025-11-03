@@ -8,7 +8,7 @@ use macroquad::color::Color;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
-use crate::init::GameInitState;
+use crate::init_fight_map::GameInitState;
 use crate::pathfind::PathfindGrid;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 
@@ -1029,9 +1029,8 @@ impl CoreGame {
     }
 
     fn on_character_health_changed(&self, character: &Character) {
-        if character.health.current() as f32 > character.health.max() as f32 * 0.3 {
-            character.conditions.borrow_mut().near_death = false;
-        }
+        character.conditions.borrow_mut().near_death =
+            (character.health.current() as f32) < character.health.max() as f32 / 4.0;
 
         if character.health.current() == 0 {
             character.conditions.borrow_mut().near_death = false;
@@ -1845,7 +1844,7 @@ impl Condition {
             MainHandExertion(_) => "-x on further similar actions",
             OffHandExertion(_) => "-x on further similar actions",
             Encumbered(_) => "-x to Evasion and -x/2 to dice rolls",
-            NearDeath => "< 30% HP: Reduced AP, disadvantage on everything",
+            NearDeath => "< 25% HP: Reduced AP, disadvantage on everything",
             Dead => "This character has reached 0 HP and is dead",
             Slowed(_) => "Gains 2 less AP per turn",
             Exposed(_) => "-3 to all defenses",
@@ -2333,7 +2332,7 @@ impl Attributes {
     }
 
     fn max_health(&self) -> u32 {
-        8 + self.strength.get()
+        6 + self.strength.get()
     }
 
     fn max_mana(&self) -> u32 {
@@ -3419,7 +3418,6 @@ impl NumberedResource {
     }
 
     pub fn change_max_value_to(&self, new_max: u32) {
-        assert!(new_max > 0);
         let diff = new_max as i32 - self.max() as i32;
         self.max.set(new_max);
         let new_value = self.current() as i32 + diff;
