@@ -55,6 +55,7 @@ impl CharacterSheet {
             reaction_buttons,
             attack_enhancement_buttons,
             spell_buttons,
+            450.0,
         );
 
         let stats_table = build_character_stats_table(font, Rc::clone(&character));
@@ -272,13 +273,14 @@ pub fn build_spell_book(
     reaction_buttons: Vec<Rc<ActionButton>>,
     attack_enhancement_buttons: Vec<Rc<ActionButton>>,
     spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+    max_height: f32,
 ) -> Container {
     let mut spell_book_rows = Container {
         layout_dir: LayoutDirection::Vertical,
         margin: 5.0,
         children: vec![],
         scroll: Some(ContainerScroll::new(40.0)),
-        max_height: Some(450.0),
+        max_height: Some(max_height),
         style: Style {
             padding: 10.0,
             border_color: Some(LIGHTGRAY),

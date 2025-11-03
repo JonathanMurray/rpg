@@ -6,8 +6,8 @@ use crate::{
         AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect,
         OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
         OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect,
-        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellModifier, SpellReach,
-        SpellTarget, SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
+        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellId, SpellModifier,
+        SpellReach, SpellTarget, SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -316,6 +316,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
 };
 
 pub const SWEEP_ATTACK: Spell = Spell {
+    id: SpellId::SweepAttack,
     name: "Sweeping attack",
     description: "Target all enemies around you",
     icon: IconId::SweepAttack,
@@ -327,6 +328,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
     modifier: SpellModifier::Attack(-3),
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::SweepAttack,
             name: "Precise",
             description: "Increase your precision",
             icon: IconId::Precision,
@@ -356,6 +358,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
 };
 
 pub const LUNGE_ATTACK: Spell = Spell {
+    id: SpellId::LungeAttack,
     name: "Lunge attack",
     description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
@@ -368,6 +371,7 @@ pub const LUNGE_ATTACK: Spell = Spell {
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::LungeAttack,
             name: "Heavy impact",
             description: "Apply more force on impact",
             icon: IconId::CrushingStrike,
@@ -395,6 +399,7 @@ pub const LUNGE_ATTACK: Spell = Spell {
 };
 
 pub const BRACE: Spell = Spell {
+    id: SpellId::Brace,
     name: "Brace",
     description: Condition::Braced.description(),
     icon: IconId::Brace,
@@ -416,6 +421,7 @@ pub const BRACE: Spell = Spell {
 };
 
 pub const SCREAM: Spell = Spell {
+    id: SpellId::Scream,
     name: "Scream",
     description: "Daze nearby enemies",
     icon: IconId::Scream,
@@ -438,6 +444,7 @@ pub const SCREAM: Spell = Spell {
     },
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::Scream,
             name: "Shriek",
             description: "Increased range",
             icon: IconId::Banshee,
@@ -457,6 +464,7 @@ pub const SCREAM: Spell = Spell {
 };
 
 pub const SHACKLED_MIND: Spell = Spell {
+    id: SpellId::ShackledMind,
     name: "Shackled Mind",
     description: "Shackle an enemy's mind, slowing them and lowering their defenses",
     icon: IconId::ShackledMind,
@@ -480,6 +488,7 @@ pub const SHACKLED_MIND: Spell = Spell {
     },
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::ShackledMind,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
@@ -492,6 +501,7 @@ pub const SHACKLED_MIND: Spell = Spell {
             },
         }),
         Some(SpellEnhancement {
+            spell_id: SpellId::ShackledMind,
             name: "Focus",
             description: "",
             icon: IconId::SpellAdvantage,
@@ -510,6 +520,7 @@ pub const SHACKLED_MIND: Spell = Spell {
 };
 
 pub const MIND_BLAST: Spell = Spell {
+    id: SpellId::MindBlast,
     name: "Mind blast",
     description: "Assault an enemy's mind, damaging and disrupting them",
     icon: IconId::Mindblast,
@@ -521,6 +532,7 @@ pub const MIND_BLAST: Spell = Spell {
     modifier: SpellModifier::Spell,
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::MindBlast,
             name: "Dualcast",
             description: "Spell is cast twice",
             icon: IconId::Dualcast,
@@ -548,6 +560,7 @@ pub const MIND_BLAST: Spell = Spell {
 };
 
 pub const HEAL: Spell = Spell {
+    id: SpellId::Heal,
     name: "Heal",
     description: "Restore an ally's health",
     icon: IconId::Heal,
@@ -566,6 +579,7 @@ pub const HEAL: Spell = Spell {
     },
     possible_enhancements: [
         Some(SpellEnhancement {
+            spell_id: SpellId::Heal,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
@@ -579,6 +593,7 @@ pub const HEAL: Spell = Spell {
         }),
         // TODO add enhancement that heals over time (1 per round for 3 turns?)
         Some(SpellEnhancement {
+            spell_id: SpellId::Heal,
             name: "Energize",
             description: "",
             icon: IconId::Energize,
@@ -597,6 +612,7 @@ pub const HEAL: Spell = Spell {
 };
 
 pub const HEALING_NOVA: Spell = Spell {
+    id: SpellId::HealingNova,
     name: "Healing nova",
     description: "Restore health to nearby allies",
     icon: IconId::PlusPlus,
@@ -621,6 +637,7 @@ pub const HEALING_NOVA: Spell = Spell {
 };
 
 pub const SELF_HEAL: Spell = Spell {
+    id: SpellId::SelfHeal,
     name: "Self heal",
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
@@ -642,6 +659,7 @@ pub const SELF_HEAL: Spell = Spell {
 };
 
 pub const HEALING_RAIN: Spell = Spell {
+    id: SpellId::HealingRain,
     name: "Healing rain",
     description: "Restore health to allies in an area",
     icon: IconId::PlusPlus,
@@ -664,6 +682,7 @@ pub const HEALING_RAIN: Spell = Spell {
 };
 
 pub const FIREBALL_REACH: SpellEnhancement = SpellEnhancement {
+    spell_id: SpellId::Fireballl,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
@@ -677,6 +696,7 @@ pub const FIREBALL_REACH: SpellEnhancement = SpellEnhancement {
 };
 
 pub const FIREBALL_MASSIVE: SpellEnhancement = SpellEnhancement {
+    spell_id: SpellId::Fireballl,
     name: "Massive",
     description: "",
     icon: IconId::Radius,
@@ -689,6 +709,7 @@ pub const FIREBALL_MASSIVE: SpellEnhancement = SpellEnhancement {
     },
 };
 pub const FIREBALL_INFERNO: SpellEnhancement = SpellEnhancement {
+    spell_id: SpellId::Fireballl,
     name: "Inferno",
     description: "More deadly impact",
     icon: IconId::Inferno,
@@ -701,6 +722,7 @@ pub const FIREBALL_INFERNO: SpellEnhancement = SpellEnhancement {
     },
 };
 pub const FIREBALL: Spell = Spell {
+    id: SpellId::Fireballl,
     name: "Fireball",
     description: "Hurl fire at an enemy, damaging them",
     icon: IconId::Fireball,
@@ -718,7 +740,7 @@ pub const FIREBALL: Spell = Spell {
             on_hit: None,
         },
         impact_area: Some((
-            Range::Melee,
+            Range::Ranged(2),
             SpellEnemyEffect {
                 defense_type: None,
                 damage: Some(SpellDamage::Static(2)),
@@ -736,6 +758,7 @@ pub const FIREBALL: Spell = Spell {
 };
 
 pub const KILL: Spell = Spell {
+    id: SpellId::Kill,
     name: "Kill",
     description: "Kill an enemy",
     icon: IconId::Fireball,

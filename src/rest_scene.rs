@@ -26,6 +26,10 @@ pub async fn run_rest_loop(
     portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Character {
     let character = Rc::new(player_character);
+
+    character.health.gain(character.health.max() / 2);
+    character.mana.set_to_max();
+
     {
         let (screen_w, screen_h) = screen_size();
 

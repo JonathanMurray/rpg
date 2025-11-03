@@ -72,39 +72,24 @@ async fn main() {
 
     let mut map_scene = MapScene::new();
 
-    let mut player_character = init_player_character();
-
-    loop {
-        let core_game = init_fight_scene(
-            player_character,
-            FightId::Hard,
-            &equipment_icons,
-            icons.clone(),
-            portrait_textures.clone(),
-        )
-        .await;
-        player_character = core_game.run().await;
-
-        player_character = run_victory_loop(
-            player_character,
-            font.clone(),
-            &equipment_icons,
-            icons.clone(),
-            &portrait_textures,
-        )
-        .await;
-    }
+    let mut alice = init_player_character();
+    let mut bob = Character::new(
+        true,
+        "Bob",
+        PortraitId::Bob,
+        SpriteId::Bob,
+        Attributes::new(3, 3, 3, 3),
+        (2, 10),
+    );
+    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.armor.set(Some(LEATHER_ARMOR));
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
         match map_choice {
             MapChoice::Rest => {
-                player_character
-                    .health
-                    .gain(player_character.health.max() / 2);
-                player_character.mana.set_to_max();
-                player_character = run_rest_loop(
-                    player_character,
+                alice = run_rest_loop(
+                    alice,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -113,8 +98,8 @@ async fn main() {
                 .await;
             }
             MapChoice::Shop => {
-                player_character = run_shop_loop(
-                    player_character,
+                alice = run_shop_loop(
+                    alice,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -124,17 +109,21 @@ async fn main() {
             }
             MapChoice::Fight(fight_id) => {
                 let core_game = init_fight_scene(
-                    player_character,
+                    alice,
+                    bob,
                     fight_id,
                     &equipment_icons,
                     icons.clone(),
                     portrait_textures.clone(),
                 )
                 .await;
-                player_character = core_game.run().await;
+                let mut player_chars = core_game.run().await;
+                alice = player_chars.remove(0);
+                bob = player_chars.remove(0);
 
-                player_character = run_victory_loop(
-                    player_character,
+                (alice, bob) = run_victory_loop(
+                    alice,
+                    bob,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -143,8 +132,8 @@ async fn main() {
                 .await;
             }
             MapChoice::Chest(reward) => {
-                player_character = run_chest_loop(
-                    player_character,
+                alice = run_chest_loop(
+                    alice,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
@@ -160,8 +149,8 @@ fn init_player_character() -> Character {
     let mut character = Character::new(
         true,
         "Alice",
-        PortraitId::Portrait1,
-        SpriteId::Character4,
+        PortraitId::Alice,
+        SpriteId::Alice,
         Attributes::new(3, 5, 3, 2),
         (1, 10),
     );
@@ -169,20 +158,10 @@ fn init_player_character() -> Character {
     character
         .known_actions
         .push(BaseAction::CastSpell(FIREBALL));
-    /*
-    character.known_actions.push(BaseAction::CastSpell(KILL)); //TODO
-    character.known_attack_enhancements.push(OVERWHELMING);
-    character.known_attacked_reactions.push(SIDE_STEP);
-    //alice.known_attack_enhancements.push(QUICK);
-    //alice.known_attack_enhancements.push(SMITE);
-    character.known_on_hit_reactions.push(RAGE);
-    character
-        .known_actions
-        .push(BaseAction::CastSpell(SWEEP_ATTACK));
+    character.known_actions.push(BaseAction::CastSpell(KILL));
     character
         .known_actions
         .push(BaseAction::CastSpell(LUNGE_ATTACK));
-     */
     character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     character.set_weapon(HandType::MainHand, BOW);
     character.armor.set(Some(SHIRT));
@@ -192,13 +171,14 @@ fn init_player_character() -> Character {
 }
 
 async fn init_fight_scene(
-    player_character: Character,
+    char1: Character,
+    char2: Character,
     fight_id: FightId,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: HashMap<PortraitId, Texture2D>,
 ) -> CoreGame {
-    let init_state = init(player_character, fight_id);
+    let init_state = init(char1, char2, fight_id);
 
     let mut game_ui = GameUserInterfaceConnection::uninitialized();
 

@@ -8,11 +8,11 @@ use macroquad::{
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
-    Character,
-    Character2,
-    Character3,
-    Character4,
-    Character5,
+    PinkMan,
+    AlsoWeirdOrangeMan,
+    WeirdOrangeMan,
+    Alice,
+    Bob,
     Skeleton,
     Warhammer,
     Bow,
@@ -24,11 +24,11 @@ pub enum SpriteId {
 
 pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
     load_sprites(vec![
-        (SpriteId::Character, "character.png"),
-        (SpriteId::Character2, "character2.png"),
-        (SpriteId::Character3, "character3.png"),
-        (SpriteId::Character4, "character4.png"),
-        (SpriteId::Character5, "character5.png"),
+        (SpriteId::PinkMan, "character.png"),
+        (SpriteId::AlsoWeirdOrangeMan, "character2.png"),
+        (SpriteId::WeirdOrangeMan, "character3.png"),
+        (SpriteId::Alice, "character4.png"),
+        (SpriteId::Bob, "character5.png"),
         (SpriteId::Skeleton, "skeleton.png"),
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Bow, "bow.png"),
@@ -130,16 +130,16 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum PortraitId {
-    Portrait1,
-    Portrait2,
+    Alice,
+    Bob,
     Portrait3,
     Skeleton,
 }
 
 pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
     load_and_init_textures(vec![
-        (PortraitId::Portrait1, "portrait_1.png"),
-        (PortraitId::Portrait2, "portrait_2.png"),
+        (PortraitId::Alice, "portrait_1.png"),
+        (PortraitId::Bob, "portrait_2.png"),
         (PortraitId::Portrait3, "portrait_3.png"),
         (PortraitId::Skeleton, "portrait_skeleton.png"),
     ])

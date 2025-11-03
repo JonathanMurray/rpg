@@ -1,6 +1,16 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use macroquad::{color::Color, miniquad::window::screen_size, text::Font, texture::Texture2D};
+use macroquad::{
+    color::{Color, GRAY, WHITE, YELLOW},
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    math::Rect,
+    miniquad::window::screen_size,
+    shapes::draw_rectangle_lines,
+    text::Font,
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    time::get_frame_time,
+    window::clear_background,
+};
 
 use crate::{
     action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
@@ -12,6 +22,61 @@ use crate::{
     stats_ui::build_character_stats_table,
     textures::{EquipmentIconId, IconId, PortraitId},
 };
+
+pub struct PortraitRow {
+    pub selected_idx: usize,
+    portraits: Vec<Texture2D>,
+}
+
+impl PortraitRow {
+    pub fn new(
+        char1: &Character,
+        char2: &Character,
+        portrait_textures: &HashMap<PortraitId, Texture2D>,
+    ) -> Self {
+        let selected_idx = 0;
+        let portraits = vec![
+            portrait_textures[&char1.portrait].clone(),
+            portrait_textures[&char2.portrait].clone(),
+        ];
+        Self {
+            selected_idx,
+            portraits,
+        }
+    }
+
+    pub fn draw_and_handle_input(&mut self) {
+        let (screen_w, screen_h) = screen_size();
+
+        for (i, portrait) in self.portraits.iter().enumerate() {
+            let border_color = if i == self.selected_idx { YELLOW } else { GRAY };
+
+            let w = 64.0;
+            let h = 80.0;
+            let x = 10.0 + w * i as f32 + 10.0;
+            let y = screen_h - 400.0;
+            let rect = Rect::new(x, y, w, h);
+            draw_texture_ex(
+                &portrait,
+                x,
+                y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(rect.size()),
+                    ..Default::default()
+                },
+            );
+            draw_rectangle_lines(x, y, w, h, 3.0, border_color);
+
+            if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
+            {
+                self.selected_idx = i;
+            }
+        }
+    }
+}
+
+const UI_HEIGHT: f32 = 290.0;
 
 pub struct NonCombatUi {
     bottom_panel: Element,
@@ -119,6 +184,7 @@ impl NonCombatUi {
             reaction_buttons,
             attack_enhancement_buttons,
             spell_buttons,
+            UI_HEIGHT - 20.0,
         );
 
         let stats_table = Rc::new(RefCell::new(build_character_stats_table(
@@ -142,6 +208,7 @@ impl NonCombatUi {
                 ..Default::default()
             },
             min_width: Some(screen_w),
+            min_height: Some(UI_HEIGHT),
             children: vec![
                 Element::Container(Container {
                     layout_dir: LayoutDirection::Vertical,
@@ -189,7 +256,7 @@ impl NonCombatUi {
     pub fn draw_and_handle_input(&mut self) {
         let (_screen_w, screen_h) = screen_size();
 
-        let pos = (0.0, screen_h - 290.0);
+        let pos = (0.0, screen_h - UI_HEIGHT);
         self.bottom_panel.draw(pos.0, pos.1);
         self.bottom_panel.draw_tooltips(pos.0, pos.1);
 

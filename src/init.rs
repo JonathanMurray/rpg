@@ -13,7 +13,7 @@ use crate::{
     textures::{PortraitId, SpriteId, TerrainId},
 };
 
-pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
+pub fn init(player_char1: Character, player_char2: Character, fight_id: FightId) -> GameInitState {
     let active_character_id = 0;
 
     let skeleton_str = Character::new(
@@ -89,15 +89,17 @@ pub fn init(player_character: Character, fight_id: FightId) -> GameInitState {
         row += 1;
     }
 
-    player_character.position.set(player_pos.unwrap());
+    let player_pos = player_pos.unwrap();
+    player_char1.position.set(player_pos);
+    player_char2.position.set((player_pos.0 + 1, player_pos.1));
 
     let characters = if fight_id == FightId::Easy {
         skeleton_agi.position.set(enemy_positions[&0]);
-        vec![player_character, skeleton_agi]
+        vec![player_char1, player_char2, skeleton_agi]
     } else {
         skeleton_str.position.set(enemy_positions[&0]);
         skeleton_agi.position.set(enemy_positions[&1]);
-        vec![player_character, skeleton_str, skeleton_agi]
+        vec![player_char1, player_char2, skeleton_str, skeleton_agi]
     };
 
     for (x, y) in water_grid.iter().copied() {

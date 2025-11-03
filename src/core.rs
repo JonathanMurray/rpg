@@ -33,7 +33,7 @@ impl CoreGame {
         }
     }
 
-    pub async fn run(mut self) -> Character {
+    pub async fn run(mut self) -> Vec<Character> {
         for character in self.characters.iter() {
             character.update_encumbrance();
             character.action_points.set_to_max();
@@ -61,7 +61,7 @@ impl CoreGame {
                     character.stamina.set_to_max();
                 }
 
-                return self.characters.player_character();
+                return self.characters.player_characters();
             }
 
             let action = self.ui_select_action().await;
@@ -1665,9 +1665,11 @@ impl Characters {
         self.0.iter().map(|(_id, ch)| ch)
     }
 
-    pub fn player_character(self) -> Character {
-        let rc_player_char = self.iter().find(|ch| ch.player_controlled).unwrap();
-        Character::clone(rc_player_char)
+    pub fn player_characters(self) -> Vec<Character> {
+        self.iter()
+            .filter(|ch| ch.player_controlled)
+            .map(|ch| Character::clone(ch))
+            .collect()
     }
 
     pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<Character>)> {
@@ -2046,6 +2048,7 @@ pub enum HandType {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Spell {
+    pub id: SpellId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
@@ -2058,6 +2061,22 @@ pub struct Spell {
     pub target: SpellTarget,
     pub possible_enhancements: [Option<SpellEnhancement>; 3],
     pub animation_color: Color,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum SpellId {
+    SweepAttack,
+    LungeAttack,
+    Brace,
+    Scream,
+    ShackledMind,
+    MindBlast,
+    Heal,
+    HealingNova,
+    SelfHeal,
+    HealingRain,
+    Fireballl,
+    Kill,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2176,6 +2195,7 @@ impl SpellTarget {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellEnhancement {
+    pub spell_id: SpellId,
     pub name: &'static str,
     pub description: &'static str,
     pub icon: IconId,
@@ -2932,6 +2952,13 @@ impl Character {
             && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && (!reaction.must_be_melee || is_within_melee)
+    }
+
+    pub fn knows_spell(&self, spell_id: SpellId) -> bool {
+        self.known_actions.iter().any(|action| match action {
+            BaseAction::CastSpell(spell) => spell.id == spell_id,
+            _ => false,
+        })
     }
 
     pub fn known_spells(&self) -> Vec<Spell> {

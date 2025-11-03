@@ -1,17 +1,13 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
+    shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
     text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
-    texture::Texture2D,
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
@@ -29,7 +25,7 @@ use crate::{
         BRACE, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING,
         QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
     },
-    non_combat_ui::NonCombatUi,
+    non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
@@ -62,54 +58,33 @@ enum AttributeName {
     Spi,
 }
 
-struct AttributeLine {
-    element: Element,
-    attribute: AttributeName,
-}
-
-impl AttributeLine {
-    fn new(label: &'static str, attribute: AttributeName, font: &Font) -> Self {
-        let text_line = TextLine::new(label, 20, WHITE, Some(font.clone())).with_padding(5.0, 5.0);
-        Self {
-            element: Element::Text(text_line),
-            attribute,
-        }
-    }
-}
-
-impl Drawable for AttributeLine {
-    fn draw(&self, x: f32, y: f32) {
-        self.element.draw(x, y);
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.element.size()
-    }
-}
-
-pub async fn run_victory_loop(
-    player_character: Character,
+struct RewardSelectionUi {
+    bottom_panel: NonCombatUi,
+    attribute_selection_card: Element,
+    selected_attribute: Option<AttributeName>,
+    str_element: Rc<RefCell<TextLine>>,
+    agi_element: Rc<RefCell<TextLine>>,
+    int_element: Rc<RefCell<TextLine>>,
+    spi_element: Rc<RefCell<TextLine>>,
+    character: Rc<Character>,
+    reward_buttons: Vec<Rc<RewardButton>>,
+    hovered_btn: Option<(u32, (f32, f32))>,
+    selected_btn: Option<Rc<RewardButton>>,
     font: Font,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
+    event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
+}
 
-    portrait_textures: &HashMap<PortraitId, Texture2D>,
-) -> Character {
-    let character = Rc::new(player_character);
-    let mut selected_learning = None;
-    {
-        let mut selected_btn: Option<&RewardButton> = None;
-        let money_amount = 3;
-
-        character.gain_money(money_amount);
-
-        let (screen_w, screen_h) = screen_size();
-        let x_mid = screen_w / 2.0;
-
-        let transition_duration = 0.5;
-        let mut transition_countdown = None;
-
-        let mut bottom_panel = NonCombatUi::new(
+impl RewardSelectionUi {
+    fn new(
+        character: Rc<Character>,
+        font: Font,
+        equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+        icons: HashMap<IconId, Texture2D>,
+        portrait_textures: &HashMap<PortraitId, Texture2D>,
+        rewards: Vec<(ButtonAction, Option<&'static str>)>,
+        next_button_id: &mut u32,
+    ) -> Self {
+        let bottom_panel = NonCombatUi::new(
             character.clone(),
             &font,
             equipment_icons,
@@ -119,71 +94,12 @@ pub async fn run_victory_loop(
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 
-        let mut next_button_id = 0;
-
-        let mut rewards = vec![];
-
-        let candidate_attack_enhancements = vec![QUICK, SMITE, OVERWHELMING];
-        for enhancement in candidate_attack_enhancements {
-            if !character.known_attack_enhancements.contains(&enhancement) {
-                rewards.push((ButtonAction::AttackEnhancement(enhancement), Some("Attack")));
-            }
-        }
-
-        let known_spells = character.known_spells();
-        let candidate_spells = vec![
-            FIREBALL,
-            SWEEP_ATTACK,
-            LUNGE_ATTACK,
-            BRACE,
-            SCREAM,
-            SHACKLED_MIND,
-            MIND_BLAST,
-            HEAL,
-            HEALING_NOVA,
-            HEALING_RAIN,
-        ];
-        for spell in candidate_spells {
-            if !known_spells.contains(&spell) {
-                rewards.push((ButtonAction::Action(BaseAction::CastSpell(spell)), None));
-            }
-        }
-        for spell in &known_spells {
-            for enhancement in spell.possible_enhancements {
-                if let Some(enhancement) = enhancement {
-                    if !character.known_spell_enhancements.contains(&enhancement) {
-                        rewards.push((
-                            ButtonAction::SpellEnhancement(enhancement),
-                            Some(spell.name),
-                        ));
-                    }
-                }
-            }
-        }
-
-        let candidate_attacked_reactions = vec![SIDE_STEP];
-        for reaction in candidate_attacked_reactions {
-            if !character.known_attacked_reactions.contains(&reaction) {
-                rewards.push((
-                    ButtonAction::OnAttackedReaction(reaction),
-                    Some("On attacked"),
-                ));
-            }
-        }
-
-        let candidate_on_hit_reactions = vec![RAGE];
-        for reaction in candidate_on_hit_reactions {
-            if !character.known_on_hit_reactions.contains(&reaction) {
-                rewards.push((ButtonAction::OnHitReaction(reaction), Some("On hit")));
-            }
-        }
-
-        let reward_buttons: Vec<RewardButton> = select_n_random(rewards, 4)
+        let reward_buttons: Vec<Rc<RewardButton>> = rewards
             .into_iter()
             .map(|(action, context)| {
-                let id = next_button_id;
-                next_button_id += 1;
-                RewardButton {
+                let id = *next_button_id;
+                *next_button_id += 1;
+                let btn = RewardButton {
                     action_button: ActionButton::new(
                         action,
                         &event_queue,
@@ -192,44 +108,38 @@ pub async fn run_victory_loop(
                         Some(Rc::clone(&character)),
                     ),
                     context,
-                }
+                };
+
+                btn.action_button
+                    .enabled
+                    .set(can_learn(&character, action_to_reward_choice(action)));
+
+                Rc::new(btn)
             })
             .collect();
-
-        let button_margin = 60.0;
-        let row_w: f32 = reward_buttons
-            .iter()
-            .map(|btn| btn.action_button.size.0)
-            .sum::<f32>()
-            + button_margin * (reward_buttons.len() - 1) as f32;
-
-        let mut hovered_btn = None;
-
-        let header_color = Color::new(0.7, 0.9, 0.7, 1.0);
 
         let card_w = 480.0;
         let card_color = Color::new(0.1, 0.1, 0.1, 1.00);
 
-        let mut selected_attribute = None;
-
+        let attr_font_size = 24;
         let str_element = Rc::new(RefCell::new(
-            TextLine::new("Strength", 20, WHITE, Some(font.clone()))
-                .with_padding(15.0, 15.0)
+            TextLine::new("Strength", attr_font_size, WHITE, Some(font.clone()))
+                .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
         let agi_element = Rc::new(RefCell::new(
-            TextLine::new("Agility", 20, WHITE, Some(font.clone()))
-                .with_padding(15.0, 15.0)
+            TextLine::new("Agility", attr_font_size, WHITE, Some(font.clone()))
+                .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
         let int_element = Rc::new(RefCell::new(
-            TextLine::new("Intellect", 20, WHITE, Some(font.clone()))
-                .with_padding(15.0, 15.0)
+            TextLine::new("Intellect", attr_font_size, WHITE, Some(font.clone()))
+                .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
         let spi_element = Rc::new(RefCell::new(
-            TextLine::new("Spirit", 20, WHITE, Some(font.clone()))
-                .with_padding(15.0, 15.0)
+            TextLine::new("Spirit", attr_font_size, WHITE, Some(font.clone()))
+                .with_padding(15.0, 10.0)
                 .with_hover_color(YELLOW),
         ));
 
@@ -253,12 +163,329 @@ pub async fn run_victory_loop(
             ..Default::default()
         });
 
+        Self {
+            bottom_panel,
+            attribute_selection_card,
+            selected_attribute: None,
+            str_element,
+            agi_element,
+            int_element,
+            spi_element,
+            character,
+            reward_buttons,
+            hovered_btn: None,
+            selected_btn: None,
+            font,
+            event_queue,
+        }
+    }
+
+    fn draw(&mut self) {
+        self.bottom_panel.draw_and_handle_input();
+
+        let (screen_w, screen_h) = screen_size();
+        let x_mid = screen_w / 2.0;
+
+        let mut y = 300.0;
+
+        let card_w = 480.0;
+        let card_color = Color::new(0.1, 0.1, 0.1, 1.00);
+
+        self.attribute_selection_card.draw(x_mid - card_w / 2.0, y);
+
+        let mut hovered_attribute = None;
+        if self.str_element.borrow().has_been_hovered.take().is_some() {
+            hovered_attribute = Some(AttributeName::Str);
+        }
+        if self.agi_element.borrow().has_been_hovered.take().is_some() {
+            hovered_attribute = Some(AttributeName::Agi);
+        }
+        if self.int_element.borrow().has_been_hovered.take().is_some() {
+            hovered_attribute = Some(AttributeName::Int);
+        }
+        if self.spi_element.borrow().has_been_hovered.take().is_some() {
+            hovered_attribute = Some(AttributeName::Spi);
+        }
+
+        if is_mouse_button_pressed(MouseButton::Left) {
+            if let Some(new_attribute) = hovered_attribute {
+                let mut did_change = true;
+                if let Some(old_attribute) = self.selected_attribute {
+                    did_change = new_attribute != old_attribute;
+                    if did_change {
+                        match old_attribute {
+                            AttributeName::Str => {
+                                self.character.add_to_strength(-1);
+                                self.str_element.borrow_mut().set_color(WHITE);
+                            }
+                            AttributeName::Agi => {
+                                self.character.add_to_agility(-1);
+                                self.agi_element.borrow_mut().set_color(WHITE);
+                            }
+                            AttributeName::Int => {
+                                self.character.add_to_intellect(-1);
+                                self.int_element.borrow_mut().set_color(WHITE);
+                            }
+                            AttributeName::Spi => {
+                                self.character.add_to_spirit(-1);
+                                self.spi_element.borrow_mut().set_color(WHITE);
+                            }
+                        }
+                    }
+                }
+
+                if did_change {
+                    match new_attribute {
+                        AttributeName::Str => {
+                            self.character.add_to_strength(1);
+                            self.str_element.borrow_mut().set_color(ORANGE);
+                        }
+                        AttributeName::Agi => {
+                            self.character.add_to_agility(1);
+                            self.agi_element.borrow_mut().set_color(ORANGE);
+                        }
+                        AttributeName::Int => {
+                            self.character.add_to_intellect(1);
+                            self.int_element.borrow_mut().set_color(ORANGE);
+                        }
+                        AttributeName::Spi => {
+                            self.character.add_to_spirit(1);
+                            self.spi_element.borrow_mut().set_color(ORANGE);
+                        }
+                    }
+                    self.bottom_panel.on_character_stats_changed();
+                    //bottom_panel2.draw_and_handle_input();
+                    self.selected_attribute = Some(new_attribute);
+                }
+            }
+        }
+
+        y += 240.0;
+
+        draw_rectangle(x_mid - card_w / 2.0, y, card_w, 180.0, card_color);
+        /*
+        let text = "1 new skill";
+        let font_size = 32;
+        let text_dim = measure_text(text, Some(&font), font_size, 1.0);
+        y += 20.0;
+        draw_text(
+            text,
+            screen_w / 2.0 - text_dim.width / 2.0,
+            y + (text_dim.height) / 2.0,
+            font_size.into(),
+            header_color,
+        );
+         */
+
+        let button_margin = 60.0;
+
+        let row_w: f32 = self
+            .reward_buttons
+            .iter()
+            .map(|btn| btn.action_button.size.0)
+            .sum::<f32>()
+            + button_margin * (self.reward_buttons.len() - 1) as f32;
+
+        let mut btn_x = x_mid - row_w / 2.0;
+        let btn_y = y + 80.0;
+
+        for btn in &self.reward_buttons {
+            btn.action_button.draw(btn_x, btn_y);
+
+            if let Some(context) = btn.context {
+                let text = format!("({})", context);
+                let font_size = 16;
+                let text_dim = measure_text(&text, Some(&self.font), font_size, 1.0);
+                draw_text_ex(
+                    &text,
+                    btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
+                    btn_y - 30.0,
+                    TextParams {
+                        font: Some(&self.font),
+                        font_size,
+                        color: ORANGE,
+                        ..Default::default()
+                    },
+                );
+            }
+
+            let text = btn.action_button.action.name();
+            let font_size = 18;
+            let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
+            draw_text_ex(
+                text,
+                btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
+                btn_y - 10.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
+
+            btn_x += btn.action_button.size.0 + button_margin;
+        }
+
+        for event in self.event_queue.borrow_mut().drain(..) {
+            match event {
+                InternalUiEvent::ButtonHovered(btn_id, _button_action, maybe_btn_pos) => {
+                    if let Some(btn_pos) = maybe_btn_pos {
+                        self.hovered_btn = Some((btn_id, btn_pos));
+                    } else {
+                        self.hovered_btn = None;
+                    }
+                }
+                InternalUiEvent::ButtonClicked(btn_id, _btn_action) => {
+                    let reward_btn = self
+                        .reward_buttons
+                        .iter()
+                        .find(|btn| btn.action_button.id == btn_id);
+
+                    if let Some(btn) = reward_btn {
+                        if let Some(previously_selected) = &self.selected_btn {
+                            previously_selected
+                                .action_button
+                                .selected
+                                .set(ButtonSelected::No);
+                        }
+
+                        btn.action_button.selected.set(ButtonSelected::Yes);
+                        self.selected_btn = Some(Rc::clone(btn));
+                    }
+                }
+            }
+        }
+
+        if let Some((btn_id, btn_pos)) = self.hovered_btn {
+            let reward_btn = self
+                .reward_buttons
+                .iter()
+                .find(|btn| btn.action_button.id == btn_id)
+                .map(|reward_btn| &reward_btn.action_button)
+                .unwrap();
+            draw_button_tooltip(&self.font, btn_pos, &reward_btn.tooltip());
+        }
+    }
+}
+
+pub async fn run_victory_loop(
+    player_char1: Character,
+    player_char2: Character,
+    font: Font,
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+    icons: HashMap<IconId, Texture2D>,
+    portrait_textures: &HashMap<PortraitId, Texture2D>,
+) -> (Character, Character) {
+    let char1 = Rc::new(player_char1);
+    let char2 = Rc::new(player_char2);
+    let selected_learning1;
+    let selected_learning2;
+    {
+        let mut portrait_row = PortraitRow::new(&char1, &char2, portrait_textures);
+
+        let money_amount = 3;
+
+        char1.gain_money(money_amount);
+
+        let (screen_w, screen_h) = screen_size();
+        let x_mid = screen_w / 2.0;
+
+        let transition_duration = 0.5;
+        let mut transition_countdown = None;
+
+        let mut candidate_rewards = vec![];
+        for enhancement in vec![QUICK, SMITE, OVERWHELMING] {
+            candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some("Attack")));
+        }
+        for spell in vec![
+            FIREBALL,
+            SWEEP_ATTACK,
+            LUNGE_ATTACK,
+            BRACE,
+            SCREAM,
+            SHACKLED_MIND,
+            MIND_BLAST,
+            HEAL,
+            HEALING_NOVA,
+            HEALING_RAIN,
+        ] {
+            candidate_rewards.push((ButtonAction::Action(BaseAction::CastSpell(spell)), None));
+        }
+        for spell in &char1.known_spells() {
+            for enhancement in spell.possible_enhancements {
+                if let Some(enhancement) = enhancement {
+                    candidate_rewards.push((
+                        ButtonAction::SpellEnhancement(enhancement),
+                        Some(spell.name),
+                    ));
+                }
+            }
+        }
+        for reaction in vec![SIDE_STEP] {
+            candidate_rewards.push((
+                ButtonAction::OnAttackedReaction(reaction),
+                Some("On attacked"),
+            ));
+        }
+        for reaction in vec![RAGE] {
+            candidate_rewards.push((ButtonAction::OnHitReaction(reaction), Some("On hit")));
+        }
+        let mut rewards = select_n_random(
+            candidate_rewards
+                .iter()
+                .filter(|reward| can_learn(&char1, action_to_reward_choice(reward.0)))
+                .copied()
+                .collect(),
+            2,
+        );
+        let rewards2 = select_n_random(
+            candidate_rewards
+                .iter()
+                .filter(|reward| {
+                    !rewards.contains(reward)
+                        && can_learn(&char2, action_to_reward_choice(reward.0))
+                })
+                .copied()
+                .collect(),
+            2,
+        );
+        rewards.extend_from_slice(&rewards2);
+        let rewards: Vec<(ButtonAction, Option<&'static str>)> = select_n_random(rewards, 4);
+
+        let mut next_button_id = 0;
+
+        let mut ui_1 = RewardSelectionUi::new(
+            Rc::clone(&char1),
+            font.clone(),
+            equipment_icons,
+            icons.clone(),
+            portrait_textures,
+            rewards.clone(),
+            &mut next_button_id,
+        );
+        let mut ui_2 = RewardSelectionUi::new(
+            Rc::clone(&char2),
+            font.clone(),
+            equipment_icons,
+            icons,
+            portrait_textures,
+            rewards,
+            &mut next_button_id,
+        );
+
         loop {
             let elapsed = get_frame_time();
 
             clear_background(BLACK);
 
-            bottom_panel.draw_and_handle_input();
+            portrait_row.draw_and_handle_input();
+
+            if portrait_row.selected_idx == 0 {
+                ui_1.draw();
+            } else {
+                ui_2.draw();
+            }
 
             let text = "Rewards!";
             let font_size = 32;
@@ -270,6 +497,9 @@ pub async fn run_victory_loop(
                 font_size.into(),
                 WHITE,
             );
+
+            let card_color = Color::new(0.1, 0.1, 0.1, 1.00);
+            let card_w = 480.0;
 
             let mut y = 125.0;
             draw_rectangle(x_mid - card_w / 2.0, y, card_w, 60.0, card_color);
@@ -285,174 +515,10 @@ pub async fn run_victory_loop(
                 WHITE,
             );
 
-            y += 70.0;
-            attribute_selection_card.draw(x_mid - card_w / 2.0, y);
-
-            let mut hovered_attribute = None;
-            if str_element.borrow().has_been_hovered.take().is_some() {
-                hovered_attribute = Some(AttributeName::Str);
-            }
-            if agi_element.borrow().has_been_hovered.take().is_some() {
-                hovered_attribute = Some(AttributeName::Agi);
-            }
-            if int_element.borrow().has_been_hovered.take().is_some() {
-                hovered_attribute = Some(AttributeName::Int);
-            }
-            if spi_element.borrow().has_been_hovered.take().is_some() {
-                hovered_attribute = Some(AttributeName::Spi);
-            }
-
-            if is_mouse_button_pressed(MouseButton::Left) {
-                if let Some(new_attribute) = hovered_attribute {
-                    let mut did_change = true;
-                    if let Some(old_attribute) = selected_attribute {
-                        did_change = new_attribute != old_attribute;
-                        if did_change {
-                            match old_attribute {
-                                AttributeName::Str => {
-                                    character.add_to_strength(-1);
-                                    str_element.borrow_mut().set_color(WHITE);
-                                }
-                                AttributeName::Agi => {
-                                    character.add_to_agility(-1);
-                                    agi_element.borrow_mut().set_color(WHITE);
-                                }
-                                AttributeName::Int => {
-                                    character.add_to_intellect(-1);
-                                    int_element.borrow_mut().set_color(WHITE);
-                                }
-                                AttributeName::Spi => {
-                                    character.add_to_spirit(-1);
-                                    spi_element.borrow_mut().set_color(WHITE);
-                                }
-                            }
-                        }
-                    }
-
-                    if did_change {
-                        match new_attribute {
-                            AttributeName::Str => {
-                                character.add_to_strength(1);
-                                str_element.borrow_mut().set_color(ORANGE);
-                            }
-                            AttributeName::Agi => {
-                                character.add_to_agility(1);
-                                agi_element.borrow_mut().set_color(ORANGE);
-                            }
-                            AttributeName::Int => {
-                                character.add_to_intellect(1);
-                                int_element.borrow_mut().set_color(ORANGE);
-                            }
-                            AttributeName::Spi => {
-                                character.add_to_spirit(1);
-                                spi_element.borrow_mut().set_color(ORANGE);
-                            }
-                        }
-                        bottom_panel.on_character_stats_changed();
-                        bottom_panel.draw_and_handle_input();
-                        selected_attribute = Some(new_attribute);
-                    }
-                }
-            }
-
-            y += 240.0;
-
-            draw_rectangle(x_mid - card_w / 2.0, y, card_w, 180.0, card_color);
-            /*
-            let text = "1 new skill";
-            let font_size = 32;
-            let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            y += 20.0;
-            draw_text(
-                text,
-                screen_w / 2.0 - text_dim.width / 2.0,
-                y + (text_dim.height) / 2.0,
-                font_size.into(),
-                header_color,
-            );
-             */
-
-            let mut btn_x = x_mid - row_w / 2.0;
-            let btn_y = y + 80.0;
-
-            for btn in &reward_buttons {
-                btn.action_button.draw(btn_x, btn_y);
-
-                if let Some(context) = btn.context {
-                    let text = format!("({})", context);
-                    let font_size = 16;
-                    let text_dim = measure_text(&text, Some(&font), font_size, 1.0);
-                    draw_text_ex(
-                        &text,
-                        btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
-                        btn_y - 30.0,
-                        TextParams {
-                            font: Some(&font),
-                            font_size,
-                            color: ORANGE,
-                            ..Default::default()
-                        },
-                    );
-                }
-
-                let text = btn.action_button.action.name();
-                let font_size = 18;
-                let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-                draw_text_ex(
-                    text,
-                    btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
-                    btn_y - 10.0,
-                    TextParams {
-                        font: Some(&font),
-                        font_size,
-                        color: WHITE,
-                        ..Default::default()
-                    },
-                );
-
-                btn_x += btn.action_button.size.0 + button_margin;
-            }
-
-            for event in event_queue.borrow_mut().drain(..) {
-                match event {
-                    InternalUiEvent::ButtonHovered(btn_id, _button_action, maybe_btn_pos) => {
-                        if let Some(btn_pos) = maybe_btn_pos {
-                            hovered_btn = Some((btn_id, btn_pos));
-                        } else {
-                            hovered_btn = None;
-                        }
-                    }
-                    InternalUiEvent::ButtonClicked(btn_id, btn_action) => {
-                        let reward_btn = reward_buttons
-                            .iter()
-                            .find(|btn| btn.action_button.id == btn_id);
-
-                        if let Some(btn) = reward_btn {
-                            if let Some(previously_selected) = selected_btn {
-                                previously_selected
-                                    .action_button
-                                    .selected
-                                    .set(ButtonSelected::No);
-                            }
-
-                            btn.action_button.selected.set(ButtonSelected::Yes);
-                            selected_btn = Some(btn);
-                        }
-                    }
-                }
-            }
-
-            if let Some((btn_id, btn_pos)) = hovered_btn {
-                //character_ui.draw(y);
-                let reward_btn = reward_buttons
-                    .iter()
-                    .find(|btn| btn.action_button.id == btn_id)
-                    .map(|reward_btn| &reward_btn.action_button)
-                    .unwrap();
-                draw_button_tooltip(&font, btn_pos, &reward_btn.tooltip());
-            }
-
-            let some_remaining_rewards = selected_btn.is_none() || selected_attribute.is_none();
+            let some_remaining_rewards = ui_1.selected_btn.is_none()
+                || ui_1.selected_attribute.is_none()
+                || ui_2.selected_btn.is_none()
+                || ui_2.selected_attribute.is_none();
 
             let text = if some_remaining_rewards {
                 "Skip rewards"
@@ -505,9 +571,12 @@ pub async fn run_victory_loop(
 
                 *countdown -= elapsed;
                 if *countdown < 0.0 {
-                    selected_learning = Some(action_to_reward_choice(
-                        selected_btn.unwrap().action_button.action,
-                    ));
+                    selected_learning1 = ui_1
+                        .selected_btn
+                        .map(|btn| action_to_reward_choice(btn.action_button.action));
+                    selected_learning2 = ui_2
+                        .selected_btn
+                        .map(|btn| action_to_reward_choice(btn.action_button.action));
 
                     break;
                 }
@@ -517,9 +586,38 @@ pub async fn run_victory_loop(
         }
     }
 
-    let mut character = Rc::into_inner(character).unwrap();
+    let mut char1 = Rc::into_inner(char1).unwrap();
+    let mut char2 = Rc::into_inner(char2).unwrap();
 
-    match selected_learning.unwrap() {
+    if let Some(learning) = selected_learning1 {
+        apply_learning(learning, &mut char1);
+    }
+    if let Some(learning) = selected_learning2 {
+        apply_learning(learning, &mut char2);
+    }
+
+    (char1, char2)
+}
+
+fn can_learn(character: &Character, learning: Learning) -> bool {
+    match learning {
+        Learning::Spell(spell) => !character.known_spells().contains(&spell),
+        Learning::OnAttackedReaction(reaction) => {
+            !character.known_attacked_reactions.contains(&reaction)
+        }
+        Learning::OnHitReaction(reaction) => !character.known_on_hit_reactions.contains(&reaction),
+        Learning::AttackEnhancement(enhancement) => {
+            !character.known_attack_enhancements.contains(&enhancement)
+        }
+        Learning::SpellEnhancement(enhancement) => {
+            character.knows_spell(enhancement.spell_id)
+                && !character.known_spell_enhancements.contains(&enhancement)
+        }
+    }
+}
+
+fn apply_learning(learning: Learning, character: &mut Character) {
+    match learning {
         Learning::Spell(spell) => character.known_actions.push(BaseAction::CastSpell(spell)),
         Learning::OnAttackedReaction(reaction) => character.known_attacked_reactions.push(reaction),
         Learning::OnHitReaction(reaction) => character.known_on_hit_reactions.push(reaction),
@@ -530,8 +628,6 @@ pub async fn run_victory_loop(
             character.known_spell_enhancements.push(enhancement)
         }
     }
-
-    character
 }
 
 fn action_to_reward_choice(btn_action: ButtonAction) -> Learning {
