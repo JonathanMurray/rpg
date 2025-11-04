@@ -1434,6 +1434,12 @@ impl CoreGame {
                 self.log(format!("{} is no longer Exposed", name)).await;
             }
         }
+        if conditions.borrow().hindered > 0 {
+            conditions.borrow_mut().hindered -= 1;
+            if conditions.borrow().hindered == 0 {
+                self.log(format!("{} is no longer Hindered", name)).await;
+            }
+        }
 
         if conditions.borrow().slowed > 0 {
             conditions.borrow_mut().slowed -= 1;
@@ -1718,8 +1724,24 @@ pub struct AttackEnhancement {
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub mana_cost: u32,
-
+    pub weapon_requirement: Option<WeaponType>,
     pub effect: AttackEnhancementEffect,
+}
+
+impl AttackEnhancement {
+    // the version from the Default trait is not const
+    pub const fn default() -> Self {
+        Self {
+            name: "<placeholder>",
+            description: "",
+            icon: IconId::Equip,
+            action_point_cost: 0,
+            stamina_cost: 0,
+            mana_cost: 0,
+            weapon_requirement: None,
+            effect: AttackEnhancementEffect::default(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -1809,6 +1831,7 @@ pub enum Condition {
     Dead,
     Slowed(u32),
     Exposed(u32),
+    Hindered(u32),
 }
 
 impl Condition {
@@ -1829,6 +1852,7 @@ impl Condition {
             Dead => None,
             Slowed(n) => Some(n),
             Exposed(n) => Some(n),
+            Hindered(n) => Some(n),
         }
     }
 
@@ -1849,6 +1873,7 @@ impl Condition {
             Dead => "Dead",
             Slowed(..) => "Slowed",
             Exposed(..) => "Exposed",
+            Hindered(..) => "Hindered",
         }
     }
 
@@ -1869,6 +1894,7 @@ impl Condition {
             Dead => "This character has reached 0 HP and is dead",
             Slowed(_) => "Gains 2 less AP per turn",
             Exposed(_) => "-3 to all defenses",
+            Hindered(..) => "Half movement speed",
         }
     }
 
@@ -1912,6 +1938,7 @@ struct Conditions {
     dead: bool,
     slowed: u32,
     exposed: u32,
+    hindered: u32,
 }
 
 impl Conditions {
@@ -1958,6 +1985,9 @@ impl Conditions {
         }
         if self.exposed > 0 {
             result.push(Condition::Exposed(self.exposed).info())
+        }
+        if self.hindered > 0 {
+            result.push(Condition::Hindered(self.hindered).info())
         }
 
         result
@@ -2019,10 +2049,9 @@ pub struct AttackAction {
 impl BaseAction {
     pub fn requires_equipped_melee_weapon(&self) -> bool {
         match self {
-            BaseAction::CastSpell(spell) => matches!(
-                spell.weapon_requirement,
-                Some(SpellWeaponRequirement::Melee)
-            ),
+            BaseAction::CastSpell(spell) => {
+                matches!(spell.weapon_requirement, Some(WeaponType::Melee))
+            }
             _ => false,
         }
     }
@@ -2076,7 +2105,7 @@ pub struct Spell {
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub stamina_cost: u32,
-    pub weapon_requirement: Option<SpellWeaponRequirement>,
+    pub weapon_requirement: Option<WeaponType>,
 
     pub modifier: SpellModifier,
     pub target: SpellTarget,
@@ -2104,9 +2133,10 @@ pub enum SpellId {
     MagiInflictHorrors,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub enum SpellWeaponRequirement {
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum WeaponType {
     Melee,
+    Ranged,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2236,13 +2266,16 @@ pub struct AttackEnhancementEffect {
     pub action_point_discount: u32,
     pub bonus_damage: u32,
     pub bonus_advantage: u32,
-    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
     pub roll_modifier: i32,
     pub inflict_condition_per_damage: Option<Condition>,
     pub armor_penetration: u32,
     // TODO Actually handle this
     pub on_self: Option<ApplyEffect>,
 
+    // Gets activated if the attack hits
+    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
+
+    // Gets applied on the target regardless if the attack hits
     pub on_target: Option<ApplyEffect>,
 }
 
@@ -2394,7 +2427,7 @@ pub struct Character {
     pub health: NumberedResource,
     pub mana: NumberedResource,
     // How many cells you can move per AP
-    pub move_speed: Cell<f32>,
+    pub base_move_speed: Cell<f32>,
     pub capacity: Cell<u32>,
     pub inventory: [Cell<Option<EquipmentEntry>>; 6],
     pub armor: Cell<Option<ArmorPiece>>,
@@ -2441,7 +2474,7 @@ impl Character {
             base_attributes,
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
-            move_speed: Cell::new(move_speed),
+            base_move_speed: Cell::new(move_speed),
             capacity: Cell::new(capacity),
             inventory: Default::default(),
             armor: Default::default(),
@@ -2469,6 +2502,14 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
         }
+    }
+
+    pub fn move_speed(&self) -> f32 {
+        let mut speed = self.base_move_speed.get();
+        if self.conditions.borrow().hindered > 0 {
+            speed /= 2.0;
+        }
+        speed
     }
 
     pub fn player_controlled(&self) -> bool {
@@ -2517,7 +2558,7 @@ impl Character {
         self.stamina.change_max_value_to(attr.max_stamina());
         self.mana.change_max_value_to(attr.max_mana());
         self.capacity.set(attr.capacity());
-        self.move_speed.set(attr.move_speed());
+        self.base_move_speed.set(attr.move_speed());
     }
 
     pub fn is_dead(&self) -> bool {
@@ -2856,10 +2897,8 @@ impl Character {
                 matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
             }
             BaseAction::CastSpell(spell) => {
-                if matches!(
-                    spell.weapon_requirement,
-                    Some(SpellWeaponRequirement::Melee)
-                ) && !self.has_equipped_melee_weapon()
+                if matches!(spell.weapon_requirement, Some(WeaponType::Melee))
+                    && !self.has_equipped_melee_weapon()
                 {
                     return false;
                 }
@@ -2914,9 +2953,15 @@ impl Character {
         enhancement: &AttackEnhancement,
     ) -> bool {
         let weapon = self.weapon(attack_hand).unwrap();
-        self.action_points.current()
-            >= weapon.action_point_cost + enhancement.action_point_cost
-                - enhancement.effect.action_point_discount
+        let is_weapon_compatible = enhancement
+            .weapon_requirement
+            .map(|required_type| weapon.weapon_type() == required_type)
+            .unwrap_or(true);
+
+        is_weapon_compatible
+            && self.action_points.current()
+                >= weapon.action_point_cost + enhancement.action_point_cost
+                    - enhancement.effect.action_point_discount
             && self.stamina.current() >= enhancement.stamina_cost
             && self.mana.current() >= enhancement.mana_cost
     }
@@ -3391,6 +3436,7 @@ impl Character {
                 conditions.slowed += n;
             }
             Exposed(n) => conditions.exposed += n,
+            Hindered(n) => conditions.hindered += n,
         }
     }
 }
@@ -3528,6 +3574,13 @@ pub struct Weapon {
 impl Weapon {
     pub fn is_melee(&self) -> bool {
         matches!(self.range, WeaponRange::Melee)
+    }
+
+    pub fn weapon_type(&self) -> WeaponType {
+        match self.range {
+            WeaponRange::Melee => WeaponType::Melee,
+            WeaponRange::Ranged(_) => WeaponType::Ranged,
+        }
     }
 }
 

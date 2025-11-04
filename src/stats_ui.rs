@@ -61,7 +61,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             ),
             (
                 Some(("Agi", character.base_attributes.agility.get())),
-                &[("Movement", StatValue::F32(character.move_speed.get()))],
+                &[("Movement", StatValue::F32(character.base_move_speed.get()))],
             ),
             (None, &[("Evasion", StatValue::U32(character.evasion()))]),
             (

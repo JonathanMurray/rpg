@@ -353,7 +353,7 @@ impl GameGrid {
     pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
         let active_char = self.characters.get(active_char_id);
 
-        let speed = active_char.move_speed.get();
+        let speed = active_char.move_speed();
         let ap = active_char.action_points.current();
         let sta = active_char.stamina.current();
         let max_range = ap as f32 * speed + sta.min(ap) as f32 * speed;

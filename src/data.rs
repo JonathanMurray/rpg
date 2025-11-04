@@ -1,3 +1,4 @@
+
 use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 
 use crate::{
@@ -7,7 +8,7 @@ use crate::{
         OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
         OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect,
         SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellId, SpellModifier,
-        SpellReach, SpellTarget, SpellWeaponRequirement, Weapon, WeaponGrip, WeaponRange,
+        SpellReach, SpellTarget, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -53,16 +54,13 @@ pub const ROBE: ArmorPiece = ArmorPiece {
 
 pub const STABBING: AttackEnhancement = AttackEnhancement {
     name: "Stabbing",
-    description: "",
     icon: IconId::Stabbing,
-    action_point_cost: 0,
-    stamina_cost: 0,
-    mana_cost: 0,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
         inflict_condition_per_damage: Some(Condition::Weakened(1)),
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const BAD_DAGGER: Weapon = Weapon {
@@ -97,16 +95,13 @@ pub const DAGGER: Weapon = Weapon {
 
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
     name: "Slashing",
-    description: "",
     icon: IconId::Slashing,
-    action_point_cost: 0,
-    stamina_cost: 0,
-    mana_cost: 0,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
         inflict_condition_per_damage: Some(Condition::Bleeding(1)),
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const BAD_SWORD: Weapon = Weapon {
@@ -143,14 +138,12 @@ const FEINT: AttackEnhancement = AttackEnhancement {
     name: "Feint",
     description: "Reduce the target's defense by 6 against the next attack",
     icon: IconId::Feint,
-    action_point_cost: 0,
-    stamina_cost: 0,
-    mana_cost: 0,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
         on_target: Some(ApplyEffect::Condition(Condition::Distracted)),
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const RAPIER: Weapon = Weapon {
@@ -173,13 +166,12 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
     description: "Deal additional damage and bypass target's armor",
     icon: IconId::AllIn,
     action_point_cost: 1,
-    stamina_cost: 0,
-    mana_cost: 0,
     effect: AttackEnhancementEffect {
         bonus_damage: 1,
         armor_penetration: 2,
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const BAD_WAR_HAMMER: Weapon = Weapon {
@@ -219,7 +211,7 @@ pub const BAD_BOW: Weapon = Weapon {
     damage: 1,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
-    attack_enhancement: Some(CAREFULLY_AIMED),
+    attack_enhancement: Some(CAREFUL_AIM),
     on_attacked_reaction: None,
     on_true_hit: None,
     sprite: Some(SpriteId::Bow),
@@ -234,7 +226,7 @@ pub const BOW: Weapon = Weapon {
     damage: 3,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
-    attack_enhancement: Some(CAREFULLY_AIMED),
+    attack_enhancement: Some(CAREFUL_AIM),
     on_attacked_reaction: None,
     on_true_hit: None,
     sprite: Some(SpriteId::Bow),
@@ -271,56 +263,67 @@ pub const QUICK: AttackEnhancement = AttackEnhancement {
     name: "Quick strike",
     description: "", //"Strike more quickly",
     icon: IconId::QuickStrike,
-    action_point_cost: 0,
     stamina_cost: 3,
-    mana_cost: 0,
+    weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
         action_point_discount: 1,
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const SMITE: AttackEnhancement = AttackEnhancement {
     name: "Smite",
     description: "", //"Enhance your strike with magic",
     icon: IconId::Smite,
-    action_point_cost: 0,
     stamina_cost: 1,
     mana_cost: 1,
     effect: AttackEnhancementEffect {
         bonus_damage: 1,
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
 pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     name: "Overwhelm",
     description: "", //"Overwhelm the target",
     icon: IconId::CrushingStrike,
-    action_point_cost: 0,
     stamina_cost: 2,
-    mana_cost: 0,
-
+    weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
         on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
             ApplyEffect::RemoveActionPoints(1),
         )),
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
 };
 
-pub const CAREFULLY_AIMED: AttackEnhancement = AttackEnhancement {
-    name: "Carefully aimed",
+pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
+    name: "Careful aim",
     description: "", // "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
-    stamina_cost: 0,
-    mana_cost: 0,
-
     effect: AttackEnhancementEffect {
         bonus_advantage: 1,
         ..AttackEnhancementEffect::default()
     },
+    ..AttackEnhancement::default()
+};
+
+pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
+    name: "Crippling shot",
+    icon: IconId::CripplingShot,
+    stamina_cost: 1,
+    effect: AttackEnhancementEffect {
+        on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
+            ApplyEffect::Condition(Condition::Hindered(1)),
+        )),
+        ..AttackEnhancementEffect::default()
+    },
+    weapon_requirement: Some(WeaponType::Ranged),
+    ..AttackEnhancement::default()
 };
 
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
@@ -362,7 +365,7 @@ pub const SWEEP_ATTACK: Spell = Spell {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 1,
-    weapon_requirement: Some(SpellWeaponRequirement::Melee),
+    weapon_requirement: Some(WeaponType::Melee),
 
     modifier: SpellModifier::Attack(-3),
     possible_enhancements: [
@@ -404,7 +407,7 @@ pub const LUNGE_ATTACK: Spell = Spell {
     action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 2,
-    weapon_requirement: Some(SpellWeaponRequirement::Melee),
+    weapon_requirement: Some(WeaponType::Melee),
 
     modifier: SpellModifier::Attack(0),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement

@@ -20,7 +20,7 @@ use crate::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
         DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
         SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellModifier, SpellReach,
-        SpellTarget, SpellWeaponRequirement, Weapon,
+        SpellTarget, Weapon, WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -83,6 +83,13 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
     let mut technical_description = vec![];
 
     let effect = enhancement.effect;
+
+    if let Some(weapon_requirement) = enhancement.weapon_requirement {
+        match weapon_requirement {
+            WeaponType::Melee => technical_description.push("[ melee ]".to_string()),
+            WeaponType::Ranged => technical_description.push("[ ranged ]".to_string()),
+        }
+    }
 
     if effect.roll_modifier != 0 {
         if effect.roll_modifier > 0 {
@@ -478,7 +485,7 @@ impl ActionButton {
     pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
         // TODO: if action requires melee weapon and none is equipped, add error message to tooltip
         if let ButtonAction::Action(BaseAction::CastSpell(spell)) = self.action {
-            if spell.weapon_requirement == Some(SpellWeaponRequirement::Melee) {
+            if spell.weapon_requirement == Some(WeaponType::Melee) {
                 let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
 
                 if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {

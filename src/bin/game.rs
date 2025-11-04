@@ -25,8 +25,9 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR,
-    LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
+    BOW, CRIPPLING_SHOT, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL,
+    LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP,
+    SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -72,7 +73,20 @@ async fn main() {
 
     let mut map_scene = MapScene::new();
 
-    let mut alice = init_player_character();
+    let mut alice = Character::new(
+        Behaviour::Player,
+        "Alice",
+        PortraitId::Alice,
+        SpriteId::Alice,
+        Attributes::new(2, 4, 3, 2),
+        (1, 10),
+    );
+    alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    alice.set_weapon(HandType::MainHand, BOW);
+    alice.armor.set(Some(SHIRT));
+    alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
+    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
+
     let mut bob = Character::new(
         Behaviour::Player,
         "Bob",
@@ -87,15 +101,27 @@ async fn main() {
     let mut player_characters = vec![alice, bob];
 
 
+              player_characters = run_victory_loop(
+                    player_characters,
+                    font.clone(),
+                    &equipment_icons,
+                    icons.clone(),
+                    &portrait_textures,
+                )
+                .await;
+
+            
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Elite,
+        FightId::Easy2,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
     )
     .await;
+
+
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
@@ -151,33 +177,6 @@ async fn main() {
             }
         }
     }
-}
-
-fn init_player_character() -> Character {
-    let mut character = Character::new(
-        Behaviour::Player,
-        "Alice",
-        PortraitId::Alice,
-        SpriteId::Alice,
-        Attributes::new(2, 4, 3, 2),
-        (1, 10),
-    );
-
-    /*
-    character
-        .known_actions
-        .push(BaseAction::CastSpell(FIREBALL));
-    character.known_actions.push(BaseAction::CastSpell(KILL));
-    character
-        .known_actions
-        .push(BaseAction::CastSpell(LUNGE_ATTACK));
-     */
-    character.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    character.set_weapon(HandType::MainHand, BOW);
-    character.armor.set(Some(SHIRT));
-    character.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
-
-    character
 }
 
 async fn run_fight_loop(

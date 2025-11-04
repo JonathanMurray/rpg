@@ -12,7 +12,8 @@ use crate::{
         Attributes, BaseAction, Behaviour, Character, CharacterId, Characters, HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT
+        BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL,
+        MAGI_INFLICT_WOUNDS, SHIRT,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -158,7 +159,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             tanky.health.change_max_value_to(25);
             tanky.armor.set(Some(CHAIN_MAIL));
             tanky.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
-            tanky.move_speed.set(0.7);
+            tanky.base_move_speed.set(0.7);
             characters.push(tanky);
 
             for i in 1..5 {

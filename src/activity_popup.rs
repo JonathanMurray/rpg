@@ -636,7 +636,7 @@ impl ActivityPopup {
 
                     ConfiguredAction::Move { .. } => {
                         let active_char = self.characters.get(active_character_id);
-                        let speed = active_char.move_speed.get();
+                        let speed = active_char.move_speed();
                         lines.push(format!("Speed: {}", speed));
                         let stamina = &active_char.stamina;
                         if stamina.max() > 0 {

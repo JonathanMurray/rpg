@@ -182,7 +182,7 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     let mut positions = vec![];
     let mut ap_cost = 0;
     for (dist, pos) in path.positions {
-        let cost = dist / character.move_speed.get();
+        let cost = dist / character.move_speed();
         if cost <= character.action_points.current() as f32 {
             positions.push(pos);
             ap_cost = cost.ceil() as u32;

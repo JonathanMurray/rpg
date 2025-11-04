@@ -14,16 +14,15 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
+        ActionButton, ButtonAction, ButtonSelected, InternalUiEvent, draw_button_tooltip
     },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::{
         AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction, Spell,
-        SpellEnhancement,
+        SpellEnhancement, WeaponType,
     },
     data::{
-        BRACE, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING,
-        QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
+        BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK
     },
     non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -397,8 +396,13 @@ pub async fn run_victory_loop(
         let mut transition_countdown = None;
 
         let mut candidate_rewards = vec![];
-        for enhancement in vec![QUICK, SMITE, OVERWHELMING] {
-            candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some("Attack")));
+        for enhancement in vec![QUICK, SMITE, OVERWHELMING, CRIPPLING_SHOT] {
+            let label = match enhancement.weapon_requirement {
+                Some(WeaponType::Melee) => "Melee attack",
+                Some(WeaponType::Ranged) => "Ranged attack",
+                None => "Attack",
+            };
+            candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some(label)));
         }
         for spell in vec![
             FIREBALL,
