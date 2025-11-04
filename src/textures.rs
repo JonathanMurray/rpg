@@ -83,6 +83,11 @@ pub enum IconId {
     Heal,
     Inferno,
     Energize,
+
+    HardenedSkin,
+    WeaponProficiency,
+    ArcaneSurge,
+    Reaper,
 }
 
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
@@ -128,6 +133,10 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Feint, "deceptive_icon.png"),
         (IconId::Inferno, "inferno_icon.png"),
         (IconId::Energize, "energize_icon.png"),
+        (IconId::HardenedSkin, "hardened_skin_icon.png"),
+        (IconId::WeaponProficiency, "weapon_proficiency_icon.png"),
+        (IconId::ArcaneSurge, "arcane_surge_icon.png"),
+        (IconId::Reaper, "reaper_icon.png"),
     ])
     .await
 }

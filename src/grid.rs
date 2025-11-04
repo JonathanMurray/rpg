@@ -8,6 +8,7 @@ use macroquad::{
     text::{draw_text_ex, Font, TextParams},
     window::{screen_height, screen_width},
 };
+use rand::Rng;
 
 use std::cell::Cell;
 
@@ -302,10 +303,15 @@ impl GameGrid {
         text: impl Into<String>,
         goodness: Goodness,
     ) {
-        let pos = (
+        let mut pos = (
             self.grid_x_to_screen(position.0),
             self.grid_y_to_screen(position.1),
         );
+
+        let mut rng = rand::rng();
+        let dx = rng.random_range(-10..=10) as f32;
+        let dy = rng.random_range(-10..=10) as f32;
+        pos = (pos.0 + dx, pos.1 + dy);
 
         let color = match goodness {
             Goodness::Good => GREEN,
@@ -1825,19 +1831,23 @@ impl EffectGraphics {
             }
             EffectGraphics::Text(text, font, color) => {
                 let font_size = 20;
-                let text_dimensions = measure_text(text, None, font_size, 1.0);
+                let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
                 let y0 = y - cell_w * 0.3 * t;
 
+                let alpha = if t > 0.5 { 1.0 - (t - 0.5) * 2.0 } else { 1.0 };
+
                 let mut text_params = TextParams {
                     font: Some(font),
                     font_size,
-                    color: BLACK,
+                    color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
                 draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
                 text_params.color = *color;
+                text_params.color.a = alpha;
+
                 draw_text_ex(text, x0, y0, text_params);
             }
         }

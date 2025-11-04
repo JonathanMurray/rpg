@@ -18,9 +18,9 @@ use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
         ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
-        DefenseType, HandType, OnAttackedReaction, OnHitReaction, Spell, SpellAllyEffect,
-        SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement, SpellModifier, SpellReach,
-        SpellTarget, Weapon, WeaponType,
+        DefenseType, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill, Spell,
+        SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
+        SpellModifier, SpellReach, SpellTarget, Weapon, WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -57,6 +57,15 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
             header: "THIS SHOULD NOT BE SHOWN".to_string(), // This is replaced on-the-fly if needed
             ..Default::default()
         },
+        ButtonAction::Passive(skill) => passive_skill_tooltip(skill),
+    }
+}
+
+fn passive_skill_tooltip(skill: &PassiveSkill) -> ActionButtonTooltip {
+    ActionButtonTooltip {
+        header: skill.name().to_string(),
+        description: Some(skill.description()),
+        ..Default::default()
     }
 }
 
@@ -419,7 +428,7 @@ impl ActionButton {
         let tooltip = button_action_tooltip(&action);
 
         let (size, texture_draw_size) = match action {
-            ButtonAction::Proceed => ((64.0, 52.0), (60.0, 48.0)),
+            ButtonAction::Proceed | ButtonAction::Passive(..) => ((64.0, 52.0), (60.0, 48.0)),
             _ => ((64.0, 64.0), (60.0, 48.0)),
         };
 
@@ -442,12 +451,14 @@ impl ActionButton {
         for _ in 0..stamina_points {
             point_icons.push(Element::Circle(Circle { r, color: GREEN }))
         }
+
+        let padding = if point_icons.is_empty() { 0.0 } else { 1.0 };
         let points_row = Container {
             children: point_icons,
             margin: 4.0,
             layout_dir: LayoutDirection::Horizontal,
             style: Style {
-                padding: 1.0,
+                padding,
                 ..Default::default()
             },
             ..Default::default()
@@ -731,6 +742,7 @@ pub enum ButtonAction {
     SpellEnhancement(SpellEnhancement),
     OpportunityAttack,
     Proceed,
+    Passive(PassiveSkill),
 }
 
 impl ButtonAction {
@@ -750,6 +762,7 @@ impl ButtonAction {
             ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
             ButtonAction::OpportunityAttack => "Opportunity attack",
             ButtonAction::Proceed => "Proceed",
+            ButtonAction::Passive(skill) => skill.name(),
         }
     }
 
@@ -785,6 +798,7 @@ impl ButtonAction {
             ButtonAction::OnHitReaction(reaction) => reaction.icon,
             ButtonAction::Proceed => IconId::Go,
             ButtonAction::OpportunityAttack => IconId::MeleeAttack,
+            ButtonAction::Passive(skill) => skill.icon(),
         }
     }
 
@@ -797,6 +811,7 @@ impl ButtonAction {
             ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 1,
+            ButtonAction::Passive(..) => 0,
         }
     }
 
@@ -818,6 +833,7 @@ impl ButtonAction {
             ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 0,
+            ButtonAction::Passive(..) => 0,
         }
     }
 
@@ -830,6 +846,7 @@ impl ButtonAction {
             ButtonAction::SpellEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 0,
+            ButtonAction::Passive(..) => 0,
         }
     }
 
@@ -894,7 +911,9 @@ pub fn draw_button_tooltip(
     if let Some(description) = tooltip.description {
         if !description.is_empty() {
             lines.push(description.to_string());
-            lines.push("".to_string());
+            if !tooltip.technical_description.is_empty() {
+                lines.push("".to_string());
+            }
         }
     }
 

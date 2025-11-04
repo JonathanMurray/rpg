@@ -78,6 +78,7 @@ pub async fn run_chest_loop(
             clear_background(BLACK);
             portrait_row.draw_and_handle_input();
             bottom_panels[portrait_row.selected_idx].draw_and_handle_input();
+            bottom_panels[portrait_row.selected_idx].draw_tooltips();
 
             let text = "You find:";
             let font_size = 32;

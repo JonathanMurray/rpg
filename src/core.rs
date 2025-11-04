@@ -67,6 +67,8 @@ impl CoreGame {
 
             let action = self.ui_select_action().await;
 
+            let mut active_character_killed_target = false;
+
             if let Some(action) = action {
                 let ap_before_action = self.active_character().action_points.current();
                 let attack_hit = self.perform_action(action).await;
@@ -84,15 +86,17 @@ impl CoreGame {
                     // You recover from 1 stack of Dazed each time you're hit by an attack
                     self.perform_recover_from_dazed(victim_id, 1).await;
 
-                    let character = self.active_character();
-
                     let victim = self.characters.get(victim_id);
 
+                    if victim.is_dead() {
+                        active_character_killed_target = true;
+                    }
+
+                    let character = self.active_character();
                     let is_within_melee =
                         within_meele(character.position.get(), victim.position.get());
                     let can_react = !victim.is_dead()
                         && !victim.usable_on_hit_reactions(is_within_melee).is_empty();
-
                     if can_react {
                         if let Some(reaction) = self
                             .user_interface
@@ -110,13 +114,10 @@ impl CoreGame {
                     }
                 }
 
-                {
-                    if self.active_character().action_points.current() == 0 {
-                        self.perform_end_of_turn_character().await;
-                        self.active_character_id =
-                            self.characters.next_id(self.active_character_id);
-                        self.notify_ui_of_new_turn().await;
-                    }
+                if self.active_character().action_points.current() == 0 {
+                    self.perform_end_of_turn_character().await;
+                    self.active_character_id = self.characters.next_id(self.active_character_id);
+                    self.notify_ui_of_new_turn().await;
                 }
             } else {
                 let name = self.active_character().name;
@@ -152,6 +153,25 @@ impl CoreGame {
                     new_active,
                 })
                 .await;
+            }
+
+            if !active_character_died && active_character_killed_target {
+                // TODO: This only accounts for direct attacks, but the passive skill should
+                // probably work on spells, as well as (perhaps) indirect kills (DOT's etc)
+                let active_char = self.active_character();
+                if active_char
+                    .known_passive_skills
+                    .contains(&PassiveSkill::Reaper)
+                {
+                    let gain = active_char.stamina.gain(1);
+                    if gain > 0 {
+                        self.log(format!(
+                            "{} gained {} stamina (Reaper)",
+                            active_char.name, gain
+                        ))
+                        .await;
+                    }
+                }
             }
 
             // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
@@ -1140,14 +1160,24 @@ impl CoreGame {
             detail_lines.push(description);
         }
 
+        let mut armor_penetrators = vec![];
+        for enhancement in &enhancements {
+            let penetration = enhancement.effect.armor_penetration;
+            if penetration > 0 {
+                armor_penetrators.push((penetration, enhancement.name));
+            }
+        }
+        if attacker
+            .known_passive_skills
+            .contains(&PassiveSkill::WeaponProficiency)
+        {
+            armor_penetrators.push((2, PassiveSkill::WeaponProficiency.name()));
+        }
         let mut armor_value = defender.protection_from_armor();
         let mut armor_str = armor_value.to_string();
-        for enhancement in &enhancements {
-            let armor_pentration = enhancement.effect.armor_penetration;
-            if armor_pentration > 0 {
-                armor_value = armor_value.saturating_sub(armor_pentration);
-                armor_str.push_str(&format!(" -{} ({})", armor_pentration, enhancement.name));
-            }
+        for (penetration, label) in armor_penetrators {
+            armor_value = armor_value.saturating_sub(penetration);
+            armor_str.push_str(&format!(" -{} ({})", penetration, label));
         }
 
         detail_lines.push(format!(
@@ -2245,6 +2275,43 @@ impl SpellTarget {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum PassiveSkill {
+    HardenedSkin,
+    WeaponProficiency,
+    ArcaneSurge,
+    Reaper,
+}
+
+impl PassiveSkill {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::HardenedSkin => "Hardened skin",
+            Self::WeaponProficiency => "Weapon proficiency",
+            Self::ArcaneSurge => "Arcane surge",
+            Self::Reaper => "Reaper",
+        }
+    }
+
+    pub fn icon(&self) -> IconId {
+        match self {
+            Self::HardenedSkin => IconId::HardenedSkin,
+            Self::WeaponProficiency => IconId::WeaponProficiency,
+            Self::ArcaneSurge => IconId::ArcaneSurge,
+            Self::Reaper => IconId::Reaper,
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::HardenedSkin => "+1 armor",
+            Self::WeaponProficiency => "Attacks gain +2 armor penetration",
+            Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
+            Self::Reaper => "On kill: regain 1 stamina",
+        }
+    }
+}
+
 // TODO Merge SpellEnhancement and AttackEnhancement? (There may be AttackEnhancements that should also be
 // usable for attack abilities (like Lunge attack / Sweeping attack))
 
@@ -2442,6 +2509,7 @@ pub struct Character {
     pub known_attacked_reactions: Vec<OnAttackedReaction>,
     pub known_on_hit_reactions: Vec<OnHitReaction>,
     pub known_spell_enhancements: Vec<SpellEnhancement>,
+    pub known_passive_skills: Vec<PassiveSkill>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 
@@ -2499,6 +2567,7 @@ impl Character {
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
             known_spell_enhancements: Default::default(),
+            known_passive_skills: Default::default(),
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
         }
@@ -3085,7 +3154,17 @@ impl Character {
             res += armor.equip.bonus_spell_modifier;
         }
 
+        if self.has_active_arcane_surge() {
+            res += 3;
+        }
+
         res
+    }
+
+    fn has_active_arcane_surge(&self) -> bool {
+        self.known_passive_skills
+            .contains(&PassiveSkill::ArcaneSurge)
+            && self.mana.ratio() <= 0.5
     }
 
     fn is_dazed(&self) -> bool {
@@ -3165,6 +3244,13 @@ impl Character {
 
         if self.conditions.borrow().protected > 0 {
             protection += PROTECTED_ARMOR_BONUS;
+        }
+
+        if self
+            .known_passive_skills
+            .contains(&PassiveSkill::HardenedSkin)
+        {
+            protection += 1;
         }
 
         protection
@@ -3278,6 +3364,7 @@ impl Character {
             bonuses.push(("Raging", RollBonusContributor::Advantage(1)));
         }
         if conditions.weakened > 0 {
+            // TODO: this seems wrong, shouldn't the penalty be applied here? If not here, then where?
             bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
         }
 
@@ -3309,6 +3396,11 @@ impl Character {
                 ));
             }
         }
+
+        if self.has_active_arcane_surge() {
+            bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
+        }
+
         let conditions = self.conditions.borrow();
         if conditions.weakened > 0 {
             bonuses.push((

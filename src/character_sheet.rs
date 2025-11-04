@@ -48,6 +48,7 @@ impl CharacterSheet {
         reaction_buttons: Vec<Rc<ActionButton>>,
         attack_enhancement_buttons: Vec<Rc<ActionButton>>,
         spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+        passive_skill_buttons: Vec<Rc<ActionButton>>,
     ) -> Self {
         let spell_book_rows = build_spell_book(
             font,
@@ -55,6 +56,7 @@ impl CharacterSheet {
             reaction_buttons,
             attack_enhancement_buttons,
             spell_buttons,
+            passive_skill_buttons,
             450.0,
         );
 
@@ -273,6 +275,7 @@ pub fn build_spell_book(
     reaction_buttons: Vec<Rc<ActionButton>>,
     attack_enhancement_buttons: Vec<Rc<ActionButton>>,
     spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+    passive_skill_buttons: Vec<Rc<ActionButton>>,
     max_height: f32,
 ) -> Container {
     let mut spell_book_rows = Container {
@@ -343,6 +346,24 @@ pub fn build_spell_book(
         );
         spell_book_rows.children.push(spell_row);
     }
+
+    if !passive_skill_buttons.is_empty() {
+        let row = buttons_row(
+            passive_skill_buttons
+                .into_iter()
+                .map(|btn| Element::Rc(btn))
+                .collect(),
+        );
+
+        spell_book_rows.children.push(Element::Text(TextLine::new(
+            "Passive",
+            16,
+            WHITE,
+            Some(font.clone()),
+        )));
+        spell_book_rows.children.push(row);
+    }
+
     spell_book_rows
 }
 

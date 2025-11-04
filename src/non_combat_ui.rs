@@ -118,6 +118,7 @@ impl NonCombatUi {
         let mut attack_button = None;
         let mut spell_buttons = vec![];
         let mut attack_enhancement_buttons = vec![];
+        let mut passive_skill_buttons = vec![];
 
         for action in character.known_actions() {
             let btn_action = ButtonAction::Action(action);
@@ -174,6 +175,12 @@ impl NonCombatUi {
             hoverable_buttons.push(Rc::clone(&btn));
             attack_enhancement_buttons.push(btn);
         }
+        for passive_skill in &character.known_passive_skills {
+            let btn_action = ButtonAction::Passive(*passive_skill);
+            let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+            hoverable_buttons.push(Rc::clone(&btn));
+            passive_skill_buttons.push(Rc::clone(&btn));
+        }
 
         let spell_book = build_spell_book(
             font,
@@ -181,6 +188,7 @@ impl NonCombatUi {
             reaction_buttons,
             attack_enhancement_buttons,
             spell_buttons,
+            passive_skill_buttons,
             UI_HEIGHT - 20.0,
         );
 
@@ -250,12 +258,26 @@ impl NonCombatUi {
             .repopulate_character_equipment();
     }
 
+    pub fn draw_tooltips(&mut self) {
+        let (_screen_w, screen_h) = screen_size();
+        let pos = (0.0, screen_h - UI_HEIGHT);
+        self.bottom_panel.draw_tooltips(pos.0, pos.1);
+
+        if let Some((id, btn_pos)) = self.hovered_button {
+            let btn = self
+                .hoverable_buttons
+                .iter()
+                .find(|btn| btn.id == id)
+                .unwrap();
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
+        }
+    }
+
     pub fn draw_and_handle_input(&mut self) {
         let (_screen_w, screen_h) = screen_size();
 
         let pos = (0.0, screen_h - UI_HEIGHT);
         self.bottom_panel.draw(pos.0, pos.1);
-        self.bottom_panel.draw_tooltips(pos.0, pos.1);
 
         let outcome = self
             .equipment_section
@@ -296,15 +318,6 @@ impl NonCombatUi {
                     dbg!(event);
                 }
             }
-        }
-
-        if let Some((id, btn_pos)) = self.hovered_button {
-            let btn = self
-                .hoverable_buttons
-                .iter()
-                .find(|btn| btn.id == id)
-                .unwrap();
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
         }
     }
 }

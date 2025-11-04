@@ -1128,7 +1128,7 @@ impl UserInterface {
                 );
 
                 self.game_grid
-                    .add_text_effect(target_pos, duration, 0.5, impact_text, goodness);
+                    .add_text_effect(target_pos, duration, 1.0, impact_text, goodness);
             }
 
             GameEvent::SpellWasCast {
@@ -1247,7 +1247,7 @@ impl UserInterface {
                     self.game_grid.add_text_effect(
                         target_pos,
                         duration,
-                        0.5,
+                        1.0,
                         target_text,
                         goodness,
                     );
@@ -1296,7 +1296,7 @@ impl UserInterface {
                         self.game_grid.add_text_effect(
                             target_pos,
                             duration,
-                            0.5,
+                            1.0,
                             target_text,
                             goodness,
                         );
@@ -1641,6 +1641,7 @@ pub fn build_character_ui(
     let mut attack_button_for_character_sheet = None;
     let mut spell_buttons_for_character_sheet = vec![];
     let mut attack_enhancement_buttons_for_character_sheet = vec![];
+    let mut passive_buttons_for_character_sheet = vec![];
 
     for action in character.known_actions() {
         let btn_action = ButtonAction::Action(action);
@@ -1714,6 +1715,13 @@ pub fn build_character_ui(
         attack_enhancement_buttons_for_character_sheet.push(btn);
     }
 
+    for passive_skill in &character.known_passive_skills {
+        let btn_action = ButtonAction::Passive(*passive_skill);
+        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+        hoverable_buttons.push(Rc::clone(&btn));
+        passive_buttons_for_character_sheet.push(Rc::clone(&btn));
+    }
+
     let character_sheet = CharacterSheet::new(
         simple_font,
         Rc::clone(character),
@@ -1722,6 +1730,7 @@ pub fn build_character_ui(
         reaction_buttons_for_character_sheet,
         attack_enhancement_buttons_for_character_sheet,
         spell_buttons_for_character_sheet,
+        passive_buttons_for_character_sheet,
     );
 
     let mut upper_buttons = basic_buttons;
@@ -1855,6 +1864,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::UseConsumable => "USING_CONSUMABLE".to_string(),
             BaseAction::EndTurn => "END_TURN".to_string(),
         },
+
         _ => unreachable!(),
     }
 }

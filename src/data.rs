@@ -1,4 +1,3 @@
-
 use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 
 use crate::{
@@ -507,7 +506,7 @@ pub const SCREAM: Spell = Spell {
 
 pub const SHACKLED_MIND: Spell = Spell {
     id: SpellId::ShackledMind,
-    name: "Shackled Mind",
+    name: "Shackle",
     description: "Shackle an enemy's mind, slowing them and lowering their defenses",
     icon: IconId::ShackledMind,
     action_point_cost: 3,

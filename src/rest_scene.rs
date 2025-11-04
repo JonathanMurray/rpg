@@ -58,6 +58,7 @@ pub async fn run_rest_loop(
             clear_background(BLACK);
             portrait_row.draw_and_handle_input();
             bottom_panels[portrait_row.selected_idx].draw_and_handle_input();
+            bottom_panels[portrait_row.selected_idx].draw_tooltips();
 
             let text = "You regained 50% health and 100% mana";
             let font_size = 32;

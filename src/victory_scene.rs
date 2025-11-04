@@ -14,15 +14,17 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        ActionButton, ButtonAction, ButtonSelected, InternalUiEvent, draw_button_tooltip
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
     },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::{
-        AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction, Spell,
-        SpellEnhancement, WeaponType,
+        AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction, PassiveSkill,
+        Spell, SpellEnhancement, WeaponType,
     },
     data::{
-        BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK
+        BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK,
+        MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE,
+        SWEEP_ATTACK,
     },
     non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -36,6 +38,7 @@ pub enum Learning {
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
     SpellEnhancement(SpellEnhancement),
+    Passive(PassiveSkill),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -369,6 +372,8 @@ impl RewardSelectionUi {
                 .unwrap();
             draw_button_tooltip(&self.font, btn_pos, &reward_btn.tooltip());
         }
+
+        self.bottom_panel.draw_tooltips();
     }
 }
 
@@ -441,6 +446,15 @@ pub async fn run_victory_loop(
             let reaction = RAGE;
             candidate_rewards.push((ButtonAction::OnHitReaction(reaction), Some("On hit")));
         }
+        for passive in [
+            PassiveSkill::HardenedSkin,
+            PassiveSkill::WeaponProficiency,
+            PassiveSkill::ArcaneSurge,
+            PassiveSkill::Reaper,
+        ] {
+            candidate_rewards.push((ButtonAction::Passive(passive), Some("Passive")));
+        }
+
         let mut rewards: Vec<(ButtonAction, Option<&'static str>)> = vec![];
         for character in &characters {
             let applicable = select_n_random(
@@ -611,6 +625,9 @@ fn can_learn(character: &Character, learning: Learning) -> bool {
             character.knows_spell(enhancement.spell_id)
                 && !character.known_spell_enhancements.contains(&enhancement)
         }
+        Learning::Passive(passive_skill) => {
+            !character.known_passive_skills.contains(&passive_skill)
+        }
     }
 }
 
@@ -625,6 +642,7 @@ fn apply_learning(learning: Learning, character: &mut Character) {
         Learning::SpellEnhancement(enhancement) => {
             character.known_spell_enhancements.push(enhancement)
         }
+        Learning::Passive(passive_skill) => character.known_passive_skills.push(passive_skill),
     }
 }
 
@@ -636,6 +654,7 @@ fn action_to_reward_choice(btn_action: ButtonAction) -> Learning {
         ButtonAction::OnHitReaction(reaction) => Learning::OnHitReaction(reaction),
         ButtonAction::AttackEnhancement(enhancement) => Learning::AttackEnhancement(enhancement),
         ButtonAction::SpellEnhancement(enhancement) => Learning::SpellEnhancement(enhancement),
+        ButtonAction::Passive(skill) => Learning::Passive(skill),
         ButtonAction::OpportunityAttack | ButtonAction::Proceed => unreachable!(),
     }
 }
