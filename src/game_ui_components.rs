@@ -150,7 +150,7 @@ impl TopCharacterPortrait {
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
 
-        let name_color = if character.player_controlled {
+        let name_color = if character.player_controlled() {
             WHITE
         } else {
             Color::new(1.0, 0.7, 0.7, 1.0)
@@ -296,7 +296,7 @@ impl PlayerPortraits {
             Default::default();
 
         for (id, character) in characters.iter_with_ids() {
-            if character.player_controlled {
+            if character.player_controlled() {
                 let texture = portrait_textures.get(&character.portrait).unwrap().clone();
 
                 portraits.insert(

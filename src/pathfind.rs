@@ -3,7 +3,7 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
-use crate::{core::Position, util::are_adjacent};
+use crate::core::{distance_between, Position};
 
 pub struct PathfindGrid {
     dimensions: (u32, u32),
@@ -14,6 +14,12 @@ pub struct PathfindGrid {
 pub struct Route {
     pub distance_from_start: f32,
     pub came_from: Position,
+}
+
+#[derive(Debug)]
+pub struct Path {
+    pub total_distance: f32,
+    pub positions: Vec<(f32, Position)>,
 }
 
 impl PathfindGrid {
@@ -43,15 +49,25 @@ impl PathfindGrid {
         self.dimensions
     }
 
-    pub fn find_path_to_adjacent(
+    pub fn find_shortest_path_to_adjacent(
         &self,
         start: Position,
         target: Position,
-    ) -> Option<(f32, Vec<(f32, Position)>)> {
+    ) -> Option<Path> {
+        let proximity = 1.5; // adjacent = one diaginal away (sqrt(2)) is allowed, but 2 away is not
+        self.find_shortest_path_to_proximity(start, target, proximity)
+    }
+
+    pub fn find_shortest_path_to_proximity(
+        &self,
+        start: Position,
+        target: Position,
+        proximity: f32,
+    ) -> Option<Path> {
         let routes = self.explore_outward(start, 20.0);
         let mut shortest_path: Option<Vec<(f32, (i32, i32))>> = None;
         for (end, route) in &routes {
-            if are_adjacent(*end, target) {
+            if distance_between(*end, target) <= proximity {
                 let mut path = build_path_from_route(&routes, start, *end);
 
                 //dbg!("before popping start pos from path: ", &path);
@@ -75,9 +91,12 @@ impl PathfindGrid {
         }
 
         shortest_path.map(|path| {
-            let total_dist = path[0].0;
+            let total_distance = path[0].0;
             let positions = path.iter().rev().copied().collect();
-            (total_dist, positions)
+            Path {
+                total_distance,
+                positions,
+            }
         })
     }
 

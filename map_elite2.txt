@@ -1,0 +1,8 @@
++----------------------------
+BBBBBBBBBBBBBBBBBBBB
+B       P P        B
+B                  B
+B        2  1      B
+B0                 B
+BBBBBBBBBBBBBBBBBBBB
++----------------------------

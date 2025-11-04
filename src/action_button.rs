@@ -343,6 +343,7 @@ fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: 
     match effect.defense_type {
         Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
         Some(DefenseType::Evasion) => technical_description.push("  [ evasion ]".to_string()),
+        Some(DefenseType::Toughness) => technical_description.push("  [ toughness ]".to_string()),
         None => {}
     };
 
@@ -766,7 +767,7 @@ impl ButtonAction {
                 BaseAction::CastSpell(spell) => spell.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
-                BaseAction::UseConsumable => IconId::Equip, //TODO
+                BaseAction::UseConsumable => IconId::UseConsumable,
                 BaseAction::EndTurn => IconId::EndTurn,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,

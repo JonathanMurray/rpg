@@ -30,10 +30,7 @@ pub async fn run_rest_loop(
         character.mana.set_to_max();
     }
 
-    let characters: Vec<Rc<Character>> = player_characters
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
     {
         let (screen_w, screen_h) = screen_size();

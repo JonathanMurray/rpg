@@ -33,10 +33,7 @@ pub async fn run_shop_loop(
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Vec<Character> {
-    let characters: Vec<Rc<Character>> = player_characters
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
     {
         let (screen_w, screen_h) = screen_size();

@@ -225,7 +225,7 @@ impl GameGrid {
                 self.selected_player_character_id = self
                     .characters
                     .iter()
-                    .find(|ch| ch.player_controlled)
+                    .find(|ch| ch.player_controlled())
                     .map(|ch| ch.id());
             }
         }
@@ -657,14 +657,14 @@ impl GameGrid {
         // state to another one.
         if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
             if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
-                if self.characters.get(id).player_controlled {
+                if self.characters.get(id).player_controlled() {
                     ui_state.set_target(ActionTarget::None);
                 }
             }
         }
         if matches!(mouse_state, MouseState::RequiresAllyTarget) {
             if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
-                if !self.characters.get(id).player_controlled {
+                if !self.characters.get(id).player_controlled() {
                     ui_state.set_target(ActionTarget::None);
                 }
             }
@@ -863,7 +863,7 @@ impl GameGrid {
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
-                let player_controlled = self.characters.get(hovered_id).player_controlled;
+                let player_controlled = self.characters.get(hovered_id).player_controlled();
 
                 if player_controlled {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {

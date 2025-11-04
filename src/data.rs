@@ -1,4 +1,4 @@
-use macroquad::color::{BLACK, BLUE, GREEN, MAGENTA, PURPLE, RED};
+use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 
 use crate::{
     core::{
@@ -180,6 +180,21 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
         armor_penetration: 2,
         ..AttackEnhancementEffect::default()
     },
+};
+
+pub const BAD_WAR_HAMMER: Weapon = Weapon {
+    name: "Bad war hammer",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 3,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Strength,
+    attack_enhancement: Some(ALL_IN),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Warhammer),
+    icon: EquipmentIconId::Warhammer,
+    weight: 5,
 };
 
 pub const WAR_HAMMER: Weapon = Weapon {
@@ -583,6 +598,76 @@ pub const MIND_BLAST: Spell = Spell {
     animation_color: PURPLE,
 };
 
+pub const MAGI_INFLICT_WOUNDS: Spell = Spell {
+    id: SpellId::MagiInflictWounds,
+    name: "Inflict wounds",
+    description: "",
+    icon: IconId::Mindblast,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    weapon_requirement: None,
+
+    modifier: SpellModifier::Spell,
+    possible_enhancements: [None, None, None],
+    target: SpellTarget::Enemy {
+        effect: SpellEnemyEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: None,
+            on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(3))), None]),
+        },
+        impact_area: None,
+        reach: SpellReach::Range(Range::Ranged(5)),
+    },
+    animation_color: BROWN,
+};
+
+pub const MAGI_INFLICT_HORRORS: Spell = Spell {
+    id: SpellId::MagiInflictHorrors,
+    name: "Inflict horrors",
+    description: "",
+    icon: IconId::Mindblast,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    weapon_requirement: None,
+
+    modifier: SpellModifier::Spell,
+    possible_enhancements: [None, None, None],
+    target: SpellTarget::Enemy {
+        effect: SpellEnemyEffect {
+            defense_type: Some(DefenseType::Will),
+            damage: None,
+            on_hit: Some([Some(ApplyEffect::Condition(Condition::Slowed(1))), None]),
+        },
+        impact_area: None,
+        reach: SpellReach::Range(Range::Ranged(5)),
+    },
+    animation_color: PURPLE,
+};
+
+pub const MAGI_HEAL: Spell = Spell {
+    id: SpellId::MagiHeal,
+    name: "Heal",
+    description: "",
+    icon: IconId::Heal,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    weapon_requirement: None,
+
+    modifier: SpellModifier::Spell,
+    target: SpellTarget::Ally {
+        range: Range::Ranged(5),
+        effect: SpellAllyEffect {
+            healing: 4,
+            apply: None,
+        },
+    },
+    possible_enhancements: [None, None, None],
+    animation_color: LIME,
+};
+
 pub const HEAL: Spell = Spell {
     id: SpellId::Heal,
     name: "Heal",
@@ -640,7 +725,7 @@ pub const HEALING_NOVA: Spell = Spell {
     name: "Healing nova",
     description: "Restore health to nearby allies",
     icon: IconId::PlusPlus,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
     weapon_requirement: None,
@@ -687,7 +772,7 @@ pub const HEALING_RAIN: Spell = Spell {
     name: "Healing rain",
     description: "Restore health to allies in an area",
     icon: IconId::PlusPlus,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 2,
     stamina_cost: 0,
     weapon_requirement: None,

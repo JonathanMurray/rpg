@@ -380,10 +380,7 @@ pub async fn run_victory_loop(
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Vec<Character> {
-    let characters: Vec<Rc<Character>> = player_characters
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
     let mut selected_learnings: Vec<Option<Learning>> = vec![];
     {
         let mut portrait_row = PortraitRow::new(&characters, portrait_textures);
@@ -429,13 +426,15 @@ pub async fn run_victory_loop(
                 }
             }
         }
-        for reaction in [SIDE_STEP] {
+        {
+            let reaction = SIDE_STEP;
             candidate_rewards.push((
                 ButtonAction::OnAttackedReaction(reaction),
                 Some("On attacked"),
             ));
         }
-        for reaction in [RAGE] {
+        {
+            let reaction = RAGE;
             candidate_rewards.push((ButtonAction::OnHitReaction(reaction), Some("On hit")));
         }
         let mut rewards: Vec<(ButtonAction, Option<&'static str>)> = vec![];

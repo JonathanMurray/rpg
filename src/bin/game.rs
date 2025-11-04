@@ -20,13 +20,13 @@ use macroquad::{
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Action, Attributes, BaseAction, Character, CharacterId, CoreGame, EquipmentEntry, HandType,
-    OnAttackedReaction, OnHitReaction,
+    Action, Attributes, BaseAction, Behaviour, Character, CharacterId, CoreGame, EquipmentEntry,
+    HandType, OnAttackedReaction, OnHitReaction,
 };
 
 use rpg::data::{
-    BOW, DAGGER, FIREBALL, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE,
-    ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
+    BOW, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR,
+    LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -74,7 +74,7 @@ async fn main() {
 
     let mut alice = init_player_character();
     let mut bob = Character::new(
-        true,
+        Behaviour::Player,
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -86,15 +86,16 @@ async fn main() {
 
     let mut player_characters = vec![alice, bob];
 
-           player_characters = run_fight_loop(
-                    player_characters,
-                    FightId::Elite,
-                    &equipment_icons,
-                    icons.clone(),
-                    portrait_textures.clone(),
-                )
-                .await;
 
+
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::Elite,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
@@ -154,7 +155,7 @@ async fn main() {
 
 fn init_player_character() -> Character {
     let mut character = Character::new(
-        true,
+        Behaviour::Player,
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,

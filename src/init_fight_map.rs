@@ -7,8 +7,13 @@ use std::{
 use rand::distr::{Distribution, Uniform};
 
 use crate::{
-    core::{Attributes, Character, CharacterId, Characters, HandType, Position},
-    data::{BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, CHAIN_MAIL, SHIRT, WAR_HAMMER},
+    bot::BotBehaviour,
+    core::{
+        Attributes, BaseAction, Behaviour, Character, CharacterId, Characters, HandType, Position,
+    },
+    data::{
+        BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT
+    },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
 };
@@ -19,6 +24,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Easy2 => "map2.txt",
         FightId::Easy3 => "map3.txt",
         FightId::Elite => "map_elite.txt",
+        FightId::Elite2 => "map_elite2.txt",
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
@@ -63,7 +69,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 '3' => {
                     enemy_positions.insert(3, pos);
                 }
-                 '4' => {
+                '4' => {
                     enemy_positions.insert(4, pos);
                 }
                 ' ' => {}
@@ -81,7 +87,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     match fight_id {
         FightId::Easy1 => {
             let melee = Character::new(
-                false,
+                Behaviour::Bot(BotBehaviour::Normal),
                 "Shambler",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
@@ -91,7 +97,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             melee.set_weapon(HandType::MainHand, BAD_DAGGER);
 
             let ranged = Character::new(
-                false,
+                Behaviour::Bot(BotBehaviour::Normal),
                 "Archer",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
@@ -105,7 +111,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
         FightId::Easy2 => {
             let tanky = Character::new(
-                false,
+                Behaviour::Bot(BotBehaviour::Normal),
                 "Guard",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
@@ -123,7 +129,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Easy3 => {
             for i in 0..4 {
                 let enemy = Character::new(
-                    false,
+                    Behaviour::Bot(BotBehaviour::Normal),
                     "Ghoul",
                     PortraitId::Skeleton,
                     SpriteId::Skeleton,
@@ -141,24 +147,23 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Elite => {
-
             let tanky = Character::new(
-                    false,
-                    "Ogre",
-                    PortraitId::Skeleton,
-                    SpriteId::Skeleton,
-                    Attributes::new(4, 1, 1, 1),
-                    enemy_positions[&0],
-                );
+                Behaviour::Bot(BotBehaviour::Normal),
+                "Ogre",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(4, 1, 1, 1),
+                enemy_positions[&0],
+            );
             tanky.health.change_max_value_to(25);
             tanky.armor.set(Some(CHAIN_MAIL));
-            tanky.set_weapon(HandType::MainHand, WAR_HAMMER);
-            tanky.move_speed.set(0.5);
+            tanky.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
+            tanky.move_speed.set(0.7);
             characters.push(tanky);
 
-                  for i in 1..5 {
+            for i in 1..5 {
                 let archer = Character::new(
-                    false,
+                    Behaviour::Bot(BotBehaviour::Normal),
                     "Archer",
                     PortraitId::Skeleton,
                     SpriteId::Skeleton,
@@ -167,6 +172,38 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 );
                 archer.set_weapon(HandType::MainHand, BAD_BOW);
                 characters.push(archer);
+            }
+        }
+
+        FightId::Elite2 => {
+            let mut magi = Character::new(
+                Behaviour::Bot(BotBehaviour::Magi(Default::default())),
+                "Magi",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(4, 1, 3, 5),
+                enemy_positions[&0],
+            );
+            magi.known_actions.push(BaseAction::CastSpell(MAGI_HEAL));
+            magi.armor.set(Some(SHIRT));
+            magi.known_actions
+                .push(BaseAction::CastSpell(MAGI_INFLICT_WOUNDS));
+            magi.health.change_max_value_to(25);
+            characters.push(magi);
+
+            for i in 1..3 {
+                let tanky = Character::new(
+                    Behaviour::Bot(BotBehaviour::Normal),
+                    "Warrior",
+                    PortraitId::Skeleton,
+                    SpriteId::Skeleton,
+                    Attributes::new(3, 1, 1, 1),
+                    enemy_positions[&i],
+                );
+                tanky.health.change_max_value_to(20);
+                tanky.armor.set(Some(CHAIN_MAIL));
+                tanky.set_weapon(HandType::MainHand, BAD_SWORD);
+                characters.push(tanky);
             }
         }
     }
@@ -252,4 +289,5 @@ pub enum FightId {
     Easy2,
     Easy3,
     Elite,
+    Elite2,
 }

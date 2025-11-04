@@ -5,6 +5,7 @@ use std::rc::{Rc, Weak};
 
 use macroquad::color::Color;
 
+use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::game_ui_connection::GameUserInterfaceConnection;
@@ -48,7 +49,7 @@ impl CoreGame {
             let enemies_remaining = self
                 .characters
                 .iter()
-                .any(|character| !character.player_controlled);
+                .any(|character| !character.player_controlled());
 
             if !enemies_remaining {
                 println!("No enemies remaining. Exiting game loop");
@@ -172,14 +173,22 @@ impl CoreGame {
         self.characters.get(self.active_character_id)
     }
 
+    pub fn enemies(&self) -> impl Iterator<Item = &Rc<Character>> {
+        self.characters.iter().filter(|ch| !ch.player_controlled())
+    }
+
+    pub fn player_characters(&self) -> impl Iterator<Item = &Rc<Character>> {
+        self.characters.iter().filter(|ch| ch.player_controlled())
+    }
+
     pub fn is_players_turn(&self) -> bool {
-        self.active_character().player_controlled
+        self.active_character().player_controlled()
     }
 
     pub fn player_positions(&self) -> Vec<Position> {
         let mut positions = vec![];
         for character in self.characters.iter() {
-            if character.player_controlled {
+            if character.player_controlled() {
                 positions.push(character.pos());
             }
         }
@@ -331,7 +340,7 @@ impl CoreGame {
             }
 
             for other_char in self.characters.iter() {
-                if other_char.player_controlled != character.player_controlled
+                if other_char.player_controlled() != character.player_controlled()
                     && within_meele(character.pos(), other_char.pos())
                     && !within_meele(new_position, other_char.pos())
                     && other_char.can_use_opportunity_attack()
@@ -525,6 +534,9 @@ impl CoreGame {
                             }
                             DefenseType::Evasion => {
                                 line.push_str(&format!(", vs evasion={}", target.evasion()))
+                            }
+                            DefenseType::Toughness => {
+                                line.push_str(&format!(", vs toughness={}", target.toughness()))
                             }
                         }
                     }
@@ -733,7 +745,7 @@ impl CoreGame {
         }
 
         for other_char in self.characters.iter() {
-            if other_char.player_controlled != caster.player_controlled {
+            if other_char.player_controlled() != caster.player_controlled() {
                 continue;
             }
 
@@ -834,7 +846,7 @@ impl CoreGame {
         }
 
         for other_char in self.characters.iter() {
-            if other_char.player_controlled == caster.player_controlled {
+            if other_char.player_controlled() == caster.player_controlled() {
                 continue;
             }
 
@@ -845,6 +857,9 @@ impl CoreGame {
                         DefenseType::Will => line.push_str(&format!(" will={}", other_char.will())),
                         DefenseType::Evasion => {
                             line.push_str(&format!(" evasion={}", other_char.evasion()))
+                        }
+                        DefenseType::Toughness => {
+                            line.push_str(&format!(" toughness={}", other_char.toughness()))
                         }
                     }
                 }
@@ -885,6 +900,7 @@ impl CoreGame {
                 let defense = match contest {
                     DefenseType::Will => target.will(),
                     DefenseType::Evasion => target.evasion(),
+                    DefenseType::Toughness => target.toughness(),
                 };
 
                 if spell_result >= defense {
@@ -1001,7 +1017,7 @@ impl CoreGame {
         } else {
             let line = match (modifier, enemy_effect.defense_type) {
                 (_, None) => unreachable!("uncontested effect cannot fail"),
-                (SpellModifier::Spell, Some(DefenseType::Will)) => {
+                (SpellModifier::Spell, Some(DefenseType::Will | DefenseType::Toughness)) => {
                     format!("  {} resisted the spell", target.name)
                 }
                 (SpellModifier::Spell, Some(DefenseType::Evasion)) => {
@@ -1419,21 +1435,21 @@ impl CoreGame {
             }
         }
 
-        let mut new_ap = MAX_ACTION_POINTS;
-        if conditions.borrow().near_death {
-            new_ap = new_ap.saturating_sub(2);
-        }
-        if conditions.borrow().slowed > 0 {
-            new_ap = new_ap.saturating_sub(2);
-        }
-        character.action_points.current.set(new_ap);
-
         if conditions.borrow().slowed > 0 {
             conditions.borrow_mut().slowed -= 1;
             if conditions.borrow().slowed == 0 {
                 self.log(format!("{} is no longer Slowed", name)).await;
             }
         }
+
+        let mut new_ap = MAX_ACTION_POINTS;
+        if conditions.borrow().near_death {
+            new_ap = new_ap.saturating_sub(2);
+        }
+        if conditions.borrow().slowed > 0 {
+            new_ap = new_ap.saturating_sub(SLOWED_AP_PENALTY);
+        }
+        character.action_points.current.set(new_ap);
 
         conditions.borrow_mut().mainhand_exertion = 0;
         conditions.borrow_mut().offhand_exertion = 0;
@@ -1603,6 +1619,7 @@ pub fn prob_spell_hit(
     let def = match defense_type {
         DefenseType::Will => defender.will(),
         DefenseType::Evasion => defender.evasion(),
+        DefenseType::Toughness => defender.toughness(),
     };
     let target = def.saturating_sub(caster.spell_modifier()).max(1);
     probability_of_d20_reaching(target, bonus)
@@ -1647,6 +1664,10 @@ impl Characters {
         }
     }
 
+    pub fn contains(&self, character_id: CharacterId) -> bool {
+        self.0.iter().any(|(id, _ch)| *id == character_id)
+    }
+
     pub fn get(&self, character_id: CharacterId) -> &Character {
         self.get_rc(character_id)
     }
@@ -1666,7 +1687,7 @@ impl Characters {
 
     pub fn player_characters(self) -> Vec<Character> {
         self.iter()
-            .filter(|ch| ch.player_controlled)
+            .filter(|ch| ch.player_controlled())
             .map(|ch| Character::clone(ch))
             .collect()
     }
@@ -1867,6 +1888,7 @@ const PROTECTED_ARMOR_BONUS: u32 = 3;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
+const SLOWED_AP_PENALTY: u32 = 2;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -2076,6 +2098,10 @@ pub enum SpellId {
     HealingRain,
     Fireballl,
     Kill,
+
+    MagiHeal,
+    MagiInflictWounds,
+    MagiInflictHorrors,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2275,6 +2301,7 @@ pub enum AttackEnhancementOnHitEffect {
 pub enum DefenseType {
     Will,
     Evasion,
+    Toughness,
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
@@ -2348,6 +2375,12 @@ impl Attributes {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Behaviour {
+    Player,
+    Bot(BotBehaviour),
+}
+
 #[derive(Debug, Clone)]
 pub struct Character {
     id: Option<CharacterId>,
@@ -2355,7 +2388,7 @@ pub struct Character {
     pub portrait: PortraitId,
 
     pub sprite: SpriteId,
-    pub player_controlled: bool,
+    pub behaviour: Behaviour,
     pub position: Cell<Position>,
     pub base_attributes: Attributes,
     pub health: NumberedResource,
@@ -2384,7 +2417,7 @@ pub struct Character {
 
 impl Character {
     pub fn new(
-        player_controlled: bool,
+        behaviour: Behaviour,
         name: &'static str,
         portrait: PortraitId,
         sprite: SpriteId,
@@ -2402,7 +2435,7 @@ impl Character {
             id: None,
             portrait,
             sprite,
-            player_controlled,
+            behaviour,
             position: Cell::new(position),
             name,
             base_attributes,
@@ -2436,6 +2469,10 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
         }
+    }
+
+    pub fn player_controlled(&self) -> bool {
+        matches!(self.behaviour, Behaviour::Player)
     }
 
     pub fn add_to_strength(&self, amount: i32) {
@@ -3324,6 +3361,10 @@ impl Character {
         terms
     }
 
+    pub fn is_bleeding(&self) -> bool {
+        self.conditions.borrow().bleeding > 0
+    }
+
     pub fn receive_condition(&self, condition: Condition) {
         let mut conditions = self.conditions.borrow_mut();
         use Condition::*;
@@ -3340,7 +3381,15 @@ impl Character {
             Encumbered(n) => conditions.encumbered += n,
             NearDeath => conditions.near_death = true,
             Dead => conditions.dead = true,
-            Slowed(n) => conditions.slowed += n,
+            Slowed(n) => {
+                assert!(n > 0, "{n}");
+                if conditions.slowed == 0 {
+                    // Since a character receives max AP at end-of-turn, if they are then slowed by an enemy
+                    // that debuff must reasonably affect the character's next turn.
+                    self.action_points.lose(SLOWED_AP_PENALTY);
+                }
+                conditions.slowed += n;
+            }
             Exposed(n) => conditions.exposed += n,
         }
     }
@@ -3391,6 +3440,10 @@ impl NumberedResource {
         self.current.get()
     }
 
+    pub fn ratio(&self) -> f32 {
+        self.current() as f32 / self.max() as f32
+    }
+
     pub fn max(&self) -> u32 {
         self.max.get()
     }
@@ -3403,6 +3456,7 @@ impl NumberedResource {
     }
 
     fn spend(&self, amount: u32) {
+        // The caller must have checked that we have the required amount
         self.current.set(self.current.get() - amount);
     }
 

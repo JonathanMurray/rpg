@@ -391,7 +391,7 @@ impl UserInterface {
 
         let first_player_character_id = characters
             .iter_with_ids()
-            .find(|(_id, ch)| ch.player_controlled)
+            .find(|(_id, ch)| ch.player_controlled())
             .unwrap()
             .0;
 
@@ -473,7 +473,7 @@ impl UserInterface {
             || self.character_sheet_toggle.shown.get()
             || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_input = !matches!(&*self.state.borrow(), UiState::Idle)
-            && self.active_character().player_controlled
+            && self.active_character().player_controlled()
             && !is_grid_obstructed;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
         let grid_outcome = self.game_grid.draw(
@@ -825,7 +825,7 @@ impl UserInterface {
             fully_selected = fully;
         }
 
-        if self.active_character().player_controlled {
+        if self.active_character().player_controlled() {
             if self.player_portraits.selected_id() != self.active_character_id {
                 println!("SWITCHING");
                 self.player_portraits
@@ -1326,7 +1326,7 @@ impl UserInterface {
                 self.game_grid.remove_dead();
                 self.character_portraits.remove_dead();
 
-                if self.characters.get(character).player_controlled {
+                if self.characters.get(character).player_controlled() {
                     self.player_portraits.mark_as_dead(character);
                 }
 
@@ -1364,7 +1364,7 @@ impl UserInterface {
                 "Switching shown char from {} to {}",
                 self.active_character_id, new_active_id
             );
-            if self.characters.get(new_active_id).player_controlled {
+            if self.characters.get(new_active_id).player_controlled() {
                 self.player_portraits.set_selected_id(new_active_id);
 
                 // In case we're hovering a button that will no longer be shown due to the character switch,
@@ -1600,7 +1600,7 @@ fn build_character_uis<'a>(
     let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
     for character in characters {
-        if !character.player_controlled {
+        if !character.player_controlled() {
             continue;
         }
 
