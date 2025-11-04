@@ -120,7 +120,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 enemy_positions[&0],
             );
             tanky.health.change_max_value_to(20);
-            tanky.armor.set(Some(CHAIN_MAIL));
+            tanky.armor_piece.set(Some(CHAIN_MAIL));
             tanky.set_shield(BAD_SMALL_SHIELD);
             tanky.set_weapon(HandType::MainHand, BAD_DAGGER);
 
@@ -138,7 +138,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     enemy_positions[&i],
                 );
                 if i % 2 == 0 {
-                    enemy.armor.set(Some(SHIRT));
+                    enemy.armor_piece.set(Some(SHIRT));
                 } else {
                     enemy.set_shield(BAD_SMALL_SHIELD);
                 }
@@ -157,7 +157,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 enemy_positions[&0],
             );
             tanky.health.change_max_value_to(25);
-            tanky.armor.set(Some(CHAIN_MAIL));
+            tanky.armor_piece.set(Some(CHAIN_MAIL));
             tanky.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
             tanky.base_move_speed.set(0.7);
             characters.push(tanky);
@@ -186,7 +186,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 enemy_positions[&0],
             );
             magi.known_actions.push(BaseAction::CastSpell(MAGI_HEAL));
-            magi.armor.set(Some(SHIRT));
+            magi.armor_piece.set(Some(SHIRT));
             magi.known_actions
                 .push(BaseAction::CastSpell(MAGI_INFLICT_WOUNDS));
             magi.health.change_max_value_to(25);
@@ -202,7 +202,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     enemy_positions[&i],
                 );
                 tanky.health.change_max_value_to(20);
-                tanky.armor.set(Some(CHAIN_MAIL));
+                tanky.armor_piece.set(Some(CHAIN_MAIL));
                 tanky.set_weapon(HandType::MainHand, BAD_SWORD);
                 characters.push(tanky);
             }

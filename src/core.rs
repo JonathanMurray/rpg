@@ -2430,7 +2430,7 @@ pub struct Character {
     pub base_move_speed: Cell<f32>,
     pub capacity: Cell<u32>,
     pub inventory: [Cell<Option<EquipmentEntry>>; 6],
-    pub armor: Cell<Option<ArmorPiece>>,
+    pub armor_piece: Cell<Option<ArmorPiece>>,
     main_hand: Cell<Hand>,
     off_hand: Cell<Hand>,
     conditions: RefCell<Conditions>,
@@ -2477,7 +2477,7 @@ impl Character {
             base_move_speed: Cell::new(move_speed),
             capacity: Cell::new(capacity),
             inventory: Default::default(),
-            armor: Default::default(),
+            armor_piece: Default::default(),
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
@@ -2642,7 +2642,7 @@ impl Character {
         } else if let Some(shield) = self.shield() {
             sum += shield.weight;
         }
-        if let Some(armor) = self.armor.get() {
+        if let Some(armor) = self.armor_piece.get() {
             sum += armor.weight;
         }
         for entry in &self.inventory {
@@ -2702,7 +2702,7 @@ impl Character {
                 self.weapon(HandType::MainHand).map(EquipmentEntry::Weapon)
             }
             EquipmentSlotRole::OffHand => self.shield().map(EquipmentEntry::Shield),
-            EquipmentSlotRole::Armor => self.armor.get().map(EquipmentEntry::Armor),
+            EquipmentSlotRole::Armor => self.armor_piece.get().map(EquipmentEntry::Armor),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
         }
     }
@@ -2764,8 +2764,8 @@ impl Character {
                 _ => panic!(),
             },
             EquipmentSlotRole::Armor => match entry {
-                Some(EquipmentEntry::Armor(armor)) => self.armor.set(Some(armor)),
-                None => self.armor.set(None),
+                Some(EquipmentEntry::Armor(armor)) => self.armor_piece.set(Some(armor)),
+                None => self.armor_piece.set(None),
                 _ => panic!(),
             },
             EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
@@ -3081,7 +3081,7 @@ impl Character {
     pub fn spell_modifier(&self) -> u32 {
         let mut res = self.intellect() + self.spirit();
 
-        if let Some(armor) = self.armor.get() {
+        if let Some(armor) = self.armor_piece.get() {
             res += armor.equip.bonus_spell_modifier;
         }
 
@@ -3120,7 +3120,7 @@ impl Character {
 
     fn evasion_from_agility(&self) -> u32 {
         let mut bonus = if self.is_dazed() { 0 } else { self.agility() };
-        if let Some(armor) = self.armor.get() {
+        if let Some(armor) = self.armor_piece.get() {
             if let Some(limit) = armor.limit_evasion_from_agi {
                 bonus = bonus.min(limit);
             }
@@ -3159,7 +3159,7 @@ impl Character {
 
     pub fn protection_from_armor(&self) -> u32 {
         let mut protection = 0;
-        if let Some(armor) = self.armor.get() {
+        if let Some(armor) = self.armor_piece.get() {
             protection += armor.protection;
         }
 

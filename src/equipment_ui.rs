@@ -555,7 +555,7 @@ pub fn build_equipped_section(
             EquipmentEntry::Shield(shield),
         ));
     }
-    if let Some(armor) = character.armor.get() {
+    if let Some(armor) = character.armor_piece.get() {
         let texture = equipment_icons[&armor.icon].clone();
         slots[1].content = Some(EquipmentSlotContent::new(
             texture,
@@ -632,7 +632,7 @@ impl EquipmentStatsTable {
             format!(
                 "{}",
                 character
-                    .armor
+                    .armor_piece
                     .get()
                     .map(|armor| armor.protection)
                     .unwrap_or(0)

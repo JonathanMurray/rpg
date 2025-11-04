@@ -84,12 +84,14 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
 
     let effect = enhancement.effect;
 
+    /*
     if let Some(weapon_requirement) = enhancement.weapon_requirement {
         match weapon_requirement {
             WeaponType::Melee => technical_description.push("[ melee ]".to_string()),
             WeaponType::Ranged => technical_description.push("[ ranged ]".to_string()),
         }
     }
+     */
 
     if effect.roll_modifier != 0 {
         if effect.roll_modifier > 0 {

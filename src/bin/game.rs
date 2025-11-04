@@ -83,7 +83,7 @@ async fn main() {
     );
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     alice.set_weapon(HandType::MainHand, BOW);
-    alice.armor.set(Some(SHIRT));
+    alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
 
@@ -96,7 +96,7 @@ async fn main() {
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
-    bob.armor.set(Some(LEATHER_ARMOR));
+    bob.armor_piece.set(Some(LEATHER_ARMOR));
 
     let mut player_characters = vec![alice, bob];
 
@@ -110,7 +110,7 @@ async fn main() {
                 )
                 .await;
 
-            
+
 
     player_characters = run_fight_loop(
         player_characters,
