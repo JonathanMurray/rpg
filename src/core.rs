@@ -1212,7 +1212,7 @@ impl CoreGame {
             if attack_result < evasion {
                 //let mut line = "  Graze! (50% damage".to_string();
                 let line = "  Graze!".to_string();
-                dmg_str.push_str(&" -50% (graze)".to_string());
+                dmg_str.push_str(" -50% (graze)");
                 dmg_calculation = (dmg_calculation as f32 * 0.5).ceil() as i32;
 
                 if armor_value > 0 {

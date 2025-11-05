@@ -472,12 +472,8 @@ impl UserInterface {
         let is_grid_obstructed = popup_rectangle.contains(mouse_pos.into())
             || self.character_sheet_toggle.shown.get()
             || mouse_pos.1 >= ui_y - 1.0;
-        let is_grid_receptive_to_input = !matches!(&*self.state.borrow(), UiState::Idle)
-            && self.active_character().player_controlled()
-            && !is_grid_obstructed;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
         let grid_outcome = self.game_grid.draw(
-            is_grid_receptive_to_input,
             is_grid_receptive_to_dragging,
             &mut self.state.borrow_mut(),
             is_grid_obstructed,

@@ -513,7 +513,6 @@ impl GameGrid {
 
     pub fn draw(
         &mut self,
-        receptive_to_input: bool,
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
         obstructed: bool,
@@ -964,31 +963,31 @@ impl GameGrid {
                         }
 
                         if may_acquire_attack_target {
-                            let is_configuring_attack = matches!(
-                                ui_state,
-                                UiState::ConfiguringAction(ConfiguredAction::Attack { .. })
-                            );
-
-                            if !(is_configuring_attack) {
+                            if let UiState::ConfiguringAction(ConfiguredAction::Attack {
+                                ref mut target,
+                                ..
+                            }) = ui_state
+                            {
+                                *target = Some(hovered_id);
+                            } else {
                                 outcome.switched_state = Some(NewState::Attack);
+
+                                let hand = HandType::MainHand;
+                                let action_point_cost = self
+                                    .characters
+                                    .get(self.active_character_id)
+                                    .attack_action_point_cost(hand);
+                                *ui_state = UiState::ConfiguringAction(ConfiguredAction::Attack {
+                                    attack: AttackAction {
+                                        hand,
+                                        action_point_cost,
+                                    },
+                                    selected_enhancements: vec![],
+                                    target: Some(hovered_id),
+                                });
                             }
 
-                            let hand = HandType::MainHand;
-                            let action_point_cost = self
-                                .characters
-                                .get(self.active_character_id)
-                                .attack_action_point_cost(hand);
-                            *ui_state = UiState::ConfiguringAction(ConfiguredAction::Attack {
-                                attack: AttackAction {
-                                    hand,
-                                    action_point_cost,
-                                },
-                                selected_enhancements: vec![],
-                                target: Some(hovered_id),
-                            });
-
                             outcome.switched_players_action_target = true;
-
                             self.players_inspect_target = Some(hovered_id);
                         } else if let MouseState::RequiresEnemyTarget {
                             move_into_melee, ..
