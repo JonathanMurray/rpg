@@ -1089,23 +1089,10 @@ impl CoreGame {
         let attacker = self.characters.get(attacker_id);
         let defender = self.characters.get(defender_id);
 
-        /*
-        // Remove this, it's already checked from inside attack_roll_bonus
-        let circumstance_advantage = match attacker
-            .reaches_with_attack(hand_type, defender.position.get())
-            .1
-        {
-            ActionReach::Yes => 0,
-            ActionReach::YesButDisadvantage(..) => -1,
-            ActionReach::No => unreachable!(),
-        };
-         */
-
         let attack_bonus = attack_roll_bonus(
             attacker,
             hand_type,
             defender,
-            /*circumstance_advantage,*/
             &enhancements,
             defender_reaction,
         );
@@ -1171,7 +1158,7 @@ impl CoreGame {
             .known_passive_skills
             .contains(&PassiveSkill::WeaponProficiency)
         {
-            armor_penetrators.push((2, PassiveSkill::WeaponProficiency.name()));
+            armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
         }
         let mut armor_value = defender.protection_from_armor();
         let mut armor_str = armor_value.to_string();
@@ -1196,9 +1183,9 @@ impl CoreGame {
             armor_str
         ));
 
-        let hit = attack_result >= evasion;
+        let hit_or_graze = attack_result >= evasion - 5;
 
-        let outcome = if hit {
+        let outcome = if hit_or_graze {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
             let mut dmg_calculation = weapon.damage as i32;
@@ -1211,8 +1198,31 @@ impl CoreGame {
                 dmg_calculation += bonus_dmg;
             }
 
+            for enhancement in &enhancements {
+                let bonus_dmg = enhancement.effect.bonus_damage;
+                if bonus_dmg > 0 {
+                    dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
+                    dmg_calculation += bonus_dmg as i32;
+                }
+            }
+
             let armored_defense = evasion + armor_value;
-            if attack_result < armored_defense {
+
+            if attack_result < evasion {
+                //let mut line = "  Graze! (50% damage".to_string();
+                let line = "  Graze!".to_string();
+                dmg_str.push_str(&" -50% (graze)".to_string());
+                dmg_calculation = (dmg_calculation as f32 * 0.5).ceil() as i32;
+
+                if armor_value > 0 {
+                    //line.push_str(&format!(", {} mitigated", armor_value));
+                    dmg_str.push_str(&format!(" -{armor_value} (armor)"));
+                    dmg_calculation -= armor_value as i32;
+                }
+
+                //line.push_str(")");
+                detail_lines.push(line);
+            } else if attack_result < armored_defense {
                 let mitigated = armored_defense - attack_result;
 
                 detail_lines.push(format!("  Hit! ({} mitigated)", mitigated));
@@ -1233,14 +1243,6 @@ impl CoreGame {
                     dmg_calculation += 1;
                 } else {
                     detail_lines.push("  True hit".to_string());
-                }
-            }
-
-            for enhancement in &enhancements {
-                let bonus_dmg = enhancement.effect.bonus_damage;
-                if bonus_dmg > 0 {
-                    dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
-                    dmg_calculation += bonus_dmg as i32;
                 }
             }
 
@@ -1288,7 +1290,11 @@ impl CoreGame {
                 }
             }
 
-            AttackOutcome::Hit(damage)
+            if attack_result < evasion {
+                AttackOutcome::Graze(damage)
+            } else {
+                AttackOutcome::Hit(damage)
+            }
         } else if defender_reacted_with_parry {
             detail_lines.push("  Parried!".to_string());
             AttackOutcome::Parry
@@ -1560,6 +1566,7 @@ pub enum GameEvent {
 #[derive(Debug, Copy, Clone)]
 pub enum AttackOutcome {
     Hit(u32),
+    Graze(u32),
     Dodge,
     Parry,
     Miss,
@@ -1620,18 +1627,10 @@ pub fn prob_attack_hit(
     attacker: &Character,
     hand: HandType,
     defender: &Character,
-    circumstance_advantage: i32,
     enhancements: &[AttackEnhancement],
     reaction: Option<OnAttackedReaction>,
 ) -> f32 {
-    let bonus = attack_roll_bonus(
-        attacker,
-        hand,
-        defender,
-        //circumstance_advantage,
-        enhancements,
-        reaction,
-    );
+    let bonus = attack_roll_bonus(attacker, hand, defender, enhancements, reaction);
     let mut evasion = defender.evasion();
 
     if let Some(reaction) = reaction {
@@ -2181,12 +2180,6 @@ pub enum SpellEffect {
     Ally(SpellAllyEffect),
 }
 
-// enemey effects:
-
-// 1. weapon based (attack contest, optional on_hit)
-// 2. spell contest (mental or projectile); damage optionally scaled by degree of success, optional on hit
-// 3. no contest, damage not scaled
-
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct SpellEnemyEffect {
     pub defense_type: Option<DefenseType>,
@@ -2305,7 +2298,7 @@ impl PassiveSkill {
     pub fn description(&self) -> &'static str {
         match self {
             Self::HardenedSkin => "+1 armor",
-            Self::WeaponProficiency => "Attacks gain +2 armor penetration",
+            Self::WeaponProficiency => "Attacks gain +1 armor penetration",
             Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
             Self::Reaper => "On kill: regenerate 1 stamina",
         }

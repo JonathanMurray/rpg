@@ -178,7 +178,7 @@ impl TargetUi {
 
         let (mut x, y) = container_pos;
 
-        let header_font_size = 18;
+        let header_font_size = 20;
         let detail_font_size = 20;
         let params = TextParams {
             font: Some(&self.big_font),

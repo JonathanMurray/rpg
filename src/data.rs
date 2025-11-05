@@ -14,7 +14,7 @@ use crate::{
 
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     name: "Leather armor",
-    protection: 3,
+    protection: 2,
     limit_evasion_from_agi: None,
     icon: EquipmentIconId::LeatherArmor,
     weight: 2,
@@ -23,7 +23,7 @@ pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
 
 pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     name: "Chain mail",
-    protection: 5,
+    protection: 4,
     limit_evasion_from_agi: Some(4),
     icon: EquipmentIconId::ChainMail,
     weight: 3,
@@ -699,7 +699,7 @@ pub const HEAL: Spell = Spell {
     target: SpellTarget::Ally {
         range: Range::Ranged(3),
         effect: SpellAllyEffect {
-            healing: 3,
+            healing: 2,
             apply: None,
         },
     },

@@ -656,7 +656,6 @@ impl UserInterface {
                     self.active_character(),
                     attack.hand,
                     target_char,
-                    0,
                     selected_enhancements,
                     defender_reaction,
                 ));
@@ -1062,17 +1061,27 @@ impl UserInterface {
                 outcome,
                 detail_lines,
             } => {
+                let verb = match outcome {
+                    AttackOutcome::Hit(..) => "hit",
+                    AttackOutcome::Graze(..) => "grazed",
+                    AttackOutcome::Dodge => "missed",
+                    AttackOutcome::Parry => "missed",
+                    AttackOutcome::Miss => "missed",
+                };
+
                 let mut line = format!(
-                    "{} attacked {}",
+                    "{} {} {}",
                     self.characters.get(attacker).name,
+                    verb,
                     self.characters.get(target).name
                 );
 
                 match outcome {
                     AttackOutcome::Hit(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
+                    AttackOutcome::Graze(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
                     AttackOutcome::Dodge => line.push_str(" (dodge)"),
                     AttackOutcome::Parry => line.push_str(" (parry)"),
-                    AttackOutcome::Miss => line.push_str(" (miss)"),
+                    AttackOutcome::Miss => {}
                 }
 
                 self.log.add_with_details(line, detail_lines);
@@ -1085,6 +1094,7 @@ impl UserInterface {
                 self.animation_stopwatch.set_to_at_least(duration + 0.6);
                 let impact_text = match outcome {
                     AttackOutcome::Hit(damage) => format!("{}", damage),
+                    AttackOutcome::Graze(damage) => format!("{}", damage),
                     AttackOutcome::Dodge => "Dodge".to_string(),
                     AttackOutcome::Parry => "Parry".to_string(),
                     AttackOutcome::Miss => "Miss".to_string(),

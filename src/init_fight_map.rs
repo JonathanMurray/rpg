@@ -12,7 +12,8 @@ use crate::{
         Attributes, BaseAction, Behaviour, Character, CharacterId, Characters, HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
+        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},

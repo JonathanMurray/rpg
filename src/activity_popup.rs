@@ -552,7 +552,6 @@ impl ActivityPopup {
                 attacker,
                 *hand,
                 defender,
-                0,
                 attack_enhancements,
                 reaction
             ))
