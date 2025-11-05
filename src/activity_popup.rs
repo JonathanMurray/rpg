@@ -171,7 +171,6 @@ impl ActivityPopup {
             width += button_margin + btn.size.0;
         }
 
-        //let sprint_stamina_text = "Sprint (stamina)";
         let sprint_stamina_text = "Sprint:";
         let sprint_stamina_margin = 15.0;
         if let Some(slider) = &self.movement_stamina_slider {
@@ -234,7 +233,7 @@ impl ActivityPopup {
             let mut text = format!("{} AP", ap_cost);
             if let Some(slider) = &self.movement_stamina_slider {
                 if slider.selected_stamina() > 0 {
-                    text.push_str(&format!(" -{}", slider.selected_stamina()));
+                    text = format!("{} AP", ap_cost - slider.selected_stamina());
                 }
             }
 
@@ -401,7 +400,12 @@ impl ActivityPopup {
 
         if let Some(slider) = self.movement_stamina_slider.as_mut() {
             // Each AP spent on movement can be accompanied by 1 stamina point
-            slider.set_max_allowed(ap_cost / 2);
+            let max_stamina_usage = ap_cost / 2;
+            slider.set_max_allowed(max_stamina_usage);
+
+            // Assume that player wants to spend as much stamina as possible on movement.
+            // They are free to reduce the amount with the slider.
+            slider.selected_i = slider.max.min(max_stamina_usage);
         }
     }
 
