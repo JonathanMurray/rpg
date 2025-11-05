@@ -1,6 +1,6 @@
 use std::{cell::Cell, rc::Rc};
 
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     core::{
@@ -131,20 +131,19 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     assert!(!character.player_controlled());
 
     if let Some(attack) = character.usable_attack_action() {
-        for (id, other_character) in game.characters.iter_with_ids() {
-            if *id == game.active_character_id {
-                continue; //Avoid borrowing already borrowed
-            }
-            if other_character.player_controlled()
-                && character
-                    .reaches_with_attack(attack.hand, other_character.position.get())
-                    .1
-                    != ActionReach::No
+        let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
+        let mut rng = rand::rng();
+        player_chars.shuffle(&mut rng);
+        for player_char in player_chars {
+            if character
+                .reaches_with_attack(attack.hand, player_char.position.get())
+                .1
+                != ActionReach::No
             {
                 return Some(Action::Attack {
                     hand: attack.hand,
                     enhancements: vec![],
-                    target: *id,
+                    target: player_char.id(),
                 });
             }
         }
