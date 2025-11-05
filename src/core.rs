@@ -1267,23 +1267,23 @@ impl CoreGame {
                 }
             }
 
-            for enhancement in &enhancements {
-                if let Some(effect) = enhancement.effect.on_hit_effect {
-                    let log_line = match effect {
-                        AttackEnhancementOnHitEffect::RegainActionPoint => {
-                            attacker.action_points.gain(1);
-                            format!("{} regained 1 AP", attacker.name)
-                        }
-                        AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                            self.perform_effect_application(apply_effect, defender)
-                        }
-                    };
+            if damage > 0 {
+                for enhancement in &enhancements {
+                    if let Some(effect) = enhancement.effect.on_damage_effect {
+                        let log_line = match effect {
+                            AttackEnhancementOnHitEffect::RegainActionPoint => {
+                                attacker.action_points.gain(1);
+                                format!("{} regained 1 AP", attacker.name)
+                            }
+                            AttackEnhancementOnHitEffect::Target(apply_effect) => {
+                                self.perform_effect_application(apply_effect, defender)
+                            }
+                        };
 
-                    detail_lines.push(format!("{} ({})", log_line, enhancement.name))
-                }
+                        detail_lines.push(format!("{} ({})", log_line, enhancement.name))
+                    }
 
-                if let Some(mut condition) = enhancement.effect.inflict_condition_per_damage {
-                    if damage > 0 {
+                    if let Some(mut condition) = enhancement.effect.inflict_condition_per_damage {
                         *condition.stacks().unwrap() = damage;
                         let line = self.perform_receive_condition(condition, defender);
                         detail_lines.push(format!("{} ({})", line, enhancement.name))
@@ -2335,8 +2335,8 @@ pub struct AttackEnhancementEffect {
     // TODO Actually handle this
     pub on_self: Option<ApplyEffect>,
 
-    // Gets activated if the attack hits
-    pub on_hit_effect: Option<AttackEnhancementOnHitEffect>,
+    // Gets activated if the attack deals damage
+    pub on_damage_effect: Option<AttackEnhancementOnHitEffect>,
 
     // Gets applied on the target regardless if the attack hits
     pub on_target: Option<ApplyEffect>,
@@ -2349,7 +2349,7 @@ impl AttackEnhancementEffect {
             action_point_discount: 0,
             bonus_damage: 0,
             bonus_advantage: 0,
-            on_hit_effect: None,
+            on_damage_effect: None,
             roll_modifier: 0,
             inflict_condition_per_damage: None,
             armor_penetration: 0,

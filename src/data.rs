@@ -306,7 +306,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
-        on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             ApplyEffect::RemoveActionPoints(1),
         )),
         ..AttackEnhancementEffect::default()
@@ -331,7 +331,7 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     icon: IconId::CripplingShot,
     stamina_cost: 1,
     effect: AttackEnhancementEffect {
-        on_hit_effect: Some(AttackEnhancementOnHitEffect::Target(
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             ApplyEffect::Condition(Condition::Hindered(1)),
         )),
         ..AttackEnhancementEffect::default()

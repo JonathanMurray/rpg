@@ -9,10 +9,10 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
+        Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine, table
     },
     conditions_ui::ConditionsList,
-    core::{Character, Goodness},
+    core::{Character, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
 };
 
@@ -68,6 +68,7 @@ impl TargetUi {
                 WHITE,
                 Some(self.simple_font.clone()),
             );
+
 
             let def_table = table(
                 vec![
@@ -131,11 +132,36 @@ impl TargetUi {
                 ..Default::default()
             };
 
+            
+            let movement_text_line = TextLine::new(
+                format!("Movement: {}", char.move_speed()),
+                16,
+                LIGHTGRAY,
+                Some(self.simple_font.clone()),
+            );
+            let attack_text_line = TextLine::new(
+                format!("Attack mod: {}", char.attack_modifier(HandType::MainHand)),
+                16,
+                LIGHTGRAY,
+                Some(self.simple_font.clone()),
+            );
+            let detailed_stats = Container {
+                layout_dir: LayoutDirection::Vertical,
+                children: vec![
+                    Element::Text(movement_text_line),
+                    Element::Text(attack_text_line),
+                ],
+                margin: 7.0,
+                style: Style { padding: 5.0, ..Default::default() },
+                ..Default::default()
+            };
+
             self.container = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Start,
                 children: vec![
                     Element::Container(centered_list),
+                    Element::Container(detailed_stats),
                     Element::Box(Box::new(conditions_list)),
                 ],
                 margin: 10.0,

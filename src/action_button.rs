@@ -137,7 +137,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
         describe_apply_effect(effect, &mut technical_description);
     }
 
-    if let Some(effect) = effect.on_hit_effect {
+    if let Some(effect) = effect.on_damage_effect {
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
                 technical_description.push("Regain AP".to_string())
