@@ -148,7 +148,10 @@ impl TopCharacterPortrait {
             character.max_reactive_action_points,
             (10.0, 10.0),
             0.2,
-            Style{ background_color: Some(BLACK), ..Default::default() },
+            Style {
+                background_color: Some(BLACK),
+                ..Default::default()
+            },
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
 
@@ -712,7 +715,9 @@ impl Drawable for ActionPointsRow {
             if i < self.current_ap.saturating_sub(reserved_ap) {
                 // Unreserved point
 
-                if false /* blocked_by_lack_of_reactive_ap */ {
+                if false
+                /* blocked_by_lack_of_reactive_ap */
+                {
                     draw_circle(
                         x0 + self.cell_size.0 / 2.0,
                         y0 + self.cell_size.1 / 2.0,

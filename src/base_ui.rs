@@ -394,7 +394,7 @@ pub struct Style {
 impl Style {
     pub fn draw(&self, x: f32, y: f32, size: (f32, f32)) {
         self.draw_background(x, y, size);
-        self.draw_foreground(x, y, size);   
+        self.draw_foreground(x, y, size);
     }
 
     pub fn draw_background(&self, x: f32, y: f32, size: (f32, f32)) {
@@ -409,7 +409,6 @@ impl Style {
             draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
         }
     }
-
 }
 
 pub struct Circle {

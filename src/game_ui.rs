@@ -59,10 +59,17 @@ pub enum UiState {
         is_within_melee: bool,
         selected: Option<OnHitReaction>,
     },
-    ReactingToOpportunity {
+    ReactingToMovementAttackOpportunity {
         reactor: CharacterId,
+        // TODO: characterId?
         target: u32,
         movement: ((i32, i32), (i32, i32)),
+        selected: bool,
+    },
+    ReactingToRangedAttackOpportunity {
+        reactor: CharacterId,
+        attacker: CharacterId,
+        victim: CharacterId,
         selected: bool,
     },
     Idle,
@@ -147,8 +154,8 @@ impl ConfiguredAction {
             ConfiguredAction::Attack { target, attack, .. } => match target {
                 Some(target_id) => {
                     let target_char = characters.get(*target_id);
-                    let (_range, reach) = relevant_character
-                        .reaches_with_attack(attack.hand, target_char.position.get());
+                    let (_range, reach) =
+                        relevant_character.attack_reach(attack.hand, target_char.position.get());
                     matches!(
                         reach,
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..)
@@ -637,7 +644,7 @@ impl UserInterface {
 
                 let (_range, reach) = self
                     .active_character()
-                    .reaches_with_attack(attack.hand, target_char.position.get());
+                    .attack_reach(attack.hand, target_char.position.get());
 
                 let mut details = vec![];
 
@@ -893,7 +900,13 @@ impl UserInterface {
                 self.set_allowed_to_use_action_buttons(false);
             }
 
-            UiState::ReactingToOpportunity { .. } => {
+            UiState::ReactingToMovementAttackOpportunity { .. } => {
+                self.target_ui
+                    .set_action("React?".to_string(), vec![], false);
+                self.set_allowed_to_use_action_buttons(false);
+            }
+
+            UiState::ReactingToRangedAttackOpportunity { .. } => {
                 self.target_ui
                     .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
@@ -1526,7 +1539,10 @@ impl UserInterface {
 
             UiState::ReactingToAttack { selected, .. } => PlayerChose::AttackedReaction(*selected),
             UiState::ReactingToHit { selected, .. } => PlayerChose::HitReaction(*selected),
-            UiState::ReactingToOpportunity { selected, .. } => {
+            UiState::ReactingToMovementAttackOpportunity { selected, .. } => {
+                PlayerChose::OpportunityAttack(*selected)
+            }
+            UiState::ReactingToRangedAttackOpportunity { selected, .. } => {
                 PlayerChose::OpportunityAttack(*selected)
             }
 

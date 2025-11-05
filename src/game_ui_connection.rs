@@ -39,10 +39,16 @@ enum MessageFromGame {
         damage: u32,
         is_within_melee: bool,
     },
-    AwaitingChooseOpportunityAttack {
+    AwaitingChooseMovementOpportunityAttack {
         reactor: CharacterId,
+        // TODO characterId?
         target: u32,
         movement: ((i32, i32), (i32, i32)),
+    },
+    AwaitingChooseRangedOpportunityAttack {
+        reactor: CharacterId,
+        attacker: CharacterId,
+        victim: CharacterId,
     },
     Event(GameEvent),
 }
@@ -130,7 +136,7 @@ impl GameUserInterfaceConnection {
         }
     }
 
-    pub async fn choose_opportunity_attack(
+    pub async fn choose_movement_opportunity_attack(
         &self,
         game: &CoreGame,
         reactor: CharacterId,
@@ -140,10 +146,33 @@ impl GameUserInterfaceConnection {
         match self
             .run_ui(
                 game,
-                MessageFromGame::AwaitingChooseOpportunityAttack {
+                MessageFromGame::AwaitingChooseMovementOpportunityAttack {
                     reactor,
                     target,
                     movement,
+                },
+            )
+            .await
+        {
+            UiOutcome::ChoseOpportunityAttack(choice) => choice,
+            _ => unreachable!(),
+        }
+    }
+
+    pub async fn choose_ranged_opportunity_attack(
+        &self,
+        game: &CoreGame,
+        reactor: CharacterId,
+        attacker: CharacterId,
+        victim: CharacterId,
+    ) -> bool {
+        match self
+            .run_ui(
+                game,
+                MessageFromGame::AwaitingChooseRangedOpportunityAttack {
+                    reactor,
+                    attacker,
+                    victim,
                 },
             )
             .await
@@ -225,7 +254,7 @@ impl _GameUserInterfaceConnection {
                 }
             }
 
-            MessageFromGame::AwaitingChooseOpportunityAttack {
+            MessageFromGame::AwaitingChooseMovementOpportunityAttack {
                 reactor,
                 target,
                 movement,
@@ -234,10 +263,28 @@ impl _GameUserInterfaceConnection {
                     // TODO
                     return UiOutcome::ChoseOpportunityAttack(true);
                 } else {
-                    user_interface.set_state(UiState::ReactingToOpportunity {
+                    user_interface.set_state(UiState::ReactingToMovementAttackOpportunity {
                         reactor,
                         target,
                         movement,
+                        selected: false,
+                    });
+                }
+            }
+
+            MessageFromGame::AwaitingChooseRangedOpportunityAttack {
+                reactor,
+                attacker,
+                victim,
+            } => {
+                if players_turn {
+                    // TODO
+                    return UiOutcome::ChoseOpportunityAttack(true);
+                } else {
+                    user_interface.set_state(UiState::ReactingToRangedAttackOpportunity {
+                        reactor,
+                        attacker,
+                        victim,
                         selected: false,
                     });
                 }

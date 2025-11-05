@@ -24,12 +24,18 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Drawable, Style}, core::{
+    base_ui::{Drawable, Style},
+    core::{
         ActionReach, ActionTarget, AttackAction, Character, Goodness, Position, SpellReach,
         SpellTarget,
-    }, drawing::{
+    },
+    drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
-    }, game_ui::{ConfiguredAction, UiState}, game_ui_components::ActionPointsRow, pathfind::{PathfindGrid, Route, build_path_from_route}, textures::{SpriteId, TerrainId, draw_terrain}
+    },
+    game_ui::{ConfiguredAction, UiState},
+    game_ui_components::ActionPointsRow,
+    pathfind::{build_path_from_route, PathfindGrid, Route},
+    textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -711,30 +717,104 @@ impl GameGrid {
             _ => {}
         }
 
-        if let UiState::ReactingToOpportunity {
-            reactor,
-            target,
-            movement,
-            selected,
-        } = ui_state
-        {
-            let path = [movement.0, movement.1];
-            self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0);
-            self.draw_cornered_outline(
-                self.character_screen_pos(self.characters.get(*reactor)),
-                ACTIVE_CHARACTER_COLOR,
-                5.0,
-                2.0,
-            );
+        match ui_state {
+            UiState::ReactingToMovementAttackOpportunity {
+                reactor,
+                target,
+                movement,
+                selected,
+            } => {
+                let path = [movement.0, movement.1];
+                self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0);
+                let reactor = self.characters.get(*reactor);
+                self.draw_cornered_outline(
+                    self.character_screen_pos(reactor),
+                    ACTIVE_CHARACTER_COLOR,
+                    5.0,
+                    2.0,
+                );
 
-            if *selected {
+                if *selected {
+                    self.draw_target_crosshair(
+                        reactor.pos(),
+                        self.characters.get(*target).pos(),
+                        PLAYERS_TARGET_CROSSHAIR_COLOR,
+                        4.0,
+                    );
+                }
+
+                self.draw_overhead_exclamation_mark(reactor);
+            }
+
+            UiState::ReactingToRangedAttackOpportunity {
+                reactor,
+                attacker,
+                victim,
+                selected,
+            } => {
+                let reactor = self.characters.get(*reactor);
+                self.draw_cornered_outline(
+                    self.character_screen_pos(reactor),
+                    ACTIVE_CHARACTER_COLOR,
+                    5.0,
+                    2.0,
+                );
+
                 self.draw_target_crosshair(
-                    self.characters.get(*reactor).pos(),
-                    self.characters.get(*target).pos(),
-                    PLAYERS_TARGET_CROSSHAIR_COLOR,
+                    self.characters.get(*attacker).pos(),
+                    self.characters.get(*victim).pos(),
+                    RED,
                     4.0,
                 );
+
+                if *selected {
+                    self.draw_target_crosshair(
+                        reactor.pos(),
+                        self.characters.get(*attacker).pos(),
+                        PLAYERS_TARGET_CROSSHAIR_COLOR,
+                        4.0,
+                    );
+                }
+
+                self.draw_overhead_exclamation_mark(reactor);
             }
+
+            UiState::ReactingToAttack {
+                attacker, reactor, ..
+            } => {
+                let reactor = self.characters.get(*reactor);
+                self.draw_cornered_outline(
+                    self.character_screen_pos(reactor),
+                    ACTIVE_CHARACTER_COLOR,
+                    5.0,
+                    2.0,
+                );
+
+                self.draw_target_crosshair(
+                    self.characters.get(*attacker).pos(),
+                    reactor.pos(),
+                    RED,
+                    4.0,
+                );
+
+                self.draw_overhead_exclamation_mark(reactor);
+            }
+
+            UiState::ReactingToHit {
+                victim, ..
+            } => {
+                let reactor = self.characters.get(*victim);
+                self.draw_cornered_outline(
+                    self.character_screen_pos(reactor),
+                    ACTIVE_CHARACTER_COLOR,
+                    5.0,
+                    2.0,
+                );
+
+                self.draw_overhead_exclamation_mark(reactor);
+            }
+
+            _ => {}
         }
 
         if is_mouse_within_grid && receptive_to_input {
@@ -1065,7 +1145,10 @@ impl GameGrid {
 
         self.draw_effects();
 
-        if !matches!(ui_state, UiState::ReactingToOpportunity { .. }) {
+        if !matches!(
+            ui_state,
+            UiState::ReactingToMovementAttackOpportunity { .. }
+        ) {
             let active_char = self.characters.get(self.active_character_id);
             let draw_action_points = !active_char.player_controlled();
             self.draw_character_label(active_char, draw_action_points);
@@ -1149,10 +1232,7 @@ impl GameGrid {
                         let (range, reach) = self
                             .characters
                             .get(self.active_character_id)
-                            .reaches_with_attack(
-                                attack.hand,
-                                self.characters.get(*target).position.get(),
-                            );
+                            .attack_reach(attack.hand, self.characters.get(*target).position.get());
 
                         let maybe_indicator = match reach {
                             ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
@@ -1283,19 +1363,21 @@ impl GameGrid {
         );
 
         if draw_action_points {
-
             let mut action_points_row = ActionPointsRow::new(
                 character.max_reactive_action_points,
                 (10.0, 10.0),
                 0.2,
-                Style{
-                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)), ..Default::default()
+                Style {
+                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+                    ..Default::default()
                 },
             );
             action_points_row.current_ap = character.action_points.current();
-            action_points_row.draw(x - (action_points_row.size().0 - self.cell_w) / 2.0, box_y - action_points_row.size().1 - 3.0);
+            action_points_row.draw(
+                x - (action_points_row.size().0 - self.cell_w) / 2.0,
+                box_y - action_points_row.size().1 - 3.0,
+            );
         }
-
     }
 
     fn draw_active_character_highlight(&self) {
@@ -1401,6 +1483,26 @@ impl GameGrid {
         }
         assert!(path.len() > 1);
         path
+    }
+
+    fn draw_overhead_exclamation_mark(&self, reactor: &Character) {
+        let text = "?";
+        let font_size = 20;
+        let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
+        let (x, y) = self.character_screen_pos(reactor);
+        let x0 = x + self.cell_w / 2.0 - text_dim.width / 2.0;
+        let y0 = y - 5.0;
+        draw_text_ex(
+            text,
+            x0,
+            y0,
+            TextParams {
+                font: Some(&self.big_font),
+                font_size,
+                color: YELLOW,
+                ..Default::default()
+            },
+        );
     }
 
     fn draw_target_crosshair(

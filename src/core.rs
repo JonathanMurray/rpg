@@ -226,12 +226,7 @@ impl CoreGame {
                 let attacker = self.active_character();
                 let defender = self.characters.get(target);
 
-                assert!(
-                    attacker
-                        .reaches_with_attack(hand, defender.position.get())
-                        .1
-                        != ActionReach::No
-                );
+                assert!(attacker.attack_reach(hand, defender.position.get()).1 != ActionReach::No);
 
                 let mut action_point_cost = attacker.weapon(hand).unwrap().action_point_cost as i32;
 
@@ -246,39 +241,87 @@ impl CoreGame {
 
                 let is_within_melee =
                     within_meele(attacker.position.get(), defender.position.get());
-                let defender_can_react_to_attack = !defender
-                    .usable_on_attacked_reactions(is_within_melee)
-                    .is_empty();
 
-                let reaction = if defender_can_react_to_attack {
-                    self.user_interface
-                        .choose_attack_reaction(
-                            self,
-                            self.active_character_id,
-                            hand,
-                            target,
-                            is_within_melee,
-                        )
-                        .await
-                } else {
-                    None
-                };
+                if !is_within_melee {
+                    for other_char in self.characters.iter() {
+                        if other_char.player_controlled() != attacker.player_controlled()
+                            && within_meele(attacker.pos(), other_char.pos())
+                            && target != other_char.id()
+                            && other_char.can_use_opportunity_attack()
+                        {
+                            let reactor = other_char;
+                            let chooses_to_use_opportunity_attack = self
+                                .user_interface
+                                .choose_ranged_opportunity_attack(
+                                    self,
+                                    reactor.id(),
+                                    attacker.id(),
+                                    target,
+                                )
+                                .await;
 
-                if reaction.is_some() {
-                    self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
-                        reactor: defender.id(),
-                    })
-                    .await;
+                            dbg!(chooses_to_use_opportunity_attack);
+
+                            if chooses_to_use_opportunity_attack {
+                                self.ui_handle_event(
+                                    GameEvent::CharacterReactedWithOpportunityAttack {
+                                        reactor: reactor.id(),
+                                    },
+                                )
+                                .await;
+
+                                reactor.action_points.spend(1);
+
+                                self.perform_attack(
+                                    reactor.id(),
+                                    HandType::MainHand,
+                                    vec![],
+                                    attacker.id(),
+                                    None,
+                                )
+                                .await;
+                            }
+                        }
+                    }
                 }
 
-                self.perform_attack(
-                    self.active_character_id,
-                    hand,
-                    enhancements,
-                    target,
-                    reaction,
-                )
-                .await
+                if attacker.is_dead() {
+                    None
+                } else {
+                    let defender_can_react_to_attack = !defender
+                        .usable_on_attacked_reactions(is_within_melee)
+                        .is_empty();
+
+                    let reaction = if defender_can_react_to_attack {
+                        self.user_interface
+                            .choose_attack_reaction(
+                                self,
+                                self.active_character_id,
+                                hand,
+                                target,
+                                is_within_melee,
+                            )
+                            .await
+                    } else {
+                        None
+                    };
+
+                    if reaction.is_some() {
+                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
+                            reactor: defender.id(),
+                        })
+                        .await;
+                    }
+
+                    self.perform_attack(
+                        self.active_character_id,
+                        hand,
+                        enhancements,
+                        target,
+                        reaction,
+                    )
+                    .await
+                }
             }
 
             Action::CastSpell {
@@ -370,7 +413,7 @@ impl CoreGame {
 
                     let chooses_to_use_opportunity_attack = self
                         .user_interface
-                        .choose_opportunity_attack(
+                        .choose_movement_opportunity_attack(
                             self,
                             reactor.id(),
                             character.id(),
@@ -2888,11 +2931,7 @@ impl Character {
         self.hand(hand).get().weapon.unwrap().action_point_cost
     }
 
-    pub fn reaches_with_attack(
-        &self,
-        hand: HandType,
-        target_position: Position,
-    ) -> (Range, ActionReach) {
+    pub fn attack_reach(&self, hand: HandType, target_position: Position) -> (Range, ActionReach) {
         let weapon = self.weapon(hand).unwrap();
         let weapon_range = weapon.range;
 
@@ -3347,7 +3386,7 @@ impl Character {
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut bonuses = vec![];
 
-        let (_range, reach) = self.reaches_with_attack(hand_type, target_pos);
+        let (_range, reach) = self.attack_reach(hand_type, target_pos);
 
         if let ActionReach::YesButDisadvantage(reason) = reach {
             bonuses.push((reason, RollBonusContributor::Advantage(-1)));

@@ -347,7 +347,11 @@ impl ActivityPopup {
                                 .first()
                                 .map(|action| action.unwrap_on_hit_reaction());
                         }
-                        UiState::ReactingToOpportunity { selected, .. } => {
+                        UiState::ReactingToMovementAttackOpportunity { selected, .. } => {
+                            // It's a binary choice of 'use opportunity attack or not'
+                            *selected = !selected_button_actions.is_empty();
+                        }
+                        UiState::ReactingToRangedAttackOpportunity { selected, .. } => {
                             // It's a binary choice of 'use opportunity attack or not'
                             *selected = !selected_button_actions.is_empty();
                         }
@@ -709,7 +713,22 @@ impl ActivityPopup {
                 }
             }
 
-            &UiState::ReactingToOpportunity { reactor, .. } => {
+            &UiState::ReactingToMovementAttackOpportunity { reactor, .. } => {
+                self.relevant_character_id = reactor;
+                lines.push("React (opportunity attack)".to_string());
+                lines.push(format!(
+                    "{} has an attack opportunity",
+                    self.characters.get(reactor).name
+                ));
+
+                let btn = self.new_button_with_character_dependency(
+                    ButtonAction::OpportunityAttack,
+                    self.characters.get_rc(reactor).clone(),
+                );
+                popup_buttons.push(btn);
+            }
+
+            &UiState::ReactingToRangedAttackOpportunity { reactor, .. } => {
                 self.relevant_character_id = reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(

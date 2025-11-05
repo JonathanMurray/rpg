@@ -136,7 +136,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
         player_chars.shuffle(&mut rng);
         for player_char in player_chars {
             if character
-                .reaches_with_attack(attack.hand, player_char.position.get())
+                .attack_reach(attack.hand, player_char.position.get())
                 .1
                 != ActionReach::No
             {
