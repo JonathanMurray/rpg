@@ -16,6 +16,7 @@ use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 pub type Position = (i32, i32);
 
 pub const MAX_ACTION_POINTS: u32 = 5;
+pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
 pub struct CoreGame {
     pub characters: Characters,
@@ -37,7 +38,7 @@ impl CoreGame {
     pub async fn run(mut self) -> Vec<Character> {
         for character in self.characters.iter() {
             character.update_encumbrance();
-            character.action_points.set_to_max();
+            character.action_points.current.set(ACTION_POINTS_PER_TURN);
         }
 
         loop {
@@ -1484,14 +1485,16 @@ impl CoreGame {
             }
         }
 
-        let mut new_ap = MAX_ACTION_POINTS;
+        //let mut new_ap = MAX_ACTION_POINTS;
+        let mut gain_ap = ACTION_POINTS_PER_TURN;
         if conditions.borrow().near_death {
-            new_ap = new_ap.saturating_sub(2);
+            gain_ap = gain_ap.saturating_sub(1);
         }
         if conditions.borrow().slowed > 0 {
-            new_ap = new_ap.saturating_sub(SLOWED_AP_PENALTY);
+            gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
         }
-        character.action_points.current.set(new_ap);
+        character.action_points.gain(gain_ap);
+        //character.action_points.current.set(new_ap);
 
         conditions.borrow_mut().mainhand_exertion = 0;
         conditions.borrow_mut().offhand_exertion = 0;
@@ -2525,6 +2528,8 @@ impl Character {
         let max_stamina = base_attributes.max_stamina();
         let max_reactive_action_points = 1 + base_attributes.intellect.get() / 2;
         let capacity = base_attributes.capacity();
+        let action_points = NumberedResource::new(MAX_ACTION_POINTS);
+        action_points.current.set(ACTION_POINTS_PER_TURN);
         Self {
             id: None,
             portrait,
@@ -2542,7 +2547,7 @@ impl Character {
             main_hand: Default::default(),
             off_hand: Default::default(),
             conditions: Default::default(),
-            action_points: NumberedResource::new(MAX_ACTION_POINTS),
+            action_points,
             max_reactive_action_points,
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
