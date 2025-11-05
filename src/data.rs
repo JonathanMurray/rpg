@@ -207,6 +207,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
     action_point_cost: 2,
+    // Note: sword held in 2h deals the same as this
     damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,

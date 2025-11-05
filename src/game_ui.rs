@@ -334,9 +334,9 @@ pub struct CharacterUi {
 impl CharacterUi {
     pub fn draw(&self, y: f32) {
         self.actions_section.draw(10.0, y + 5.0);
-        self.action_points_row.draw(430.0, y);
+        self.action_points_row.draw(410.0, y + 5.0);
         self.resource_bars
-            .draw(480.0 - self.resource_bars.size().0 / 2.0, y + 40.0);
+            .draw(460.0 - self.resource_bars.size().0 / 2.0, y + 40.0);
     }
 }
 
@@ -486,8 +486,8 @@ impl UserInterface {
 
         self.activity_popup.draw(20.0, ui_y + 1.0);
 
-        self.player_portraits.draw(570.0, ui_y + 5.0);
-        self.character_sheet_toggle.draw(570.0, ui_y + 90.0);
+        self.player_portraits.draw(570.0, ui_y + 25.0);
+        self.character_sheet_toggle.draw(570.0, ui_y + 110.0);
 
         let character_ui = self
             .character_uis
@@ -510,7 +510,7 @@ impl UserInterface {
         self.log.draw(log_x, ui_y);
 
         // We draw this late to ensure that any hover popups are shown above other UI elements
-        character_ui.conditions_list.draw(800.0, ui_y + 5.0);
+        character_ui.conditions_list.draw(760.0, ui_y + 5.0);
 
         self.log.draw_tooltips(log_x, ui_y);
 
@@ -882,20 +882,20 @@ impl UserInterface {
 
             UiState::ReactingToAttack { .. } => {
                 self.target_ui
-                    .set_action("Select a reaction".to_string(), vec![], false);
+                    .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
                 on_attacked = true;
             }
 
             UiState::ReactingToHit { .. } => {
                 self.target_ui
-                    .set_action("Select a reaction".to_string(), vec![], false);
+                    .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
             }
 
             UiState::ReactingToOpportunity { .. } => {
                 self.target_ui
-                    .set_action("Select a reaction".to_string(), vec![], false);
+                    .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
             }
 
@@ -1085,7 +1085,7 @@ impl UserInterface {
                 let attacker_pos = self.characters.get(attacker).pos();
                 let target_pos = self.characters.get(target).pos();
 
-                let duration = 0.15 * distance_between(attacker_pos, target_pos);
+                let duration = 0.1 * distance_between(attacker_pos, target_pos);
 
                 self.animation_stopwatch.set_to_at_least(duration + 0.6);
                 let impact_text = match outcome {
@@ -1109,7 +1109,7 @@ impl UserInterface {
                         end_time: duration,
                         variant: EffectVariant::Line {
                             thickness: 1.0,
-                            end_thickness: Some(10.0),
+                            end_thickness: Some(5.0),
                             color: RED,
                             extend_gradually: true,
                         },
@@ -1332,9 +1332,8 @@ impl UserInterface {
                 self.game_grid.remove_dead();
                 self.character_portraits.remove_dead();
 
-                if self.characters.get(character).player_controlled() {
-                    self.player_portraits.mark_as_dead(character);
-                }
+                // TODO: Ideally the UI shouldn't show a new active character until the death "animation" is complete.
+                self.animation_stopwatch.set_to_at_least(0.5);
 
                 if let Some(new_active) = new_active {
                     self.set_new_active_character_id(new_active);
@@ -1350,7 +1349,7 @@ impl UserInterface {
                 from,
                 to,
             } => {
-                let mut duration = 0.4;
+                let mut duration = 0.3;
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;
@@ -1589,6 +1588,14 @@ impl UserInterface {
                     .action_points
                     .current();
                 ui.action_points_row.is_characters_turn = *id == self.active_character_id;
+
+                let statuses = ui
+                    .conditions_list
+                    .descriptions
+                    .iter()
+                    .map(|(info, _)| info.is_positive)
+                    .collect();
+                self.player_portraits.set_statuses(*id, statuses);
             }
         }
     }

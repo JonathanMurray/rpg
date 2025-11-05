@@ -6,6 +6,7 @@ use std::{
 
 use macroquad::{
     color::SKYBLUE,
+    shapes::{draw_triangle, draw_triangle_lines},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -20,7 +21,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Style, TextLine,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style,
+        TextLine,
     },
     core::{Character, CharacterId, Characters, CoreGame, MAX_ACTION_POINTS},
     drawing::draw_cross,
@@ -146,7 +148,7 @@ impl TopCharacterPortrait {
             character.max_reactive_action_points,
             (10.0, 10.0),
             0.2,
-            Style::default(),
+            Style{ background_color: Some(BLACK), ..Default::default() },
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
 
@@ -310,16 +312,15 @@ impl PlayerPortraits {
             }
         }
 
-        let mut elements = vec![];
+        let mut portrait_elements = vec![];
         for portrait in portraits.values() {
-            let cloned = Rc::clone(portrait);
-            elements.push(Element::RcRefCell(cloned));
+            portrait_elements.push(Element::RcRefCell(portrait.clone()));
         }
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
             margin: 10.0,
-            children: elements,
+            children: portrait_elements,
             ..Default::default()
         };
 
@@ -368,14 +369,20 @@ impl PlayerPortraits {
         self.row.draw(x, y);
 
         for (i, portrait) in &self.portraits {
-            if portrait.borrow().has_been_clicked.get() {
-                portrait.borrow().has_been_clicked.set(false);
+            if portrait.borrow().has_been_clicked.take() {
                 self.set_selected_id(*i);
                 break;
             }
         }
     }
 
+    pub fn set_statuses(&mut self, character_id: CharacterId, statuses: Vec<bool>) {
+        if let Some(portrait) = self.portraits.get_mut(&character_id) {
+            portrait.borrow_mut().set_statuses(statuses);
+        }
+    }
+
+    /*
     pub fn mark_as_dead(&mut self, character_id: CharacterId) {
         self.portraits
             .get(&character_id)
@@ -383,37 +390,88 @@ impl PlayerPortraits {
             .borrow_mut()
             .is_character_dead = true;
     }
+     */
 }
 
 struct PlayerCharacterPortrait {
     text: TextLine,
+    character: Rc<Character>,
     shown_character: Cell<bool>,
     active_character: Cell<bool>,
     padding: f32,
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
-    is_character_dead: bool,
+    status_column: Element,
+    icons: Vec<Rc<RefCell<Rectangle>>>,
 }
 
 impl PlayerCharacterPortrait {
-    fn new(character: &Character, font: Font, texture: Texture2D) -> Self {
+    fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
         let mut text = TextLine::new(character.name, 20, WHITE, Some(font));
         text.set_depth(BLACK, 2.0);
+
+        let mut icons = vec![];
+        let mut icon_elements = vec![];
+        for i in 0..6 {
+            let color = if i < 3 {
+                Color::new(0.3, 0.7, 0.3, 0.5)
+            } else if i < 5 {
+                Color::new(0.7, 0.3, 0.3, 0.5)
+            } else {
+                BLACK
+            };
+            let icon = Rc::new(RefCell::new(Rectangle {
+                size: (STATUS_ICON_W, STATUS_ICON_W),
+                style: Style {
+                    background_color: Some(color),
+                    ..Default::default()
+                },
+            }));
+            icons.push(icon.clone());
+            icon_elements.push(Element::RcRefCell(icon));
+        }
+
+        let status_column = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 1.0,
+            style: Style {
+                background_color: Some(Color::new(0.2, 0.2, 0.2, 1.0)),
+                padding: 2.0,
+                ..Default::default()
+            },
+            children: icon_elements,
+            ..Default::default()
+        });
+
         Self {
+            character: Rc::clone(character),
             text,
             shown_character: Cell::new(false),
             active_character: Cell::new(false),
             padding: 10.0,
             has_been_clicked: Cell::new(false),
             texture,
-            is_character_dead: false,
+            status_column,
+            icons,
+        }
+    }
+
+    fn set_statuses(&mut self, statuses: Vec<bool>) {
+        for (i, icon) in self.icons.iter().enumerate() {
+            let color = match statuses.get(i) {
+                Some(true) => Color::new(0.3, 0.7, 0.3, 0.5),
+                Some(false) => Color::new(0.7, 0.3, 0.3, 0.5),
+                None => BLACK,
+            };
+            icon.borrow_mut().style.background_color = Some(color);
         }
     }
 }
 
+const STATUS_ICON_W: f32 = 10.0;
 impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
-        let (w, h) = self.size();
+        let (w, h) = (64.0, 80.0);
         draw_rectangle(x, y, w, h, DARKGRAY);
 
         let params = DrawTextureParams {
@@ -422,11 +480,24 @@ impl Drawable for PlayerCharacterPortrait {
         };
         draw_texture_ex(&self.texture, x, y, WHITE, params);
 
-        if self.is_character_dead {
+        if self.character.is_dead() {
             draw_rectangle(x, y, w, h, Color::new(0.6, 0.0, 0.0, 0.5));
             draw_cross(x, y, w, h, RED, 2.0, 5.0);
-            //draw_line(x, y, x+w, y+h, 2.0, RED);
-            //draw_line(x, y+h, x+w, y, 2.0, RED);
+        } else if !self.character.health.is_at_max() {
+            let margin = 1.0;
+            let w = 64.0 - margin * 2.0;
+            let damage_h = (80.0 - margin * 2.0) * (1.0 - self.character.health.ratio());
+            let x0 = x + margin;
+            let y0 = y + margin;
+            draw_rectangle(x0, y0, w, damage_h, Color::new(0.3, 0.0, 0.0, 0.8));
+            draw_line(
+                x0,
+                y0 + damage_h,
+                x0 + w,
+                y0 + damage_h,
+                3.0,
+                Color::new(0.6, 0.0, 0.0, 0.6),
+            );
         }
 
         if self.shown_character.get() {
@@ -438,16 +509,15 @@ impl Drawable for PlayerCharacterPortrait {
         //self.text.draw(self.padding + x, self.padding + y);
 
         if self.active_character.get() {
-            let y_line = y + h - 5.0;
-            let line_margin = 5.0;
-            draw_line(
-                x + self.padding - line_margin,
-                y_line,
-                x + w - self.padding + line_margin,
-                y_line,
-                2.0,
-                GOLD,
-            );
+            let x_mid = x + w / 2.0;
+            let arrow_w = 14.0;
+            let arrow_h = 7.0;
+            let margin = 7.0;
+            let v1 = (x_mid - arrow_w / 2.0, y - margin - arrow_h).into();
+            let v2 = (x_mid + arrow_w / 2.0, y - margin - arrow_h).into();
+            let v3 = (x_mid, y - margin).into();
+            draw_triangle(v1, v2, v3, GOLD);
+            draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
         }
 
         let (mouse_x, mouse_y) = mouse_position();
@@ -459,13 +529,15 @@ impl Drawable for PlayerCharacterPortrait {
                 self.has_been_clicked.set(true);
             }
         }
+
+        self.status_column.draw(x + w + 1.0, y + 1.0);
     }
 
     fn size(&self) -> (f32, f32) {
-        let text_size = self.text.size();
+        //let text_size = self.text.size();
         //(text_size.0 + self.padding * 2.0, 15.0 + self.padding * 2.0)
 
-        (64.0, 80.0)
+        (64.0 + 3.0 + STATUS_ICON_W, 80.0)
     }
 }
 
@@ -619,7 +691,8 @@ impl Drawable for ActionPointsRow {
         assert!(self.current_ap <= self.max_ap);
 
         let size = self.size();
-        draw_rectangle(x, y, size.0, size.1, BLACK);
+        //draw_rectangle(x, y, size.0, size.1, BLACK);
+        self.style.draw_background(x, y, size);
 
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
@@ -639,7 +712,7 @@ impl Drawable for ActionPointsRow {
             if i < self.current_ap.saturating_sub(reserved_ap) {
                 // Unreserved point
 
-                if blocked_by_lack_of_reactive_ap {
+                if false /* blocked_by_lack_of_reactive_ap */ {
                     draw_circle(
                         x0 + self.cell_size.0 / 2.0,
                         y0 + self.cell_size.1 / 2.0,
@@ -711,7 +784,7 @@ impl Drawable for ActionPointsRow {
             x0 += self.cell_size.0;
         }
 
-        self.style.draw(x, y, self.size());
+        self.style.draw_foreground(x, y, self.size());
 
         if reserved_ap > self.max_ap {
             let (w, h) = self.size();

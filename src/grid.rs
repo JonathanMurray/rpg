@@ -24,16 +24,12 @@ use macroquad::{
 };
 
 use crate::{
-    core::{
+    base_ui::{Drawable, Style}, core::{
         ActionReach, ActionTarget, AttackAction, Character, Goodness, Position, SpellReach,
         SpellTarget,
-    },
-    drawing::{
+    }, drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
-    },
-    game_ui::{ConfiguredAction, UiState},
-    pathfind::{build_path_from_route, PathfindGrid, Route},
-    textures::{draw_terrain, SpriteId, TerrainId},
+    }, game_ui::{ConfiguredAction, UiState}, game_ui_components::ActionPointsRow, pathfind::{PathfindGrid, Route, build_path_from_route}, textures::{SpriteId, TerrainId, draw_terrain}
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -1070,13 +1066,15 @@ impl GameGrid {
         self.draw_effects();
 
         if !matches!(ui_state, UiState::ReactingToOpportunity { .. }) {
-            self.draw_character_label(self.characters.get(self.active_character_id));
+            let active_char = self.characters.get(self.active_character_id);
+            let draw_action_points = !active_char.player_controlled();
+            self.draw_character_label(active_char, draw_action_points);
         }
 
         if let Some(id) = hovered_character_id {
             if id != self.active_character_id {
                 let char = self.characters.get(id);
-                self.draw_character_label(char);
+                self.draw_character_label(char, false);
             }
         }
 
@@ -1241,8 +1239,8 @@ impl GameGrid {
         draw_cross(x, y, self.cell_w, self.cell_w, RED, 2.0, self.cell_w * 0.15);
     }
 
-    fn draw_character_label(&self, char: &Character) {
-        let (x, y) = self.character_screen_pos(char);
+    fn draw_character_label(&self, character: &Character, draw_action_points: bool) {
+        let (x, y) = self.character_screen_pos(character);
         let y = y - 5.0;
 
         let font_size = 14;
@@ -1257,7 +1255,7 @@ impl GameGrid {
         let healthbar_w = self.cell_w;
         let healthbar_h = 5.0;
 
-        let header = char.name;
+        let header = character.name;
 
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
 
@@ -1279,10 +1277,25 @@ impl GameGrid {
         draw_rectangle(
             x,
             y - healthbar_h,
-            healthbar_w * (char.health.current() as f32 / char.health.max() as f32),
+            healthbar_w * (character.health.current() as f32 / character.health.max() as f32),
             healthbar_h,
             RED,
         );
+
+        if draw_action_points {
+
+            let mut action_points_row = ActionPointsRow::new(
+                character.max_reactive_action_points,
+                (10.0, 10.0),
+                0.2,
+                Style{
+                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)), ..Default::default()
+                },
+            );
+            action_points_row.current_ap = character.action_points.current();
+            action_points_row.draw(x - (action_points_row.size().0 - self.cell_w) / 2.0, box_y - action_points_row.size().1 - 3.0);
+        }
+
     }
 
     fn draw_active_character_highlight(&self) {

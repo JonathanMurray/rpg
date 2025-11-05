@@ -366,6 +366,17 @@ pub struct Rectangle {
     pub style: Style,
 }
 
+impl Drawable for Rectangle {
+    fn draw(&self, x: f32, y: f32) {
+        self.style.draw(x, y, self.size);
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.size
+    }
+}
+
+// TODO
 impl Rectangle {
     pub fn draw(&self, x: f32, y: f32) {
         self.style.draw(x, y, self.size);
@@ -382,14 +393,23 @@ pub struct Style {
 
 impl Style {
     pub fn draw(&self, x: f32, y: f32, size: (f32, f32)) {
+        self.draw_background(x, y, size);
+        self.draw_foreground(x, y, size);   
+    }
+
+    pub fn draw_background(&self, x: f32, y: f32, size: (f32, f32)) {
         if let Some(color) = self.background_color {
             draw_rectangle(x, y, size.0, size.1, color);
         }
+    }
+
+    pub fn draw_foreground(&self, x: f32, y: f32, size: (f32, f32)) {
         if let Some(color) = self.border_color {
             let thickness = self.border_width.unwrap_or(1.0);
             draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
         }
     }
+
 }
 
 pub struct Circle {

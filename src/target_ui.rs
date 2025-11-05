@@ -9,7 +9,7 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine, table
+        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{Character, Goodness, HandType},
@@ -69,7 +69,6 @@ impl TargetUi {
                 Some(self.simple_font.clone()),
             );
 
-
             let def_table = table(
                 vec![
                     "Toughness".into(),
@@ -96,6 +95,7 @@ impl TargetUi {
                 (15.0, 15.0),
                 0.25,
                 Style {
+                    background_color: Some(BLACK),
                     border_color: Some(WHITE),
                     ..Default::default()
                 },
@@ -132,7 +132,6 @@ impl TargetUi {
                 ..Default::default()
             };
 
-            
             let movement_text_line = TextLine::new(
                 format!("Movement: {}", char.move_speed()),
                 16,
@@ -152,7 +151,10 @@ impl TargetUi {
                     Element::Text(attack_text_line),
                 ],
                 margin: 7.0,
-                style: Style { padding: 5.0, ..Default::default() },
+                style: Style {
+                    padding: 5.0,
+                    ..Default::default()
+                },
                 ..Default::default()
             };
 

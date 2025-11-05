@@ -1930,11 +1930,33 @@ impl Condition {
         }
     }
 
+    pub const fn is_positive(&self) -> bool {
+        use Condition::*;
+        match self {
+            Protected(_) => true,
+            Dazed(_) => false,
+            Bleeding(_) => false,
+            Braced => true,
+            Raging => true,
+            Distracted => false,
+            Weakened(_) => false,
+            MainHandExertion(_) => false,
+            OffHandExertion(_) => false,
+            Encumbered(_) => false,
+            NearDeath => false,
+            Dead => false,
+            Slowed(_) => false,
+            Exposed(_) => false,
+            Hindered(..) => false,
+        }
+    }
+
     pub const fn info(&mut self) -> (ConditionInfo, Option<u32>) {
         (
             ConditionInfo {
                 name: self.name(),
                 description: self.description(),
+                is_positive: self.is_positive(),
             },
             self.stacks().copied(),
         )
@@ -1952,6 +1974,7 @@ const SLOWED_AP_PENALTY: u32 = 2;
 pub struct ConditionInfo {
     pub name: &'static str,
     pub description: &'static str,
+    pub is_positive: bool,
 }
 
 #[derive(Debug, Copy, Clone, Default)]
@@ -3570,6 +3593,10 @@ impl NumberedResource {
             current: Cell::new(max),
             max: Cell::new(max),
         }
+    }
+
+    pub fn is_at_max(&self) -> bool {
+        self.current() == self.max()
     }
 
     pub fn current(&self) -> u32 {

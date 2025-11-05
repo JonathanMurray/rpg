@@ -20,8 +20,8 @@ use macroquad::{
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Action, Attributes, BaseAction, Behaviour, Character, CharacterId, CoreGame, EquipmentEntry,
-    HandType, OnAttackedReaction, OnHitReaction, PassiveSkill,
+    Action, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition, CoreGame,
+    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill,
 };
 
 use rpg::data::{
@@ -85,14 +85,6 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
-    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
-    alice.known_passive_skills.push(PassiveSkill::Reaper);
-    alice
-        .known_actions
-        .push(BaseAction::CastSpell(SHACKLED_MIND));
-    alice.add_to_spirit(5);
-    alice.mana.lose(6);
-    alice.known_actions.push(BaseAction::CastSpell(FIREBALL));
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -104,17 +96,18 @@ async fn main() {
     );
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
+    //bob.health.lose(2);
 
     let mut player_characters = vec![alice, bob];
 
-    player_characters = run_fight_loop(
-        player_characters,
-        FightId::Elite,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-    )
-    .await;
+            player_characters = run_fight_loop(
+                    player_characters,
+                    FightId::Easy1,
+                    &equipment_icons,
+                    icons.clone(),
+                    portrait_textures.clone(),
+                )
+                .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

@@ -174,7 +174,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 let archer = Character::new(
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Archer",
-                    PortraitId::Skeleton,
+                    PortraitId::Ghoul,
                     SpriteId::Ghoul,
                     Attributes::new(1, 1, 2, 1),
                     enemy_positions[&i],
