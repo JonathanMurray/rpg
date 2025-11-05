@@ -1,7 +1,7 @@
 +----------------------------
 BBBBBBBBBBBB
-BR  P P  RRB
-B         SB
+BR  PPP  RRB
+B    P    SB
 B         WB
 B  R     WWB
 B        WWB

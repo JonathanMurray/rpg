@@ -4,7 +4,7 @@ BR          B
 B     3 01  B
 B       2   B
 B           B
-B      R    B
+B PP   R    B
 B PP        B
 BRR        RB
  BBBBBBBBBBB

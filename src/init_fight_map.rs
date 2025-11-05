@@ -4,7 +4,10 @@ use std::{
     rc::Rc,
 };
 
-use rand::distr::{Distribution, Uniform};
+use rand::{
+    distr::{Distribution, Uniform},
+    Rng,
+};
 
 use crate::{
     bot::BotBehaviour,
@@ -20,6 +23,8 @@ use crate::{
 };
 
 pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> GameInitState {
+    let mut rng = rand::rng();
+
     let map_filename = match fight_id {
         FightId::Easy1 => "map1.txt",
         FightId::Easy2 => "map2.txt",
@@ -81,7 +86,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     }
 
     for character in &player_characters {
-        character.position.set(player_positions.remove(0));
+        let i = rng.random_range(..player_positions.len());
+
+        character.position.set(player_positions.remove(i));
     }
 
     let mut characters = player_characters;
@@ -253,7 +260,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         TerrainId::Grass4,
     ];
     let uniform_distribution = Uniform::new(0, grass_variations.len()).unwrap();
-    let mut rng = rand::rng();
+
     let mut choices = uniform_distribution.sample_iter(&mut rng);
 
     for x in 0..grid_dimensions.0 {

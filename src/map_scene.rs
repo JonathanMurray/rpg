@@ -100,7 +100,7 @@ impl MapScene {
             Node::new((2, 2), MapChoice::Fight(FightId::Elite)),
             Node::new((3, 0), MapChoice::Rest),
             Node::new((3, 1), MapChoice::Chest(chest_reward)),
-            Node::new((4, 0), MapChoice::Fight(FightId::Elite)),
+            Node::new((4, 0), MapChoice::Fight(FightId::Elite2)),
             Node::new((5, 0), MapChoice::Shop),
         ];
         let edges: HashMap<Option<usize>, Vec<usize>> = [

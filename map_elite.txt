@@ -4,8 +4,8 @@ BRR      2       RRB
 BR                RB
 B                  B
 B                  B
-B                  B
-B       P P        B
+B        P         B
+B       PPP        B
 B1      WWW       3B
 B       WWW        B
 B        W         B
