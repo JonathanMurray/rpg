@@ -145,6 +145,21 @@ const FEINT: AttackEnhancement = AttackEnhancement {
     ..AttackEnhancement::default()
 };
 
+pub const BAD_RAPIER: Weapon = Weapon {
+    name: "Bad rapier",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 1,
+    grip: WeaponGrip::MainHand,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(FEINT),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Rapier),
+    icon: EquipmentIconId::Rapier,
+    weight: 2,
+};
+
 pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
     range: WeaponRange::Melee,

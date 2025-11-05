@@ -14,6 +14,10 @@ pub enum SpriteId {
     Alice,
     Bob,
     Skeleton,
+    Skeleton2,
+    Ghoul,
+    Ogre,
+    Magi,
     Warhammer,
     Bow,
     Sword,
@@ -30,6 +34,10 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::Alice, "character4.png"),
         (SpriteId::Bob, "character5.png"),
         (SpriteId::Skeleton, "skeleton.png"),
+        (SpriteId::Skeleton2, "skeleton2.png"),
+        (SpriteId::Ghoul, "ghoul.png"),
+        (SpriteId::Ogre, "ogre.png"),
+        (SpriteId::Magi, "magi.png"),
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
@@ -147,6 +155,8 @@ pub enum PortraitId {
     Bob,
     Portrait3,
     Skeleton,
+    Magi,
+    Ghoul,
 }
 
 pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
@@ -155,6 +165,8 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
         (PortraitId::Bob, "portrait_2.png"),
         (PortraitId::Portrait3, "portrait_3.png"),
         (PortraitId::Skeleton, "portrait_skeleton.png"),
+        (PortraitId::Magi, "portrait_magi.png"),
+        (PortraitId::Ghoul, "portrait_ghoul.png"),
     ])
     .await
 }

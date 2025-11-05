@@ -1,8 +1,13 @@
 +----------------------------
-BBBBBBBBBBBBBBBBBBBB
-B       P P        B
-B                  B
-B        2  1      B
-B0                 B
-BBBBBBBBBBBBBBBBBBBB
+BBBBBBBBBBBB
+BR  P P  RRB
+B         SB
+B         WB
+B  R     WWB
+B        WWB
+B        WWB
+B   2  1   B
+BS   0     B
+BS  S   WWWB
+BBBBBBBBBBBB
 +----------------------------

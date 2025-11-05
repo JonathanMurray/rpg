@@ -2307,7 +2307,7 @@ impl PassiveSkill {
             Self::HardenedSkin => "+1 armor",
             Self::WeaponProficiency => "Attacks gain +2 armor penetration",
             Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
-            Self::Reaper => "On kill: regain 1 stamina",
+            Self::Reaper => "On kill: regenerate 1 stamina",
         }
     }
 }

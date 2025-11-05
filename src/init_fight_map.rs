@@ -12,8 +12,7 @@ use crate::{
         Attributes, BaseAction, Behaviour, Character, CharacterId, Characters, HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL,
-        MAGI_INFLICT_WOUNDS, SHIRT,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -89,12 +88,13 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Easy1 => {
             let melee = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
-                "Shambler",
+                "Thug",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
                 Attributes::new(3, 2, 2, 2),
                 enemy_positions[&0],
             );
+            melee.armor_piece.set(Some(SHIRT));
             melee.set_weapon(HandType::MainHand, BAD_DAGGER);
 
             let ranged = Character::new(
@@ -115,14 +115,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Guard",
                 PortraitId::Skeleton,
-                SpriteId::Skeleton,
+                SpriteId::Skeleton2,
                 Attributes::new(4, 3, 2, 2),
                 enemy_positions[&0],
             );
             tanky.health.change_max_value_to(20);
             tanky.armor_piece.set(Some(CHAIN_MAIL));
             tanky.set_shield(BAD_SMALL_SHIELD);
-            tanky.set_weapon(HandType::MainHand, BAD_DAGGER);
+            tanky.set_weapon(HandType::MainHand, BAD_RAPIER);
 
             characters.extend_from_slice(&[tanky]);
         }
@@ -133,7 +133,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Ghoul",
                     PortraitId::Skeleton,
-                    SpriteId::Skeleton,
+                    SpriteId::Ghoul,
                     Attributes::new(2, 1, 1, 1),
                     enemy_positions[&i],
                 );
@@ -152,7 +152,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Ogre",
                 PortraitId::Skeleton,
-                SpriteId::Skeleton,
+                SpriteId::Ogre,
                 Attributes::new(4, 1, 1, 1),
                 enemy_positions[&0],
             );
@@ -167,7 +167,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Archer",
                     PortraitId::Skeleton,
-                    SpriteId::Skeleton,
+                    SpriteId::Ghoul,
                     Attributes::new(1, 1, 2, 1),
                     enemy_positions[&i],
                 );
@@ -180,13 +180,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let mut magi = Character::new(
                 Behaviour::Bot(BotBehaviour::Magi(Default::default())),
                 "Magi",
-                PortraitId::Skeleton,
-                SpriteId::Skeleton,
+                PortraitId::Magi,
+                SpriteId::Magi,
                 Attributes::new(4, 1, 3, 5),
                 enemy_positions[&0],
             );
             magi.known_actions.push(BaseAction::CastSpell(MAGI_HEAL));
             magi.armor_piece.set(Some(SHIRT));
+            magi.set_weapon(HandType::MainHand, SWORD);
             magi.known_actions
                 .push(BaseAction::CastSpell(MAGI_INFLICT_WOUNDS));
             magi.health.change_max_value_to(25);
@@ -195,15 +196,19 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             for i in 1..3 {
                 let tanky = Character::new(
                     Behaviour::Bot(BotBehaviour::Normal),
-                    "Warrior",
-                    PortraitId::Skeleton,
-                    SpriteId::Skeleton,
+                    "Enslaved",
+                    PortraitId::Ghoul,
+                    SpriteId::Skeleton2,
                     Attributes::new(3, 1, 1, 1),
                     enemy_positions[&i],
                 );
                 tanky.health.change_max_value_to(20);
                 tanky.armor_piece.set(Some(CHAIN_MAIL));
-                tanky.set_weapon(HandType::MainHand, BAD_SWORD);
+                if i % 2 == 0 {
+                    tanky.set_weapon(HandType::MainHand, BAD_SWORD);
+                } else {
+                    tanky.set_weapon(HandType::MainHand, BAD_RAPIER);
+                }
                 characters.push(tanky);
             }
         }
