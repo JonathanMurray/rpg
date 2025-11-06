@@ -78,7 +78,7 @@ async fn main() {
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
-        Attributes::new(2, 4, 3, 2),
+        Attributes::new(2, 3, 3, 2),
         (1, 10),
     );
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
@@ -91,7 +91,7 @@ async fn main() {
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(4, 2, 2, 3),
+        Attributes::new(3, 2, 2, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);

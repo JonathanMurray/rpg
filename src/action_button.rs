@@ -40,15 +40,7 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
         ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => on_attacked_reaction_tooltip(reaction),
-        ButtonAction::OnHitReaction(reaction) => ActionButtonTooltip {
-            header: format!(
-                "{} {}",
-                reaction.name,
-                cost_string(reaction.action_point_cost, 0, 0)
-            ),
-            description: Some(reaction.description),
-            ..Default::default()
-        },
+        ButtonAction::OnHitReaction(reaction) => on_hit_reaction_tooltip(reaction),
         ButtonAction::Proceed => ActionButtonTooltip {
             header: "Proceed".to_string(),
             ..Default::default()
@@ -86,6 +78,18 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
         error: None,
         technical_description,
     }
+}
+
+fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
+    ActionButtonTooltip {
+            header: format!(
+                "{} {}",
+                reaction.name,
+                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+            ),
+            description: Some(reaction.description),
+            ..Default::default()
+        }
 }
 
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
@@ -841,7 +845,7 @@ impl ButtonAction {
         match self {
             ButtonAction::Action(base_action) => base_action.stamina_cost(),
             ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
-            ButtonAction::OnHitReaction(_reaction) => 0,
+            ButtonAction::OnHitReaction(reaction) => reaction.stamina_cost,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::SpellEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::Proceed => 0,

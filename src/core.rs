@@ -1404,6 +1404,7 @@ impl CoreGame {
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
         let reactor = self.characters.get(reactor_id);
         reactor.action_points.spend(reaction.action_point_cost);
+        reactor.stamina.spend(reaction.stamina_cost);
         let reactor_name = reactor.name;
 
         match reaction.effect {
@@ -1855,6 +1856,7 @@ pub struct OnHitReaction {
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
+    pub stamina_cost: u32,
     pub effect: OnHitReactionEffect,
     pub must_be_melee: bool,
 }
@@ -2529,7 +2531,7 @@ impl Attributes {
     }
 
     fn max_stamina(&self) -> u32 {
-        (self.strength.get() + self.agility.get()).saturating_sub(5)
+        (self.strength.get() + self.agility.get()).saturating_sub(2)
     }
 
     fn capacity(&self) -> u32 {
@@ -3161,6 +3163,7 @@ impl Character {
         ap >= reaction.action_point_cost
             && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
+            && self.stamina.current() >= reaction.stamina_cost
             && (!reaction.must_be_melee || is_within_melee)
     }
 

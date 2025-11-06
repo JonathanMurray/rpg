@@ -66,7 +66,7 @@ pub const BAD_DAGGER: Weapon = Weapon {
     name: "Bad dagger",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
@@ -107,7 +107,7 @@ pub const BAD_SWORD: Weapon = Weapon {
     name: "Bad Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -149,7 +149,7 @@ pub const BAD_RAPIER: Weapon = Weapon {
     name: "Bad rapier",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(FEINT),
@@ -223,7 +223,7 @@ pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
     range: WeaponRange::Ranged(5),
     action_point_cost: 3,
-    damage: 1,
+    damage: 2,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFUL_AIM),
@@ -268,6 +268,7 @@ pub const SMALL_SHIELD: Shield = Shield {
         description: "Possibly daze attacker (str vs [toughness])",
         icon: IconId::ShieldBash,
         action_point_cost: 1,
+        stamina_cost: 0,
         effect: OnHitReactionEffect::ShieldBash,
         must_be_melee: true,
     }),
@@ -308,7 +309,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
-            ApplyEffect::RemoveActionPoints(1),
+            ApplyEffect::RemoveActionPoints(2),
         )),
         ..AttackEnhancementEffect::default()
     },
@@ -330,7 +331,7 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
     icon: IconId::CripplingShot,
-    stamina_cost: 1,
+    stamina_cost: 2,
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             ApplyEffect::Condition(Condition::Hindered(1)),
@@ -347,8 +348,8 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     description: "Gain bonus evasion against one melee attack",
     icon: IconId::Parry,
     action_point_cost: 1,
-    stamina_cost: 0,
-    effect: OnAttackedReactionEffect { bonus_evasion: 4 },
+    stamina_cost: 1,
+    effect: OnAttackedReactionEffect { bonus_evasion: 5 },
     must_be_melee: true,
 };
 
@@ -358,8 +359,8 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     description: "Gain bonus evasion against one attack",
     icon: IconId::Sidestep,
     action_point_cost: 1,
-    stamina_cost: 1,
-    effect: OnAttackedReactionEffect { bonus_evasion: 4 },
+    stamina_cost: 2,
+    effect: OnAttackedReactionEffect { bonus_evasion: 5 },
     must_be_melee: false,
 };
 
@@ -368,6 +369,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     description: Condition::Raging.description(),
     icon: IconId::Rage,
     action_point_cost: 1,
+    stamina_cost: 1,
     effect: OnHitReactionEffect::Rage,
     must_be_melee: false,
 };
@@ -377,9 +379,9 @@ pub const SWEEP_ATTACK: Spell = Spell {
     name: "Sweeping attack",
     description: "Target all enemies around you",
     icon: IconId::SweepAttack,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 0,
-    stamina_cost: 1,
+    stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
 
     modifier: SpellModifier::Attack(-3),
@@ -678,7 +680,7 @@ pub const MAGI_HEAL: Spell = Spell {
     target: SpellTarget::Ally {
         range: Range::Ranged(5),
         effect: SpellAllyEffect {
-            healing: 4,
+            healing: 3,
             apply: None,
         },
     },

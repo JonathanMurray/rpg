@@ -1110,7 +1110,8 @@ impl GameGrid {
 
         match ui_state.players_action_target() {
             ActionTarget::Character(target, movement) => {
-                let target_pos = self.characters.get(target).pos();
+                let target = self.characters.get(target);
+                let target_pos = target.pos();
                 if let Some(positions) = movement {
                     self.draw_movement_to_target(active_char_pos, target_pos, positions);
                 } else {
@@ -1121,6 +1122,8 @@ impl GameGrid {
                         7.0,
                     );
                 }
+
+                self.draw_character_label(target, false);
             }
             ActionTarget::Position(target_pos) => {
                 self.draw_target_crosshair(
