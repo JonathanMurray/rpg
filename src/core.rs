@@ -487,7 +487,6 @@ impl CoreGame {
 
     async fn perform_spell(
         &mut self,
-
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
         selected_target: ActionTarget,
@@ -581,11 +580,8 @@ impl CoreGame {
                         unreachable!()
                     };
 
-                    // TODO (is it ok to perform movement right inside perform_spell? No weird state interactions?)
                     if let Some(positions) = movement {
-                        println!("WILL PERFORM MOVEMENT {positions:?}");
                         self.perform_movement(positions.clone()).await;
-                        println!("PERFORMED MOVEMENT {positions:?}");
                     }
 
                     let target = self.characters.get(*target_id);
@@ -968,7 +964,10 @@ impl CoreGame {
                 };
 
                 if spell_result >= defense {
-                    Some((spell_result - defense) / 5)
+                    Some(((spell_result - defense) / 5) as i32)
+                } else if spell_result >= defense - 5 {
+                    // graze
+                    Some(-1)
                 } else {
                     None
                 }
@@ -977,7 +976,11 @@ impl CoreGame {
         };
 
         if let Some(degree_of_success) = success {
-            let heavy_hit_label = match degree_of_success {
+            let success_label = match degree_of_success {
+                -1 => {
+                    detail_lines.push("  Graze".to_string());
+                    "Graze".to_string()
+                }
                 0 => "".to_string(),
                 1 => {
                     detail_lines.push("  Heavy hit".to_string());
@@ -1021,7 +1024,7 @@ impl CoreGame {
                 };
 
                 if increased_by_good_roll && degree_of_success > 0 {
-                    dmg_str.push_str(&format!(" +{degree_of_success} ({heavy_hit_label})"));
+                    dmg_str.push_str(&format!(" +{degree_of_success} ({success_label})"));
                     dmg_calculation += degree_of_success as i32;
                 }
 
@@ -1037,6 +1040,12 @@ impl CoreGame {
                     }
                 }
 
+                if degree_of_success == -1 {
+                    dmg_str.push_str(&format!(" -50% (Graze)"));
+                    // Since there's no armor/protection against spells, rounding up would make the spell too powerful.
+                    dmg_calculation /= 2;
+                }
+
                 let damage = dmg_calculation.max(0) as u32;
 
                 if dmg_calculation > 0 {
@@ -1049,6 +1058,15 @@ impl CoreGame {
                 None
             };
 
+            fn apply_degree_of_success(stacks: &mut u32, degree_of_success: i32) {
+                if degree_of_success == -1 {
+                    *stacks /= 2;
+                } else {
+                    assert!(degree_of_success >= 0);
+                    *stacks += degree_of_success as u32;
+                }
+            }
+
             for mut effect in enemy_effect
                 .on_hit
                 .unwrap_or_default()
@@ -1057,11 +1075,15 @@ impl CoreGame {
                 .flatten()
             {
                 match effect {
-                    ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
-                    ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::RemoveActionPoints(ref mut n) => {
+                        apply_degree_of_success(n, degree_of_success)
+                    }
+                    ApplyEffect::GainStamina(ref mut n) => {
+                        apply_degree_of_success(n, degree_of_success)
+                    }
                     ApplyEffect::Condition(ref mut condition) => {
                         if let Some(stacks) = condition.stacks() {
-                            *stacks += degree_of_success;
+                            apply_degree_of_success(stacks, degree_of_success)
                         }
                     }
                 }
@@ -1076,6 +1098,8 @@ impl CoreGame {
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
             }
+
+            // TODO communicate Graze?
 
             SpellTargetOutcome::HitEnemy { damage }
         } else {

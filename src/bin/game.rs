@@ -85,14 +85,14 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
-    alice.known_actions.push(BaseAction::CastSpell(HEAL));
+    alice.known_actions.push(BaseAction::CastSpell(FIREBALL));
     alice
         .known_actions
         .push(BaseAction::CastSpell(HEALING_RAIN));
     alice
         .known_actions
         .push(BaseAction::CastSpell(HEALING_NOVA));
-    alice.add_to_spirit(5);
+    alice.add_to_spirit(2);
 
     let mut bob = Character::new(
         Behaviour::Player,
