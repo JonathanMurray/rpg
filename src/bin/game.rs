@@ -108,9 +108,18 @@ async fn main() {
 
     let mut player_characters = vec![alice, bob];
 
+    player_characters = run_victory_loop(
+        player_characters,
+        font.clone(),
+        &equipment_icons,
+        icons.clone(),
+        &portrait_textures,
+    )
+    .await;
+
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Easy1,
+        FightId::Elite2,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

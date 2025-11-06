@@ -1187,9 +1187,11 @@ impl UserInterface {
 
                 if let Some((_target_id, outcome)) = target_outcome {
                     match outcome {
-                        SpellTargetOutcome::HitEnemy { damage } => {
+                        SpellTargetOutcome::HitEnemy { damage, graze } => {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" ({} damage)", dmg))
+                            } else if graze {
+                                line.push_str(" (graze)");
                             } else {
                                 line.push_str(" (hit)");
                             }
@@ -1265,9 +1267,11 @@ impl UserInterface {
                     );
 
                     let (target_text, goodness) = match outcome {
-                        SpellTargetOutcome::HitEnemy { damage } => {
+                        SpellTargetOutcome::HitEnemy { damage, graze } => {
                             if let Some(dmg) = damage {
                                 (format!("{}", dmg), Goodness::Bad)
+                            } else if graze {
+                                ("Graze".to_string(), Goodness::Bad)
                             } else {
                                 ("Hit".to_string(), Goodness::Bad)
                             }
@@ -1314,9 +1318,11 @@ impl UserInterface {
                         );
 
                         let (target_text, goodness) = match outcome {
-                            SpellTargetOutcome::HitEnemy { damage } => {
+                            SpellTargetOutcome::HitEnemy { damage, graze } => {
                                 if let Some(dmg) = damage {
                                     (format!("{}", dmg), Goodness::Bad)
+                                } else if graze {
+                                    ("Graze".to_string(), Goodness::Bad)
                                 } else {
                                     ("Hit".to_string(), Goodness::Bad)
                                 }

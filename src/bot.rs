@@ -51,13 +51,13 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
         let mut rng = rand::rng();
         let i = rng.random_range(0..2);
 
-        let is_any_enemy_hurt = game
+        let is_healing_warranted = game
             .enemies()
-            .any(|char| char.health.current() < char.health.max());
+            .any(|char| char.health.current() < char.health.max() - 2);
 
         let are_all_players_bleeding = game.player_characters().all(|ch| ch.is_bleeding());
 
-        if i == 0 && is_any_enemy_hurt {
+        if i == 0 && is_healing_warranted {
             let target: &Rc<Character> = game
                 .enemies()
                 .min_by(|a, b| a.health.ratio().total_cmp(&b.health.ratio()))

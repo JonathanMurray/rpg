@@ -1099,9 +1099,10 @@ impl CoreGame {
                 }
             }
 
-            // TODO communicate Graze?
-
-            SpellTargetOutcome::HitEnemy { damage }
+            SpellTargetOutcome::HitEnemy {
+                damage,
+                graze: degree_of_success == -1,
+            }
         } else {
             let line = match (modifier, enemy_effect.defense_type) {
                 (_, None) => unreachable!("uncontested effect cannot fail"),
@@ -1656,7 +1657,7 @@ pub struct OffensiveHitReactionOutcome {
 
 #[derive(Debug, Copy, Clone)]
 pub enum SpellTargetOutcome {
-    HitEnemy { damage: Option<u32> },
+    HitEnemy { damage: Option<u32>, graze: bool },
     Resist,
     HealedAlly(u32),
 }
@@ -3633,8 +3634,7 @@ impl Character {
             NearDeath => conditions.near_death = true,
             Dead => conditions.dead = true,
             Slowed(n) => {
-                assert!(n > 0, "{n}");
-                if conditions.slowed == 0 {
+                if conditions.slowed == 0 && n > 0 {
                     // Since a character receives max AP at end-of-turn, if they are then slowed by an enemy
                     // that debuff must reasonably affect the character's next turn.
                     self.action_points.lose(SLOWED_AP_PENALTY);
