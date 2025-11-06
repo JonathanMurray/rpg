@@ -82,14 +82,14 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
 
 fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
     ActionButtonTooltip {
-            header: format!(
-                "{} {}",
-                reaction.name,
-                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
-            ),
-            description: Some(reaction.description),
-            ..Default::default()
-        }
+        header: format!(
+            "{} {}",
+            reaction.name,
+            cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+        ),
+        description: Some(reaction.description),
+        ..Default::default()
+    }
 }
 
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {

@@ -25,8 +25,8 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL,
-    LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP,
+    BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION,
+    KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP,
     SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
@@ -85,6 +85,14 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
+    alice.known_actions.push(BaseAction::CastSpell(HEAL));
+    alice
+        .known_actions
+        .push(BaseAction::CastSpell(HEALING_RAIN));
+    alice
+        .known_actions
+        .push(BaseAction::CastSpell(HEALING_NOVA));
+    alice.add_to_spirit(5);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -100,7 +108,14 @@ async fn main() {
 
     let mut player_characters = vec![alice, bob];
 
-
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::Easy1,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

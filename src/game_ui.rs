@@ -699,6 +699,8 @@ impl UserInterface {
 
         let spell = *spell;
 
+        println!("REFRESH CAST SPELL STATE : {}", spell.name);
+
         match target {
             ActionTarget::Character(target_id, ..) => {
                 let target_char = self.characters.get(*target_id);

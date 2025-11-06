@@ -665,6 +665,7 @@ impl GameGrid {
         if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
             if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
                 if self.characters.get(id).player_controlled() {
+                    todo!("can this happen?");
                     ui_state.set_target(ActionTarget::None);
                 }
             }
@@ -672,6 +673,7 @@ impl GameGrid {
         if matches!(mouse_state, MouseState::RequiresAllyTarget) {
             if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
                 if !self.characters.get(id).player_controlled() {
+                    todo!("can this happen?");
                     ui_state.set_target(ActionTarget::None);
                 }
             }
@@ -800,9 +802,7 @@ impl GameGrid {
                 self.draw_overhead_exclamation_mark(reactor);
             }
 
-            UiState::ReactingToHit {
-                victim, ..
-            } => {
+            UiState::ReactingToHit { victim, .. } => {
                 let reactor = self.characters.get(*victim);
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
@@ -848,6 +848,7 @@ impl GameGrid {
             {
                 if ui_state.players_action_target() == ActionTarget::None {
                     ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
+                    outcome.switched_players_action_target = true;
                 } else {
                     *ui_state = UiState::ChoosingAction;
                     outcome.switched_state = Some(NewState::ChoosingAction);
@@ -944,9 +945,9 @@ impl GameGrid {
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
-                let player_controlled = self.characters.get(hovered_id).player_controlled();
+                let hovers_player = self.characters.get(hovered_id).player_controlled();
 
-                if player_controlled {
+                if hovers_player {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_cornered_outline(
                             self.grid_pos_to_screen(mouse_grid_pos),
@@ -966,21 +967,26 @@ impl GameGrid {
 
                     if pressed_left_mouse {
                         if self.active_character_id == hovered_id {
-                            *ui_state = UiState::ChoosingAction;
-                            outcome.switched_state = Some(NewState::ChoosingAction);
-                            outcome.switched_players_action_target = true;
-                        } else {
-                            match mouse_state {
-                                MouseState::RequiresAllyTarget => {
-                                    ui_state.set_target(ActionTarget::Character(hovered_id, None));
-                                    outcome.switched_players_action_target = true;
-                                    self.players_inspect_target = Some(hovered_id);
-                                    //self.selected_movement_path = None;
-                                }
-                                _ => {
-                                    self.players_inspect_target = Some(hovered_id);
-                                }
+                            if matches!(mouse_state, MouseState::RequiresPositionTarget(..)) {
+                                ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
+                                outcome.switched_players_action_target = true;
+                                self.players_inspect_target = Some(hovered_id);
+                            } else if mouse_state == MouseState::RequiresAllyTarget {
+                                ui_state.set_target(ActionTarget::Character(hovered_id, None));
+                                outcome.switched_players_action_target = true;
+                                self.players_inspect_target = Some(hovered_id);
+                            } else {
+                                // Click self => abort the action
+                                *ui_state = UiState::ChoosingAction;
+                                outcome.switched_state = Some(NewState::ChoosingAction);
+                                outcome.switched_players_action_target = true;
                             }
+                        } else {
+                            if mouse_state == MouseState::RequiresAllyTarget {
+                                ui_state.set_target(ActionTarget::Character(hovered_id, None));
+                                outcome.switched_players_action_target = true;
+                            }
+                            self.players_inspect_target = Some(hovered_id);
                         }
                     }
                 } else {
@@ -1971,6 +1977,7 @@ impl EffectGraphics {
     }
 }
 
+#[derive(PartialEq, Debug)]
 enum MouseState {
     RequiresEnemyTarget {
         area_range: Option<Range>,
