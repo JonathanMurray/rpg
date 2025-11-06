@@ -4,6 +4,7 @@ use std::{
     rc::Rc,
 };
 
+use macroquad::rand::ChooseRandom;
 use rand::{
     distr::{Distribution, Uniform},
     Rng,
@@ -37,7 +38,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let mut water_grid: HashSet<Position> = Default::default();
 
     let mut player_positions = vec![];
-    let mut enemy_positions = HashMap::new();
+    let mut enemy_positions: HashMap<u32, Vec<Position>> = HashMap::new();
 
     let mut row = 0;
     for line in map_str.lines() {
@@ -63,20 +64,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 'P' => {
                     player_positions.push(pos);
                 }
-                '0' => {
-                    enemy_positions.insert(0, pos);
-                }
-                '1' => {
-                    enemy_positions.insert(1, pos);
-                }
-                '2' => {
-                    enemy_positions.insert(2, pos);
-                }
-                '3' => {
-                    enemy_positions.insert(3, pos);
-                }
-                '4' => {
-                    enemy_positions.insert(4, pos);
+                '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                    let digit = ch.to_digit(10).unwrap();
+                    enemy_positions.entry(digit).or_default().push(pos);
                 }
                 ' ' => {}
                 _ => panic!("Unhandled map object: {}", ch),
@@ -94,24 +84,26 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let mut characters = player_characters;
     match fight_id {
         FightId::Easy1 => {
+            let pos = *enemy_positions[&0].choose().unwrap();
             let melee = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Thug",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
                 Attributes::new(3, 2, 2, 2),
-                enemy_positions[&0],
+                pos,
             );
             melee.armor_piece.set(Some(SHIRT));
             melee.set_weapon(HandType::MainHand, BAD_DAGGER);
 
+            let pos = *enemy_positions[&1].choose().unwrap();
             let ranged = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Archer",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
                 Attributes::new(1, 3, 3, 1),
-                enemy_positions[&1],
+                pos,
             );
             ranged.set_weapon(HandType::MainHand, BAD_BOW);
 
@@ -119,13 +111,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Easy2 => {
+            let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Guard",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton2,
                 Attributes::new(4, 3, 2, 2),
-                enemy_positions[&0],
+                pos,
             );
             tanky.health.change_max_value_to(20);
             tanky.armor_piece.set(Some(CHAIN_MAIL));
@@ -137,13 +130,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
         FightId::Easy3 => {
             for i in 0..4 {
+                let pos = *enemy_positions[&i].choose().unwrap();
                 let enemy = Character::new(
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Ghoul",
                     PortraitId::Skeleton,
                     SpriteId::Ghoul,
                     Attributes::new(2, 1, 1, 1),
-                    enemy_positions[&i],
+                    pos,
                 );
                 if i % 2 == 0 {
                     enemy.armor_piece.set(Some(SHIRT));
@@ -156,28 +150,30 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Elite => {
+            let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Ogre",
                 PortraitId::Skeleton,
                 SpriteId::Ogre,
                 Attributes::new(4, 1, 1, 1),
-                enemy_positions[&0],
+                pos,
             );
             tanky.health.change_max_value_to(25);
             tanky.armor_piece.set(Some(CHAIN_MAIL));
             tanky.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
-            tanky.base_move_speed.set(0.7);
+            //tanky.base_move_speed.set(0.7);
             characters.push(tanky);
 
             for i in 1..5 {
+                let pos = *enemy_positions[&i].choose().unwrap();
                 let archer = Character::new(
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Archer",
                     PortraitId::Ghoul,
                     SpriteId::Ghoul,
                     Attributes::new(1, 1, 2, 1),
-                    enemy_positions[&i],
+                    pos,
                 );
                 archer.set_weapon(HandType::MainHand, BAD_BOW);
                 characters.push(archer);
@@ -185,13 +181,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Elite2 => {
+            let pos = *enemy_positions[&0].choose().unwrap();
             let mut magi = Character::new(
                 Behaviour::Bot(BotBehaviour::Magi(Default::default())),
                 "Magi",
                 PortraitId::Magi,
                 SpriteId::Magi,
                 Attributes::new(4, 1, 3, 5),
-                enemy_positions[&0],
+                pos,
             );
             magi.known_actions.push(BaseAction::CastSpell(MAGI_HEAL));
             magi.armor_piece.set(Some(SHIRT));
@@ -202,13 +199,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             characters.push(magi);
 
             for i in 1..3 {
+                let pos = *enemy_positions[&i].choose().unwrap();
                 let tanky = Character::new(
                     Behaviour::Bot(BotBehaviour::Normal),
                     "Enslaved",
                     PortraitId::Ghoul,
                     SpriteId::Skeleton2,
                     Attributes::new(3, 1, 1, 1),
-                    enemy_positions[&i],
+                    pos,
                 );
                 tanky.health.change_max_value_to(20);
                 tanky.armor_piece.set(Some(CHAIN_MAIL));

@@ -25,9 +25,9 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION,
-    KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP,
-    SWEEP_ATTACK, SWORD,
+    BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
+    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE,
+    SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -92,6 +92,7 @@ async fn main() {
     alice
         .known_actions
         .push(BaseAction::CastSpell(HEALING_NOVA));
+    alice.known_spell_enhancements.push(FIREBALL_INFERNO);
     alice.add_to_spirit(2);
 
     let mut bob = Character::new(
@@ -108,18 +109,9 @@ async fn main() {
 
     let mut player_characters = vec![alice, bob];
 
-    player_characters = run_victory_loop(
-        player_characters,
-        font.clone(),
-        &equipment_icons,
-        icons.clone(),
-        &portrait_textures,
-    )
-    .await;
-
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Easy3,
+        FightId::Elite,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

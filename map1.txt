@@ -2,8 +2,8 @@
 BBBBBBBBBBBBB
 BRR         B
 BR          B
-B     0 1   B
-B PP       SB
+B     001   B
+B PP    1  SB
 B PP       SB
 B      W   SB
 B      WW   B

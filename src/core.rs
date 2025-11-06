@@ -1025,7 +1025,7 @@ impl CoreGame {
 
                 if increased_by_good_roll && degree_of_success > 0 {
                     dmg_str.push_str(&format!(" +{degree_of_success} ({success_label})"));
-                    dmg_calculation += degree_of_success as i32;
+                    dmg_calculation += degree_of_success;
                 }
 
                 for enhancement in enhancements {
@@ -1041,7 +1041,7 @@ impl CoreGame {
                 }
 
                 if degree_of_success == -1 {
-                    dmg_str.push_str(&format!(" -50% (Graze)"));
+                    dmg_str.push_str(&" -50% (Graze)".to_string());
                     // Since there's no armor/protection against spells, rounding up would make the spell too powerful.
                     dmg_calculation /= 2;
                 }

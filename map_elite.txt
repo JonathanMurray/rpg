@@ -1,16 +1,16 @@
 +----------------------------
 BBBBBBBBBBBBBBBBBBBB
-BRR      2       RRB
+BRR     222      RRB
 BR                RB
 B                  B
 B                  B
 B        P         B
-B       PPP        B
+B1      PPP       3B
 B1      WWW       3B
-B       WWW        B
+B1      WWW       3B
 B        W         B
 B                  B
-BR           0    RB
-BRR      4       RRB
+BR           00   RB
+BRR     444      RRB
 BBBBBBBBBBBBBBBBBBBB
 +----------------------------

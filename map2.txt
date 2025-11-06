@@ -5,8 +5,8 @@ BR   PPP    B
 B           B
 B         SSB
 B          SB
-B           B
 B     0     B
+B    000    B
 BRR        RB
  BBBBBBBBBBB
 +----------------------------
