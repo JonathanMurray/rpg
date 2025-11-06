@@ -1690,6 +1690,33 @@ pub fn prob_attack_hit(
     probability_of_d20_reaching(dice_target, bonus)
 }
 
+pub fn prob_attack_penetrating_hit(
+    attacker: &Character,
+    hand: HandType,
+    defender: &Character,
+    enhancements: &[AttackEnhancement],
+    reaction: Option<OnAttackedReaction>,
+) -> f32 {
+    let bonus = attack_roll_bonus(attacker, hand, defender, enhancements, reaction);
+    let mut evasion = defender.evasion();
+
+    if let Some(reaction) = reaction {
+        evasion += reaction.effect.bonus_evasion;
+    }
+
+    let mut armor = defender.protection_from_armor();
+    for enhancement in enhancements {
+        armor = armor.saturating_sub(enhancement.effect.armor_penetration);
+    }
+
+    let armored_defense = evasion + armor;
+
+    let dice_target = armored_defense
+        .saturating_sub(attacker.attack_modifier(hand))
+        .max(1);
+    probability_of_d20_reaching(dice_target, bonus)
+}
+
 pub fn prob_spell_hit(
     caster: &Character,
     defense_type: DefenseType,

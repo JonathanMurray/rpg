@@ -22,11 +22,11 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_spell_hit, Action, ActionReach,
-        ActionTarget, AttackAction, AttackEnhancement, AttackOutcome, BaseAction, Character,
-        CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType, OnAttackedReaction,
-        OnHitReaction, Position, Spell, SpellEnhancement, SpellModifier, SpellTarget,
-        SpellTargetOutcome,
+        as_percentage, distance_between, prob_attack_hit, prob_attack_penetrating_hit,
+        prob_spell_hit, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
+        AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
+        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position, Spell, SpellEnhancement,
+        SpellModifier, SpellTarget, SpellTargetOutcome,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -655,7 +655,16 @@ impl UserInterface {
                 // We cannot know yet if the defender will react
                 let defender_reaction = None;
 
-                let chance = as_percentage(prob_attack_hit(
+                // TODO: perhaps instead of "chance to hit", we should show "chance to deal at least 1 damage"?
+                // (That would account for grazing and armor.)
+                let hit_chance = as_percentage(prob_attack_hit(
+                    self.active_character(),
+                    attack.hand,
+                    target_char,
+                    selected_enhancements,
+                    defender_reaction,
+                ));
+                let full_penetration_chance = as_percentage(prob_attack_penetrating_hit(
                     self.active_character(),
                     attack.hand,
                     target_char,
@@ -674,8 +683,12 @@ impl UserInterface {
                     details.push((term.to_string(), bonus.goodness()));
                 }
 
-                self.target_ui
-                    .set_action(format!("Attack: {}", chance), details, true);
+                let header = if hit_chance == full_penetration_chance {
+                    format!("Attack: {}", hit_chance)
+                } else {
+                    format!("Attack: {} / {}", hit_chance, full_penetration_chance)
+                };
+                self.target_ui.set_action(header, details, true);
             }
 
             None => {
