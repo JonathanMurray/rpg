@@ -862,7 +862,7 @@ pub const FIREBALL: Spell = Spell {
 
     modifier: SpellModifier::Spell,
     target: SpellTarget::Enemy {
-        reach: SpellReach::Range(Range::Float(4.0)),
+        reach: SpellReach::Range(Range::Float(4.5)),
         effect: SpellEnemyEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(SpellDamage::AtLeast(2)),
@@ -871,8 +871,8 @@ pub const FIREBALL: Spell = Spell {
         impact_area: Some((
             Range::Ranged(2),
             SpellEnemyEffect {
-                defense_type: None,
-                damage: Some(SpellDamage::Static(2)),
+                defense_type: Some(DefenseType::Toughness),
+                damage: Some(SpellDamage::AtLeast(1)),
                 on_hit: None,
             },
         )),

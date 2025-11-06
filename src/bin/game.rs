@@ -119,7 +119,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Elite2,
+        FightId::Easy3,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
