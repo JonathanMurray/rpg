@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, f32::consts::FRAC_1_PI, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -599,6 +599,43 @@ impl GameGrid {
         {
             if !selected_movement_path.is_empty() {
                 self.draw_movement_path(selected_movement_path, false);
+            }
+        }
+
+        for character in self.characters.iter() {
+            for engager_id in character.is_engaged_by.borrow().iter() {
+                let engager = self.characters.get(*engager_id);
+
+                let mut engager_pos = self.character_screen_pos(engager);
+                let mut target_pos = self.character_screen_pos(&character);
+
+                let offset_dir =
+                    match (
+                        target_pos.0.total_cmp(&engager_pos.0),
+                        target_pos.1.total_cmp(&engager_pos.1),
+                    ) {
+                        (Ordering::Less, Ordering::Less)
+                        | (Ordering::Greater, Ordering::Greater) => (1, -1),
+                        (Ordering::Less, Ordering::Equal)
+                        | (Ordering::Greater, Ordering::Equal) => (0, 1),
+                        (Ordering::Less, Ordering::Greater)
+                        | (Ordering::Greater, Ordering::Less) => (1, 1),
+                        (Ordering::Equal, Ordering::Less)
+                        | (Ordering::Equal, Ordering::Greater) => (1, 0),
+                        (Ordering::Equal, Ordering::Equal) => unreachable!(),
+                    };
+                let factor = if engager.id() < character.id() {
+                    7.0
+                } else {
+                    -7.0
+                };
+                let offset = (offset_dir.0 as f32 * factor, offset_dir.1 as f32 * factor);
+                engager_pos = (engager_pos.0 + offset.0, engager_pos.1 + offset.1);
+                target_pos = (target_pos.0 + offset.0, target_pos.1 + offset.1);
+
+                let is_player_engaging = engager.player_controlled();
+
+                self.draw_engagement_arrow(engager_pos, target_pos, is_player_engaging);
             }
         }
 
@@ -1512,6 +1549,43 @@ impl GameGrid {
                 ..Default::default()
             },
         );
+    }
+
+    fn draw_engagement_arrow(
+        &self,
+        engager: (f32, f32),
+        target: (f32, f32),
+        is_player_engaging: bool,
+    ) {
+        let color = if is_player_engaging {
+            Color::new(0.1, 0.6, 0.1, 0.4)
+        } else {
+            Color::new(0.9, 0.1, 0.2, 0.4)
+        };
+        //let depth = None;
+        let depth = Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0));
+        draw_dashed_line(
+            (engager.0 + self.cell_w / 2.0, engager.1 + self.cell_w / 2.0),
+            (target.0 + self.cell_w / 2.0, target.1 + self.cell_w / 2.0),
+            7.0,
+            color,
+            5.0,
+            depth,
+        );
+
+        let (mut dx, mut dy) = (0, 0);
+        if target.0 < engager.0 {
+            dx = -1;
+        } else if target.0 > engager.0 {
+            dx = 1;
+        }
+        if target.1 < engager.1 {
+            dy = -1;
+        } else if target.1 > engager.1 {
+            dy = 1;
+        }
+
+        //draw_arrow(target, self.cell_w, (dx, dy), color, 3.0);
     }
 
     fn draw_target_crosshair(

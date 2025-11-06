@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 
+use std::collections::HashSet;
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
@@ -143,14 +144,20 @@ impl CoreGame {
                     self.pathfind_grid.set_blocked(ch.pos(), false);
                 }
             }
-            for id in self.characters.remove_dead() {
+            let dead_character_ids = self.characters.remove_dead();
+            for dead_id in &dead_character_ids {
+                for ch in self.characters.iter() {
+                    ch.set_not_engaged_by(*dead_id);
+                    ch.set_not_engaging(*dead_id);
+                }
+
                 let new_active = if active_character_died {
                     Some(self.active_character_id)
                 } else {
                     None
                 };
                 self.ui_handle_event(GameEvent::CharacterDied {
-                    character: id,
+                    character: *dead_id,
                     new_active,
                 })
                 .await;
@@ -242,12 +249,16 @@ impl CoreGame {
                 let is_within_melee =
                     within_meele(attacker.position.get(), defender.position.get());
 
+                // Opportunity attack vs ranged attacker
                 if !is_within_melee {
                     for other_char in self.characters.iter() {
-                        if other_char.player_controlled() != attacker.player_controlled()
+                        let unfriendly =
+                            other_char.player_controlled() != attacker.player_controlled();
+                        if unfriendly
                             && within_meele(attacker.pos(), other_char.pos())
                             && target != other_char.id()
                             && other_char.can_use_opportunity_attack()
+                            && other_char.is_engaging(attacker.id())
                         {
                             let reactor = other_char;
                             let chooses_to_use_opportunity_attack = self
@@ -311,6 +322,16 @@ impl CoreGame {
                             reactor: defender.id(),
                         })
                         .await;
+                    }
+
+                    if attacker.weapon(hand).unwrap().is_melee() {
+                        if let Some(previously_engaged) = attacker.engagement_target.take() {
+                            self.characters
+                                .get(previously_engaged)
+                                .set_not_engaged_by(attacker.id());
+                        }
+                        defender.set_engaged_by(attacker.id());
+                        attacker.engagement_target.set(Some(defender.id()));
                     }
 
                     self.perform_attack(
@@ -404,44 +425,57 @@ impl CoreGame {
             }
 
             for other_char in self.characters.iter() {
-                if other_char.player_controlled() != character.player_controlled()
-                    && within_meele(character.pos(), other_char.pos())
-                    && !within_meele(new_position, other_char.pos())
-                    && other_char.can_use_opportunity_attack()
-                {
-                    let reactor = other_char;
+                let unfriendly = other_char.player_controlled() != character.player_controlled();
+                let leaving_melee = within_meele(character.pos(), other_char.pos())
+                    && !within_meele(new_position, other_char.pos());
 
-                    let chooses_to_use_opportunity_attack = self
-                        .user_interface
-                        .choose_movement_opportunity_attack(
-                            self,
-                            reactor.id(),
-                            character.id(),
-                            (character.pos(), new_position),
-                        )
-                        .await;
+                if unfriendly && leaving_melee {
+                    if other_char.can_use_opportunity_attack()
+                        && other_char.is_engaging(character.id())
+                    {
+                        let reactor = other_char;
 
-                    dbg!(chooses_to_use_opportunity_attack);
+                        let chooses_to_use_opportunity_attack = self
+                            .user_interface
+                            .choose_movement_opportunity_attack(
+                                self,
+                                reactor.id(),
+                                character.id(),
+                                (character.pos(), new_position),
+                            )
+                            .await;
 
-                    if chooses_to_use_opportunity_attack {
-                        self.ui_handle_event(GameEvent::CharacterReactedWithOpportunityAttack {
-                            reactor: reactor.id(),
-                        })
-                        .await;
+                        dbg!(chooses_to_use_opportunity_attack);
 
-                        reactor.action_points.spend(1);
+                        if chooses_to_use_opportunity_attack {
+                            self.ui_handle_event(
+                                GameEvent::CharacterReactedWithOpportunityAttack {
+                                    reactor: reactor.id(),
+                                },
+                            )
+                            .await;
 
-                        self.perform_attack(
-                            reactor.id(),
-                            HandType::MainHand,
-                            vec![],
-                            character.id(),
-                            None,
-                        )
-                        .await;
+                            reactor.action_points.spend(1);
+
+                            self.perform_attack(
+                                reactor.id(),
+                                HandType::MainHand,
+                                vec![],
+                                character.id(),
+                                None,
+                            )
+                            .await;
+                        }
                     }
+
+                    character.set_not_engaging(other_char.id());
+                    character.set_not_engaged_by(other_char.id());
+                    other_char.set_not_engaging(character.id());
+                    other_char.set_not_engaged_by(character.id());
                 }
             }
+
+            // TODO don't perform movement if the actor died from opportunity attack!
 
             let prev_position = character.position.get();
             let id = character.id();
@@ -2527,10 +2561,6 @@ pub struct Hand {
 }
 
 impl Hand {
-    fn empty() -> Self {
-        Self::default()
-    }
-
     fn is_empty(&self) -> bool {
         self.weapon.is_none() && self.shield.is_none()
     }
@@ -2627,6 +2657,9 @@ pub struct Character {
     pub known_spell_enhancements: Vec<SpellEnhancement>,
     pub known_passive_skills: Vec<PassiveSkill>,
 
+    pub is_engaged_by: RefCell<HashSet<CharacterId>>,
+    engagement_target: Cell<Option<CharacterId>>,
+
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 
     pub money: Cell<u32>,
@@ -2686,9 +2719,29 @@ impl Character {
             known_on_hit_reactions: Default::default(),
             known_spell_enhancements: Default::default(),
             known_passive_skills: Default::default(),
+            is_engaged_by: Default::default(),
+            engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
         }
+    }
+
+    fn set_engaged_by(&self, engager: CharacterId) {
+        self.is_engaged_by.borrow_mut().insert(engager);
+    }
+
+    fn set_not_engaged_by(&self, not_engager: CharacterId) {
+        self.is_engaged_by.borrow_mut().remove(&not_engager);
+    }
+
+    fn set_not_engaging(&self, target: CharacterId) {
+        if self.engagement_target.get() == Some(target) {
+            self.engagement_target.set(None);
+        }
+    }
+
+    fn is_engaging(&self, target: CharacterId) -> bool {
+        self.engagement_target.get() == Some(target)
     }
 
     pub fn move_speed(&self) -> f32 {
