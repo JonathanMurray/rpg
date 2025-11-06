@@ -1041,7 +1041,7 @@ impl CoreGame {
                 }
 
                 if degree_of_success == -1 {
-                    dmg_str.push_str(&" -50% (Graze)".to_string());
+                    dmg_str.push_str(" -50% (Graze)");
                     // Since there's no armor/protection against spells, rounding up would make the spell too powerful.
                     dmg_calculation /= 2;
                 }

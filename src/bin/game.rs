@@ -27,7 +27,7 @@ use rpg::core::{
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE,
-    SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD,
+    SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -94,6 +94,7 @@ async fn main() {
         .push(BaseAction::CastSpell(HEALING_NOVA));
     alice.known_spell_enhancements.push(FIREBALL_INFERNO);
     alice.add_to_spirit(2);
+    alice.known_attack_enhancements.push(TRUE_STRIKE);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -105,6 +106,7 @@ async fn main() {
     );
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
+    bob.known_attack_enhancements.push(TRUE_STRIKE);
     //bob.health.lose(2);
 
     let mut player_characters = vec![alice, bob];

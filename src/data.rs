@@ -328,6 +328,17 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     ..AttackEnhancement::default()
 };
 
+pub const TRUE_STRIKE: AttackEnhancement = AttackEnhancement {
+    name: "True strike",
+    icon: IconId::TrueStrike,
+    stamina_cost: 1,
+    effect: AttackEnhancementEffect {
+        armor_penetration: 2,
+        ..AttackEnhancementEffect::default()
+    },
+    ..AttackEnhancement::default()
+};
+
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
     icon: IconId::CripplingShot,
