@@ -3169,14 +3169,17 @@ impl Character {
         known
     }
 
-    pub fn usable_attack_enhancements(
-        &self,
-        attack_hand: HandType,
-    ) -> Vec<(String, AttackEnhancement)> {
-        let mut usable = self.known_attack_enhancements(attack_hand);
-
-        usable.retain(|(_, enhancement)| self.can_use_attack_enhancement(attack_hand, enhancement));
-        usable
+    pub fn usable_attack_enhancements(&self, attack_hand: HandType) -> Vec<AttackEnhancement> {
+        self.known_attack_enhancements(attack_hand)
+            .iter()
+            .filter_map(|(_, e)| {
+                if self.can_use_attack_enhancement(attack_hand, e) {
+                    Some(*e)
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 
     pub fn can_use_opportunity_attack(&self) -> bool {
@@ -3476,7 +3479,6 @@ impl Character {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
         for (label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target) {
-            dbg!(label, bonus);
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::FlatAmount(n) => flat_amount += n,
@@ -3516,7 +3518,6 @@ impl Character {
         }
 
         for enhancement in enhancements {
-            dbg!(enhancement);
             if enhancement.effect.bonus_advantage > 0 {
                 bonuses.push((
                     enhancement.name,
@@ -3525,7 +3526,6 @@ impl Character {
             }
 
             if enhancement.effect.roll_modifier != 0 {
-                dbg!(enhancement); // TODO
                 bonuses.push((
                     enhancement.name,
                     RollBonusContributor::FlatAmount(enhancement.effect.roll_modifier),

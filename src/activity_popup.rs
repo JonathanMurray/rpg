@@ -19,7 +19,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
     },
     base_ui::Drawable,
-    core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
+    core::{as_percentage, prob_attack_hit, AttackEnhancement, Character, CharacterId, Characters},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,
@@ -608,21 +608,31 @@ impl ActivityPopup {
         let mut popup_buttons = vec![];
 
         let mut stamina_slider = None;
+        self.selected_choice_button_ids.clear();
 
-        match &*self.ui_state.borrow() {
+        match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {
                 let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
                 lines.extend_from_slice(&tooltip.technical_description);
 
                 match configured_action {
-                    ConfiguredAction::Attack { attack, .. } => {
-                        for (_subtext, enhancement) in self
+                    ConfiguredAction::Attack {
+                        attack,
+                        selected_enhancements,
+                        ..
+                    } => {
+                        let usable_attack_enhancements = self
                             .characters
                             .get(active_character_id)
-                            .usable_attack_enhancements(attack.hand)
-                        {
+                            .usable_attack_enhancements(attack.hand);
+
+                        for enhancement in usable_attack_enhancements {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
+                            if selected_enhancements.contains(&enhancement) {
+                                self.selected_choice_button_ids.push(btn.id);
+                                btn.selected.set(ButtonSelected::Yes);
+                            }
                             popup_buttons.push(btn);
                         }
                     }
@@ -658,86 +668,87 @@ impl ActivityPopup {
                 }
             }
 
-            &UiState::ReactingToAttack {
+            UiState::ReactingToAttack {
                 attacker: attacker_id,
                 hand,
                 reactor: reactor_id,
                 is_within_melee,
                 ..
             } => {
-                self.relevant_character_id = reactor_id;
-                let attacker = self.characters.get(attacker_id);
-                let defender = self.characters.get(reactor_id);
+                self.relevant_character_id = *reactor_id;
+                let attacker = self.characters.get(*attacker_id);
+                let defender = self.characters.get(*reactor_id);
                 lines.push("React (on attacked)".to_string());
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
                     attacker.name,
                     defender.name,
-                    attacker.attack_modifier(hand),
+                    attacker.attack_modifier(*hand),
                     defender.evasion(),
                 );
                 lines.push(attacks_str);
 
-                let defender = self.characters.get(reactor_id);
+                let defender = self.characters.get(*reactor_id);
 
-                for (_subtext, reaction) in defender.usable_on_attacked_reactions(is_within_melee) {
+                for (_subtext, reaction) in defender.usable_on_attacked_reactions(*is_within_melee)
+                {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
                 }
             }
 
-            &UiState::ReactingToHit {
+            UiState::ReactingToHit {
                 attacker: attacker_id,
                 damage,
                 victim: victim_id,
                 is_within_melee,
                 ..
             } => {
-                self.relevant_character_id = victim_id;
-                let victim = self.characters.get(victim_id);
+                self.relevant_character_id = *victim_id;
+                let victim = self.characters.get(*victim_id);
                 lines.push("React (on hit)".to_string());
                 lines.push(format!(
                     "{} attacked {} for {} damage",
-                    self.characters.get(attacker_id).name,
+                    self.characters.get(*attacker_id).name,
                     victim.name,
                     damage,
                 ));
 
-                let victim = self.characters.get(victim_id);
-                for (_subtext, reaction) in victim.usable_on_hit_reactions(is_within_melee) {
+                let victim = self.characters.get(*victim_id);
+                for (_subtext, reaction) in victim.usable_on_hit_reactions(*is_within_melee) {
                     let btn_action = ButtonAction::OnHitReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);
                 }
             }
 
-            &UiState::ReactingToMovementAttackOpportunity { reactor, .. } => {
-                self.relevant_character_id = reactor;
+            UiState::ReactingToMovementAttackOpportunity { reactor, .. } => {
+                self.relevant_character_id = *reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(
                     "{} has an attack opportunity",
-                    self.characters.get(reactor).name
+                    self.characters.get(*reactor).name
                 ));
 
                 let btn = self.new_button_with_character_dependency(
                     ButtonAction::OpportunityAttack,
-                    self.characters.get_rc(reactor).clone(),
+                    self.characters.get_rc(*reactor).clone(),
                 );
                 popup_buttons.push(btn);
             }
 
-            &UiState::ReactingToRangedAttackOpportunity { reactor, .. } => {
-                self.relevant_character_id = reactor;
+            UiState::ReactingToRangedAttackOpportunity { reactor, .. } => {
+                self.relevant_character_id = *reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(
                     "{} has an attack opportunity",
-                    self.characters.get(reactor).name
+                    self.characters.get(*reactor).name
                 ));
 
                 let btn = self.new_button_with_character_dependency(
                     ButtonAction::OpportunityAttack,
-                    self.characters.get_rc(reactor).clone(),
+                    self.characters.get_rc(*reactor).clone(),
                 );
                 popup_buttons.push(btn);
             }
@@ -757,7 +768,6 @@ impl ActivityPopup {
 
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
-        self.selected_choice_button_ids.clear();
     }
 
     fn refresh_enabled_state(&mut self) {

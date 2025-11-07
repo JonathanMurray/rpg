@@ -140,11 +140,11 @@ impl MapScene {
             };
             node.texture = match node.choice {
                 MapChoice::Rest => Some(rest_texture.clone()),
-                MapChoice::Fight(FightId::Elite|FightId::Elite2) => None,
+                MapChoice::Fight(FightId::Elite | FightId::Elite2) => None,
                 MapChoice::Fight(..) => Some(fight_texture.clone()),
                 MapChoice::Chest(..) => Some(chest_texture.clone()),
                 MapChoice::Shop => Some(shop_texture.clone()),
-                _ => None
+                _ => None,
             };
         }
         for node in &mut nodes {
@@ -272,7 +272,6 @@ impl MapScene {
                 }
 
                 if let Some(texture) = &node.texture {
-                    
                     let (w, h) = (64.0, 64.0);
                     draw_texture_ex(
                         texture,

@@ -109,7 +109,16 @@ async fn main() {
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![alice, bob];
+
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::Easy1,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

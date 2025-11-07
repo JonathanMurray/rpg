@@ -357,8 +357,9 @@ pub struct UserInterface {
 
     hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
     active_character_id: CharacterId,
+    remembered_attack_enhancements: HashMap<CharacterId, Vec<AttackEnhancement>>,
 
-    pub game_grid: GameGrid,
+    game_grid: GameGrid,
     activity_popup: ActivityPopup,
     character_portraits: CharacterPortraits,
     player_portraits: PlayerPortraits,
@@ -456,6 +457,7 @@ impl UserInterface {
             player_portraits,
             character_sheet_toggle,
             active_character_id,
+            remembered_attack_enhancements: Default::default(),
             animation_stopwatch: StopWatch::default(),
 
             font: simple_font.clone(),
@@ -570,15 +572,9 @@ impl UserInterface {
 
         if let Some(grid_switched_to) = outcome.switched_state {
             dbg!(&grid_switched_to);
-
-            match grid_switched_to {
-                NewState::Move => {
-                    self.on_new_state();
-                    self.activity_popup.on_new_movement_ap_cost();
-                }
-                NewState::Attack | NewState::ChoosingAction => {
-                    self.on_new_state();
-                }
+            self.on_new_state();
+            if matches!(grid_switched_to, NewState::Move) {
+                self.activity_popup.on_new_movement_ap_cost();
             }
         }
 
@@ -635,8 +631,10 @@ impl UserInterface {
             target,
         }) = &*self.state.borrow()
         else {
-            panic!()
+            unreachable!()
         };
+
+        self.remembered_attack_enhancements.insert(self.active_character_id, selected_enhancements.clone());
 
         match target {
             Some(target_id) => {
@@ -874,15 +872,16 @@ impl UserInterface {
 
     fn on_new_state(&mut self) {
         dbg!(&self.state.borrow());
+        println!("^^^ on_new_state() ^^^");
 
         self.activity_popup.additional_line = None;
 
         let mut relevant_action_button = None;
 
-        let mut on_attacked = false;
+        let mut is_reacting_to_attack = false;
 
-        match &*self.state.borrow() {
-            UiState::ConfiguringAction(configured_action) => {
+        match &mut *self.state.borrow_mut() {
+            UiState::ConfiguringAction(ref mut configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
@@ -891,14 +890,28 @@ impl UserInterface {
                         configured_action.base_action(),
                     )))
                     .cloned();
-                assert!(
-                    relevant_action_button.is_some(),
-                    "No button found for action: {:?}",
-                    configured_action
-                );
+                assert!(relevant_action_button.is_some(), "{:?}", configured_action);
 
-                if let ConfiguredAction::EndTurn = configured_action {
+                if matches!(configured_action, ConfiguredAction::EndTurn) {
                     self.target_ui.clear_action();
+                } else if let ConfiguredAction::Attack {
+                    selected_enhancements,
+                    attack,
+                    ..
+                } = configured_action
+                {
+                    let usable = self
+                        .active_character()
+                        .usable_attack_enhancements(attack.hand);
+
+                    if let Some(remembered) = self
+                        .remembered_attack_enhancements
+                        .get_mut(&self.active_character_id)
+                    {
+                        // Forget enhancements that are no longer usable (e.g. due to lack of resources)
+                        remembered.retain(|e| usable.contains(e));
+                        *selected_enhancements = remembered.clone();
+                    }
                 }
             }
 
@@ -906,7 +919,7 @@ impl UserInterface {
                 self.target_ui
                     .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
-                on_attacked = true;
+                is_reacting_to_attack = true;
             }
 
             UiState::ReactingToHit { .. } => {
@@ -940,7 +953,7 @@ impl UserInterface {
             }
         }
 
-        if on_attacked {
+        if is_reacting_to_attack {
             self.activity_popup.refresh_on_attacked_state();
         }
 
@@ -1505,11 +1518,16 @@ impl UserInterface {
                         selected_enhancements,
                         target,
                         ..
-                    } => Some(Action::Attack {
-                        hand: attack.hand,
-                        enhancements: selected_enhancements.clone(),
-                        target: target.unwrap(),
-                    }),
+                    } => {
+                        self.remembered_attack_enhancements
+                            .insert(self.active_character_id, selected_enhancements.clone());
+
+                        Some(Action::Attack {
+                            hand: attack.hand,
+                            enhancements: selected_enhancements.clone(),
+                            target: target.unwrap(),
+                        })
+                    }
                     &ConfiguredAction::CastSpell {
                         spell,
                         selected_enhancements,
