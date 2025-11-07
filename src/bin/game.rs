@@ -86,7 +86,9 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_actions.push(BaseAction::CastSpell(FIREBALL));
-    alice.known_actions.push(BaseAction::CastSpell(KILL));
+    alice
+        .known_actions
+        .push(BaseAction::CastSpell(SHACKLED_MIND));
     alice
         .known_actions
         .push(BaseAction::CastSpell(HEALING_NOVA));
@@ -113,7 +115,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Easy3,
+        FightId::Elite2,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

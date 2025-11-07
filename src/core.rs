@@ -1136,6 +1136,8 @@ impl CoreGame {
                 None
             };
 
+            let mut applied_effects = vec![];
+
             fn apply_degree_of_success(stacks: &mut u32, degree_of_success: i32) {
                 if degree_of_success == -1 {
                     *stacks /= 2;
@@ -1166,20 +1168,30 @@ impl CoreGame {
                     }
                 }
 
+                applied_effects.push(effect);
                 let log_line = self.perform_effect_application(effect, target);
                 detail_lines.push(log_line);
             }
 
             for enhancement in enhancements {
+                // TODO: shouldn't these also be affected by degree of success?
                 if let Some(effect) = enhancement.effect.on_hit {
+                    applied_effects.push(effect);
                     let log_line = self.perform_effect_application(effect, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
             }
 
+            assert!(applied_effects.len() <= 2);
+            let applied_effects = [
+                applied_effects.get(0).copied(),
+                applied_effects.get(1).copied(),
+            ];
+
             SpellTargetOutcome::HitEnemy {
                 damage,
                 graze: degree_of_success == -1,
+                applied_effects,
             }
         } else {
             let line = match (modifier, enemy_effect.defense_type) {
@@ -1736,7 +1748,11 @@ pub struct OffensiveHitReactionOutcome {
 
 #[derive(Debug, Copy, Clone)]
 pub enum SpellTargetOutcome {
-    HitEnemy { damage: Option<u32>, graze: bool },
+    HitEnemy {
+        damage: Option<u32>,
+        graze: bool,
+        applied_effects: [Option<ApplyEffect>; 2],
+    },
     Resist,
     HealedAlly(u32),
 }
@@ -1956,6 +1972,16 @@ pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(Condition),
     GainStamina(u32),
+}
+
+impl Display for ApplyEffect {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
+            ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("+{n} stamina")),
+            ApplyEffect::Condition(condition) => f.write_fmt(format_args!("{}", condition.name())),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3936,6 +3962,7 @@ pub struct Weapon {
     pub attack_attribute: AttackAttribute,
     pub attack_enhancement: Option<AttackEnhancement>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
+    // TODO: Not used?
     pub on_true_hit: Option<AttackHitEffect>,
     pub weight: u32,
 }

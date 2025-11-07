@@ -23,10 +23,10 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_attack_hit, prob_attack_penetrating_hit,
-        prob_spell_hit, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
-        AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
-        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position, Spell, SpellEnhancement,
-        SpellModifier, SpellTarget, SpellTargetOutcome,
+        prob_spell_hit, Action, ActionReach, ActionTarget, ApplyEffect, AttackAction,
+        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
+        GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction, Position, Spell,
+        SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -1201,13 +1201,28 @@ impl UserInterface {
 
                 if let Some((_target_id, outcome)) = target_outcome {
                     match outcome {
-                        SpellTargetOutcome::HitEnemy { damage, graze } => {
+                        SpellTargetOutcome::HitEnemy {
+                            damage,
+                            graze,
+                            applied_effects,
+                        } => {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" ({} damage)", dmg))
-                            } else if graze {
-                                line.push_str(" (graze)");
                             } else {
-                                line.push_str(" (hit)");
+                                match applied_effects {
+                                    [None, None] => {
+                                        if graze {
+                                            line.push_str(" (graze)");
+                                        } else {
+                                            line.push_str(" (hit)");
+                                        }
+                                    }
+                                    [Some(e), None] => line.push_str(&format!("  ({e})")),
+                                    [Some(e1), Some(e2)] => {
+                                        line.push_str(&format!("  ({e1}, {e2})"))
+                                    }
+                                    _ => unreachable!("{applied_effects:?}"),
+                                };
                             }
                         }
                         SpellTargetOutcome::Resist => line.push_str(" (miss)"),
@@ -1280,30 +1295,7 @@ impl UserInterface {
                         },
                     );
 
-                    let (target_text, goodness) = match outcome {
-                        SpellTargetOutcome::HitEnemy { damage, graze } => {
-                            if let Some(dmg) = damage {
-                                (format!("{}", dmg), Goodness::Bad)
-                            } else if graze {
-                                ("Graze".to_string(), Goodness::Bad)
-                            } else {
-                                ("Hit".to_string(), Goodness::Bad)
-                            }
-                        }
-                        SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
-                        SpellTargetOutcome::HealedAlly(healing) => {
-                            (format!("{}", healing), Goodness::Good)
-                        }
-                    };
-
-                    self.game_grid.add_text_effect(
-                        target_pos,
-                        duration,
-                        1.0,
-                        target_text,
-                        goodness,
-                    );
-
+                    self.add_text_effect_for_spell_target_outcome(outcome, duration, target_pos);
                     self.animation_stopwatch.set_to_at_least(duration + 0.3);
                 }
 
@@ -1331,30 +1323,9 @@ impl UserInterface {
                             },
                         );
 
-                        let (target_text, goodness) = match outcome {
-                            SpellTargetOutcome::HitEnemy { damage, graze } => {
-                                if let Some(dmg) = damage {
-                                    (format!("{}", dmg), Goodness::Bad)
-                                } else if graze {
-                                    ("Graze".to_string(), Goodness::Bad)
-                                } else {
-                                    ("Hit".to_string(), Goodness::Bad)
-                                }
-                            }
-                            SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
-                            SpellTargetOutcome::HealedAlly(healing) => {
-                                (format!("{}", healing), Goodness::Good)
-                            }
-                        };
-
-                        self.game_grid.add_text_effect(
-                            target_pos,
-                            duration,
-                            1.0,
-                            target_text,
-                            goodness,
+                        self.add_text_effect_for_spell_target_outcome(
+                            outcome, duration, target_pos,
                         );
-
                         self.animation_stopwatch.set_to_at_least(duration + 0.3);
                     }
                 }
@@ -1408,6 +1379,42 @@ impl UserInterface {
                 self.animation_stopwatch.set_to_at_least(duration);
             }
         }
+    }
+
+    fn add_text_effect_for_spell_target_outcome(
+        &mut self,
+        outcome: SpellTargetOutcome,
+        start_time: f32,
+        target_pos: (i32, i32),
+    ) {
+        let (target_text, goodness) = match outcome {
+            SpellTargetOutcome::HitEnemy {
+                damage,
+                graze,
+                applied_effects,
+            } => {
+                if let Some(dmg) = damage {
+                    (format!("{}", dmg), Goodness::Bad)
+                } else {
+                    match applied_effects {
+                        [None, None] => {
+                            if graze {
+                                ("Graze".to_string(), Goodness::Bad)
+                            } else {
+                                ("Hit".to_string(), Goodness::Bad)
+                            }
+                        }
+                        [Some(e), None] => (format!("{e}"), Goodness::Bad),
+                        [Some(e1), Some(e2)] => (format!("{e1} {e2}"), Goodness::Bad),
+                        _ => unreachable!("{applied_effects:?}"),
+                    }
+                }
+            }
+            SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
+            SpellTargetOutcome::HealedAlly(healing) => (format!("{}", healing), Goodness::Good),
+        };
+        self.game_grid
+            .add_text_effect(target_pos, start_time, 1.0, target_text, goodness);
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {

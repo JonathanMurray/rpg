@@ -77,8 +77,8 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
     for character in &player_characters {
         let i = rng.random_range(..player_positions.len());
-
-        character.position.set(player_positions.remove(i));
+        let pos = player_positions.remove(i);
+        character.position.set(pos);
     }
 
     let mut characters = player_characters;
