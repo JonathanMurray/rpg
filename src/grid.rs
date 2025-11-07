@@ -26,8 +26,8 @@ use macroquad::{
 use crate::{
     base_ui::{Drawable, Style},
     core::{
-        ActionReach, ActionTarget, AttackAction, Character, Goodness, Position, SpellReach,
-        SpellTarget,
+        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
+        Position,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
@@ -658,12 +658,12 @@ impl GameGrid {
                     area_range: None,
                     move_into_melee: false,
                 },
-                ConfiguredAction::CastSpell {
-                    spell,
+                ConfiguredAction::UseAbility {
+                    ability,
                     selected_enhancements,
                     target,
-                } => match spell.target {
-                    SpellTarget::Enemy {
+                } => match ability.target {
+                    AbilityTarget::Enemy {
                         impact_area, reach, ..
                     } => {
                         let mut area_range = None;
@@ -677,15 +677,17 @@ impl GameGrid {
                             }
                             area_range = Some(range);
                         }
-                        let move_into_melee = matches!(reach, SpellReach::MoveIntoMelee(..));
+                        let move_into_melee = matches!(reach, AbilityReach::MoveIntoMelee(..));
                         MouseState::RequiresEnemyTarget {
                             area_range,
                             move_into_melee,
                         }
                     }
-                    SpellTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                    SpellTarget::Area { radius, .. } => MouseState::RequiresPositionTarget(radius),
-                    SpellTarget::None { .. } => MouseState::ImplicitTarget,
+                    AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
+                    AbilityTarget::Area { radius, .. } => {
+                        MouseState::RequiresPositionTarget(radius)
+                    }
+                    AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                 },
                 ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
                 ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
@@ -1303,8 +1305,8 @@ impl GameGrid {
                         Some((range, RangeIndicator::ActionTargetRange))
                     }
                 },
-                ConfiguredAction::CastSpell {
-                    spell,
+                ConfiguredAction::UseAbility {
+                    ability,
                     selected_enhancements,
                     target,
                 } => match target {
@@ -1312,8 +1314,8 @@ impl GameGrid {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
-                            .reaches_with_spell(
-                                *spell,
+                            .reaches_with_ability(
+                                *ability,
                                 selected_enhancements,
                                 self.characters.get(*target_char_id).position.get(),
                             ) {
@@ -1323,7 +1325,7 @@ impl GameGrid {
                         };
                         maybe_indicator.map(|indicator| {
                             (
-                                spell.target.range(selected_enhancements).unwrap(),
+                                ability.target.range(selected_enhancements).unwrap(),
                                 indicator,
                             )
                         })
@@ -1332,7 +1334,7 @@ impl GameGrid {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
-                            .reaches_with_spell(*spell, selected_enhancements, *target_pos)
+                            .reaches_with_ability(*ability, selected_enhancements, *target_pos)
                         {
                             None
                         } else {
@@ -1340,12 +1342,12 @@ impl GameGrid {
                         };
                         maybe_indicator.map(|indicator| {
                             (
-                                spell.target.range(selected_enhancements).unwrap(),
+                                ability.target.range(selected_enhancements).unwrap(),
                                 indicator,
                             )
                         })
                     }
-                    ActionTarget::None => spell
+                    ActionTarget::None => ability
                         .target
                         .range(selected_enhancements)
                         .map(|range| (range, RangeIndicator::ActionTargetRange)),

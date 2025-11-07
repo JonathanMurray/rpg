@@ -4,8 +4,8 @@ use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     core::{
-        Action, ActionReach, ActionTarget, BaseAction, Behaviour, Character, CharacterId, CoreGame,
-        OnAttackedReaction, OnHitReaction, Spell,
+        Ability, Action, ActionReach, ActionTarget, BaseAction, Behaviour, Character, CharacterId,
+        CoreGame, OnAttackedReaction, OnHitReaction,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     pathfind::Path,
@@ -19,7 +19,7 @@ pub enum BotBehaviour {
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct MagiBehaviour {
-    current_goal: Cell<Option<(Spell, CharacterId)>>,
+    current_goal: Cell<Option<(Ability, CharacterId)>>,
 }
 
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
@@ -40,7 +40,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Action> {
     let character = game.active_character();
 
-    if let Some((_spell, target_id)) = behaviour.current_goal.get() {
+    if let Some((_, target_id)) = behaviour.current_goal.get() {
         if !game.characters.contains(target_id) {
             dbg!("MAGI, TARGET HAS DIED?", target_id);
             behaviour.current_goal.set(None);
@@ -88,11 +88,11 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
         }
     }
 
-    let (spell, target_id) = behaviour.current_goal.get().unwrap();
+    let (ability, target_id) = behaviour.current_goal.get().unwrap();
 
-    if !character.can_use_action(BaseAction::CastSpell(spell)) {
+    if !character.can_use_action(BaseAction::UseAbility(ability)) {
         dbg!(
-            "MAGI cannot use spell; not enough AP?",
+            "MAGI cannot use ability; not enough AP?",
             &character.action_points
         );
         return None;
@@ -102,12 +102,12 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
 
     let target = game.characters.get(target_id);
 
-    if !character.reaches_with_spell(spell, &enhancements, target.pos()) {
-        let spell_range = spell.target.range(&enhancements).unwrap().into();
+    if !character.reaches_with_ability(ability, &enhancements, target.pos()) {
+        let ability_range = ability.target.range(&enhancements).unwrap().into();
         let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
             character.pos(),
             target.pos(),
-            spell_range,
+            ability_range,
         );
         if let Some(path) = maybe_path {
             return convert_path_to_move_action(character, path);
@@ -116,8 +116,8 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
         }
     }
 
-    let action = Action::CastSpell {
-        spell,
+    let action = Action::UseAbility {
+        ability,
         enhancements,
         target: ActionTarget::Character(target_id, None),
     };

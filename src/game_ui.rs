@@ -22,11 +22,12 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_attack_hit, prob_attack_penetrating_hit,
-        prob_spell_hit, Action, ActionReach, ActionTarget, ApplyEffect, AttackAction,
-        AttackEnhancement, AttackOutcome, BaseAction, Character, CharacterId, Characters, CoreGame,
-        GameEvent, Goodness, HandType, OnAttackedReaction, OnHitReaction, Position, Spell,
-        SpellEnhancement, SpellModifier, SpellTarget, SpellTargetOutcome,
+        as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
+        prob_attack_penetrating_hit, Ability, AbilityEnemyEffect, AbilityEnhancement,
+        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
+        ApplyEffect, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
+        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -95,7 +96,7 @@ impl UiState {
                 ConfiguredAction::Attack { target, .. } => target
                     .map(|id| ActionTarget::Character(id, None))
                     .unwrap_or(ActionTarget::None),
-                ConfiguredAction::CastSpell { target, .. } => target.clone(),
+                ConfiguredAction::UseAbility { target, .. } => target.clone(),
                 _ => ActionTarget::None,
             },
             _ => ActionTarget::None,
@@ -112,7 +113,7 @@ impl UiState {
                         _ => panic!(),
                     };
                 }
-                ConfiguredAction::CastSpell { target, .. } => *target = new_target,
+                ConfiguredAction::UseAbility { target, .. } => *target = new_target,
 
                 action => panic!("Action has no target: {:?}", action),
             },
@@ -128,9 +129,9 @@ pub enum ConfiguredAction {
         selected_enhancements: Vec<AttackEnhancement>,
         target: Option<CharacterId>,
     },
-    CastSpell {
-        spell: Spell,
-        selected_enhancements: Vec<SpellEnhancement>,
+    UseAbility {
+        ability: Ability,
+        selected_enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
     },
     Move {
@@ -164,9 +165,9 @@ impl ConfiguredAction {
                 None => false,
             },
 
-            ConfiguredAction::CastSpell {
+            ConfiguredAction::UseAbility {
                 target,
-                spell,
+                ability,
                 selected_enhancements,
                 ..
             } => match target {
@@ -178,27 +179,27 @@ impl ConfiguredAction {
                     }
                     let target_char = characters.get(*target_id);
 
-                    relevant_character.reaches_with_spell(
-                        *spell,
+                    relevant_character.reaches_with_ability(
+                        *ability,
                         selected_enhancements,
                         target_char.position.get(),
                     )
                 }
 
                 ActionTarget::Position(target_pos) => {
-                    assert!(matches!(spell.target, SpellTarget::Area { .. }));
-                    relevant_character.reaches_with_spell(
-                        *spell,
+                    assert!(matches!(ability.target, AbilityTarget::Area { .. }));
+                    relevant_character.reaches_with_ability(
+                        *ability,
                         selected_enhancements,
                         *target_pos,
                     )
                 }
 
-                ActionTarget::None => match spell.target {
-                    SpellTarget::Enemy { .. } => false,
-                    SpellTarget::Ally { .. } => false,
-                    SpellTarget::None { .. } => true,
-                    SpellTarget::Area { .. } => false,
+                ActionTarget::None => match ability.target {
+                    AbilityTarget::Enemy { .. } => false,
+                    AbilityTarget::Ally { .. } => false,
+                    AbilityTarget::None { .. } => true,
+                    AbilityTarget::Area { .. } => false,
                 },
             },
 
@@ -228,8 +229,8 @@ impl ConfiguredAction {
                 selected_enhancements: vec![],
                 target: None,
             },
-            BaseAction::CastSpell(spell) => Self::CastSpell {
-                spell,
+            BaseAction::UseAbility(ability) => Self::UseAbility {
+                ability,
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
             },
@@ -246,7 +247,7 @@ impl ConfiguredAction {
     pub fn base_action(&self) -> BaseAction {
         match self {
             ConfiguredAction::Attack { attack, .. } => BaseAction::Attack(*attack),
-            ConfiguredAction::CastSpell { spell, .. } => BaseAction::CastSpell(*spell),
+            ConfiguredAction::UseAbility { ability, .. } => BaseAction::UseAbility(*ability),
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
             ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
@@ -272,12 +273,12 @@ impl ConfiguredAction {
                 }
                 ap
             }
-            ConfiguredAction::CastSpell {
-                spell,
+            ConfiguredAction::UseAbility {
+                ability,
                 selected_enhancements,
                 ..
             } => {
-                let mut ap = spell.action_point_cost;
+                let mut ap = ability.action_point_cost;
                 for enhancement in selected_enhancements {
                     ap += enhancement.action_point_cost;
                 }
@@ -618,9 +619,9 @@ impl UserInterface {
 
         if matches!(
             &*self.state.borrow(),
-            UiState::ConfiguringAction(ConfiguredAction::CastSpell { .. })
+            UiState::ConfiguringAction(ConfiguredAction::UseAbility { .. })
         ) {
-            self.refresh_cast_spell_state();
+            self.refresh_use_ability_state();
         }
     }
 
@@ -656,24 +657,29 @@ impl UserInterface {
 
                 // TODO: perhaps instead of "chance to hit", we should show "chance to deal at least 1 damage"?
                 // (That would account for grazing and armor.)
+                let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
+                    selected_enhancements
+                        .iter()
+                        .map(|e| (e.name, e.effect))
+                        .collect();
                 let hit_chance = as_percentage(prob_attack_hit(
                     self.active_character(),
                     attack.hand,
                     target_char,
-                    selected_enhancements,
+                    &selected_enhancement_effects,
                     defender_reaction,
                 ));
                 let full_penetration_chance = as_percentage(prob_attack_penetrating_hit(
                     self.active_character(),
                     attack.hand,
                     target_char,
-                    selected_enhancements,
+                    &selected_enhancement_effects,
                     defender_reaction,
                 ));
 
                 for (term, bonus) in self.active_character().outgoing_attack_bonuses(
                     attack.hand,
-                    selected_enhancements,
+                    &selected_enhancement_effects,
                     target_char,
                 ) {
                     details.push((term.to_string(), bonus.goodness()));
@@ -699,9 +705,9 @@ impl UserInterface {
         //self.activity_popup.refresh_enabled_state();
     }
 
-    fn refresh_cast_spell_state(&mut self) {
-        let UiState::ConfiguringAction(ConfiguredAction::CastSpell {
-            spell,
+    fn refresh_use_ability_state(&mut self) {
+        let UiState::ConfiguringAction(ConfiguredAction::UseAbility {
+            ability,
             selected_enhancements,
             target,
         }) = &*self.state.borrow()
@@ -709,9 +715,9 @@ impl UserInterface {
             panic!()
         };
 
-        let spell = *spell;
+        let ability = *ability;
 
-        println!("REFRESH CAST SPELL STATE : {}", spell.name);
+        println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
 
         match target {
             ActionTarget::Character(target_id, ..) => {
@@ -719,8 +725,8 @@ impl UserInterface {
 
                 let mut details = vec![];
 
-                let reaches = self.active_character().reaches_with_spell(
-                    spell,
+                let reaches = self.active_character().reaches_with_ability(
+                    ability,
                     selected_enhancements,
                     target_char.pos(),
                 );
@@ -731,33 +737,72 @@ impl UserInterface {
 
                 for (term, bonus) in self
                     .active_character()
-                    .outgoing_spell_bonuses(selected_enhancements)
+                    .outgoing_ability_roll_bonuses(selected_enhancements, ability.modifier)
                 {
                     details.push((term.to_string(), bonus.goodness()));
                 }
-                for (term, bonus) in target_char.incoming_spell_bonuses() {
+                for (term, bonus) in target_char.incoming_ability_bonuses() {
                     details.push((term.to_string(), bonus.goodness()));
                 }
 
-                let action_text = match spell.target {
-                    SpellTarget::Enemy { effect, .. } => {
-                        let prob = effect
-                            .defense_type
-                            .map(|def| {
-                                prob_spell_hit(
-                                    self.active_character(),
-                                    def,
-                                    target_char,
-                                    selected_enhancements,
-                                )
-                            })
-                            .unwrap_or(1.0);
-                        let chance = as_percentage(prob);
+                let action_text = match ability.target {
+                    AbilityTarget::Enemy { effect, .. } => {
+                        let chance = match effect {
+                            AbilityEnemyEffect::Spell(spell_enemy_effect) => {
+                                let prob = spell_enemy_effect
+                                    .defense_type
+                                    .map(|def| {
+                                        prob_ability_hit(
+                                            self.active_character(),
+                                            def,
+                                            target_char,
+                                            selected_enhancements,
+                                            ability.modifier,
+                                        )
+                                    })
+                                    .unwrap_or(1.0);
 
-                        format!("{}: {}", spell.name, chance)
+                                as_percentage(prob)
+                            }
+                            AbilityEnemyEffect::Attack => {
+                                let enhancements: Vec<(&'static str, AttackEnhancementEffect)> =
+                                    selected_enhancements
+                                        .iter()
+                                        .filter_map(|e| e.attack_enhancement_effect())
+                                        .collect();
+
+                                let reaction = None;
+
+                                let hit_chance = prob_attack_hit(
+                                    self.active_character(),
+                                    HandType::MainHand,
+                                    target_char,
+                                    &enhancements,
+                                    reaction,
+                                );
+                                let full_penetration_chance = prob_attack_penetrating_hit(
+                                    self.active_character(),
+                                    HandType::MainHand,
+                                    target_char,
+                                    &enhancements,
+                                    reaction,
+                                );
+                                if hit_chance == full_penetration_chance {
+                                    as_percentage(hit_chance)
+                                } else {
+                                    format!(
+                                        "{} / {}",
+                                        as_percentage(hit_chance),
+                                        as_percentage(full_penetration_chance)
+                                    )
+                                }
+                            }
+                        };
+
+                        format!("{}: {}", ability.name, chance)
                     }
-                    SpellTarget::Ally { .. } => spell.name.to_string(),
-                    SpellTarget::None { .. } | SpellTarget::Area { .. } => {
+                    AbilityTarget::Ally { .. } => ability.name.to_string(),
+                    AbilityTarget::None { .. } | AbilityTarget::Area { .. } => {
                         unreachable!()
                     }
                 };
@@ -766,29 +811,29 @@ impl UserInterface {
             }
 
             ActionTarget::Position(..) => {
-                assert!(matches!(spell.target, SpellTarget::Area { .. }));
+                assert!(matches!(ability.target, AbilityTarget::Area { .. }));
                 self.target_ui
-                    .set_action(format!("{} (AoE)", spell.name), vec![], false);
+                    .set_action(format!("{} (AoE)", ability.name), vec![], false);
             }
 
             ActionTarget::None => {
-                match spell.target {
-                    SpellTarget::Enemy { .. } => {
+                match ability.target {
+                    AbilityTarget::Enemy { .. } => {
                         self.target_ui
                             .set_action("Select an enemy".to_string(), vec![], false);
                     }
 
-                    SpellTarget::Ally { .. } => {
+                    AbilityTarget::Ally { .. } => {
                         self.target_ui
                             .set_action("Select an ally".to_string(), vec![], false);
                     }
 
-                    SpellTarget::None { .. } => {
-                        let header = spell.name.to_string();
+                    AbilityTarget::None { .. } => {
+                        let header = ability.name.to_string();
                         self.target_ui.set_action(header, vec![], false);
                     }
 
-                    SpellTarget::Area { .. } => {
+                    AbilityTarget::Area { .. } => {
                         self.target_ui
                             .set_action("Select an area".to_string(), vec![], false);
                     }
@@ -1014,7 +1059,7 @@ impl UserInterface {
     }
 
     pub fn handle_game_event(&mut self, event: GameEvent) {
-        dbg!(&event);
+        //dbg!(&event);
 
         self.target_ui.rebuild_character_ui();
 
@@ -1056,7 +1101,7 @@ impl UserInterface {
                 reactor,
                 outcome,
             } => {
-                self.log.add_with_details(main_line, detail_lines);
+                self.log.add_with_details(main_line, &detail_lines);
 
                 let reactor_pos = self.characters.get(reactor).pos();
 
@@ -1093,115 +1138,34 @@ impl UserInterface {
                 self.animation_stopwatch.set_to_at_least(0.5);
             }
 
-            GameEvent::Attacked {
-                attacker,
-                target,
-                outcome,
-                detail_lines,
-            } => {
-                let verb = match outcome {
-                    AttackOutcome::Hit(..) => "hit",
-                    AttackOutcome::Graze(..) => "grazed",
-                    AttackOutcome::Dodge => "missed",
-                    AttackOutcome::Parry => "missed",
-                    AttackOutcome::Miss => "missed",
-                };
-
-                let mut line = format!(
-                    "{} {} {}",
-                    self.characters.get(attacker).name,
-                    verb,
-                    self.characters.get(target).name
-                );
-
-                match outcome {
-                    AttackOutcome::Hit(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
-                    AttackOutcome::Graze(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
-                    AttackOutcome::Dodge => line.push_str(" (dodge)"),
-                    AttackOutcome::Parry => line.push_str(" (parry)"),
-                    AttackOutcome::Miss => {}
-                }
-
-                self.log.add_with_details(line, detail_lines);
-
-                let attacker_pos = self.characters.get(attacker).pos();
-                let target_pos = self.characters.get(target).pos();
-
-                let duration = 0.1 * distance_between(attacker_pos, target_pos);
-
-                self.animation_stopwatch.set_to_at_least(duration + 0.6);
-                let impact_text = match outcome {
-                    AttackOutcome::Hit(damage) => format!("{}", damage),
-                    AttackOutcome::Graze(damage) => format!("{}", damage),
-                    AttackOutcome::Dodge => "Dodge".to_string(),
-                    AttackOutcome::Parry => "Parry".to_string(),
-                    AttackOutcome::Miss => "Miss".to_string(),
-                };
-                let goodness = if matches!(outcome, AttackOutcome::Hit(..)) {
-                    Goodness::Bad
-                } else {
-                    Goodness::Neutral
-                };
-
-                self.game_grid.add_effect(
-                    attacker_pos,
-                    target_pos,
-                    Effect {
-                        start_time: 0.0,
-                        end_time: duration,
-                        variant: EffectVariant::Line {
-                            thickness: 1.0,
-                            end_thickness: Some(5.0),
-                            color: RED,
-                            extend_gradually: true,
-                        },
-                    },
-                );
-                self.game_grid.add_effect(
-                    attacker_pos,
-                    target_pos,
-                    Effect {
-                        start_time: duration,
-                        end_time: duration + 0.2,
-                        variant: EffectVariant::At(
-                            EffectPosition::Destination,
-                            EffectGraphics::Circle {
-                                radius: 25.0,
-                                end_radius: Some(5.0),
-                                fill: None,
-                                stroke: Some((MAGENTA, 2.0)),
-                            },
-                        ),
-                    },
-                );
-
-                self.game_grid
-                    .add_text_effect(target_pos, duration, 1.0, impact_text, goodness);
+            GameEvent::Attacked(event) => {
+                self.handle_attacked_event(&event);
             }
 
-            GameEvent::SpellWasCast {
-                caster,
+            GameEvent::AbilityWasUsed {
+                actor,
                 target_outcome,
                 area_outcomes,
-                spell,
-                detail_lines,
+                ability,
+                mut detail_lines,
             } => {
-                let mut line = if let Some((target_id, _outcome)) = target_outcome {
-                    format!(
-                        "{} cast {} on {}",
-                        self.characters.get(caster).name,
-                        spell.name,
-                        self.characters.get(target_id).name
-                    )
-                } else if matches!(spell.modifier, SpellModifier::Spell) {
-                    format!("{} cast {}", self.characters.get(caster).name, spell.name,)
+                let actor_name = self.characters.get(actor).name;
+                let verb = if matches!(ability.modifier, AbilityModifier::Spell) {
+                    "cast"
                 } else {
-                    format!("{} used {}", self.characters.get(caster).name, spell.name,)
+                    "used"
                 };
+                let mut line = format!("{} {} {}", actor_name, verb, ability.name);
+                if let Some((target_id, _outcome)) = &target_outcome {
+                    let target_name = self.characters.get(*target_id).name;
+                    line.push_str(&format!(" on {}", target_name));
+                }
 
-                if let Some((_target_id, outcome)) = target_outcome {
+                let mut attacks = vec![];
+
+                if let Some((_target_id, outcome)) = &target_outcome {
                     match outcome {
-                        SpellTargetOutcome::HitEnemy {
+                        AbilityTargetOutcome::HitEnemy {
                             damage,
                             graze,
                             applied_effects,
@@ -1211,7 +1175,7 @@ impl UserInterface {
                             } else {
                                 match applied_effects {
                                     [None, None] => {
-                                        if graze {
+                                        if *graze {
                                             line.push_str(" (graze)");
                                         } else {
                                             line.push_str(" (hit)");
@@ -1225,21 +1189,43 @@ impl UserInterface {
                                 };
                             }
                         }
-                        SpellTargetOutcome::Resist => line.push_str(" (miss)"),
-                        SpellTargetOutcome::HealedAlly(healing) => {
+                        AbilityTargetOutcome::Resist => line.push_str(" (miss)"),
+                        AbilityTargetOutcome::HealedAlly(healing) => {
                             line.push_str(&format!(" ({} healing)", healing))
+                        }
+                        AbilityTargetOutcome::AttackedEnemy(event) => {
+                            attacks.push(event);
                         }
                     }
                 }
 
-                self.log.add_with_details(line, detail_lines);
+                if let Some((_, outcomes)) = &area_outcomes {
+                    for (_, outcome) in outcomes {
+                        if let AbilityTargetOutcome::AttackedEnemy(attacked_event) = &outcome {
+                            attacks.push(attacked_event);
+                        }
+                    }
+                }
+
+                if !attacks.is_empty() {
+                    // The provided details are misleading; they report the dice-roll used when performing the ability, but that
+                    // dice roll is effectively ignored since the ability instead proceeded to perform an attack (which uses
+                    // its own dice roll)
+                    detail_lines.clear();
+                    if attacks.len() == 1 {
+                        detail_lines.push("resulting in an attack".to_string());
+                    } else {
+                        detail_lines.push(format!("resulting in {} attacks)", attacks.len()));
+                    }
+                }
+                self.log.add_with_details(line, &detail_lines);
 
                 let mut duration = 0.0;
 
-                let animation_color = spell.animation_color;
-                if let Some((target, outcome)) = target_outcome {
-                    let caster_pos = self.characters.get(caster).pos();
-                    let target_pos = self.characters.get(target).pos();
+                let animation_color = ability.animation_color;
+                if let Some((target, outcome)) = &target_outcome {
+                    let caster_pos = self.characters.get(actor).pos();
+                    let target_pos = self.characters.get(*target).pos();
 
                     duration = 0.15 * distance_between(caster_pos, target_pos);
 
@@ -1295,15 +1281,15 @@ impl UserInterface {
                         },
                     );
 
-                    self.add_text_effect_for_spell_target_outcome(outcome, duration, target_pos);
+                    self.add_text_effect_for_ability_target_outcome(outcome, duration, target_pos);
                     self.animation_stopwatch.set_to_at_least(duration + 0.3);
                 }
 
-                if let Some((area_center_pos, outcomes)) = area_outcomes {
+                if let Some((area_center_pos, outcomes)) = &area_outcomes {
                     let area_duration = 0.2;
 
                     for (target_id, outcome) in outcomes {
-                        let target_pos = self.characters.get(target_id).pos();
+                        let target_pos = self.characters.get(*target_id).pos();
 
                         self.game_grid.add_effect(
                             (area_center_pos.0, area_center_pos.1),
@@ -1323,11 +1309,15 @@ impl UserInterface {
                             },
                         );
 
-                        self.add_text_effect_for_spell_target_outcome(
-                            outcome, duration, target_pos,
+                        self.add_text_effect_for_ability_target_outcome(
+                            &outcome, duration, target_pos,
                         );
                         self.animation_stopwatch.set_to_at_least(duration + 0.3);
                     }
+                }
+
+                for event in attacks {
+                    self.handle_attacked_event(event);
                 }
             }
 
@@ -1381,24 +1371,110 @@ impl UserInterface {
         }
     }
 
-    fn add_text_effect_for_spell_target_outcome(
+    fn handle_attacked_event(&mut self, event: &AttackedEvent) {
+        let attacker = event.attacker;
+        let target = event.target;
+        let outcome = event.outcome;
+        let detail_lines = &event.detail_lines;
+
+        let verb = match outcome {
+            AttackOutcome::Hit(..) => "hit",
+            AttackOutcome::Graze(..) => "grazed",
+            AttackOutcome::Dodge => "missed",
+            AttackOutcome::Parry => "missed",
+            AttackOutcome::Miss => "missed",
+        };
+
+        let mut line = format!(
+            "{} {} {}",
+            self.characters.get(attacker).name,
+            verb,
+            self.characters.get(target).name
+        );
+
+        match outcome {
+            AttackOutcome::Hit(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
+            AttackOutcome::Graze(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
+            AttackOutcome::Dodge => line.push_str(" (dodge)"),
+            AttackOutcome::Parry => line.push_str(" (parry)"),
+            AttackOutcome::Miss => {}
+        }
+
+        self.log.add_with_details(line, detail_lines);
+
+        let attacker_pos = self.characters.get(attacker).pos();
+        let target_pos = self.characters.get(target).pos();
+
+        let duration = 0.1 * distance_between(attacker_pos, target_pos);
+
+        self.animation_stopwatch.set_to_at_least(duration + 0.6);
+        let impact_text = match outcome {
+            AttackOutcome::Hit(damage) => format!("{}", damage),
+            AttackOutcome::Graze(damage) => format!("{}", damage),
+            AttackOutcome::Dodge => "Dodge".to_string(),
+            AttackOutcome::Parry => "Parry".to_string(),
+            AttackOutcome::Miss => "Miss".to_string(),
+        };
+        let goodness = if matches!(outcome, AttackOutcome::Hit(..)) {
+            Goodness::Bad
+        } else {
+            Goodness::Neutral
+        };
+
+        self.game_grid.add_effect(
+            attacker_pos,
+            target_pos,
+            Effect {
+                start_time: 0.0,
+                end_time: duration,
+                variant: EffectVariant::Line {
+                    thickness: 1.0,
+                    end_thickness: Some(5.0),
+                    color: RED,
+                    extend_gradually: true,
+                },
+            },
+        );
+        self.game_grid.add_effect(
+            attacker_pos,
+            target_pos,
+            Effect {
+                start_time: duration,
+                end_time: duration + 0.2,
+                variant: EffectVariant::At(
+                    EffectPosition::Destination,
+                    EffectGraphics::Circle {
+                        radius: 25.0,
+                        end_radius: Some(5.0),
+                        fill: None,
+                        stroke: Some((MAGENTA, 2.0)),
+                    },
+                ),
+            },
+        );
+
+        self.game_grid
+            .add_text_effect(target_pos, duration, 1.0, impact_text, goodness);
+    }
+
+    fn add_text_effect_for_ability_target_outcome(
         &mut self,
-        outcome: SpellTargetOutcome,
+        outcome: &AbilityTargetOutcome,
         start_time: f32,
         target_pos: (i32, i32),
     ) {
-        let (target_text, goodness) = match outcome {
-            SpellTargetOutcome::HitEnemy {
+        let effect = match &outcome {
+            AbilityTargetOutcome::HitEnemy {
                 damage,
                 graze,
                 applied_effects,
             } => {
-                if let Some(dmg) = damage {
+                let effect = if let Some(dmg) = damage {
                     (format!("{}", dmg), Goodness::Bad)
                 } else {
                     match applied_effects {
                         [None, None] => {
-                            if graze {
+                            if *graze {
                                 ("Graze".to_string(), Goodness::Bad)
                             } else {
                                 ("Hit".to_string(), Goodness::Bad)
@@ -1408,13 +1484,23 @@ impl UserInterface {
                         [Some(e1), Some(e2)] => (format!("{e1} {e2}"), Goodness::Bad),
                         _ => unreachable!("{applied_effects:?}"),
                     }
-                }
+                };
+                Some(effect)
             }
-            SpellTargetOutcome::Resist => ("Resist".to_string(), Goodness::Neutral),
-            SpellTargetOutcome::HealedAlly(healing) => (format!("{}", healing), Goodness::Good),
+            AbilityTargetOutcome::Resist => Some(("Resist".to_string(), Goodness::Neutral)),
+            AbilityTargetOutcome::HealedAlly(healing) => {
+                Some((format!("{}", healing), Goodness::Good))
+            }
+            AbilityTargetOutcome::AttackedEnemy(..) => {
+                // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.
+                None
+            }
         };
-        self.game_grid
-            .add_text_effect(target_pos, start_time, 1.0, target_text, goodness);
+
+        if let Some((target_text, goodness)) = effect {
+            self.game_grid
+                .add_text_effect(target_pos, start_time, 1.0, target_text, goodness);
+        }
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {
@@ -1458,9 +1544,9 @@ impl UserInterface {
             Some(ActivityPopupOutcome::ClickedProceed) => {
                 player_choice = Some(self.handle_popup_proceed());
             }
-            Some(ActivityPopupOutcome::ChangedSpellEnhancements) => {
+            Some(ActivityPopupOutcome::ChangedAbilityEnhancements) => {
                 // TODO update hit chance?
-                self.refresh_cast_spell_state();
+                self.refresh_use_ability_state();
             }
             Some(ActivityPopupOutcome::ChangedAttackEnhancements) => {
                 self.refresh_attack_state();
@@ -1536,12 +1622,12 @@ impl UserInterface {
                             target: target.unwrap(),
                         })
                     }
-                    &ConfiguredAction::CastSpell {
-                        spell,
+                    &ConfiguredAction::UseAbility {
+                        ability,
                         selected_enhancements,
                         target,
-                    } => Some(Action::CastSpell {
-                        spell: *spell,
+                    } => Some(Action::UseAbility {
+                        ability: *ability,
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
                     }),
@@ -1712,10 +1798,10 @@ pub fn build_character_ui(
     let mut tracked_action_buttons = HashMap::new();
     let mut hoverable_buttons = vec![];
     let mut basic_buttons = vec![];
-    let mut spell_buttons = vec![];
+    let mut ability_buttons = vec![];
 
     let mut attack_button_for_character_sheet = None;
-    let mut spell_buttons_for_character_sheet = vec![];
+    let mut ability_buttons_for_character_sheet = vec![];
     let mut attack_enhancement_buttons_for_character_sheet = vec![];
     let mut passive_buttons_for_character_sheet = vec![];
 
@@ -1732,19 +1818,19 @@ pub fn build_character_ui(
                 attack_button_for_character_sheet = Some(btn.clone());
                 hoverable_buttons.push(btn);
             }
-            BaseAction::CastSpell(spell) => {
-                spell_buttons.push(btn);
+            BaseAction::UseAbility(ability) => {
+                ability_buttons.push(btn);
 
                 let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
 
-                let enhancement_buttons: Vec<Rc<ActionButton>> = spell
+                let enhancement_buttons: Vec<Rc<ActionButton>> = ability
                     .possible_enhancements
                     .iter()
                     .filter_map(|maybe_enhancement| *maybe_enhancement)
                     .filter_map(|enhancement| {
-                        if character.knows_spell_enhancement(enhancement) {
+                        if character.knows_ability_enhancement(enhancement) {
                             let enhancement_btn = Rc::new(new_button(
-                                ButtonAction::SpellEnhancement(enhancement),
+                                ButtonAction::AbilityEnhancement(enhancement),
                                 None,
                                 false,
                             ));
@@ -1755,7 +1841,7 @@ pub fn build_character_ui(
                         }
                     })
                     .collect();
-                spell_buttons_for_character_sheet.push((btn.clone(), enhancement_buttons));
+                ability_buttons_for_character_sheet.push((btn.clone(), enhancement_buttons));
 
                 hoverable_buttons.push(btn);
             }
@@ -1805,12 +1891,12 @@ pub fn build_character_ui(
         attack_button_for_character_sheet,
         reaction_buttons_for_character_sheet,
         attack_enhancement_buttons_for_character_sheet,
-        spell_buttons_for_character_sheet,
+        ability_buttons_for_character_sheet,
         passive_buttons_for_character_sheet,
     );
 
     let mut upper_buttons = basic_buttons;
-    let mut lower_buttons = spell_buttons;
+    let mut lower_buttons = ability_buttons;
     while lower_buttons.len() > upper_buttons.len() + 1 {
         upper_buttons.push(lower_buttons.pop().unwrap());
     }
@@ -1934,7 +2020,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
     match btn_action {
         ButtonAction::Action(base_action) => match base_action {
             BaseAction::Attack(attack) => format!("ATTACK_{:?}", attack.hand),
-            BaseAction::CastSpell(spell) => format!("SPELL_{}", spell.name),
+            BaseAction::UseAbility(ability) => format!("ABILITY_{}", ability.name),
             BaseAction::Move => "MOVE".to_string(),
             BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
             BaseAction::UseConsumable => "USING_CONSUMABLE".to_string(),

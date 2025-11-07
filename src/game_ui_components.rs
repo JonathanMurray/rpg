@@ -582,10 +582,10 @@ impl Log {
     }
 
     pub fn add(&mut self, text: impl Into<String>) {
-        self.add_with_details(text, vec![]);
+        self.add_with_details(text, &[]);
     }
 
-    pub fn add_with_details(&mut self, text: impl Into<String>, details: Vec<String>) {
+    pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
         const MAX_LINES: usize = 50;
         if self.container.children.len() == MAX_LINES {
             self.container.children.pop();

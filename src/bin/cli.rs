@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashSet, io, rc::Rc};
 
 use rpg::core::{
-    as_percentage, prob_attack_hit, prob_spell_hit, Action, BaseAction, Character, CoreGame,
+    as_percentage, prob_ability_hit, prob_attack_hit, Action, BaseAction, Character, CoreGame,
     GameState, HandType, Logger, OnAttackedReaction, OnHitReaction, SelfEffectAction,
 };
 
@@ -74,12 +74,16 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
             }) => {
                 format!("[{}] ({} AP)", name, action_point_cost)
             }
-            BaseAction::CastSpell(spell) => format!(
+            BaseAction::UseAbility(spell) => format!(
                 "[{}] ({} AP, {} mana, hit={})",
                 spell.name,
                 spell.action_point_cost,
                 spell.mana_cost,
-                as_percentage(prob_spell_hit(character, spell.spell_type, other_character))
+                as_percentage(prob_ability_hit(
+                    character,
+                    spell.spell_type,
+                    other_character
+                ))
             ),
         };
         println!("  {}. {}", i + 1, label);
@@ -165,7 +169,7 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
             }
         }
         BaseAction::SelfEffect(self_effect) => Action::SelfEffect(*self_effect),
-        BaseAction::CastSpell(spell) => {
+        BaseAction::UseAbility(spell) => {
             let mut enhanced = false;
 
             if let Some(enhancement) = spell.possible_enhancement {
@@ -187,8 +191,8 @@ pub fn player_choose_action(character: &Character, other_character: &Character) 
                 }
             }
 
-            Action::CastSpell {
-                spell: *spell,
+            Action::UseAbility {
+                ability: *spell,
                 enhanced,
             }
         }

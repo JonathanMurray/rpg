@@ -26,8 +26,9 @@ use rpg::core::{
 
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
-    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, OVERWHELMING, RAGE, ROBE,
-    SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWORD, TRUE_STRIKE,
+    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_PRECISE,
+    OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE,
+    SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -85,14 +86,14 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
-    alice.known_actions.push(BaseAction::CastSpell(FIREBALL));
+    alice.known_actions.push(BaseAction::UseAbility(FIREBALL));
     alice
         .known_actions
-        .push(BaseAction::CastSpell(SHACKLED_MIND));
+        .push(BaseAction::UseAbility(SHACKLED_MIND));
     alice
         .known_actions
-        .push(BaseAction::CastSpell(HEALING_NOVA));
-    alice.known_spell_enhancements.push(FIREBALL_INFERNO);
+        .push(BaseAction::UseAbility(HEALING_NOVA));
+    alice.known_ability_enhancements.push(FIREBALL_INFERNO);
     alice.add_to_spirit(2);
     alice.known_attack_enhancements.push(TRUE_STRIKE);
     alice.known_passive_skills.push(PassiveSkill::Reaper);
@@ -109,13 +110,19 @@ async fn main() {
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
+    bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
+    bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
+    bob.known_ability_enhancements.push(LUNGE_ATTACK_PRECISE);
+    bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
+    bob.known_on_hit_reactions.push(RAGE);
+    bob.add_to_agility(5);
     //bob.health.lose(2);
 
-    let mut player_characters = vec![alice, bob];
+    let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Elite2,
+        FightId::Easy1,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

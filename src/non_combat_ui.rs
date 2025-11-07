@@ -116,7 +116,7 @@ impl NonCombatUi {
 
         let mut hoverable_buttons = vec![];
         let mut attack_button = None;
-        let mut spell_buttons = vec![];
+        let mut ability_buttons = vec![];
         let mut attack_enhancement_buttons = vec![];
         let mut passive_skill_buttons = vec![];
 
@@ -128,15 +128,15 @@ impl NonCombatUi {
                 BaseAction::Attack { .. } => {
                     attack_button = Some(btn.clone());
                 }
-                BaseAction::CastSpell(spell) => {
-                    let enhancement_buttons: Vec<Rc<ActionButton>> = spell
+                BaseAction::UseAbility(ability) => {
+                    let enhancement_buttons: Vec<Rc<ActionButton>> = ability
                         .possible_enhancements
                         .iter()
                         .filter_map(|maybe_enhancement| *maybe_enhancement)
                         .filter_map(|enhancement| {
-                            if character.knows_spell_enhancement(enhancement) {
+                            if character.knows_ability_enhancement(enhancement) {
                                 let enhancement_btn = Rc::new(new_button(
-                                    ButtonAction::SpellEnhancement(enhancement),
+                                    ButtonAction::AbilityEnhancement(enhancement),
                                     None,
                                     false,
                                 ));
@@ -147,7 +147,7 @@ impl NonCombatUi {
                             }
                         })
                         .collect();
-                    spell_buttons.push((btn.clone(), enhancement_buttons));
+                    ability_buttons.push((btn.clone(), enhancement_buttons));
                 }
                 _ => {}
             }
@@ -187,7 +187,7 @@ impl NonCombatUi {
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,
-            spell_buttons,
+            ability_buttons,
             passive_skill_buttons,
             UI_HEIGHT - 20.0,
         );

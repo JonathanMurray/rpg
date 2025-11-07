@@ -17,10 +17,11 @@ use macroquad::{
 use crate::{
     base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
     core::{
-        ApplyEffect, AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character,
-        DefenseType, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill, Spell,
-        SpellAllyEffect, SpellDamage, SpellEffect, SpellEnemyEffect, SpellEnhancement,
-        SpellModifier, SpellReach, SpellTarget, Weapon, WeaponType,
+        Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
+        AbilityEnhancement, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
+        AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType,
+        HandType, OnAttackedReaction, OnHitReaction, PassiveSkill, SpellEnemyEffect, Weapon,
+        WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -38,7 +39,7 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
-        ButtonAction::SpellEnhancement(enhancement) => spell_enhancement_tooltip(enhancement),
+        ButtonAction::AbilityEnhancement(enhancement) => ability_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => on_attacked_reaction_tooltip(reaction),
         ButtonAction::OnHitReaction(reaction) => on_hit_reaction_tooltip(reaction),
         ButtonAction::Proceed => ActionButtonTooltip {
@@ -169,7 +170,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
     }
 }
 
-fn spell_enhancement_tooltip(enhancement: &SpellEnhancement) -> ActionButtonTooltip {
+fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
     let effect = enhancement.effect;
@@ -230,7 +231,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
             header: "No weapon equipped".to_string(), // This is replaced on-the-fly if needed
             ..Default::default()
         },
-        BaseAction::CastSpell(spell) => spell_tooltip(spell),
+        BaseAction::UseAbility(ability) => ability_tooltip(ability),
         BaseAction::Move => ActionButtonTooltip {
             header: "Move".to_string(),
             ..Default::default()
@@ -269,119 +270,145 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
     }
 }
 
-fn spell_tooltip(spell: &Spell) -> ActionButtonTooltip {
+fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
     let header = format!(
         "{} {}",
-        spell.name,
-        cost_string(spell.action_point_cost, spell.stamina_cost, spell.mana_cost)
+        ability.name,
+        cost_string(
+            ability.action_point_cost,
+            ability.stamina_cost,
+            ability.mana_cost
+        )
     );
     let mut technical_description = vec![];
 
-    match spell.modifier {
-        SpellModifier::Spell => technical_description.push("[ spell roll ]".to_string()),
-        SpellModifier::Attack(bonus) if bonus < 0 => {
+    match ability.modifier {
+        AbilityModifier::Spell => technical_description.push("[ spell roll ]".to_string()),
+        AbilityModifier::Attack(bonus) if bonus < 0 => {
             technical_description.push(format!("[ attack roll - {} ]", -bonus))
         }
-        SpellModifier::Attack(bonus) if bonus > 0 => {
+        AbilityModifier::Attack(bonus) if bonus > 0 => {
             technical_description.push(format!("[ attack roll + {} ]", bonus))
         }
-        SpellModifier::Attack(_) => technical_description.push("[ attack roll ]".to_string()),
+        AbilityModifier::Attack(_) => technical_description.push("[ attack roll ]".to_string()),
     }
 
-    match spell.target {
-        SpellTarget::Enemy {
+    match ability.target {
+        AbilityTarget::Enemy {
             effect,
             impact_area: area,
             reach,
         } => {
             match reach {
-                SpellReach::Range(range) => {
+                AbilityReach::Range(range) => {
                     technical_description.push(format!("Target enemy (range {})", range));
                 }
-                SpellReach::MoveIntoMelee(range) => {
+                AbilityReach::MoveIntoMelee(range) => {
                     technical_description.push(format!("Engage enemy (range {})", range));
                 }
             }
-            describe_spell_enemy_effect(effect, &mut technical_description);
+            describe_ability_enemy_effect(effect, &mut technical_description);
 
             if let Some((range, effect)) = area {
                 technical_description.push(format!("Impact area (radius {})", range));
-                describe_spell_enemy_effect(effect, &mut technical_description);
+                describe_ability_enemy_effect(effect, &mut technical_description);
             }
         }
 
-        SpellTarget::Ally { range, effect } => {
+        AbilityTarget::Ally { range, effect } => {
             technical_description.push(format!("Target ally (range {})", range));
-            describe_spell_ally_effect(effect, &mut technical_description);
+            describe_ability_ally_effect(effect, &mut technical_description);
         }
 
-        SpellTarget::None {
+        AbilityTarget::None {
             self_area,
             self_effect,
         } => {
             if let Some(effect) = self_effect {
                 technical_description.push("Self effect".to_string());
-                describe_spell_ally_effect(effect, &mut technical_description);
+                describe_ability_ally_effect(effect, &mut technical_description);
             }
 
             if let Some((radius, effect)) = self_area {
                 match effect {
-                    SpellEffect::Enemy(effect) => {
+                    AbilityEffect::Enemy(effect) => {
                         technical_description.push(format!("Nearby enemies (radius {})", radius));
-                        describe_spell_enemy_effect(effect, &mut technical_description);
+                        describe_ability_enemy_effect(effect, &mut technical_description);
                     }
-                    SpellEffect::Ally(effect) => {
+                    AbilityEffect::Ally(effect) => {
                         technical_description.push(format!("Nearby allies (radius {})", radius));
-                        describe_spell_ally_effect(effect, &mut technical_description);
+                        describe_ability_ally_effect(effect, &mut technical_description);
                     }
                 }
             }
         }
 
-        SpellTarget::Area {
+        AbilityTarget::Area {
             range,
             radius,
             effect,
         } => match effect {
-            SpellEffect::Enemy(effect) => {
+            AbilityEffect::Enemy(effect) => {
                 technical_description.push(format!("Enemies (range {}, radius {})", range, radius));
-                describe_spell_enemy_effect(effect, &mut technical_description);
+                describe_ability_enemy_effect(effect, &mut technical_description);
             }
-            SpellEffect::Ally(effect) => {
+            AbilityEffect::Ally(effect) => {
                 technical_description.push(format!("Allies (range {}, radius {})", range, radius));
-                describe_spell_ally_effect(effect, &mut technical_description);
+                describe_ability_ally_effect(effect, &mut technical_description);
             }
         },
     };
     ActionButtonTooltip {
         header,
-        description: Some(spell.description),
+        description: Some(ability.description),
         error: None,
         technical_description,
     }
 }
 
-fn describe_spell_enemy_effect(effect: SpellEnemyEffect, technical_description: &mut Vec<String>) {
-    match effect.defense_type {
-        Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
-        Some(DefenseType::Evasion) => technical_description.push("  [ evasion ]".to_string()),
-        Some(DefenseType::Toughness) => technical_description.push("  [ toughness ]".to_string()),
-        None => {}
-    };
+fn describe_ability_enemy_effect(
+    effect: AbilityEnemyEffect,
+    technical_description: &mut Vec<String>,
+) {
+    match effect {
+        AbilityEnemyEffect::Spell(effect) => {
+            match effect.defense_type {
+                Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
+                Some(DefenseType::Evasion) => {
+                    technical_description.push("  [ evasion ]".to_string())
+                }
+                Some(DefenseType::Toughness) => {
+                    technical_description.push("  [ toughness ]".to_string())
+                }
+                None => {}
+            };
 
-    match effect.damage {
-        Some(SpellDamage::Static(n)) => technical_description.push(format!("  {} damage", n)),
-        Some(SpellDamage::AtLeast(n)) => technical_description.push(format!("  {}+ damage", n)),
-        Some(SpellDamage::Weapon) => technical_description.push("  weapon damage".to_string()),
-        None => {}
-    }
+            match effect.damage {
+                Some(AbilityDamage::Static(n)) => {
+                    technical_description.push(format!("  {} damage", n))
+                }
+                Some(AbilityDamage::AtLeast(n)) => {
+                    technical_description.push(format!("  {}+ damage", n))
+                }
+                None => {}
+            }
 
-    for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
-        describe_apply_effect(*apply_effect, technical_description);
+            for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
+                describe_apply_effect(*apply_effect, technical_description);
+            }
+        }
+
+        AbilityEnemyEffect::Attack => {
+            technical_description.push("  [ evasion ]".to_string());
+            technical_description.push("  weapon damage".to_string());
+        }
     }
 }
 
-fn describe_spell_ally_effect(effect: SpellAllyEffect, technical_description: &mut Vec<String>) {
+fn describe_ability_ally_effect(
+    effect: AbilityAllyEffect,
+    technical_description: &mut Vec<String>,
+) {
     if effect.healing > 0 {
         technical_description.push(format!("  {}+ healing", effect.healing));
     }
@@ -501,8 +528,8 @@ impl ActionButton {
 
     pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
         // TODO: if action requires melee weapon and none is equipped, add error message to tooltip
-        if let ButtonAction::Action(BaseAction::CastSpell(spell)) = self.action {
-            if spell.weapon_requirement == Some(WeaponType::Melee) {
+        if let ButtonAction::Action(BaseAction::UseAbility(ability)) = self.action {
+            if ability.weapon_requirement == Some(WeaponType::Melee) {
                 let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
 
                 if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
@@ -743,7 +770,7 @@ pub enum ButtonAction {
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
-    SpellEnhancement(SpellEnhancement),
+    AbilityEnhancement(AbilityEnhancement),
     OpportunityAttack,
     Proceed,
     Passive(PassiveSkill),
@@ -754,7 +781,7 @@ impl ButtonAction {
         match self {
             ButtonAction::Action(base_action) => match base_action {
                 BaseAction::Attack(..) => "Attack",
-                BaseAction::CastSpell(spell) => spell.name,
+                BaseAction::UseAbility(ability) => ability.name,
                 BaseAction::Move => "Move",
                 BaseAction::ChangeEquipment => "Change equipment",
                 BaseAction::UseConsumable => "Use consumable",
@@ -763,7 +790,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.name,
             ButtonAction::OnHitReaction(reaction) => reaction.name,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.name,
-            ButtonAction::SpellEnhancement(enhancement) => enhancement.name,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.name,
             ButtonAction::OpportunityAttack => "Opportunity attack",
             ButtonAction::Proceed => "Proceed",
             ButtonAction::Passive(skill) => skill.name(),
@@ -773,7 +800,7 @@ impl ButtonAction {
     pub fn context_explanation(&self) -> Option<String> {
         match self {
             ButtonAction::AttackEnhancement(_enhancement) => Some("Attack enhancement".to_string()),
-            ButtonAction::SpellEnhancement(enhancement) => {
+            ButtonAction::AbilityEnhancement(enhancement) => {
                 Some(format!("{} enhancement", enhancement.name))
             }
             _ => None,
@@ -790,14 +817,14 @@ impl ButtonAction {
                         IconId::MeleeAttack
                     }
                 }
-                BaseAction::CastSpell(spell) => spell.icon,
+                BaseAction::UseAbility(ability) => ability.icon,
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
                 BaseAction::UseConsumable => IconId::UseConsumable,
                 BaseAction::EndTurn => IconId::EndTurn,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
-            ButtonAction::SpellEnhancement(enhancement) => enhancement.icon,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.icon,
             ButtonAction::OnAttackedReaction(reaction) => reaction.icon,
             ButtonAction::OnHitReaction(reaction) => reaction.icon,
             ButtonAction::Proceed => IconId::Go,
@@ -812,7 +839,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost,
             ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
-            ButtonAction::SpellEnhancement(enhancement) => enhancement.action_point_cost,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.action_point_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 1,
             ButtonAction::Passive(..) => 0,
@@ -834,7 +861,7 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(..) => 0,
             ButtonAction::OnHitReaction(..) => 0,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.mana_cost,
-            ButtonAction::SpellEnhancement(enhancement) => enhancement.mana_cost,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.mana_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 0,
             ButtonAction::Passive(..) => 0,
@@ -847,23 +874,23 @@ impl ButtonAction {
             ButtonAction::OnAttackedReaction(reaction) => reaction.stamina_cost,
             ButtonAction::OnHitReaction(reaction) => reaction.stamina_cost,
             ButtonAction::AttackEnhancement(enhancement) => enhancement.stamina_cost,
-            ButtonAction::SpellEnhancement(enhancement) => enhancement.stamina_cost,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.stamina_cost,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 0,
             ButtonAction::Passive(..) => 0,
         }
     }
 
-    pub fn unwrap_spell(&self) -> Spell {
+    pub fn unwrap_ability(&self) -> Ability {
         match self {
-            ButtonAction::Action(BaseAction::CastSpell(spell)) => *spell,
+            ButtonAction::Action(BaseAction::UseAbility(ability)) => *ability,
             _ => panic!(),
         }
     }
 
-    pub fn unwrap_spell_enhancement(&self) -> SpellEnhancement {
+    pub fn unwrap_ability_enhancement(&self) -> AbilityEnhancement {
         match self {
-            ButtonAction::SpellEnhancement(enhancement) => *enhancement,
+            ButtonAction::AbilityEnhancement(enhancement) => *enhancement,
             _ => panic!(),
         }
     }

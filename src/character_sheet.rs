@@ -47,7 +47,7 @@ impl CharacterSheet {
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
         attack_enhancement_buttons: Vec<Rc<ActionButton>>,
-        spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+        ability_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
         passive_skill_buttons: Vec<Rc<ActionButton>>,
     ) -> Self {
         let spell_book_rows = build_spell_book(
@@ -55,7 +55,7 @@ impl CharacterSheet {
             attack_button,
             reaction_buttons,
             attack_enhancement_buttons,
-            spell_buttons,
+            ability_buttons,
             passive_skill_buttons,
             450.0,
         );
@@ -274,7 +274,7 @@ pub fn build_spell_book(
     attack_button: Option<Rc<ActionButton>>,
     reaction_buttons: Vec<Rc<ActionButton>>,
     attack_enhancement_buttons: Vec<Rc<ActionButton>>,
-    spell_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
+    ability_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
     passive_skill_buttons: Vec<Rc<ActionButton>>,
     max_height: f32,
 ) -> Container {
@@ -325,26 +325,26 @@ pub fn build_spell_book(
         spell_book_rows.children.push(row);
     }
 
-    for (spell_btn, enhancement_buttons) in spell_buttons.into_iter() {
-        let spell = spell_btn.action.unwrap_spell();
+    for (ability_btn, enhancement_buttons) in ability_buttons.into_iter() {
+        let ability = ability_btn.action.unwrap_ability();
         spell_book_rows.children.push(Element::Text(TextLine::new(
-            spell.name,
+            ability.name,
             16,
             WHITE,
             Some(font.clone()),
         )));
 
-        let mut row_buttons = vec![spell_btn.clone()];
+        let mut row_buttons = vec![ability_btn.clone()];
         for enhancement_btn in enhancement_buttons {
             row_buttons.push(Rc::clone(&enhancement_btn));
         }
-        let spell_row = buttons_row(
+        let ability_row = buttons_row(
             row_buttons
                 .into_iter()
                 .map(|btn| Element::Rc(btn))
                 .collect(),
         );
-        spell_book_rows.children.push(spell_row);
+        spell_book_rows.children.push(ability_row);
     }
 
     if !passive_skill_buttons.is_empty() {

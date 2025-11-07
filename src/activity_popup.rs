@@ -279,7 +279,7 @@ impl ActivityPopup {
 
     pub fn update(&mut self) -> Option<ActivityPopupOutcome> {
         let mut changed_on_attacked_reaction = false;
-        let mut changed_spell_enhancements = false;
+        let mut changed_ability_enhancements = false;
         let mut changed_attack_enhancements = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
@@ -323,16 +323,16 @@ impl ActivityPopup {
                                     .collect();
                                 changed_attack_enhancements = true;
                             }
-                            ConfiguredAction::CastSpell {
+                            ConfiguredAction::UseAbility {
                                 selected_enhancements,
                                 ..
                             } => {
                                 *selected_enhancements = selected_button_actions
                                     .iter()
-                                    .map(|action| action.unwrap_spell_enhancement())
+                                    .map(|action| action.unwrap_ability_enhancement())
                                     .collect();
 
-                                changed_spell_enhancements = true;
+                                changed_ability_enhancements = true;
                             }
                             _ => unreachable!(),
                         },
@@ -379,8 +379,8 @@ impl ActivityPopup {
         if changed_on_attacked_reaction {
             self.refresh_on_attacked_state();
         }
-        if changed_spell_enhancements {
-            return Some(ActivityPopupOutcome::ChangedSpellEnhancements);
+        if changed_ability_enhancements {
+            return Some(ActivityPopupOutcome::ChangedAbilityEnhancements);
         }
         if changed_attack_enhancements {
             return Some(ActivityPopupOutcome::ChangedAttackEnhancements);
@@ -637,14 +637,14 @@ impl ActivityPopup {
                         }
                     }
 
-                    ConfiguredAction::CastSpell { spell, .. } => {
-                        for enhancement in spell.possible_enhancements.iter().flatten().copied() {
+                    ConfiguredAction::UseAbility { ability, .. } => {
+                        for enhancement in ability.possible_enhancements.iter().flatten().copied() {
                             let character = self.characters.get(active_character_id);
-                            if character.knows_spell_enhancement(enhancement)
-                                && character.can_use_spell_enhancement(*spell, enhancement)
+                            if character.knows_ability_enhancement(enhancement)
+                                && character.can_use_ability_enhancement(*ability, enhancement)
                             {
                                 let btn =
-                                    self.new_button(ButtonAction::SpellEnhancement(enhancement));
+                                    self.new_button(ButtonAction::AbilityEnhancement(enhancement));
                                 popup_buttons.push(btn);
                             }
                         }
@@ -653,7 +653,7 @@ impl ActivityPopup {
                     ConfiguredAction::Move { .. } => {
                         let active_char = self.characters.get(active_character_id);
                         let speed = active_char.move_speed();
-                        lines.push(format!("Speed: {}", speed));
+                        lines.push(format!("Speed: {:.1}", speed));
                         let stamina = &active_char.stamina;
                         if stamina.max() > 0 {
                             let max_stamina_spend =
@@ -788,7 +788,7 @@ impl ActivityPopup {
 
 pub enum ActivityPopupOutcome {
     ClickedProceed,
-    ChangedSpellEnhancements,
+    ChangedAbilityEnhancements,
     ChangedAttackEnhancements,
 }
 

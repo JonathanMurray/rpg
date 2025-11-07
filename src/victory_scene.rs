@@ -18,8 +18,8 @@ use crate::{
     },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::{
-        AttackEnhancement, BaseAction, Character, OnAttackedReaction, OnHitReaction, PassiveSkill,
-        Spell, SpellEnhancement, WeaponType,
+        Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
+        OnHitReaction, PassiveSkill, WeaponType,
     },
     data::{
         BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK,
@@ -33,11 +33,11 @@ use crate::{
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Learning {
-    Spell(Spell),
+    Ability(Ability),
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
-    SpellEnhancement(SpellEnhancement),
+    AbilityEnhancement(AbilityEnhancement),
     Passive(PassiveSkill),
 }
 
@@ -409,7 +409,7 @@ pub async fn run_victory_loop(
             };
             candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some(label)));
         }
-        for spell in vec![
+        for ability in vec![
             FIREBALL,
             SWEEP_ATTACK,
             LUNGE_ATTACK,
@@ -421,15 +421,15 @@ pub async fn run_victory_loop(
             HEALING_NOVA,
             HEALING_RAIN,
         ] {
-            candidate_rewards.push((ButtonAction::Action(BaseAction::CastSpell(spell)), None));
+            candidate_rewards.push((ButtonAction::Action(BaseAction::UseAbility(ability)), None));
         }
         for character in &characters {
-            for spell in character.known_spells() {
-                for enhancement in spell.possible_enhancements {
+            for ability in character.known_abilities() {
+                for enhancement in ability.possible_enhancements {
                     if let Some(enhancement) = enhancement {
                         candidate_rewards.push((
-                            ButtonAction::SpellEnhancement(enhancement),
-                            Some(spell.name),
+                            ButtonAction::AbilityEnhancement(enhancement),
+                            Some(ability.name),
                         ));
                     }
                 }
@@ -613,7 +613,7 @@ pub async fn run_victory_loop(
 
 fn can_learn(character: &Character, learning: Learning) -> bool {
     match learning {
-        Learning::Spell(spell) => !character.known_spells().contains(&spell),
+        Learning::Ability(ability) => !character.known_abilities().contains(&ability),
         Learning::OnAttackedReaction(reaction) => {
             !character.known_attacked_reactions.contains(&reaction)
         }
@@ -621,9 +621,9 @@ fn can_learn(character: &Character, learning: Learning) -> bool {
         Learning::AttackEnhancement(enhancement) => {
             !character.known_attack_enhancements.contains(&enhancement)
         }
-        Learning::SpellEnhancement(enhancement) => {
-            character.knows_spell(enhancement.spell_id)
-                && !character.known_spell_enhancements.contains(&enhancement)
+        Learning::AbilityEnhancement(enhancement) => {
+            character.knows_ability(enhancement.ability_id)
+                && !character.known_ability_enhancements.contains(&enhancement)
         }
         Learning::Passive(passive_skill) => {
             !character.known_passive_skills.contains(&passive_skill)
@@ -633,14 +633,16 @@ fn can_learn(character: &Character, learning: Learning) -> bool {
 
 fn apply_learning(learning: Learning, character: &mut Character) {
     match learning {
-        Learning::Spell(spell) => character.known_actions.push(BaseAction::CastSpell(spell)),
+        Learning::Ability(ability) => character
+            .known_actions
+            .push(BaseAction::UseAbility(ability)),
         Learning::OnAttackedReaction(reaction) => character.known_attacked_reactions.push(reaction),
         Learning::OnHitReaction(reaction) => character.known_on_hit_reactions.push(reaction),
         Learning::AttackEnhancement(enhancement) => {
             character.known_attack_enhancements.push(enhancement)
         }
-        Learning::SpellEnhancement(enhancement) => {
-            character.known_spell_enhancements.push(enhancement)
+        Learning::AbilityEnhancement(enhancement) => {
+            character.known_ability_enhancements.push(enhancement)
         }
         Learning::Passive(passive_skill) => character.known_passive_skills.push(passive_skill),
     }
@@ -648,12 +650,12 @@ fn apply_learning(learning: Learning, character: &mut Character) {
 
 fn action_to_reward_choice(btn_action: ButtonAction) -> Learning {
     match btn_action {
-        ButtonAction::Action(BaseAction::CastSpell(spell)) => Learning::Spell(spell),
+        ButtonAction::Action(BaseAction::UseAbility(ability)) => Learning::Ability(ability),
         ButtonAction::Action(..) => unreachable!(),
         ButtonAction::OnAttackedReaction(reaction) => Learning::OnAttackedReaction(reaction),
         ButtonAction::OnHitReaction(reaction) => Learning::OnHitReaction(reaction),
         ButtonAction::AttackEnhancement(enhancement) => Learning::AttackEnhancement(enhancement),
-        ButtonAction::SpellEnhancement(enhancement) => Learning::SpellEnhancement(enhancement),
+        ButtonAction::AbilityEnhancement(enhancement) => Learning::AbilityEnhancement(enhancement),
         ButtonAction::Passive(skill) => Learning::Passive(skill),
         ButtonAction::OpportunityAttack | ButtonAction::Proceed => unreachable!(),
     }

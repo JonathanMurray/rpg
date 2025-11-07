@@ -2,12 +2,13 @@ use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 
 use crate::{
     core::{
-        ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect,
-        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
-        OnHitReactionEffect, Range, Shield, Spell, SpellAllyEffect, SpellDamage, SpellEffect,
-        SpellEnemyEffect, SpellEnhancement, SpellEnhancementEffect, SpellId, SpellModifier,
-        SpellReach, SpellTarget, Weapon, WeaponGrip, WeaponRange, WeaponType,
+        Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
+        AbilityEnhancement, AbilityEnhancementEffect, AbilityId, AbilityModifier, AbilityReach,
+        AbilityTarget, ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement,
+        AttackEnhancementEffect, AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType,
+        EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
+        OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnemyEffect, Weapon, WeaponGrip,
+        WeaponRange, WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -385,8 +386,24 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     must_be_melee: false,
 };
 
-pub const SWEEP_ATTACK: Spell = Spell {
-    id: SpellId::SweepAttack,
+pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::SweepAttack,
+    name: "Precise",
+    description: "Increase your precision",
+    icon: IconId::Precision,
+    action_point_cost: 0,
+    mana_cost: 0,
+    stamina_cost: 2,
+    effect: AbilityEnhancementEffect {
+        attack_enhancement_effect: Some(AttackEnhancementEffect {
+            roll_modifier: 3,
+            ..AttackEnhancementEffect::default()
+        }),
+        ..AbilityEnhancementEffect::default()
+    },
+};
+pub const SWEEP_ATTACK: Ability = Ability {
+    id: AbilityId::SweepAttack,
     name: "Sweeping attack",
     description: "Target all enemies around you",
     icon: IconId::SweepAttack,
@@ -395,40 +412,36 @@ pub const SWEEP_ATTACK: Spell = Spell {
     stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
 
-    modifier: SpellModifier::Attack(-3),
-    possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::SweepAttack,
-            name: "Precise",
-            description: "Increase your precision",
-            icon: IconId::Precision,
-            action_point_cost: 0,
-            mana_cost: 0,
-            stamina_cost: 2,
-            effect: SpellEnhancementEffect {
-                roll_bonus: 3,
-                ..SpellEnhancementEffect::default()
-            },
-        }),
-        None,
-        None,
-    ],
-    target: SpellTarget::None {
+    modifier: AbilityModifier::Attack(-3),
+    possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
+    target: AbilityTarget::None {
         self_area: Some((
             Range::Melee,
-            SpellEffect::Enemy(SpellEnemyEffect {
-                defense_type: Some(DefenseType::Evasion),
-                damage: Some(SpellDamage::Weapon),
-                on_hit: None,
-            }),
+            AbilityEffect::Enemy(AbilityEnemyEffect::Attack),
         )),
         self_effect: None,
     },
     animation_color: MAGENTA,
 };
 
-pub const LUNGE_ATTACK: Spell = Spell {
-    id: SpellId::LungeAttack,
+pub const LUNGE_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::LungeAttack,
+    name: "Precise",
+    description: "",
+    icon: IconId::Precision,
+    action_point_cost: 0,
+    mana_cost: 0,
+    stamina_cost: 1,
+    effect: AbilityEnhancementEffect {
+        attack_enhancement_effect: Some(AttackEnhancementEffect {
+            roll_modifier: 5,
+            ..AttackEnhancementEffect::default()
+        }),
+        ..AbilityEnhancementEffect::default()
+    },
+};
+pub const LUNGE_ATTACK: Ability = Ability {
+    id: AbilityId::LungeAttack,
     name: "Lunge attack",
     description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
@@ -437,39 +450,40 @@ pub const LUNGE_ATTACK: Spell = Spell {
     stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
 
-    modifier: SpellModifier::Attack(0),
+    modifier: AbilityModifier::Attack(0),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
     possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::LungeAttack,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::LungeAttack,
             name: "Heavy impact",
             description: "Apply more force on impact",
             icon: IconId::CrushingStrike,
             action_point_cost: 0,
             mana_cost: 0,
             stamina_cost: 2,
-            effect: SpellEnhancementEffect {
-                on_hit: Some(ApplyEffect::RemoveActionPoints(1)),
-                ..SpellEnhancementEffect::default()
+            effect: AbilityEnhancementEffect {
+                attack_enhancement_effect: Some(AttackEnhancementEffect {
+                    on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+                        ApplyEffect::RemoveActionPoints(1),
+                    )),
+                    ..AttackEnhancementEffect::default()
+                }),
+                ..AbilityEnhancementEffect::default()
             },
         }),
-        None,
+        Some(LUNGE_ATTACK_PRECISE),
         None,
     ],
-    target: SpellTarget::Enemy {
-        reach: SpellReach::MoveIntoMelee(Range::Float(2.99)),
-        effect: SpellEnemyEffect {
-            defense_type: Some(DefenseType::Evasion),
-            damage: Some(SpellDamage::Weapon),
-            on_hit: None,
-        },
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::MoveIntoMelee(Range::Float(2.99)),
+        effect: AbilityEnemyEffect::Attack,
         impact_area: None,
     },
     animation_color: MAGENTA,
 };
 
-pub const BRACE: Spell = Spell {
-    id: SpellId::Brace,
+pub const BRACE: Ability = Ability {
+    id: AbilityId::Brace,
     name: "Brace",
     description: Condition::Braced.description(),
     icon: IconId::Brace,
@@ -478,11 +492,11 @@ pub const BRACE: Spell = Spell {
     stamina_cost: 1,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None; 3],
-    target: SpellTarget::None {
+    target: AbilityTarget::None {
         self_area: None,
-        self_effect: Some(SpellAllyEffect {
+        self_effect: Some(AbilityAllyEffect {
             healing: 0,
             apply: Some(ApplyEffect::Condition(Condition::Braced)),
         }),
@@ -490,8 +504,8 @@ pub const BRACE: Spell = Spell {
     animation_color: MAGENTA,
 };
 
-pub const SCREAM: Spell = Spell {
-    id: SpellId::Scream,
+pub const SCREAM: Ability = Ability {
+    id: AbilityId::Scream,
     name: "Scream",
     description: "Daze nearby enemies",
     icon: IconId::Scream,
@@ -500,30 +514,30 @@ pub const SCREAM: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
-    target: SpellTarget::None {
+    modifier: AbilityModifier::Spell,
+    target: AbilityTarget::None {
         self_area: Some((
             Range::Ranged(3),
-            SpellEffect::Enemy(SpellEnemyEffect {
+            AbilityEffect::Enemy(AbilityEnemyEffect::Spell(SpellEnemyEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: None,
                 on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
-            }),
+            })),
         )),
         self_effect: None,
     },
     possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::Scream,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::Scream,
             name: "Shriek",
             description: "Increased range",
             icon: IconId::Banshee,
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 increased_range_tenths: 15,
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
         None,
@@ -533,8 +547,8 @@ pub const SCREAM: Spell = Spell {
     animation_color: BLUE,
 };
 
-pub const SHACKLED_MIND: Spell = Spell {
-    id: SpellId::ShackledMind,
+pub const SHACKLED_MIND: Ability = Ability {
+    id: AbilityId::ShackledMind,
     name: "Shackle",
     description: "Shackle an enemy's mind, slowing them and lowering their defenses",
     icon: IconId::ShackledMind,
@@ -543,44 +557,44 @@ pub const SHACKLED_MIND: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
-    target: SpellTarget::Enemy {
-        reach: SpellReach::Range(Range::Float(4.0)),
-        effect: SpellEnemyEffect {
+    modifier: AbilityModifier::Spell,
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Float(4.0)),
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([
                 Some(ApplyEffect::Condition(Condition::Slowed(2))),
                 Some(ApplyEffect::Condition(Condition::Exposed(2))),
             ]),
-        },
+        }),
         impact_area: None,
     },
     possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::ShackledMind,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::ShackledMind,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 increased_range_tenths: 30,
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
-        Some(SpellEnhancement {
-            spell_id: SpellId::ShackledMind,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::ShackledMind,
             name: "Focus",
             description: "",
             icon: IconId::SpellAdvantage,
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 bonus_advantage: 1,
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
         None,
@@ -589,8 +603,8 @@ pub const SHACKLED_MIND: Spell = Spell {
     animation_color: PURPLE,
 };
 
-pub const MIND_BLAST: Spell = Spell {
-    id: SpellId::MindBlast,
+pub const MIND_BLAST: Ability = Ability {
+    id: AbilityId::MindBlast,
     name: "Mind blast",
     description: "Assault an enemy's mind, damaging and disrupting them",
     icon: IconId::Mindblast,
@@ -599,38 +613,38 @@ pub const MIND_BLAST: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::MindBlast,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::MindBlast,
             name: "Dualcast",
             description: "Spell is cast twice",
             icon: IconId::Dualcast,
             action_point_cost: 1,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 cast_twice: true,
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
         None,
         None,
     ],
-    target: SpellTarget::Enemy {
-        effect: SpellEnemyEffect {
+    target: AbilityTarget::Enemy {
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: Some(DefenseType::Will),
-            damage: Some(SpellDamage::Static(1)),
+            damage: Some(AbilityDamage::Static(1)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
-        },
+        }),
         impact_area: None,
-        reach: SpellReach::Range(Range::Ranged(5)),
+        reach: AbilityReach::Range(Range::Ranged(5)),
     },
     animation_color: PURPLE,
 };
 
-pub const MAGI_INFLICT_WOUNDS: Spell = Spell {
-    id: SpellId::MagiInflictWounds,
+pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
+    id: AbilityId::MagiInflictWounds,
     name: "Inflict wounds",
     description: "",
     icon: IconId::Mindblast,
@@ -639,22 +653,22 @@ pub const MAGI_INFLICT_WOUNDS: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None, None, None],
-    target: SpellTarget::Enemy {
-        effect: SpellEnemyEffect {
+    target: AbilityTarget::Enemy {
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
             on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(3))), None]),
-        },
+        }),
         impact_area: None,
-        reach: SpellReach::Range(Range::Ranged(5)),
+        reach: AbilityReach::Range(Range::Ranged(5)),
     },
     animation_color: BROWN,
 };
 
-pub const MAGI_INFLICT_HORRORS: Spell = Spell {
-    id: SpellId::MagiInflictHorrors,
+pub const MAGI_INFLICT_HORRORS: Ability = Ability {
+    id: AbilityId::MagiInflictHorrors,
     name: "Inflict horrors",
     description: "",
     icon: IconId::Mindblast,
@@ -663,22 +677,22 @@ pub const MAGI_INFLICT_HORRORS: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None, None, None],
-    target: SpellTarget::Enemy {
-        effect: SpellEnemyEffect {
+    target: AbilityTarget::Enemy {
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([Some(ApplyEffect::Condition(Condition::Slowed(1))), None]),
-        },
+        }),
         impact_area: None,
-        reach: SpellReach::Range(Range::Ranged(5)),
+        reach: AbilityReach::Range(Range::Ranged(5)),
     },
     animation_color: PURPLE,
 };
 
-pub const MAGI_HEAL: Spell = Spell {
-    id: SpellId::MagiHeal,
+pub const MAGI_HEAL: Ability = Ability {
+    id: AbilityId::MagiHeal,
     name: "Heal",
     description: "",
     icon: IconId::Heal,
@@ -687,10 +701,10 @@ pub const MAGI_HEAL: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
-    target: SpellTarget::Ally {
+    modifier: AbilityModifier::Spell,
+    target: AbilityTarget::Ally {
         range: Range::Ranged(5),
-        effect: SpellAllyEffect {
+        effect: AbilityAllyEffect {
             healing: 3,
             apply: None,
         },
@@ -699,8 +713,8 @@ pub const MAGI_HEAL: Spell = Spell {
     animation_color: LIME,
 };
 
-pub const HEAL: Spell = Spell {
-    id: SpellId::Heal,
+pub const HEAL: Ability = Ability {
+    id: AbilityId::Heal,
     name: "Heal",
     description: "Restore an ally's health",
     icon: IconId::Heal,
@@ -709,40 +723,40 @@ pub const HEAL: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
-    target: SpellTarget::Ally {
+    modifier: AbilityModifier::Spell,
+    target: AbilityTarget::Ally {
         range: Range::Ranged(3),
-        effect: SpellAllyEffect {
+        effect: AbilityAllyEffect {
             healing: 2,
             apply: None,
         },
     },
     possible_enhancements: [
-        Some(SpellEnhancement {
-            spell_id: SpellId::Heal,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::Heal,
             name: "Reach",
             description: "",
             icon: IconId::Extend,
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 increased_range_tenths: 20,
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
         // TODO add enhancement that heals over time (1 per round for 3 turns?)
-        Some(SpellEnhancement {
-            spell_id: SpellId::Heal,
+        Some(AbilityEnhancement {
+            ability_id: AbilityId::Heal,
             name: "Energize",
             description: "",
             icon: IconId::Energize,
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: SpellEnhancementEffect {
+            effect: AbilityEnhancementEffect {
                 on_hit: Some(ApplyEffect::GainStamina(2)),
-                ..SpellEnhancementEffect::default()
+                ..AbilityEnhancementEffect::default()
             },
         }),
         None,
@@ -751,8 +765,8 @@ pub const HEAL: Spell = Spell {
     animation_color: GREEN,
 };
 
-pub const HEALING_NOVA: Spell = Spell {
-    id: SpellId::HealingNova,
+pub const HEALING_NOVA: Ability = Ability {
+    id: AbilityId::HealingNova,
     name: "Healing nova",
     description: "Restore health to nearby allies",
     icon: IconId::PlusPlus,
@@ -761,12 +775,12 @@ pub const HEALING_NOVA: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None, None, None],
-    target: SpellTarget::None {
+    target: AbilityTarget::None {
         self_area: Some((
             Range::Ranged(4),
-            SpellEffect::Ally(SpellAllyEffect {
+            AbilityEffect::Ally(AbilityAllyEffect {
                 healing: 1,
                 apply: None,
             }),
@@ -776,8 +790,8 @@ pub const HEALING_NOVA: Spell = Spell {
     animation_color: GREEN,
 };
 
-pub const SELF_HEAL: Spell = Spell {
-    id: SpellId::SelfHeal,
+pub const SELF_HEAL: Ability = Ability {
+    id: AbilityId::SelfHeal,
     name: "Self heal",
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
@@ -786,11 +800,11 @@ pub const SELF_HEAL: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None, None, None],
-    target: SpellTarget::None {
+    target: AbilityTarget::None {
         self_area: None,
-        self_effect: Some(SpellAllyEffect {
+        self_effect: Some(AbilityAllyEffect {
             healing: 1,
             apply: Some(ApplyEffect::Condition(Condition::Protected(1))),
         }),
@@ -798,8 +812,8 @@ pub const SELF_HEAL: Spell = Spell {
     animation_color: GREEN,
 };
 
-pub const HEALING_RAIN: Spell = Spell {
-    id: SpellId::HealingRain,
+pub const HEALING_RAIN: Ability = Ability {
+    id: AbilityId::HealingRain,
     name: "Healing rain",
     description: "Restore health to allies in an area",
     icon: IconId::PlusPlus,
@@ -808,12 +822,12 @@ pub const HEALING_RAIN: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None, None, None],
-    target: SpellTarget::Area {
+    target: AbilityTarget::Area {
         range: Range::Ranged(5),
         radius: Range::Float(1.95),
-        effect: SpellEffect::Ally(SpellAllyEffect {
+        effect: AbilityEffect::Ally(AbilityAllyEffect {
             healing: 1,
             apply: None,
         }),
@@ -821,48 +835,48 @@ pub const HEALING_RAIN: Spell = Spell {
     animation_color: GREEN,
 };
 
-pub const FIREBALL_REACH: SpellEnhancement = SpellEnhancement {
-    spell_id: SpellId::Fireballl,
+pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Fireballl,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: SpellEnhancementEffect {
+    effect: AbilityEnhancementEffect {
         increased_range_tenths: 30,
-        ..SpellEnhancementEffect::default()
+        ..AbilityEnhancementEffect::default()
     },
 };
 
-pub const FIREBALL_MASSIVE: SpellEnhancement = SpellEnhancement {
-    spell_id: SpellId::Fireballl,
+pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Fireballl,
     name: "Massive",
     description: "",
     icon: IconId::Radius,
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: SpellEnhancementEffect {
+    effect: AbilityEnhancementEffect {
         increased_radius_tenths: 10,
-        ..SpellEnhancementEffect::default()
+        ..AbilityEnhancementEffect::default()
     },
 };
-pub const FIREBALL_INFERNO: SpellEnhancement = SpellEnhancement {
-    spell_id: SpellId::Fireballl,
+pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Fireballl,
     name: "Inferno",
     description: "More deadly impact",
     icon: IconId::Inferno,
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: SpellEnhancementEffect {
+    effect: AbilityEnhancementEffect {
         bonus_area_damage: 1,
-        ..SpellEnhancementEffect::default()
+        ..AbilityEnhancementEffect::default()
     },
 };
-pub const FIREBALL: Spell = Spell {
-    id: SpellId::Fireballl,
+pub const FIREBALL: Ability = Ability {
+    id: AbilityId::Fireballl,
     name: "Fireball",
     description: "Hurl fire at an enemy, damaging them",
     icon: IconId::Fireball,
@@ -871,21 +885,21 @@ pub const FIREBALL: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
-    target: SpellTarget::Enemy {
-        reach: SpellReach::Range(Range::Float(4.5)),
-        effect: SpellEnemyEffect {
+    modifier: AbilityModifier::Spell,
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Float(4.5)),
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(SpellDamage::AtLeast(2)),
+            damage: Some(AbilityDamage::AtLeast(2)),
             on_hit: None,
-        },
+        }),
         impact_area: Some((
             Range::Ranged(2),
-            SpellEnemyEffect {
+            AbilityEnemyEffect::Spell(SpellEnemyEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(SpellDamage::AtLeast(1)),
+                damage: Some(AbilityDamage::AtLeast(1)),
                 on_hit: None,
-            },
+            }),
         )),
     },
     possible_enhancements: [
@@ -897,8 +911,8 @@ pub const FIREBALL: Spell = Spell {
     animation_color: RED,
 };
 
-pub const KILL: Spell = Spell {
-    id: SpellId::Kill,
+pub const KILL: Ability = Ability {
+    id: AbilityId::Kill,
     name: "Kill",
     description: "Kill an enemy",
     icon: IconId::Fireball,
@@ -907,16 +921,16 @@ pub const KILL: Spell = Spell {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: SpellModifier::Spell,
+    modifier: AbilityModifier::Spell,
     possible_enhancements: [None; 3],
-    target: SpellTarget::Enemy {
-        effect: SpellEnemyEffect {
+    target: AbilityTarget::Enemy {
+        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
             defense_type: None,
-            damage: Some(SpellDamage::Static(99)),
+            damage: Some(AbilityDamage::Static(99)),
             on_hit: None,
-        },
+        }),
         impact_area: None,
-        reach: SpellReach::Range(Range::Ranged(10)),
+        reach: AbilityReach::Range(Range::Ranged(10)),
     },
     animation_color: BLACK,
 };

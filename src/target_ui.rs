@@ -133,7 +133,7 @@ impl TargetUi {
             };
 
             let movement_text_line = TextLine::new(
-                format!("Movement: {}", char.move_speed()),
+                format!("Movement: {:.1}", char.move_speed()),
                 16,
                 LIGHTGRAY,
                 Some(self.simple_font.clone()),
