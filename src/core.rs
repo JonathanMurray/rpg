@@ -1,6 +1,6 @@
 use std::cell::{Cell, RefCell};
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
@@ -230,7 +230,8 @@ impl CoreGame {
                 enhancements,
                 target,
             } => {
-                let attacker = self.active_character();
+                //let attacker = self.active_character();
+                let attacker = self.characters.get_rc(self.active_character_id);
                 let defender = self.characters.get(target);
 
                 assert!(attacker.attack_reach(hand, defender.position.get()).1 != ActionReach::No);
@@ -299,6 +300,7 @@ impl CoreGame {
                 if attacker.is_dead() {
                     None
                 } else {
+                    // TODO: Should not be able to react when flanked!
                     let defender_can_react_to_attack = !defender
                         .usable_on_attacked_reactions(is_within_melee)
                         .is_empty();
@@ -330,7 +332,7 @@ impl CoreGame {
                                 .get(previously_engaged)
                                 .set_not_engaged_by(attacker.id());
                         }
-                        defender.set_engaged_by(attacker.id());
+                        defender.set_engaged_by(Rc::clone(attacker));
                         attacker.engagement_target.set(Some(defender.id()));
                     }
 
@@ -1286,7 +1288,7 @@ impl CoreGame {
             armor_str
         ));
 
-        let hit_or_graze = attack_result >= evasion - 5;
+        let hit_or_graze = attack_result >= evasion.saturating_sub(5);
 
         let outcome = if hit_or_graze {
             let mut on_true_hit_effect = None;
@@ -1722,10 +1724,10 @@ pub fn attack_roll_bonus(
     enhancements: &[AttackEnhancement],
     reaction: Option<OnAttackedReaction>,
 ) -> DiceRollBonus {
-    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements, defender.pos());
+    // TODO: Check defender is engaged by someone on the attacker's opposite side. In that case, grant +3 to attack roll due to "Flanked"
+
+    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements, defender);
     bonus.advantage += defender.incoming_attack_advantage(reaction);
-    //dbg!(circumstance_advantage);
-    //bonus.advantage += circumstance_advantage;
     bonus
 }
 
@@ -2657,7 +2659,7 @@ pub struct Character {
     pub known_spell_enhancements: Vec<SpellEnhancement>,
     pub known_passive_skills: Vec<PassiveSkill>,
 
-    pub is_engaged_by: RefCell<HashSet<CharacterId>>,
+    pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
     engagement_target: Cell<Option<CharacterId>>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
@@ -2726,8 +2728,10 @@ impl Character {
         }
     }
 
-    fn set_engaged_by(&self, engager: CharacterId) {
-        self.is_engaged_by.borrow_mut().insert(engager);
+    fn set_engaged_by(&self, engager: Rc<Character>) {
+        self.is_engaged_by
+            .borrow_mut()
+            .insert(engager.id(), engager);
     }
 
     fn set_not_engaged_by(&self, not_engager: CharacterId) {
@@ -3078,7 +3082,7 @@ impl Character {
                     ) {
                         (
                             weapon_range.into_range(),
-                            ActionReach::YesButDisadvantage("far"),
+                            ActionReach::YesButDisadvantage("Far"),
                         )
                     } else {
                         (Range::Float(extended), ActionReach::No)
@@ -3467,11 +3471,11 @@ impl Character {
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
-        target_pos: Position,
+        target: &Character,
     ) -> DiceRollBonus {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
-        for (label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target_pos) {
+        for (label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target) {
             dbg!(label, bonus);
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
@@ -3490,9 +3494,20 @@ impl Character {
         &self,
         hand_type: HandType,
         enhancements: &[AttackEnhancement],
-        target_pos: Position,
+        target: &Character,
     ) -> Vec<(&'static str, RollBonusContributor)> {
+        let target_pos = target.pos();
         let mut bonuses = vec![];
+
+        let flanking = target
+            .is_engaged_by
+            .borrow()
+            .values()
+            .any(|engager| are_flanking_target(self.pos(), engager.pos(), target_pos));
+
+        if flanking {
+            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
+        }
 
         let (_range, reach) = self.attack_reach(hand_type, target_pos);
 
@@ -3697,6 +3712,29 @@ impl Character {
             Exposed(n) => conditions.exposed += n,
             Hindered(n) => conditions.hindered += n,
         }
+    }
+}
+
+fn are_flanking_target(
+    attacker: (i32, i32),
+    melee_engager: (i32, i32),
+    target: (i32, i32),
+) -> bool {
+    // Note: engagement is always melee, which is why this vector is also a direction
+    let engage_dir = (melee_engager.0 - target.0, melee_engager.1 - target.1);
+    let (dx, dy) = (attacker.0 - target.0, attacker.1 - target.1);
+    assert!((dx, dy) != (0, 0));
+
+    match engage_dir {
+        (1, 0) => dx < 0 && dy.abs() <= dx.abs(),
+        (1, -1) => dx <= 0 && dy >= 0,
+        (0, -1) => dy > 0 && dx.abs() <= dy.abs(),
+        (-1, -1) => dx >= 0 && dy >= 0,
+        (-1, 0) => dx > 0 && dy.abs() <= dx.abs(),
+        (-1, 1) => dx >= 0 && dy <= 0,
+        (0, 1) => dy < 0 && dx.abs() <= dy.abs(),
+        (1, 1) => dx <= 0 && dy <= 0,
+        _ => unreachable!("Engagement not melee: {engage_dir:?}"),
     }
 }
 

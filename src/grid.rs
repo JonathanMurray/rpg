@@ -603,9 +603,7 @@ impl GameGrid {
         }
 
         for character in self.characters.iter() {
-            for engager_id in character.is_engaged_by.borrow().iter() {
-                let engager = self.characters.get(*engager_id);
-
+            for engager in character.is_engaged_by.borrow().values() {
                 let mut engager_pos = self.character_screen_pos(engager);
                 let mut target_pos = self.character_screen_pos(&character);
 

@@ -543,8 +543,7 @@ impl ActivityPopup {
 
         let mut explanation = String::new();
 
-        for (term, _bonus) in
-            attacker.outgoing_attack_bonuses(*hand, attack_enhancements, defender.pos())
+        for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements, defender)
         {
             explanation.push_str(term);
             explanation.push(' ');

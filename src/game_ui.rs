@@ -675,7 +675,7 @@ impl UserInterface {
                 for (term, bonus) in self.active_character().outgoing_attack_bonuses(
                     attack.hand,
                     selected_enhancements,
-                    target_char.pos(),
+                    target_char,
                 ) {
                     details.push((term.to_string(), bonus.goodness()));
                 }
