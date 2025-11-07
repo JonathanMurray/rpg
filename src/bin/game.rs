@@ -86,15 +86,15 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_actions.push(BaseAction::CastSpell(FIREBALL));
-    alice
-        .known_actions
-        .push(BaseAction::CastSpell(HEALING_RAIN));
+    alice.known_actions.push(BaseAction::CastSpell(KILL));
     alice
         .known_actions
         .push(BaseAction::CastSpell(HEALING_NOVA));
     alice.known_spell_enhancements.push(FIREBALL_INFERNO);
     alice.add_to_spirit(2);
     alice.known_attack_enhancements.push(TRUE_STRIKE);
+    alice.known_passive_skills.push(PassiveSkill::Reaper);
+    alice.stamina.lose(3);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -113,7 +113,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Easy1,
+        FightId::Easy3,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

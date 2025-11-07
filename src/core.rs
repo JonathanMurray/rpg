@@ -19,6 +19,13 @@ pub type Position = (i32, i32);
 pub const MAX_ACTION_POINTS: u32 = 5;
 pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
+#[derive(Debug)]
+enum ActionOutcome {
+    AttackHit { victim_id: CharacterId, damage: u32 },
+    SpellHitEnemies { victim_ids: Vec<CharacterId> },
+    Default,
+}
+
 pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
@@ -69,11 +76,10 @@ impl CoreGame {
 
             let action = self.ui_select_action().await;
 
-            let mut active_character_killed_target = false;
-
             if let Some(action) = action {
+                let mut killed_by_action = HashSet::new();
                 let ap_before_action = self.active_character().action_points.current();
-                let attack_hit = self.perform_action(action).await;
+                let action_outcome = self.perform_action(action).await;
 
                 // You recover from 1 stack of Dazed for each AP you spend
                 // This must happen before "on attacked and hit" reactions because those might
@@ -82,16 +88,15 @@ impl CoreGame {
                 self.perform_recover_from_dazed(self.active_character_id, spent)
                     .await;
 
-                if let Some((victim_id, damage)) = attack_hit {
+                if let ActionOutcome::AttackHit { victim_id, damage } = action_outcome {
                     // TODO this can remove a Dazed that was just added from the attack, which is bad.
 
                     // You recover from 1 stack of Dazed each time you're hit by an attack
                     self.perform_recover_from_dazed(victim_id, 1).await;
 
                     let victim = self.characters.get(victim_id);
-
                     if victim.is_dead() {
-                        active_character_killed_target = true;
+                        killed_by_action.insert(victim.id());
                     }
 
                     let character = self.active_character();
@@ -112,6 +117,30 @@ impl CoreGame {
                             .await
                         {
                             self.perform_on_hit_reaction(victim_id, reaction).await;
+                        }
+                    }
+                } else if let ActionOutcome::SpellHitEnemies { victim_ids } = action_outcome {
+                    for victim_id in victim_ids {
+                        let victim = self.characters.get(victim_id);
+                        if victim.is_dead() {
+                            killed_by_action.insert(victim.id());
+                        }
+                    }
+                }
+
+                if !killed_by_action.is_empty() {
+                    let character = self.active_character();
+                    if let Some((sta, ap)) =
+                        character.maybe_gain_resources_from_reaper(killed_by_action.len() as u32)
+                    {
+                        if sta + ap > 0 {
+                            let gain = match (sta, ap) {
+                                (0, _) => format!("{ap} AP"),
+                                (_, 0) => format!("{sta} stamina"),
+                                _ => format!("{sta} stamina, {ap} AP"),
+                            };
+                            self.log(format!("{} gained {} (Reaper)", character.name, gain))
+                                .await;
                         }
                     }
                 }
@@ -163,25 +192,6 @@ impl CoreGame {
                 .await;
             }
 
-            if !active_character_died && active_character_killed_target {
-                // TODO: This only accounts for direct attacks, but the passive skill should
-                // probably work on spells, as well as (perhaps) indirect kills (DOT's etc)
-                let active_char = self.active_character();
-                if active_char
-                    .known_passive_skills
-                    .contains(&PassiveSkill::Reaper)
-                {
-                    let gain = active_char.stamina.gain(1);
-                    if gain > 0 {
-                        self.log(format!(
-                            "{} gained {} stamina (Reaper)",
-                            active_char.name, gain
-                        ))
-                        .await;
-                    }
-                }
-            }
-
             // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
             // before the character died.
             if active_character_died {
@@ -223,7 +233,7 @@ impl CoreGame {
         positions
     }
 
-    async fn perform_action(&mut self, action: Action) -> Option<(CharacterId, u32)> {
+    async fn perform_action(&mut self, action: Action) -> ActionOutcome {
         match action {
             Action::Attack {
                 hand,
@@ -298,7 +308,7 @@ impl CoreGame {
                 }
 
                 if attacker.is_dead() {
-                    None
+                    ActionOutcome::Default
                 } else {
                     // TODO: Should not be able to react when flanked?
                     let defender_can_react_to_attack = !defender
@@ -336,14 +346,24 @@ impl CoreGame {
                         attacker.engagement_target.set(Some(defender.id()));
                     }
 
-                    self.perform_attack(
-                        self.active_character_id,
-                        hand,
-                        enhancements,
-                        target,
-                        reaction,
-                    )
-                    .await
+                    let attack_hit = self
+                        .perform_attack(
+                            self.active_character_id,
+                            hand,
+                            enhancements,
+                            target,
+                            reaction,
+                        )
+                        .await;
+
+                    if let Some((defender_id, damage)) = attack_hit {
+                        ActionOutcome::AttackHit {
+                            victim_id: defender_id,
+                            damage,
+                        }
+                    } else {
+                        ActionOutcome::Default
+                    }
                 }
             }
 
@@ -352,8 +372,14 @@ impl CoreGame {
                 enhancements,
                 target,
             } => {
-                self.perform_spell(spell, enhancements, target).await;
-                None
+                let enemies_hit = self.perform_spell(spell, enhancements, target).await;
+                if enemies_hit.is_empty() {
+                    ActionOutcome::Default
+                } else {
+                    ActionOutcome::SpellHitEnemies {
+                        victim_ids: enemies_hit,
+                    }
+                }
             }
 
             Action::Move {
@@ -365,14 +391,14 @@ impl CoreGame {
                 character.action_points.spend(action_point_cost);
                 character.stamina.spend(stamina_cost);
                 self.perform_movement(positions).await;
-                None
+                ActionOutcome::Default
             }
 
             Action::ChangeEquipment { from, to } => {
                 let character = self.active_character();
                 character.action_points.spend(1);
                 character.swap_equipment_slots(from, to);
-                None
+                ActionOutcome::Default
             }
 
             Action::UseConsumable {
@@ -401,7 +427,7 @@ impl CoreGame {
                 })
                 .await;
 
-                None
+                ActionOutcome::Default
             }
         }
     }
@@ -526,13 +552,15 @@ impl CoreGame {
         spell: Spell,
         enhancements: Vec<SpellEnhancement>,
         selected_target: ActionTarget,
-    ) {
+    ) -> Vec<CharacterId> {
         let caster = self.active_character();
         let caster_id = caster.id();
 
         caster.action_points.spend(spell.action_point_cost);
         caster.mana.spend(spell.mana_cost);
         caster.stamina.spend(spell.stamina_cost);
+
+        let mut enemies_hit = vec![];
 
         for enhancement in &enhancements {
             caster.action_points.spend(enhancement.action_point_cost);
@@ -765,8 +793,20 @@ impl CoreGame {
                 detail_lines.push(format!("{} cast again!", caster_ref.name))
             }
 
-            let caster_id = caster_ref.id();
+            if let Some((target_id, outcome)) = target_outcome {
+                if matches!(outcome, SpellTargetOutcome::HitEnemy { .. }) {
+                    enemies_hit.push(target_id);
+                }
+            }
+            if let Some((_, outcomes)) = &area_outcomes {
+                for (target_id, outcome) in outcomes {
+                    if matches!(outcome, SpellTargetOutcome::HitEnemy { .. }) {
+                        enemies_hit.push(*target_id);
+                    }
+                }
+            }
 
+            let caster_id = caster_ref.id();
             self.ui_handle_event(GameEvent::SpellWasCast {
                 caster: caster_id,
                 target_outcome,
@@ -776,6 +816,8 @@ impl CoreGame {
             })
             .await;
         }
+
+        enemies_hit
     }
 
     fn perform_spell_area_effect(
@@ -1603,6 +1645,7 @@ impl CoreGame {
 
         conditions.borrow_mut().mainhand_exertion = 0;
         conditions.borrow_mut().offhand_exertion = 0;
+        conditions.borrow_mut().reaper_ap_cooldown = false;
         let stamina_gain = (character.stamina.max() as f32 / 3.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
     }
@@ -1997,6 +2040,7 @@ pub enum Condition {
     Slowed(u32),
     Exposed(u32),
     Hindered(u32),
+    ReaperApCooldown,
 }
 
 impl Condition {
@@ -2018,6 +2062,7 @@ impl Condition {
             Slowed(n) => Some(n),
             Exposed(n) => Some(n),
             Hindered(n) => Some(n),
+            ReaperApCooldown => None,
         }
     }
 
@@ -2039,6 +2084,7 @@ impl Condition {
             Slowed(..) => "Slowed",
             Exposed(..) => "Exposed",
             Hindered(..) => "Hindered",
+            ReaperApCooldown => "Reaper",
         }
     }
 
@@ -2060,6 +2106,7 @@ impl Condition {
             Slowed(_) => "Gains 2 less AP per turn",
             Exposed(_) => "-3 to all defenses",
             Hindered(..) => "Half movement speed",
+            ReaperApCooldown => "Can not gain more AP from Reaper this turn",
         }
     }
 
@@ -2081,6 +2128,7 @@ impl Condition {
             Slowed(_) => false,
             Exposed(_) => false,
             Hindered(..) => false,
+            ReaperApCooldown => false,
         }
     }
 
@@ -2127,6 +2175,7 @@ struct Conditions {
     slowed: u32,
     exposed: u32,
     hindered: u32,
+    reaper_ap_cooldown: bool,
 }
 
 impl Conditions {
@@ -2176,6 +2225,9 @@ impl Conditions {
         }
         if self.hindered > 0 {
             result.push(Condition::Hindered(self.hindered).info())
+        }
+        if self.reaper_ap_cooldown {
+            result.push(Condition::ReaperApCooldown.info())
         }
 
         result
@@ -2459,7 +2511,7 @@ impl PassiveSkill {
             Self::HardenedSkin => "+1 armor",
             Self::WeaponProficiency => "Attacks gain +1 armor penetration",
             Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
-            Self::Reaper => "On kill: regenerate 1 stamina",
+            Self::Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
         }
     }
 }
@@ -2725,6 +2777,21 @@ impl Character {
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
             money: Cell::new(5),
+        }
+    }
+
+    fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
+        if self.known_passive_skills.contains(&PassiveSkill::Reaper) {
+            let sta = self.stamina.gain(num_killed);
+            let ap = if self.conditions.borrow().reaper_ap_cooldown {
+                0
+            } else {
+                self.action_points.gain(1)
+            };
+            self.receive_condition(Condition::ReaperApCooldown);
+            Some((sta, ap))
+        } else {
+            None
         }
     }
 
@@ -3711,6 +3778,7 @@ impl Character {
             }
             Exposed(n) => conditions.exposed += n,
             Hindered(n) => conditions.hindered += n,
+            ReaperApCooldown => conditions.reaper_ap_cooldown = true,
         }
     }
 }

@@ -902,7 +902,7 @@ pub const KILL: Spell = Spell {
     name: "Kill",
     description: "Kill an enemy",
     icon: IconId::Fireball,
-    action_point_cost: 4,
+    action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 0,
     weapon_requirement: None,

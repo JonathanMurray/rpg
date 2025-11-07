@@ -634,7 +634,8 @@ impl UserInterface {
             unreachable!()
         };
 
-        self.remembered_attack_enhancements.insert(self.active_character_id, selected_enhancements.clone());
+        self.remembered_attack_enhancements
+            .insert(self.active_character_id, selected_enhancements.clone());
 
         match target {
             Some(target_id) => {
