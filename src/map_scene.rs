@@ -7,6 +7,7 @@ use macroquad::{
     miniquad::window::screen_size,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, DrawRectangleParams},
     text::{draw_text, measure_text, Font},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
@@ -17,14 +18,16 @@ use crate::{
     data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
     drawing::draw_dashed_line,
     init_fight_map::FightId,
+    textures::load_and_init_texture,
 };
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 struct Node {
     map_pos: (u32, u32),
     screen_pos: (f32, f32),
     text: &'static str,
     choice: MapChoice,
+    texture: Option<Texture2D>,
 }
 
 impl Node {
@@ -34,6 +37,7 @@ impl Node {
             screen_pos: Default::default(),
             text: Default::default(),
             choice,
+            texture: Default::default(),
         }
     }
 
@@ -76,6 +80,11 @@ impl MapScene {
         let y_mid = screen_h / 2.0;
         let radius = 60.0;
         let mut selected_node_i = None;
+
+        let fight_texture = load_and_init_texture("map_fight.png").await;
+        let rest_texture = load_and_init_texture("map_rest.png").await;
+        let chest_texture = load_and_init_texture("map_chest.png").await;
+        let shop_texture = load_and_init_texture("map_shop.png").await;
 
         let candidate_chest_rewards = vec![
             EquipmentEntry::Armor(CHAIN_MAIL),
@@ -127,7 +136,15 @@ impl MapScene {
                 MapChoice::Rest => "Rest",
                 MapChoice::Shop => "Shop",
                 MapChoice::Fight(fight_id) => format!("{:?}", fight_id).leak(),
-                MapChoice::Chest(equipment_entry) => "Chest",
+                MapChoice::Chest(..) => "Chest",
+            };
+            node.texture = match node.choice {
+                MapChoice::Rest => Some(rest_texture.clone()),
+                MapChoice::Fight(FightId::Elite|FightId::Elite2) => None,
+                MapChoice::Fight(..) => Some(fight_texture.clone()),
+                MapChoice::Chest(..) => Some(chest_texture.clone()),
+                MapChoice::Shop => Some(shop_texture.clone()),
+                _ => None
             };
         }
         for node in &mut nodes {
@@ -153,11 +170,14 @@ impl MapScene {
             start_size,
         );
 
+        let bg_color = BLACK;
+        let bg_color = Color::new(0.6, 0.5, 0.3, 1.0);
+
         loop {
             let elapsed = get_frame_time();
 
             let mouse_pos = mouse_position();
-            clear_background(BLACK);
+            clear_background(bg_color);
 
             let mut hovered_i = None;
 
@@ -176,7 +196,7 @@ impl MapScene {
                     None => start_pos.center().into(),
                 };
                 for to_i in to {
-                    let to_node = nodes[*to_i];
+                    let to_node = &nodes[*to_i];
 
                     let visited_from = match from_i {
                         Some(from_i) => self.visited_nodes.contains(from_i),
@@ -188,7 +208,7 @@ impl MapScene {
                     } else if visited_from && self.visited_nodes.contains(to_i) {
                         RED
                     } else {
-                        GRAY
+                        BLACK
                     };
                     draw_dashed_line(from_pos, to_node.screen_pos, 2.0, line_color, 15.0, None);
                 }
@@ -237,7 +257,7 @@ impl MapScene {
                 let fill_color = if self.visited_nodes.contains(&node_i) {
                     current_pos_color
                 } else {
-                    BLACK
+                    bg_color
                 };
 
                 draw_circle(node.screen_pos.0, node.screen_pos.1, radius, fill_color);
@@ -250,26 +270,38 @@ impl MapScene {
                         outline_color,
                     );
                 }
-                let font_size = 28;
-                let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
 
-                let mut text_color = GRAY;
-                if let Some(valid_next) = edges.get(&self.player_node_i) {
-                    if valid_next.contains(&node_i) {
-                        text_color = WHITE;
+                if let Some(texture) = &node.texture {
+                    
+                    let (w, h) = (64.0, 64.0);
+                    draw_texture_ex(
+                        texture,
+                        node.screen_pos.0 - w / 2.0,
+                        node.screen_pos.1 - h / 2.0,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some((w, h).into()),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    let font_size = 28;
+                    let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
+
+                    let mut text_color = BLACK;
+                    if let Some(valid_next) = edges.get(&self.player_node_i) {
+                        if valid_next.contains(&node_i) {
+                            text_color = WHITE;
+                        }
                     }
-                }
 
-                draw_text(
-                    node.text,
-                    node.screen_pos.0 - text_dim.width / 2.0,
-                    node.screen_pos.1 + (text_dim.height) / 2.0,
-                    font_size.into(),
-                    text_color,
-                );
-
-                if self.player_node_i == Some(node_i) {
-                    //draw_cross((node.pos.0, node.pos.1 - 15.0), 15.0);
+                    draw_text(
+                        node.text,
+                        node.screen_pos.0 - text_dim.width / 2.0,
+                        node.screen_pos.1 + (text_dim.height) / 2.0,
+                        font_size.into(),
+                        text_color,
+                    );
                 }
             }
 

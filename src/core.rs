@@ -300,7 +300,7 @@ impl CoreGame {
                 if attacker.is_dead() {
                     None
                 } else {
-                    // TODO: Should not be able to react when flanked!
+                    // TODO: Should not be able to react when flanked?
                     let defender_can_react_to_attack = !defender
                         .usable_on_attacked_reactions(is_within_melee)
                         .is_empty();

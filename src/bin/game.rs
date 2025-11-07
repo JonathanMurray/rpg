@@ -111,15 +111,6 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_fight_loop(
-        player_characters,
-        FightId::Easy1,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-    )
-    .await;
-
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;
         match map_choice {
