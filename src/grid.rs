@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, f32::consts::FRAC_1_PI, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -605,7 +605,7 @@ impl GameGrid {
         for character in self.characters.iter() {
             for engager in character.is_engaged_by.borrow().values() {
                 let mut engager_pos = self.character_screen_pos(engager);
-                let mut target_pos = self.character_screen_pos(&character);
+                let mut target_pos = self.character_screen_pos(character);
 
                 let offset_dir =
                     match (

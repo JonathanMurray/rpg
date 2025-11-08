@@ -24,8 +24,7 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
         prob_attack_penetrating_hit, Ability, AbilityEnemyEffect, AbilityEnhancement,
-        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
-        ApplyEffect, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
+        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
         AttackedEvent, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
         Goodness, HandType, OnAttackedReaction, OnHitReaction, Position,
     },
@@ -1312,7 +1311,7 @@ impl UserInterface {
                         );
 
                         self.add_text_effect_for_ability_target_outcome(
-                            &outcome, duration, target_pos,
+                            outcome, duration, target_pos,
                         );
                         self.animation_stopwatch.set_to_at_least(duration + 0.3);
                     }

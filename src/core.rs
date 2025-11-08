@@ -1282,7 +1282,7 @@ impl CoreGame {
 
             assert!(applied_effects.len() <= 2);
             let applied_effects = [
-                applied_effects.get(0).copied(),
+                applied_effects.first().copied(),
                 applied_effects.get(1).copied(),
             ];
 

@@ -19,7 +19,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
     },
     base_ui::Drawable,
-    core::{as_percentage, prob_attack_hit, AttackEnhancement, Character, CharacterId, Characters},
+    core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,
