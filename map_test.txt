@@ -1,0 +1,12 @@
++----------------------------
+BBBBBBBBBBBBB
+BRR         B
+BR          B
+B           B
+B P        SB
+B P 0      SB
+B      W   SB
+B      WW   B
+BB         BB
+ BBBBBBBBBBB
++----------------------------

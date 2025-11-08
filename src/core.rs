@@ -1358,8 +1358,8 @@ impl CoreGame {
 
         let mut evasion = defender.evasion();
 
-        let mut defender_reacted_with_parry = false;
-        let mut defender_reacted_with_sidestep = false;
+        let mut evasion_added_by_parry = 0;
+        let mut evasion_added_by_sidestep = 0;
         let mut skip_attack_exertion = false;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
@@ -1389,10 +1389,10 @@ impl CoreGame {
 
             match reaction.id {
                 OnAttackedReactionId::Parry => {
-                    defender_reacted_with_parry = true;
+                    evasion_added_by_parry = reaction.effect.bonus_evasion;
                 }
                 OnAttackedReactionId::SideStep => {
-                    defender_reacted_with_sidestep = true;
+                    evasion_added_by_sidestep = reaction.effect.bonus_evasion;
                 }
             }
         }
@@ -1440,9 +1440,7 @@ impl CoreGame {
             armor_str
         ));
 
-        let hit_or_graze = attack_result >= evasion.saturating_sub(5);
-
-        let outcome = if hit_or_graze {
+        let outcome = if attack_result >= evasion.saturating_sub(5) {
             let mut on_true_hit_effect = None;
             let weapon = attacker.weapon(hand_type).unwrap();
             let mut dmg_calculation = weapon.damage as i32;
@@ -1482,7 +1480,7 @@ impl CoreGame {
             } else if attack_result < armored_defense {
                 let mitigated = armored_defense - attack_result;
 
-                detail_lines.push(format!("  Hit! ({} mitigated)", mitigated));
+                detail_lines.push(format!("  Mitigated hit ({} armor)", mitigated));
                 dmg_str.push_str(&format!(" -{mitigated} (armor)"));
                 dmg_calculation -= mitigated as i32;
             } else {
@@ -1499,7 +1497,11 @@ impl CoreGame {
                     dmg_str.push_str(" +1 (Heavy hit)");
                     dmg_calculation += 1;
                 } else {
-                    detail_lines.push("  True hit".to_string());
+                    if armor_value > 0 {
+                        detail_lines.push("  Penetrating hit".to_string());
+                    } else {
+                        detail_lines.push("  Neutral hit".to_string());
+                    }
                 }
             }
 
@@ -1550,15 +1552,21 @@ impl CoreGame {
             } else {
                 AttackOutcome::Hit(damage)
             }
-        } else if defender_reacted_with_parry {
+        } else if attack_result
+            < evasion.saturating_sub(evasion_added_by_parry + evasion_added_by_sidestep + 5)
+        {
+            detail_lines.push("  Missed!".to_string());
+            AttackOutcome::Miss
+        } else if evasion_added_by_parry > 0 {
             detail_lines.push("  Parried!".to_string());
             AttackOutcome::Parry
-        } else if defender_reacted_with_sidestep {
+        } else if evasion_added_by_sidestep > 0 {
             detail_lines.push("  Side stepped!".to_string());
             AttackOutcome::Dodge
         } else {
-            detail_lines.push("  Missed!".to_string());
-            AttackOutcome::Miss
+            unreachable!(
+                "{attack_result}, {evasion}, {evasion_added_by_parry}, {evasion_added_by_sidestep}"
+            );
         };
 
         if defender.lose_braced() {
@@ -2845,6 +2853,15 @@ pub enum Behaviour {
     Bot(BotBehaviour),
 }
 
+impl Behaviour {
+    pub fn unwrap_bot_behaviour(&self) -> &BotBehaviour {
+        match self {
+            Behaviour::Player => panic!(),
+            Behaviour::Bot(bot_behaviour) => bot_behaviour,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Character {
     id: Option<CharacterId>,
@@ -3348,6 +3365,15 @@ impl Character {
         None
     }
 
+    pub fn attack_action(&self) -> Option<AttackAction> {
+        for action in &self.known_actions {
+            if let BaseAction::Attack(attack_action) = action {
+                return Some(*attack_action);
+            }
+        }
+        None
+    }
+
     pub fn usable_actions(&self) -> Vec<BaseAction> {
         self.known_actions
             .iter()
@@ -3359,6 +3385,11 @@ impl Character {
                 }
             })
             .collect()
+    }
+
+    pub fn can_attack(&self, attack: AttackAction) -> bool {
+        let ap = self.action_points.current();
+        matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
     }
 
     pub fn can_use_action(&self, action: BaseAction) -> bool {

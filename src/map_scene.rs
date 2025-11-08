@@ -144,7 +144,6 @@ impl MapScene {
                 MapChoice::Fight(..) => Some(fight_texture.clone()),
                 MapChoice::Chest(..) => Some(chest_texture.clone()),
                 MapChoice::Shop => Some(shop_texture.clone()),
-                _ => None,
             };
         }
         for node in &mut nodes {

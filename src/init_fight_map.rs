@@ -32,6 +32,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Easy3 => "map3.txt",
         FightId::Elite => "map_elite.txt",
         FightId::Elite2 => "map_elite2.txt",
+        FightId::Test => "map_test.txt",
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
@@ -218,6 +219,22 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(tanky);
             }
         }
+
+        FightId::Test => {
+            let pos = *enemy_positions[&0].choose().unwrap();
+            let enemy = Character::new(
+                Behaviour::Bot(BotBehaviour::Normal),
+                "Test enemy",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton2,
+                Attributes::new(1, 1, 1, 1),
+                pos,
+            );
+            enemy.health.change_max_value_to(20);
+            enemy.set_weapon(HandType::MainHand, BAD_RAPIER);
+
+            characters.extend_from_slice(&[enemy]);
+        }
     }
 
     for (x, y) in water_grid.iter().copied() {
@@ -302,4 +319,5 @@ pub enum FightId {
     Easy3,
     Elite,
     Elite2,
+    Test,
 }

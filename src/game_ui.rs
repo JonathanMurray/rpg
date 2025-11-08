@@ -24,9 +24,10 @@ use crate::{
     core::{
         as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
         prob_attack_penetrating_hit, Ability, AbilityEnemyEffect, AbilityEnhancement,
-        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
-        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position,
+        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
+        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
+        BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType,
+        OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{

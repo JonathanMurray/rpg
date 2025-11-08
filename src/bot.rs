@@ -26,12 +26,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
     assert!(!character.player_controlled());
 
-    let bot_behaviour = match &character.behaviour {
-        Behaviour::Player => unreachable!(),
-        Behaviour::Bot(bot_behaviour) => bot_behaviour,
-    };
-
-    match bot_behaviour {
+    match character.behaviour.unwrap_bot_behaviour() {
         BotBehaviour::Normal => run_normal_behaviour(game),
         BotBehaviour::Magi(magi_behaviour) => run_magi_behaviour(game, magi_behaviour),
     }
@@ -127,10 +122,9 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
 
 fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
-
     assert!(!character.player_controlled());
 
-    if let Some(attack) = character.usable_attack_action() {
+    if let Some(attack) = character.attack_action() {
         let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
         let mut rng = rand::rng();
         player_chars.shuffle(&mut rng);
@@ -140,17 +134,21 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
                 .1
                 != ActionReach::No
             {
-                return Some(Action::Attack {
-                    hand: attack.hand,
-                    enhancements: vec![],
-                    target: player_char.id(),
-                });
+                if character.can_attack(attack) {
+                    return Some(Action::Attack {
+                        hand: attack.hand,
+                        enhancements: vec![],
+                        target: player_char.id(),
+                    });
+                } else {
+                    println!("bot reaches a player char but doesn't have enough AP to attack. Let it chill.");
+                    return None;
+                }
             }
         }
     }
 
     let bot_pos = character.position.get();
-
     let mut shortest_path_to_some_player: Option<Path> = None;
 
     for player_pos in &game.player_positions() {
