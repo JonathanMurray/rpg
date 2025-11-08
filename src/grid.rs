@@ -1350,7 +1350,7 @@ impl GameGrid {
                     }
                     ActionTarget::None => ability
                         .target
-                        .range(selected_enhancements)
+                        .radius(selected_enhancements)
                         .map(|range| (range, RangeIndicator::ActionTargetRange)),
                 },
                 _ => None,

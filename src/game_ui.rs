@@ -1116,7 +1116,7 @@ impl UserInterface {
                         reactor_pos,
                         0.0,
                         1.0,
-                        format!("{:?}", condition),
+                        format!("{}", condition.name()),
                         Goodness::Neutral,
                     );
                 }
@@ -1128,7 +1128,7 @@ impl UserInterface {
                             attacker_pos,
                             0.0,
                             1.0,
-                            format!("{:?}", condition),
+                            format!("{}", condition.name()),
                             Goodness::Neutral,
                         );
                     } else {

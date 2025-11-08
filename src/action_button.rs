@@ -23,7 +23,7 @@ use crate::{
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, PassiveSkill, Weapon, WeaponType,
+        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, PassiveSkill, Weapon, WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -84,6 +84,14 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
 }
 
 fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
+    let mut technical_description = vec![];
+
+    if reaction.effect == OnHitReactionEffect::ShieldBash {
+        technical_description.push("[ attack roll ]".to_string());
+        technical_description.push("Targets the attacker".to_string());
+        technical_description.push("  [ toughness ]".to_string());
+        technical_description.push("  Dazed (2+)".to_string());
+    }
     ActionButtonTooltip {
         header: format!(
             "{} {}",
@@ -91,6 +99,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
             cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
         ),
         description: Some(reaction.description),
+        technical_description,
         ..Default::default()
     }
 }

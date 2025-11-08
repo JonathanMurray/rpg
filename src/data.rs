@@ -267,7 +267,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
-        description: "Possibly daze attacker (str vs [toughness])",
+        description: "Strike back at the attacker with your shield",
         icon: IconId::ShieldBash,
         action_point_cost: 1,
         stamina_cost: 0,
@@ -495,6 +495,20 @@ pub const BRACE: Ability = Ability {
     animation_color: MAGENTA,
 };
 
+pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Scream,
+    name: "Shriek",
+    description: "Increased range",
+    icon: IconId::Banshee,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
+        increased_radius_tenths: 15,
+        ..SpellEnhancementEffect::default()
+    }),
+};
 pub const SCREAM: Ability = Ability {
     id: AbilityId::Scream,
     name: "Scream",
@@ -508,7 +522,7 @@ pub const SCREAM: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
         self_area: Some((
-            Range::Ranged(3),
+            Range::Float(2.5),
             AreaTargetAcquisition::Enemies,
             AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
@@ -518,24 +532,7 @@ pub const SCREAM: Ability = Ability {
         )),
         self_effect: None,
     },
-    possible_enhancements: [
-        Some(AbilityEnhancement {
-            ability_id: AbilityId::Scream,
-            name: "Shriek",
-            description: "Increased range",
-            icon: IconId::Banshee,
-            action_point_cost: 0,
-            mana_cost: 1,
-            stamina_cost: 0,
-            attack_effect: None,
-            spell_effect: Some(SpellEnhancementEffect {
-                increased_range_tenths: 15,
-                ..SpellEnhancementEffect::default()
-            }),
-        }),
-        None,
-        None,
-    ],
+    possible_enhancements: [Some(SCREAM_SHRIEK), None, None],
 
     animation_color: BLUE,
 };

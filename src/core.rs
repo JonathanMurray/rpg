@@ -78,22 +78,9 @@ impl CoreGame {
 
             if let Some(action) = action {
                 let mut killed_by_action = HashSet::new();
-                let ap_before_action = self.active_character().action_points.current();
                 let action_outcome = self.perform_action(action).await;
 
-                // You recover from 1 stack of Dazed for each AP you spend
-                // This must happen before "on attacked and hit" reactions because those might
-                // inflict new Dazed stacks, which should not be covered here.
-                let spent = ap_before_action - self.active_character().action_points.current();
-                self.perform_recover_from_dazed(self.active_character_id, spent)
-                    .await;
-
                 if let ActionOutcome::AttackHit { victim_id, damage } = action_outcome {
-                    // TODO this can remove a Dazed that was just added from the attack, which is bad.
-
-                    // You recover from 1 stack of Dazed each time you're hit by an attack
-                    self.perform_recover_from_dazed(victim_id, 1).await;
-
                     let victim = self.characters.get(victim_id);
                     if victim.is_dead() {
                         killed_by_action.insert(victim.id());
@@ -1648,16 +1635,6 @@ impl CoreGame {
         }
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
-    async fn perform_recover_from_dazed(&mut self, character_id: CharacterId, stacks: u32) {
-        let character = self.characters.get(character_id);
-
-        if character.lose_dazed(stacks) {
-            let name = character.name;
-            self.log(format!("{} recovered from Dazed", name)).await;
-        }
-    }
-
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
         let reactor = self.characters.get(reactor_id);
         reactor.action_points.spend(reaction.action_point_cost);
@@ -1685,28 +1662,31 @@ impl CoreGame {
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
 
-                let offensive = {
+                let outcome = {
                     let attacker = self.characters.get(self.active_character_id);
                     let reactor = self.characters.get(reactor_id);
-                    let target = attacker.toughness();
+                    let toughness = attacker.toughness();
                     let roll = roll_d20_with_advantage(0);
-                    let res = roll + reactor.strength();
+                    let attack_mod = reactor.attack_modifier(HandType::MainHand);
+                    let res = roll + attack_mod;
                     lines.push(format!(
-                        "Rolled: {} (+{} str) = {}, vs toughness={}",
+                        "Rolled: {} (+{} atk mod) = {}, vs toughness={}",
                         roll,
-                        reactor.strength(),
+                        attack_mod,
                         res,
-                        target,
+                        toughness,
                     ));
-                    let condition = if res >= target {
-                        let degree_of_success = (res - target) / 5;
+                    let condition = if res >= toughness {
+                        let degree_of_success = (res - toughness) / 5;
                         let (label, bonus) = match degree_of_success {
                             0 => ("Hit".to_string(), 0),
                             1 => ("Heavy hit".to_string(), 1),
                             n => (format!("Heavy hit ({n})"), n),
                         };
 
-                        let stacks = 1 + bonus;
+                        // It's important that at least 2 stacks are applied. Since 1 decays at end of attacker's turn, just 1 would
+                        // be very weak.
+                        let stacks = 2 + bonus;
                         lines.push(label);
 
                         Some(Condition::Dazed(stacks))
@@ -1734,7 +1714,7 @@ impl CoreGame {
                     reactor: reactor_id,
                     outcome: HitReactionOutcome {
                         received_condition: None,
-                        offensive: Some(offensive),
+                        offensive: Some(outcome),
                     },
                 })
                 .await;
@@ -1776,6 +1756,12 @@ impl CoreGame {
             conditions.borrow_mut().hindered -= 1;
             if conditions.borrow().hindered == 0 {
                 self.log(format!("{} is no longer Hindered", name)).await;
+            }
+        }
+        if conditions.borrow().dazed > 0 {
+            conditions.borrow_mut().dazed -= 1;
+            if conditions.borrow().dazed == 0 {
+                self.log(format!("{} is no longer Dazed", name)).await;
             }
         }
 
@@ -2273,7 +2259,7 @@ impl Condition {
         use Condition::*;
         match self {
             Protected(_) => "+x armor against the next attack that hits",
-            Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
+            Dazed(_) => "-3 evasion and attacks with disadvantage",
             Bleeding(_) => "End of turn: 50% stacks decay, 1 damage for each decayed",
             Braced => "Gain +3 evasion against the next incoming attack",
             Raging => "Gains advantage on melee attack rolls until end of turn",
@@ -2328,6 +2314,7 @@ impl Condition {
 const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
+const DAZED_EVASION_PENALTY: u32 = 3;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 2;
 
@@ -2671,13 +2658,30 @@ impl AbilityTarget {
             },
             AbilityTarget::Ally { range, .. } => Some(*range),
             AbilityTarget::Area { range, .. } => Some(*range),
-            AbilityTarget::None { self_area, .. } => {
-                // TODO This is actually radius, not range; is this misused somewhere (with enahcenements for example)
-                self_area
-                    .as_ref()
-                    .map(|(radius, _acquisition, _effect)| *radius)
-            }
+            AbilityTarget::None { self_area, .. } => None,
         }
+    }
+
+    fn base_radius(&self) -> Option<Range> {
+        match self {
+            AbilityTarget::None { self_area, .. } => self_area
+                .as_ref()
+                .map(|(radius, _acquisition, _effect)| *radius),
+            _ => None,
+        }
+    }
+
+    pub fn radius(&self, enhancements: &[AbilityEnhancement]) -> Option<Range> {
+        self.base_radius().map(|mut range| {
+            for enhancement in enhancements {
+                if let Some(e) = enhancement.spell_effect {
+                    if e.increased_radius_tenths > 0 {
+                        range = range.plusf(e.increased_radius_tenths as f32 * 0.1);
+                    }
+                }
+            }
+            range
+        })
     }
 
     pub fn range(&self, enhancements: &[AbilityEnhancement]) -> Option<Range> {
@@ -3212,17 +3216,6 @@ impl Character {
         }
     }
 
-    fn lose_dazed(&self, stacks: u32) -> bool {
-        let mut conditions = self.conditions.borrow_mut();
-        if conditions.dazed > 0 {
-            conditions.dazed = conditions.dazed.saturating_sub(stacks);
-            if conditions.dazed == 0 {
-                return true;
-            }
-        }
-        false
-    }
-
     pub fn equipment_weight(&self) -> u32 {
         let mut sum = 0;
         if let Some(weapon) = self.weapon(HandType::MainHand) {
@@ -3735,8 +3728,12 @@ impl Character {
         if conditions.braced {
             res += BRACED_DEFENSE_BONUS;
         }
+
         if conditions.distracted {
-            res -= DISTRACTED_DEFENSE_PENALTY;
+            res = res.saturating_sub(DISTRACTED_DEFENSE_PENALTY);
+        }
+        if self.is_dazed() {
+            res = res.saturating_sub(DAZED_EVASION_PENALTY);
         }
         res = res.saturating_sub(conditions.encumbered);
 
@@ -3752,7 +3749,8 @@ impl Character {
     }
 
     fn evasion_from_agility(&self) -> u32 {
-        let mut bonus = if self.is_dazed() { 0 } else { self.agility() };
+        let mut bonus = self.agility();
+
         if let Some(armor) = self.armor_piece.get() {
             if let Some(limit) = armor.limit_evasion_from_agi {
                 bonus = bonus.min(limit);
@@ -3813,15 +3811,17 @@ impl Character {
     pub fn attack_modifier(&self, hand: HandType) -> u32 {
         let str = self.strength();
         let agi = self.agility();
-        let weapon = self.weapon(hand).unwrap();
 
-        let use_str = match weapon.attack_attribute {
-            AttackAttribute::Strength => true,
-            AttackAttribute::Agility => false,
-            AttackAttribute::Finesse => str >= agi,
+        let attack_attribute = self
+            .weapon(hand)
+            .map(|weapon| weapon.attack_attribute)
+            .unwrap_or(AttackAttribute::Strength);
+        let physical_attr = match attack_attribute {
+            AttackAttribute::Strength => str,
+            AttackAttribute::Agility => agi,
+            AttackAttribute::Finesse => str.max(agi),
         };
 
-        let physical_attr = if use_str { str } else { agi };
         physical_attr + self.intellect()
     }
 

@@ -29,8 +29,8 @@ use rpg::core::{
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    MANA_POTION, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD,
-    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    MANA_POTION, OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP,
+    SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -116,6 +116,8 @@ async fn main() {
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_actions.push(BaseAction::UseAbility(BRACE));
+    bob.known_actions.push(BaseAction::UseAbility(SCREAM));
+    bob.known_ability_enhancements.push(SCREAM_SHRIEK);
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     //bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
@@ -128,11 +130,11 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![alice, bob];
+    let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::EliteOgre,
+        FightId::EasySurrounded,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
