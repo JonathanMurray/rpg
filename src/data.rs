@@ -3,12 +3,12 @@ use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 use crate::{
     core::{
         Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
-        AbilityEnhancement, AbilityEnhancementEffect, AbilityId, AbilityModifier, AbilityReach,
-        AbilityTarget, ApplyEffect, ArmorPiece, AttackAttribute, AttackEnhancement,
-        AttackEnhancementEffect, AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType,
-        EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
-        OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnemyEffect, Weapon, WeaponGrip,
-        WeaponRange, WeaponType,
+        AbilityEnhancement, AbilityId, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
+        ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect,
+        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
+        OnHitReactionEffect, Range, Shield, SpellEnemyEffect, SpellEnhancementEffect, Weapon,
+        WeaponGrip, WeaponRange, WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -394,13 +394,11 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
     action_point_cost: 0,
     mana_cost: 0,
     stamina_cost: 2,
-    effect: AbilityEnhancementEffect {
-        attack_enhancement_effect: Some(AttackEnhancementEffect {
-            roll_modifier: 3,
-            ..AttackEnhancementEffect::default()
-        }),
-        ..AbilityEnhancementEffect::default()
-    },
+    attack_effect: Some(AttackEnhancementEffect {
+        roll_modifier: 3,
+        ..AttackEnhancementEffect::default()
+    }),
+    spell_effect: None,
 };
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
@@ -424,21 +422,21 @@ pub const SWEEP_ATTACK: Ability = Ability {
     animation_color: MAGENTA,
 };
 
-pub const LUNGE_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
+pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::LungeAttack,
-    name: "Precise",
+    name: "Heavy impact",
     description: "",
-    icon: IconId::Precision,
+    icon: IconId::CrushingStrike,
     action_point_cost: 0,
     mana_cost: 0,
-    stamina_cost: 1,
-    effect: AbilityEnhancementEffect {
-        attack_enhancement_effect: Some(AttackEnhancementEffect {
-            roll_modifier: 5,
-            ..AttackEnhancementEffect::default()
-        }),
-        ..AbilityEnhancementEffect::default()
-    },
+    stamina_cost: 2,
+    attack_effect: Some(AttackEnhancementEffect {
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            ApplyEffect::RemoveActionPoints(1),
+        )),
+        ..AttackEnhancementEffect::default()
+    }),
+    spell_effect: None,
 };
 pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
@@ -452,30 +450,10 @@ pub const LUNGE_ATTACK: Ability = Ability {
 
     modifier: AbilityModifier::Attack(0),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
-    possible_enhancements: [
-        Some(AbilityEnhancement {
-            ability_id: AbilityId::LungeAttack,
-            name: "Heavy impact",
-            description: "Apply more force on impact",
-            icon: IconId::CrushingStrike,
-            action_point_cost: 0,
-            mana_cost: 0,
-            stamina_cost: 2,
-            effect: AbilityEnhancementEffect {
-                attack_enhancement_effect: Some(AttackEnhancementEffect {
-                    on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
-                        ApplyEffect::RemoveActionPoints(1),
-                    )),
-                    ..AttackEnhancementEffect::default()
-                }),
-                ..AbilityEnhancementEffect::default()
-            },
-        }),
-        Some(LUNGE_ATTACK_PRECISE),
-        None,
-    ],
+    possible_enhancements: [Some(LUNGE_ATTACK_HEAVY_IMPACT), None, None],
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::MoveIntoMelee(Range::Float(2.99)),
+        //reach: AbilityReach::MoveIntoMelee(Range::Float(2.99)),
+        reach: AbilityReach::MoveIntoMelee(Range::Float(2.5)),
         effect: AbilityEnemyEffect::Attack,
         impact_area: None,
     },
@@ -535,10 +513,11 @@ pub const SCREAM: Ability = Ability {
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 increased_range_tenths: 15,
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         None,
         None,
@@ -579,10 +558,11 @@ pub const SHACKLED_MIND: Ability = Ability {
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 increased_range_tenths: 30,
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         Some(AbilityEnhancement {
             ability_id: AbilityId::ShackledMind,
@@ -592,10 +572,11 @@ pub const SHACKLED_MIND: Ability = Ability {
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 bonus_advantage: 1,
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         None,
     ],
@@ -623,10 +604,11 @@ pub const MIND_BLAST: Ability = Ability {
             action_point_cost: 1,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 cast_twice: true,
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         None,
         None,
@@ -740,10 +722,11 @@ pub const HEAL: Ability = Ability {
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 increased_range_tenths: 20,
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         // TODO add enhancement that heals over time (1 per round for 3 turns?)
         Some(AbilityEnhancement {
@@ -754,10 +737,11 @@ pub const HEAL: Ability = Ability {
             action_point_cost: 0,
             mana_cost: 1,
             stamina_cost: 0,
-            effect: AbilityEnhancementEffect {
+            attack_effect: None,
+            spell_effect: Some(SpellEnhancementEffect {
                 on_hit: Some(ApplyEffect::GainStamina(2)),
-                ..AbilityEnhancementEffect::default()
-            },
+                ..SpellEnhancementEffect::default()
+            }),
         }),
         None,
     ],
@@ -843,10 +827,11 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: AbilityEnhancementEffect {
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
         increased_range_tenths: 30,
-        ..AbilityEnhancementEffect::default()
-    },
+        ..SpellEnhancementEffect::default()
+    }),
 };
 
 pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
@@ -857,10 +842,11 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: AbilityEnhancementEffect {
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
         increased_radius_tenths: 10,
-        ..AbilityEnhancementEffect::default()
-    },
+        ..SpellEnhancementEffect::default()
+    }),
 };
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::Fireballl,
@@ -870,10 +856,11 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
-    effect: AbilityEnhancementEffect {
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
         bonus_area_damage: 1,
-        ..AbilityEnhancementEffect::default()
-    },
+        ..SpellEnhancementEffect::default()
+    }),
 };
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireballl,

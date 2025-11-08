@@ -580,8 +580,10 @@ impl CoreGame {
 
         let mut cast_n_times = 1;
         for enhancement in &enhancements {
-            if enhancement.effect.cast_twice {
-                cast_n_times = 2;
+            if let Some(e) = enhancement.spell_effect {
+                if e.cast_twice {
+                    cast_n_times = 2;
+                }
             }
         }
 
@@ -593,9 +595,11 @@ impl CoreGame {
             let mut advantange_level = 0_i32;
 
             for enhancement in &enhancements {
-                let bonus = enhancement.effect.bonus_advantage;
-                if bonus > 0 {
-                    advantange_level += bonus as i32;
+                if let Some(e) = enhancement.spell_effect {
+                    let bonus = e.bonus_advantage;
+                    if bonus > 0 {
+                        advantange_level += bonus as i32;
+                    }
                 }
             }
 
@@ -628,10 +632,12 @@ impl CoreGame {
             };
 
             for enhancement in &enhancements {
-                let bonus = enhancement.effect.roll_bonus;
-                if bonus > 0 {
-                    roll_calculation += bonus as i32;
-                    line.push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                if let Some(e) = enhancement.spell_effect {
+                    let bonus = e.roll_bonus;
+                    if bonus > 0 {
+                        roll_calculation += bonus as i32;
+                        line.push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                    }
                 }
             }
 
@@ -909,8 +915,9 @@ impl CoreGame {
         let mut target_outcomes = vec![];
 
         for enhancement in enhancements {
-            if enhancement.effect.increased_radius_tenths > 0 {
-                radius = radius.plusf(enhancement.effect.increased_radius_tenths as f32 * 0.1);
+            let e = enhancement.spell_effect.unwrap();
+            if e.increased_radius_tenths > 0 {
+                radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
             }
         }
 
@@ -991,8 +998,9 @@ impl CoreGame {
         }
 
         for enhancement in enhancements {
-            if let Some(effect) = enhancement.effect.on_hit {
-                let log_line = self.perform_effect_application(effect, target);
+            let effect = enhancement.spell_effect.unwrap();
+            if let Some(apply_effect) = effect.on_hit {
+                let log_line = self.perform_effect_application(apply_effect, target);
                 detail_lines.push(format!("{} ({})", log_line, enhancement.name));
             }
         }
@@ -1015,8 +1023,10 @@ impl CoreGame {
         let mut target_outcomes = vec![];
 
         for enhancement in enhancements {
-            if enhancement.effect.increased_radius_tenths > 0 {
-                radius = radius.plusf(enhancement.effect.increased_radius_tenths as f32 * 0.1);
+            if let Some(e) = enhancement.spell_effect {
+                if e.increased_radius_tenths > 0 {
+                    radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+                }
             }
         }
 
@@ -1191,10 +1201,11 @@ impl CoreGame {
                 }
 
                 for enhancement in enhancements {
+                    let e = enhancement.spell_effect.unwrap();
                     let bonus_dmg = if is_direct_target {
-                        enhancement.effect.bonus_target_damage
+                        e.bonus_target_damage
                     } else {
-                        enhancement.effect.bonus_area_damage
+                        e.bonus_area_damage
                     };
                     if bonus_dmg > 0 {
                         dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
@@ -1261,7 +1272,8 @@ impl CoreGame {
 
             for enhancement in enhancements {
                 // TODO: shouldn't these also be affected by degree of success?
-                if let Some(effect) = enhancement.effect.on_hit {
+                let e = enhancement.spell_effect.unwrap();
+                if let Some(effect) = e.on_hit {
                     applied_effects.push(effect);
                     let log_line = self.perform_effect_application(effect, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
@@ -2564,8 +2576,10 @@ impl AbilityTarget {
     pub fn range(&self, enhancements: &[AbilityEnhancement]) -> Option<Range> {
         self.base_range().map(|mut range| {
             for enhancement in enhancements {
-                if enhancement.effect.increased_range_tenths > 0 {
-                    range = range.plusf(enhancement.effect.increased_range_tenths as f32 * 0.1);
+                if let Some(e) = enhancement.spell_effect {
+                    if e.increased_range_tenths > 0 {
+                        range = range.plusf(e.increased_range_tenths as f32 * 0.1);
+                    }
                 }
             }
             range
@@ -2651,13 +2665,13 @@ pub struct AbilityEnhancement {
     pub mana_cost: u32,
     pub stamina_cost: u32,
 
-    pub effect: AbilityEnhancementEffect,
+    pub spell_effect: Option<SpellEnhancementEffect>,
+    pub attack_effect: Option<AttackEnhancementEffect>,
 }
 
 impl AbilityEnhancement {
     pub fn attack_enhancement_effect(&self) -> Option<(&'static str, AttackEnhancementEffect)> {
-        self.effect
-            .attack_enhancement_effect
+        self.attack_effect
             .map(|attack_effect| (self.name, attack_effect))
     }
 }
@@ -2698,7 +2712,22 @@ impl AttackEnhancementEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub struct AbilityEnhancementEffect {
+pub enum AbilityEnhancementEffect {
+    Spell(SpellEnhancementEffect),
+    Attack(AttackEnhancementEffect),
+}
+
+impl AbilityEnhancementEffect {
+    fn unwrap_spell_enhancement_effect(&self) -> &SpellEnhancementEffect {
+        match self {
+            AbilityEnhancementEffect::Spell(e) => e,
+            AbilityEnhancementEffect::Attack(..) => panic!("{:?}", self),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct SpellEnhancementEffect {
     pub roll_bonus: u32,
     pub bonus_advantage: u32,
     pub bonus_target_damage: u32,
@@ -2709,10 +2738,11 @@ pub struct AbilityEnhancementEffect {
     pub increased_radius_tenths: u32,
 
     // Used by abilities that perform attacks
+    //TODO remove this, use enum variant instead
     pub attack_enhancement_effect: Option<AttackEnhancementEffect>,
 }
 
-impl AbilityEnhancementEffect {
+impl SpellEnhancementEffect {
     // the impl from #[derive(Default)] is not const
     pub const fn default() -> Self {
         Self {
@@ -3780,11 +3810,13 @@ impl Character {
         let is_spell = matches!(modifier, AbilityModifier::Spell);
         let mut bonuses = vec![];
         for enhancement in enhancements {
-            if enhancement.effect.bonus_advantage > 0 {
-                bonuses.push((
-                    enhancement.name,
-                    RollBonusContributor::Advantage(enhancement.effect.bonus_advantage as i32),
-                ));
+            if let Some(e) = enhancement.spell_effect {
+                if e.bonus_advantage > 0 {
+                    bonuses.push((
+                        enhancement.name,
+                        RollBonusContributor::Advantage(e.bonus_advantage as i32),
+                    ));
+                }
             }
         }
 

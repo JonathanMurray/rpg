@@ -735,6 +735,8 @@ impl UserInterface {
                     details.push(("Can not reach!".to_string(), Goodness::Bad));
                 }
 
+                // TODO For attack-based abilities, these details SHOULD use attack rules, and not ability rules (?)
+                // For example, the below probably doesn't account correctly for flanking?
                 for (term, bonus) in self
                     .active_character()
                     .outgoing_ability_roll_bonuses(selected_enhancements, ability.modifier)

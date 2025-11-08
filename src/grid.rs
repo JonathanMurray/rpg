@@ -668,11 +668,12 @@ impl GameGrid {
                     } => {
                         let mut area_range = None;
                         if let Some((mut range, _effect)) = impact_area {
-                            for enhancement in selected_enhancements {
-                                if enhancement.effect.increased_radius_tenths > 0 {
-                                    range = range.plusf(
-                                        enhancement.effect.increased_radius_tenths as f32 * 0.1,
-                                    );
+                            for effect in
+                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
+                            {
+                                if effect.increased_radius_tenths > 0 {
+                                    range =
+                                        range.plusf(effect.increased_radius_tenths as f32 * 0.1);
                                 }
                             }
                             area_range = Some(range);

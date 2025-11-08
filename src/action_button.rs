@@ -19,9 +19,9 @@ use crate::{
     core::{
         Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
         AbilityEnhancement, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
-        AttackEnhancement, AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType,
-        HandType, OnAttackedReaction, OnHitReaction, PassiveSkill, SpellEnemyEffect, Weapon,
-        WeaponType,
+        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, BaseAction,
+        Character, DefenseType, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill,
+        SpellEnemyEffect, Weapon, WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -96,8 +96,28 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
-    let effect = enhancement.effect;
+    describe_attack_enhancement_effect(&enhancement.effect, &mut technical_description);
 
+    ActionButtonTooltip {
+        header: format!(
+            "{} {}",
+            enhancement.name,
+            cost_string(
+                enhancement.action_point_cost,
+                enhancement.stamina_cost,
+                enhancement.mana_cost
+            )
+        ),
+        description: Some(enhancement.description),
+        error: None,
+        technical_description,
+    }
+}
+
+fn describe_attack_enhancement_effect(
+    effect: &AttackEnhancementEffect,
+    technical_description: &mut Vec<String>,
+) {
     /*
     if let Some(weapon_requirement) = enhancement.weapon_requirement {
         match weapon_requirement {
@@ -139,7 +159,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
 
     if let Some(effect) = effect.on_target {
         technical_description.push("Target:".to_string());
-        describe_apply_effect(effect, &mut technical_description);
+        describe_apply_effect(effect, technical_description);
     }
 
     if let Some(effect) = effect.on_damage_effect {
@@ -149,64 +169,53 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
             }
             AttackEnhancementOnHitEffect::Target(apply_effect) => {
                 technical_description.push("Target (on hit):".to_string());
-                describe_apply_effect(apply_effect, &mut technical_description);
+                describe_apply_effect(apply_effect, technical_description);
             }
         }
-    }
-
-    ActionButtonTooltip {
-        header: format!(
-            "{} {}",
-            enhancement.name,
-            cost_string(
-                enhancement.action_point_cost,
-                enhancement.stamina_cost,
-                enhancement.mana_cost
-            )
-        ),
-        description: Some(enhancement.description),
-        error: None,
-        technical_description,
     }
 }
 
 fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButtonTooltip {
     let mut technical_description = vec![];
 
-    let effect = enhancement.effect;
+    if let Some(effect) = enhancement.spell_effect {
+        if effect.roll_bonus > 0 {
+            technical_description.push(format!("+ {} to dice roll", effect.roll_bonus));
+        }
 
-    if effect.roll_bonus > 0 {
-        technical_description.push(format!("+ {} to dice roll", effect.roll_bonus));
+        if effect.bonus_advantage > 0 {
+            technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
+        }
+
+        if effect.bonus_target_damage > 0 {
+            technical_description.push(format!("+ {} damage (target)", effect.bonus_target_damage));
+        }
+
+        if effect.bonus_area_damage > 0 {
+            technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
+        }
+
+        if let Some(apply_effect) = effect.on_hit {
+            describe_apply_effect(apply_effect, &mut technical_description);
+        }
+
+        if effect.increased_range_tenths > 0 {
+            technical_description.push(format!(
+                "+ {} range",
+                effect.increased_range_tenths as f32 * 0.1
+            ));
+        }
+
+        if effect.increased_radius_tenths > 0 {
+            technical_description.push(format!(
+                "+ {} radius",
+                effect.increased_radius_tenths as f32 * 0.1
+            ));
+        }
     }
 
-    if effect.bonus_advantage > 0 {
-        technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
-    }
-
-    if effect.bonus_target_damage > 0 {
-        technical_description.push(format!("+ {} damage (target)", effect.bonus_target_damage));
-    }
-
-    if effect.bonus_area_damage > 0 {
-        technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
-    }
-
-    if let Some(apply_effect) = effect.on_hit {
-        describe_apply_effect(apply_effect, &mut technical_description);
-    }
-
-    if effect.increased_range_tenths > 0 {
-        technical_description.push(format!(
-            "+ {} range",
-            effect.increased_range_tenths as f32 * 0.1
-        ));
-    }
-
-    if effect.increased_radius_tenths > 0 {
-        technical_description.push(format!(
-            "+ {} radius",
-            effect.increased_radius_tenths as f32 * 0.1
-        ));
+    if let Some(effect) = enhancement.attack_effect {
+        describe_attack_enhancement_effect(&effect, &mut technical_description);
     }
 
     ActionButtonTooltip {
