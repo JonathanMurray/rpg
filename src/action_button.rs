@@ -10,12 +10,14 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
-    text::{draw_text_ex, measure_text, Font, TextParams},
+    text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
-    base_ui::{draw_debug, Circle, Container, Drawable, Element, LayoutDirection, Style},
+    base_ui::{
+        draw_debug, draw_text_rounded, Circle, Container, Drawable, Element, LayoutDirection, Style,
+    },
     core::{
         Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
         AbilityEnhancement, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
@@ -654,7 +656,10 @@ fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
 }
 
 impl Drawable for ActionButton {
-    fn draw(&self, x: f32, y: f32) {
+    fn draw(&self, mut x: f32, mut y: f32) {
+        x = x.floor();
+        y = y.floor();
+
         let (w, h) = self.size;
 
         self.style.draw(x, y, self.size);
@@ -1096,7 +1101,7 @@ pub fn draw_tooltip(
         if let Some(c) = color {
             params.color = c;
         }
-        draw_text_ex(line, tooltip_rect.0 + text_margin, line_y, params);
+        draw_text_rounded(line, tooltip_rect.0 + text_margin, line_y, params);
         if line.is_empty() {
             line_y += empty_line_h;
         } else {

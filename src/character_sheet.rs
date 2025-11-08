@@ -7,7 +7,7 @@ use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
 };
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
-use macroquad::text::{draw_text_ex, measure_text, TextParams};
+use macroquad::text::{measure_text, TextParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
@@ -15,7 +15,7 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::base_ui::Drawable;
+use crate::base_ui::{draw_text_rounded, Drawable};
 use crate::core::EquipmentSlotRole;
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
@@ -383,7 +383,7 @@ const MONEY_FONT_SIZE: u16 = 18;
 impl Drawable for MoneyText {
     fn draw(&self, x: f32, y: f32) {
         let text_dim = measure_text(&self.text(), Some(&self.font), MONEY_FONT_SIZE, 1.0);
-        draw_text_ex(
+        draw_text_rounded(
             &self.text(),
             x,
             y + text_dim.offset_y,

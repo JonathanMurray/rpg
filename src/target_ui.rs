@@ -3,13 +3,14 @@ use std::{rc::Rc, vec};
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
     shapes::{draw_rectangle, draw_rectangle_lines},
-    text::{draw_text_ex, measure_text, Font, TextParams},
+    text::{measure_text, Font, TextParams},
     window::screen_width,
 };
 
 use crate::{
     base_ui::{
-        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine,
+        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
+        TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{Character, Goodness, HandType},
@@ -92,7 +93,7 @@ impl TargetUi {
 
             let mut action_points_row = ActionPointsRow::new(
                 char.max_reactive_action_points,
-                (15.0, 15.0),
+                (16.0, 16.0),
                 0.25,
                 Style {
                     background_color: Some(BLACK),
@@ -268,7 +269,7 @@ impl TargetUi {
         let mut y0 = y - h;
         draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
 
-        let dim = draw_text_ex(
+        let dim = draw_text_rounded(
             header,
             x0 + header_pad,
             y0 + header_pad + header_dimensions.offset_y,
@@ -307,14 +308,14 @@ impl TargetUi {
             );
 
             params.color = BLACK;
-            draw_text_ex(
+            draw_text_rounded(
                 line,
                 x0 + detail_pad,
                 y0 + detail_pad + details_max_offset,
                 params.clone(),
             );
             params.color = WHITE;
-            draw_text_ex(
+            draw_text_rounded(
                 line,
                 x0 + detail_pad - 1.0,
                 y0 + detail_pad + details_max_offset - 1.0,

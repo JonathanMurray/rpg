@@ -700,15 +700,21 @@ impl Drawable for ActionPointsRow {
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
         let r = self.cell_size.1 * self.radius_factor;
+        if r.floor() != r {
+            dbg!("POSSIBLY BAD CIRCLE DRAWING?", r);
+        }
+
         let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
 
         for i in 0..self.max_ap {
             let is_point_hovered =
                 (self.current_ap.saturating_sub(hovered_ap)..self.current_ap).contains(&i);
 
+            /*
             let blocked_by_lack_of_reactive_ap = !self.is_characters_turn
                 && i < self.max_ap.saturating_sub(self.max_reactive_ap)
                 && i < self.current_ap;
+            */
 
             let mut overcomitted = false;
 

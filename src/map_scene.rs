@@ -6,7 +6,7 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, DrawRectangleParams},
-    text::{draw_text, measure_text, Font},
+    text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
@@ -14,6 +14,7 @@ use macroquad::{
 use rand::Rng;
 
 use crate::{
+    base_ui::draw_text_rounded,
     core::EquipmentEntry,
     data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
     drawing::draw_dashed_line,
@@ -82,6 +83,7 @@ impl MapScene {
         let mut selected_node_i = None;
 
         let fight_texture = load_and_init_texture("map_fight.png").await;
+        let fight_elite_texture = load_and_init_texture("map_fight_elite.png").await;
         let rest_texture = load_and_init_texture("map_rest.png").await;
         let chest_texture = load_and_init_texture("map_chest.png").await;
         let shop_texture = load_and_init_texture("map_shop.png").await;
@@ -140,7 +142,9 @@ impl MapScene {
             };
             node.texture = match node.choice {
                 MapChoice::Rest => Some(rest_texture.clone()),
-                MapChoice::Fight(FightId::Elite | FightId::Elite2) => None,
+                MapChoice::Fight(FightId::Elite | FightId::Elite2) => {
+                    Some(fight_elite_texture.clone())
+                }
                 MapChoice::Fight(..) => Some(fight_texture.clone()),
                 MapChoice::Chest(..) => Some(chest_texture.clone()),
                 MapChoice::Shop => Some(shop_texture.clone()),
@@ -293,12 +297,16 @@ impl MapScene {
                         }
                     }
 
-                    draw_text(
+                    draw_text_rounded(
                         node.text,
                         node.screen_pos.0 - text_dim.width / 2.0,
                         node.screen_pos.1 + (text_dim.height) / 2.0,
-                        font_size.into(),
-                        text_color,
+                        TextParams {
+                            font: Some(&font),
+                            font_size,
+                            color: text_color,
+                            ..Default::default()
+                        },
                     );
                 }
             }

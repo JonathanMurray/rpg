@@ -1,8 +1,9 @@
-use std::cell::RefCell;
 use std::rc::Rc;
+use std::{cell::RefCell, sync::atomic::Ordering};
 
 use macroquad::{
     color::BLACK,
+    input::{get_keys_pressed, KeyCode},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };

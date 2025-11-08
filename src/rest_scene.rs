@@ -6,13 +6,14 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text, measure_text, Font, TextParams},
     texture::Texture2D,
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
 
 use crate::{
+    base_ui::draw_text_rounded,
     core::Character,
     non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -63,12 +64,16 @@ pub async fn run_rest_loop(
             let text = "You regained 50% health and 100% mana";
             let font_size = 32;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            draw_text(
+            draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 150.0 + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
 
             let text = "Proceed";
@@ -88,7 +93,7 @@ pub async fn run_rest_loop(
                 GRAY
             };
             draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_ex(
+            draw_text_rounded(
                 text,
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,

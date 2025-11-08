@@ -6,7 +6,7 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text, measure_text, Font, TextParams},
     texture::Texture2D,
     time::get_frame_time,
     window::{clear_background, next_frame},
@@ -16,7 +16,9 @@ use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
     },
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    base_ui::{
+        draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
+    },
     core::{
         Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
         OnHitReaction, PassiveSkill, WeaponType,
@@ -269,19 +271,6 @@ impl RewardSelectionUi {
         y += 240.0;
 
         draw_rectangle(x_mid - card_w / 2.0, y, card_w, 180.0, card_color);
-        /*
-        let text = "1 new skill";
-        let font_size = 32;
-        let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-        y += 20.0;
-        draw_text(
-            text,
-            screen_w / 2.0 - text_dim.width / 2.0,
-            y + (text_dim.height) / 2.0,
-            font_size.into(),
-            header_color,
-        );
-         */
 
         let button_margin = 60.0;
 
@@ -302,7 +291,7 @@ impl RewardSelectionUi {
                 let text = format!("({})", context);
                 let font_size = 16;
                 let text_dim = measure_text(&text, Some(&self.font), font_size, 1.0);
-                draw_text_ex(
+                draw_text_rounded(
                     &text,
                     btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
                     btn_y - 30.0,
@@ -318,7 +307,7 @@ impl RewardSelectionUi {
             let text = btn.action_button.action.name();
             let font_size = 18;
             let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
-            draw_text_ex(
+            draw_text_rounded(
                 text,
                 btn_x + btn.action_button.size.0 / 2.0 - text_dim.width / 2.0,
                 btn_y - 10.0,
@@ -498,12 +487,16 @@ pub async fn run_victory_loop(
             let text = "Rewards!";
             let font_size = 32;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            draw_text(
+            draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 50.0 + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
 
             let card_color = Color::new(0.1, 0.1, 0.1, 1.00);
@@ -515,12 +508,16 @@ pub async fn run_victory_loop(
             let font_size = 28;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
             y += 25.0;
-            draw_text(
+            draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 y + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
 
             let text = if reward_selection_uis
@@ -547,7 +544,7 @@ pub async fn run_victory_loop(
                 GRAY
             };
             draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_ex(
+            draw_text_rounded(
                 text,
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,

@@ -1,14 +1,15 @@
 use macroquad::{
     color::{Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, WHITE},
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
+    prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},
-    rc::Rc,
-    rc::Weak,
+    rc::{Rc, Weak},
+    sync::atomic::{AtomicBool, Ordering},
 };
 
 pub trait Drawable {
@@ -303,8 +304,13 @@ impl TextLine {
     }
 }
 
+pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> TextDimensions {
+    draw_text_ex(text, x.floor(), y.floor(), params)
+    //draw_text_ex(text, x, y, params)
+}
+
 impl Drawable for TextLine {
-    fn draw(&self, x: f32, y: f32) {
+    fn draw(&self, mut x: f32, mut y: f32) {
         let y0 = y + self.vert_padding;
 
         let x0 = if self.right_align {
@@ -322,7 +328,7 @@ impl Drawable for TextLine {
                 font: self.font.as_ref(),
                 ..Default::default()
             };
-            draw_text_ex(
+            draw_text_rounded(
                 &self.string,
                 x0 + offset,
                 y0 + self.offset_y + offset,
@@ -347,7 +353,7 @@ impl Drawable for TextLine {
             font: self.font.as_ref(),
             ..Default::default()
         };
-        draw_text_ex(&self.string, x0, y0 + self.offset_y, params);
+        draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
 
         draw_debug(x, y, self.size.0, self.size.1);
 

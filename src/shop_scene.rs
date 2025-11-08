@@ -6,7 +6,7 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
@@ -14,7 +14,7 @@ use macroquad::{
 
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
-    base_ui::{Drawable, TextLine},
+    base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{Character, EquipmentEntry},
     data::{
         BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, RAPIER, SMALL_SHIELD,
@@ -89,12 +89,16 @@ pub async fn run_shop_loop(
             let text = "Buy something?";
             let font_size = 32;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            draw_text(
+            draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 40.0 + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
 
             let text = "Leave shop";
@@ -114,7 +118,7 @@ pub async fn run_shop_loop(
                 GRAY
             };
             draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_ex(
+            draw_text_rounded(
                 text,
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,

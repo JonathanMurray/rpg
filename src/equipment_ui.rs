@@ -751,6 +751,8 @@ impl EquipmentSlot {
 
 impl Drawable for EquipmentSlot {
     fn draw(&self, x: f32, y: f32) {
+        let x = x.floor();
+        let y = y.floor();
         self.style.draw(x, y, self.size);
         let params = DrawTextureParams {
             dest_size: Some(self.size.into()),

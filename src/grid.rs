@@ -5,7 +5,7 @@ use macroquad::{
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
-    text::{draw_text_ex, Font, TextParams},
+    text::{Font, TextParams},
     window::{screen_height, screen_width},
 };
 use rand::Rng;
@@ -24,7 +24,7 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Drawable, Style},
+    base_ui::{draw_text_rounded, Drawable, Style},
     core::{
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
         Position,
@@ -1393,7 +1393,7 @@ impl GameGrid {
         let box_y = y - healthbar_h - margin - box_h;
 
         draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
-        draw_text_ex(
+        draw_text_rounded(
             header,
             box_x + text_pad,
             box_y + text_pad + text_dimensions.offset_y,
@@ -1539,7 +1539,7 @@ impl GameGrid {
         let (x, y) = self.character_screen_pos(reactor);
         let x0 = x + self.cell_w / 2.0 - text_dim.width / 2.0;
         let y0 = y - 5.0;
-        draw_text_ex(
+        draw_text_rounded(
             text,
             x0,
             y0,
@@ -1647,7 +1647,7 @@ impl GameGrid {
         }
 
         draw_rectangle(x, y - h, w, h, bg_color);
-        draw_text_ex(
+        draw_text_rounded(
             header,
             x + pad,
             y - h + pad + header_dimensions.offset_y,
@@ -2042,11 +2042,11 @@ impl EffectGraphics {
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
-                draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
+                draw_text_rounded(text, x0 + 2.0, y0 + 2.0, text_params.clone());
                 text_params.color = *color;
                 text_params.color.a = alpha;
 
-                draw_text_ex(text, x0, y0, text_params);
+                draw_text_rounded(text, x0, y0, text_params);
             }
         }
     }

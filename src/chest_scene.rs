@@ -6,7 +6,7 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text, measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
@@ -14,7 +14,7 @@ use macroquad::{
 
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
-    base_ui::Drawable,
+    base_ui::{draw_text_rounded, Drawable},
     core::{Character, EquipmentEntry},
     data::{HEALTH_POTION, MANA_POTION},
     equipment_ui::equipment_tooltip_lines,
@@ -83,12 +83,16 @@ pub async fn run_chest_loop(
             let text = "You find:";
             let font_size = 32;
             let text_dim = measure_text(text, Some(&font), font_size, 1.0);
-            draw_text(
+            draw_text_rounded(
                 text,
                 screen_w / 2.0 - text_dim.width / 2.0,
                 60.0 + (text_dim.height) / 2.0,
-                font_size.into(),
-                WHITE,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
 
             let mut icon_x = x_mid - row_w / 2.0;
@@ -165,7 +169,7 @@ pub async fn run_chest_loop(
                 GRAY
             };
             draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
-            draw_text_ex(
+            draw_text_rounded(
                 text,
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,

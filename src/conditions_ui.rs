@@ -4,12 +4,12 @@ use macroquad::{
     color::WHITE,
     input::mouse_position,
     math::Rect,
-    text::{draw_text_ex, Font, TextParams},
+    text::{Font, TextParams},
 };
 
 use crate::{
     action_button::{draw_tooltip, Side, TooltipPositionPreference},
-    base_ui::Drawable,
+    base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
 };
 
@@ -66,14 +66,14 @@ fn draw_conditions(
         y_offset += line_height;
         let y0 = y + y_offset;
         let dimensions = if let Some(stacks) = stacks {
-            draw_text_ex(
+            draw_text_rounded(
                 &format!("{} ({})", condition.name, stacks),
                 x,
                 y0,
                 text_params.clone(),
             )
         } else {
-            draw_text_ex(condition.name, x, y0, text_params.clone())
+            draw_text_rounded(condition.name, x, y0, text_params.clone())
         };
 
         if (x..x + dimensions.width).contains(&mouse_x)

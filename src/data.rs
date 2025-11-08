@@ -927,7 +927,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
     health_gain: 4,
     mana_gain: 0,
     icon: EquipmentIconId::HealthPotion,
-    weight: 1,
+    weight: 0,
 };
 
 pub const MANA_POTION: Consumable = Consumable {
@@ -935,5 +935,5 @@ pub const MANA_POTION: Consumable = Consumable {
     health_gain: 0,
     mana_gain: 5,
     icon: EquipmentIconId::ManaPotion,
-    weight: 1,
+    weight: 0,
 };

@@ -1,14 +1,16 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::collections::HashMap;
 use std::rc::Rc;
+use std::sync::atomic::{AtomicBool, Ordering};
 
-use macroquad::color::{Color, MAGENTA, WHITE};
+use macroquad::color::{Color, LIGHTGRAY, MAGENTA, WHITE};
 use macroquad::input::{get_keys_pressed, mouse_position};
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
+use macroquad::miniquad::KeyCode;
 
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{draw_text, load_ttf_font, Font};
-use macroquad::texture::{FilterMode, Texture2D};
+use macroquad::texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
 use macroquad::{
     color::BLACK,
     miniquad,
@@ -27,8 +29,8 @@ use rpg::core::{
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE,
-    SWORD, TRUE_STRIKE,
+    MANA_POTION, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK,
+    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -117,13 +119,15 @@ async fn main() {
         .push(LUNGE_ATTACK_HEAVY_IMPACT);
     bob.known_on_hit_reactions.push(RAGE);
     bob.add_to_agility(5);
+    bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     //bob.health.lose(2);
 
     let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Test,
+        FightId::Easy1,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
@@ -272,6 +276,7 @@ fn window_conf() -> Conf {
         //window_height: 960,
         window_height: 1060,
         high_dpi: true,
+
         window_resizable: false,
         ..Default::default()
     }

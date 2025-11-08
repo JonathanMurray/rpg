@@ -10,7 +10,7 @@ use macroquad::{
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text_ex, measure_text, Font, TextParams},
+    text::{measure_text, Font, TextParams},
     texture::Texture2D,
 };
 
@@ -18,7 +18,7 @@ use crate::{
     action_button::{
         draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
     },
-    base_ui::Drawable,
+    base_ui::{draw_text_rounded, Drawable},
     core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
@@ -215,11 +215,11 @@ impl ActivityPopup {
         for (i, (line, dim)) in measured_lines.iter().enumerate() {
             if i == 0 {
                 let mut params = header_params.clone();
-                draw_text_ex(line, x0 + 2.0, y0 + 2.0, params.clone());
+                draw_text_rounded(line, x0 + 2.0, y0 + 2.0, params.clone());
                 params.color = YELLOW;
-                draw_text_ex(line, x0, y0, params.clone());
+                draw_text_rounded(line, x0, y0, params.clone());
             } else {
-                draw_text_ex(line, x0, y0, base_text_params.clone());
+                draw_text_rounded(line, x0, y0, base_text_params.clone());
             }
 
             y0 += dim.offset_y + line_margin;
@@ -237,11 +237,11 @@ impl ActivityPopup {
                 }
             }
 
-            draw_text_ex(&text, x0, y0, base_text_params.clone());
+            draw_text_rounded(&text, x0, y0, base_text_params.clone());
         }
 
         if let Some(slider) = &mut self.movement_stamina_slider {
-            let text_dimensions = draw_text_ex(
+            let text_dimensions = draw_text_rounded(
                 sprint_stamina_text,
                 x_btn,
                 y - height + 20.0,
