@@ -128,11 +128,11 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![ alice];
+    let mut player_characters = vec![alice, bob];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Elite,
+        FightId::EliteOgre,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

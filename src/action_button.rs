@@ -324,12 +324,13 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             describe_ability_enemy_effect(effect, &mut technical_description);
 
             if let Some((range, acquisition, effect)) = area {
-                  let targets_str = match acquisition {
+                let targets_str = match acquisition {
                     AreaTargetAcquisition::Enemies => "Enemies",
                     AreaTargetAcquisition::Everyone => "EVERYONE",
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
-                technical_description.push(format!("{} in impact area (radius {})", targets_str, range));
+                technical_description
+                    .push(format!("{} in impact area (radius {})", targets_str, range));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
         }

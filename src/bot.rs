@@ -1,14 +1,16 @@
 use std::{cell::Cell, rc::Rc};
 
+use macroquad::rand::ChooseRandom;
 use rand::{seq::SliceRandom, Rng};
 
 use crate::{
     core::{
         Ability, Action, ActionReach, ActionTarget, BaseAction, Behaviour, Character, CharacterId,
-        CoreGame, OnAttackedReaction, OnHitReaction,
+        CoreGame, HandType, OnAttackedReaction, OnHitReaction, Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     pathfind::Path,
+    util::{adjacent_positions, are_adjacent},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -126,11 +128,40 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 
     let mut attack_range = None;
 
+    let is_ranged_attacker = character
+        .weapon(HandType::MainHand)
+        .map(|weapon| !weapon.is_melee())
+        .unwrap_or(false);
+
+    let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
+
+    let bot_pos = character.position.get();
+
+    if is_ranged_attacker {
+        if let Some(adj_player_char) = player_chars
+            .iter()
+            .find(|ch| are_adjacent(bot_pos, ch.pos()))
+        {
+            let safe_adjacent_positions: Vec<Position> = adjacent_positions(bot_pos)
+                .into_iter()
+                .filter(|pos| {
+                    !game.pathfind_grid.blocked_positions().contains(pos)
+                        && !player_chars.iter().any(|ch| are_adjacent(ch.pos(), *pos))
+                })
+                .collect();
+
+            if let Some(safe_pos) = ChooseRandom::choose(&safe_adjacent_positions[..]) {
+                if let Some(path) = game.pathfind_grid.find_shortest_path_to(bot_pos, *safe_pos) {
+                    println!("Bot flees from {}: {:?}", adj_player_char.name, path);
+                    return convert_path_to_move_action(character, path);
+                }
+            }
+        }
+    }
+
     if let Some(attack) = character.attack_action() {
         attack_range = Some(character.weapon(attack.hand).unwrap().range);
-        let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
-        let mut rng = rand::rng();
-        player_chars.shuffle(&mut rng);
+        ChooseRandom::shuffle(&mut player_chars[..]);
         for player_char in player_chars {
             if character
                 .attack_reach(attack.hand, player_char.position.get())
@@ -151,7 +182,6 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
         }
     }
 
-    let bot_pos = character.position.get();
     let mut shortest_path_to_some_player: Option<Path> = None;
 
     for player_pos in &game.player_positions() {

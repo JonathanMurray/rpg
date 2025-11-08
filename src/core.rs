@@ -727,7 +727,7 @@ impl CoreGame {
                                 target.position.get(),
                                 &mut detail_lines,
                                 area_effect,
-                                acquisition
+                                acquisition,
                             )
                             .await;
 
@@ -843,7 +843,7 @@ impl CoreGame {
                                 radius,
                                 &mut detail_lines,
                                 effect,
-                                acquisition
+                                acquisition,
                             )
                             .await;
                         area_outcomes = Some((caster.position.get(), outcomes));
@@ -2619,7 +2619,7 @@ pub enum AbilityTarget {
     Enemy {
         reach: AbilityReach,
         effect: AbilityNegativeEffect,
-        impact_area: Option<(Range, AreaTargetAcquisition,  AbilityNegativeEffect)>,
+        impact_area: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
     },
 
     Ally {
@@ -2635,7 +2635,7 @@ pub enum AbilityTarget {
     },
 
     None {
-        self_area: Option<(Range, AreaTargetAcquisition, AbilityEffect )>,
+        self_area: Option<(Range, AreaTargetAcquisition, AbilityEffect)>,
         self_effect: Option<AbilityPositiveEffect>,
     },
 }
@@ -2673,7 +2673,9 @@ impl AbilityTarget {
             AbilityTarget::Area { range, .. } => Some(*range),
             AbilityTarget::None { self_area, .. } => {
                 // TODO This is actually radius, not range; is this misused somewhere (with enahcenements for example)
-                self_area.as_ref().map(|(radius, _acquisition, _effect)| *radius)
+                self_area
+                    .as_ref()
+                    .map(|(radius, _acquisition, _effect)| *radius)
             }
         }
     }

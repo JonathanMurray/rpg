@@ -58,6 +58,11 @@ impl PathfindGrid {
         self.find_shortest_path_to_proximity(start, target, proximity)
     }
 
+    pub fn find_shortest_path_to(&self, start: Position, target: Position) -> Option<Path> {
+        let proximity = 0.0; // i.e. that exact position
+        self.find_shortest_path_to_proximity(start, target, proximity)
+    }
+
     pub fn find_shortest_path_to_proximity(
         &self,
         start: Position,

@@ -16,8 +16,8 @@ use crate::{
         Attributes, BaseAction, Behaviour, Character, CharacterId, Characters, HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BOW,
+        CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -32,8 +32,8 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::EasyCluster => "map_easy_cluster.txt",
         FightId::EasySurrounded => "map_easy_surrounded.txt",
         FightId::EasyRiver => "map_easy_river.txt",
-        FightId::Elite => "map_elite.txt",
-        FightId::Elite2 => "map_elite2.txt",
+        FightId::EliteOgre => "map_elite.txt",
+        FightId::EliteMagi => "map_elite2.txt",
         FightId::Test => "map_test.txt",
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
@@ -190,7 +190,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             }
         }
 
-        FightId::Elite => {
+        FightId::EliteOgre => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
@@ -221,7 +221,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             }
         }
 
-        FightId::Elite2 => {
+        FightId::EliteMagi => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let mut magi = Character::new(
                 Behaviour::Bot(BotBehaviour::Magi(Default::default())),
@@ -271,7 +271,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 pos,
             );
             enemy.health.change_max_value_to(20);
-            enemy.set_weapon(HandType::MainHand, BAD_RAPIER);
+            enemy.set_weapon(HandType::MainHand, BOW);
 
             characters.extend_from_slice(&[enemy]);
         }
@@ -359,7 +359,7 @@ pub enum FightId {
     EasyCluster,
     EasySurrounded,
     EasyRiver,
-    Elite,
-    Elite2,
+    EliteOgre,
+    EliteMagi,
     Test,
 }
