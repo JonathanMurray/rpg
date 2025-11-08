@@ -661,13 +661,13 @@ impl GameGrid {
                 ConfiguredAction::UseAbility {
                     ability,
                     selected_enhancements,
-                    target,
+                    target: _,
                 } => match ability.target {
                     AbilityTarget::Enemy {
                         impact_area, reach, ..
                     } => {
                         let mut area_range = None;
-                        if let Some((mut range, _effect)) = impact_area {
+                        if let Some((mut range, _acquisition, _effect)) = impact_area {
                             for effect in
                                 selected_enhancements.iter().filter_map(|e| e.spell_effect)
                             {

@@ -1,0 +1,13 @@
++----------------------------
+BBBBBBBBBBB
+BS        SB
+B         SB
+B   R      B
+B  WWW     B
+B   WW   3 B
+B    WW4223B
+B PP  WW411B
+B PP   WW00B
+BRR    WWW5B
+ BBBBBBBBBBB
++----------------------------

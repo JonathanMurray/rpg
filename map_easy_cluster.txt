@@ -4,8 +4,9 @@ BR          B
 B     3301  B
 B      221  B
 B           B
-B PP   R    B
+B PP  RR    B
 B PP        B
+B           B
 BRR        RB
  BBBBBBBBBBB
 +----------------------------

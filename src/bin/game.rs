@@ -29,8 +29,8 @@ use rpg::core::{
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    MANA_POTION, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SWEEP_ATTACK,
-    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    MANA_POTION, OVERWHELMING, RAGE, ROBE, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD,
+    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -88,6 +88,7 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
+
     alice.known_actions.push(BaseAction::UseAbility(FIREBALL));
     alice
         .known_actions
@@ -99,7 +100,8 @@ async fn main() {
     alice.add_to_spirit(2);
     alice.known_attack_enhancements.push(TRUE_STRIKE);
     alice.known_passive_skills.push(PassiveSkill::Reaper);
-    alice.stamina.lose(3);
+
+    //alice.stamina.lose(3);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -110,24 +112,27 @@ async fn main() {
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
-    bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
-    bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
-    bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
-    bob.known_ability_enhancements
-        .push(LUNGE_ATTACK_HEAVY_IMPACT);
-    bob.known_on_hit_reactions.push(RAGE);
-    bob.add_to_agility(5);
-    bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    bob.known_actions.push(BaseAction::UseAbility(BRACE));
+
+    //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
+    //bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
+    //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
+    //bob.known_ability_enhancements
+    //.push(LUNGE_ATTACK_HEAVY_IMPACT);
+    //bob.known_on_hit_reactions.push(RAGE);
+    //bob.add_to_agility(5);
+    //bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![ alice];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Easy1,
+        FightId::Elite,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

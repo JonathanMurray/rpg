@@ -159,6 +159,7 @@ pub enum PortraitId {
     Skeleton,
     Magi,
     Ghoul,
+    Ogre,
 }
 
 pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
@@ -169,6 +170,7 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
         (PortraitId::Skeleton, "portrait_skeleton.png"),
         (PortraitId::Magi, "portrait_magi.png"),
         (PortraitId::Ghoul, "portrait_ghoul.png"),
+        (PortraitId::Ogre, "portrait_ogre.png"),
     ])
     .await
 }

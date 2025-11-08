@@ -27,9 +27,11 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let mut rng = rand::rng();
 
     let map_filename = match fight_id {
-        FightId::Easy1 => "map1.txt",
-        FightId::Easy2 => "map2.txt",
-        FightId::Easy3 => "map3.txt",
+        FightId::EasyPair => "map_easy_pair.txt",
+        FightId::EasyGuard => "map_easy_guard.txt",
+        FightId::EasyCluster => "map_easy_cluster.txt",
+        FightId::EasySurrounded => "map_easy_surrounded.txt",
+        FightId::EasyRiver => "map_easy_river.txt",
         FightId::Elite => "map_elite.txt",
         FightId::Elite2 => "map_elite2.txt",
         FightId::Test => "map_test.txt",
@@ -84,7 +86,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
     let mut characters = player_characters;
     match fight_id {
-        FightId::Easy1 => {
+        FightId::EasyPair => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let melee = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
@@ -111,7 +113,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             characters.extend_from_slice(&[melee, ranged]);
         }
 
-        FightId::Easy2 => {
+        FightId::EasyGuard => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
@@ -129,7 +131,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             characters.extend_from_slice(&[tanky]);
         }
 
-        FightId::Easy3 => {
+        FightId::EasyCluster => {
             for i in 0..4 {
                 let pos = *enemy_positions[&i].choose().unwrap();
                 let enemy = Character::new(
@@ -142,10 +144,48 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 );
                 if i % 2 == 0 {
                     enemy.armor_piece.set(Some(SHIRT));
-                } else {
                     enemy.set_shield(BAD_SMALL_SHIELD);
                 }
                 enemy.set_weapon(HandType::MainHand, BAD_DAGGER);
+                characters.push(enemy);
+            }
+        }
+
+        FightId::EasySurrounded => {
+            for i in 0..4 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let enemy = Character::new(
+                    Behaviour::Bot(BotBehaviour::Normal),
+                    "Ghoul",
+                    PortraitId::Skeleton,
+                    SpriteId::Ghoul,
+                    Attributes::new(2, 1, 1, 1),
+                    pos,
+                );
+                enemy.armor_piece.set(Some(SHIRT));
+                enemy.set_weapon(HandType::MainHand, BAD_DAGGER);
+                characters.push(enemy);
+            }
+        }
+
+        FightId::EasyRiver => {
+            for i in 0..6 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let enemy = Character::new(
+                    Behaviour::Bot(BotBehaviour::Normal),
+                    "Ghoul",
+                    PortraitId::Skeleton,
+                    SpriteId::Ghoul,
+                    Attributes::new(1, 2, 1, 1),
+                    pos,
+                );
+                if i < 5 {
+                    enemy.armor_piece.set(Some(SHIRT));
+                    enemy.set_shield(BAD_SMALL_SHIELD);
+                    enemy.set_weapon(HandType::MainHand, BAD_DAGGER);
+                } else {
+                    enemy.set_weapon(HandType::MainHand, BAD_BOW);
+                }
                 characters.push(enemy);
             }
         }
@@ -155,7 +195,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let tanky = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
                 "Ogre",
-                PortraitId::Skeleton,
+                PortraitId::Ogre,
                 SpriteId::Ogre,
                 Attributes::new(4, 1, 1, 1),
                 pos,
@@ -314,9 +354,11 @@ pub struct GameInitState {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FightId {
-    Easy1,
-    Easy2,
-    Easy3,
+    EasyPair,
+    EasyGuard,
+    EasyCluster,
+    EasySurrounded,
+    EasyRiver,
     Elite,
     Elite2,
     Test,

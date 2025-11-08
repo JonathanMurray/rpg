@@ -603,46 +603,58 @@ impl CoreGame {
                 }
             }
 
-            let roll = roll_d20_with_advantage(advantange_level);
+            let mut maybe_ability_roll = None;
 
-            if let Some(description) = roll_description(advantange_level) {
-                detail_lines.push(description);
-            }
+            if let Some(roll_type) = ability.roll {
+                let dice_roll = roll_d20_with_advantage(advantange_level);
 
-            let mut line = format!("Rolled: {}", roll);
-            let mut roll_calculation = roll as i32;
-            match ability.modifier {
-                AbilityModifier::Spell => {
-                    let modifier = caster_ref.spell_modifier() as i32;
-                    roll_calculation += modifier;
-                    line.push_str(&format!(" (+{} spell mod)", modifier));
+                if let Some(description) = roll_description(advantange_level) {
+                    detail_lines.push(description);
                 }
-                AbilityModifier::Attack(bonus) => {
-                    let modifier = caster_ref.attack_modifier(HandType::MainHand) as i32;
-                    roll_calculation += modifier + bonus;
-                    let bonus_str = if bonus < 0 {
-                        format!(" -{}", -bonus)
-                    } else if bonus > 0 {
-                        format!(" +{}", bonus)
-                    } else {
-                        "".to_string()
-                    };
-                    line.push_str(&format!(" (+{} attack mod{})", modifier, bonus_str,));
-                }
-            };
 
-            for enhancement in &enhancements {
-                if let Some(e) = enhancement.spell_effect {
-                    let bonus = e.roll_bonus;
-                    if bonus > 0 {
-                        roll_calculation += bonus as i32;
-                        line.push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                let mut dice_roll_line = format!("Rolled: {}", dice_roll);
+                let mut roll_calculation = dice_roll as i32;
+                match roll_type {
+                    AbilityRollType::Spell => {
+                        let modifier = caster_ref.spell_modifier() as i32;
+                        roll_calculation += modifier;
+                        dice_roll_line.push_str(&format!(" (+{} spell mod)", modifier));
+
+                        for enhancement in &enhancements {
+                            if let Some(e) = enhancement.spell_effect {
+                                let bonus = e.roll_bonus;
+                                if bonus > 0 {
+                                    roll_calculation += bonus as i32;
+                                    dice_roll_line
+                                        .push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                                }
+                            }
+                        }
+                        let ability_result = roll_calculation as u32;
+                        dice_roll_line.push_str(&format!(" = {}", ability_result));
+
+                        maybe_ability_roll = Some(AbilityRoll::Spell {
+                            result: ability_result,
+                            line: dice_roll_line,
+                        });
                     }
-                }
+                    AbilityRollType::Attack(bonus) => {
+                        maybe_ability_roll = Some(AbilityRoll::Attack { bonus });
+                        /*
+                        let modifier = caster_ref.attack_modifier(HandType::MainHand) as i32;
+                        roll_calculation += modifier + bonus;
+                        let bonus_str = if bonus < 0 {
+                            format!(" -{}", -bonus)
+                        } else if bonus > 0 {
+                            format!(" +{}", bonus)
+                        } else {
+                            "".to_string()
+                        };
+                        dice_roll_line.push_str(&format!(" (+{} attack mod{})", modifier, bonus_str,));
+                         */
+                    }
+                };
             }
-
-            let ability_result = roll_calculation as u32;
-            line.push_str(&format!(" = {}", ability_result));
 
             let mut target_outcome = None;
             let mut area_outcomes = None;
@@ -668,38 +680,33 @@ impl CoreGame {
                         target.position.get()
                     ));
 
-                    match effect {
-                        AbilityEnemyEffect::Spell(spell_enemy_effect) => {
-                            if let Some(contest) = spell_enemy_effect.defense_type {
-                                match contest {
-                                    DefenseType::Will => {
-                                        line.push_str(&format!(", vs will={}", target.will()))
-                                    }
-                                    DefenseType::Evasion => {
-                                        line.push_str(&format!(", vs evasion={}", target.evasion()))
-                                    }
-                                    DefenseType::Toughness => line.push_str(&format!(
-                                        ", vs toughness={}",
-                                        target.toughness()
-                                    )),
+                    let mut ability_roll = maybe_ability_roll.unwrap();
+
+                    if let AbilityRoll::Spell { result: _, line } = &mut ability_roll {
+                        let spell_enemy_effect = effect.unwrap_spell();
+                        if let Some(contest) = spell_enemy_effect.defense_type {
+                            match contest {
+                                DefenseType::Will => {
+                                    line.push_str(&format!(", vs will={}", target.will()))
+                                }
+                                DefenseType::Evasion => {
+                                    line.push_str(&format!(", vs evasion={}", target.evasion()))
+                                }
+                                DefenseType::Toughness => {
+                                    line.push_str(&format!(", vs toughness={}", target.toughness()))
                                 }
                             }
                         }
-                        AbilityEnemyEffect::Attack => {
-                            // The relevant details will come from perform_attack, not from here.
-                        }
+                        detail_lines.push(line.to_string());
                     }
-
-                    detail_lines.push(line);
 
                     let outcome = self
                         .perform_ability_enemy_effect(
                             caster_id,
                             ability.name,
-                            ability.modifier,
+                            &ability_roll,
                             &enhancements,
                             effect,
-                            ability_result,
                             target,
                             &mut detail_lines,
                             true,
@@ -707,20 +714,20 @@ impl CoreGame {
                         .await;
                     target_outcome = Some((*target_id, outcome));
 
-                    if let Some((radius, area_effect)) = impact_area {
+                    if let Some((radius, acquisition, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
 
                         let area_target_outcomes = self
                             .perform_ability_area_enemy_effect(
                                 radius,
                                 "AoE",
-                                ability.modifier,
+                                ability_roll,
                                 &enhancements,
                                 caster,
                                 target.position.get(),
                                 &mut detail_lines,
-                                ability_result,
                                 area_effect,
+                                acquisition
                             )
                             .await;
 
@@ -739,7 +746,9 @@ impl CoreGame {
                         target.position.get()
                     ));
 
-                    detail_lines.push(line);
+                    let ability_roll = maybe_ability_roll.unwrap();
+                    let (ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                    detail_lines.push(dice_roll_line.to_string());
 
                     let degree_of_success = ability_result / 10;
                     if degree_of_success > 0 {
@@ -761,25 +770,26 @@ impl CoreGame {
                     range: _,
                     radius,
                     effect,
+                    acquisition,
                 } => {
-                    let ActionTarget::Position(target_pos) = selected_target else {
-                        unreachable!()
-                    };
+                    let target_pos = selected_target.unwrap_position();
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
 
-                    detail_lines.push(line);
+                    let ability_roll = maybe_ability_roll.unwrap();
+                    let (ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                    detail_lines.push(dice_roll_line.to_string());
 
                     let outcomes = self
                         .perform_ability_area_effect(
                             ability.name,
-                            ability.modifier,
+                            ability_roll,
                             &enhancements,
                             caster,
                             target_pos,
                             radius,
                             &mut detail_lines,
-                            ability_result,
                             effect,
+                            acquisition,
                         )
                         .await;
 
@@ -790,13 +800,23 @@ impl CoreGame {
                     self_area,
                     self_effect,
                 } => {
-                    detail_lines.push(line);
+                    if let Some(ability_roll) = &maybe_ability_roll {
+                        let (_ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                        detail_lines.push(dice_roll_line.to_string());
+                    }
 
                     if let Some(effect) = self_effect {
-                        let degree_of_success = ability_result / 10;
+                        let degree_of_success = if let Some(ability_roll) = &maybe_ability_roll {
+                            let (ability_result, _dice_roll_line) = ability_roll.unwrap_spell();
+                            ability_result / 10
+                        } else {
+                            0
+                        };
+
                         if degree_of_success > 0 {
                             detail_lines.push(format!("Fortune: {}", degree_of_success));
                         }
+
                         let outcome = self.perform_ability_ally_effect(
                             ability.name,
                             &enhancements,
@@ -808,20 +828,22 @@ impl CoreGame {
                         target_outcome = Some((caster_id, outcome));
                     }
 
-                    if let Some((radius, effect)) = self_area {
+                    if let Some((radius, acquisition, effect)) = self_area {
                         dbg!("SELF AREA ", radius);
+
+                        let ability_roll = maybe_ability_roll.unwrap();
 
                         let outcomes = self
                             .perform_ability_area_effect(
                                 ability.name,
-                                ability.modifier,
+                                ability_roll,
                                 &enhancements,
                                 caster,
                                 caster.position.get(),
                                 radius,
                                 &mut detail_lines,
-                                ability_result,
                                 effect,
+                                acquisition
                             )
                             .await;
                         area_outcomes = Some((caster.position.get(), outcomes));
@@ -863,41 +885,45 @@ impl CoreGame {
     async fn perform_ability_area_effect(
         &self,
         name: &'static str,
-        modifier: AbilityModifier,
+        ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
         caster: &Character,
         area_center: Position,
         radius: Range,
         detail_lines: &mut Vec<String>,
-        ability_result: u32,
         effect: AbilityEffect,
+        acquisition: AreaTargetAcquisition,
     ) -> Vec<(u32, AbilityTargetOutcome)> {
         match effect {
-            AbilityEffect::Enemy(enemy_area) => {
+            AbilityEffect::Negative(effect) => {
                 self.perform_ability_area_enemy_effect(
                     radius,
                     name,
-                    modifier,
+                    ability_roll,
                     enhancements,
                     caster,
                     area_center,
                     detail_lines,
-                    ability_result,
-                    enemy_area,
+                    effect,
+                    acquisition,
                 )
                 .await
             }
 
-            AbilityEffect::Ally(ally_area) => self.perform_ability_area_ally_effect(
-                radius,
-                name,
-                enhancements,
-                caster,
-                area_center,
-                detail_lines,
-                ability_result,
-                ally_area,
-            ),
+            AbilityEffect::Positive(effect) => {
+                assert!(acquisition == AreaTargetAcquisition::Allies);
+
+                self.perform_ability_area_ally_effect(
+                    radius,
+                    name,
+                    enhancements,
+                    caster,
+                    area_center,
+                    detail_lines,
+                    ability_roll,
+                    effect,
+                )
+            }
         }
     }
 
@@ -909,8 +935,8 @@ impl CoreGame {
         caster: &Character,
         area_center: Position,
         detail_lines: &mut Vec<String>,
-        ability_result: u32,
-        ally_area: AbilityAllyEffect,
+        ability_roll: AbilityRoll,
+        effect: AbilityPositiveEffect,
     ) -> Vec<(u32, AbilityTargetOutcome)> {
         let mut target_outcomes = vec![];
 
@@ -921,7 +947,9 @@ impl CoreGame {
             }
         }
 
-        let degree_of_success = ability_result / 10;
+        let roll_result = ability_roll.unwrap_spell().0;
+
+        let degree_of_success = roll_result / 10;
         if degree_of_success > 0 {
             detail_lines.push(format!("Fortune: {}", degree_of_success));
         }
@@ -937,7 +965,7 @@ impl CoreGame {
                 let outcome = self.perform_ability_ally_effect(
                     name,
                     enhancements,
-                    ally_area,
+                    effect,
                     other_char,
                     detail_lines,
                     degree_of_success,
@@ -954,12 +982,12 @@ impl CoreGame {
         &self,
         name: &'static str,
         enhancements: &[AbilityEnhancement],
-        ally_effect: AbilityAllyEffect,
+        ally_effect: AbilityPositiveEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
         degree_of_success: u32,
     ) -> AbilityTargetOutcome {
-        let mut health_gained = 0;
+        let mut maybe_healing = None;
 
         if ally_effect.healing > 0 {
             let mut healing = ally_effect.healing;
@@ -973,11 +1001,12 @@ impl CoreGame {
             line.push_str(&format!(" = {}", healing));
             detail_lines.push(line);
 
-            health_gained = self.perform_gain_health(target, healing);
+            let health_gained = self.perform_gain_health(target, healing);
             detail_lines.push(format!(
                 "  {} was healed for {}",
                 target.name, health_gained
             ));
+            maybe_healing = Some(health_gained);
         };
 
         if let Some(mut effect) = ally_effect.apply {
@@ -1005,21 +1034,25 @@ impl CoreGame {
             }
         }
 
-        AbilityTargetOutcome::HealedAlly(health_gained)
+        AbilityTargetOutcome::AffectedAlly {
+            healing: maybe_healing,
+        }
     }
 
     async fn perform_ability_area_enemy_effect(
         &self,
         mut radius: Range,
         name: &'static str,
-        modifier: AbilityModifier,
+        ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
         caster: &Character,
         area_center: Position,
         detail_lines: &mut Vec<String>,
-        ability_result: u32,
-        enemy_area: AbilityEnemyEffect,
+        effect: AbilityNegativeEffect,
+        acquisition: AreaTargetAcquisition,
     ) -> Vec<(u32, AbilityTargetOutcome)> {
+        assert!(acquisition != AreaTargetAcquisition::Allies);
+
         let mut target_outcomes = vec![];
 
         for enhancement in enhancements {
@@ -1031,15 +1064,20 @@ impl CoreGame {
         }
 
         for other_char in self.characters.iter() {
-            dbg!(other_char.name);
-            if other_char.player_controlled() == caster.player_controlled() {
+            let is_ally = other_char.player_controlled() == caster.player_controlled();
+            let valid_target = match acquisition {
+                AreaTargetAcquisition::Enemies => !is_ally,
+                AreaTargetAcquisition::Everyone => true,
+                AreaTargetAcquisition::Allies => unreachable!(),
+            };
+            if !valid_target {
                 continue;
             }
 
             if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
                 let mut line = other_char.name.to_string();
-                match enemy_area {
-                    AbilityEnemyEffect::Spell(spell_enemy_effect) => {
+                match effect {
+                    AbilityNegativeEffect::Spell(spell_enemy_effect) => {
                         if let Some(contest) = spell_enemy_effect.defense_type {
                             match contest {
                                 DefenseType::Will => {
@@ -1054,7 +1092,7 @@ impl CoreGame {
                             }
                         }
                     }
-                    AbilityEnemyEffect::Attack => {
+                    AbilityNegativeEffect::Attack => {
                         // The relevant details will come from perform_attack, not from here.
                     }
                 }
@@ -1065,10 +1103,9 @@ impl CoreGame {
                     .perform_ability_enemy_effect(
                         caster.id(),
                         name,
-                        modifier,
+                        &ability_roll,
                         enhancements,
-                        enemy_area,
-                        ability_result,
+                        effect,
                         other_char,
                         detail_lines,
                         false,
@@ -1086,35 +1123,31 @@ impl CoreGame {
         &self,
         caster_id: CharacterId,
         ability_name: &'static str,
-        modifier: AbilityModifier,
+        ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
-        enemy_effect: AbilityEnemyEffect,
-        ability_result: u32,
+        enemy_effect: AbilityNegativeEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
         is_direct_target: bool,
     ) -> AbilityTargetOutcome {
         match enemy_effect {
-            AbilityEnemyEffect::Spell(spell_enemy_effect) => self.perform_spell_enemy_effect(
+            AbilityNegativeEffect::Spell(spell_enemy_effect) => self.perform_spell_enemy_effect(
                 ability_name,
-                modifier,
+                ability_roll,
                 enhancements,
                 spell_enemy_effect,
-                ability_result,
                 target,
                 detail_lines,
                 is_direct_target,
             ),
-            AbilityEnemyEffect::Attack => {
+            AbilityNegativeEffect::Attack => {
                 let attack_enhancement_effects = enhancements
                     .iter()
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
                 let reaction = None;
-                let AbilityModifier::Attack(roll_modifier) = modifier else {
-                    unreachable!()
-                };
+                let roll_modifier = ability_roll.unwrap_attack_bonus();
                 let event = self.perform_attack(
                     caster_id,
                     HandType::MainHand,
@@ -1132,14 +1165,15 @@ impl CoreGame {
     fn perform_spell_enemy_effect(
         &self,
         ability_name: &'static str,
-        modifier: AbilityModifier,
+        ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
-        spell_enemy_effect: SpellEnemyEffect,
-        ability_result: u32,
+        spell_enemy_effect: SpellNegativeEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
         is_direct_target: bool,
     ) -> AbilityTargetOutcome {
+        let ability_result = ability_roll.unwrap_spell().0;
+
         let success = match spell_enemy_effect.defense_type {
             Some(contest) => {
                 let defense = match contest {
@@ -1292,17 +1326,14 @@ impl CoreGame {
                 applied_effects,
             }
         } else {
-            let line = match (modifier, spell_enemy_effect.defense_type) {
-                (_, None) => unreachable!("uncontested effect cannot fail"),
-                (AbilityModifier::Spell, Some(DefenseType::Will | DefenseType::Toughness)) => {
+            let line = match spell_enemy_effect.defense_type {
+                Some(DefenseType::Will | DefenseType::Toughness) => {
                     format!("  {} resisted the spell", target.name)
                 }
-                (AbilityModifier::Spell, Some(DefenseType::Evasion)) => {
+                Some(DefenseType::Evasion) => {
                     format!("  The spell missed {}", target.name)
                 }
-                (AbilityModifier::Attack(_), Some(_)) => {
-                    format!("  The ability missed {}", target.name)
-                }
+                None => unreachable!("uncontested effect cannot fail"),
             };
             detail_lines.push(line);
             AbilityTargetOutcome::Resist
@@ -1360,6 +1391,7 @@ impl CoreGame {
 
         let mut evasion_added_by_parry = 0;
         let mut evasion_added_by_sidestep = 0;
+        let mut evasion_added_by_block = 0;
         let mut skip_attack_exertion = false;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
@@ -1393,6 +1425,9 @@ impl CoreGame {
                 }
                 OnAttackedReactionId::SideStep => {
                     evasion_added_by_sidestep = reaction.effect.bonus_evasion;
+                }
+                OnAttackedReactionId::Block => {
+                    evasion_added_by_block = reaction.effect.bonus_evasion
                 }
             }
         }
@@ -1547,13 +1582,19 @@ impl CoreGame {
                 }
             }
 
+            if defender.lose_protected() {
+                detail_lines.push(format!("{} lost Protected", defender.name));
+            }
+
             if attack_result < evasion {
                 AttackOutcome::Graze(damage)
             } else {
                 AttackOutcome::Hit(damage)
             }
         } else if attack_result
-            < evasion.saturating_sub(evasion_added_by_parry + evasion_added_by_sidestep + 5)
+            < evasion.saturating_sub(
+                evasion_added_by_parry + evasion_added_by_sidestep + evasion_added_by_block + 5,
+            )
         {
             detail_lines.push("  Missed!".to_string());
             AttackOutcome::Miss
@@ -1563,15 +1604,15 @@ impl CoreGame {
         } else if evasion_added_by_sidestep > 0 {
             detail_lines.push("  Side stepped!".to_string());
             AttackOutcome::Dodge
+        } else if evasion_added_by_block > 0 {
+            detail_lines.push("  Blocked!".to_string());
+            AttackOutcome::Block
         } else {
             unreachable!(
                 "{attack_result}, {evasion}, {evasion_added_by_parry}, {evasion_added_by_sidestep}"
             );
         };
 
-        if defender.lose_braced() {
-            detail_lines.push(format!("{} lost Braced", defender.name));
-        }
         if defender.lose_distracted() {
             detail_lines.push(format!("{} lost Distracted", defender.name));
         }
@@ -1708,7 +1749,7 @@ impl CoreGame {
 
         let bleed_stacks = conditions.borrow().bleeding;
         if bleed_stacks > 0 {
-            let decay = (bleed_stacks / 2).max(1);
+            let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
             let damage = self.perform_losing_health(character, decay);
             self.log(format!("{} took {} damage from Bleeding", name, damage))
                 .await;
@@ -1777,6 +1818,27 @@ fn roll_description(advantage: i32) -> Option<String> {
     }
 }
 
+#[derive(Debug)]
+enum AbilityRoll {
+    Spell { result: u32, line: String },
+    Attack { bonus: i32 },
+}
+
+impl AbilityRoll {
+    fn unwrap_spell(&self) -> (u32, &str) {
+        match self {
+            AbilityRoll::Spell { result, line } => (*result, line),
+            _ => panic!(),
+        }
+    }
+    fn unwrap_attack_bonus(&self) -> i32 {
+        match self {
+            AbilityRoll::Attack { bonus } => *bonus,
+            _ => panic!(),
+        }
+    }
+}
+
 pub trait GameEventHandler {
     fn handle(&self, event: GameEvent);
 }
@@ -1835,6 +1897,7 @@ pub enum AttackOutcome {
     Hit(u32),
     Graze(u32),
     Dodge,
+    Block,
     Parry,
     Miss,
 }
@@ -1859,7 +1922,9 @@ pub enum AbilityTargetOutcome {
     },
     AttackedEnemy(AttackedEvent),
     Resist,
-    HealedAlly(u32),
+    AffectedAlly {
+        healing: Option<u32>,
+    },
 }
 
 pub fn as_percentage(probability: f32) -> String {
@@ -1874,7 +1939,7 @@ fn ability_roll_bonus(
     caster: &Character,
     defender: &Character,
     enhancements: &[AbilityEnhancement],
-    modifier: AbilityModifier,
+    modifier: AbilityRollType,
 ) -> DiceRollBonus {
     let mut bonus = caster.outgoing_ability_roll_bonus(enhancements, modifier);
     bonus.advantage += defender.incoming_ability_advantage();
@@ -1946,7 +2011,7 @@ pub fn prob_ability_hit(
     defense_type: DefenseType,
     defender: &Character,
     enhancements: &[AbilityEnhancement],
-    modifier: AbilityModifier,
+    modifier: AbilityRollType,
 ) -> f32 {
     let bonus = ability_roll_bonus(caster, defender, enhancements, modifier);
 
@@ -1957,8 +2022,8 @@ pub fn prob_ability_hit(
     };
 
     let modifier_value = match modifier {
-        AbilityModifier::Spell => caster.spell_modifier() as i32,
-        AbilityModifier::Attack(bonus) => caster.attack_modifier(HandType::MainHand) as i32 + bonus,
+        AbilityRollType::Spell => caster.spell_modifier() as i32,
+        AbilityRollType::Attack(bonus) => caster.attack_modifier(HandType::MainHand) as i32 + bonus,
     };
 
     let target = (def as i32 - modifier_value).max(1) as u32;
@@ -2076,13 +2141,14 @@ pub struct OnAttackedReaction {
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
-    pub must_be_melee: bool,
+    pub required_circumstance: Option<AttackCircumstance>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum OnAttackedReactionId {
     Parry,
     SideStep,
+    Block,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2098,7 +2164,13 @@ pub struct OnHitReaction {
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnHitReactionEffect,
-    pub must_be_melee: bool,
+    pub required_circumstance: Option<AttackCircumstance>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum AttackCircumstance {
+    Melee,
+    Ranged,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2200,7 +2272,7 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Protected(_) => "Gains +3 armor",
+            Protected(_) => "+x armor against the next attack that hits",
             Dazed(_) => "Gains no evasion from agility and attacks with disadvantage",
             Bleeding(_) => "End of turn: 50% stacks decay, 1 damage for each decayed",
             Braced => "Gain +3 evasion against the next incoming attack",
@@ -2253,8 +2325,7 @@ impl Condition {
     }
 }
 
-const BLEEDING_DAMAGE_AMOUNT: u32 = 1;
-const PROTECTED_ARMOR_BONUS: u32 = 3;
+const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
@@ -2376,6 +2447,15 @@ pub enum ActionTarget {
     None,
 }
 
+impl ActionTarget {
+    pub fn unwrap_position(&self) -> Position {
+        match self {
+            Self::Position(pos) => *pos,
+            _ => panic!(),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq)]
 
 pub enum BaseAction {
@@ -2456,7 +2536,7 @@ pub struct Ability {
     pub stamina_cost: u32,
     pub weapon_requirement: Option<WeaponType>,
 
-    pub modifier: AbilityModifier,
+    pub roll: Option<AbilityRollType>,
     pub target: AbilityTarget,
     pub possible_enhancements: [Option<AbilityEnhancement>; 3],
     pub animation_color: Color,
@@ -2489,28 +2569,37 @@ pub enum WeaponType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum AbilityModifier {
+pub enum AbilityRollType {
     Spell,
     Attack(i32),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AbilityEffect {
-    Enemy(AbilityEnemyEffect),
-    Ally(AbilityAllyEffect),
+    Negative(AbilityNegativeEffect),
+    Positive(AbilityPositiveEffect),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct SpellEnemyEffect {
+pub struct SpellNegativeEffect {
     pub defense_type: Option<DefenseType>,
     pub damage: Option<AbilityDamage>,
     pub on_hit: Option<[Option<ApplyEffect>; 2]>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum AbilityEnemyEffect {
-    Spell(SpellEnemyEffect),
+pub enum AbilityNegativeEffect {
+    Spell(SpellNegativeEffect),
     Attack,
+}
+
+impl AbilityNegativeEffect {
+    fn unwrap_spell(&self) -> &SpellNegativeEffect {
+        match self {
+            AbilityNegativeEffect::Spell(spell_enemy_effect) => spell_enemy_effect,
+            AbilityNegativeEffect::Attack => panic!(),
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2520,7 +2609,7 @@ pub enum AbilityDamage {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub struct AbilityAllyEffect {
+pub struct AbilityPositiveEffect {
     pub healing: u32,
     pub apply: Option<ApplyEffect>,
 }
@@ -2529,25 +2618,33 @@ pub struct AbilityAllyEffect {
 pub enum AbilityTarget {
     Enemy {
         reach: AbilityReach,
-        effect: AbilityEnemyEffect,
-        impact_area: Option<(Range, AbilityEnemyEffect)>,
+        effect: AbilityNegativeEffect,
+        impact_area: Option<(Range, AreaTargetAcquisition,  AbilityNegativeEffect)>,
     },
 
     Ally {
         range: Range,
-        effect: AbilityAllyEffect,
+        effect: AbilityPositiveEffect,
     },
 
     Area {
         range: Range,
         radius: Range,
+        acquisition: AreaTargetAcquisition,
         effect: AbilityEffect,
     },
 
     None {
-        self_area: Option<(Range, AbilityEffect)>,
-        self_effect: Option<AbilityAllyEffect>,
+        self_area: Option<(Range, AreaTargetAcquisition, AbilityEffect )>,
+        self_effect: Option<AbilityPositiveEffect>,
     },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AreaTargetAcquisition {
+    Enemies,
+    Allies,
+    Everyone,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2576,7 +2673,7 @@ impl AbilityTarget {
             AbilityTarget::Area { range, .. } => Some(*range),
             AbilityTarget::None { self_area, .. } => {
                 // TODO This is actually radius, not range; is this misused somewhere (with enahcenements for example)
-                self_area.as_ref().map(|(radius, _effect)| *radius)
+                self_area.as_ref().map(|(radius, _acquisition, _effect)| *radius)
             }
         }
     }
@@ -2957,7 +3054,7 @@ impl Character {
             is_engaged_by: Default::default(),
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
-            money: Cell::new(5),
+            money: Cell::new(8),
         }
     }
 
@@ -3093,10 +3190,10 @@ impl Character {
         self.money.set(self.money.get() - amount);
     }
 
-    fn lose_braced(&self) -> bool {
+    fn lose_protected(&self) -> bool {
         let mut conditions = self.conditions.borrow_mut();
-        if conditions.braced {
-            conditions.braced = false;
+        if conditions.protected > 0 {
+            conditions.protected = 0;
             true
         } else {
             false
@@ -3476,10 +3573,14 @@ impl Character {
         for reaction in &self.known_attacked_reactions {
             known.push(("".to_string(), *reaction));
         }
-        // TODO: off-hand reactions?
         if let Some(weapon) = &self.weapon(HandType::MainHand) {
             if let Some(reaction) = weapon.on_attacked_reaction {
                 known.push((weapon.name.to_string(), reaction));
+            }
+        }
+        if let Some(shield) = &self.shield() {
+            if let Some(reaction) = shield.on_attacked_reaction {
+                known.push((shield.name.to_string(), reaction));
             }
         }
         known
@@ -3499,12 +3600,17 @@ impl Character {
         reaction: OnAttackedReaction,
         is_within_melee: bool,
     ) -> bool {
+        let allowed = match reaction.required_circumstance {
+            None => true,
+            Some(AttackCircumstance::Melee) => is_within_melee,
+            Some(AttackCircumstance::Ranged) => !is_within_melee,
+        };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
             && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && self.stamina.current() >= reaction.stamina_cost
-            && (!reaction.must_be_melee || is_within_melee)
+            && allowed
     }
 
     pub fn known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
@@ -3533,12 +3639,17 @@ impl Character {
                 return false;
             }
         }
+        let allowed = match reaction.required_circumstance {
+            None => true,
+            Some(AttackCircumstance::Melee) => is_within_melee,
+            Some(AttackCircumstance::Ranged) => !is_within_melee,
+        };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
             && (ap - reaction.action_point_cost)
                 >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && self.stamina.current() >= reaction.stamina_cost
-            && (!reaction.must_be_melee || is_within_melee)
+            && allowed
     }
 
     pub fn knows_ability(&self, id: AbilityId) -> bool {
@@ -3684,7 +3795,7 @@ impl Character {
         }
 
         if self.conditions.borrow().protected > 0 {
-            protection += PROTECTED_ARMOR_BONUS;
+            protection += self.conditions.borrow().protected;
         }
 
         if self
@@ -3722,7 +3833,7 @@ impl Character {
     fn outgoing_ability_roll_bonus(
         &self,
         enhancements: &[AbilityEnhancement],
-        modifier: AbilityModifier,
+        modifier: AbilityRollType,
     ) -> DiceRollBonus {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
@@ -3836,9 +3947,9 @@ impl Character {
     pub fn outgoing_ability_roll_bonuses(
         &self,
         enhancements: &[AbilityEnhancement],
-        modifier: AbilityModifier,
+        modifier: AbilityRollType,
     ) -> Vec<(&'static str, RollBonusContributor)> {
-        let is_spell = matches!(modifier, AbilityModifier::Spell);
+        let is_spell = matches!(modifier, AbilityRollType::Spell);
         let mut bonuses = vec![];
         for enhancement in enhancements {
             if let Some(e) = enhancement.spell_effect {
@@ -4165,6 +4276,7 @@ pub struct Shield {
     pub icon: EquipmentIconId,
     pub evasion: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
+    pub on_attacked_reaction: Option<OnAttackedReaction>,
     pub weight: u32,
 }
 

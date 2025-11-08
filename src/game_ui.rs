@@ -23,8 +23,8 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
-        prob_attack_penetrating_hit, Ability, AbilityEnemyEffect, AbilityEnhancement,
-        AbilityModifier, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
+        prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityNegativeEffect,
+        AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
         AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
         BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType,
         OnAttackedReaction, OnHitReaction, Position,
@@ -735,22 +735,26 @@ impl UserInterface {
                     details.push(("Can not reach!".to_string(), Goodness::Bad));
                 }
 
-                // TODO For attack-based abilities, these details SHOULD use attack rules, and not ability rules (?)
-                // For example, the below probably doesn't account correctly for flanking?
-                for (term, bonus) in self
-                    .active_character()
-                    .outgoing_ability_roll_bonuses(selected_enhancements, ability.modifier)
-                {
-                    details.push((term.to_string(), bonus.goodness()));
-                }
-                for (term, bonus) in target_char.incoming_ability_bonuses() {
-                    details.push((term.to_string(), bonus.goodness()));
+                if let Some(ability_roll) = ability.roll {
+                    // TODO For attack-based abilities, these details SHOULD use attack rules, and not ability rules (?)
+                    // For example, the below probably doesn't account correctly for flanking?
+                    for (term, bonus) in self
+                        .active_character()
+                        .outgoing_ability_roll_bonuses(selected_enhancements, ability_roll)
+                    {
+                        details.push((term.to_string(), bonus.goodness()));
+                    }
+                    for (term, bonus) in target_char.incoming_ability_bonuses() {
+                        details.push((term.to_string(), bonus.goodness()));
+                    }
                 }
 
                 let action_text = match ability.target {
                     AbilityTarget::Enemy { effect, .. } => {
+                        let ability_roll = ability.roll.unwrap();
+
                         let chance = match effect {
-                            AbilityEnemyEffect::Spell(spell_enemy_effect) => {
+                            AbilityNegativeEffect::Spell(spell_enemy_effect) => {
                                 let prob = spell_enemy_effect
                                     .defense_type
                                     .map(|def| {
@@ -759,14 +763,14 @@ impl UserInterface {
                                             def,
                                             target_char,
                                             selected_enhancements,
-                                            ability.modifier,
+                                            ability_roll,
                                         )
                                     })
                                     .unwrap_or(1.0);
 
                                 as_percentage(prob)
                             }
-                            AbilityEnemyEffect::Attack => {
+                            AbilityNegativeEffect::Attack => {
                                 let enhancements: Vec<(&'static str, AttackEnhancementEffect)> =
                                     selected_enhancements
                                         .iter()
@@ -1152,7 +1156,7 @@ impl UserInterface {
                 mut detail_lines,
             } => {
                 let actor_name = self.characters.get(actor).name;
-                let verb = if matches!(ability.modifier, AbilityModifier::Spell) {
+                let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
                 } else {
                     "used"
@@ -1192,8 +1196,10 @@ impl UserInterface {
                             }
                         }
                         AbilityTargetOutcome::Resist => line.push_str(" (miss)"),
-                        AbilityTargetOutcome::HealedAlly(healing) => {
-                            line.push_str(&format!(" ({} healing)", healing))
+                        AbilityTargetOutcome::AffectedAlly { healing } => {
+                            if let Some(amount) = healing {
+                                line.push_str(&format!(" ({} healing)", amount))
+                            }
                         }
                         AbilityTargetOutcome::AttackedEnemy(event) => {
                             attacks.push(event);
@@ -1382,9 +1388,7 @@ impl UserInterface {
         let verb = match outcome {
             AttackOutcome::Hit(..) => "hit",
             AttackOutcome::Graze(..) => "grazed",
-            AttackOutcome::Dodge => "missed",
-            AttackOutcome::Parry => "missed",
-            AttackOutcome::Miss => "missed",
+            _ => "missed",
         };
 
         let mut line = format!(
@@ -1399,6 +1403,7 @@ impl UserInterface {
             AttackOutcome::Graze(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
             AttackOutcome::Parry => line.push_str(" (parry)"),
+            AttackOutcome::Block => line.push_str(" (block)"),
             AttackOutcome::Miss => {}
         }
 
@@ -1407,7 +1412,7 @@ impl UserInterface {
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
-        let duration = 0.1 * distance_between(attacker_pos, target_pos);
+        let duration = 0.08 * distance_between(attacker_pos, target_pos);
 
         self.animation_stopwatch.set_to_at_least(duration + 0.6);
         let impact_text = match outcome {
@@ -1416,6 +1421,7 @@ impl UserInterface {
             AttackOutcome::Dodge => "Dodge".to_string(),
             AttackOutcome::Parry => "Parry".to_string(),
             AttackOutcome::Miss => "Miss".to_string(),
+            AttackOutcome::Block => "Block".to_string(),
         };
         let goodness = if matches!(outcome, AttackOutcome::Hit(..)) {
             Goodness::Bad
@@ -1431,7 +1437,7 @@ impl UserInterface {
                 end_time: duration,
                 variant: EffectVariant::Line {
                     thickness: 1.0,
-                    end_thickness: Some(5.0),
+                    end_thickness: Some(4.0),
                     color: RED,
                     extend_gradually: true,
                 },
@@ -1490,8 +1496,12 @@ impl UserInterface {
                 Some(effect)
             }
             AbilityTargetOutcome::Resist => Some(("Resist".to_string(), Goodness::Neutral)),
-            AbilityTargetOutcome::HealedAlly(healing) => {
-                Some((format!("{}", healing), Goodness::Good))
+            AbilityTargetOutcome::AffectedAlly { healing } => {
+                if let Some(heal_amount) = healing {
+                    Some((format!("{}", heal_amount), Goodness::Good))
+                } else {
+                    Some(("+".to_string(), Goodness::Good))
+                }
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
                 // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.

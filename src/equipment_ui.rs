@@ -92,6 +92,9 @@ fn shield_tooltip(shield: &Shield) -> Vec<String> {
         format!("+{} evasion", shield.evasion),
     ];
 
+    if let Some(reaction) = shield.on_attacked_reaction {
+        lines.push(format!("[attacked?] {}", reaction.name));
+    }
     if let Some(reaction) = shield.on_hit_reaction {
         lines.push(format!("[hit?] {}", reaction.name));
     }

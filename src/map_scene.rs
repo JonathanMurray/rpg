@@ -101,18 +101,18 @@ impl MapScene {
             candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())];
 
         let mut nodes = [
-            Node::new((0, 0), MapChoice::Fight(FightId::Easy3)),
-            Node::new((0, 1), MapChoice::Fight(FightId::Easy1)),
-            Node::new((1, 0), MapChoice::Fight(FightId::Easy2)),
-            Node::new((1, 1), MapChoice::Fight(FightId::Easy3)),
+            Node::new((0, 0), MapChoice::Fight(FightId::EasyCluster)),
+            Node::new((0, 1), MapChoice::Fight(FightId::EasyPair)),
+            Node::new((1, 0), MapChoice::Fight(FightId::EasyGuard)),
+            Node::new((1, 1), MapChoice::Fight(FightId::EasyRiver)),
             Node::new((1, 2), MapChoice::Shop),
-            Node::new((2, 0), MapChoice::Fight(FightId::Easy1)),
+            Node::new((2, 0), MapChoice::Shop),
             Node::new((2, 1), MapChoice::Chest(chest_reward)),
             Node::new((2, 2), MapChoice::Fight(FightId::Elite)),
             Node::new((3, 0), MapChoice::Rest),
             Node::new((3, 1), MapChoice::Chest(chest_reward)),
-            Node::new((4, 0), MapChoice::Fight(FightId::Elite2)),
-            Node::new((5, 0), MapChoice::Shop),
+            Node::new((4, 0), MapChoice::Fight(FightId::EasySurrounded)),
+            Node::new((5, 0), MapChoice::Fight(FightId::Elite2)),
         ];
         let edges: HashMap<Option<usize>, Vec<usize>> = [
             (None, vec![0, 1]),

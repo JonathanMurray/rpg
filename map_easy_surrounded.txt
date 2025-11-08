@@ -1,0 +1,13 @@
++----------------------------
+BBBBBBBBBBB
+BR    00  RB
+B         RB
+B          B
+B1   PP    B
+B1   PP   3B
+B         3B
+B      RR  B
+BWW        B
+BWW  22   RB
+ BBBBBBBBBBB
++----------------------------

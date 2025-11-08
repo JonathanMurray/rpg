@@ -19,11 +19,11 @@ use crate::{
         draw_debug, draw_text_rounded, Circle, Container, Drawable, Element, LayoutDirection, Style,
     },
     core::{
-        Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
-        AbilityEnhancement, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
-        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, BaseAction,
-        Character, DefenseType, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill, Weapon,
-        WeaponType,
+        Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
+        AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
+        AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
+        OnAttackedReaction, OnHitReaction, PassiveSkill, Weapon, WeaponType,
     },
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
@@ -293,15 +293,18 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
     );
     let mut technical_description = vec![];
 
-    match ability.modifier {
-        AbilityModifier::Spell => technical_description.push("[ spell roll ]".to_string()),
-        AbilityModifier::Attack(bonus) if bonus < 0 => {
-            technical_description.push(format!("[ attack roll - {} ]", -bonus))
-        }
-        AbilityModifier::Attack(bonus) if bonus > 0 => {
-            technical_description.push(format!("[ attack roll + {} ]", bonus))
-        }
-        AbilityModifier::Attack(_) => technical_description.push("[ attack roll ]".to_string()),
+    if let Some(ability_roll) = ability.roll {
+        let s = match ability_roll {
+            AbilityRollType::Spell => "[ spell roll ]".to_string(),
+            AbilityRollType::Attack(bonus) if bonus < 0 => {
+                format!("[ attack roll - {} ]", -bonus)
+            }
+            AbilityRollType::Attack(bonus) if bonus > 0 => {
+                format!("[ attack roll + {} ]", bonus)
+            }
+            AbilityRollType::Attack(_) => "[ attack roll ]".to_string(),
+        };
+        technical_description.push(s);
     }
 
     match ability.target {
@@ -320,8 +323,13 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             }
             describe_ability_enemy_effect(effect, &mut technical_description);
 
-            if let Some((range, effect)) = area {
-                technical_description.push(format!("Impact area (radius {})", range));
+            if let Some((range, acquisition, effect)) = area {
+                  let targets_str = match acquisition {
+                    AreaTargetAcquisition::Enemies => "Enemies",
+                    AreaTargetAcquisition::Everyone => "EVERYONE",
+                    AreaTargetAcquisition::Allies => unreachable!(),
+                };
+                technical_description.push(format!("{} in impact area (radius {})", targets_str, range));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
         }
@@ -340,13 +348,16 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                 describe_ability_ally_effect(effect, &mut technical_description);
             }
 
-            if let Some((radius, effect)) = self_area {
+            if let Some((radius, acquisition, effect)) = self_area {
+                // There's no use-case for this yet (?)
+                assert!(acquisition != AreaTargetAcquisition::Everyone);
+
                 match effect {
-                    AbilityEffect::Enemy(effect) => {
+                    AbilityEffect::Negative(effect) => {
                         technical_description.push(format!("Nearby enemies (radius {})", radius));
                         describe_ability_enemy_effect(effect, &mut technical_description);
                     }
-                    AbilityEffect::Ally(effect) => {
+                    AbilityEffect::Positive(effect) => {
                         technical_description.push(format!("Nearby allies (radius {})", radius));
                         describe_ability_ally_effect(effect, &mut technical_description);
                     }
@@ -358,12 +369,22 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             range,
             radius,
             effect,
+            acquisition,
         } => match effect {
-            AbilityEffect::Enemy(effect) => {
-                technical_description.push(format!("Enemies (range {}, radius {})", range, radius));
+            AbilityEffect::Negative(effect) => {
+                let targets_str = match acquisition {
+                    AreaTargetAcquisition::Enemies => "Enemies",
+                    AreaTargetAcquisition::Everyone => "EVERYONE",
+                    AreaTargetAcquisition::Allies => unreachable!(),
+                };
+                technical_description.push(format!(
+                    "{} (range {}, radius {})",
+                    targets_str, range, radius
+                ));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
-            AbilityEffect::Ally(effect) => {
+            AbilityEffect::Positive(effect) => {
+                assert!(acquisition == AreaTargetAcquisition::Allies);
                 technical_description.push(format!("Allies (range {}, radius {})", range, radius));
                 describe_ability_ally_effect(effect, &mut technical_description);
             }
@@ -378,11 +399,11 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
 }
 
 fn describe_ability_enemy_effect(
-    effect: AbilityEnemyEffect,
+    effect: AbilityNegativeEffect,
     technical_description: &mut Vec<String>,
 ) {
     match effect {
-        AbilityEnemyEffect::Spell(effect) => {
+        AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
                 Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
                 Some(DefenseType::Evasion) => {
@@ -409,7 +430,7 @@ fn describe_ability_enemy_effect(
             }
         }
 
-        AbilityEnemyEffect::Attack => {
+        AbilityNegativeEffect::Attack => {
             technical_description.push("  [ evasion ]".to_string());
             technical_description.push("  weapon damage".to_string());
         }
@@ -417,7 +438,7 @@ fn describe_ability_enemy_effect(
 }
 
 fn describe_ability_ally_effect(
-    effect: AbilityAllyEffect,
+    effect: AbilityPositiveEffect,
     technical_description: &mut Vec<String>,
 ) {
     if effect.healing > 0 {

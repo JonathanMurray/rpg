@@ -170,6 +170,8 @@ impl TopCharacterPortrait {
             (action_points_row.borrow().size().0, 8.0),
         )));
 
+        //let texture_size = (48.0, 60.0);
+        let texture_size = (64.0, 80.0);
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
@@ -180,7 +182,7 @@ impl TopCharacterPortrait {
                         background_color: Some(DARKGRAY),
                         ..Default::default()
                     },
-                    children: vec![Element::Texture(texture, Some((48.0, 60.0)))],
+                    children: vec![Element::Texture(texture, Some(texture_size))],
                     ..Default::default()
                 }),
                 Element::RcRefCell(cloned_ap_row),

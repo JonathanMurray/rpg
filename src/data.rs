@@ -2,13 +2,7 @@ use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
 
 use crate::{
     core::{
-        Ability, AbilityAllyEffect, AbilityDamage, AbilityEffect, AbilityEnemyEffect,
-        AbilityEnhancement, AbilityId, AbilityModifier, AbilityReach, AbilityTarget, ApplyEffect,
-        ArmorPiece, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect,
-        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction,
-        OnHitReactionEffect, Range, Shield, SpellEnemyEffect, SpellEnhancementEffect, Weapon,
-        WeaponGrip, WeaponRange, WeaponType,
+        Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect, AreaTargetAcquisition, ArmorPiece, AttackAttribute, AttackCircumstance, AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, Condition, Consumable, DefenseType, EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -256,6 +250,7 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
     icon: EquipmentIconId::SmallShield,
     evasion: 1,
     on_hit_reaction: None,
+    on_attacked_reaction: None,
     weight: 2,
 };
 
@@ -271,7 +266,18 @@ pub const SMALL_SHIELD: Shield = Shield {
         action_point_cost: 1,
         stamina_cost: 0,
         effect: OnHitReactionEffect::ShieldBash,
-        must_be_melee: true,
+        required_circumstance: Some(AttackCircumstance::Melee),
+    }),
+    on_attacked_reaction: Some(OnAttackedReaction {
+        id: OnAttackedReactionId::Block,
+        name: "Block",
+        description: "Block an incoming ranged attack",
+        // TODO: make better icon
+        icon: IconId::RangedAttack,
+        action_point_cost: 1,
+        stamina_cost: 1,
+        effect: OnAttackedReactionEffect { bonus_evasion: 5 },
+        required_circumstance: Some(AttackCircumstance::Ranged),
     }),
     weight: 2,
 };
@@ -330,11 +336,12 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
 };
 
 pub const TRUE_STRIKE: AttackEnhancement = AttackEnhancement {
-    name: "True strike",
+    name: "Empower",
     icon: IconId::TrueStrike,
     stamina_cost: 1,
     effect: AttackEnhancementEffect {
-        armor_penetration: 2,
+        bonus_damage: 1,
+        //armor_penetration: 2,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -362,7 +369,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect { bonus_evasion: 5 },
-    must_be_melee: true,
+    required_circumstance: Some(AttackCircumstance::Melee),
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
@@ -373,7 +380,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     action_point_cost: 1,
     stamina_cost: 2,
     effect: OnAttackedReactionEffect { bonus_evasion: 5 },
-    must_be_melee: false,
+    required_circumstance: None,
 };
 
 pub const RAGE: OnHitReaction = OnHitReaction {
@@ -383,7 +390,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnHitReactionEffect::Rage,
-    must_be_melee: false,
+    required_circumstance: None,
 };
 
 pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
@@ -410,12 +417,13 @@ pub const SWEEP_ATTACK: Ability = Ability {
     stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
 
-    modifier: AbilityModifier::Attack(-3),
+    roll: Some(AbilityRollType::Attack(-3)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some((
             Range::Melee,
-            AbilityEffect::Enemy(AbilityEnemyEffect::Attack),
+            AreaTargetAcquisition::Enemies,
+            AbilityEffect::Negative(AbilityNegativeEffect::Attack),
         )),
         self_effect: None,
     },
@@ -448,13 +456,13 @@ pub const LUNGE_ATTACK: Ability = Ability {
     stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
 
-    modifier: AbilityModifier::Attack(0),
+    roll: Some(AbilityRollType::Attack(0)),
     // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
     possible_enhancements: [Some(LUNGE_ATTACK_HEAVY_IMPACT), None, None],
     target: AbilityTarget::Enemy {
         //reach: AbilityReach::MoveIntoMelee(Range::Float(2.99)),
         reach: AbilityReach::MoveIntoMelee(Range::Float(2.5)),
-        effect: AbilityEnemyEffect::Attack,
+        effect: AbilityNegativeEffect::Attack,
         impact_area: None,
     },
     animation_color: MAGENTA,
@@ -463,20 +471,19 @@ pub const LUNGE_ATTACK: Ability = Ability {
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
-    description: Condition::Braced.description(),
+    description: Condition::Protected(1).description(),
     icon: IconId::Brace,
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 1,
     weapon_requirement: None,
-
-    modifier: AbilityModifier::Spell,
+    roll: None,
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
         self_area: None,
-        self_effect: Some(AbilityAllyEffect {
+        self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some(ApplyEffect::Condition(Condition::Braced)),
+            apply: Some(ApplyEffect::Condition(Condition::Protected(2))),
         }),
     },
     animation_color: MAGENTA,
@@ -492,11 +499,12 @@ pub const SCREAM: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
         self_area: Some((
             Range::Ranged(3),
-            AbilityEffect::Enemy(AbilityEnemyEffect::Spell(SpellEnemyEffect {
+            AreaTargetAcquisition::Enemies,
+            AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: None,
                 on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
@@ -536,10 +544,10 @@ pub const SHACKLED_MIND: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Float(4.0)),
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([
@@ -594,7 +602,7 @@ pub const MIND_BLAST: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [
         Some(AbilityEnhancement {
             ability_id: AbilityId::MindBlast,
@@ -614,7 +622,7 @@ pub const MIND_BLAST: Ability = Ability {
         None,
     ],
     target: AbilityTarget::Enemy {
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Static(1)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
@@ -635,10 +643,10 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
             on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(3))), None]),
@@ -659,10 +667,10 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([Some(ApplyEffect::Condition(Condition::Slowed(1))), None]),
@@ -683,10 +691,10 @@ pub const MAGI_HEAL: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
         range: Range::Ranged(5),
-        effect: AbilityAllyEffect {
+        effect: AbilityPositiveEffect {
             healing: 3,
             apply: None,
         },
@@ -705,10 +713,10 @@ pub const HEAL: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
         range: Range::Ranged(3),
-        effect: AbilityAllyEffect {
+        effect: AbilityPositiveEffect {
             healing: 2,
             apply: None,
         },
@@ -759,12 +767,13 @@ pub const HEALING_NOVA: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: Some((
             Range::Ranged(4),
-            AbilityEffect::Ally(AbilityAllyEffect {
+            AreaTargetAcquisition::Allies,
+            AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
                 apply: None,
             }),
@@ -784,11 +793,11 @@ pub const SELF_HEAL: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: None,
-        self_effect: Some(AbilityAllyEffect {
+        self_effect: Some(AbilityPositiveEffect {
             healing: 1,
             apply: Some(ApplyEffect::Condition(Condition::Protected(1))),
         }),
@@ -806,12 +815,13 @@ pub const HEALING_RAIN: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Area {
         range: Range::Ranged(5),
         radius: Range::Float(1.95),
-        effect: AbilityEffect::Ally(AbilityAllyEffect {
+        acquisition: AreaTargetAcquisition::Allies,
+        effect: AbilityEffect::Positive(AbilityPositiveEffect {
             healing: 1,
             apply: None,
         }),
@@ -872,17 +882,18 @@ pub const FIREBALL: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Float(4.5)),
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::AtLeast(2)),
             on_hit: None,
         }),
         impact_area: Some((
             Range::Ranged(2),
-            AbilityEnemyEffect::Spell(SpellEnemyEffect {
+            AreaTargetAcquisition::Everyone,
+            AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
                 damage: Some(AbilityDamage::AtLeast(1)),
                 on_hit: None,
@@ -908,10 +919,10 @@ pub const KILL: Ability = Ability {
     stamina_cost: 0,
     weapon_requirement: None,
 
-    modifier: AbilityModifier::Spell,
+    roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
     target: AbilityTarget::Enemy {
-        effect: AbilityEnemyEffect::Spell(SpellEnemyEffect {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: None,
             damage: Some(AbilityDamage::Static(99)),
             on_hit: None,

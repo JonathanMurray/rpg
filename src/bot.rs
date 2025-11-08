@@ -124,7 +124,10 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
     assert!(!character.player_controlled());
 
+    let mut attack_range = None;
+
     if let Some(attack) = character.attack_action() {
+        attack_range = Some(character.weapon(attack.hand).unwrap().range);
         let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
         let mut rng = rand::rng();
         player_chars.shuffle(&mut rng);
@@ -152,9 +155,17 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     let mut shortest_path_to_some_player: Option<Path> = None;
 
     for player_pos in &game.player_positions() {
-        let maybe_path = game
-            .pathfind_grid
-            .find_shortest_path_to_adjacent(bot_pos, *player_pos);
+        let maybe_path = if let Some(range) = attack_range {
+            game.pathfind_grid.find_shortest_path_to_proximity(
+                bot_pos,
+                *player_pos,
+                range.into_range().into(),
+            )
+        } else {
+            game.pathfind_grid
+                .find_shortest_path_to_adjacent(bot_pos, *player_pos)
+        };
+
         if let Some(path) = maybe_path {
             dbg!(bot_pos, player_pos, &path);
             if let Some(shortest) = &shortest_path_to_some_player {
