@@ -25,7 +25,7 @@ enum UiOutcome {
     None,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 enum MessageFromGame {
     AwaitingChooseAction,
     AwaitingChooseOnAttackedReaction {

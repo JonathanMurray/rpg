@@ -1155,6 +1155,8 @@ impl UserInterface {
                 ability,
                 mut detail_lines,
             } => {
+                dbg!(&target_outcome);
+
                 let actor_name = self.characters.get(actor).name;
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
@@ -1179,23 +1181,18 @@ impl UserInterface {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" ({} damage)", dmg))
                             } else {
-                                match applied_effects {
-                                    [None, None] => {
-                                        if *graze {
-                                            line.push_str(" (graze)");
-                                        } else {
-                                            line.push_str(" (hit)");
-                                        }
+                                if applied_effects.is_empty() {
+                                    if *graze {
+                                        line.push_str(" (graze)");
+                                    } else {
+                                        line.push_str(" (hit)");
                                     }
-                                    [Some(e), None] => line.push_str(&format!("  ({e})")),
-                                    [Some(e1), Some(e2)] => {
-                                        line.push_str(&format!("  ({e1}, {e2})"))
-                                    }
-                                    _ => unreachable!("{applied_effects:?}"),
-                                };
+                                } else if applied_effects.len() == 1 {
+                                    line.push_str(&format!("  ({})", applied_effects[0]));
+                                }
                             }
                         }
-                        AbilityTargetOutcome::Resist => line.push_str(" (miss)"),
+                        AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
                         AbilityTargetOutcome::AffectedAlly { healing } => {
                             if let Some(amount) = healing {
                                 line.push_str(&format!(" ({} healing)", amount))
@@ -1223,9 +1220,10 @@ impl UserInterface {
                     if attacks.len() == 1 {
                         detail_lines.push("resulting in an attack".to_string());
                     } else {
-                        detail_lines.push(format!("resulting in {} attacks)", attacks.len()));
+                        detail_lines.push(format!("resulting in {} attacks", attacks.len()));
                     }
                 }
+
                 self.log.add_with_details(line, &detail_lines);
 
                 let mut duration = 0.0;
@@ -1480,22 +1478,23 @@ impl UserInterface {
                 let effect = if let Some(dmg) = damage {
                     (format!("{}", dmg), Goodness::Bad)
                 } else {
-                    match applied_effects {
-                        [None, None] => {
-                            if *graze {
-                                ("Graze".to_string(), Goodness::Bad)
-                            } else {
-                                ("Hit".to_string(), Goodness::Bad)
-                            }
+                    if applied_effects.is_empty() {
+                        if *graze {
+                            ("Graze".to_string(), Goodness::Bad)
+                        } else {
+                            ("Hit".to_string(), Goodness::Bad)
                         }
-                        [Some(e), None] => (format!("{e}"), Goodness::Bad),
-                        [Some(e1), Some(e2)] => (format!("{e1} {e2}"), Goodness::Bad),
-                        _ => unreachable!("{applied_effects:?}"),
+                    } else {
+                        let mut s = String::new();
+                        for apply_effect in applied_effects {
+                            s.push_str(&format!("{} ", apply_effect));
+                        }
+                        (s, Goodness::Bad)
                     }
                 };
                 Some(effect)
             }
-            AbilityTargetOutcome::Resist => Some(("Resist".to_string(), Goodness::Neutral)),
+            AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), Goodness::Neutral)),
             AbilityTargetOutcome::AffectedAlly { healing } => {
                 if let Some(heal_amount) = healing {
                     Some((format!("{}", heal_amount), Goodness::Good))

@@ -158,7 +158,7 @@ fn describe_attack_enhancement_effect(
     if let Some(mut condition) = effect.inflict_condition_per_damage {
         let stacks = *condition.stacks().unwrap();
         technical_description.push(format!(
-            "inflicts {} {} per damage dealt",
+            "Inflicts {} {} per damage dealt",
             stacks,
             condition.name()
         ));
@@ -206,8 +206,8 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButton
             technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
         }
 
-        if let Some(apply_effect) = effect.on_hit {
-            describe_apply_effect(apply_effect, &mut technical_description);
+        for apply_effect in effect.on_hit.iter().flatten().flatten() {
+            describe_apply_effect(*apply_effect, &mut technical_description);
         }
 
         if effect.increased_range_tenths > 0 {
@@ -287,6 +287,24 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
             };
             technical_description.push(line);
         }
+        ApplyEffect::PerBleeding {
+            damage,
+            caster_healing_percentage,
+        } => {
+            technical_description.push(format!(
+                "  {} damage per stack of Bleeding. Caster heals for {}% of the damage dealt.",
+                damage, caster_healing_percentage
+            ));
+        }
+        ApplyEffect::ConsumeCondition { mut condition } => {
+            let line = if condition.stacks().is_some() {
+                format!("  Loses all {}", condition.name())
+            } else {
+                format!("  Loses {}", condition.name())
+            };
+
+            technical_description.push(line);
+        }
     }
 }
 
@@ -324,10 +342,10 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
         } => {
             match reach {
                 AbilityReach::Range(range) => {
-                    technical_description.push(format!("Target enemy (range {})", range));
+                    technical_description.push(format!("Target enemy (range {}) :", range));
                 }
                 AbilityReach::MoveIntoMelee(range) => {
-                    technical_description.push(format!("Engage enemy (range {})", range));
+                    technical_description.push(format!("Engage enemy (range {}) :", range));
                 }
             }
             describe_ability_enemy_effect(effect, &mut technical_description);
@@ -339,13 +357,13 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
                 technical_description
-                    .push(format!("{} in impact area (radius {})", targets_str, range));
+                    .push(format!("{} in impact area (radius {}) :", targets_str, range));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
         }
 
         AbilityTarget::Ally { range, effect } => {
-            technical_description.push(format!("Target ally (range {})", range));
+            technical_description.push(format!("Target ally (range {}) :", range));
             describe_ability_ally_effect(effect, &mut technical_description);
         }
 
@@ -354,7 +372,7 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             self_effect,
         } => {
             if let Some(effect) = self_effect {
-                technical_description.push("Self effect".to_string());
+                technical_description.push("Self :".to_string());
                 describe_ability_ally_effect(effect, &mut technical_description);
             }
 
@@ -364,11 +382,11 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
 
                 match effect {
                     AbilityEffect::Negative(effect) => {
-                        technical_description.push(format!("Nearby enemies (radius {})", radius));
+                        technical_description.push(format!("Nearby enemies (radius {}) :", radius));
                         describe_ability_enemy_effect(effect, &mut technical_description);
                     }
                     AbilityEffect::Positive(effect) => {
-                        technical_description.push(format!("Nearby allies (radius {})", radius));
+                        technical_description.push(format!("Nearby allies (radius {}) :", radius));
                         describe_ability_ally_effect(effect, &mut technical_description);
                     }
                 }
@@ -388,14 +406,14 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
                 technical_description.push(format!(
-                    "{} (range {}, radius {})",
+                    "{} (range {}, radius {}) :",
                     targets_str, range, radius
                 ));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
             AbilityEffect::Positive(effect) => {
                 assert!(acquisition == AreaTargetAcquisition::Allies);
-                technical_description.push(format!("Allies (range {}, radius {})", range, radius));
+                technical_description.push(format!("Allies (range {}, radius {}) :", range, radius));
                 describe_ability_ally_effect(effect, &mut technical_description);
             }
         },

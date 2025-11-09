@@ -655,7 +655,7 @@ impl GameGrid {
             UiState::ChoosingAction => MouseState::MayInputMovement,
             UiState::ConfiguringAction(base_action) => match base_action {
                 ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
-                    area_range: None,
+                    area_radius: None,
                     move_into_melee: false,
                 },
                 ConfiguredAction::UseAbility {
@@ -666,21 +666,21 @@ impl GameGrid {
                     AbilityTarget::Enemy {
                         impact_area, reach, ..
                     } => {
-                        let mut area_range = None;
-                        if let Some((mut range, _acquisition, _effect)) = impact_area {
+                        let mut area_radius = None;
+                        if let Some((mut radius, _acquisition, _effect)) = impact_area {
                             for effect in
                                 selected_enhancements.iter().filter_map(|e| e.spell_effect)
                             {
                                 if effect.increased_radius_tenths > 0 {
-                                    range =
-                                        range.plusf(effect.increased_radius_tenths as f32 * 0.1);
+                                    radius =
+                                        radius.plusf(effect.increased_radius_tenths as f32 * 0.1);
                                 }
                             }
-                            area_range = Some(range);
+                            area_radius = Some(radius);
                         }
                         let move_into_melee = matches!(reach, AbilityReach::MoveIntoMelee(..));
                         MouseState::RequiresEnemyTarget {
-                            area_range,
+                            area_radius,
                             move_into_melee,
                         }
                     }
@@ -719,8 +719,8 @@ impl GameGrid {
 
         match mouse_state {
             MouseState::RequiresEnemyTarget {
-                area_range: Some(range),
-                move_into_melee,
+                area_radius: Some(radius),
+                ..
             } => {
                 if let ActionTarget::Character(target_id, movement) =
                     ui_state.players_action_target()
@@ -728,13 +728,13 @@ impl GameGrid {
                     // TODO draw movement?
                     self.draw_range_indicator(
                         self.characters.get(target_id).pos(),
-                        range,
+                        radius,
                         RangeIndicator::TargetAreaEffect,
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
                     self.draw_range_indicator(
                         mouse_grid_pos,
-                        range,
+                        radius,
                         RangeIndicator::TargetAreaEffect,
                     );
                 }
@@ -1348,10 +1348,13 @@ impl GameGrid {
                             )
                         })
                     }
-                    ActionTarget::None => ability
-                        .target
-                        .radius(selected_enhancements)
-                        .map(|range| (range, RangeIndicator::ActionTargetRange)),
+                    ActionTarget::None => {
+                        let radius = ability.target.radius(selected_enhancements);
+                        let range = ability.target.range(selected_enhancements);
+                        radius
+                            .or(range)
+                            .map(|range| (range, RangeIndicator::ActionTargetRange))
+                    }
                 },
                 _ => None,
             }
@@ -2055,7 +2058,7 @@ impl EffectGraphics {
 #[derive(PartialEq, Debug)]
 enum MouseState {
     RequiresEnemyTarget {
-        area_range: Option<Range>,
+        area_radius: Option<Range>,
         move_into_melee: bool,
     },
     RequiresAllyTarget,

@@ -29,8 +29,9 @@ use rpg::core::{
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    MANA_POTION, OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP,
-    SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    MANA_POTION, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE,
+    SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK,
+    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -89,19 +90,6 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
 
-    alice.known_actions.push(BaseAction::UseAbility(FIREBALL));
-    alice
-        .known_actions
-        .push(BaseAction::UseAbility(SHACKLED_MIND));
-    alice
-        .known_actions
-        .push(BaseAction::UseAbility(HEALING_NOVA));
-    alice.known_ability_enhancements.push(FIREBALL_INFERNO);
-    alice.add_to_spirit(2);
-    alice.known_attack_enhancements.push(TRUE_STRIKE);
-    alice.known_passive_skills.push(PassiveSkill::Reaper);
-
-    //alice.stamina.lose(3);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -115,12 +103,9 @@ async fn main() {
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
-    bob.known_actions.push(BaseAction::UseAbility(BRACE));
-    bob.known_actions.push(BaseAction::UseAbility(SCREAM));
-    bob.known_ability_enhancements.push(SCREAM_SHRIEK);
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
-    //bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
+    bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements
     //.push(LUNGE_ATTACK_HEAVY_IMPACT);
@@ -131,15 +116,6 @@ async fn main() {
     //bob.health.lose(2);
 
     let mut player_characters = vec![bob, alice];
-
-    player_characters = run_fight_loop(
-        player_characters,
-        FightId::EasySurrounded,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-    )
-    .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

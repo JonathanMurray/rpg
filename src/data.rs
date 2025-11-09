@@ -636,6 +636,52 @@ pub const MIND_BLAST: Ability = Ability {
     animation_color: PURPLE,
 };
 
+pub const NECROTIC_INFLUENCE_ENHANCEMENT: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::NecroticInfluence,
+    name: "Necrotic influence",
+    description: "Converts all bleeding to immediate damage and life-drain",
+    icon: IconId::NecroticInfluence,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    spell_effect: Some(SpellEnhancementEffect {
+        on_hit: Some([
+            Some(ApplyEffect::PerBleeding {
+                damage: 1,
+                caster_healing_percentage: 40,
+            }),
+            Some(ApplyEffect::ConsumeCondition {
+                condition: Condition::Bleeding(0),
+            }),
+        ]),
+        ..SpellEnhancementEffect::default()
+    }),
+    attack_effect: None,
+};
+pub const NECROTIC_INFLUENCE: Ability = Ability {
+    id: AbilityId::NecroticInfluence,
+    name: "Inflict wounds",
+    description: "",
+    icon: IconId::NecroticInfluence,
+    action_point_cost: 3,
+    mana_cost: 1,
+    stamina_cost: 0,
+    weapon_requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [Some(NECROTIC_INFLUENCE_ENHANCEMENT), None, None],
+    target: AbilityTarget::Enemy {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: None,
+            on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(4))), None]),
+        }),
+        impact_area: None,
+        reach: AbilityReach::Range(Range::Float(4.5)),
+    },
+    animation_color: PURPLE,
+};
+
 pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::MagiInflictWounds,
     name: "Inflict wounds",
@@ -750,7 +796,7 @@ pub const HEAL: Ability = Ability {
             stamina_cost: 0,
             attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
-                on_hit: Some(ApplyEffect::GainStamina(2)),
+                on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
                 ..SpellEnhancementEffect::default()
             }),
         }),

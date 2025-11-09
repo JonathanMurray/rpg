@@ -519,8 +519,14 @@ impl CoreGame {
         }
     }
 
-    fn perform_effect_application(&self, effect: ApplyEffect, receiver: &Character) -> String {
-        match effect {
+    fn perform_effect_application(
+        &self,
+        effect: ApplyEffect,
+        giver: Option<&Character>,
+        receiver: &Character,
+    ) -> (String, u32) {
+        let mut damage_dealt = 0;
+        let line = match effect {
             ApplyEffect::RemoveActionPoints(n) => {
                 receiver.action_points.lose(n);
                 format!("  {} lost {} AP", receiver.name, n)
@@ -532,7 +538,36 @@ impl CoreGame {
             ApplyEffect::Condition(condition) => {
                 self.perform_receive_condition(condition, receiver)
             }
-        }
+            ApplyEffect::PerBleeding {
+                damage,
+                caster_healing_percentage,
+            } => {
+                let stacks = receiver.conditions.borrow().bleeding;
+                damage_dealt = self.perform_losing_health(receiver, damage * stacks);
+                let healing_amount = damage_dealt * caster_healing_percentage / 100;
+                self.perform_gain_health(
+                    giver.unwrap(),
+                    healing_amount,
+                );
+                format!(
+                    "  {} lost {} health. {} was healed for {}",
+                    receiver.name,
+                    damage_dealt,
+                    giver.unwrap().name,
+                    healing_amount
+                )
+            }
+            ApplyEffect::ConsumeCondition { condition } => {
+                let stacks_cleared = receiver.clear_condition(condition);
+                let mut line = format!("  {} lost {}", receiver.name, condition.name());
+                if let Some(stacks) = stacks_cleared {
+                    line.push_str(&format!(" ({})", stacks));
+                }
+                line
+            }
+        };
+
+        (line, damage_dealt)
     }
 
     fn perform_receive_condition(&self, mut condition: Condition, receiver: &Character) -> String {
@@ -689,7 +724,7 @@ impl CoreGame {
 
                     let outcome = self
                         .perform_ability_enemy_effect(
-                            caster_id,
+                            caster,
                             ability.name,
                             &ability_roll,
                             &enhancements,
@@ -787,9 +822,8 @@ impl CoreGame {
                     self_area,
                     self_effect,
                 } => {
-                    if let Some(ability_roll) = &maybe_ability_roll {
-                        let (_ability_result, dice_roll_line) = ability_roll.unwrap_spell();
-                        detail_lines.push(dice_roll_line.to_string());
+                    if let Some(AbilityRoll::Spell { result: _, line }) = &maybe_ability_roll {
+                        detail_lines.push(line.clone());
                     }
 
                     if let Some(effect) = self_effect {
@@ -856,6 +890,7 @@ impl CoreGame {
             }
 
             let caster_id = caster_ref.id();
+            // TODO also communicate if the caster healed from hitting the target (e.g. necrotic influence)
             self.ui_handle_event(GameEvent::AbilityWasUsed {
                 actor: caster_id,
                 target_outcome,
@@ -1005,18 +1040,21 @@ impl CoreGame {
                         *stacks += degree_of_success;
                     }
                 }
+                ApplyEffect::PerBleeding { .. } => {}
+                ApplyEffect::ConsumeCondition { .. } => {}
             }
 
             dbg!(effect);
 
-            let log_line = self.perform_effect_application(effect, target);
+            let (log_line, _damage) = self.perform_effect_application(effect, None, target);
             detail_lines.push(log_line);
         }
 
         for enhancement in enhancements {
             let effect = enhancement.spell_effect.unwrap();
-            if let Some(apply_effect) = effect.on_hit {
-                let log_line = self.perform_effect_application(apply_effect, target);
+            for apply_effect in effect.on_hit.iter().flatten().flatten() {
+                let (log_line, _damage) =
+                    self.perform_effect_application(*apply_effect, None, target);
                 detail_lines.push(format!("{} ({})", log_line, enhancement.name));
             }
         }
@@ -1088,7 +1126,7 @@ impl CoreGame {
 
                 let outcome = self
                     .perform_ability_enemy_effect(
-                        caster.id(),
+                        caster,
                         name,
                         &ability_roll,
                         enhancements,
@@ -1108,7 +1146,7 @@ impl CoreGame {
 
     async fn perform_ability_enemy_effect(
         &self,
-        caster_id: CharacterId,
+        caster: &Character,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
@@ -1119,6 +1157,7 @@ impl CoreGame {
     ) -> AbilityTargetOutcome {
         match enemy_effect {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => self.perform_spell_enemy_effect(
+                caster,
                 ability_name,
                 ability_roll,
                 enhancements,
@@ -1136,7 +1175,7 @@ impl CoreGame {
                 let reaction = None;
                 let roll_modifier = ability_roll.unwrap_attack_bonus();
                 let event = self.perform_attack(
-                    caster_id,
+                    caster.id(),
                     HandType::MainHand,
                     attack_enhancement_effects,
                     target.id(),
@@ -1151,6 +1190,7 @@ impl CoreGame {
 
     fn perform_spell_enemy_effect(
         &self,
+        caster: &Character,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
@@ -1265,6 +1305,8 @@ impl CoreGame {
                 }
             }
 
+            let mut damage_from_effects = 0;
+
             for mut effect in spell_enemy_effect
                 .on_hit
                 .unwrap_or_default()
@@ -1284,28 +1326,34 @@ impl CoreGame {
                             apply_degree_of_success(stacks, degree_of_success)
                         }
                     }
+                    ApplyEffect::PerBleeding { .. } => {}
+                    ApplyEffect::ConsumeCondition { .. } => {}
                 }
 
                 applied_effects.push(effect);
-                let log_line = self.perform_effect_application(effect, target);
+                let (log_line, damage) =
+                    self.perform_effect_application(effect, Some(caster), target);
+                damage_from_effects += damage;
                 detail_lines.push(log_line);
             }
 
             for enhancement in enhancements {
                 // TODO: shouldn't these also be affected by degree of success?
                 let e = enhancement.spell_effect.unwrap();
-                if let Some(effect) = e.on_hit {
-                    applied_effects.push(effect);
-                    let log_line = self.perform_effect_application(effect, target);
+                for effect in e.on_hit.iter().flatten().flatten() {
+                    applied_effects.push(*effect);
+                    let (log_line, damage) =
+                        self.perform_effect_application(*effect, Some(caster), target);
+                    damage_from_effects += damage;
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
             }
 
-            assert!(applied_effects.len() <= 2);
-            let applied_effects = [
-                applied_effects.first().copied(),
-                applied_effects.get(1).copied(),
-            ];
+            let damage = match damage {
+                Some(dmg) => Some(dmg + damage_from_effects),
+                None if damage_from_effects > 0 => Some(damage_from_effects),
+                _ => None,
+            };
 
             AbilityTargetOutcome::HitEnemy {
                 damage,
@@ -1323,7 +1371,7 @@ impl CoreGame {
                 None => unreachable!("uncontested effect cannot fail"),
             };
             detail_lines.push(line);
-            AbilityTargetOutcome::Resist
+            AbilityTargetOutcome::Resisted
         }
     }
 
@@ -1538,7 +1586,8 @@ impl CoreGame {
             if let Some(effect) = on_true_hit_effect {
                 match effect {
                     AttackHitEffect::Apply(effect) => {
-                        let log_line = self.perform_effect_application(effect, defender);
+                        let (log_line, _damage) =
+                            self.perform_effect_application(effect, Some(attacker), defender);
                         detail_lines.push(format!("{} (true hit)", log_line))
                     }
                     AttackHitEffect::SkipExertion => skip_attack_exertion = true,
@@ -1554,7 +1603,12 @@ impl CoreGame {
                                 format!("{} regained 1 AP", attacker.name)
                             }
                             AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                                self.perform_effect_application(apply_effect, defender)
+                                let (log_line, _damage) = self.perform_effect_application(
+                                    apply_effect,
+                                    Some(attacker),
+                                    defender,
+                                );
+                                log_line
                             }
                         };
 
@@ -1606,7 +1660,8 @@ impl CoreGame {
 
         for (name, effect) in &enhancements {
             if let Some(effect) = effect.on_target {
-                let log_line = self.perform_effect_application(effect, defender);
+                let (log_line, _damage) =
+                    self.perform_effect_application(effect, Some(attacker), defender);
                 detail_lines.push(format!("{} ({})", log_line, name));
             }
         }
@@ -1671,10 +1726,7 @@ impl CoreGame {
                     let res = roll + attack_mod;
                     lines.push(format!(
                         "Rolled: {} (+{} atk mod) = {}, vs toughness={}",
-                        roll,
-                        attack_mod,
-                        res,
-                        toughness,
+                        roll, attack_mod, res, toughness,
                     ));
                     let condition = if res >= toughness {
                         let degree_of_success = (res - toughness) / 5;
@@ -1695,8 +1747,9 @@ impl CoreGame {
                     };
 
                     if let Some(condition) = condition {
-                        let log_line = self.perform_effect_application(
+                        let (log_line, _damage) = self.perform_effect_application(
                             ApplyEffect::Condition(condition),
+                            Some(reactor),
                             attacker,
                         );
                         lines.push(format!("{} (Shield bash)", log_line));
@@ -1829,7 +1882,7 @@ pub trait GameEventHandler {
     fn handle(&self, event: GameEvent);
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum GameEvent {
     LogLine(String),
     Moved {
@@ -1899,15 +1952,15 @@ pub struct OffensiveHitReactionOutcome {
     pub inflicted_condition: Option<Condition>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum AbilityTargetOutcome {
     HitEnemy {
         damage: Option<u32>,
         graze: bool,
-        applied_effects: [Option<ApplyEffect>; 2],
+        applied_effects: Vec<ApplyEffect>,
     },
     AttackedEnemy(AttackedEvent),
-    Resist,
+    Resisted,
     AffectedAlly {
         healing: Option<u32>,
     },
@@ -2106,6 +2159,13 @@ pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(Condition),
     GainStamina(u32),
+    PerBleeding {
+        damage: u32,
+        caster_healing_percentage: u32,
+    },
+    ConsumeCondition {
+        condition: Condition,
+    },
 }
 
 impl Display for ApplyEffect {
@@ -2114,6 +2174,18 @@ impl Display for ApplyEffect {
             ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("+{n} stamina")),
             ApplyEffect::Condition(condition) => f.write_fmt(format_args!("{}", condition.name())),
+            ApplyEffect::PerBleeding {
+                damage,
+                caster_healing_percentage,
+            } => {
+                f.write_fmt(format_args!("{} damage per Bleeding", damage))?;
+
+                // TODO mention healing? (where is this shown?)
+                Ok(())
+            }
+            ApplyEffect::ConsumeCondition { condition } => {
+                f.write_fmt(format_args!("-{}", condition.name()))
+            }
         }
     }
 }
@@ -2174,17 +2246,9 @@ pub enum AttackHitEffect {
 impl Display for AttackHitEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttackHitEffect::Apply(apply_effect) => match apply_effect {
-                ApplyEffect::RemoveActionPoints(n) => {
-                    f.write_fmt(format_args!("Target loses {n} AP"))
-                }
-                ApplyEffect::GainStamina(n) => {
-                    f.write_fmt(format_args!("Target gains {n} stamina"))
-                }
-                ApplyEffect::Condition(condition) => {
-                    f.write_fmt(format_args!("Target receives {condition:?}"))
-                }
-            },
+            AttackHitEffect::Apply(apply_effect) => {
+                f.write_fmt(format_args!("Target: {}", apply_effect))
+            }
             AttackHitEffect::SkipExertion => f.write_fmt(format_args!("No exertion")),
         }
     }
@@ -2537,6 +2601,7 @@ pub enum AbilityId {
     Scream,
     ShackledMind,
     MindBlast,
+    NecroticInfluence,
     Heal,
     HealingNova,
     SelfHeal,
@@ -2561,20 +2626,20 @@ pub enum AbilityRollType {
     Attack(i32),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityEffect {
     Negative(AbilityNegativeEffect),
     Positive(AbilityPositiveEffect),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellNegativeEffect {
     pub defense_type: Option<DefenseType>,
     pub damage: Option<AbilityDamage>,
     pub on_hit: Option<[Option<ApplyEffect>; 2]>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityNegativeEffect {
     Spell(SpellNegativeEffect),
     Attack,
@@ -2589,13 +2654,13 @@ impl AbilityNegativeEffect {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityDamage {
     Static(u32),
     AtLeast(u32),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityPositiveEffect {
     pub healing: u32,
     pub apply: Option<ApplyEffect>,
@@ -2844,13 +2909,9 @@ pub struct SpellEnhancementEffect {
     pub bonus_target_damage: u32,
     pub bonus_area_damage: u32,
     pub cast_twice: bool,
-    pub on_hit: Option<ApplyEffect>,
+    pub on_hit: Option<[Option<ApplyEffect>; 2]>,
     pub increased_range_tenths: u32,
     pub increased_radius_tenths: u32,
-
-    // Used by abilities that perform attacks
-    //TODO remove this, use enum variant instead
-    pub attack_enhancement_effect: Option<AttackEnhancementEffect>,
 }
 
 impl SpellEnhancementEffect {
@@ -2865,7 +2926,6 @@ impl SpellEnhancementEffect {
             on_hit: None,
             increased_range_tenths: 0,
             increased_radius_tenths: 0,
-            attack_enhancement_effect: None,
         }
     }
 }
@@ -4096,6 +4156,70 @@ impl Character {
             Exposed(n) => conditions.exposed += n,
             Hindered(n) => conditions.hindered += n,
             ReaperApCooldown => conditions.reaper_ap_cooldown = true,
+        }
+    }
+
+    pub fn get_condition_stacks(&self, condition: Condition) -> Option<u32> {
+        let mut conditions = self.conditions.borrow_mut();
+        use Condition::*;
+        fn clear_u32(value: &mut u32) -> Option<u32> {
+            let prev = *value;
+            *value = 0;
+            Some(prev)
+        }
+        fn clear_bool(value: &mut bool) -> Option<u32> {
+            *value = false;
+            None
+        }
+        match condition {
+            Protected(..) => clear_u32(&mut conditions.protected),
+            Dazed(..) => clear_u32(&mut conditions.dazed),
+            Bleeding(..) => clear_u32(&mut conditions.bleeding),
+            Braced => clear_bool(&mut conditions.braced),
+            Raging => clear_bool(&mut conditions.raging),
+            Distracted => clear_bool(&mut conditions.distracted),
+            Weakened(..) => clear_u32(&mut conditions.weakened),
+            MainHandExertion(..) => clear_u32(&mut conditions.mainhand_exertion),
+            OffHandExertion(..) => clear_u32(&mut conditions.offhand_exertion),
+            Encumbered(..) => clear_u32(&mut conditions.encumbered),
+            NearDeath => clear_bool(&mut conditions.near_death),
+            Dead => clear_bool(&mut conditions.dead),
+            Slowed(..) => clear_u32(&mut conditions.slowed),
+            Exposed(..) => clear_u32(&mut conditions.exposed),
+            Hindered(..) => clear_u32(&mut conditions.hindered),
+            ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
+        }
+    }
+
+    pub fn clear_condition(&self, condition: Condition) -> Option<u32> {
+        let mut conditions = self.conditions.borrow_mut();
+        use Condition::*;
+        fn clear_u32(value: &mut u32) -> Option<u32> {
+            let prev = *value;
+            *value = 0;
+            Some(prev)
+        }
+        fn clear_bool(value: &mut bool) -> Option<u32> {
+            *value = false;
+            None
+        }
+        match condition {
+            Protected(..) => clear_u32(&mut conditions.protected),
+            Dazed(..) => clear_u32(&mut conditions.dazed),
+            Bleeding(..) => clear_u32(&mut conditions.bleeding),
+            Braced => clear_bool(&mut conditions.braced),
+            Raging => clear_bool(&mut conditions.raging),
+            Distracted => clear_bool(&mut conditions.distracted),
+            Weakened(..) => clear_u32(&mut conditions.weakened),
+            MainHandExertion(..) => clear_u32(&mut conditions.mainhand_exertion),
+            OffHandExertion(..) => clear_u32(&mut conditions.offhand_exertion),
+            Encumbered(..) => clear_u32(&mut conditions.encumbered),
+            NearDeath => clear_bool(&mut conditions.near_death),
+            Dead => clear_bool(&mut conditions.dead),
+            Slowed(..) => clear_u32(&mut conditions.slowed),
+            Exposed(..) => clear_u32(&mut conditions.exposed),
+            Hindered(..) => clear_u32(&mut conditions.hindered),
+            ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
         }
     }
 }
