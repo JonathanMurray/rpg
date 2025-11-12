@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::atomic::AtomicBool;
 use std::{cell::RefCell, sync::atomic::Ordering};
 
 use macroquad::{
@@ -15,6 +16,8 @@ use super::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, OnHitReaction};
 
 use super::game_ui::{PlayerChose, UiState, UserInterface};
+
+pub static DEBUG: AtomicBool = AtomicBool::new(true);
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -196,6 +199,8 @@ struct _GameUserInterfaceConnection {
     user_interface: RefCell<UserInterface>,
 }
 
+
+
 impl _GameUserInterfaceConnection {
     async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
         let mut user_interface = self.user_interface.borrow_mut();
@@ -304,6 +309,12 @@ impl _GameUserInterfaceConnection {
 
             clear_background(BLACK);
             user_interface.draw();
+
+            if get_keys_pressed().contains(&KeyCode::Space) {
+                DEBUG.fetch_not(Ordering::SeqCst);
+                dbg!(DEBUG.load(Ordering::SeqCst));
+            }
+
 
             if let Some(player_choice) = player_choice {
                 user_interface.set_state(UiState::Idle);

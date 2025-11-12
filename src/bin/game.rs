@@ -82,7 +82,7 @@ async fn main() {
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
-        Attributes::new(2, 3, 3, 2),
+        Attributes::new(3, 4, 4, 2),
         (1, 10),
     );
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
@@ -96,7 +96,7 @@ async fn main() {
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(3, 2, 2, 3),
+        Attributes::new(4, 3, 3, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
@@ -116,6 +116,15 @@ async fn main() {
     //bob.health.lose(2);
 
     let mut player_characters = vec![bob, alice];
+
+              player_characters = run_fight_loop(
+                    player_characters,
+                    FightId::EasySurrounded,
+                    &equipment_icons,
+                    icons.clone(),
+                    portrait_textures.clone(),
+                )
+                .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

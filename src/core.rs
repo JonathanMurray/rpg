@@ -17,7 +17,7 @@ use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 pub type Position = (i32, i32);
 
 pub const MAX_ACTION_POINTS: u32 = 5;
-pub const ACTION_POINTS_PER_TURN: u32 = 4;
+pub const ACTION_POINTS_PER_TURN: u32 = 3;
 
 #[derive(Debug)]
 enum ActionOutcome {
@@ -1277,9 +1277,9 @@ impl CoreGame {
                 let graze = degree_of_success == -1;
 
                 if graze {
-                    dmg_str.push_str(" -50% (Graze)");
+                    dmg_str.push_str(" -1 (Graze)");
                     // Since there's no armor/protection against spells, rounding up would make the spell too powerful.
-                    dmg_calculation /= 2;
+                    dmg_calculation -= 1;
                 }
 
                 let damage = dmg_calculation.max(0) as u32;
@@ -1536,8 +1536,8 @@ impl CoreGame {
             if attack_result < evasion {
                 //let mut line = "  Graze! (50% damage".to_string();
                 let line = "  Graze!".to_string();
-                dmg_str.push_str(" -50% (graze)");
-                dmg_calculation = (dmg_calculation as f32 * 0.5).ceil() as i32;
+                dmg_str.push_str(" -1 (graze)");
+                dmg_calculation -= 1;
 
                 if armor_value > 0 {
                     //line.push_str(&format!(", {} mitigated", armor_value));
@@ -2994,7 +2994,7 @@ impl Attributes {
     }
 
     fn max_health(&self) -> u32 {
-        6 + self.strength.get()
+        8 + self.strength.get()
     }
 
     fn max_mana(&self) -> u32 {

@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, rc::Rc, sync::atomic};
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -24,18 +24,12 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_rounded, Drawable, Style},
-    core::{
+    base_ui::{Drawable, Style, draw_text_rounded}, core::{
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
         Position,
-    },
-    drawing::{
+    }, drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
-    },
-    game_ui::{ConfiguredAction, UiState},
-    game_ui_components::ActionPointsRow,
-    pathfind::{build_path_from_route, PathfindGrid, Route},
-    textures::{draw_terrain, SpriteId, TerrainId},
+    }, game_ui::{ConfiguredAction, UiState}, game_ui_components::ActionPointsRow, game_ui_connection::DEBUG, pathfind::{PathfindGrid, Route, build_path_from_route}, textures::{SpriteId, TerrainId, draw_terrain}
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -45,7 +39,7 @@ use crate::{
 const BACKGROUND_COLOR: Color = Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
-const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.04);
+const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
 const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
 const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
@@ -62,7 +56,7 @@ const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = WHITE;
-const MOVE_RANGE_COLOR: Color = GREEN;
+const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
 const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
@@ -95,10 +89,6 @@ impl MovementRange {
     fn set(&mut self, speed: f32, max_range: f32) {
         self.speed = speed;
         self.max_range = max_range;
-    }
-
-    fn selected(&self) -> f32 {
-        0.0
     }
 
     fn ap_cost(&self, range: f32) -> u32 {
@@ -970,10 +960,17 @@ impl GameGrid {
                     let path = build_path_from_route(&self.routes, active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path, true);
 
+                    // TODO draw move range here
+                    let ap_cost = self
+                        .movement_range
+                        .ap_cost(hovered_route.distance_from_start);
+
+                    //self.draw_movement_path_background();
+                    
+                    self.draw_move_range_indicator(active_char_pos, ap_cost as f32 * self.movement_range.speed);
+
                     if pressed_left_mouse {
-                        let ap_cost = self
-                            .movement_range
-                            .ap_cost(hovered_route.distance_from_start);
+                      
 
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
                             ap_cost,
@@ -1510,31 +1507,6 @@ impl GameGrid {
         }
     }
 
-    // TODO remove, replaced by func in pathfind.rs
-    fn build_path_from_route(
-        &self,
-        start: Position,
-        destination: Position,
-    ) -> Vec<(f32, Position)> {
-        let route = self.routes.get(&destination).unwrap();
-        let mut dist = route.distance_from_start;
-
-        let mut path = vec![(dist, destination)];
-        let mut pos = route.came_from;
-
-        loop {
-            let route = self.routes.get(&pos).unwrap();
-            dist = route.distance_from_start;
-            path.push((dist, pos));
-            if pos == start {
-                break;
-            }
-            pos = route.came_from;
-        }
-        assert!(path.len() > 1);
-        path
-    }
-
     fn draw_overhead_exclamation_mark(&self, reactor: &Character) {
         let text = "?";
         let font_size = 20;
@@ -1661,15 +1633,20 @@ impl GameGrid {
     fn draw_movement_path_background(&self) {
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        // TODO: Keep this or not?
-        self.draw_move_range_indicator(active_char_pos);
-
-        for pos in self.routes.keys() {
+        for (pos, route) in &self.routes {
             if self.is_within_grid(*pos) && *pos != active_char_pos {
-                self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 1.0, 2.0);
-                //self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+                let mut color = MOVEMENT_PREVIEW_GRID_COLOR;
+               // color.g -= route.distance_from_start * 0.2;
+               // color.b -= route.distance_from_start * 0.2;
+
+                //self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 1.0, 2.0);
+                self.fill_cell(*pos, color, self.cell_w / 20.0);
             }
         }
+
+   
+
+
     }
 
     fn is_within_grid(&self, pos: Position) -> bool {
@@ -1773,9 +1750,8 @@ impl GameGrid {
         );
     }
 
-    fn draw_move_range_indicator(&self, origin: Position) {
-        let range = self.movement_range.selected();
-        let range_ceil = range.ceil() as i32;
+    fn draw_move_range_indicator(&self, origin: Position, range: f32) {
+        let range_floor = range.floor() as i32;
 
         let within = |x: i32, y: i32| {
             self.routes
@@ -1784,15 +1760,16 @@ impl GameGrid {
                 .unwrap_or(false)
         };
 
-        for x in (origin.0 - range_ceil).max(0)
-            ..=(origin.0 + range_ceil).min(self.grid_dimensions.0 as i32 - 1)
+        for x in (origin.0 - range_floor).max(0)
+            ..=(origin.0 + range_floor).min(self.grid_dimensions.0 as i32 - 1)
         {
-            for y in (origin.1 - range_ceil).max(0)
-                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 as i32 - 1)
+            for y in (origin.1 - range_floor).max(0)
+                ..=(origin.1 + range_floor).min(self.grid_dimensions.1 as i32 - 1)
             {
                 let thickness = 2.0;
 
                 if within(x, y) {
+                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
                     self.draw_dashed_borders(
                         x,
                         y,
