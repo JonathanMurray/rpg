@@ -152,11 +152,19 @@ impl ConfiguredAction {
         characters: &Characters,
     ) -> bool {
         match self {
-            ConfiguredAction::Attack { target, attack, .. } => match target {
+            ConfiguredAction::Attack {
+                target,
+                attack,
+                selected_enhancements,
+                ..
+            } => match target {
                 Some(target_id) => {
                     let target_char = characters.get(*target_id);
-                    let (_range, reach) =
-                        relevant_character.attack_reach(attack.hand, target_char.position.get());
+                    let (_range, reach) = relevant_character.attack_reaches(
+                        attack.hand,
+                        target_char.position.get(),
+                        selected_enhancements.iter().map(|e| e.effect),
+                    );
                     matches!(
                         reach,
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..)
@@ -644,9 +652,11 @@ impl UserInterface {
             Some(target_id) => {
                 let target_char = self.characters.get(*target_id);
 
-                let (_range, reach) = self
-                    .active_character()
-                    .attack_reach(attack.hand, target_char.position.get());
+                let (_range, reach) = self.active_character().attack_reaches(
+                    attack.hand,
+                    target_char.position.get(),
+                    selected_enhancements.iter().map(|e| e.effect),
+                );
 
                 let mut details = vec![];
 

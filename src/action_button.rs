@@ -152,8 +152,10 @@ fn describe_attack_enhancement_effect(
     if effect.bonus_damage > 0 {
         technical_description.push(format!("+ {} damage", effect.bonus_damage));
     }
-    if effect.bonus_advantage > 0 {
-        technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
+    if effect.roll_advantage > 0 {
+        technical_description.push(format!("+ {} advantage", effect.roll_advantage));
+    } else if effect.roll_advantage < 0 {
+        technical_description.push(format!("- {} advantage", -effect.roll_advantage));
     }
     if let Some(mut condition) = effect.inflict_condition_per_damage {
         let stacks = *condition.stacks().unwrap();

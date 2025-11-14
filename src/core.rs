@@ -232,7 +232,16 @@ impl CoreGame {
                 let attacker = self.characters.get_rc(self.active_character_id);
                 let defender = self.characters.get(target);
 
-                assert!(attacker.attack_reach(hand, defender.position.get()).1 != ActionReach::No);
+                assert!(
+                    attacker
+                        .attack_reaches(
+                            hand,
+                            defender.position.get(),
+                            enhancements.iter().map(|e| e.effect)
+                        )
+                        .1
+                        != ActionReach::No
+                );
 
                 let mut action_point_cost = attacker.weapon(hand).unwrap().action_point_cost as i32;
 
@@ -2858,11 +2867,13 @@ impl AbilityEnhancement {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AttackEnhancementEffect {
     pub roll_modifier: i32,
-    pub bonus_advantage: u32,
+    pub roll_advantage: i32,
     pub bonus_damage: u32,
     pub action_point_discount: u32,
     pub inflict_condition_per_damage: Option<Condition>,
     pub armor_penetration: u32,
+    pub range_bonus: u32,
+
     // TODO Actually handle this
     pub on_self: Option<ApplyEffect>,
 
@@ -2879,11 +2890,12 @@ impl AttackEnhancementEffect {
         Self {
             action_point_discount: 0,
             bonus_damage: 0,
-            bonus_advantage: 0,
+            roll_advantage: 0,
             on_damage_effect: None,
             roll_modifier: 0,
             inflict_condition_per_damage: None,
             armor_penetration: 0,
+            range_bonus: 0,
             on_self: None,
             on_target: None,
         }
@@ -3336,6 +3348,19 @@ impl Character {
         self.hand(hand).get().weapon
     }
 
+    pub fn attack_range(
+        &self,
+        hand: HandType,
+        enhancements: impl Iterator<Item = AttackEnhancementEffect>,
+    ) -> Range {
+        let mut modifier = 0;
+        for enhancement in enhancements {
+            modifier += enhancement.range_bonus;
+        }
+        let weapon = self.weapon(hand).unwrap();
+        weapon.range.into_range().plus(modifier)
+    }
+
     pub fn has_equipped_ranged_weapon(&self) -> bool {
         if let Some(weapon) = self.weapon(HandType::MainHand) {
             !weapon.is_melee()
@@ -3465,7 +3490,12 @@ impl Character {
         self.hand(hand).get().weapon.unwrap().action_point_cost
     }
 
-    pub fn attack_reach(&self, hand: HandType, target_position: Position) -> (Range, ActionReach) {
+    pub fn attack_reaches(
+        &self,
+        hand: HandType,
+        target_position: Position,
+        enhancements: impl Iterator<Item = AttackEnhancementEffect>,
+    ) -> (Range, ActionReach) {
         let weapon = self.weapon(hand).unwrap();
         let weapon_range = weapon.range;
 
@@ -3481,9 +3511,14 @@ impl Character {
                     (weapon_range.into_range(), ActionReach::No)
                 }
             }
-            WeaponRange::Ranged(..) => {
+            WeaponRange::Ranged(range) => {
+                let mut modifier = 0;
+                for enhancement in enhancements {
+                    modifier += enhancement.range_bonus;
+                }
+
                 if within_range_squared(
-                    weapon_range.squared(),
+                    (range as f32 + modifier as f32).powf(2.0),
                     self.position.get(),
                     target_position,
                 ) {
@@ -3497,19 +3532,7 @@ impl Character {
                         (weapon_range.into_range(), ActionReach::Yes)
                     }
                 } else {
-                    let extended = weapon_range.extended().unwrap();
-                    if within_range_squared(
-                        extended.powf(2.0),
-                        self.position.get(),
-                        target_position,
-                    ) {
-                        (
-                            weapon_range.into_range(),
-                            ActionReach::YesButDisadvantage("Far"),
-                        )
-                    } else {
-                        (Range::Float(extended), ActionReach::No)
-                    }
+                    (weapon_range.into_range(), ActionReach::No)
                 }
             }
         }
@@ -3981,18 +4004,20 @@ impl Character {
             bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
         }
 
-        let (_range, reach) = self.attack_reach(hand_type, target_pos);
+        let (_range, reach) = self.attack_reaches(
+            hand_type,
+            target_pos,
+            enhancement_effects.iter().map(|(_, e)| *e),
+        );
 
         if let ActionReach::YesButDisadvantage(reason) = reach {
             bonuses.push((reason, RollBonusContributor::Advantage(-1)));
         }
 
         for (name, effect) in enhancement_effects {
-            if effect.bonus_advantage > 0 {
-                bonuses.push((
-                    name,
-                    RollBonusContributor::Advantage(effect.bonus_advantage as i32),
-                ));
+            let adv = effect.roll_advantage;
+            if adv != 0 {
+                bonuses.push((name, RollBonusContributor::Advantage(adv)));
             }
 
             if effect.roll_modifier != 0 {
@@ -4468,9 +4493,7 @@ impl Display for WeaponRange {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Melee => f.write_str("melee"),
-            Self::Ranged(range) => {
-                f.write_fmt(format_args!("{} ({})", range, self.extended().unwrap()))
-            }
+            Self::Ranged(range) => f.write_fmt(format_args!("{}", range)),
         }
     }
 }
@@ -4480,13 +4503,6 @@ impl WeaponRange {
         match self {
             Self::Melee => 2.0,
             Self::Ranged(range) => range.pow(2) as f32,
-        }
-    }
-
-    pub fn extended(&self) -> Option<f32> {
-        match self {
-            Self::Ranged(range) => Some((*range as f32) * 1.5),
-            _ => None,
         }
     }
 

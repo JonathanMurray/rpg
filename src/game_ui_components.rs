@@ -721,7 +721,7 @@ impl Drawable for ActionPointsRow {
                     missing = true;
                 }
             } else {
-                // A negative reserved_ap means that the player is about to make an action that will grant AP (such as 
+                // A negative reserved_ap means that the player is about to make an action that will grant AP (such as
                 // ending their turn)
                 if i < self.current_ap as i32 {
                     available = true;

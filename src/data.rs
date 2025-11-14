@@ -335,7 +335,20 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
-        bonus_advantage: 1,
+        roll_advantage: 1,
+        ..AttackEnhancementEffect::default()
+    },
+    ..AttackEnhancement::default()
+};
+
+pub const LONGER_REACH: AttackEnhancement = AttackEnhancement {
+    name: "Longer reach",
+    description: "",
+    icon: IconId::Extend,
+    weapon_requirement: Some(WeaponType::Ranged),
+    effect: AttackEnhancementEffect {
+        roll_advantage: -1,
+        range_bonus: 2,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()

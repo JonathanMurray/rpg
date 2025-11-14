@@ -1282,12 +1282,21 @@ impl GameGrid {
     fn determine_range_indicator(&self, ui_state: &mut UiState) -> Option<(Range, RangeIndicator)> {
         if let UiState::ConfiguringAction(configured_action) = ui_state {
             match configured_action {
-                ConfiguredAction::Attack { attack, target, .. } => match target {
+                ConfiguredAction::Attack {
+                    attack,
+                    target,
+                    selected_enhancements,
+                    ..
+                } => match target {
                     Some(target) => {
                         let (range, reach) = self
                             .characters
                             .get(self.active_character_id)
-                            .attack_reach(attack.hand, self.characters.get(*target).position.get());
+                            .attack_reaches(
+                                attack.hand,
+                                self.characters.get(*target).position.get(),
+                                selected_enhancements.iter().map(|e| e.effect),
+                            );
 
                         let maybe_indicator = match reach {
                             ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
@@ -1304,13 +1313,10 @@ impl GameGrid {
                     }
 
                     None => {
-                        let range = self
-                            .characters
-                            .get(self.active_character_id)
-                            .weapon(attack.hand)
-                            .unwrap()
-                            .range
-                            .into_range();
+                        let range = self.characters.get(self.active_character_id).attack_range(
+                            attack.hand,
+                            selected_enhancements.iter().map(|e| e.effect),
+                        );
                         Some((range, RangeIndicator::ActionTargetRange))
                     }
                 },

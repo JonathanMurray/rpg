@@ -28,10 +28,10 @@ use rpg::core::{
 
 use rpg::data::{
     BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
-    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    MANA_POTION, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE,
-    SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK,
-    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
+    LUNGE_ATTACK_HEAVY_IMPACT, MANA_POTION, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT,
+    OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD,
+    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -89,6 +89,7 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
+    alice.known_attack_enhancements.push(LONGER_REACH);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -117,7 +118,7 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![alice, bob];
 
     player_characters = run_fight_loop(
         player_characters,

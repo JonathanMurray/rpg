@@ -1,4 +1,4 @@
-use std::{cell::Cell, rc::Rc};
+use std::{cell::Cell, iter, rc::Rc};
 
 use macroquad::rand::ChooseRandom;
 use rand::{seq::SliceRandom, Rng};
@@ -164,7 +164,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
         ChooseRandom::shuffle(&mut player_chars[..]);
         for player_char in player_chars {
             if character
-                .attack_reach(attack.hand, player_char.position.get())
+                .attack_reaches(attack.hand, player_char.position.get(), iter::empty())
                 .1
                 != ActionReach::No
             {
