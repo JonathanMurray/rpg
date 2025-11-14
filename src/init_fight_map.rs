@@ -285,7 +285,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             );
             enemy2.set_weapon(HandType::MainHand, SWORD);
 
-            characters.extend_from_slice(&[enemy1, enemy2]);
+            characters.extend_from_slice(&[enemy1]);
         }
     }
 

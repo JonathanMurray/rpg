@@ -3,9 +3,9 @@ BBBBBBBBBBBBB
 BRR         B
 BR          B
 B           B
-B0P1       SB
-B P        SB
-B      W   SB
+B P 0 P    SB
+B          SB
+B   1  W   SB
 B      WW   B
 BB         BB
  BBBBBBBBBBB

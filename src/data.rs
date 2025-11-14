@@ -1019,6 +1019,7 @@ pub enum PassiveSkill {
     Reaper,
     BloodRage,
     ThrillOfBattle,
+    Honorless,
 }
 
 impl PassiveSkill {
@@ -1031,6 +1032,7 @@ impl PassiveSkill {
             Reaper => "Reaper",
             BloodRage => "Blood rage",
             ThrillOfBattle => "Thrill of battle",
+            Honorless => "Honorless",
         }
     }
 
@@ -1045,6 +1047,8 @@ impl PassiveSkill {
             BloodRage => IconId::Rage,
             // TODO: unique icon
             ThrillOfBattle => IconId::MeleeAttack,
+            // TODO: unique icon
+            Honorless => IconId::RangedAttack,
         }
     }
 
@@ -1056,7 +1060,8 @@ impl PassiveSkill {
             ArcaneSurge => "+3 spell modifier while at/below 50% mana",
             Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
             BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
-            ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked."
+            ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
+            Honorless => "Attacks deal +1 damage against Flanked targets",
         }
     }
 }

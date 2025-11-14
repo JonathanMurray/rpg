@@ -90,9 +90,7 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_attack_enhancements.push(LONGER_REACH);
-    alice
-        .known_passive_skills
-        .push(PassiveSkill::ThrillOfBattle);
+    alice.known_passive_skills.push(PassiveSkill::Honorless);
 
     let mut bob = Character::new(
         Behaviour::Player,
@@ -121,7 +119,7 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![alice];
+    let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,

@@ -1566,6 +1566,17 @@ impl CoreGame {
                 }
             }
 
+            if attacker
+                .known_passive_skills
+                .contains(&PassiveSkill::Honorless)
+            {
+                let bonus_dmg = 1;
+                if is_target_flanked(attacker.pos(), defender) {
+                    dmg_str.push_str(&format!(" +{} (Honorless)", bonus_dmg));
+                    dmg_calculation += bonus_dmg as i32;
+                }
+            }
+
             let armored_defense = evasion + armor_value;
 
             if attack_result < evasion {
@@ -4034,20 +4045,8 @@ impl Character {
         let target_pos = target.pos();
         let mut bonuses = vec![];
 
-        let target_is_immune_to_flanking = target
-            .known_passive_skills
-            .contains(&PassiveSkill::ThrillOfBattle);
-
-        if !target_is_immune_to_flanking {
-            let flanking = target
-                .is_engaged_by
-                .borrow()
-                .values()
-                .any(|engager| are_flanking_target(self.pos(), engager.pos(), target_pos));
-
-            if flanking {
-                bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
-            }
+        if is_target_flanked(self.pos(), target) {
+            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
         }
 
         let (_range, reach) = self.attack_reaches(
@@ -4310,11 +4309,23 @@ impl Character {
     }
 }
 
-fn are_flanking_target(
-    attacker: (i32, i32),
-    melee_engager: (i32, i32),
-    target: (i32, i32),
-) -> bool {
+fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
+    let target_is_immune_to_flanking = target
+        .known_passive_skills
+        .contains(&PassiveSkill::ThrillOfBattle);
+
+    if target_is_immune_to_flanking {
+        return false;
+    }
+
+    target
+        .is_engaged_by
+        .borrow()
+        .values()
+        .any(|engager| are_flanking_target(attacker_pos, engager.pos(), target.pos()))
+}
+
+fn are_flanking_target(attacker: Position, melee_engager: Position, target: Position) -> bool {
     // Note: engagement is always melee, which is why this vector is also a direction
     let engage_dir = (melee_engager.0 - target.0, melee_engager.1 - target.1);
     let (dx, dy) = (attacker.0 - target.0, attacker.1 - target.1);
