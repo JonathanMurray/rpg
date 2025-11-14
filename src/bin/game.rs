@@ -125,7 +125,7 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob];
+    let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,

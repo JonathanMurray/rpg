@@ -62,8 +62,7 @@ pub enum UiState {
     },
     ReactingToMovementAttackOpportunity {
         reactor: CharacterId,
-        // TODO: characterId?
-        target: u32,
+        target: CharacterId,
         movement: ((i32, i32), (i32, i32)),
         selected: bool,
     },
@@ -942,6 +941,7 @@ impl UserInterface {
 
         let mut relevant_action_button = None;
 
+        let mut is_reacting = None;
         let mut is_reacting_to_attack = false;
         let mut movement_cost = 0;
 
@@ -983,32 +983,20 @@ impl UserInterface {
             }
 
             UiState::ReactingToAttack { reactor, .. } => {
-                self.target_ui
-                    .set_action("React?".to_string(), vec![], false);
-                self.set_allowed_to_use_action_buttons(false);
-
-                // TODO correct? Should do same for all reactions then?
-                self.player_portraits.set_selected_id(*reactor);
-
+                is_reacting = Some(*reactor);
                 is_reacting_to_attack = true;
             }
 
-            UiState::ReactingToHit { .. } => {
-                self.target_ui
-                    .set_action("React?".to_string(), vec![], false);
-                self.set_allowed_to_use_action_buttons(false);
+            UiState::ReactingToHit { victim, .. } => {
+                is_reacting = Some(*victim);
             }
 
-            UiState::ReactingToMovementAttackOpportunity { .. } => {
-                self.target_ui
-                    .set_action("React?".to_string(), vec![], false);
-                self.set_allowed_to_use_action_buttons(false);
+            UiState::ReactingToMovementAttackOpportunity { reactor, .. } => {
+                is_reacting = Some(*reactor);
             }
 
-            UiState::ReactingToRangedAttackOpportunity { .. } => {
-                self.target_ui
-                    .set_action("React?".to_string(), vec![], false);
-                self.set_allowed_to_use_action_buttons(false);
+            UiState::ReactingToRangedAttackOpportunity { reactor, .. } => {
+                is_reacting = Some(*reactor);
             }
 
             UiState::ChoosingAction => {
@@ -1024,8 +1012,15 @@ impl UserInterface {
             }
         }
 
-        if is_reacting_to_attack {
-            self.activity_popup.refresh_on_attacked_state();
+        if let Some(reactor) = is_reacting {
+            self.target_ui
+                .set_action("React?".to_string(), vec![], false);
+            self.set_allowed_to_use_action_buttons(false);
+            self.player_portraits.set_selected_id(reactor);
+
+            if is_reacting_to_attack {
+                self.activity_popup.refresh_on_attacked_state();
+            }
         }
 
         self.activity_popup
