@@ -9,7 +9,6 @@ use macroquad::{
 use std::{
     cell::{Cell, RefCell},
     rc::{Rc, Weak},
-    sync::atomic::{AtomicBool, Ordering},
 };
 
 pub trait Drawable {
@@ -310,7 +309,7 @@ pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> Text
 }
 
 impl Drawable for TextLine {
-    fn draw(&self, mut x: f32, mut y: f32) {
+    fn draw(&self, x: f32, y: f32) {
         let y0 = y + self.vert_padding;
 
         let x0 = if self.right_align {

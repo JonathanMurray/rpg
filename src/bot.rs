@@ -1,11 +1,11 @@
 use std::{cell::Cell, iter, rc::Rc};
 
 use macroquad::rand::ChooseRandom;
-use rand::{seq::SliceRandom, Rng};
+use rand::Rng;
 
 use crate::{
     core::{
-        Ability, Action, ActionReach, ActionTarget, BaseAction, Behaviour, Character, CharacterId,
+        Ability, Action, ActionReach, ActionTarget, BaseAction, Character, CharacterId,
         CoreGame, HandType, OnAttackedReaction, OnHitReaction, Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},

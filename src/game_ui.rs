@@ -1138,7 +1138,7 @@ impl UserInterface {
                         reactor_pos,
                         0.0,
                         1.0,
-                        format!("{}", condition.name()),
+                        condition.name().to_string(),
                         Goodness::Neutral,
                     );
                 }
@@ -1150,7 +1150,7 @@ impl UserInterface {
                             attacker_pos,
                             0.0,
                             1.0,
-                            format!("{}", condition.name()),
+                            condition.name().to_string(),
                             Goodness::Neutral,
                         );
                     } else {
@@ -1202,16 +1202,14 @@ impl UserInterface {
                         } => {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" ({} damage)", dmg))
-                            } else {
-                                if applied_effects.is_empty() {
-                                    if *graze {
-                                        line.push_str(" (graze)");
-                                    } else {
-                                        line.push_str(" (hit)");
-                                    }
-                                } else if applied_effects.len() == 1 {
-                                    line.push_str(&format!("  ({})", applied_effects[0]));
+                            } else if applied_effects.is_empty() {
+                                if *graze {
+                                    line.push_str(" (graze)");
+                                } else {
+                                    line.push_str(" (hit)");
                                 }
+                            } else if applied_effects.len() == 1 {
+                                line.push_str(&format!("  ({})", applied_effects[0]));
                             }
                         }
                         AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
@@ -1499,20 +1497,18 @@ impl UserInterface {
             } => {
                 let effect = if let Some(dmg) = damage {
                     (format!("{}", dmg), Goodness::Bad)
-                } else {
-                    if applied_effects.is_empty() {
-                        if *graze {
-                            ("Graze".to_string(), Goodness::Bad)
-                        } else {
-                            ("Hit".to_string(), Goodness::Bad)
-                        }
+                } else if applied_effects.is_empty() {
+                    if *graze {
+                        ("Graze".to_string(), Goodness::Bad)
                     } else {
-                        let mut s = String::new();
-                        for apply_effect in applied_effects {
-                            s.push_str(&format!("{} ", apply_effect));
-                        }
-                        (s, Goodness::Bad)
+                        ("Hit".to_string(), Goodness::Bad)
                     }
+                } else {
+                    let mut s = String::new();
+                    for apply_effect in applied_effects {
+                        s.push_str(&format!("{} ", apply_effect));
+                    }
+                    (s, Goodness::Bad)
                 };
                 Some(effect)
             }

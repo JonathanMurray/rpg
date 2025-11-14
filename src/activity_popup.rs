@@ -447,7 +447,7 @@ impl ActivityPopup {
             .unwrap_or(0);
         let mut reserved_from_choices: i32 = 0;
         for action in self.selected_choices() {
-            reserved_from_choices += action.action_point_cost() as i32;
+            reserved_from_choices += action.action_point_cost();
             reserved_from_choices -= action.action_point_discount() as i32;
         }
         let mut additional_hovered_from_choices = 0;
@@ -463,7 +463,7 @@ impl ActivityPopup {
         }
         let reserved_ap = reserved_from_action + reserved_from_choices;
         let hovered_ap = if additional_hovered_from_choices > 0 {
-            reserved_ap as i32 + additional_hovered_from_choices
+            reserved_ap + additional_hovered_from_choices
         } else {
             0
         };

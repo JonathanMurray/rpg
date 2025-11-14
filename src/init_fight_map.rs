@@ -223,7 +223,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
         FightId::EliteMagi => {
             let pos = *enemy_positions[&0].choose().unwrap();
-            let mut magi = Character::new(
+            let magi = Character::new(
                 Behaviour::Bot(BotBehaviour::Magi(Default::default())),
                 "Magi",
                 PortraitId::Magi,

@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, rc::Rc, sync::atomic};
+use std::{cmp::Ordering, collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
@@ -25,7 +25,6 @@ use macroquad::{
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
-    character_sheet,
     core::{
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
         Position,
@@ -35,7 +34,6 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    game_ui_connection::DEBUG,
     pathfind::{build_path_from_route, PathfindGrid, Route},
     textures::{draw_terrain, SpriteId, TerrainId},
 };
@@ -1653,7 +1651,7 @@ impl GameGrid {
             //if route.distance_from_start < self.movement_range.speed {
 
             if self.is_within_grid(*pos) && *pos != active_char_pos {
-                let mut color = MOVEMENT_PREVIEW_GRID_COLOR;
+                let color = MOVEMENT_PREVIEW_GRID_COLOR;
                 // color.g -= route.distance_from_start * 0.2;
                 // color.b -= route.distance_from_start * 0.2;
 

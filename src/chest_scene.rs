@@ -6,7 +6,7 @@ use macroquad::{
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
-    text::{draw_text, measure_text, Font, TextParams},
+    text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},

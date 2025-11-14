@@ -1576,12 +1576,10 @@ impl CoreGame {
                     detail_lines.push("  Heavy hit".to_string());
                     dmg_str.push_str(" +1 (Heavy hit)");
                     dmg_calculation += 1;
+                } else if armor_value > 0 {
+                    detail_lines.push("  Penetrating hit".to_string());
                 } else {
-                    if armor_value > 0 {
-                        detail_lines.push("  Penetrating hit".to_string());
-                    } else {
-                        detail_lines.push("  Neutral hit".to_string());
-                    }
+                    detail_lines.push("  Neutral hit".to_string());
                 }
             }
 
@@ -2735,7 +2733,7 @@ impl AbilityTarget {
             },
             AbilityTarget::Ally { range, .. } => Some(*range),
             AbilityTarget::Area { range, .. } => Some(*range),
-            AbilityTarget::None { self_area, .. } => None,
+            AbilityTarget::None {  .. } => None,
         }
     }
 
