@@ -270,8 +270,7 @@ impl CoreGame {
                         if unfriendly
                             && within_meele(attacker.pos(), other_char.pos())
                             && target != other_char.id()
-                            && other_char.can_use_opportunity_attack()
-                            && other_char.is_engaging(attacker.id())
+                            && other_char.can_use_opportunity_attack(attacker.id())
                         {
                             let reactor = other_char;
                             let chooses_to_use_opportunity_attack = self
@@ -473,9 +472,7 @@ impl CoreGame {
                     && !within_meele(new_position, other_char.pos());
 
                 if unfriendly && leaving_melee {
-                    if other_char.can_use_opportunity_attack()
-                        && other_char.is_engaging(character.id())
-                    {
+                    if other_char.can_use_opportunity_attack(character.id()) {
                         let reactor = other_char;
 
                         let chooses_to_use_opportunity_attack = self
@@ -3689,7 +3686,12 @@ impl Character {
             .collect()
     }
 
-    pub fn can_use_opportunity_attack(&self) -> bool {
+    pub fn can_use_opportunity_attack(&self, target: CharacterId) -> bool {
+        if !self.known_passive_skills.contains(&PassiveSkill::Vigilant) && !self.is_engaging(target)
+        {
+            return false;
+        }
+
         if let Some(weapon) = self.weapon(HandType::MainHand) {
             weapon.is_melee() && self.action_points.current() >= 1
         } else {

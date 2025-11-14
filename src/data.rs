@@ -1020,6 +1020,7 @@ pub enum PassiveSkill {
     BloodRage,
     ThrillOfBattle,
     Honorless,
+    Vigilant,
 }
 
 impl PassiveSkill {
@@ -1033,6 +1034,7 @@ impl PassiveSkill {
             BloodRage => "Blood rage",
             ThrillOfBattle => "Thrill of battle",
             Honorless => "Honorless",
+            Vigilant => "Vigilant",
         }
     }
 
@@ -1049,6 +1051,8 @@ impl PassiveSkill {
             ThrillOfBattle => IconId::MeleeAttack,
             // TODO: unique icon
             Honorless => IconId::RangedAttack,
+            // TODO: unique icon
+            Vigilant => IconId::MeleeAttack,
         }
     }
 
@@ -1062,6 +1066,7 @@ impl PassiveSkill {
             BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
             ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal +1 damage against Flanked targets",
+            Vigilant => "Can opportunity attack an enemy even if you are not engaging them"
         }
     }
 }

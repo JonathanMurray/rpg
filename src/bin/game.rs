@@ -105,6 +105,7 @@ async fn main() {
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
+    bob.known_passive_skills.push(PassiveSkill::Vigilant);
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions
@@ -119,7 +120,7 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![bob];
 
     player_characters = run_fight_loop(
         player_characters,
