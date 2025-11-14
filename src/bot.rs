@@ -218,21 +218,19 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 
 pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<Action> {
     let mut positions = vec![];
-    let mut ap_cost = 0;
+    let mut total_distance = 0.0;
     for (dist, pos) in path.positions {
-        let cost = dist / character.move_speed();
-        if cost <= character.action_points.current() as f32 {
+        if dist <= character.remaining_movement.get() {
             positions.push(pos);
-            ap_cost = cost.ceil() as u32;
+            total_distance = dist;
         }
     }
 
-    // It's possible that no affordable path was found, if the best path would be diagonal and that costs more than 1 AP
-    if ap_cost > 0 {
+    if total_distance > 0.0 {
         Some(Action::Move {
-            action_point_cost: ap_cost,
+            total_distance,
             positions,
-            stamina_cost: 0,
+            extra_cost: 0,
         })
     } else {
         None

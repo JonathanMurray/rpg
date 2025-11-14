@@ -136,7 +136,7 @@ pub enum ConfiguredAction {
     },
     Move {
         selected_movement_path: Vec<(f32, Position)>,
-        ap_cost: u32,
+        cost: u32,
     },
     ChangeEquipment {
         drag: Option<EquipmentDrag>,
@@ -235,7 +235,7 @@ impl ConfiguredAction {
                 target: ActionTarget::None,
             },
             BaseAction::Move => Self::Move {
-                ap_cost: 0,
+                cost: 0,
                 selected_movement_path: Default::default(),
             },
             BaseAction::ChangeEquipment => Self::ChangeEquipment { drag: None },
@@ -255,7 +255,7 @@ impl ConfiguredAction {
         }
     }
 
-    pub fn base_action_point_cost(&self) -> u32 {
+    pub fn base_action_point_cost(&self) -> i32 {
         self.base_action().action_point_cost()
     }
 
@@ -284,7 +284,7 @@ impl ConfiguredAction {
                 }
                 ap
             }
-            ConfiguredAction::Move { ap_cost, .. } => *ap_cost,
+            ConfiguredAction::Move { cost: ap_cost, .. } => *ap_cost,
             ConfiguredAction::ChangeEquipment { .. } => 1,
             ConfiguredAction::UseConsumable { .. } => 1,
             ConfiguredAction::EndTurn => 0,
@@ -595,6 +595,8 @@ impl UserInterface {
             ..
         }) = &*self.state.borrow()
         {
+            self.activity_popup.on_new_movement_ap_cost();
+
             if !selected_movement_path.is_empty() {
                 self.target_ui.clear_action();
             } else {
@@ -931,6 +933,7 @@ impl UserInterface {
         let mut relevant_action_button = None;
 
         let mut is_reacting_to_attack = false;
+        let mut movement_cost = 0;
 
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
@@ -964,13 +967,19 @@ impl UserInterface {
                         remembered.retain(|e| usable.contains(e));
                         *selected_enhancements = remembered.clone();
                     }
+                } else if let ConfiguredAction::Move { cost, .. } = configured_action {
+                    movement_cost = *cost;
                 }
             }
 
-            UiState::ReactingToAttack { .. } => {
+            UiState::ReactingToAttack { reactor, .. } => {
                 self.target_ui
                     .set_action("React?".to_string(), vec![], false);
                 self.set_allowed_to_use_action_buttons(false);
+
+                // TODO correct? Should do same for all reactions then?
+                self.player_portraits.set_selected_id(*reactor);
+
                 is_reacting_to_attack = true;
             }
 
@@ -1016,7 +1025,10 @@ impl UserInterface {
 
         self.refresh_target_state();
         self.refresh_movement_state();
-        self.game_grid.update_move_speed(self.active_character_id);
+
+        self.game_grid
+            .update_move_speed(self.active_character_id, movement_cost);
+
         self.refresh_selected_action_button();
         self.target_ui.rebuild_character_ui();
     }
@@ -1528,6 +1540,7 @@ impl UserInterface {
                 // we need to clear it, so that we don't panic trying to render its tooltip for example
                 self.hovered_button = None;
             }
+            self.character_sheet_toggle.shown.set(false);
         }
 
         self.active_character_id = new_active_id;
@@ -1561,6 +1574,10 @@ impl UserInterface {
             }
             Some(ActivityPopupOutcome::ChangedAttackEnhancements) => {
                 self.refresh_attack_state();
+            }
+            Some(ActivityPopupOutcome::ChangedMovementSprint(sprint_usage)) => {
+                self.game_grid
+                    .update_move_speed(self.active_character_id, sprint_usage);
             }
             None => {}
         }
@@ -1643,23 +1660,27 @@ impl UserInterface {
                         target: target.clone(),
                     }),
                     &ConfiguredAction::Move {
-                        ap_cost,
+                        cost,
                         selected_movement_path,
                     } => {
                         let mut reversed_path = selected_movement_path.clone();
                         // Remove the character's current position; it should not be part of the movement path
                         reversed_path.remove(reversed_path.len() - 1);
 
+                        let mut total_distance = 0.0;
+
                         let positions = reversed_path
                             .into_iter()
                             .rev()
-                            .map(|(_dist, (x, y))| (x, y))
+                            .map(|(dist, (x, y))| {
+                                total_distance = f32::max(total_distance, dist);
+                                (x, y)
+                            })
                             .collect();
 
-                        let stamina_cost = self.activity_popup.movement_stamina_cost();
                         Some(Action::Move {
-                            action_point_cost: *ap_cost - stamina_cost,
-                            stamina_cost,
+                            total_distance,
+                            extra_cost: *cost,
                             positions,
                         })
                     }
@@ -1935,7 +1956,6 @@ pub fn build_character_ui(
     let resource_bars = ResourceBars::new(character, simple_font);
 
     let action_points_row = ActionPointsRow::new(
-        character.max_reactive_action_points,
         (20.0, 20.0),
         0.3,
         Style {

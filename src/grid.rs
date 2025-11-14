@@ -24,12 +24,20 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Drawable, Style, draw_text_rounded}, core::{
+    base_ui::{draw_text_rounded, Drawable, Style},
+    character_sheet,
+    core::{
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
         Position,
-    }, drawing::{
+    },
+    drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
-    }, game_ui::{ConfiguredAction, UiState}, game_ui_components::ActionPointsRow, game_ui_connection::DEBUG, pathfind::{PathfindGrid, Route, build_path_from_route}, textures::{SpriteId, TerrainId, draw_terrain}
+    },
+    game_ui::{ConfiguredAction, UiState},
+    game_ui_components::ActionPointsRow,
+    game_ui_connection::DEBUG,
+    pathfind::{build_path_from_route, PathfindGrid, Route},
+    textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -91,8 +99,13 @@ impl MovementRange {
         self.max_range = max_range;
     }
 
-    fn ap_cost(&self, range: f32) -> u32 {
-        (range / self.speed).ceil() as u32
+    fn ap_cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
+        let extra_range = range - character_remaining_movement;
+        if extra_range <= 0.0 {
+            0
+        } else {
+            (extra_range / self.speed).ceil() as u32
+        }
         //self.options.iter().position(|(_, r)| range <= *r).unwrap()
     }
 }
@@ -348,13 +361,12 @@ impl GameGrid {
         self.effects.push(concrete_effect);
     }
 
-    pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
+    pub fn update_move_speed(&mut self, active_char_id: CharacterId, sprint_usage: u32) {
+        dbg!(sprint_usage);
         let active_char = self.characters.get(active_char_id);
 
         let speed = active_char.move_speed();
-        let ap = active_char.action_points.current();
-        let sta = active_char.stamina.current();
-        let max_range = ap as f32 * speed + sta.min(ap) as f32 * speed;
+        let max_range = active_char.remaining_movement.get() + (sprint_usage as f32) * speed;
 
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
@@ -578,6 +590,7 @@ impl GameGrid {
             ui_state,
             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
         ) {
+            // TODO
             self.draw_movement_path_background();
         }
 
@@ -960,20 +973,18 @@ impl GameGrid {
                     let path = build_path_from_route(&self.routes, active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path, true);
 
-                    // TODO draw move range here
-                    let ap_cost = self
-                        .movement_range
-                        .ap_cost(hovered_route.distance_from_start);
-
-                    //self.draw_movement_path_background();
-                    
-                    self.draw_move_range_indicator(active_char_pos, ap_cost as f32 * self.movement_range.speed);
-
                     if pressed_left_mouse {
-                      
+                        let char_remaining_movement = self
+                            .characters
+                            .get(self.active_character_id)
+                            .remaining_movement
+                            .get();
+                        let ap_cost = self
+                            .movement_range
+                            .ap_cost(hovered_route.distance_from_start, char_remaining_movement);
 
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
-                            ap_cost,
+                            cost: ap_cost,
                             selected_movement_path: path,
                         });
                         outcome.switched_state = Some(NewState::Move);
@@ -1411,7 +1422,6 @@ impl GameGrid {
 
         if draw_action_points {
             let mut action_points_row = ActionPointsRow::new(
-                character.max_reactive_action_points,
                 (10.0, 10.0),
                 0.2,
                 Style {
@@ -1634,19 +1644,18 @@ impl GameGrid {
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
         for (pos, route) in &self.routes {
+            //if route.distance_from_start < self.movement_range.speed {
+
             if self.is_within_grid(*pos) && *pos != active_char_pos {
                 let mut color = MOVEMENT_PREVIEW_GRID_COLOR;
-               // color.g -= route.distance_from_start * 0.2;
-               // color.b -= route.distance_from_start * 0.2;
+                // color.g -= route.distance_from_start * 0.2;
+                // color.b -= route.distance_from_start * 0.2;
 
                 //self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 1.0, 2.0);
                 self.fill_cell(*pos, color, self.cell_w / 20.0);
             }
+            //}
         }
-
-   
-
-
     }
 
     fn is_within_grid(&self, pos: Position) -> bool {
@@ -1683,16 +1692,18 @@ impl GameGrid {
             Color::new(0.0, 0.0, 0.0, 0.7)
         };
 
-        let draw_ap_instead_of_distance = true;
-
-        let text = if draw_ap_instead_of_distance {
-            let ap = self.movement_range.ap_cost(distance);
-            format!("{}", ap)
-        } else {
-            format!("{:.4}", distance.to_string())
-        };
-
-        self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
+        let char_remaining_movement = self
+            .characters
+            .get(self.active_character_id)
+            .remaining_movement
+            .get();
+        let ap = self
+            .movement_range
+            .ap_cost(distance, char_remaining_movement);
+        if ap > 0 {
+            let text = format!("-{}", ap);
+            self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
+        }
     }
 
     fn draw_movement_path_arrow(

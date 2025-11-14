@@ -632,6 +632,7 @@ fn apply_learning(learning: Learning, character: &mut Character) {
     match learning {
         Learning::Ability(ability) => character
             .known_actions
+            .borrow_mut()
             .push(BaseAction::UseAbility(ability)),
         Learning::OnAttackedReaction(reaction) => character.known_attacked_reactions.push(reaction),
         Learning::OnHitReaction(reaction) => character.known_on_hit_reactions.push(reaction),

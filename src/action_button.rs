@@ -266,6 +266,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
         },
         BaseAction::EndTurn => ActionButtonTooltip {
             header: "End your turn".to_string(),
+            description: Some("Regain 4 AP and some of your stamina"),
             ..Default::default()
         },
     }
@@ -356,8 +357,10 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                     AreaTargetAcquisition::Everyone => "EVERYONE",
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
-                technical_description
-                    .push(format!("{} in impact area (radius {}) :", targets_str, range));
+                technical_description.push(format!(
+                    "{} in impact area (radius {}) :",
+                    targets_str, range
+                ));
                 describe_ability_enemy_effect(effect, &mut technical_description);
             }
         }
@@ -413,7 +416,8 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             }
             AbilityEffect::Positive(effect) => {
                 assert!(acquisition == AreaTargetAcquisition::Allies);
-                technical_description.push(format!("Allies (range {}, radius {}) :", range, radius));
+                technical_description
+                    .push(format!("Allies (range {}, radius {}) :", range, radius));
                 describe_ability_ally_effect(effect, &mut technical_description);
             }
         },
@@ -896,13 +900,13 @@ impl ButtonAction {
         }
     }
 
-    pub fn action_point_cost(&self) -> u32 {
+    pub fn action_point_cost(&self) -> i32 {
         match self {
             ButtonAction::Action(base_action) => base_action.action_point_cost(),
-            ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost,
-            ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost,
-            ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost,
-            ButtonAction::AbilityEnhancement(enhancement) => enhancement.action_point_cost,
+            ButtonAction::OnAttackedReaction(reaction) => reaction.action_point_cost as i32,
+            ButtonAction::OnHitReaction(reaction) => reaction.action_point_cost as i32,
+            ButtonAction::AttackEnhancement(enhancement) => enhancement.action_point_cost as i32,
+            ButtonAction::AbilityEnhancement(enhancement) => enhancement.action_point_cost as i32,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 1,
             ButtonAction::Passive(..) => 0,

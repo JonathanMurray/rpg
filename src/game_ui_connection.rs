@@ -199,8 +199,6 @@ struct _GameUserInterfaceConnection {
     user_interface: RefCell<UserInterface>,
 }
 
-
-
 impl _GameUserInterfaceConnection {
     async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
         let mut user_interface = self.user_interface.borrow_mut();
@@ -314,7 +312,6 @@ impl _GameUserInterfaceConnection {
                 DEBUG.fetch_not(Ordering::SeqCst);
                 dbg!(DEBUG.load(Ordering::SeqCst));
             }
-
 
             if let Some(player_choice) = player_choice {
                 user_interface.set_state(UiState::Idle);

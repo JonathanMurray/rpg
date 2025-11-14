@@ -66,13 +66,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             (None, &[("Evasion", StatValue::U32(character.evasion()))]),
             (
                 Some(("Int", character.base_attributes.intellect.get())),
-                &[
-                    ("Will", StatValue::U32(character.will())),
-                    (
-                        "Reaction AP",
-                        StatValue::String(format!("{}", character.max_reactive_action_points)),
-                    ),
-                ],
+                &[("Will", StatValue::U32(character.will()))],
             ),
             (
                 None,

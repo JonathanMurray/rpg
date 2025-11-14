@@ -90,13 +90,13 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
 
-
     let mut bob = Character::new(
         Behaviour::Player,
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(4, 3, 3, 3),
+        //Attributes::new(4, 3, 3, 3),
+        Attributes::new(1, 3, 3, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
@@ -105,7 +105,9 @@ async fn main() {
     bob.known_attack_enhancements.push(TRUE_STRIKE);
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
-    bob.known_actions.push(BaseAction::UseAbility(SWEEP_ATTACK));
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(SWEEP_ATTACK));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements
     //.push(LUNGE_ATTACK_HEAVY_IMPACT);
@@ -117,14 +119,14 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-              player_characters = run_fight_loop(
-                    player_characters,
-                    FightId::EasySurrounded,
-                    &equipment_icons,
-                    icons.clone(),
-                    portrait_textures.clone(),
-                )
-                .await;
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::EasySurrounded,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene.run_map_loop(font.clone()).await;

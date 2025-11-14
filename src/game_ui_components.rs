@@ -145,7 +145,6 @@ struct TopCharacterPortrait {
 impl TopCharacterPortrait {
     fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
-            character.max_reactive_action_points,
             (10.0, 10.0),
             0.2,
             Style {
@@ -660,9 +659,8 @@ impl Log {
 #[derive(Default)]
 pub struct ActionPointsRow {
     pub is_characters_turn: bool,
-    max_reactive_ap: u32,
     pub current_ap: u32,
-    pub reserved_and_hovered_ap: (u32, u32),
+    pub reserved_and_hovered_ap: (i32, i32),
     max_ap: u32,
     cell_size: (f32, f32),
     padding: f32,
@@ -671,15 +669,9 @@ pub struct ActionPointsRow {
 }
 
 impl ActionPointsRow {
-    pub fn new(
-        max_reactive_ap: u32,
-        cell_size: (f32, f32),
-        radius_factor: f32,
-        style: Style,
-    ) -> Self {
+    pub fn new(cell_size: (f32, f32), radius_factor: f32, style: Style) -> Self {
         Self {
             is_characters_turn: false,
-            max_reactive_ap,
             current_ap: 0,
             reserved_and_hovered_ap: (0, 0),
             max_ap: MAX_ACTION_POINTS,
@@ -702,64 +694,59 @@ impl Drawable for ActionPointsRow {
         let mut x0 = x + self.padding;
         let y0 = y + self.padding;
         let r = self.cell_size.1 * self.radius_factor;
-        if r.floor() != r {
-            dbg!("POSSIBLY BAD CIRCLE DRAWING?", r);
-        }
 
         let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
 
-        for i in 0..self.max_ap {
-            let is_point_hovered =
-                (self.current_ap.saturating_sub(hovered_ap)..self.current_ap).contains(&i);
-
-            /*
-            let blocked_by_lack_of_reactive_ap = !self.is_characters_turn
-                && i < self.max_ap.saturating_sub(self.max_reactive_ap)
-                && i < self.current_ap;
-            */
+        for i in 0..self.max_ap as i32 {
+            let is_point_hovered = if hovered_ap >= 0 {
+                ((self.current_ap as i32).saturating_sub(hovered_ap)..(self.current_ap as i32))
+                    .contains(&i)
+            } else {
+                ((self.current_ap as i32)..((self.current_ap as i32) - hovered_ap)).contains(&i)
+            };
 
             let mut overcomitted = false;
+            let mut reserved = false;
+            let mut available = false;
+            let mut missing = false;
 
-            if i < self.current_ap.saturating_sub(reserved_ap) {
-                // Unreserved point
-
-                if false
-                /* blocked_by_lack_of_reactive_ap */
-                {
-                    draw_circle(
-                        x0 + self.cell_size.0 / 2.0,
-                        y0 + self.cell_size.1 / 2.0,
-                        r,
-                        Color::new(0.78, 0.48, 1.00, 0.7),
-                    );
-                    //draw_rectangle(x0, y0, self.cell_size.0, self.cell_size.1 * 0.5, BLACK);
+            if reserved_ap >= 0 {
+                if i < self.current_ap as i32 - reserved_ap {
+                    available = true;
+                } else if i < self.current_ap as i32 {
+                    reserved = true;
+                } else if (i) < (reserved_ap).max(hovered_ap) {
+                    overcomitted = true;
                 } else {
-                    draw_circle(
-                        x0 + self.cell_size.0 / 2.0,
-                        y0 + self.cell_size.1 / 2.0,
-                        r,
-                        GOLD,
-                    );
+                    missing = true;
                 }
-            } else if i < self.current_ap {
-                // Reserved
+            } else {
+                // A negative reserved_ap means that the player is about to make an action that will grant AP (such as 
+                // ending their turn)
+                if i < self.current_ap as i32 {
+                    available = true;
+                } else if i < self.current_ap as i32 - reserved_ap {
+                    reserved = true;
+                } else {
+                    missing = true;
+                }
+            }
+
+            if available {
+                draw_circle(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    GOLD,
+                );
+            } else if reserved {
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
                     WHITE,
                 );
-            } else if i < reserved_ap.max(hovered_ap) {
-                // Overcomitted
-                overcomitted = true;
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    GRAY,
-                );
-            } else {
-                // Spent / missing
+            } else if missing {
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
@@ -769,6 +756,12 @@ impl Drawable for ActionPointsRow {
             }
 
             if overcomitted {
+                draw_circle(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    GRAY,
+                );
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
@@ -799,7 +792,7 @@ impl Drawable for ActionPointsRow {
 
         self.style.draw_foreground(x, y, self.size());
 
-        if reserved_ap > self.max_ap {
+        if reserved_ap > self.max_ap as i32 {
             let (w, h) = self.size();
             draw_rectangle_lines(x, y, w, h, 2.0, RED);
         }

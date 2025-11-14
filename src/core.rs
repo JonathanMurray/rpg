@@ -17,7 +17,7 @@ use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
 pub type Position = (i32, i32);
 
 pub const MAX_ACTION_POINTS: u32 = 5;
-pub const ACTION_POINTS_PER_TURN: u32 = 3;
+pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
 #[derive(Debug)]
 enum ActionOutcome {
@@ -47,6 +47,7 @@ impl CoreGame {
         for character in self.characters.iter() {
             character.update_encumbrance();
             character.action_points.current.set(ACTION_POINTS_PER_TURN);
+            character.regain_movement();
         }
 
         loop {
@@ -379,13 +380,16 @@ impl CoreGame {
             }
 
             Action::Move {
-                action_point_cost,
-                stamina_cost,
+                extra_cost,
                 positions,
+                total_distance,
             } => {
                 let character = self.active_character();
-                character.action_points.spend(action_point_cost);
-                character.stamina.spend(stamina_cost);
+                let free_movement = total_distance - extra_cost as f32 * character.move_speed();
+                character.action_points.spend(extra_cost);
+                character.stamina.spend(extra_cost);
+                character.spend_movement(free_movement);
+
                 self.perform_movement(positions).await;
                 ActionOutcome::Default
             }
@@ -545,10 +549,7 @@ impl CoreGame {
                 let stacks = receiver.conditions.borrow().bleeding;
                 damage_dealt = self.perform_losing_health(receiver, damage * stacks);
                 let healing_amount = damage_dealt * caster_healing_percentage / 100;
-                self.perform_gain_health(
-                    giver.unwrap(),
-                    healing_amount,
-                );
+                self.perform_gain_health(giver.unwrap(), healing_amount);
                 format!(
                     "  {} lost {} health. {} was healed for {}",
                     receiver.name,
@@ -1841,6 +1842,8 @@ impl CoreGame {
         conditions.borrow_mut().reaper_ap_cooldown = false;
         let stamina_gain = (character.stamina.max() as f32 / 3.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
+
+        character.regain_movement();
     }
 }
 
@@ -2478,9 +2481,9 @@ pub enum Action {
         target: ActionTarget,
     },
     Move {
+        total_distance: f32,
         positions: Vec<Position>,
-        action_point_cost: u32,
-        stamina_cost: u32,
+        extra_cost: u32,
     },
     ChangeEquipment {
         from: EquipmentSlotRole,
@@ -2536,14 +2539,14 @@ impl BaseAction {
         }
     }
 
-    pub fn action_point_cost(&self) -> u32 {
+    pub fn action_point_cost(&self) -> i32 {
         match self {
-            BaseAction::Attack(attack) => attack.action_point_cost,
-            BaseAction::UseAbility(ability) => ability.action_point_cost,
+            BaseAction::Attack(attack) => attack.action_point_cost as i32,
+            BaseAction::UseAbility(ability) => ability.action_point_cost as i32,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
             BaseAction::UseConsumable => 1,
-            BaseAction::EndTurn => 0,
+            BaseAction::EndTurn => -(ACTION_POINTS_PER_TURN as i32),
         }
     }
 
@@ -3037,8 +3040,12 @@ pub struct Character {
     pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
+
     // How many cells you can move per AP
     pub base_move_speed: Cell<f32>,
+    // How many more cells can you move free of cost, this turn
+    pub remaining_movement: Cell<f32>,
+
     pub capacity: Cell<u32>,
     pub inventory: [Cell<Option<EquipmentEntry>>; 6],
     pub armor_piece: Cell<Option<ArmorPiece>>,
@@ -3046,10 +3053,9 @@ pub struct Character {
     off_hand: Cell<Hand>,
     conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
-    pub max_reactive_action_points: u32,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
-    pub known_actions: Vec<BaseAction>,
+    pub known_actions: RefCell<Vec<BaseAction>>,
     pub known_attacked_reactions: Vec<OnAttackedReaction>,
     pub known_on_hit_reactions: Vec<OnHitReaction>,
     pub known_ability_enhancements: Vec<AbilityEnhancement>,
@@ -3077,7 +3083,6 @@ impl Character {
 
         let move_speed = base_attributes.move_speed();
         let max_stamina = base_attributes.max_stamina();
-        let max_reactive_action_points = 1 + base_attributes.intellect.get() / 2;
         let capacity = base_attributes.capacity();
         let action_points = NumberedResource::new(MAX_ACTION_POINTS);
         action_points.current.set(ACTION_POINTS_PER_TURN);
@@ -3092,6 +3097,7 @@ impl Character {
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
             base_move_speed: Cell::new(move_speed),
+            remaining_movement: Cell::new(0.0),
             capacity: Cell::new(capacity),
             inventory: Default::default(),
             armor_piece: Default::default(),
@@ -3099,20 +3105,20 @@ impl Character {
             off_hand: Default::default(),
             conditions: Default::default(),
             action_points,
-            max_reactive_action_points,
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
-            known_actions: vec![
+            known_actions: RefCell::new(vec![
                 BaseAction::Attack(AttackAction {
                     hand: HandType::MainHand,
-                    action_point_cost: 2,
+                    // TODO
+                    action_point_cost: 0,
                 }),
                 //BaseAction::SelfEffect(BRACE),
                 BaseAction::Move,
                 BaseAction::ChangeEquipment,
                 BaseAction::UseConsumable,
                 BaseAction::EndTurn,
-            ],
+            ]),
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
             known_ability_enhancements: Default::default(),
@@ -3122,6 +3128,16 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             money: Cell::new(8),
         }
+    }
+
+    fn regain_movement(&self) {
+        self.remaining_movement.set(self.move_speed() * 2.0);
+    }
+
+    fn spend_movement(&self, distance: f32) {
+        let remaining = self.remaining_movement.get();
+        assert!(distance <= remaining);
+        self.remaining_movement.set(remaining - distance);
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
@@ -3382,6 +3398,13 @@ impl Character {
             EquipmentSlotRole::from_hand_type(hand_type)
         ));
         self.hand(hand_type).set(Hand::with_weapon(weapon));
+
+        for action in self.known_actions.borrow_mut().iter_mut() {
+            if let BaseAction::Attack(attack) = action {
+                attack.action_point_cost = weapon.action_point_cost;
+            }
+        }
+
         self.on_changed_equipment();
     }
 
@@ -3503,11 +3526,11 @@ impl Character {
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
-        self.known_actions.to_vec()
+        self.known_actions.borrow().to_vec()
     }
 
     pub fn usable_attack_action(&self) -> Option<AttackAction> {
-        for action in &self.known_actions {
+        for action in self.known_actions.borrow().iter() {
             if self.can_use_action(*action) {
                 if let BaseAction::Attack(attack_action) = action {
                     return Some(*attack_action);
@@ -3518,7 +3541,7 @@ impl Character {
     }
 
     pub fn attack_action(&self) -> Option<AttackAction> {
-        for action in &self.known_actions {
+        for action in self.known_actions.borrow().iter() {
             if let BaseAction::Attack(attack_action) = action {
                 return Some(*attack_action);
             }
@@ -3528,6 +3551,7 @@ impl Character {
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {
         self.known_actions
+            .borrow()
             .iter()
             .filter_map(|action| {
                 if self.can_use_action(*action) {
@@ -3545,6 +3569,7 @@ impl Character {
     }
 
     pub fn can_use_action(&self, action: BaseAction) -> bool {
+        let sta = self.stamina.current();
         let ap = self.action_points.current();
         match action {
             BaseAction::Attack(attack) => {
@@ -3560,9 +3585,11 @@ impl Character {
                     && self.stamina.current() >= ability.stamina_cost
                     && self.mana.current() >= ability.mana_cost
             }
-            BaseAction::Move => ap > 0,
-            BaseAction::ChangeEquipment => ap >= BaseAction::ChangeEquipment.action_point_cost(),
-            BaseAction::UseConsumable => ap >= BaseAction::UseConsumable.action_point_cost(),
+            BaseAction::Move => self.remaining_movement.get() > 0.0 || ap.min(sta) > 0,
+            BaseAction::ChangeEquipment => {
+                ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
+            }
+            BaseAction::UseConsumable => ap as i32 >= BaseAction::UseConsumable.action_point_cost(),
             BaseAction::EndTurn => true,
         }
     }
@@ -3662,8 +3689,6 @@ impl Character {
         };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
-            && (ap - reaction.action_point_cost)
-                >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && self.stamina.current() >= reaction.stamina_cost
             && allowed
     }
@@ -3701,21 +3726,23 @@ impl Character {
         };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
-            && (ap - reaction.action_point_cost)
-                >= (MAX_ACTION_POINTS - self.max_reactive_action_points)
             && self.stamina.current() >= reaction.stamina_cost
             && allowed
     }
 
     pub fn knows_ability(&self, id: AbilityId) -> bool {
-        self.known_actions.iter().any(|action| match action {
-            BaseAction::UseAbility(ability) => ability.id == id,
-            _ => false,
-        })
+        self.known_actions
+            .borrow()
+            .iter()
+            .any(|action| match action {
+                BaseAction::UseAbility(ability) => ability.id == id,
+                _ => false,
+            })
     }
 
     pub fn known_abilities(&self) -> Vec<Ability> {
         self.known_actions
+            .borrow()
             .iter()
             .filter_map(|action| match action {
                 BaseAction::UseAbility(ability) => Some(*ability),

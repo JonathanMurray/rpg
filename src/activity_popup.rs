@@ -43,7 +43,7 @@ pub struct ActivityPopup {
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
 
-    movement_stamina_slider: Option<MovementStaminaSlider>,
+    movement_cost_slider: Option<MovementStaminaSlider>,
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -87,7 +87,7 @@ impl ActivityPopup {
             next_button_id: Cell::new(next_button_id),
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
-            movement_stamina_slider: None,
+            movement_cost_slider: None,
             hovered_choice_button_id: None,
             last_drawn_rectangle: Default::default(),
         }
@@ -171,9 +171,9 @@ impl ActivityPopup {
             width += button_margin + btn.size.0;
         }
 
-        let sprint_stamina_text = "Sprint:";
+        let sprint_stamina_text = "Extend range:";
         let sprint_stamina_margin = 15.0;
-        if let Some(slider) = &self.movement_stamina_slider {
+        if let Some(slider) = &self.movement_cost_slider {
             let text_dimensions = measure_text(
                 sprint_stamina_text,
                 base_text_params.font,
@@ -227,20 +227,18 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
-            &*self.ui_state.borrow()
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = &*self.ui_state.borrow()
         {
-            let mut text = format!("{} AP", ap_cost);
-            if let Some(slider) = &self.movement_stamina_slider {
-                if slider.selected_stamina() > 0 {
-                    text = format!("{} AP", ap_cost - slider.selected_stamina());
-                }
-            }
+            let cost = self.movement_cost_slider.as_ref().unwrap().selected();
+            let character = self.characters.get(self.relevant_character_id);
+            let movement =
+                character.remaining_movement.get() + (cost as f32) * character.move_speed();
+            let text = format!("Range: {:.1}", movement);
 
             draw_text_rounded(&text, x0, y0, base_text_params.clone());
         }
 
-        if let Some(slider) = &mut self.movement_stamina_slider {
+        if let Some(slider) = &mut self.movement_cost_slider {
             let text_dimensions = draw_text_rounded(
                 sprint_stamina_text,
                 x_btn,
@@ -385,6 +383,13 @@ impl ActivityPopup {
         if changed_attack_enhancements {
             return Some(ActivityPopupOutcome::ChangedAttackEnhancements);
         }
+        if let Some(slider) = &self.movement_cost_slider {
+            if slider.has_changed.take() {
+                return Some(ActivityPopupOutcome::ChangedMovementSprint(
+                    slider.selected_i,
+                ));
+            }
+        }
 
         None
     }
@@ -395,48 +400,39 @@ impl ActivityPopup {
             .map(|id| &self.choice_buttons[id].action)
     }
 
+    // TODO rename
     pub fn on_new_movement_ap_cost(&mut self) {
-        let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
-            &*self.ui_state.borrow()
+        let UiState::ConfiguringAction(ConfiguredAction::Move { cost, .. }) =
+            *self.ui_state.borrow()
         else {
             panic!()
         };
 
-        if let Some(slider) = self.movement_stamina_slider.as_mut() {
-            // Each AP spent on movement can be accompanied by 1 stamina point
-            let max_stamina_usage = ap_cost / 2;
-            slider.set_max_allowed(max_stamina_usage);
+        if let Some(slider) = self.movement_cost_slider.as_mut() {
+            let character = self.characters.get(self.relevant_character_id);
+            let max_cost = character
+                .stamina
+                .current()
+                .min(character.action_points.current());
+            slider.set_max_allowed(max_cost);
 
-            // Assume that player wants to spend as much stamina as possible on movement.
-            // They are free to reduce the amount with the slider.
-            slider.selected_i = slider.max.min(max_stamina_usage);
+            assert!(cost <= max_cost);
+
+            slider.selected_i = cost;
         }
     }
 
-    fn movement_base_ap_cost(&self) -> u32 {
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { ap_cost, .. }) =
-            &*self.ui_state.borrow()
-        {
-            *ap_cost
-        } else {
-            0
-        }
-    }
-
-    fn movement_ap_cost(&self) -> u32 {
-        self.movement_base_ap_cost() - self.movement_stamina_cost()
-    }
-
-    pub fn movement_stamina_cost(&self) -> u32 {
-        self.movement_stamina_slider
+    fn movement_cost(&self) -> u32 {
+        self.movement_cost_slider
             .as_ref()
-            .map(|slider| slider.selected_stamina())
+            .map(|slider| slider.selected())
             .unwrap_or(0)
     }
 
-    pub fn reserved_and_hovered_action_points(&self) -> (u32, u32) {
-        if self.movement_base_ap_cost() > 0 {
-            return (self.movement_ap_cost(), 0);
+    pub fn reserved_and_hovered_action_points(&self) -> (i32, i32) {
+        let movement_cost = self.movement_cost();
+        if movement_cost > 0 {
+            return (movement_cost as i32, 0);
         }
 
         let borrowed_state = self.ui_state.borrow();
@@ -465,9 +461,9 @@ impl ActivityPopup {
                 }
             }
         }
-        let reserved_ap = (reserved_from_action as i32 + reserved_from_choices) as u32;
+        let reserved_ap = reserved_from_action + reserved_from_choices;
         let hovered_ap = if additional_hovered_from_choices > 0 {
-            reserved_ap + additional_hovered_from_choices
+            reserved_ap as i32 + additional_hovered_from_choices
         } else {
             0
         };
@@ -497,8 +493,8 @@ impl ActivityPopup {
     }
 
     pub fn stamina_points(&self) -> u32 {
-        if self.movement_stamina_cost() > 0 {
-            return self.movement_stamina_cost();
+        if self.movement_cost() > 0 {
+            return self.movement_cost();
         }
 
         let borrowed_state = self.ui_state.borrow();
@@ -764,7 +760,7 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
-        self.movement_stamina_slider = stamina_slider;
+        self.movement_cost_slider = stamina_slider;
 
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
@@ -772,7 +768,8 @@ impl ActivityPopup {
 
     fn refresh_enabled_state(&mut self) {
         let char = self.characters.get(self.relevant_character_id);
-        let enough_ap = char.action_points.current() >= self.reserved_and_hovered_action_points().0;
+        let enough_ap =
+            char.action_points.current() as i32 >= self.reserved_and_hovered_action_points().0;
         let enough_mana = char.mana.current() >= self.mana_points();
         let enough_stamina = char.stamina.current() >= self.stamina_points();
 
@@ -790,6 +787,7 @@ pub enum ActivityPopupOutcome {
     ClickedProceed,
     ChangedAbilityEnhancements,
     ChangedAttackEnhancements,
+    ChangedMovementSprint(u32),
 }
 
 struct MovementStaminaSlider {
@@ -799,6 +797,7 @@ struct MovementStaminaSlider {
     is_sliding: bool,
     cell_w: f32,
     cell_h: f32,
+    has_changed: Cell<bool>,
 }
 
 impl MovementStaminaSlider {
@@ -810,6 +809,7 @@ impl MovementStaminaSlider {
             is_sliding: false,
             cell_w: 35.0,
             cell_h: 28.0,
+            has_changed: Cell::new(false),
         }
     }
 
@@ -823,7 +823,7 @@ impl MovementStaminaSlider {
         self.selected_i = self.selected_i.min(max_allowed);
     }
 
-    fn selected_stamina(&self) -> u32 {
+    fn selected(&self) -> u32 {
         self.selected_i
     }
 
@@ -877,7 +877,9 @@ impl MovementStaminaSlider {
             }
 
             if self.is_sliding {
-                self.selected_i = (i).min(self.max_allowed);
+                let new_value = (i).min(self.max_allowed);
+                self.has_changed.set(self.selected_i != new_value);
+                self.selected_i = new_value;
             }
         }
 

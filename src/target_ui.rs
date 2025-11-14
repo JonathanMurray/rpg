@@ -92,7 +92,6 @@ impl TargetUi {
             );
 
             let mut action_points_row = ActionPointsRow::new(
-                char.max_reactive_action_points,
                 (16.0, 16.0),
                 0.25,
                 Style {

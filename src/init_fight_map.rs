@@ -231,10 +231,13 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Attributes::new(4, 1, 3, 5),
                 pos,
             );
-            magi.known_actions.push(BaseAction::UseAbility(MAGI_HEAL));
+            magi.known_actions
+                .borrow_mut()
+                .push(BaseAction::UseAbility(MAGI_HEAL));
             magi.armor_piece.set(Some(SHIRT));
             magi.set_weapon(HandType::MainHand, SWORD);
             magi.known_actions
+                .borrow_mut()
                 .push(BaseAction::UseAbility(MAGI_INFLICT_WOUNDS));
             magi.health.change_max_value_to(25);
             characters.push(magi);

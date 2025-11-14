@@ -81,7 +81,7 @@ pub const BAD_DAGGER: Weapon = Weapon {
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: WeaponRange::Melee,
-    action_point_cost: 2,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
@@ -122,7 +122,7 @@ pub const BAD_SWORD: Weapon = Weapon {
 pub const SWORD: Weapon = Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
-    action_point_cost: 2,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
@@ -164,7 +164,7 @@ pub const BAD_RAPIER: Weapon = Weapon {
 pub const RAPIER: Weapon = Weapon {
     name: "Rapier",
     range: WeaponRange::Melee,
-    action_point_cost: 2,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
@@ -207,7 +207,7 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
 pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
-    action_point_cost: 2,
+    action_point_cost: 3,
     // Note: sword held in 2h deals the same as this
     damage: 5,
     grip: WeaponGrip::TwoHanded,
@@ -238,7 +238,7 @@ pub const BAD_BOW: Weapon = Weapon {
 pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(5),
-    action_point_cost: 2,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
