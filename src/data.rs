@@ -66,8 +66,8 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
 pub const BAD_DAGGER: Weapon = Weapon {
     name: "Bad dagger",
     range: WeaponRange::Melee,
-    action_point_cost: 3,
-    damage: 3,
+    action_point_cost: 2,
+    damage: 2,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
@@ -81,8 +81,8 @@ pub const BAD_DAGGER: Weapon = Weapon {
 pub const DAGGER: Weapon = Weapon {
     name: "Dagger",
     range: WeaponRange::Melee,
-    action_point_cost: 3,
-    damage: 4,
+    action_point_cost: 2,
+    damage: 3,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
