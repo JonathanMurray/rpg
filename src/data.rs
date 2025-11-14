@@ -1017,6 +1017,7 @@ pub enum PassiveSkill {
     WeaponProficiency,
     ArcaneSurge,
     Reaper,
+    BloodRage,
 }
 
 impl PassiveSkill {
@@ -1026,6 +1027,7 @@ impl PassiveSkill {
             Self::WeaponProficiency => "Weapon proficiency",
             Self::ArcaneSurge => "Arcane surge",
             Self::Reaper => "Reaper",
+            Self::BloodRage => "Blood rage",
         }
     }
 
@@ -1035,6 +1037,8 @@ impl PassiveSkill {
             Self::WeaponProficiency => IconId::WeaponProficiency,
             Self::ArcaneSurge => IconId::ArcaneSurge,
             Self::Reaper => IconId::Reaper,
+            // TODO: unique icon
+            Self::BloodRage => IconId::Rage,
         }
     }
 
@@ -1044,6 +1048,7 @@ impl PassiveSkill {
             Self::WeaponProficiency => "Attacks gain +1 armor penetration",
             Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
             Self::Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
+            Self::BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death"
         }
     }
 }

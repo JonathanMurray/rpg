@@ -49,6 +49,7 @@ impl CoreGame {
             character.update_encumbrance();
             character.action_points.current.set(ACTION_POINTS_PER_TURN);
             character.regain_movement();
+            character.on_health_changed();
         }
 
         loop {
@@ -251,6 +252,7 @@ impl CoreGame {
                     action_point_cost -= enhancement.effect.action_point_discount as i32;
                     attacker.stamina.spend(enhancement.stamina_cost);
                     attacker.mana.spend(enhancement.mana_cost);
+                    attacker.on_mana_changed();
                 }
 
                 attacker.action_points.spend(action_point_cost as u32);
@@ -427,6 +429,7 @@ impl CoreGame {
                 }
                 if consumable.mana_gain > 0 {
                     character.mana.gain(consumable.mana_gain);
+                    character.on_mana_changed();
                 }
 
                 character.set_equipment(None, slot_role);
@@ -601,6 +604,7 @@ impl CoreGame {
 
         caster.action_points.spend(ability.action_point_cost);
         caster.mana.spend(ability.mana_cost);
+        caster.on_mana_changed();
         caster.stamina.spend(ability.stamina_cost);
 
         let mut enemies_hit = vec![];
@@ -608,6 +612,7 @@ impl CoreGame {
         for enhancement in &enhancements {
             caster.action_points.spend(enhancement.action_point_cost);
             caster.mana.spend(enhancement.mana_cost);
+            caster.on_mana_changed();
             caster.stamina.spend(enhancement.stamina_cost);
         }
 
@@ -1388,24 +1393,14 @@ impl CoreGame {
 
     fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
-        self.on_character_health_changed(character);
+        character.on_health_changed();
         amount_lost
     }
 
     fn perform_gain_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_gained = character.health.gain(amount);
-        self.on_character_health_changed(character);
+        character.on_health_changed();
         amount_gained
-    }
-
-    fn on_character_health_changed(&self, character: &Character) {
-        character.conditions.borrow_mut().near_death =
-            (character.health.current() as f32) < character.health.max() as f32 / 4.0;
-
-        if character.health.current() == 0 {
-            character.conditions.borrow_mut().near_death = false;
-            character.conditions.borrow_mut().dead = true;
-        }
     }
 
     async fn log(&self, line: impl Into<String>) {
@@ -2283,6 +2278,8 @@ pub enum Condition {
     Exposed(u32),
     Hindered(u32),
     ReaperApCooldown,
+    BloodRage,
+    ArcaneSurge,
 }
 
 impl Condition {
@@ -2305,6 +2302,8 @@ impl Condition {
             Exposed(n) => Some(n),
             Hindered(n) => Some(n),
             ReaperApCooldown => None,
+            BloodRage => None,
+            ArcaneSurge => None,
         }
     }
 
@@ -2327,6 +2326,8 @@ impl Condition {
             Exposed(..) => "Exposed",
             Hindered(..) => "Hindered",
             ReaperApCooldown => "Reaper",
+            BloodRage => "Blood rage",
+            ArcaneSurge => "Arcane surge",
         }
     }
 
@@ -2349,6 +2350,8 @@ impl Condition {
             Exposed(_) => "-3 to all defenses",
             Hindered(..) => "Half movement speed",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn",
+            BloodRage => "+3 attack modifier (from passive skill)",
+            ArcaneSurge => "+3 spell modifier (from passive skill)",
         }
     }
 
@@ -2371,6 +2374,8 @@ impl Condition {
             Exposed(_) => false,
             Hindered(..) => false,
             ReaperApCooldown => false,
+            BloodRage => true,
+            ArcaneSurge => true,
         }
     }
 
@@ -2418,6 +2423,8 @@ struct Conditions {
     exposed: u32,
     hindered: u32,
     reaper_ap_cooldown: bool,
+    blood_rage: bool,
+    arcane_surge: bool,
 }
 
 impl Conditions {
@@ -2470,6 +2477,9 @@ impl Conditions {
         }
         if self.reaper_ap_cooldown {
             result.push(Condition::ReaperApCooldown.info())
+        }
+        if self.blood_rage {
+            result.push(Condition::BloodRage.info())
         }
 
         result
@@ -3104,6 +3114,26 @@ impl Character {
         }
     }
 
+    fn on_health_changed(&self) {
+        let health_ratio = self.health.ratio();
+        let has_blood_rage_passive = self.known_passive_skills.contains(&PassiveSkill::BloodRage);
+
+        self.conditions.borrow_mut().blood_rage = has_blood_rage_passive && health_ratio <= 0.5;
+        self.conditions.borrow_mut().near_death = !has_blood_rage_passive && health_ratio < 0.25;
+
+        if self.health.current() == 0 {
+            self.conditions.borrow_mut().near_death = false;
+            self.conditions.borrow_mut().dead = true;
+        }
+    }
+
+    fn on_mana_changed(&self) {
+        self.conditions.borrow_mut().arcane_surge = self
+            .known_passive_skills
+            .contains(&PassiveSkill::ArcaneSurge)
+            && self.mana.ratio() <= 0.5;
+    }
+
     fn regain_movement(&self) {
         self.remaining_movement.set(self.move_speed() * 2.0);
     }
@@ -3200,8 +3230,10 @@ impl Character {
     fn on_attributes_changed(&self) {
         let attr = &self.base_attributes;
         self.health.change_max_value_to(attr.max_health());
+        self.on_health_changed();
         self.stamina.change_max_value_to(attr.max_stamina());
         self.mana.change_max_value_to(attr.max_mana());
+        self.on_mana_changed();
         self.capacity.set(attr.capacity());
         self.base_move_speed.set(attr.move_speed());
     }
@@ -3773,17 +3805,11 @@ impl Character {
             res += armor.equip.bonus_spell_modifier;
         }
 
-        if self.has_active_arcane_surge() {
+        if self.conditions.borrow().arcane_surge {
             res += 3;
         }
 
         res
-    }
-
-    fn has_active_arcane_surge(&self) -> bool {
-        self.known_passive_skills
-            .contains(&PassiveSkill::ArcaneSurge)
-            && self.mana.ratio() <= 0.5
     }
 
     fn is_dazed(&self) -> bool {
@@ -3894,7 +3920,13 @@ impl Character {
             AttackAttribute::Finesse => str.max(agi),
         };
 
-        physical_attr + self.intellect()
+        let mut res = physical_attr + self.intellect();
+
+        if self.conditions.borrow().blood_rage {
+            res += 3;
+        }
+
+        res
     }
 
     fn hand_exertion(&self, hand_type: HandType) -> u32 {
@@ -4017,6 +4049,11 @@ impl Character {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
 
+        if conditions.blood_rage {
+            // It's applied from attack_modifer()
+            bonuses.push(("Blood rage", RollBonusContributor::OtherPositive));
+        }
+
         bonuses
     }
 
@@ -4038,16 +4075,17 @@ impl Character {
             }
         }
 
-        if is_spell && self.has_active_arcane_surge() {
-            bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
-        }
-
         let conditions = self.conditions.borrow();
         if conditions.weakened > 0 {
             bonuses.push((
                 "Weakened",
                 RollBonusContributor::FlatAmount(-(conditions.weakened as i32)),
             ));
+        }
+
+        if is_spell && conditions.arcane_surge {
+            // It's applied from spell_modifier()
+            bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
         }
 
         let encumbrance_penalty = (conditions.encumbered / 2) as i32;
@@ -4170,38 +4208,8 @@ impl Character {
             Exposed(n) => conditions.exposed += n,
             Hindered(n) => conditions.hindered += n,
             ReaperApCooldown => conditions.reaper_ap_cooldown = true,
-        }
-    }
-
-    pub fn get_condition_stacks(&self, condition: Condition) -> Option<u32> {
-        let mut conditions = self.conditions.borrow_mut();
-        use Condition::*;
-        fn clear_u32(value: &mut u32) -> Option<u32> {
-            let prev = *value;
-            *value = 0;
-            Some(prev)
-        }
-        fn clear_bool(value: &mut bool) -> Option<u32> {
-            *value = false;
-            None
-        }
-        match condition {
-            Protected(..) => clear_u32(&mut conditions.protected),
-            Dazed(..) => clear_u32(&mut conditions.dazed),
-            Bleeding(..) => clear_u32(&mut conditions.bleeding),
-            Braced => clear_bool(&mut conditions.braced),
-            Raging => clear_bool(&mut conditions.raging),
-            Distracted => clear_bool(&mut conditions.distracted),
-            Weakened(..) => clear_u32(&mut conditions.weakened),
-            MainHandExertion(..) => clear_u32(&mut conditions.mainhand_exertion),
-            OffHandExertion(..) => clear_u32(&mut conditions.offhand_exertion),
-            Encumbered(..) => clear_u32(&mut conditions.encumbered),
-            NearDeath => clear_bool(&mut conditions.near_death),
-            Dead => clear_bool(&mut conditions.dead),
-            Slowed(..) => clear_u32(&mut conditions.slowed),
-            Exposed(..) => clear_u32(&mut conditions.exposed),
-            Hindered(..) => clear_u32(&mut conditions.hindered),
-            ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
+            BloodRage => conditions.blood_rage = true,
+            ArcaneSurge => conditions.arcane_surge = true,
         }
     }
 
@@ -4234,6 +4242,8 @@ impl Character {
             Exposed(..) => clear_u32(&mut conditions.exposed),
             Hindered(..) => clear_u32(&mut conditions.hindered),
             ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
+            BloodRage => clear_bool(&mut conditions.blood_rage),
+            ArcaneSurge => clear_bool(&mut conditions.arcane_surge),
         }
     }
 }

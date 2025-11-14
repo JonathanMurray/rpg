@@ -1075,7 +1075,27 @@ pub fn draw_tooltip(
     if let Some(error) = error.as_ref() {
         measure_width(error)
     }
+
+    // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
+    // the width of the tooltip window.
+    let mut physical_content_lines = vec![];
     for line in content_lines {
+        let mut line = &line[..];
+        let limit = 40;
+        while line.len() > limit {
+            if let Some(whitespace_i) = line[limit..].find(" ") {
+                let (left, right) = line.split_at(limit + whitespace_i + 1);
+                physical_content_lines.push(left);
+                line = right;
+            } else {
+                // No whitespace found. We'll allow the entire line then.
+                break;
+            }
+        }
+        physical_content_lines.push(line);
+    }
+
+    for line in &physical_content_lines {
         measure_width(line);
     }
 
@@ -1085,9 +1105,15 @@ pub fn draw_tooltip(
 
     let line_h = 22.0;
     let num_real_lines = 1
-        + content_lines.iter().filter(|line| !line.is_empty()).count()
+        + physical_content_lines
+            .iter()
+            .filter(|line| !line.is_empty())
+            .count()
         + error.map(|_| 1).unwrap_or(0);
-    let num_empty_lines = content_lines.iter().filter(|line| line.is_empty()).count();
+    let num_empty_lines = physical_content_lines
+        .iter()
+        .filter(|line| line.is_empty())
+        .count();
     let tooltip_h =
         num_real_lines as f32 * line_h + text_margin * 2.0 + num_empty_lines as f32 * empty_line_h;
 
@@ -1169,7 +1195,7 @@ pub fn draw_tooltip(
     if let Some(error) = error {
         draw_line(error, Some(RED))
     }
-    for line in content_lines {
+    for line in physical_content_lines {
         draw_line(line, None)
     }
 }

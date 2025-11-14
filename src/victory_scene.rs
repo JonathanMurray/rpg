@@ -440,6 +440,7 @@ pub async fn run_victory_loop(
             PassiveSkill::WeaponProficiency,
             PassiveSkill::ArcaneSurge,
             PassiveSkill::Reaper,
+            PassiveSkill::BloodRage,
         ] {
             candidate_rewards.push((ButtonAction::Passive(passive), Some("Passive")));
         }

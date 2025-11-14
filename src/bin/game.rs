@@ -27,8 +27,8 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA,
-    HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
+    PassiveSkill, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL,
+    HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
     LUNGE_ATTACK_HEAVY_IMPACT, MANA_POTION, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT,
     OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD,
     SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
@@ -90,6 +90,8 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_attack_enhancements.push(LONGER_REACH);
+    alice.known_passive_skills.push(PassiveSkill::BloodRage);
+    alice.health.lose(6); //TODO
 
     let mut bob = Character::new(
         Behaviour::Player,
