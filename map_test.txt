@@ -4,8 +4,8 @@ BRR         B
 BR          B
 B           B
 B  P0P     SB
-B          SB
-B   1  W   SB
+B   1      SB
+B      W   SB
 B      WW   B
 BB         BB
  BBBBBBBBBBB

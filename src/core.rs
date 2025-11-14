@@ -5,6 +5,7 @@ use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
 use macroquad::color::Color;
+use macroquad::rand::ChooseRandom;
 
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
@@ -1094,7 +1095,7 @@ impl CoreGame {
 
         for enhancement in enhancements {
             let effect = enhancement.spell_effect.unwrap();
-            for apply_effect in effect.on_hit.iter().flatten().flatten() {
+            for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
                 let (log_line, _damage) =
                     self.perform_effect_application(*apply_effect, None, target);
                 detail_lines.push(format!("{} ({})", log_line, enhancement.name));
@@ -1382,7 +1383,12 @@ impl CoreGame {
             for enhancement in enhancements {
                 // TODO: shouldn't these also be affected by degree of success?
                 let e = enhancement.spell_effect.unwrap();
-                for effect in e.on_hit.iter().flatten().flatten() {
+                let effects = if is_direct_target {
+                    e.target_on_hit
+                } else {
+                    e.area_on_hit
+                };
+                for effect in effects.iter().flatten().flatten() {
                     applied_effects.push(*effect);
                     let (log_line, damage) =
                         self.perform_effect_application(*effect, Some(caster), target);
@@ -1825,13 +1831,64 @@ impl CoreGame {
         if bleed_stacks > 0 {
             let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
             let damage = self.perform_losing_health(character, decay);
-            self.log(format!("{} took {} damage from Bleeding", name, damage))
-                .await;
+            self.ui_handle_event(GameEvent::CharacterTookDamage {
+                character: character.id(),
+                amount: damage,
+                source: "Burning",
+            })
+            .await;
             conditions.borrow_mut().bleeding -= decay;
             if conditions.borrow().bleeding == 0 {
                 self.log(format!("{} stopped Bleeding", name)).await;
             }
         }
+
+        let burn_stacks = conditions.borrow().burning;
+        if burn_stacks > 0 {
+            let damage = self.perform_losing_health(character, burn_stacks);
+            self.ui_handle_event(GameEvent::CharacterTookDamage {
+                character: character.id(),
+                amount: damage,
+                source: "Burning",
+            })
+            .await;
+            conditions.borrow_mut().burning = 0;
+
+            let mut adj_others: Vec<&Rc<Character>> = self
+                .characters
+                .iter()
+                .filter(|other| {
+                    other.id != character.id && are_adjacent(other.pos(), character.pos())
+                })
+                .collect();
+            if !adj_others.is_empty() {
+                let spread = burn_stacks / 2;
+                if spread > 0 {
+                    adj_others.shuffle();
+                    let per_unit = spread / adj_others.len() as u32;
+                    let mut remainder = spread % adj_others.len() as u32;
+                    for other in &adj_others {
+                        let stacks = if remainder > 0 {
+                            // Some unlucky ones get burned more than others...
+                            remainder -= 1;
+                            per_unit + 1
+                        } else {
+                            per_unit
+                        };
+                        let condition = Condition::Burning(stacks);
+                        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+                            character: other.id(),
+                            condition,
+                        })
+                        .await;
+                        other.receive_condition(condition);
+                    }
+                }
+                self.log(format!("The fire spread to {} other(s)", adj_others.len()))
+                    .await;
+            }
+        }
+
         if conditions.borrow().weakened > 0 {
             conditions.borrow_mut().weakened = 0;
             self.log(format!("{} is no longer Weakened", name)).await;
@@ -1963,6 +2020,15 @@ pub enum GameEvent {
     },
     NewTurn {
         new_active: CharacterId,
+    },
+    CharacterTookDamage {
+        character: CharacterId,
+        amount: u32,
+        source: &'static str,
+    },
+    CharacterReceivedCondition {
+        character: CharacterId,
+        condition: Condition,
     },
 }
 
@@ -2302,6 +2368,7 @@ pub enum Condition {
     Protected(u32),
     Dazed(u32),
     Bleeding(u32),
+    Burning(u32),
     Braced,
     Raging,
     Distracted,
@@ -2327,6 +2394,7 @@ impl Condition {
             Protected(n) => Some(n),
             Dazed(n) => Some(n),
             Bleeding(n) => Some(n),
+            Burning(n) => Some(n),
             Braced => None,
             Raging => None,
             Distracted => None,
@@ -2352,6 +2420,7 @@ impl Condition {
             Protected(_) => "Protected",
             Dazed(_) => "Dazed",
             Bleeding(_) => "Bleeding",
+            Burning(_) => "Burning",
             Braced => "Braced",
             Raging => "Raging",
             Distracted => "Distracted",
@@ -2376,7 +2445,8 @@ impl Condition {
         match self {
             Protected(_) => "+x armor against the next attack that hits",
             Dazed(_) => "-3 evasion and attacks with disadvantage",
-            Bleeding(_) => "End of turn: 50% stacks decay, 1 damage for each decayed",
+            Bleeding(_) => "End of turn: 50% stacks decay, lose 1 health for each decayed",
+            Burning(_) => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
             Braced => "Gain +3 evasion against the next incoming attack",
             Raging => "Gains advantage on melee attack rolls until end of turn",
             Distracted => "-6 evasion against the next incoming attack",
@@ -2402,6 +2472,7 @@ impl Condition {
             Protected(_) => true,
             Dazed(_) => false,
             Bleeding(_) => false,
+            Burning(_) => false,
             Braced => true,
             Raging => true,
             Distracted => false,
@@ -2452,6 +2523,7 @@ struct Conditions {
     protected: u32,
     dazed: u32,
     bleeding: u32,
+    burning: u32,
     braced: bool,
     raging: bool,
     distracted: bool,
@@ -2481,6 +2553,9 @@ impl Conditions {
         }
         if self.bleeding > 0 {
             result.push(Condition::Bleeding(self.bleeding).info());
+        }
+        if self.burning > 0 {
+            result.push(Condition::Burning(self.burning).info());
         }
         if self.braced {
             result.push(Condition::Braced.info());
@@ -2942,7 +3017,8 @@ pub struct SpellEnhancementEffect {
     pub bonus_target_damage: u32,
     pub bonus_area_damage: u32,
     pub cast_twice: bool,
-    pub on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub target_on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub area_on_hit: Option<[Option<ApplyEffect>; 2]>,
     pub increased_range_tenths: u32,
     pub increased_radius_tenths: u32,
 }
@@ -2956,7 +3032,8 @@ impl SpellEnhancementEffect {
             bonus_target_damage: 0,
             bonus_area_damage: 0,
             cast_twice: false,
-            on_hit: None,
+            target_on_hit: None,
+            area_on_hit: None,
             increased_range_tenths: 0,
             increased_radius_tenths: 0,
         }
@@ -4249,6 +4326,7 @@ impl Character {
             Protected(n) => conditions.protected += n,
             Dazed(n) => conditions.dazed += n,
             Bleeding(n) => conditions.bleeding += n,
+            Burning(n) => conditions.burning += n,
             Braced => conditions.braced = true,
             Raging => conditions.raging = true,
             Distracted => conditions.distracted = true,
@@ -4291,6 +4369,7 @@ impl Character {
             Protected(..) => clear_u32(&mut conditions.protected),
             Dazed(..) => clear_u32(&mut conditions.dazed),
             Bleeding(..) => clear_u32(&mut conditions.bleeding),
+            Burning(..) => clear_u32(&mut conditions.burning),
             Braced => clear_bool(&mut conditions.braced),
             Raging => clear_bool(&mut conditions.raging),
             Distracted => clear_bool(&mut conditions.distracted),

@@ -765,9 +765,11 @@ impl GameGrid {
                 movement,
                 selected,
             } => {
+                let target = self.characters.get(*target);
+                let reactor = self.characters.get(*reactor);
+
                 let path = [movement.0, movement.1];
                 self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0);
-                let reactor = self.characters.get(*reactor);
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,
@@ -778,13 +780,15 @@ impl GameGrid {
                 if *selected {
                     self.draw_target_crosshair(
                         reactor.pos(),
-                        self.characters.get(*target).pos(),
+                        target.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         4.0,
                     );
                 }
 
-                self.draw_overhead_exclamation_mark(reactor);
+                self.draw_character_label(target, false);
+                self.draw_character_label(reactor, false);
+                self.draw_overhead_question_mark(reactor);
             }
 
             UiState::ReactingToRangedAttackOpportunity {
@@ -794,6 +798,9 @@ impl GameGrid {
                 selected,
             } => {
                 let reactor = self.characters.get(*reactor);
+                let attacker = self.characters.get(*attacker);
+                let victim = self.characters.get(*victim);
+
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,
@@ -801,44 +808,38 @@ impl GameGrid {
                     2.0,
                 );
 
-                self.draw_target_crosshair(
-                    self.characters.get(*attacker).pos(),
-                    self.characters.get(*victim).pos(),
-                    RED,
-                    4.0,
-                );
+                self.draw_target_crosshair(attacker.pos(), victim.pos(), RED, 4.0);
 
                 if *selected {
                     self.draw_target_crosshair(
                         reactor.pos(),
-                        self.characters.get(*attacker).pos(),
+                        attacker.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         4.0,
                     );
                 }
 
-                self.draw_overhead_exclamation_mark(reactor);
+                self.draw_character_label(attacker, false);
+                self.draw_character_label(reactor, false);
+                self.draw_overhead_question_mark(reactor);
             }
 
             UiState::ReactingToAttack {
                 attacker, reactor, ..
             } => {
+                let attacker = self.characters.get(*attacker);
                 let reactor = self.characters.get(*reactor);
+
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,
                     5.0,
                     2.0,
                 );
-
-                self.draw_target_crosshair(
-                    self.characters.get(*attacker).pos(),
-                    reactor.pos(),
-                    RED,
-                    4.0,
-                );
-
-                self.draw_overhead_exclamation_mark(reactor);
+                self.draw_target_crosshair(attacker.pos(), reactor.pos(), RED, 4.0);
+                self.draw_character_label(attacker, false);
+                self.draw_character_label(reactor, false);
+                self.draw_overhead_question_mark(reactor);
             }
 
             UiState::ReactingToHit { victim, .. } => {
@@ -850,7 +851,8 @@ impl GameGrid {
                     2.0,
                 );
 
-                self.draw_overhead_exclamation_mark(reactor);
+                self.draw_character_label(reactor, false);
+                self.draw_overhead_question_mark(reactor);
             }
 
             _ => {}
@@ -1521,13 +1523,13 @@ impl GameGrid {
         }
     }
 
-    fn draw_overhead_exclamation_mark(&self, reactor: &Character) {
+    fn draw_overhead_question_mark(&self, reactor: &Character) {
         let text = "?";
         let font_size = 20;
         let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
         let (x, y) = self.character_screen_pos(reactor);
         let x0 = x + self.cell_w / 2.0 - text_dim.width / 2.0;
-        let y0 = y - 5.0;
+        let y0 = y - 25.0;
         draw_text_rounded(
             text,
             x0,

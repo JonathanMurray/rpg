@@ -209,7 +209,12 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButton
             technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
         }
 
-        for apply_effect in effect.on_hit.iter().flatten().flatten() {
+        for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
+            technical_description.push("Target:".to_string());
+            describe_apply_effect(*apply_effect, &mut technical_description);
+        }
+        for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
+            technical_description.push("Area:".to_string());
             describe_apply_effect(*apply_effect, &mut technical_description);
         }
 
@@ -1084,9 +1089,9 @@ pub fn draw_tooltip(
         let limit = 40;
         while line.len() > limit {
             if let Some(whitespace_i) = line[limit..].find(" ") {
-                let (left, right) = line.split_at(limit + whitespace_i + 1);
+                let (left, right) = line.split_at(limit + whitespace_i);
                 physical_content_lines.push(left);
-                line = right;
+                line = &right[1..];
             } else {
                 // No whitespace found. We'll allow the entire line then.
                 break;

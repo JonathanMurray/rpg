@@ -106,6 +106,11 @@ async fn main() {
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(FIREBALL));
+    bob.known_ability_enhancements.push(FIREBALL_INFERNO);
+    //bob.receive_condition(Condition::Burning(5));
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions

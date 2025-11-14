@@ -1095,7 +1095,6 @@ impl UserInterface {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
-
             GameEvent::CharacterReactedToAttacked { reactor } => {
                 let reactor_pos = self.characters.get(reactor).pos();
                 self.game_grid.add_text_effect(
@@ -1108,7 +1107,6 @@ impl UserInterface {
 
                 self.animation_stopwatch.set_to_at_least(0.4);
             }
-
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
                 self.log.add("Opportunity attack:".to_string());
@@ -1122,7 +1120,6 @@ impl UserInterface {
 
                 self.animation_stopwatch.set_to_at_least(0.4);
             }
-
             GameEvent::CharacterReactedToHit {
                 main_line,
                 detail_lines,
@@ -1165,11 +1162,9 @@ impl UserInterface {
                 }
                 self.animation_stopwatch.set_to_at_least(0.5);
             }
-
             GameEvent::Attacked(event) => {
                 self.handle_attacked_event(&event);
             }
-
             GameEvent::AbilityWasUsed {
                 actor,
                 target_outcome,
@@ -1346,7 +1341,6 @@ impl UserInterface {
                     self.handle_attacked_event(event);
                 }
             }
-
             GameEvent::ConsumableWasUsed { user, consumable } => {
                 self.log.add(format!(
                     "{} used {}",
@@ -1354,7 +1348,6 @@ impl UserInterface {
                     consumable.name
                 ));
             }
-
             GameEvent::CharacterDied {
                 character,
                 new_active,
@@ -1393,6 +1386,37 @@ impl UserInterface {
                 self.game_grid
                     .set_character_motion(character, from, to, duration);
                 self.animation_stopwatch.set_to_at_least(duration);
+            }
+            GameEvent::CharacterTookDamage {
+                character,
+                amount,
+                source,
+            } => {
+                let character = self.characters.get(character);
+                self.log.add(format!(
+                    "{} took {} damage from {}",
+                    character.name, amount, source
+                ));
+                self.game_grid.add_text_effect(
+                    character.pos(),
+                    0.0,
+                    1.0,
+                    format!("{}", amount),
+                    Goodness::Bad,
+                );
+            }
+            GameEvent::CharacterReceivedCondition {
+                character,
+                condition,
+            } => {
+                let character = self.characters.get(character);
+                self.game_grid.add_text_effect(
+                    character.pos(),
+                    0.0,
+                    1.0,
+                    condition.name().to_string(),
+                    Goodness::Neutral,
+                );
             }
         }
     }

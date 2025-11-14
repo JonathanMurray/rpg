@@ -658,7 +658,7 @@ pub const NECROTIC_INFLUENCE_ENHANCEMENT: AbilityEnhancement = AbilityEnhancemen
     mana_cost: 1,
     stamina_cost: 0,
     spell_effect: Some(SpellEnhancementEffect {
-        on_hit: Some([
+        target_on_hit: Some([
             Some(ApplyEffect::PerBleeding {
                 damage: 1,
                 caster_healing_percentage: 40,
@@ -809,7 +809,7 @@ pub const HEAL: Ability = Ability {
             stamina_cost: 0,
             attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
-                on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
+                target_on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
                 ..SpellEnhancementEffect::default()
             }),
         }),
@@ -923,21 +923,21 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::Fireballl,
     name: "Inferno",
-    description: "More deadly impact",
+    description: "Targets hit by the impact start burning",
     icon: IconId::Inferno,
     action_point_cost: 0,
     mana_cost: 1,
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        bonus_area_damage: 1,
+        area_on_hit: Some([Some(ApplyEffect::Condition(Condition::Burning(2))), None]),
         ..SpellEnhancementEffect::default()
     }),
 };
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireballl,
     name: "Fireball",
-    description: "Hurl fire at an enemy, damaging them",
+    description: "Hurl fire at an enemy, dealing area damage",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 1,
