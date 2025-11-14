@@ -23,7 +23,7 @@ use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
     Action, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition, CoreGame,
-    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, PassiveSkill,
+    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction,
 };
 
 use rpg::data::{

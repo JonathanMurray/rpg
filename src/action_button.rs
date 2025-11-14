@@ -23,8 +23,9 @@ use crate::{
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, PassiveSkill, Weapon, WeaponType,
+        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Weapon, WeaponType,
     },
+    data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
 };

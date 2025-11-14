@@ -5,8 +5,8 @@ use rand::Rng;
 
 use crate::{
     core::{
-        Ability, Action, ActionReach, ActionTarget, BaseAction, Character, CharacterId,
-        CoreGame, HandType, OnAttackedReaction, OnHitReaction, Position,
+        Ability, Action, ActionReach, ActionTarget, BaseAction, Character, CharacterId, CoreGame,
+        HandType, OnAttackedReaction, OnHitReaction, Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     pathfind::Path,

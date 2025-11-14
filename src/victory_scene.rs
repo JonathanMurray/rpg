@@ -21,12 +21,12 @@ use crate::{
     },
     core::{
         Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, PassiveSkill, WeaponType,
+        OnHitReaction, WeaponType,
     },
     data::{
-        BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK,
-        MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE,
-        SWEEP_ATTACK,
+        PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
+        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
+        SMITE, SWEEP_ATTACK,
     },
     non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},

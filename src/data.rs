@@ -1010,3 +1010,40 @@ pub const MANA_POTION: Consumable = Consumable {
     icon: EquipmentIconId::ManaPotion,
     weight: 0,
 };
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum PassiveSkill {
+    HardenedSkin,
+    WeaponProficiency,
+    ArcaneSurge,
+    Reaper,
+}
+
+impl PassiveSkill {
+    pub fn name(&self) -> &'static str {
+        match self {
+            Self::HardenedSkin => "Hardened skin",
+            Self::WeaponProficiency => "Weapon proficiency",
+            Self::ArcaneSurge => "Arcane surge",
+            Self::Reaper => "Reaper",
+        }
+    }
+
+    pub fn icon(&self) -> IconId {
+        match self {
+            Self::HardenedSkin => IconId::HardenedSkin,
+            Self::WeaponProficiency => IconId::WeaponProficiency,
+            Self::ArcaneSurge => IconId::ArcaneSurge,
+            Self::Reaper => IconId::Reaper,
+        }
+    }
+
+    pub fn description(&self) -> &'static str {
+        match self {
+            Self::HardenedSkin => "+1 armor",
+            Self::WeaponProficiency => "Attacks gain +1 armor penetration",
+            Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
+            Self::Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
+        }
+    }
+}
