@@ -3,8 +3,8 @@ BBBBBBBBBBBBB
 BRR         B
 BR          B
 B           B
+B0P1       SB
 B P        SB
-B P 0      SB
 B      W   SB
 B      WW   B
 BB         BB

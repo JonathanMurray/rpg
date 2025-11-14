@@ -14,6 +14,7 @@ use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::PathfindGrid;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
+use crate::util::are_adjacent;
 
 pub type Position = (i32, i32);
 
@@ -51,6 +52,7 @@ impl CoreGame {
             character.regain_movement();
             character.on_health_changed();
         }
+        self.on_character_positions_changed();
 
         loop {
             println!(
@@ -533,6 +535,33 @@ impl CoreGame {
             .await;
 
             self.active_character().position.set(new_position);
+        }
+
+        self.on_character_positions_changed();
+    }
+
+    fn on_character_positions_changed(&self) {
+        let mut positions = vec![];
+        for character in self.characters.iter() {
+            positions.push((character.pos(), character.player_controlled()));
+        }
+
+        for character in self.characters.iter() {
+            if character
+                .known_passive_skills
+                .contains(&PassiveSkill::ThrillOfBattle)
+            {
+                let mut num_adjacent_enemies = 0;
+                for (pos, player_controlled) in &positions {
+                    if *player_controlled != character.player_controlled() {
+                        if are_adjacent(*pos, character.pos()) {
+                            num_adjacent_enemies += 1;
+                        }
+                    }
+                }
+                dbg!(num_adjacent_enemies);
+                character.conditions.borrow_mut().thrill_of_battle = num_adjacent_enemies >= 2;
+            }
         }
     }
 
@@ -2280,6 +2309,7 @@ pub enum Condition {
     ReaperApCooldown,
     BloodRage,
     ArcaneSurge,
+    ThrillOfBattle,
 }
 
 impl Condition {
@@ -2304,6 +2334,7 @@ impl Condition {
             ReaperApCooldown => None,
             BloodRage => None,
             ArcaneSurge => None,
+            ThrillOfBattle => None,
         }
     }
 
@@ -2328,6 +2359,7 @@ impl Condition {
             ReaperApCooldown => "Reaper",
             BloodRage => "Blood rage",
             ArcaneSurge => "Arcane surge",
+            ThrillOfBattle => "Thrill of battle",
         }
     }
 
@@ -2352,6 +2384,7 @@ impl Condition {
             ReaperApCooldown => "Can not gain more AP from Reaper this turn",
             BloodRage => "+3 attack modifier (from passive skill)",
             ArcaneSurge => "+3 spell modifier (from passive skill)",
+            ThrillOfBattle => "+3 attack/spell modifier (from passive skill)",
         }
     }
 
@@ -2376,6 +2409,7 @@ impl Condition {
             ReaperApCooldown => false,
             BloodRage => true,
             ArcaneSurge => true,
+            ThrillOfBattle => true,
         }
     }
 
@@ -2425,6 +2459,7 @@ struct Conditions {
     reaper_ap_cooldown: bool,
     blood_rage: bool,
     arcane_surge: bool,
+    thrill_of_battle: bool,
 }
 
 impl Conditions {
@@ -2480,6 +2515,9 @@ impl Conditions {
         }
         if self.blood_rage {
             result.push(Condition::BloodRage.info())
+        }
+        if self.thrill_of_battle {
+            result.push(Condition::ThrillOfBattle.info())
         }
 
         result
@@ -3805,7 +3843,11 @@ impl Character {
             res += armor.equip.bonus_spell_modifier;
         }
 
-        if self.conditions.borrow().arcane_surge {
+        let conditions = self.conditions.borrow();
+        if conditions.arcane_surge {
+            res += 3;
+        }
+        if conditions.thrill_of_battle {
             res += 3;
         }
 
@@ -3922,7 +3964,11 @@ impl Character {
 
         let mut res = physical_attr + self.intellect();
 
-        if self.conditions.borrow().blood_rage {
+        let conditions = self.conditions.borrow();
+        if conditions.blood_rage {
+            res += 3;
+        }
+        if conditions.thrill_of_battle {
             res += 3;
         }
 
@@ -3988,14 +4034,20 @@ impl Character {
         let target_pos = target.pos();
         let mut bonuses = vec![];
 
-        let flanking = target
-            .is_engaged_by
-            .borrow()
-            .values()
-            .any(|engager| are_flanking_target(self.pos(), engager.pos(), target_pos));
+        let target_is_immune_to_flanking = target
+            .known_passive_skills
+            .contains(&PassiveSkill::ThrillOfBattle);
 
-        if flanking {
-            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
+        if !target_is_immune_to_flanking {
+            let flanking = target
+                .is_engaged_by
+                .borrow()
+                .values()
+                .any(|engager| are_flanking_target(self.pos(), engager.pos(), target_pos));
+
+            if flanking {
+                bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
+            }
         }
 
         let (_range, reach) = self.attack_reaches(
@@ -4050,8 +4102,12 @@ impl Character {
         }
 
         if conditions.blood_rage {
-            // It's applied from attack_modifer()
+            // applied from attack_modifer()
             bonuses.push(("Blood rage", RollBonusContributor::OtherPositive));
+        }
+        if conditions.thrill_of_battle {
+            // applied from attack_modifer()
+            bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
         }
 
         bonuses
@@ -4086,6 +4142,10 @@ impl Character {
         if is_spell && conditions.arcane_surge {
             // It's applied from spell_modifier()
             bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
+        }
+        if conditions.thrill_of_battle {
+            // It's applied from spell_modifier()
+            bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
         }
 
         let encumbrance_penalty = (conditions.encumbered / 2) as i32;
@@ -4210,6 +4270,7 @@ impl Character {
             ReaperApCooldown => conditions.reaper_ap_cooldown = true,
             BloodRage => conditions.blood_rage = true,
             ArcaneSurge => conditions.arcane_surge = true,
+            ThrillOfBattle => conditions.thrill_of_battle = true,
         }
     }
 
@@ -4244,6 +4305,7 @@ impl Character {
             ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
             BloodRage => clear_bool(&mut conditions.blood_rage),
             ArcaneSurge => clear_bool(&mut conditions.arcane_surge),
+            ThrillOfBattle => clear_bool(&mut conditions.thrill_of_battle),
         }
     }
 }

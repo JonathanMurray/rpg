@@ -264,19 +264,28 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Test => {
-            let pos = *enemy_positions[&0].choose().unwrap();
-            let enemy = Character::new(
+            let enemy1 = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
-                "Test enemy",
+                "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton2,
                 Attributes::new(1, 1, 1, 1),
-                pos,
+                *enemy_positions[&0].choose().unwrap(),
             );
-            enemy.health.change_max_value_to(20);
-            enemy.set_weapon(HandType::MainHand, BOW);
+            enemy1.health.change_max_value_to(20);
+            enemy1.set_weapon(HandType::MainHand, SWORD);
 
-            characters.extend_from_slice(&[enemy]);
+            let enemy2 = Character::new(
+                Behaviour::Bot(BotBehaviour::Normal),
+                "Enemy 2",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton2,
+                Attributes::new(1, 1, 1, 1),
+                *enemy_positions[&1].choose().unwrap(),
+            );
+            enemy2.set_weapon(HandType::MainHand, SWORD);
+
+            characters.extend_from_slice(&[enemy1, enemy2]);
         }
     }
 

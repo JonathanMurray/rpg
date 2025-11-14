@@ -1018,37 +1018,45 @@ pub enum PassiveSkill {
     ArcaneSurge,
     Reaper,
     BloodRage,
+    ThrillOfBattle,
 }
 
 impl PassiveSkill {
     pub fn name(&self) -> &'static str {
+        use PassiveSkill::*;
         match self {
-            Self::HardenedSkin => "Hardened skin",
-            Self::WeaponProficiency => "Weapon proficiency",
-            Self::ArcaneSurge => "Arcane surge",
-            Self::Reaper => "Reaper",
-            Self::BloodRage => "Blood rage",
+            HardenedSkin => "Hardened skin",
+            WeaponProficiency => "Weapon proficiency",
+            ArcaneSurge => "Arcane surge",
+            Reaper => "Reaper",
+            BloodRage => "Blood rage",
+            ThrillOfBattle => "Thrill of battle",
         }
     }
 
     pub fn icon(&self) -> IconId {
+        use PassiveSkill::*;
         match self {
-            Self::HardenedSkin => IconId::HardenedSkin,
-            Self::WeaponProficiency => IconId::WeaponProficiency,
-            Self::ArcaneSurge => IconId::ArcaneSurge,
-            Self::Reaper => IconId::Reaper,
+            HardenedSkin => IconId::HardenedSkin,
+            WeaponProficiency => IconId::WeaponProficiency,
+            ArcaneSurge => IconId::ArcaneSurge,
+            Reaper => IconId::Reaper,
             // TODO: unique icon
-            Self::BloodRage => IconId::Rage,
+            BloodRage => IconId::Rage,
+            // TODO: unique icon
+            ThrillOfBattle => IconId::MeleeAttack,
         }
     }
 
     pub fn description(&self) -> &'static str {
+        use PassiveSkill::*;
         match self {
-            Self::HardenedSkin => "+1 armor",
-            Self::WeaponProficiency => "Attacks gain +1 armor penetration",
-            Self::ArcaneSurge => "+3 spell modifier while at/below 50% mana",
-            Self::Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
-            Self::BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death"
+            HardenedSkin => "+1 armor",
+            WeaponProficiency => "Attacks gain +1 armor penetration",
+            ArcaneSurge => "+3 spell modifier while at/below 50% mana",
+            Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
+            BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
+            ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked."
         }
     }
 }
