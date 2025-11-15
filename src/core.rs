@@ -456,6 +456,13 @@ impl CoreGame {
     }
 
     async fn perform_movement(&self, mut positions: Vec<Position>) {
+        let start_position = positions.remove(0);
+        assert!(start_position == self.active_character().pos());
+        assert!(
+            !positions.is_empty(),
+            "movement must consist of more than just the start position"
+        );
+
         while !positions.is_empty() {
             let character = self.active_character();
             let new_position = positions.remove(0);
@@ -705,18 +712,6 @@ impl CoreGame {
                     }
                     AbilityRollType::Attack(bonus) => {
                         maybe_ability_roll = Some(AbilityRoll::Attack { bonus });
-                        /*
-                        let modifier = caster_ref.attack_modifier(HandType::MainHand) as i32;
-                        roll_calculation += modifier + bonus;
-                        let bonus_str = if bonus < 0 {
-                            format!(" -{}", -bonus)
-                        } else if bonus > 0 {
-                            format!(" +{}", bonus)
-                        } else {
-                            "".to_string()
-                        };
-                        dice_roll_line.push_str(&format!(" (+{} attack mod{})", modifier, bonus_str,));
-                         */
                     }
                 };
             }
@@ -841,7 +836,7 @@ impl CoreGame {
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                    let (_ability_result, dice_roll_line) = ability_roll.unwrap_spell();
                     detail_lines.push(dice_roll_line.to_string());
 
                     let outcomes = self
@@ -2621,6 +2616,7 @@ pub enum Action {
     },
     Move {
         total_distance: f32,
+        // Including start position, all the way to the destination
         positions: Vec<Position>,
         extra_cost: u32,
     },
@@ -3475,7 +3471,13 @@ impl Character {
             modifier += enhancement.range_bonus;
         }
         let weapon = self.weapon(hand).unwrap();
-        weapon.range.into_range().plus(modifier)
+        if modifier > 0 {
+            weapon.range.into_range().plus(modifier)
+        } else {
+            // Avoid adding the modifier unless necessary, as it could convert a melee range to a float range
+            // which is less trustable for drawing ranges in the grid
+            weapon.range.into_range()
+        }
     }
 
     pub fn has_equipped_ranged_weapon(&self) -> bool {
@@ -3517,6 +3519,12 @@ impl Character {
         } else {
             self.conditions.borrow_mut().encumbered = 0;
         }
+    }
+
+    fn has_any_consumable_in_inventory(&self) -> bool {
+        self.inventory
+            .iter()
+            .any(|entry| matches!(entry.get(), Some(EquipmentEntry::Consumable(..))))
     }
 
     fn on_changed_equipment(&self) {
@@ -3662,6 +3670,7 @@ impl Character {
         target_position: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
+        dbg!(range);
         within_range_squared(range.squared(), self.position.get(), target_position)
     }
 
@@ -3729,7 +3738,10 @@ impl Character {
             BaseAction::ChangeEquipment => {
                 ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
             }
-            BaseAction::UseConsumable => ap as i32 >= BaseAction::UseConsumable.action_point_cost(),
+            BaseAction::UseConsumable => {
+                self.has_any_consumable_in_inventory()
+                    && ap as i32 >= BaseAction::UseConsumable.action_point_cost()
+            }
             BaseAction::EndTurn => true,
         }
     }
@@ -4439,7 +4451,7 @@ pub enum ActionReach {
     No,
 }
 
-fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
+pub fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
     let distance_squared = (destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2);
     distance_squared as f32 <= range_squared
 }

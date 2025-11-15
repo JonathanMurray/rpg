@@ -1,7 +1,8 @@
-use std::{cmp::Ordering, collections::HashMap, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, iter, rc::Rc};
 
+use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, DARKBROWN, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
@@ -25,16 +26,18 @@ use macroquad::{
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
+    bot::convert_path_to_move_action,
     core::{
-        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction, Character, Goodness,
-        Position,
+        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
+        BaseAction, Character, Goodness, Position,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{build_path_from_route, PathfindGrid, Route},
+    game_ui_connection::DEBUG,
+    pathfind::{build_path_from_chart, ChartNode, PathfindGrid},
     textures::{draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
@@ -134,7 +137,7 @@ pub struct GameGrid {
     terrain_objects: HashMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: Rc<PathfindGrid>,
-    routes: HashMap<Position, Route>,
+    routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
     character_motion: Option<CharacterMotion>,
@@ -518,7 +521,9 @@ impl GameGrid {
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
         obstructed: bool,
+        hovered_base_action: Option<BaseAction>,
     ) -> GridOutcome {
+        let mut outcome = GridOutcome::default();
         // TODO
         let receptive_to_input = !obstructed;
 
@@ -539,6 +544,43 @@ impl GameGrid {
         let mouse_grid_pos = mouse_relative_to_grid(mouse_relative);
 
         let is_mouse_within_grid = self.is_within_grid(mouse_grid_pos);
+
+        if let UiState::ConfiguringAction(action) = ui_state {
+            if is_mouse_within_grid
+                && receptive_to_input
+                && is_mouse_button_pressed(MouseButton::Right)
+            {
+                match action {
+                    ConfiguredAction::Attack {
+                        target: t @ Some(..),
+                        ..
+                    } => *t = None,
+                    ConfiguredAction::UseAbility {
+                        target: t @ (ActionTarget::Character(..) | ActionTarget::Position(..)),
+                        ..
+                    } => *t = ActionTarget::None,
+                    ConfiguredAction::Move {
+                        selected_movement_path: p,
+                        ..
+                    } if !p.is_empty() => p.clear(),
+                    _ => {
+                        *ui_state = UiState::ChoosingAction;
+                        outcome.switched_state = Some(NewState::ChoosingAction);
+                    }
+                }
+            }
+        }
+
+        /*
+        if matches!(ui_state, UiState::ConfiguringAction(..))
+            && is_mouse_within_grid
+            && receptive_to_input
+            && is_mouse_button_pressed(MouseButton::Right)
+        {
+            *ui_state = UiState::ChoosingAction;
+            outcome.switched_state = Some(NewState::ChoosingAction);
+        }
+         */
 
         if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -576,28 +618,22 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        let range_indicator = self.determine_range_indicator(ui_state);
-
-        if let Some((range, indicator)) = range_indicator {
-            self.draw_range_indicator(active_char_pos, range, indicator);
-        }
+        let range_indicator = self.determine_range_indicator(ui_state, hovered_base_action);
 
         self.draw_active_character_highlight();
 
-        if matches!(
-            ui_state,
-            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
-        ) {
-            // TODO
-            self.draw_movement_path_background();
+        if matches!(ui_state, UiState::ChoosingAction) {
+            if let Some(BaseAction::Move) = hovered_base_action {
+                self.draw_movement_path_background();
+            }
         }
 
-        // TODO
         if let UiState::ConfiguringAction(ConfiguredAction::Move {
             selected_movement_path,
             ..
         }) = ui_state
         {
+            self.draw_movement_path_background();
             if !selected_movement_path.is_empty() {
                 self.draw_movement_path(selected_movement_path, false);
             }
@@ -640,9 +676,18 @@ impl GameGrid {
 
         for character in self.characters.iter() {
             self.draw_character(character);
+            self.draw_character_healthbar(character);
         }
 
-        let mut outcome = GridOutcome::default();
+        if let Some((range, indicator)) = range_indicator {
+            self.draw_range_indicator(active_char_pos, range, indicator);
+
+            for character in self.characters.iter() {
+                if within_range_squared(range.squared(), active_char_pos, character.pos()) {
+                    self.draw_character_label(character, false);
+                }
+            }
+        }
 
         let mut hovered_character_id = None;
 
@@ -657,7 +702,7 @@ impl GameGrid {
             UiState::ConfiguringAction(base_action) => match base_action {
                 ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
                     area_radius: None,
-                    move_into_melee: false,
+                    move_into_melee: None,
                 },
                 ConfiguredAction::UseAbility {
                     ability,
@@ -679,7 +724,18 @@ impl GameGrid {
                             }
                             area_radius = Some(radius);
                         }
-                        let move_into_melee = matches!(reach, AbilityReach::MoveIntoMelee(..));
+                        let mut move_into_melee = None;
+                        if let AbilityReach::MoveIntoMelee(mut range) = reach {
+                            for effect in
+                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
+                            {
+                                if effect.increased_range_tenths > 0 {
+                                    range = range.plusf(effect.increased_range_tenths as f32 * 0.1);
+                                }
+                            }
+                            move_into_melee = Some(range);
+                        }
+
                         MouseState::RequiresEnemyTarget {
                             area_radius,
                             move_into_melee,
@@ -699,31 +755,12 @@ impl GameGrid {
             _ => MouseState::None,
         };
 
-        // TODO can this even occur, now that the target is part of the state? It would mean that we carried an invalid target from one
-        // state to another one.
-        if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-            if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
-                if self.characters.get(id).player_controlled() {
-                    todo!("can this happen?");
-                    ui_state.set_target(ActionTarget::None);
-                }
-            }
-        }
-        if matches!(mouse_state, MouseState::RequiresAllyTarget) {
-            if let ActionTarget::Character(id, movement) = ui_state.players_action_target() {
-                if !self.characters.get(id).player_controlled() {
-                    todo!("can this happen?");
-                    ui_state.set_target(ActionTarget::None);
-                }
-            }
-        }
-
         match mouse_state {
             MouseState::RequiresEnemyTarget {
                 area_radius: Some(radius),
                 ..
             } => {
-                if let ActionTarget::Character(target_id, movement) =
+                if let ActionTarget::Character(target_id, _movement) =
                     ui_state.players_action_target()
                 {
                     // TODO draw movement?
@@ -970,8 +1007,8 @@ impl GameGrid {
 
             if let Some(hovered_route) = hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
-                    let path = build_path_from_route(&self.routes, active_char_pos, mouse_grid_pos);
-                    self.draw_movement_path(&path, true);
+                    let path = build_path_from_chart(&self.routes, active_char_pos, mouse_grid_pos);
+                    self.draw_movement_path(&path.positions, true);
 
                     if pressed_left_mouse {
                         let char_remaining_movement = self
@@ -985,7 +1022,7 @@ impl GameGrid {
 
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
                             cost: ap_cost,
-                            selected_movement_path: path,
+                            selected_movement_path: path.positions,
                         });
                         outcome.switched_state = Some(NewState::Move);
                     }
@@ -1040,9 +1077,21 @@ impl GameGrid {
                         move_into_melee, ..
                     } = mouse_state
                     {
-                        if move_into_melee {
-                            let positions = self
-                                .try_find_path_to_action_target(mouse_grid_pos, active_char_pos);
+                        if let Some(move_range) = move_into_melee {
+                            let positions = if within_range_squared(
+                                move_range.squared(),
+                                active_char_pos,
+                                mouse_grid_pos,
+                            ) {
+                                self.try_find_path_to_action_target(
+                                    mouse_grid_pos,
+                                    active_char_pos,
+                                    move_range,
+                                )
+                            } else {
+                                vec![]
+                            };
+
                             self.draw_movement_to_target(
                                 active_char_pos,
                                 mouse_grid_pos,
@@ -1121,14 +1170,18 @@ impl GameGrid {
                             move_into_melee, ..
                         } = mouse_state
                         {
-                            let movement = if move_into_melee {
-                                Some(self.try_find_path_to_action_target(
+                            let movement = move_into_melee.map(|move_range| {
+                                let mut path = self.try_find_path_to_action_target(
                                     mouse_grid_pos,
                                     active_char_pos,
-                                ))
-                            } else {
-                                None
-                            };
+                                    move_range,
+                                );
+                                if path.len() == 1 {
+                                    // A path consisting of just the start position is not a valid movement to the target
+                                    path = vec![];
+                                }
+                                path
+                            });
 
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
@@ -1233,21 +1286,22 @@ impl GameGrid {
         target_pos: (i32, i32),
         movement_to_target: Vec<(i32, i32)>,
     ) {
-        if movement_to_target.is_empty() {
+        if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
             self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0);
         } else {
+            dbg!(&movement_to_target);
             self.draw_target_crosshair(
-                *movement_to_target.first().unwrap(),
+                *movement_to_target.last().unwrap(),
                 target_pos,
                 PLAYERS_TARGET_CROSSHAIR_COLOR,
                 7.0,
             );
-            let mut path = vec![actor_pos];
-            for pos in movement_to_target.iter().rev() {
-                path.push(*pos);
-            }
-            self.draw_movement_path_arrow(path.iter().copied(), MOVEMENT_ARROW_COLOR, 7.0);
+            self.draw_movement_path_arrow(
+                movement_to_target.iter().copied(),
+                MOVEMENT_ARROW_COLOR,
+                7.0,
+            );
         }
     }
 
@@ -1255,7 +1309,22 @@ impl GameGrid {
         &mut self,
         target_pos: (i32, i32),
         actor_pos: (i32, i32),
+        move_range: Range,
     ) -> Vec<Position> {
+        let maybe_path = self.pathfind_grid.find_shortest_path_to_adjacent(
+            actor_pos,
+            target_pos,
+            f32::from(move_range) - 1.0,
+        );
+
+        if let Some(path) = maybe_path {
+            //path.positions.iter().rev().map(|(_dist, pos)| *pos).collect()
+            path.positions.iter().map(|(_dist, pos)| *pos).collect()
+        } else {
+            vec![]
+        }
+
+        /*
         let mut movement = vec![];
         for (dx, dy) in [
             (-1, 0),
@@ -1277,9 +1346,14 @@ impl GameGrid {
             }
         }
         movement
+         */
     }
 
-    fn determine_range_indicator(&self, ui_state: &mut UiState) -> Option<(Range, RangeIndicator)> {
+    fn determine_range_indicator(
+        &self,
+        ui_state: &mut UiState,
+        hovered_base_action: Option<BaseAction>,
+    ) -> Option<(Range, RangeIndicator)> {
         if let UiState::ConfiguringAction(configured_action) = ui_state {
             match configured_action {
                 ConfiguredAction::Attack {
@@ -1372,6 +1446,24 @@ impl GameGrid {
                 },
                 _ => None,
             }
+        } else if let UiState::ChoosingAction = ui_state {
+            match hovered_base_action {
+                Some(BaseAction::Attack(attack)) => {
+                    let range = self
+                        .characters
+                        .get(self.active_character_id)
+                        .attack_range(attack.hand, iter::empty());
+                    Some((range, RangeIndicator::ActionTargetRange))
+                }
+                Some(BaseAction::UseAbility(ability)) => {
+                    let radius = ability.target.radius(&[]);
+                    let range = ability.target.range(&[]);
+                    radius
+                        .or(range)
+                        .map(|range| (range, RangeIndicator::ActionTargetRange))
+                }
+                _ => None,
+            }
         } else {
             None
         }
@@ -1384,8 +1476,28 @@ impl GameGrid {
     }
 
     fn draw_character_label(&self, character: &Character, draw_action_points: bool) {
+        self._draw_character_label(character, draw_action_points, true, false);
+    }
+
+    fn draw_character_healthbar(&self, character: &Character) {
+        self._draw_character_label(character, false, false, true);
+    }
+
+    fn _draw_character_label(
+        &self,
+        character: &Character,
+        draw_action_points: bool,
+        draw_name: bool,
+        transparent_healthbar: bool,
+    ) {
         let (x, y) = self.character_screen_pos(character);
         let y = y - 5.0;
+
+        let margin = 2.0;
+        let health_w = (self.cell_w - 10.0).min(90.0);
+        let mut health_h = 5.0;
+        let health_x = x + (self.cell_w - health_w) * 0.5;
+        let mut health_y = y - health_h;
 
         let font_size = 14;
         let params = TextParams {
@@ -1395,10 +1507,6 @@ impl GameGrid {
             ..Default::default()
         };
 
-        let margin = 2.0;
-        let healthbar_w = self.cell_w;
-        let healthbar_h = 5.0;
-
         let header = character.name;
 
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
@@ -1406,25 +1514,35 @@ impl GameGrid {
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
         let box_h = text_dimensions.height + text_pad * 2.0;
-        let box_x = x - (box_w - self.cell_w) / 2.0;
-        let box_y = y - healthbar_h - margin - box_h;
 
-        draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
-        draw_text_rounded(
-            header,
-            box_x + text_pad,
-            box_y + text_pad + text_dimensions.offset_y,
-            params,
-        );
+        let box_y = y - health_h - margin - box_h;
 
-        draw_rectangle(x, y - healthbar_h, healthbar_w, healthbar_h, BLACK);
-        draw_rectangle(
-            x,
-            y - healthbar_h,
-            healthbar_w * (character.health.current() as f32 / character.health.max() as f32),
-            healthbar_h,
-            RED,
-        );
+        if draw_name {
+            let box_x = x - (box_w - self.cell_w) / 2.0;
+
+            draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
+            draw_text_rounded(
+                header,
+                box_x + text_pad,
+                box_y + text_pad + text_dimensions.offset_y,
+                params,
+            );
+        }
+
+        let mut healthbar_bg = BLACK;
+        healthbar_bg.a = 0.5;
+        if transparent_healthbar {
+            health_h -= 2.0;
+            health_y += 1.0;
+        }
+
+        draw_rectangle(health_x, health_y, health_w, health_h, healthbar_bg);
+        let filled_health_w =
+            (health_w) * (character.health.current() as f32 / character.health.max() as f32);
+        draw_rectangle(health_x, health_y, filled_health_w, health_h, RED);
+        if !transparent_healthbar {
+            draw_rectangle_lines(health_x, health_y, health_w, health_h, 1.0, LIGHTGRAY);
+        }
 
         if draw_action_points {
             let mut action_points_row = ActionPointsRow::new(
@@ -1672,20 +1790,20 @@ impl GameGrid {
     fn draw_movement_path(&self, path: &[(f32, Position)], hover: bool) {
         if hover {
             self.draw_movement_path_arrow(
-                path.iter().map(|(_dist, pos)| *pos).rev(),
+                path.iter().map(|(_dist, pos)| *pos),
                 HOVER_MOVEMENT_ARROW_COLOR,
                 3.0,
             );
         } else {
             self.draw_movement_path_arrow(
-                path.iter().map(|(_dist, pos)| *pos).rev(),
+                path.iter().map(|(_dist, pos)| *pos),
                 MOVEMENT_ARROW_COLOR,
                 7.0,
             );
         };
 
-        let distance = path[0].0;
-        let destination = path[0].1;
+        let distance = path.last().unwrap().0;
+        let destination = path.last().unwrap().1;
         let (x, y) = (
             self.grid_x_to_screen(destination.0),
             self.grid_y_to_screen(destination.1),
@@ -1746,6 +1864,7 @@ impl GameGrid {
         }
 
         let last_direction = (b.0 - a.0, b.1 - a.1);
+        assert!(last_direction != (0, 0));
 
         let end = b;
         draw_arrow(
@@ -1767,6 +1886,7 @@ impl GameGrid {
         );
     }
 
+    /*
     fn draw_move_range_indicator(&self, origin: Position, range: f32) {
         let range_floor = range.floor() as i32;
 
@@ -1801,6 +1921,7 @@ impl GameGrid {
             }
         }
     }
+     */
 
     fn draw_range_indicator(&self, origin: Position, range: Range, indicator: RangeIndicator) {
         let range_ceil = (f32::from(range)).ceil() as i32;
@@ -2053,7 +2174,7 @@ impl EffectGraphics {
 enum MouseState {
     RequiresEnemyTarget {
         area_radius: Option<Range>,
-        move_into_melee: bool,
+        move_into_melee: Option<Range>,
     },
     RequiresAllyTarget,
     RequiresPositionTarget(Range),

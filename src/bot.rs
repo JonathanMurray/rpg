@@ -24,6 +24,8 @@ pub struct MagiBehaviour {
     current_goal: Cell<Option<(Ability, CharacterId)>>,
 }
 
+const EXPLORATION_RANGE: f32 = 20.0;
+
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
     assert!(!character.player_controlled());
@@ -105,6 +107,7 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
             character.pos(),
             target.pos(),
             ability_range,
+            EXPLORATION_RANGE,
         );
         if let Some(path) = maybe_path {
             return convert_path_to_move_action(character, path);
@@ -190,10 +193,14 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
                 bot_pos,
                 *player_pos,
                 range.into_range().into(),
+                EXPLORATION_RANGE,
             )
         } else {
-            game.pathfind_grid
-                .find_shortest_path_to_adjacent(bot_pos, *player_pos)
+            game.pathfind_grid.find_shortest_path_to_adjacent(
+                bot_pos,
+                *player_pos,
+                EXPLORATION_RANGE,
+            )
         };
 
         if let Some(path) = maybe_path {

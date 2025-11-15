@@ -134,6 +134,7 @@ pub enum ConfiguredAction {
         target: ActionTarget,
     },
     Move {
+        // Including the actor's current location, going all the way to the destination. Each pos is annotated with "total dist from start"
         selected_movement_path: Vec<(f32, Position)>,
         cost: u32,
     },
@@ -203,10 +204,8 @@ impl ConfiguredAction {
                 }
 
                 ActionTarget::None => match ability.target {
-                    AbilityTarget::Enemy { .. } => false,
-                    AbilityTarget::Ally { .. } => false,
                     AbilityTarget::None { .. } => true,
-                    AbilityTarget::Area { .. } => false,
+                    _ => false,
                 },
             },
 
@@ -490,10 +489,20 @@ impl UserInterface {
             || self.character_sheet_toggle.shown.get()
             || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
+
+        let hovered_action = self
+            .hovered_button
+            .map(|(_btn_id, btn_action, _btn_pos)| match btn_action {
+                ButtonAction::Action(base_action) => Some(base_action),
+                _ => None,
+            })
+            .flatten();
+
         let grid_outcome = self.game_grid.draw(
             is_grid_receptive_to_dragging,
             &mut self.state.borrow_mut(),
             is_grid_obstructed,
+            hovered_action,
         );
 
         self.handle_grid_outcome(grid_outcome);
@@ -731,19 +740,23 @@ impl UserInterface {
         println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
 
         match target {
-            ActionTarget::Character(target_id, ..) => {
+            ActionTarget::Character(target_id, movement, ..) => {
                 let target_char = self.characters.get(*target_id);
 
                 let mut details = vec![];
 
-                let reaches = self.active_character().reaches_with_ability(
+                if !self.active_character().reaches_with_ability(
                     ability,
                     selected_enhancements,
                     target_char.pos(),
-                );
-
-                if !reaches {
+                ) {
                     details.push(("Can not reach!".to_string(), Goodness::Bad));
+                }
+
+                if let Some(movement) = movement {
+                    if movement.is_empty() {
+                        details.push(("No valid path!".to_string(), Goodness::Bad));
+                    }
                 }
 
                 if let Some(ability_roll) = ability.roll {
@@ -934,8 +947,8 @@ impl UserInterface {
     }
 
     fn on_new_state(&mut self) {
-        dbg!(&self.state.borrow());
-        println!("^^^ on_new_state() ^^^");
+        //dbg!(&self.state.borrow());
+        //println!("^^^ on_new_state() ^^^");
 
         self.activity_popup.additional_line = None;
 
@@ -1688,6 +1701,7 @@ impl UserInterface {
                         cost,
                         selected_movement_path,
                     } => {
+                        /*
                         let mut reversed_path = selected_movement_path.clone();
                         // Remove the character's current position; it should not be part of the movement path
                         reversed_path.remove(reversed_path.len() - 1);
@@ -1701,6 +1715,14 @@ impl UserInterface {
                                 total_distance = f32::max(total_distance, dist);
                                 (x, y)
                             })
+                            .collect();
+                         */
+
+                        let dst = selected_movement_path.last().unwrap();
+                        let total_distance = dst.0;
+                        let positions = selected_movement_path
+                            .iter()
+                            .map(|(_dist_from_start, pos)| *pos)
                             .collect();
 
                         Some(Action::Move {

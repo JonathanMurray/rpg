@@ -429,11 +429,11 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
     name: "Sweeping attack",
-    description: "Target all enemies around you",
+    description: "Attack all surrounding enemies",
     icon: IconId::SweepAttack,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 0,
-    stamina_cost: 2,
+    stamina_cost: 1,
     weapon_requirement: Some(WeaponType::Melee),
 
     roll: Some(AbilityRollType::Attack(-3)),
@@ -456,7 +456,7 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::CrushingStrike,
     action_point_cost: 0,
     mana_cost: 0,
-    stamina_cost: 2,
+    stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             ApplyEffect::RemoveActionPoints(1),
@@ -464,6 +464,23 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
         ..AttackEnhancementEffect::default()
     }),
     spell_effect: None,
+};
+pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::LungeAttack,
+    name: "Reach",
+    description: "",
+    icon: IconId::Extend,
+    action_point_cost: 0,
+    mana_cost: 0,
+    stamina_cost: 1,
+    spell_effect: Some(SpellEnhancementEffect {
+        increased_range_tenths: 10,
+        ..SpellEnhancementEffect::default()
+    }),
+    attack_effect: Some(AttackEnhancementEffect {
+        range_bonus: 1,
+        ..AttackEnhancementEffect::default()
+    }),
 };
 pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
@@ -476,10 +493,13 @@ pub const LUNGE_ATTACK: Ability = Ability {
     weapon_requirement: Some(WeaponType::Melee),
 
     roll: Some(AbilityRollType::Attack(0)),
-    // TODO enhancement that adds range; the base range could be 2.5, which also means it wouldn't allow diagonal movement
-    possible_enhancements: [Some(LUNGE_ATTACK_HEAVY_IMPACT), None, None],
+    possible_enhancements: [
+        Some(LUNGE_ATTACK_HEAVY_IMPACT),
+        Some(LUNGE_ATTACK_REACH),
+        None,
+    ],
     target: AbilityTarget::Enemy {
-        //reach: AbilityReach::MoveIntoMelee(Range::Float(2.99)),
+        //reach: AbilityReach::MoveIntoMelee(Range::Float(3.99)),
         reach: AbilityReach::MoveIntoMelee(Range::Float(2.5)),
         effect: AbilityNegativeEffect::Attack,
         impact_area: None,

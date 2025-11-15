@@ -163,12 +163,16 @@ impl ActivityPopup {
         let hor_pad = 10.0;
         let margin_between_text_and_buttons = 20.0;
         let button_margin = 10.0;
+        let margin_between_choices_and_proceed = 10.0;
 
         let mut width =
             text_content_w + margin_between_text_and_buttons + self.proceed_button.size.0;
 
-        for btn in self.choice_buttons.values() {
-            width += button_margin + btn.size.0;
+        if !self.choice_buttons.is_empty() {
+            for btn in self.choice_buttons.values() {
+                width += button_margin + btn.size.0;
+            }
+            width += margin_between_choices_and_proceed;
         }
 
         let sprint_stamina_text = "Extend range:";
@@ -260,6 +264,10 @@ impl ActivityPopup {
             }
 
             x_btn += btn.size.0 + button_margin;
+        }
+
+        if !self.choice_buttons.is_empty() {
+            x_btn += margin_between_choices_and_proceed;
         }
 
         self.proceed_button.draw(x_btn, y_btn + 6.0);

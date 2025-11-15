@@ -29,9 +29,9 @@ use rpg::core::{
 use rpg::data::{
     PassiveSkill, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL,
     HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
-    LUNGE_ATTACK_HEAVY_IMPACT, MANA_POTION, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT,
-    OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD,
-    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, NECROTIC_INFLUENCE,
+    NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND,
+    SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -98,7 +98,7 @@ async fn main() {
         PortraitId::Bob,
         SpriteId::Bob,
         //Attributes::new(4, 3, 3, 3),
-        Attributes::new(1, 3, 3, 3),
+        Attributes::new(3, 3, 3, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
@@ -116,6 +116,13 @@ async fn main() {
     bob.known_actions
         .borrow_mut()
         .push(BaseAction::UseAbility(SWEEP_ATTACK));
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(SCREAM));
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(LUNGE_ATTACK));
+    bob.known_ability_enhancements.push(LUNGE_ATTACK_REACH);
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements
     //.push(LUNGE_ATTACK_HEAVY_IMPACT);
@@ -125,7 +132,7 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![bob];
 
     player_characters = run_fight_loop(
         player_characters,

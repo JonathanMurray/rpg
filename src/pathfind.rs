@@ -3,6 +3,8 @@ use std::{
     collections::{HashMap, HashSet},
 };
 
+use indexmap::IndexMap;
+
 use crate::core::{distance_between, Position};
 
 pub struct PathfindGrid {
@@ -11,14 +13,17 @@ pub struct PathfindGrid {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Route {
+pub struct ChartNode {
     pub distance_from_start: f32,
     pub came_from: Position,
 }
 
 #[derive(Debug)]
 pub struct Path {
+    // total distance (walking, not flying) from start to end
     pub total_distance: f32,
+
+    // the positions including the start all the way to the destination, each with a "total distance from start" marker
     pub positions: Vec<(f32, Position)>,
 }
 
@@ -53,14 +58,15 @@ impl PathfindGrid {
         &self,
         start: Position,
         target: Position,
+        exploration_range: f32,
     ) -> Option<Path> {
         let proximity = 1.5; // adjacent = one diaginal away (sqrt(2)) is allowed, but 2 away is not
-        self.find_shortest_path_to_proximity(start, target, proximity)
+        self.find_shortest_path_to_proximity(start, target, proximity, exploration_range)
     }
 
     pub fn find_shortest_path_to(&self, start: Position, target: Position) -> Option<Path> {
         let proximity = 0.0; // i.e. that exact position
-        self.find_shortest_path_to_proximity(start, target, proximity)
+        self.find_shortest_path_to_proximity(start, target, proximity, 20.0)
     }
 
     pub fn find_shortest_path_to_proximity(
@@ -68,25 +74,16 @@ impl PathfindGrid {
         start: Position,
         target: Position,
         proximity: f32,
+        exploration_range: f32,
     ) -> Option<Path> {
-        let routes = self.explore_outward(start, 20.0);
-        let mut shortest_path: Option<Vec<(f32, (i32, i32))>> = None;
-        for (end, route) in &routes {
+        let routes = self.explore_outward(start, exploration_range);
+        let mut shortest_path: Option<Path> = None;
+        for (end, chart_node) in &routes {
             if distance_between(*end, target) <= proximity {
-                let mut path = build_path_from_route(&routes, start, *end);
-
-                //dbg!("before popping start pos from path: ", &path);
-
-                if path[0].1 == start {
-                    // The "path" doesn't make it beyond the start position. Discard it.
-                    continue;
-                }
-
-                // Pop the start position
-                path.pop();
+                let path = build_path_from_chart(&routes, start, *end);
 
                 if let Some(shortest) = &shortest_path {
-                    if route.distance_from_start < shortest[0].0 {
+                    if chart_node.distance_from_start < shortest.total_distance {
                         shortest_path = Some(path);
                     }
                 } else {
@@ -95,22 +92,15 @@ impl PathfindGrid {
             }
         }
 
-        shortest_path.map(|path| {
-            let total_distance = path[0].0;
-            let positions = path.iter().rev().copied().collect();
-            Path {
-                total_distance,
-                positions,
-            }
-        })
+        shortest_path
     }
 
-    pub fn explore_outward(&self, start: Position, range: f32) -> HashMap<Position, Route> {
-        let mut routes: HashMap<Position, Route> = Default::default();
+    pub fn explore_outward(&self, start: Position, range: f32) -> IndexMap<Position, ChartNode> {
+        let mut routes: IndexMap<Position, ChartNode> = Default::default();
 
-        let mut next: Vec<(Position, Route)> = vec![(
+        let mut next: Vec<(Position, ChartNode)> = vec![(
             start,
-            Route {
+            ChartNode {
                 distance_from_start: 0.0,
                 came_from: start,
             },
@@ -152,7 +142,7 @@ impl PathfindGrid {
                 {
                     next.push((
                         neighbor_node,
-                        Route {
+                        ChartNode {
                             distance_from_start: neighbor_dist,
                             came_from: node,
                         },
@@ -165,26 +155,38 @@ impl PathfindGrid {
     }
 }
 
-pub fn build_path_from_route(
-    routes: &HashMap<Position, Route>,
+pub fn build_path_from_chart(
+    chart: &IndexMap<Position, ChartNode>,
     start: Position,
     destination: Position,
-) -> Vec<(f32, Position)> {
-    let route = routes.get(&destination).unwrap();
-    let mut dist = route.distance_from_start;
+) -> Path {
+    let dst_node = chart.get(&destination).unwrap();
+    let mut dist = dst_node.distance_from_start;
 
-    let mut path = vec![(dist, destination)];
-    let mut pos = route.came_from;
+    let mut positions = vec![(dist, destination)];
 
-    loop {
-        let route = routes.get(&pos).unwrap();
-        dist = route.distance_from_start;
-        path.push((dist, pos));
-        if pos == start {
-            break;
+    // If we seeked to a location that's adjacent to the start position, the path will just consist of the start position
+    if dst_node.came_from != destination {
+        let mut pos = dst_node.came_from;
+
+        loop {
+            let node = chart.get(&pos).unwrap();
+            dist = node.distance_from_start;
+            positions.insert(0, (dist, pos));
+            //path.push((dist, pos));
+            if pos == start {
+                break;
+            }
+            pos = node.came_from;
         }
-        pos = route.came_from;
+        assert!(positions.len() > 1);
+        assert!(positions[0] != positions[1]);
     }
-    assert!(path.len() > 1);
-    path
+
+    let total_distance = positions.last().unwrap().0;
+    //let positions = path.iter().rev.copied().collect();
+    Path {
+        total_distance,
+        positions,
+    }
 }

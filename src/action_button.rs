@@ -23,7 +23,7 @@ use crate::{
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Weapon, WeaponType,
+        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Weapon, WeaponType,
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
@@ -262,19 +262,24 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
         BaseAction::UseAbility(ability) => ability_tooltip(ability),
         BaseAction::Move => ActionButtonTooltip {
             header: "Move".to_string(),
+            description: Some(
+                "Move a limited distance for free every turn. Spend AP and stamina to move further.",
+            ),
             ..Default::default()
         },
         BaseAction::ChangeEquipment => ActionButtonTooltip {
             header: "Equip/unequip (1 AP)".to_string(),
+            description: Some("Change your weapon, shield or armor."),
             ..Default::default()
         },
         BaseAction::UseConsumable => ActionButtonTooltip {
             header: "Use consumable (1 AP)".to_string(),
+            description: Some("Use a consumable from your inventory (e.g. a potion)."),
             ..Default::default()
         },
         BaseAction::EndTurn => ActionButtonTooltip {
             header: "End your turn".to_string(),
-            description: Some("Regain 4 AP and some of your stamina"),
+            description: Some("Regain 4 AP and some of your stamina."),
             ..Default::default()
         },
     }
@@ -391,13 +396,18 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                 // There's no use-case for this yet (?)
                 assert!(acquisition != AreaTargetAcquisition::Everyone);
 
+                let radius_str = match radius {
+                    Range::Melee => "melee".to_string(),
+                    r => format!("radius {r}"),
+                };
+
                 match effect {
                     AbilityEffect::Negative(effect) => {
-                        technical_description.push(format!("Nearby enemies (radius {}) :", radius));
+                        technical_description.push(format!("Enemies ({radius_str}) :"));
                         describe_ability_enemy_effect(effect, &mut technical_description);
                     }
                     AbilityEffect::Positive(effect) => {
-                        technical_description.push(format!("Nearby allies (radius {}) :", radius));
+                        technical_description.push(format!("Allies ({radius_str}) :"));
                         describe_ability_ally_effect(effect, &mut technical_description);
                     }
                 }
@@ -629,7 +639,7 @@ impl ActionButton {
                     } else {
                         format!("range {}", weapon.range.into_range())
                     };
-                    technical_description.push(format!("Target enemy ({})", range));
+                    technical_description.push(format!("Target ({})", range));
                     technical_description.push("  [ evasion ]".to_string());
                     technical_description.push(format!("  {} damage", weapon.damage));
                     ActionButtonTooltip {
