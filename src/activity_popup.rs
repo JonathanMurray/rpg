@@ -668,7 +668,6 @@ impl ActivityPopup {
 
                     ConfiguredAction::ChangeEquipment { .. } => {}
                     ConfiguredAction::UseConsumable { .. } => {}
-                    ConfiguredAction::EndTurn => {}
                 }
             }
 

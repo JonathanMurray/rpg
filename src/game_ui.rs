@@ -142,7 +142,6 @@ pub enum ConfiguredAction {
         drag: Option<EquipmentDrag>,
     },
     UseConsumable(Option<EquipmentConsumption>),
-    EndTurn,
 }
 
 impl ConfiguredAction {
@@ -223,30 +222,28 @@ impl ConfiguredAction {
             ),
 
             ConfiguredAction::UseConsumable(consumable) => consumable.is_some(),
-
-            ConfiguredAction::EndTurn => true,
         }
     }
 
-    pub fn from_base_action(base_action: BaseAction) -> Self {
+    pub fn from_base_action(base_action: BaseAction) -> Option<Self> {
         match base_action {
-            BaseAction::Attack(attack) => Self::Attack {
+            BaseAction::Attack(attack) => Some(Self::Attack {
                 attack,
                 selected_enhancements: vec![],
                 target: None,
-            },
-            BaseAction::UseAbility(ability) => Self::UseAbility {
+            }),
+            BaseAction::UseAbility(ability) => Some(Self::UseAbility {
                 ability,
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
-            },
-            BaseAction::Move => Self::Move {
+            }),
+            BaseAction::Move => Some(Self::Move {
                 cost: 0,
                 selected_movement_path: Default::default(),
-            },
-            BaseAction::ChangeEquipment => Self::ChangeEquipment { drag: None },
-            BaseAction::UseConsumable => Self::UseConsumable(None),
-            BaseAction::EndTurn => Self::EndTurn,
+            }),
+            BaseAction::ChangeEquipment => Some(Self::ChangeEquipment { drag: None }),
+            BaseAction::UseConsumable => Some(Self::UseConsumable(None)),
+            BaseAction::EndTurn => None,
         }
     }
 
@@ -257,7 +254,6 @@ impl ConfiguredAction {
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
             ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
-            ConfiguredAction::EndTurn => BaseAction::EndTurn,
         }
     }
 
@@ -293,7 +289,6 @@ impl ConfiguredAction {
             ConfiguredAction::Move { cost: ap_cost, .. } => *ap_cost,
             ConfiguredAction::ChangeEquipment { .. } => 1,
             ConfiguredAction::UseConsumable { .. } => 1,
-            ConfiguredAction::EndTurn => 0,
         }
     }
 
@@ -337,6 +332,7 @@ pub struct CharacterUi {
     action_points_row: ActionPointsRow,
     pub hoverable_buttons: Vec<Rc<ActionButton>>,
     actions_section: Container,
+    end_turn_button: Rc<ActionButton>,
     pub character_sheet: CharacterSheet,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -347,10 +343,12 @@ pub struct CharacterUi {
 
 impl CharacterUi {
     pub fn draw(&self, y: f32) {
-        self.actions_section.draw(10.0, y + 5.0);
-        self.action_points_row.draw(410.0, y + 5.0);
+        let y0 = y + 5.0;
+        self.actions_section.draw(10.0, y0);
+        self.end_turn_button.draw(300.0, y0 + 32.0);
+        self.action_points_row.draw(410.0, y0);
         self.resource_bars
-            .draw(460.0 - self.resource_bars.size().0 / 2.0, y + 40.0);
+            .draw(460.0 - self.resource_bars.size().0 / 2.0, y0 + 35.0);
     }
 }
 
@@ -970,9 +968,7 @@ impl UserInterface {
                     .cloned();
                 assert!(relevant_action_button.is_some(), "{:?}", configured_action);
 
-                if matches!(configured_action, ConfiguredAction::EndTurn) {
-                    self.target_ui.clear_action();
-                } else if let ConfiguredAction::Attack {
+                if let ConfiguredAction::Attack {
                     selected_enhancements,
                     attack,
                     ..
@@ -1623,7 +1619,44 @@ impl UserInterface {
         self.event_queue
             .take()
             .into_iter()
-            .for_each(|event| self.handle_internal_ui_event(event));
+            .for_each(|event| match event {
+                InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
+                    if let Some(pos) = hovered {
+                        self.hovered_button = Some((button_id, button_action, pos));
+                    } else if let Some(previously_hovered_button) = self.hovered_button {
+                        if button_id == previously_hovered_button.0 {
+                            self.hovered_button = None
+                        }
+                    }
+                }
+
+                InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
+                    ButtonAction::Action(base_action) => {
+                        let may_choose_action = matches!(
+                            &*self.state.borrow(),
+                            UiState::ChoosingAction | UiState::ConfiguringAction(..)
+                        );
+
+                        if may_choose_action && self.active_character().can_use_action(base_action)
+                        {
+                            if let Some(s) = ConfiguredAction::from_base_action(base_action) {
+                                self.set_state(UiState::ConfiguringAction(s));
+                            } else {
+                                assert!(player_choice.is_none());
+                                // The player ends their turn
+                                player_choice = Some(PlayerChose::Action(None));
+                            }
+                        } else {
+                            println!("Cannot choose this action at this time");
+                            todo!(
+                                "Does this ever happen? If not, let's change the if to an assert"
+                            );
+                        }
+                    }
+
+                    _ => unreachable!(),
+                },
+            });
 
         self.character_portraits.update(game);
         self.player_portraits.update(game);
@@ -1744,7 +1777,6 @@ impl UserInterface {
                     &ConfiguredAction::UseConsumable(consumption) => Some(Action::UseConsumable {
                         inventory_equipment_index: consumption.unwrap().equipment_idx,
                     }),
-                    &ConfiguredAction::EndTurn => None,
                 };
                 PlayerChose::Action(action)
             }
@@ -1782,9 +1814,11 @@ impl UserInterface {
                     );
 
                     if may_choose_action && self.active_character().can_use_action(base_action) {
-                        self.set_state(UiState::ConfiguringAction(
-                            ConfiguredAction::from_base_action(base_action),
-                        ));
+                        if let Some(s) = ConfiguredAction::from_base_action(base_action) {
+                            self.set_state(UiState::ConfiguringAction(s));
+                        } else {
+                            todo!("end turn here");
+                        }
                     } else {
                         println!("Cannot choose this action at this time");
                     }
@@ -1878,6 +1912,7 @@ pub fn build_character_ui(
     let mut hoverable_buttons = vec![];
     let mut basic_buttons = vec![];
     let mut ability_buttons = vec![];
+    let mut end_turn_button = None;
 
     let mut attack_button_for_character_sheet = None;
     let mut ability_buttons_for_character_sheet = vec![];
@@ -1929,7 +1964,7 @@ pub fn build_character_ui(
             }
             BaseAction::ChangeEquipment => basic_buttons.push(btn),
             BaseAction::UseConsumable => basic_buttons.push(btn),
-            BaseAction::EndTurn => basic_buttons.push(btn),
+            BaseAction::EndTurn => end_turn_button = Some(btn),
         }
     }
 
@@ -2016,6 +2051,7 @@ pub fn build_character_ui(
         action_points_row,
         hoverable_buttons,
         actions_section,
+        end_turn_button: end_turn_button.unwrap(),
         character_sheet,
         health_bar: resource_bars.health_bar,
         mana_bar: resource_bars.mana_bar,
