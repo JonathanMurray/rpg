@@ -161,6 +161,16 @@ pub struct GameGrid {
 
 const ZOOM_LEVELS: [f32; 6] = [40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum TextEffectStyle {
+    Friendly,
+    Miss,
+    ReactionExclamation,
+    HostileGraze,
+    HostileHit,
+    HostileCrit,
+}
+
 impl GameGrid {
     pub fn new(
         selected_character_id: CharacterId,
@@ -307,7 +317,7 @@ impl GameGrid {
         start_time: f32,
         duration: f32,
         text: impl Into<String>,
-        goodness: Goodness,
+        style: TextEffectStyle,
     ) {
         let mut pos = (
             self.grid_x_to_screen(position.0),
@@ -319,10 +329,13 @@ impl GameGrid {
         let dy = rng.random_range(-10..=10) as f32;
         pos = (pos.0 + dx, pos.1 + dy);
 
-        let color = match goodness {
-            Goodness::Good => GREEN,
-            Goodness::Neutral => YELLOW,
-            Goodness::Bad => ORANGE,
+        let color = match style {
+            TextEffectStyle::Friendly => GREEN,
+            TextEffectStyle::Miss => WHITE,
+            TextEffectStyle::ReactionExclamation => ORANGE,
+            TextEffectStyle::HostileGraze => WHITE,
+            TextEffectStyle::HostileHit => ORANGE,
+            TextEffectStyle::HostileCrit => RED,
         };
 
         let effect = ConcreteEffect {
@@ -1289,7 +1302,6 @@ impl GameGrid {
             let invalid_path = [actor_pos, target_pos];
             self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0);
         } else {
-            dbg!(&movement_to_target);
             self.draw_target_crosshair(
                 *movement_to_target.last().unwrap(),
                 target_pos,
@@ -2159,10 +2171,12 @@ impl EffectGraphics {
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
-                draw_text_rounded(text, x0 + 2.0, y0 + 2.0, text_params.clone());
+                // First draw shadow
+                draw_text_rounded(text, x0 + 3.0, y0 + 3.0, text_params.clone());
                 text_params.color = *color;
                 text_params.color.a = alpha;
 
+                // Then the regular text
                 draw_text_rounded(text, x0, y0, text_params);
             }
         }

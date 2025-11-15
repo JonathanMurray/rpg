@@ -363,8 +363,7 @@ impl CoreGame {
                         .await;
 
                     let maybe_damage = match event.outcome {
-                        AttackOutcome::Hit(dmg) => Some(dmg),
-                        AttackOutcome::Graze(dmg) => Some(dmg),
+                        AttackOutcome::Hit(dmg, _type) => Some(dmg),
                         _ => None,
                     };
                     if let Some(damage) = maybe_damage {
@@ -1267,12 +1266,12 @@ impl CoreGame {
                 }
                 0 => "".to_string(),
                 1 => {
-                    detail_lines.push("  Heavy hit".to_string());
-                    "Heavy hit".to_string()
+                    detail_lines.push("  Crit".to_string());
+                    "Crit".to_string()
                 }
                 n => {
-                    detail_lines.push(format!("  Heavy hit ({})", n));
-                    "Heavy hit".to_string()
+                    detail_lines.push(format!("  Crit ({})", n));
+                    "Crit".to_string()
                 }
             };
 
@@ -1549,6 +1548,7 @@ impl CoreGame {
             let mut dmg_calculation = weapon.damage as i32;
 
             let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, weapon.name);
+            let mut attack_hit_type = AttackHitType::Regular;
 
             if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
                 let bonus_dmg = 1;
@@ -1578,7 +1578,7 @@ impl CoreGame {
             let armored_defense = evasion + armor_value;
 
             if attack_result < evasion {
-                //let mut line = "  Graze! (50% damage".to_string();
+                attack_hit_type = AttackHitType::Graze;
                 let line = "  Graze!".to_string();
                 dmg_str.push_str(" -1 (graze)");
                 dmg_calculation -= 1;
@@ -1603,12 +1603,14 @@ impl CoreGame {
                 let degree_of_success = (attack_result - armored_defense) / 5;
 
                 if degree_of_success > 1 {
-                    detail_lines.push(format!("  Heavy hit ({})", degree_of_success));
-                    dmg_str.push_str(&format!(" +{degree_of_success} (Heavy hit)"));
+                    attack_hit_type = AttackHitType::Critical;
+                    detail_lines.push(format!("  Critical hit ({})", degree_of_success));
+                    dmg_str.push_str(&format!(" +{degree_of_success} (crit)"));
                     dmg_calculation += degree_of_success as i32;
                 } else if degree_of_success == 1 {
-                    detail_lines.push("  Heavy hit".to_string());
-                    dmg_str.push_str(" +1 (Heavy hit)");
+                    attack_hit_type = AttackHitType::Critical;
+                    detail_lines.push("  Critical hit".to_string());
+                    dmg_str.push_str(" +1 (crit)");
                     dmg_calculation += 1;
                 } else if armor_value > 0 {
                     detail_lines.push("  Penetrating hit".to_string());
@@ -1669,11 +1671,7 @@ impl CoreGame {
                 detail_lines.push(format!("{} lost Protected", defender.name));
             }
 
-            if attack_result < evasion {
-                AttackOutcome::Graze(damage)
-            } else {
-                AttackOutcome::Hit(damage)
-            }
+            AttackOutcome::Hit(damage, attack_hit_type)
         } else if attack_result
             < evasion.saturating_sub(
                 evasion_added_by_parry + evasion_added_by_sidestep + evasion_added_by_block + 5,
@@ -1774,8 +1772,8 @@ impl CoreGame {
                         let degree_of_success = (res - toughness) / 5;
                         let (label, bonus) = match degree_of_success {
                             0 => ("Hit".to_string(), 0),
-                            1 => ("Heavy hit".to_string(), 1),
-                            n => (format!("Heavy hit ({n})"), n),
+                            1 => ("Critical hit".to_string(), 1),
+                            n => (format!("Critical hit ({n})"), n),
                         };
 
                         // It's important that at least 2 stacks are applied. Since 1 decays at end of attacker's turn, just 1 would
@@ -2037,12 +2035,18 @@ pub struct AttackedEvent {
 
 #[derive(Debug, Copy, Clone)]
 pub enum AttackOutcome {
-    Hit(u32),
-    Graze(u32),
+    Hit(u32, AttackHitType),
     Dodge,
     Block,
     Parry,
     Miss,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum AttackHitType {
+    Regular,
+    Graze,
+    Critical,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -3670,7 +3674,6 @@ impl Character {
         target_position: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
-        dbg!(range);
         within_range_squared(range.squared(), self.position.get(), target_position)
     }
 

@@ -25,9 +25,9 @@ use crate::{
         as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
         prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityNegativeEffect,
         AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
-        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
-        BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent, Goodness, HandType,
-        OnAttackedReaction, OnHitReaction, Position,
+        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
+        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -36,6 +36,7 @@ use crate::{
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
+        TextEffectStyle,
     },
     init_fight_map::GameInitState,
     target_ui::TargetUi,
@@ -1106,7 +1107,7 @@ impl UserInterface {
                     0.0,
                     0.5,
                     "!".to_string(),
-                    Goodness::Neutral,
+                    TextEffectStyle::ReactionExclamation,
                 );
 
                 self.animation_stopwatch.set_to_at_least(0.4);
@@ -1119,7 +1120,7 @@ impl UserInterface {
                     0.0,
                     0.5,
                     "!".to_string(),
-                    Goodness::Neutral,
+                    TextEffectStyle::ReactionExclamation,
                 );
 
                 self.animation_stopwatch.set_to_at_least(0.4);
@@ -1140,7 +1141,7 @@ impl UserInterface {
                         0.0,
                         1.0,
                         condition.name().to_string(),
-                        Goodness::Neutral,
+                        TextEffectStyle::HostileHit,
                     );
                 }
 
@@ -1152,7 +1153,7 @@ impl UserInterface {
                             0.0,
                             1.0,
                             condition.name().to_string(),
-                            Goodness::Neutral,
+                            TextEffectStyle::HostileHit,
                         );
                     } else {
                         self.game_grid.add_text_effect(
@@ -1160,7 +1161,7 @@ impl UserInterface {
                             0.0,
                             1.0,
                             "Miss".to_string(),
-                            Goodness::Neutral,
+                            TextEffectStyle::Miss,
                         );
                     }
                 }
@@ -1406,7 +1407,7 @@ impl UserInterface {
                     0.0,
                     1.0,
                     format!("{}", amount),
-                    Goodness::Bad,
+                    TextEffectStyle::HostileHit,
                 );
             }
             GameEvent::CharacterReceivedCondition {
@@ -1419,7 +1420,7 @@ impl UserInterface {
                     0.0,
                     1.0,
                     condition.name().to_string(),
-                    Goodness::Neutral,
+                    TextEffectStyle::HostileHit,
                 );
             }
         }
@@ -1432,8 +1433,9 @@ impl UserInterface {
         let detail_lines = &event.detail_lines;
 
         let verb = match outcome {
-            AttackOutcome::Hit(..) => "hit",
-            AttackOutcome::Graze(..) => "grazed",
+            AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",
+            AttackOutcome::Hit(_, AttackHitType::Graze) => "grazed",
+            AttackOutcome::Hit(_, AttackHitType::Critical) => "crit",
             _ => "missed",
         };
 
@@ -1445,8 +1447,7 @@ impl UserInterface {
         );
 
         match outcome {
-            AttackOutcome::Hit(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
-            AttackOutcome::Graze(dmg) => line.push_str(&format!(" ({} damage)", dmg)),
+            AttackOutcome::Hit(dmg, _) => line.push_str(&format!(" ({} damage)", dmg)),
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
             AttackOutcome::Parry => line.push_str(" (parry)"),
             AttackOutcome::Block => line.push_str(" (block)"),
@@ -1458,21 +1459,25 @@ impl UserInterface {
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
-        let duration = 0.08 * distance_between(attacker_pos, target_pos);
+        let projectile_duration = 0.08 * distance_between(attacker_pos, target_pos);
 
-        self.animation_stopwatch.set_to_at_least(duration + 0.6);
-        let impact_text = match outcome {
-            AttackOutcome::Hit(damage) => format!("{}", damage),
-            AttackOutcome::Graze(damage) => format!("{}", damage),
-            AttackOutcome::Dodge => "Dodge".to_string(),
-            AttackOutcome::Parry => "Parry".to_string(),
-            AttackOutcome::Miss => "Miss".to_string(),
-            AttackOutcome::Block => "Block".to_string(),
-        };
-        let goodness = if matches!(outcome, AttackOutcome::Hit(..)) {
-            Goodness::Bad
-        } else {
-            Goodness::Neutral
+        self.animation_stopwatch
+            .set_to_at_least(projectile_duration + 0.6);
+        // TODO handle crit
+        let (impact_text, text_style) = match outcome {
+            AttackOutcome::Hit(damage, AttackHitType::Regular) => {
+                (format!("{}", damage), TextEffectStyle::HostileHit)
+            }
+            AttackOutcome::Hit(damage, AttackHitType::Graze) => {
+                (format!("{}", damage), TextEffectStyle::HostileGraze)
+            }
+            AttackOutcome::Hit(damage, AttackHitType::Critical) => {
+                (format!("{}", damage), TextEffectStyle::HostileCrit)
+            }
+            AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Block => ("Block".to_string(), TextEffectStyle::Miss),
         };
 
         self.game_grid.add_effect(
@@ -1480,7 +1485,7 @@ impl UserInterface {
             target_pos,
             Effect {
                 start_time: 0.0,
-                end_time: duration,
+                end_time: projectile_duration,
                 variant: EffectVariant::Line {
                     thickness: 1.0,
                     end_thickness: Some(4.0),
@@ -1493,8 +1498,8 @@ impl UserInterface {
             attacker_pos,
             target_pos,
             Effect {
-                start_time: duration,
-                end_time: duration + 0.2,
+                start_time: projectile_duration,
+                end_time: projectile_duration + 0.2,
                 variant: EffectVariant::At(
                     EffectPosition::Destination,
                     EffectGraphics::Circle {
@@ -1507,8 +1512,13 @@ impl UserInterface {
             },
         );
 
-        self.game_grid
-            .add_text_effect(target_pos, duration, 1.0, impact_text, goodness);
+        self.game_grid.add_text_effect(
+            target_pos,
+            projectile_duration,
+            1.5,
+            impact_text,
+            text_style,
+        );
     }
 
     fn add_text_effect_for_ability_target_outcome(
@@ -1524,28 +1534,28 @@ impl UserInterface {
                 applied_effects,
             } => {
                 let effect = if let Some(dmg) = damage {
-                    (format!("{}", dmg), Goodness::Bad)
+                    (format!("{}", dmg), TextEffectStyle::HostileHit)
                 } else if applied_effects.is_empty() {
                     if *graze {
-                        ("Graze".to_string(), Goodness::Bad)
+                        ("Graze".to_string(), TextEffectStyle::HostileGraze)
                     } else {
-                        ("Hit".to_string(), Goodness::Bad)
+                        ("Hit".to_string(), TextEffectStyle::HostileHit)
                     }
                 } else {
                     let mut s = String::new();
                     for apply_effect in applied_effects {
                         s.push_str(&format!("{} ", apply_effect));
                     }
-                    (s, Goodness::Bad)
+                    (s, TextEffectStyle::HostileHit)
                 };
                 Some(effect)
             }
-            AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), Goodness::Neutral)),
+            AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), TextEffectStyle::Miss)),
             AbilityTargetOutcome::AffectedAlly { healing } => {
                 if let Some(heal_amount) = healing {
-                    Some((format!("{}", heal_amount), Goodness::Good))
+                    Some((format!("{}", heal_amount), TextEffectStyle::Friendly))
                 } else {
-                    Some(("+".to_string(), Goodness::Good))
+                    Some(("+".to_string(), TextEffectStyle::Friendly))
                 }
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
