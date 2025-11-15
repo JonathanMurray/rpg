@@ -5,30 +5,13 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
         ApplyEffect, AreaTargetAcquisition, ArmorPiece, AttackAttribute, AttackCircumstance,
-        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, Condition,
-        Consumable, DefenseType, EquipEffect, OnAttackedReaction, OnAttackedReactionEffect,
-        OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
+        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
+        Condition, Consumable, DefenseType, EquipEffect, OnAttackedReaction,
+        OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange,
+        WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
-};
-
-pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
-    name: "Leather armor",
-    protection: 2,
-    limit_evasion_from_agi: None,
-    icon: EquipmentIconId::LeatherArmor,
-    weight: 2,
-    equip: EquipEffect::default(),
-};
-
-pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
-    name: "Chain mail",
-    protection: 4,
-    limit_evasion_from_agi: Some(4),
-    icon: EquipmentIconId::ChainMail,
-    weight: 3,
-    equip: EquipEffect::default(),
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {
@@ -50,6 +33,33 @@ pub const ROBE: ArmorPiece = ArmorPiece {
         bonus_spell_modifier: 1,
         ..EquipEffect::default()
     },
+};
+
+pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
+    name: "Leather armor",
+    protection: 2,
+    limit_evasion_from_agi: None,
+    icon: EquipmentIconId::LeatherArmor,
+    weight: 2,
+    equip: EquipEffect::default(),
+};
+
+pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
+    name: "Chain mail",
+    protection: 3,
+    limit_evasion_from_agi: Some(4),
+    icon: EquipmentIconId::ChainMail,
+    weight: 3,
+    equip: EquipEffect::default(),
+};
+
+pub const LIGHT_CHAIN_MAIL: ArmorPiece = ArmorPiece {
+    name: "Light chain mail",
+    protection: 3,
+    limit_evasion_from_agi: Some(4),
+    icon: EquipmentIconId::ChainMail,
+    weight: 2,
+    equip: EquipEffect::default(),
 };
 
 pub const STABBING: AttackEnhancement = AttackEnhancement {
@@ -220,6 +230,24 @@ pub const WAR_HAMMER: Weapon = Weapon {
     weight: 5,
 };
 
+pub const BONE_CRUSHER: Weapon = Weapon {
+    name: "Bone crusher",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    // Note: sword held in 2h deals the same as this
+    damage: 5,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Strength,
+    attack_enhancement: Some(ALL_IN),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
+        Condition::Dazed(1),
+    ))),
+    sprite: Some(SpriteId::Warhammer),
+    icon: EquipmentIconId::Warhammer,
+    weight: 7,
+};
+
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
     range: WeaponRange::Ranged(5),
@@ -238,6 +266,21 @@ pub const BAD_BOW: Weapon = Weapon {
 pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(5),
+    action_point_cost: 3,
+    damage: 4,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Agility,
+    attack_enhancement: Some(CAREFUL_AIM),
+    on_attacked_reaction: None,
+    on_true_hit: None,
+    sprite: Some(SpriteId::Bow),
+    icon: EquipmentIconId::Bow,
+    weight: 2,
+};
+
+pub const ELUSIVE_BOW: Weapon = Weapon {
+    name: "Elusive bow",
+    range: WeaponRange::Ranged(6),
     action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
@@ -292,7 +335,7 @@ pub const QUICK: AttackEnhancement = AttackEnhancement {
     name: "Quick strike",
     description: "", //"Strike more quickly",
     icon: IconId::QuickStrike,
-    stamina_cost: 3,
+    stamina_cost: 2,
     weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
         action_point_discount: 1,

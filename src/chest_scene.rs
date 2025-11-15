@@ -16,7 +16,7 @@ use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
     core::{Character, EquipmentEntry},
-    data::{HEALTH_POTION, MANA_POTION},
+    data::{BONE_CRUSHER, ELUSIVE_BOW, HEALTH_POTION, LIGHT_CHAIN_MAIL, MANA_POTION},
     equipment_ui::equipment_tooltip_lines,
     non_combat_ui::{NonCombatUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -61,6 +61,9 @@ pub async fn run_chest_loop(
              */
             EquipmentEntry::Consumable(HEALTH_POTION),
             EquipmentEntry::Consumable(MANA_POTION),
+            EquipmentEntry::Weapon(BONE_CRUSHER),
+            EquipmentEntry::Weapon(ELUSIVE_BOW),
+            EquipmentEntry::Armor(LIGHT_CHAIN_MAIL),
         ];
 
         let mut items: Vec<Option<EquipmentEntry>> = select_n_random(candidate_items, 1)

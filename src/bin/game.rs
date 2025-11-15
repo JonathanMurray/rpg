@@ -27,9 +27,9 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    PassiveSkill, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL,
-    HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
-    LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, NECROTIC_INFLUENCE,
+    PassiveSkill, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO,
+    HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH,
+    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, NECROTIC_INFLUENCE,
     NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND,
     SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
@@ -98,11 +98,11 @@ async fn main() {
         PortraitId::Bob,
         SpriteId::Bob,
         //Attributes::new(4, 3, 3, 3),
-        Attributes::new(3, 3, 3, 3),
+        Attributes::new(6, 3, 3, 3),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, SWORD);
-    bob.set_shield(SMALL_SHIELD);
+    bob.set_weapon(HandType::MainHand, BONE_CRUSHER);
+    //bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
