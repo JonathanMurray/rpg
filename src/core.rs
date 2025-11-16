@@ -3215,13 +3215,12 @@ impl Character {
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
             known_actions: RefCell::new(vec![
+                BaseAction::Move,
                 BaseAction::Attack(AttackAction {
                     hand: HandType::MainHand,
-                    // TODO
+                    // the action point cost is populated (later) by the equipped weapon
                     action_point_cost: 0,
                 }),
-                //BaseAction::SelfEffect(BRACE),
-                BaseAction::Move,
                 BaseAction::ChangeEquipment,
                 BaseAction::UseConsumable,
                 BaseAction::EndTurn,

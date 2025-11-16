@@ -2,11 +2,13 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    slice::RChunksMut,
 };
 
+use indexmap::IndexMap;
 use macroquad::{
     color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
-    input::mouse_position,
+    input::{get_keys_pressed, is_key_pressed, mouse_position, KeyCode},
     shapes::{draw_line, draw_rectangle},
     text::Font,
     texture::Texture2D,
@@ -329,7 +331,7 @@ impl StopWatch {
 }
 
 pub struct CharacterUi {
-    tracked_action_buttons: HashMap<String, Rc<ActionButton>>,
+    tracked_action_buttons: IndexMap<String, Rc<ActionButton>>,
     action_points_row: ActionPointsRow,
     pub hoverable_buttons: Vec<Rc<ActionButton>>,
     actions_section: Container,
@@ -1641,6 +1643,8 @@ impl UserInterface {
             None => {}
         }
 
+        let mut action_button_clicked = None;
+
         self.event_queue
             .take()
             .into_iter()
@@ -1657,31 +1661,49 @@ impl UserInterface {
 
                 InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
                     ButtonAction::Action(base_action) => {
-                        let may_choose_action = matches!(
-                            &*self.state.borrow(),
-                            UiState::ChoosingAction | UiState::ConfiguringAction(..)
-                        );
-
-                        if may_choose_action && self.active_character().can_use_action(base_action)
-                        {
-                            if let Some(s) = ConfiguredAction::from_base_action(base_action) {
-                                self.set_state(UiState::ConfiguringAction(s));
-                            } else {
-                                assert!(player_choice.is_none());
-                                // The player ends their turn
-                                player_choice = Some(PlayerChose::Action(None));
-                            }
-                        } else {
-                            println!("Cannot choose this action at this time");
-                            todo!(
-                                "Does this ever happen? If not, let's change the if to an assert"
-                            );
-                        }
+                        action_button_clicked = Some(base_action);
                     }
-
                     _ => unreachable!(),
                 },
             });
+
+        let character_ui = self
+            .character_uis
+            .get(&self.player_portraits.selected_id())
+            .unwrap();
+
+        for (_id, btn) in &character_ui.tracked_action_buttons {
+            if let Some((keycode, _font)) = btn.hotkey.borrow().as_ref() {
+                if is_key_pressed(*keycode) {
+                    match btn.action {
+                        ButtonAction::Action(base_action) => {
+                            action_button_clicked = Some(base_action)
+                        }
+                        _ => unreachable!("button clicked via hotkey: {:?}", btn.action),
+                    }
+                }
+            }
+        }
+
+        if let Some(base_action) = action_button_clicked {
+            let may_choose_action = matches!(
+                &*self.state.borrow(),
+                UiState::ChoosingAction | UiState::ConfiguringAction(..)
+            );
+
+            if may_choose_action && self.active_character().can_use_action(base_action) {
+                if let Some(s) = ConfiguredAction::from_base_action(base_action) {
+                    self.set_state(UiState::ConfiguringAction(s));
+                } else {
+                    assert!(player_choice.is_none());
+                    // The player ends their turn
+                    player_choice = Some(PlayerChose::Action(None));
+                }
+            } else {
+                println!("Cannot choose this action at this time");
+                todo!("Does this ever happen? If not, let's change the if to an assert");
+            }
+        }
 
         self.character_portraits.update(game);
         self.player_portraits.update(game);
@@ -1801,7 +1823,7 @@ impl UserInterface {
             UiState::ChoosingAction | UiState::Idle => unreachable!(),
         }
     }
- 
+
     fn update_character_status(&mut self, characters: &Characters) {
         for (id, character) in characters.iter_with_ids() {
             if let Some(ui) = self.character_uis.get_mut(id) {
@@ -1881,7 +1903,7 @@ pub fn build_character_ui(
         btn
     };
 
-    let mut tracked_action_buttons = HashMap::new();
+    let mut tracked_action_buttons = IndexMap::new();
     let mut hoverable_buttons = vec![];
     let mut basic_buttons = vec![];
     let mut ability_buttons = vec![];
@@ -1892,6 +1914,15 @@ pub fn build_character_ui(
     let mut attack_enhancement_buttons_for_character_sheet = vec![];
     let mut passive_buttons_for_character_sheet = vec![];
 
+    let basic_hotkeys = [
+        KeyCode::Key1,
+        KeyCode::Key2,
+        KeyCode::Key3,
+        KeyCode::Key4,
+        KeyCode::Key5,
+    ];
+    let ability_hotkeys = [KeyCode::Q, KeyCode::W, KeyCode::E, KeyCode::R, KeyCode::T];
+
     for action in character.known_actions() {
         let btn_action = ButtonAction::Action(action);
         let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
@@ -1899,6 +1930,9 @@ pub fn build_character_ui(
         hoverable_buttons.push(Rc::clone(&btn));
         match action {
             BaseAction::Attack { .. } => {
+                *btn.hotkey.borrow_mut() = basic_hotkeys
+                    .get(basic_buttons.len())
+                    .map(|key| (*key, simple_font.clone()));
                 basic_buttons.push(btn);
 
                 let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
@@ -1906,6 +1940,9 @@ pub fn build_character_ui(
                 hoverable_buttons.push(btn);
             }
             BaseAction::UseAbility(ability) => {
+                *btn.hotkey.borrow_mut() = ability_hotkeys
+                    .get(ability_buttons.len())
+                    .map(|key| (*key, simple_font.clone()));
                 ability_buttons.push(btn);
 
                 let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
@@ -1932,11 +1969,12 @@ pub fn build_character_ui(
 
                 hoverable_buttons.push(btn);
             }
-            BaseAction::Move => {
+            BaseAction::Move | BaseAction::ChangeEquipment | BaseAction::UseConsumable => {
+                *btn.hotkey.borrow_mut() = basic_hotkeys
+                    .get(basic_buttons.len())
+                    .map(|key| (*key, simple_font.clone()));
                 basic_buttons.push(btn);
             }
-            BaseAction::ChangeEquipment => basic_buttons.push(btn),
-            BaseAction::UseConsumable => basic_buttons.push(btn),
             BaseAction::EndTurn => end_turn_button = Some(btn),
         }
     }

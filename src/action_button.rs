@@ -6,7 +6,7 @@ use std::{
 
 use macroquad::{
     color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, RED, SKYBLUE, WHITE, YELLOW},
-    input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
@@ -524,6 +524,7 @@ pub struct ActionButton {
     tooltip: RefCell<ActionButtonTooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
+    pub hotkey: RefCell<Option<(KeyCode, Font)>>,
 }
 
 impl ActionButton {
@@ -605,6 +606,7 @@ impl ActionButton {
             tooltip: RefCell::new(tooltip),
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
+            hotkey: RefCell::new(None),
         }
     }
 
@@ -791,6 +793,20 @@ impl Drawable for ActionButton {
 
         draw_texture_ex(icon, x + 2.0, y + 2.0, WHITE, params);
 
+        if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
+            draw_text_rounded(
+                hotkey_string(keycode),
+                x + 5.0,
+                y + 15.0,
+                TextParams {
+                    font: Some(font),
+                    font_size: 16,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
+        }
+
         match self.selected.get() {
             ButtonSelected::Yes => {
                 let margin = 1.0;
@@ -847,6 +863,23 @@ impl Drawable for ActionButton {
     fn size(&self) -> (f32, f32) {
         self.size
     }
+}
+
+fn hotkey_string(keycode: &KeyCode) -> &str {
+    let text = match *keycode {
+        KeyCode::Key1 => "1",
+        KeyCode::Key2 => "2",
+        KeyCode::Key3 => "3",
+        KeyCode::Key4 => "4",
+        KeyCode::Key5 => "5",
+        KeyCode::Q => "Q",
+        KeyCode::W => "W",
+        KeyCode::E => "E",
+        KeyCode::R => "R",
+        KeyCode::T => "T",
+        _ => "?",
+    };
+    text
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
