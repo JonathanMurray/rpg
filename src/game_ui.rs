@@ -1801,42 +1801,7 @@ impl UserInterface {
             UiState::ChoosingAction | UiState::Idle => unreachable!(),
         }
     }
-
-    fn handle_internal_ui_event(&mut self, event: InternalUiEvent) {
-        match event {
-            InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
-                if let Some(pos) = hovered {
-                    self.hovered_button = Some((button_id, button_action, pos));
-                } else if let Some(previously_hovered_button) = self.hovered_button {
-                    if button_id == previously_hovered_button.0 {
-                        self.hovered_button = None
-                    }
-                }
-            }
-
-            InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
-                ButtonAction::Action(base_action) => {
-                    let may_choose_action = matches!(
-                        &*self.state.borrow(),
-                        UiState::ChoosingAction | UiState::ConfiguringAction(..)
-                    );
-
-                    if may_choose_action && self.active_character().can_use_action(base_action) {
-                        if let Some(s) = ConfiguredAction::from_base_action(base_action) {
-                            self.set_state(UiState::ConfiguringAction(s));
-                        } else {
-                            todo!("end turn here");
-                        }
-                    } else {
-                        println!("Cannot choose this action at this time");
-                    }
-                }
-
-                _ => unreachable!(),
-            },
-        }
-    }
-
+ 
     fn update_character_status(&mut self, characters: &Characters) {
         for (id, character) in characters.iter_with_ids() {
             if let Some(ui) = self.character_uis.get_mut(id) {
