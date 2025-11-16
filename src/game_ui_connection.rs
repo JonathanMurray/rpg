@@ -303,10 +303,19 @@ impl _GameUserInterfaceConnection {
         loop {
             let elapsed = get_frame_time();
 
-            let player_choice = user_interface.update(game, elapsed);
+            let mut player_choice = user_interface.update(game, elapsed);
 
             clear_background(BLACK);
-            user_interface.draw();
+
+            if let Some(choice) = user_interface.draw() {
+                assert!(
+                    player_choice.is_none(),
+                    "Conflicting player choices: {:?} and {:?}",
+                    player_choice,
+                    choice
+                );
+                player_choice = Some(choice);
+            }
 
             if get_keys_pressed().contains(&KeyCode::Space) {
                 DEBUG.fetch_not(Ordering::SeqCst);

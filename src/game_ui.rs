@@ -478,7 +478,7 @@ impl UserInterface {
         }
     }
 
-    pub fn draw(&mut self) {
+    pub fn draw(&mut self) -> Option<PlayerChose> {
         let ui_y = screen_height() - 160.0;
 
         let popup_rectangle = self.activity_popup.last_drawn_rectangle;
@@ -504,7 +504,7 @@ impl UserInterface {
             hovered_action,
         );
 
-        self.handle_grid_outcome(grid_outcome);
+        let player_chose = self.handle_grid_outcome(grid_outcome);
 
         draw_rectangle(0.0, ui_y, screen_width(), screen_height() - ui_y, BLACK);
         draw_line(0.0, ui_y, screen_width(), ui_y, 1.0, ORANGE);
@@ -521,16 +521,6 @@ impl UserInterface {
 
         character_ui.draw(ui_y + 5.0);
 
-        /*
-        character_ui.actions_section.draw(10.0, ui_y + 10.0);
-        character_ui.action_points_row.draw(430.0, ui_y + 5.0);
-        character_ui.resource_bars.draw(
-            480.0 - character_ui.resource_bars.size().0 / 2.0,
-            ui_y + 40.0,
-        );
-         */
-
-        //self.log.draw(800.0, ui_y);
         let log_x = 950.0;
         self.log.draw(log_x, ui_y);
 
@@ -574,9 +564,12 @@ impl UserInterface {
 
             draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
         }
+
+        player_chose
     }
 
-    fn handle_grid_outcome(&mut self, outcome: GridOutcome) {
+    fn handle_grid_outcome(&mut self, outcome: GridOutcome) -> Option<PlayerChose> {
+        let mut player_chose = None;
         self.character_portraits
             .set_hovered_character_id(outcome.hovered_character_id);
 
@@ -589,7 +582,28 @@ impl UserInterface {
         if let Some(grid_switched_to) = outcome.switched_state {
             dbg!(&grid_switched_to);
             self.on_new_state();
-            if matches!(grid_switched_to, NewState::Move) {
+            if let NewState::Move { commit_movement } = grid_switched_to {
+                if commit_movement {
+                    let UiState::ConfiguringAction(ConfiguredAction::Move {
+                        selected_movement_path,
+                        cost,
+                    }) = &*self.state.borrow()
+                    else {
+                        unreachable!()
+                    };
+                    let dst = selected_movement_path.last().unwrap();
+                    let total_distance = dst.0;
+                    let positions = selected_movement_path
+                        .iter()
+                        .map(|(_dist_from_start, pos)| *pos)
+                        .collect();
+
+                    player_chose = Some(PlayerChose::Action(Some(Action::Move {
+                        total_distance,
+                        positions,
+                        extra_cost: *cost,
+                    })));
+                }
                 self.activity_popup.on_new_movement_ap_cost();
             }
         }
@@ -599,9 +613,10 @@ impl UserInterface {
         }
 
         if outcome.switched_movement_path {
-            println!("SWITCHED MOVE PATH");
             self.refresh_movement_state();
         }
+
+        player_chose
     }
 
     fn refresh_movement_state(&mut self) {
@@ -1744,23 +1759,6 @@ impl UserInterface {
                         cost,
                         selected_movement_path,
                     } => {
-                        /*
-                        let mut reversed_path = selected_movement_path.clone();
-                        // Remove the character's current position; it should not be part of the movement path
-                        reversed_path.remove(reversed_path.len() - 1);
-
-                        let mut total_distance = 0.0;
-
-                        let positions = reversed_path
-                            .into_iter()
-                            .rev()
-                            .map(|(dist, (x, y))| {
-                                total_distance = f32::max(total_distance, dist);
-                                (x, y)
-                            })
-                            .collect();
-                         */
-
                         let dst = selected_movement_path.last().unwrap();
                         let total_distance = dst.0;
                         let positions = selected_movement_path

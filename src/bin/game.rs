@@ -134,7 +134,14 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-     
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::EasyCluster,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene

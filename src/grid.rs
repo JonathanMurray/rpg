@@ -376,11 +376,10 @@ impl GameGrid {
     }
 
     pub fn update_move_speed(&mut self, active_char_id: CharacterId, sprint_usage: u32) {
-        dbg!(sprint_usage);
         let active_char = self.characters.get(active_char_id);
 
         let speed = active_char.move_speed();
-        let max_range = active_char.remaining_movement.get() + (sprint_usage as f32) * speed;
+        let max_range = active_char.remaining_movement.get() + (sprint_usage as f32);
 
         self.movement_range.set(speed, max_range);
         let pos = self.characters.get(self.active_character_id).pos();
@@ -568,14 +567,17 @@ impl GameGrid {
                         target: t @ Some(..),
                         ..
                     } => *t = None,
+
                     ConfiguredAction::UseAbility {
                         target: t @ (ActionTarget::Character(..) | ActionTarget::Position(..)),
                         ..
                     } => *t = ActionTarget::None,
+
                     ConfiguredAction::Move {
                         selected_movement_path: p,
                         ..
                     } if !p.is_empty() => p.clear(),
+
                     _ => {
                         *ui_state = UiState::ChoosingAction;
                         outcome.switched_state = Some(NewState::ChoosingAction);
@@ -583,17 +585,6 @@ impl GameGrid {
                 }
             }
         }
-
-        /*
-        if matches!(ui_state, UiState::ConfiguringAction(..))
-            && is_mouse_within_grid
-            && receptive_to_input
-            && is_mouse_button_pressed(MouseButton::Right)
-        {
-            *ui_state = UiState::ChoosingAction;
-            outcome.switched_state = Some(NewState::ChoosingAction);
-        }
-         */
 
         if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
@@ -712,11 +703,13 @@ impl GameGrid {
 
         let mouse_state = match ui_state {
             UiState::ChoosingAction => MouseState::MayInputMovement,
+
             UiState::ConfiguringAction(base_action) => match base_action {
                 ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
                     area_radius: None,
                     move_into_melee: None,
                 },
+
                 ConfiguredAction::UseAbility {
                     ability,
                     selected_enhancements,
@@ -760,7 +753,9 @@ impl GameGrid {
                     }
                     AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                 },
+
                 ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
+
                 ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
                 ConfiguredAction::UseConsumable { .. } => MouseState::None,
             },
@@ -1032,11 +1027,15 @@ impl GameGrid {
                             .movement_range
                             .ap_cost(hovered_route.distance_from_start, char_remaining_movement);
 
+                        let commit_movement = matches!(
+                            ui_state,
+                            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
+                        );
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
                             cost: ap_cost,
                             selected_movement_path: path.positions,
                         });
-                        outcome.switched_state = Some(NewState::Move);
+                        outcome.switched_state = Some(NewState::Move { commit_movement });
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
@@ -1499,60 +1498,73 @@ impl GameGrid {
         character: &Character,
         draw_action_points: bool,
         draw_name: bool,
-        transparent_healthbar: bool,
+        discrete_healthbar: bool,
     ) {
         let (x, y) = self.character_screen_pos(character);
         let y = y - 5.0;
 
         let margin = 2.0;
         let health_w = (self.cell_w - 10.0).min(90.0);
-        let mut health_h = 5.0;
+        let mut health_h = 10.0;
         let health_x = x + (self.cell_w - health_w) * 0.5;
         let mut health_y = y - health_h;
 
+        if discrete_healthbar {
+            health_h -= 6.0;
+            health_y += 6.0;
+        }
+
         let font_size = 14;
-        let params = TextParams {
-            font: Some(&self.big_font),
-            font_size,
-            color: WHITE,
-            ..Default::default()
-        };
-
         let header = character.name;
-
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
-
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
         let box_h = text_dimensions.height + text_pad * 2.0;
 
+        let box_x = x - (box_w - self.cell_w) / 2.0;
         let box_y = y - health_h - margin - box_h;
 
         if draw_name {
-            let box_x = x - (box_w - self.cell_w) / 2.0;
-
             draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
             draw_text_rounded(
                 header,
                 box_x + text_pad,
                 box_y + text_pad + text_dimensions.offset_y,
-                params,
+                TextParams {
+                    font: Some(&self.big_font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
         }
 
         let mut healthbar_bg = BLACK;
         healthbar_bg.a = 0.5;
-        if transparent_healthbar {
-            health_h -= 2.0;
-            health_y += 1.0;
-        }
 
         draw_rectangle(health_x, health_y, health_w, health_h, healthbar_bg);
         let filled_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, filled_health_w, health_h, RED);
-        if !transparent_healthbar {
+        if !discrete_healthbar {
             draw_rectangle_lines(health_x, health_y, health_w, health_h, 1.0, LIGHTGRAY);
+
+            //let health_text = format!("{}/{}", character.health.current(), character.health.max());
+            let health_text = format!("{}", character.health.current());
+            let health_text_font_size = 16;
+            let health_text_font = Some(&self.simple_font);
+            let text_dim = measure_text(&health_text, health_text_font, health_text_font_size, 1.0);
+            draw_text_rounded(
+                &health_text,
+                health_x + health_w / 2.0 - text_dim.width / 2.0,
+                health_y + health_h / 2.0 - text_dim.height / 2.0 + text_dim.offset_y,
+                TextParams {
+                    font: health_text_font,
+                    font_size: health_text_font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
         }
 
         if draw_action_points {
@@ -2031,7 +2043,7 @@ pub struct GridOutcome {
 
 #[derive(Debug)]
 pub enum NewState {
-    Move,
+    Move { commit_movement: bool },
     Attack,
     ChoosingAction,
 }

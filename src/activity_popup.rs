@@ -160,18 +160,26 @@ impl ActivityPopup {
 
         let height = text_content_h.max(74.0);
 
+        let draw_proceed_button = !matches!(
+            &*self.ui_state.borrow(),
+            UiState::ConfiguringAction(ConfiguredAction::Move { .. })
+        );
+
         let hor_pad = 10.0;
         let margin_between_text_and_buttons = 20.0;
         let button_margin = 10.0;
         let margin_between_choices_and_proceed = 10.0;
 
-        let mut width =
-            text_content_w + margin_between_text_and_buttons + self.proceed_button.size.0;
+        let mut width = text_content_w + margin_between_text_and_buttons;
 
-        if !self.choice_buttons.is_empty() {
-            for btn in self.choice_buttons.values() {
-                width += button_margin + btn.size.0;
-            }
+        if draw_proceed_button {
+            width += self.proceed_button.size.0;
+        }
+
+        for btn in self.choice_buttons.values() {
+            width += button_margin + btn.size.0;
+        }
+        if !self.choice_buttons.is_empty() && draw_proceed_button {
             width += margin_between_choices_and_proceed;
         }
 
@@ -235,9 +243,8 @@ impl ActivityPopup {
         {
             let cost = self.movement_cost_slider.as_ref().unwrap().selected();
             let character = self.characters.get(self.relevant_character_id);
-            let movement =
-                character.remaining_movement.get() + (cost as f32) * character.move_speed();
-            let text = format!("Range: {:.1}", movement);
+            let movement = character.remaining_movement.get() + cost as f32;
+            let text = format!("Reach: {:.1}", movement);
 
             draw_text_rounded(&text, x0, y0, base_text_params.clone());
         }
@@ -266,11 +273,13 @@ impl ActivityPopup {
             x_btn += btn.size.0 + button_margin;
         }
 
-        if !self.choice_buttons.is_empty() {
-            x_btn += margin_between_choices_and_proceed;
-        }
+        if draw_proceed_button {
+            if !self.choice_buttons.is_empty() {
+                x_btn += margin_between_choices_and_proceed;
+            }
 
-        self.proceed_button.draw(x_btn, y_btn + 6.0);
+            self.proceed_button.draw(x_btn, y_btn + 6.0);
+        }
     }
 
     fn are_choice_buttons_mutually_exclusive(&self) -> bool {

@@ -224,20 +224,27 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 }
 
 pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<Action> {
+    let remaining_free_movement = character.remaining_movement.get();
+    let max_sprint_usage = character
+        .action_points
+        .current()
+        .min(character.stamina.current());
     let mut positions = vec![];
     let mut total_distance = 0.0;
     for (dist, pos) in path.positions {
-        if dist <= character.remaining_movement.get() {
+        if dist <= remaining_free_movement + max_sprint_usage as f32 {
             positions.push(pos);
             total_distance = dist;
         }
     }
 
+    let extra_cost = ((total_distance - remaining_free_movement).ceil() as u32).max(0);
+
     if total_distance > 0.0 {
         Some(Action::Move {
             total_distance,
             positions,
-            extra_cost: 0,
+            extra_cost,
         })
     } else {
         None

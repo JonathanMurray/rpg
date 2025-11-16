@@ -1,15 +1,16 @@
 use std::collections::HashMap;
 
 use macroquad::{
-    color::{BLACK, Color, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
-    input::{MouseButton, is_mouse_button_pressed, mouse_position},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{
-        DrawRectangleParams, draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex, draw_rectangle_lines
+        draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex,
+        draw_rectangle_lines, DrawRectangleParams,
     },
-    text::{Font, TextParams, measure_text},
-    texture::{DrawTextureParams, Texture2D, draw_texture_ex},
+    text::{measure_text, Font, TextParams},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
@@ -134,7 +135,6 @@ impl MapScene {
             let n = column_sizes.get(&node.map_pos.0).copied().unwrap_or(0);
             column_sizes.insert(node.map_pos.0, n + 1);
             if let Some(choice) = node.choice {
-
                 node.text = match choice {
                     MapChoice::Rest => "Rest",
                     MapChoice::Shop => "Shop",
@@ -172,7 +172,7 @@ impl MapScene {
 
         /*
         let start_size = 30.0;
-        
+
         let start_pos = Rect::new(
             100.0 - start_size / 2.0,
             y_mid - start_size / 2.0,
@@ -334,8 +334,7 @@ impl MapScene {
 
             if let Some(countdown) = &mut transition_countdown {
                 let next_node = &nodes[selected_node_i.unwrap()];
-                let ratio =
-                    (transition_duration - f32::max(*countdown, 0.0)) / transition_duration;
+                let ratio = (transition_duration - f32::max(*countdown, 0.0)) / transition_duration;
                 let x1 = next_node.screen_pos.0;
                 let y1 = next_node.screen_pos.1 + node_h / 2.0;
                 x = x + (x1 - x) * ratio;

@@ -3100,7 +3100,7 @@ impl Attributes {
     }
 
     fn move_speed(&self) -> f32 {
-        0.9 + self.agility.get() as f32 * 0.1
+        2.0 + self.agility.get() as f32 * 0.2
     }
 
     fn max_health(&self) -> u32 {
@@ -3258,7 +3258,7 @@ impl Character {
     }
 
     fn regain_movement(&self) {
-        self.remaining_movement.set(self.move_speed() * 2.0);
+        self.remaining_movement.set(self.move_speed());
     }
 
     fn spend_movement(&self, distance: f32) {
