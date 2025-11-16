@@ -75,7 +75,7 @@ async fn main() {
 
     let portrait_textures = load_all_portraits().await;
 
-    let mut map_scene = MapScene::new();
+    let mut map_scene = MapScene::new(portrait_textures.clone());
 
     let mut alice = Character::new(
         Behaviour::Player,
@@ -132,19 +132,14 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob];
+    let mut player_characters = vec![bob, alice];
 
-    player_characters = run_fight_loop(
-        player_characters,
-        FightId::Test,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-    )
-    .await;
+     
 
     loop {
-        let map_choice = map_scene.run_map_loop(font.clone()).await;
+        let map_choice = map_scene
+            .run_map_loop(font.clone(), &player_characters[..])
+            .await;
         match map_choice {
             MapChoice::Rest => {
                 player_characters = run_rest_loop(
