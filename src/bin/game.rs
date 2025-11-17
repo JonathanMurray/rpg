@@ -23,7 +23,7 @@ use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
     Action, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition, CoreGame,
-    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction,
+    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, Party,
 };
 
 use rpg::data::{
@@ -77,8 +77,12 @@ async fn main() {
 
     let mut map_scene = MapScene::new(portrait_textures.clone());
 
+    let party = Rc::new(Party {
+        money: Cell::new(8),
+    });
+
     let mut alice = Character::new(
-        Behaviour::Player,
+        Behaviour::Player(Rc::clone(&party)),
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
@@ -93,7 +97,7 @@ async fn main() {
     alice.known_passive_skills.push(PassiveSkill::Honorless);
 
     let mut bob = Character::new(
-        Behaviour::Player,
+        Behaviour::Player(Rc::clone(&party)),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -134,12 +138,13 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_fight_loop(
+    player_characters = run_shop_loop(
         player_characters,
-        FightId::EasyCluster,
+        font.clone(),
         &equipment_icons,
         icons.clone(),
-        portrait_textures.clone(),
+        &portrait_textures,
+        &party,
     )
     .await;
 
@@ -165,6 +170,7 @@ async fn main() {
                     &equipment_icons,
                     icons.clone(),
                     &portrait_textures,
+                    &party,
                 )
                 .await;
             }
@@ -184,6 +190,7 @@ async fn main() {
                     &equipment_icons,
                     icons.clone(),
                     &portrait_textures,
+                    &party,
                 )
                 .await;
             }

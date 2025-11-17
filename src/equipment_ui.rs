@@ -25,6 +25,7 @@ use crate::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
         TextLine,
     },
+    character_sheet::MoneyText,
     core::{
         ArmorPiece, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType, Shield,
         Weapon, WeaponGrip, WeaponRange,
@@ -151,6 +152,11 @@ impl EquipmentSection {
 
         equipment_slots.extend_from_slice(&equipped_slots);
 
+        let money_text = MoneyText {
+            character: Rc::clone(&character),
+            font: font.clone(),
+        };
+
         let element = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 15.0,
@@ -179,6 +185,8 @@ impl EquipmentSection {
                     margin: 15.0,
                     ..Default::default()
                 }),
+                Element::Empty(0.0, 2.0),
+                Element::Box(Box::new(money_text)),
             ],
             ..Default::default()
         });
@@ -658,9 +666,6 @@ impl EquipmentStatsTable {
         };
 
         cells.push(TableCell::new(text, color_override, None));
-
-        cells.push("Gold".into());
-        cells.push(format!("{}", character.money.get()).into());
 
         table(
             cells,

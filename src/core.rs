@@ -3122,16 +3122,32 @@ impl Attributes {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum Behaviour {
-    Player,
+    Player(Rc<Party>),
     Bot(BotBehaviour),
 }
 
 impl Behaviour {
     pub fn unwrap_bot_behaviour(&self) -> &BotBehaviour {
         match self {
-            Behaviour::Player => panic!(),
+            Behaviour::Player(..) => panic!(),
             Behaviour::Bot(bot_behaviour) => bot_behaviour,
         }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Party {
+    pub money: Cell<u32>,
+}
+
+impl Party {
+    pub fn spend_money(&self, amount: u32) {
+        self.money
+            .set(self.money.get().checked_sub(amount).unwrap());
+    }
+
+    pub fn gain_money(&self, amount: u32) {
+        self.money.set(self.money.get() + amount);
     }
 }
 
@@ -3172,8 +3188,6 @@ pub struct Character {
     engagement_target: Cell<Option<CharacterId>>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
-
-    pub money: Cell<u32>,
 }
 
 impl Character {
@@ -3232,7 +3246,13 @@ impl Character {
             is_engaged_by: Default::default(),
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
-            money: Cell::new(8),
+        }
+    }
+
+    pub fn party_money(&self) -> u32 {
+        match &self.behaviour {
+            Behaviour::Player(party) => party.money.get(),
+            Behaviour::Bot(..) => panic!(),
         }
     }
 
@@ -3310,7 +3330,7 @@ impl Character {
     }
 
     pub fn player_controlled(&self) -> bool {
-        matches!(self.behaviour, Behaviour::Player)
+        matches!(self.behaviour, Behaviour::Player(..))
     }
 
     pub fn add_to_strength(&self, amount: i32) {
@@ -3389,15 +3409,6 @@ impl Character {
             EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
             _ => false,
         }
-    }
-
-    pub fn gain_money(&self, amount: u32) {
-        self.money.set(self.money.get() + amount);
-    }
-
-    pub fn spend_money(&self, amount: u32) {
-        assert!(self.money.get() >= amount);
-        self.money.set(self.money.get() - amount);
     }
 
     fn lose_protected(&self) -> bool {

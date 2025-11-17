@@ -1,4 +1,4 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
@@ -15,7 +15,7 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable, TextLine},
-    core::{Character, EquipmentEntry},
+    core::{Character, EquipmentEntry, Party},
     data::{
         BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, RAPIER, SMALL_SHIELD,
         SWORD, WAR_HAMMER,
@@ -32,6 +32,7 @@ pub async fn run_shop_loop(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
+    party: &Party,
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
@@ -156,7 +157,7 @@ pub async fn run_shop_loop(
 
                     let character = &characters[portrait_row.selected_idx];
 
-                    let can_afford = character.money.get() >= *cost;
+                    let can_afford = party.money.get() >= *cost;
 
                     let cost_color = if can_afford { WHITE } else { RED };
                     let text = format!("{cost}");
@@ -192,7 +193,7 @@ pub async fn run_shop_loop(
                             if is_mouse_button_pressed(MouseButton::Left) {
                                 let success = character.try_gain_equipment(*equipment_entry);
                                 assert!(success);
-                                character.spend_money(*cost);
+                                party.spend_money(*cost);
                                 *item_slot = None;
                             }
                         } else {

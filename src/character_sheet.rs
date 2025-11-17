@@ -374,11 +374,11 @@ pub struct MoneyText {
 
 impl MoneyText {
     fn text(&self) -> String {
-        format!("gold: {}", self.character.money.get())
+        format!("Party gold: {}", self.character.party_money())
     }
 }
 
-const MONEY_FONT_SIZE: u16 = 18;
+const MONEY_FONT_SIZE: u16 = 16;
 
 impl Drawable for MoneyText {
     fn draw(&self, x: f32, y: f32) {

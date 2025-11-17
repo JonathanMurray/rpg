@@ -13,7 +13,7 @@ use macroquad::{
 use crate::{
     action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
-    character_sheet::build_spell_book,
+    character_sheet::{build_spell_book, MoneyText},
     core::{BaseAction, Character, HandType},
     equipment_ui::{EquipmentDrag, EquipmentSection},
     game_ui::ResourceBars,
@@ -97,7 +97,7 @@ impl NonCombatUi {
         icons: &HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
     ) -> Self {
-        let (screen_w, screen_h) = screen_size();
+        let (screen_w, _screen_h) = screen_size();
 
         let event_queue = Rc::new(RefCell::new(vec![]));
 

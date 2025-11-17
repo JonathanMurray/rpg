@@ -21,7 +21,7 @@ use crate::{
     },
     core::{
         Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, WeaponType,
+        OnHitReaction, Party, WeaponType,
     },
     data::{
         PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
@@ -372,6 +372,7 @@ pub async fn run_victory_loop(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
+    party: &Party,
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
     let mut selected_learnings: Vec<Option<Learning>> = vec![];
@@ -380,8 +381,7 @@ pub async fn run_victory_loop(
 
         let money_amount = 3;
 
-        // TODO: money should probably be on a whole-party level, and not per character
-        characters[0].gain_money(money_amount);
+        party.gain_money(money_amount);
 
         let (screen_w, screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
