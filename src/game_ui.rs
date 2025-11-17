@@ -1674,7 +1674,7 @@ impl UserInterface {
 
         for (_id, btn) in &character_ui.tracked_action_buttons {
             if let Some((keycode, _font)) = btn.hotkey.borrow().as_ref() {
-                if is_key_pressed(*keycode) {
+                if btn.enabled.get() && is_key_pressed(*keycode) {
                     match btn.action {
                         ButtonAction::Action(base_action) => {
                             action_button_clicked = Some(base_action)
@@ -1700,8 +1700,8 @@ impl UserInterface {
                     player_choice = Some(PlayerChose::Action(None));
                 }
             } else {
-                println!("Cannot choose this action at this time");
-                todo!("Does this ever happen? If not, let's change the if to an assert");
+                println!("warning: tried to use {:?}, when not allowed", base_action);
+                todo!("can this still happen? button clicks should not be registered if the button is disabled");
             }
         }
 

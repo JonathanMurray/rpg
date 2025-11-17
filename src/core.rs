@@ -339,16 +339,6 @@ impl CoreGame {
                         .await;
                     }
 
-                    if attacker.weapon(hand).unwrap().is_melee() {
-                        if let Some(previously_engaged) = attacker.engagement_target.take() {
-                            self.characters
-                                .get(previously_engaged)
-                                .set_not_engaged_by(attacker.id());
-                        }
-                        defender.set_engaged_by(Rc::clone(attacker));
-                        attacker.engagement_target.set(Some(defender.id()));
-                    }
-
                     let enhancements = enhancements.iter().map(|e| (e.name, e.effect)).collect();
 
                     let event = self.perform_attack(
@@ -1442,7 +1432,7 @@ impl CoreGame {
         defender_reaction: Option<OnAttackedReaction>,
         ability_roll_modifier: i32,
     ) -> AttackedEvent {
-        let attacker = self.characters.get(attacker_id);
+        let attacker = &self.characters.get_rc(attacker_id);
         let defender = self.characters.get(defender_id);
 
         let mut attack_bonus = attack_roll_bonus(
@@ -1542,9 +1532,9 @@ impl CoreGame {
             armor_str
         ));
 
+        let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = if attack_result >= evasion.saturating_sub(5) {
             let mut on_true_hit_effect = None;
-            let weapon = attacker.weapon(hand_type).unwrap();
             let mut dmg_calculation = weapon.damage as i32;
 
             let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, weapon.name);
@@ -1720,6 +1710,16 @@ impl CoreGame {
                 }
             };
             detail_lines.push(format!("  The attack led to exertion ({})", exertion));
+        }
+
+        if weapon.is_melee() {
+            if let Some(previously_engaged) = attacker.engagement_target.take() {
+                self.characters
+                    .get(previously_engaged)
+                    .set_not_engaged_by(attacker.id());
+            }
+            defender.set_engaged_by(Rc::clone(attacker));
+            attacker.engagement_target.set(Some(defender.id()));
         }
 
         AttackedEvent {
