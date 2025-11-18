@@ -66,6 +66,7 @@ impl CharacterSheet {
             font,
             &character,
             equipment_icons.clone(),
+            false,
         )));
 
         let contents = Element::Container(Container {
@@ -378,7 +379,7 @@ impl MoneyText {
     }
 }
 
-const MONEY_FONT_SIZE: u16 = 16;
+const MONEY_FONT_SIZE: u16 = 20;
 
 impl Drawable for MoneyText {
     fn draw(&self, x: f32, y: f32) {

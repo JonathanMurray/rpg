@@ -3138,6 +3138,7 @@ impl Behaviour {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Party {
     pub money: Cell<u32>,
+    pub stash: [Cell<Option<EquipmentEntry>>; 6],
 }
 
 impl Party {
@@ -3252,6 +3253,13 @@ impl Character {
     pub fn party_money(&self) -> u32 {
         match &self.behaviour {
             Behaviour::Player(party) => party.money.get(),
+            Behaviour::Bot(..) => panic!(),
+        }
+    }
+
+    pub fn party_stash(&self) -> &[Cell<Option<EquipmentEntry>>; 6] {
+        match &self.behaviour {
+            Behaviour::Player(party) => &party.stash,
             Behaviour::Bot(..) => panic!(),
         }
     }
@@ -3392,7 +3400,10 @@ impl Character {
     }
 
     pub fn can_equipment_fit(&self, equipment: EquipmentEntry, role: EquipmentSlotRole) -> bool {
-        if matches!(role, EquipmentSlotRole::Inventory(..)) {
+        if matches!(
+            role,
+            EquipmentSlotRole::Inventory(..) | EquipmentSlotRole::PartyStash(..)
+        ) {
             return true;
         }
         match equipment {
@@ -3522,6 +3533,7 @@ impl Character {
             EquipmentSlotRole::OffHand => self.shield().map(EquipmentEntry::Shield),
             EquipmentSlotRole::Armor => self.armor_piece.get().map(EquipmentEntry::Armor),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
+            EquipmentSlotRole::PartyStash(idx) => self.party_stash()[idx].get(),
         }
     }
 
@@ -3600,6 +3612,7 @@ impl Character {
                 _ => panic!(),
             },
             EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
+            EquipmentSlotRole::PartyStash(i) => self.party_stash()[i].set(entry),
         }
 
         self.on_changed_equipment();
@@ -4545,7 +4558,7 @@ impl NumberedResource {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ArmorPiece {
     pub name: &'static str,
     pub protection: u32,
@@ -4555,7 +4568,7 @@ pub struct ArmorPiece {
     pub equip: EquipEffect,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EquipEffect {
     pub bonus_spell_modifier: u32,
 }
@@ -4761,7 +4774,7 @@ impl RollBonusContributor {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum EquipmentEntry {
     Weapon(Weapon),
     Shield(Shield),
@@ -4813,6 +4826,7 @@ pub enum EquipmentSlotRole {
     OffHand,
     Armor,
     Inventory(usize),
+    PartyStash(usize),
 }
 
 impl EquipmentSlotRole {
@@ -4827,7 +4841,7 @@ impl EquipmentSlotRole {
         use EquipmentSlotRole::*;
         match self {
             MainHand | OffHand | Armor => true,
-            Inventory(_) => false,
+            Inventory(..) | PartyStash(..) => false,
         }
     }
 }

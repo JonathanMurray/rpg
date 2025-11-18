@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use macroquad::{
     color::{Color, GRAY, WHITE, YELLOW},
@@ -75,21 +79,86 @@ impl PortraitRow {
 
 const UI_HEIGHT: f32 = 290.0;
 
-pub struct NonCombatUi {
+pub struct NonCombatPartyUi {
+    portrait_row: PortraitRow,
+    bottom_panels: Vec<NonCombatCharacterUi>,
+    equipment_changed: Vec<Rc<Cell<bool>>>,
+}
+
+impl NonCombatPartyUi {
+    pub fn new(
+        characters: &[Rc<Character>],
+        font: Font,
+        equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+        icons: HashMap<IconId, Texture2D>,
+        portrait_textures: &HashMap<PortraitId, Texture2D>,
+    ) -> Self {
+        let portrait_row = PortraitRow::new(characters, portrait_textures);
+        let bottom_panels: Vec<NonCombatCharacterUi> = characters
+            .iter()
+            .map(|character| {
+                NonCombatCharacterUi::new(
+                    character.clone(),
+                    &font,
+                    equipment_icons,
+                    &icons,
+                    portrait_textures,
+                )
+            })
+            .collect();
+
+        let equipment_changed = characters
+            .iter()
+            .map(|ch| ch.listen_to_changed_equipment())
+            .collect();
+
+        Self {
+            portrait_row,
+            bottom_panels,
+            equipment_changed,
+        }
+    }
+
+    pub fn draw_and_handle_input(&mut self) {
+        let mut equipment_changed = false;
+        for event in &self.equipment_changed {
+            if event.take() {
+                equipment_changed = true;
+            }
+        }
+
+        if equipment_changed {
+            println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER UIs...");
+            for panel in &mut self.bottom_panels {
+                panel.on_equipment_changed();
+            }
+        }
+
+        self.portrait_row.draw_and_handle_input();
+        self.bottom_panels[self.portrait_row.selected_idx].draw_and_handle_input();
+        self.bottom_panels[self.portrait_row.selected_idx].draw_tooltips();
+    }
+
+    pub fn selected_character_idx(&self) -> usize {
+        self.portrait_row.selected_idx
+    }
+}
+
+pub struct NonCombatCharacterUi {
     bottom_panel: Element,
     stats_table: Rc<RefCell<crate::stats_ui::CharacterStatsTable>>,
     resource_bars: Rc<RefCell<ResourceBars>>,
     equipment_section: Rc<RefCell<EquipmentSection>>,
     equipment_drag: Option<EquipmentDrag>,
     character: Rc<Character>,
-    equipment_changed: Rc<std::cell::Cell<bool>>,
+
     event_queue: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_button: Option<(u32, (f32, f32))>,
     hoverable_buttons: Vec<Rc<ActionButton>>,
     font: Font,
 }
 
-impl NonCombatUi {
+impl NonCombatCharacterUi {
     pub fn new(
         character: Rc<Character>,
         font: &Font,
@@ -201,9 +270,8 @@ impl NonCombatUi {
             font,
             &character,
             equipment_icons.clone(),
+            true,
         )));
-
-        let equipment_changed = character.listen_to_changed_equipment();
 
         let bottom_panel = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
@@ -240,7 +308,6 @@ impl NonCombatUi {
             equipment_section,
             equipment_drag: None,
             character,
-            equipment_changed,
             event_queue,
             hovered_button: None,
             hoverable_buttons,
@@ -253,6 +320,12 @@ impl NonCombatUi {
 
         *self.resource_bars.borrow_mut() = ResourceBars::new(&self.character, &self.font);
 
+        self.equipment_section
+            .borrow_mut()
+            .repopulate_character_equipment();
+    }
+
+    pub fn on_equipment_changed(&mut self) {
         self.equipment_section
             .borrow_mut()
             .repopulate_character_equipment();
@@ -286,20 +359,11 @@ impl NonCombatUi {
         self.equipment_drag = outcome.equipment_drag;
         //requested_consumption = outcome.requested_consumption;
         if let Some(drag) = self.equipment_drag {
-            dbg!(&outcome);
-
             if drag.to_idx.is_some() {
                 let (from, to) = self.equipment_section.borrow().resolve_drag_to_slots(drag);
                 self.character.swap_equipment_slots(from, to);
                 self.equipment_drag = None;
             }
-        }
-
-        if self.equipment_changed.take() {
-            println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER SHEET...");
-            self.equipment_section
-                .borrow_mut()
-                .repopulate_character_equipment();
         }
 
         // Note: we have to drain the UI events, to prevent memory leak

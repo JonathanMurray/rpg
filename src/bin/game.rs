@@ -79,6 +79,7 @@ async fn main() {
 
     let party = Rc::new(Party {
         money: Cell::new(8),
+        stash: Default::default(),
     });
 
     let mut alice = Character::new(
@@ -138,13 +139,12 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_shop_loop(
+    player_characters = run_rest_loop(
         player_characters,
         font.clone(),
         &equipment_icons,
         icons.clone(),
         &portrait_textures,
-        &party,
     )
     .await;
 

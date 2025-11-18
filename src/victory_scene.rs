@@ -1,4 +1,8 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, ORANGE, WHITE, YELLOW},
@@ -28,7 +32,7 @@ use crate::{
         LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
         SMITE, SWEEP_ATTACK,
     },
-    non_combat_ui::{NonCombatUi, PortraitRow},
+    non_combat_ui::{NonCombatCharacterUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
@@ -63,7 +67,7 @@ enum AttributeName {
 }
 
 struct RewardSelectionUi {
-    bottom_panel: NonCombatUi,
+    bottom_panel: NonCombatCharacterUi,
     attribute_selection_card: Element,
     selected_attribute: Option<AttributeName>,
     str_element: Rc<RefCell<TextLine>>,
@@ -88,7 +92,7 @@ impl RewardSelectionUi {
         rewards: Vec<(ButtonAction, Option<&'static str>)>,
         next_button_id: &mut u32,
     ) -> Self {
-        let bottom_panel = NonCombatUi::new(
+        let bottom_panel = NonCombatCharacterUi::new(
             character.clone(),
             &font,
             equipment_icons,
@@ -182,6 +186,10 @@ impl RewardSelectionUi {
             font,
             event_queue,
         }
+    }
+
+    fn on_equipment_changed(&mut self) {
+        self.bottom_panel.on_equipment_changed();
     }
 
     fn has_remaining_rewards(&self) -> bool {
@@ -466,6 +474,11 @@ pub async fn run_victory_loop(
 
         let mut next_button_id = 0;
 
+        let equipment_changed: Vec<Rc<Cell<bool>>> = characters
+            .iter()
+            .map(|ch| ch.listen_to_changed_equipment())
+            .collect();
+
         let mut reward_selection_uis: Vec<RewardSelectionUi> = characters
             .iter()
             .map(|char| {
@@ -483,6 +496,18 @@ pub async fn run_victory_loop(
 
         loop {
             let elapsed = get_frame_time();
+
+            let mut did_equipment_change = false;
+            for event in &equipment_changed {
+                if event.take() {
+                    did_equipment_change = true;
+                }
+            }
+            if did_equipment_change {
+                for ui in &mut reward_selection_uis {
+                    ui.on_equipment_changed();
+                }
+            }
 
             clear_background(BLACK);
             portrait_row.draw_and_handle_input();
