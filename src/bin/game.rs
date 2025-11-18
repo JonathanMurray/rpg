@@ -75,7 +75,7 @@ async fn main() {
 
     let portrait_textures = load_all_portraits().await;
 
-    let mut map_scene = MapScene::new(portrait_textures.clone());
+    let mut map_scene = MapScene::new(portrait_textures.clone()).await;
 
     let party = Rc::new(Party {
         money: Cell::new(8),
@@ -139,15 +139,6 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_rest_loop(
-        player_characters,
-        font.clone(),
-        &equipment_icons,
-        icons.clone(),
-        &portrait_textures,
-    )
-    .await;
-
     loop {
         let map_choice = map_scene
             .run_map_loop(font.clone(), &player_characters[..])
@@ -163,7 +154,7 @@ async fn main() {
                 )
                 .await;
             }
-            MapChoice::Shop => {
+            MapChoice::Shop(entries) => {
                 player_characters = run_shop_loop(
                     player_characters,
                     font.clone(),
@@ -171,13 +162,14 @@ async fn main() {
                     icons.clone(),
                     &portrait_textures,
                     &party,
+                    entries,
                 )
                 .await;
             }
             MapChoice::Fight(fight_id) => {
                 player_characters = run_fight_loop(
                     player_characters,
-                    fight_id,
+                    *fight_id,
                     &equipment_icons,
                     icons.clone(),
                     portrait_textures.clone(),
@@ -194,13 +186,14 @@ async fn main() {
                 )
                 .await;
             }
-            MapChoice::Chest(reward) => {
+            MapChoice::Chest(entries) => {
                 player_characters = run_chest_loop(
                     player_characters,
                     font.clone(),
                     &equipment_icons,
                     icons.clone(),
                     &portrait_textures,
+                    entries,
                 )
                 .await;
             }

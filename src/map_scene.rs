@@ -18,10 +18,12 @@ use rand::Rng;
 
 use crate::{
     base_ui::draw_text_rounded,
+    chest_scene::{generate_chest_content, ChestEntry},
     core::{Character, EquipmentEntry},
     data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
     drawing::draw_dashed_line,
     init_fight_map::FightId,
+    shop_scene::{generate_shop_contents, ShopEntry},
     textures::{load_and_init_texture, PortraitId},
 };
 
@@ -32,6 +34,7 @@ struct Node {
     text: &'static str,
     choice: Option<MapChoice>,
     texture: Option<Texture2D>,
+    can_reenter: bool,
 }
 
 impl Node {
@@ -42,6 +45,7 @@ impl Node {
             text: Default::default(),
             choice,
             texture: Default::default(),
+            can_reenter: false,
         }
     }
 
@@ -51,12 +55,12 @@ impl Node {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Clone, Debug)]
 pub enum MapChoice {
     Rest,
-    Shop,
+    Shop(Vec<ShopEntry>),
     Fight(FightId),
-    Chest(EquipmentEntry),
+    Chest(Vec<ChestEntry>),
 }
 
 #[derive(Debug)]
@@ -64,40 +68,21 @@ pub struct MapScene {
     player_node_i: usize,
     visited_nodes: Vec<usize>,
     portraits: HashMap<PortraitId, Texture2D>,
+    nodes: [Node; 13],
+    edges: HashMap<usize, Vec<usize>>,
 }
 
+const TRANSITION_MOVEMENT_DURATION: f32 = 1.3;
+const TRANSITION_PAUSE_DURATION: f32 = 0.5;
+const FADE_DURATION: f32 = 0.4;
+
 impl MapScene {
-    pub fn new(portraits: HashMap<PortraitId, Texture2D>) -> Self {
-        Self {
-            player_node_i: 0,
-            visited_nodes: vec![0],
-            portraits,
-        }
-    }
-
-    pub async fn run_map_loop(&mut self, font: Font, characters: &[Character]) -> MapChoice {
-        let (screen_w, screen_h) = screen_size();
-        let y_mid = screen_h / 2.0;
-        let radius = 60.0;
-        let mut selected_node_i = None;
-
+    pub async fn new(portraits: HashMap<PortraitId, Texture2D>) -> Self {
         let fight_texture = load_and_init_texture("map_fight.png").await;
         let fight_elite_texture = load_and_init_texture("map_fight_elite.png").await;
         let rest_texture = load_and_init_texture("map_rest.png").await;
         let chest_texture = load_and_init_texture("map_chest.png").await;
         let shop_texture = load_and_init_texture("map_shop.png").await;
-
-        let candidate_chest_rewards = vec![
-            EquipmentEntry::Armor(CHAIN_MAIL),
-            EquipmentEntry::Armor(LEATHER_ARMOR),
-            EquipmentEntry::Weapon(DAGGER),
-            EquipmentEntry::Weapon(SWORD),
-            EquipmentEntry::Weapon(RAPIER),
-            EquipmentEntry::Shield(SMALL_SHIELD),
-        ];
-        let mut rng = rand::rng();
-        let chest_reward =
-            candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())];
 
         let mut nodes = [
             Node::new((0, 0), None),
@@ -105,15 +90,16 @@ impl MapScene {
             Node::new((1, 1), Some(MapChoice::Fight(FightId::EasyPair))),
             Node::new((2, 0), Some(MapChoice::Fight(FightId::EasyGuard))),
             Node::new((2, 1), Some(MapChoice::Fight(FightId::EasyRiver))),
-            Node::new((2, 2), Some(MapChoice::Shop)),
-            Node::new((3, 0), Some(MapChoice::Shop)),
-            Node::new((3, 1), Some(MapChoice::Chest(chest_reward))),
+            Node::new((2, 2), Some(MapChoice::Shop(generate_shop_contents()))),
+            Node::new((3, 0), Some(MapChoice::Shop(generate_shop_contents()))),
+            Node::new((3, 1), Some(MapChoice::Chest(generate_chest_content()))),
             Node::new((3, 2), Some(MapChoice::Fight(FightId::EliteOgre))),
             Node::new((4, 0), Some(MapChoice::Rest)),
-            Node::new((4, 1), Some(MapChoice::Chest(chest_reward))),
+            Node::new((4, 1), Some(MapChoice::Chest(generate_chest_content()))),
             Node::new((5, 0), Some(MapChoice::Fight(FightId::EasySurrounded))),
             Node::new((6, 0), Some(MapChoice::Fight(FightId::EliteMagi))),
         ];
+
         let edges: HashMap<usize, Vec<usize>> = [
             (0, vec![1, 2]),
             (1, vec![3]),
@@ -130,14 +116,27 @@ impl MapScene {
         ]
         .into();
 
+        let candidate_chest_rewards = vec![
+            EquipmentEntry::Armor(CHAIN_MAIL),
+            EquipmentEntry::Armor(LEATHER_ARMOR),
+            EquipmentEntry::Weapon(DAGGER),
+            EquipmentEntry::Weapon(SWORD),
+            EquipmentEntry::Weapon(RAPIER),
+            EquipmentEntry::Shield(SMALL_SHIELD),
+        ];
+        let mut rng = rand::rng();
+
+        let (screen_w, screen_h) = screen_size();
+        let y_mid = screen_h / 2.0;
+
         let mut column_sizes: HashMap<u32, u32> = HashMap::new();
         for node in &mut nodes {
             let n = column_sizes.get(&node.map_pos.0).copied().unwrap_or(0);
             column_sizes.insert(node.map_pos.0, n + 1);
-            if let Some(choice) = node.choice {
+            if let Some(choice) = &node.choice {
                 node.text = match choice {
                     MapChoice::Rest => "Rest",
-                    MapChoice::Shop => "Shop",
+                    MapChoice::Shop(..) => "Shop",
                     MapChoice::Fight(fight_id) => format!("{:?}", fight_id).leak(),
                     MapChoice::Chest(..) => "Chest",
                 };
@@ -148,8 +147,9 @@ impl MapScene {
                     }
                     MapChoice::Fight(..) => Some(fight_texture.clone()),
                     MapChoice::Chest(..) => Some(chest_texture.clone()),
-                    MapChoice::Shop => Some(shop_texture.clone()),
+                    MapChoice::Shop(..) => Some(shop_texture.clone()),
                 };
+                node.can_reenter = matches!(choice, MapChoice::Shop(..) | MapChoice::Chest(..));
             } else {
                 node.text = "Start";
             }
@@ -160,28 +160,29 @@ impl MapScene {
             let vert_dist = 200.0;
             let hor_dist = 190.0;
             node.screen_pos = (
-                200.0 + node.map_pos.0 as f32 * hor_dist,
+                100.0 + node.map_pos.0 as f32 * hor_dist,
                 y_mid - (col_size - 1) as f32 / 2.0 * vert_dist + node.map_pos.1 as f32 * vert_dist,
             )
         }
 
-        let current_pos_color = Color::new(0.2, 0.0, 0.0, 1.0);
+        Self {
+            player_node_i: 0,
+            visited_nodes: vec![0],
+            portraits,
+            nodes,
+            edges,
+        }
+    }
 
-        let transition_duration = 1.3;
+    pub async fn run_map_loop(&mut self, font: Font, characters: &[Character]) -> &mut MapChoice {
+        let (screen_w, screen_h) = screen_size();
+        let radius = 60.0;
+        let mut selected_node_i = None;
+
+        let visited_color = Color::new(0.2, 0.0, 0.0, 0.3);
+
         let mut transition_countdown = None;
 
-        /*
-        let start_size = 30.0;
-
-        let start_pos = Rect::new(
-            100.0 - start_size / 2.0,
-            y_mid - start_size / 2.0,
-            start_size,
-            start_size,
-        );
-         */
-
-        let bg_color = BLACK;
         let bg_color = Color::new(0.6, 0.5, 0.3, 1.0);
 
         loop {
@@ -192,33 +193,25 @@ impl MapScene {
 
             let mut hovered_i = None;
 
-            for (node_i, node) in nodes.iter().enumerate() {
-                if let Some(valid_next) = edges.get(&self.player_node_i) {
-                    if valid_next.contains(&node_i) && node.within_distance(mouse_pos, radius) {
+            for (node_i, node) in self.nodes.iter().enumerate() {
+                let can_reenter = self.player_node_i == node_i && node.can_reenter;
+                let hovers_node = node.within_distance(mouse_pos, radius);
+                if hovers_node && can_reenter {
+                    hovered_i = Some(node_i);
+                } else if let Some(valid_next) = self.edges.get(&self.player_node_i) {
+                    if hovers_node && valid_next.contains(&node_i) {
                         hovered_i = Some(node_i);
                     }
                 }
             }
 
             // Draw edges
-            for (from_i, to) in &edges {
-                let from_pos = nodes[*from_i].screen_pos;
-                /*
-                let from_pos = match from_i {
-                    Some(from_i) => nodes[*from_i].screen_pos,
-                    None => start_pos.center().into(),
-                };
-                 */
+            for (from_i, to) in &self.edges {
+                let from_pos = self.nodes[*from_i].screen_pos;
                 for to_i in to {
-                    let to_node = &nodes[*to_i];
+                    let to_node = &self.nodes[*to_i];
 
                     let visited_from = self.visited_nodes.contains(from_i);
-                    /*
-                    let visited_from = match from_i {
-                        Some(from_i) => self.visited_nodes.contains(from_i),
-                        None => true,
-                    };
-                     */
 
                     let line_color = if hovered_i == Some(*to_i) && self.player_node_i == *from_i {
                         WHITE
@@ -231,28 +224,10 @@ impl MapScene {
                 }
             }
 
-            // Start position
-            //draw_rectangle_lines(start_pos.x, start_pos.y, start_size, start_size, 2.0, RED);
-            //if self.player_node_i.is_none() {
-            //draw_cross(start_pos.center().into(), start_pos.w / 2.0 - 5.0);
-            //}
-            /*
-            let fill_color = current_pos_color;
-            draw_circle(start_pos.center().x, start_pos.center().y, 20.0, fill_color);
-            let start_color = GRAY;
-            draw_circle_lines(
-                start_pos.center().x,
-                start_pos.center().y,
-                20.0,
-                2.0,
-                start_color,
-            );
-             */
-
             let (node_w, node_h) = (64.0, 64.0);
 
             // Draw nodes
-            for (node_i, node) in nodes.iter().enumerate() {
+            for (node_i, node) in self.nodes.iter().enumerate() {
                 let hovered = hovered_i == Some(node_i);
 
                 if transition_countdown.is_none()
@@ -260,28 +235,30 @@ impl MapScene {
                     && hovered
                 {
                     selected_node_i = Some(node_i);
-                    transition_countdown = Some(transition_duration);
+                    if node_i == self.player_node_i {
+                        // Reentering the node that you're already at
+                        transition_countdown = Some(-TRANSITION_PAUSE_DURATION);
+                    } else {
+                        // Moving to the next node on a path
+                        transition_countdown = Some(TRANSITION_MOVEMENT_DURATION);
+                    }
                 }
 
-                let outline_color = if self.player_node_i == node_i {
-                    Some(GRAY)
-                } else if selected_node_i == Some(node_i) {
+                let outline_color = if selected_node_i == Some(node_i) {
                     Some(YELLOW)
-                } else if self.visited_nodes.contains(&node_i) {
-                    Some(GRAY)
                 } else if hovered {
                     Some(WHITE)
+                } else if self.visited_nodes.contains(&node_i) {
+                    Some(GRAY)
                 } else {
                     None
                 };
 
-                let fill_color = if self.visited_nodes.contains(&node_i) {
-                    current_pos_color
-                } else {
-                    bg_color
-                };
+                draw_circle(node.screen_pos.0, node.screen_pos.1, radius, bg_color);
+                if self.visited_nodes.contains(&node_i) {
+                    draw_circle(node.screen_pos.0, node.screen_pos.1, radius, visited_color);
+                }
 
-                draw_circle(node.screen_pos.0, node.screen_pos.1, radius, fill_color);
                 if let Some(outline_color) = outline_color {
                     draw_circle_lines(
                         node.screen_pos.0,
@@ -308,7 +285,7 @@ impl MapScene {
                     let text_dim = measure_text(node.text, Some(&font), font_size, 1.0);
 
                     let mut text_color = LIGHTGRAY;
-                    if let Some(valid_next) = edges.get(&self.player_node_i) {
+                    if let Some(valid_next) = self.edges.get(&self.player_node_i) {
                         if valid_next.contains(&node_i) {
                             text_color = WHITE;
                         }
@@ -328,13 +305,14 @@ impl MapScene {
                 }
             }
 
-            let player_node = &nodes[self.player_node_i];
+            let player_node = &self.nodes[self.player_node_i];
             let mut x = player_node.screen_pos.0;
             let mut y = player_node.screen_pos.1 + node_h / 2.0;
 
             if let Some(countdown) = &mut transition_countdown {
-                let next_node = &nodes[selected_node_i.unwrap()];
-                let ratio = (transition_duration - f32::max(*countdown, 0.0)) / transition_duration;
+                let next_node = &self.nodes[selected_node_i.unwrap()];
+                let ratio = (TRANSITION_MOVEMENT_DURATION - f32::max(*countdown, 0.0))
+                    / TRANSITION_MOVEMENT_DURATION;
                 let x1 = next_node.screen_pos.0;
                 let y1 = next_node.screen_pos.1 + node_h / 2.0;
                 x = x + (x1 - x) * ratio;
@@ -347,11 +325,7 @@ impl MapScene {
                 *countdown -= elapsed;
 
                 if *countdown < 0.0 {
-                    let pause_duration = 0.5;
-
-                    if *countdown < -pause_duration {
-                        let fade_duration = 0.4;
-
+                    if *countdown < -TRANSITION_PAUSE_DURATION {
                         let params = DrawRectangleParams {
                             offset: Default::default(),
                             rotation: 0.0,
@@ -359,19 +333,22 @@ impl MapScene {
                                 0.0,
                                 0.0,
                                 0.0,
-                                1.0 * (-*countdown - pause_duration) / fade_duration,
+                                1.0 * (-*countdown - TRANSITION_PAUSE_DURATION) / FADE_DURATION,
                             ),
                         };
                         draw_rectangle_ex(0.0, 0.0, screen_w, screen_h, params);
 
-                        if *countdown < -pause_duration - fade_duration {
+                        if *countdown < -TRANSITION_PAUSE_DURATION - FADE_DURATION {
                             let node_i = selected_node_i.unwrap();
                             self.player_node_i = node_i;
                             self.visited_nodes.push(node_i);
 
                             // Make sure to show the last drawn frame
                             next_frame().await;
-                            return nodes[selected_node_i.unwrap()].choice.unwrap();
+                            return self.nodes[selected_node_i.unwrap()]
+                                .choice
+                                .as_mut()
+                                .unwrap();
                         }
                     }
                 }

@@ -33,6 +33,7 @@ pub async fn run_shop_loop(
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
+    entries: &mut Vec<ShopEntry>,
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
@@ -51,27 +52,9 @@ pub async fn run_shop_loop(
         let transition_duration = 0.5;
         let mut transition_countdown = None;
 
-        let candidate_items = vec![
-            (EquipmentEntry::Weapon(WAR_HAMMER), 3),
-            (EquipmentEntry::Weapon(DAGGER), 3),
-            (EquipmentEntry::Weapon(SWORD), 8),
-            (EquipmentEntry::Weapon(RAPIER), 8),
-            (EquipmentEntry::Weapon(BOW), 11),
-            (EquipmentEntry::Armor(LEATHER_ARMOR), 4),
-            (EquipmentEntry::Armor(CHAIN_MAIL), 12),
-            (EquipmentEntry::Shield(SMALL_SHIELD), 5),
-            (EquipmentEntry::Consumable(HEALTH_POTION), 4),
-            (EquipmentEntry::Consumable(MANA_POTION), 4),
-        ];
-
-        let mut items: Vec<Option<(EquipmentEntry, u32)>> = select_n_random(candidate_items, 5)
-            .into_iter()
-            .map(Some)
-            .collect();
-
         let icon_margin = 140.0;
         let icon_w = 40.0;
-        let row_w: f32 = items.len() as f32 * icon_w + (items.len() - 1) as f32 * icon_margin;
+        let row_w: f32 = entries.len() as f32 * icon_w + (entries.len() - 1) as f32 * icon_margin;
 
         loop {
             let elapsed = get_frame_time();
@@ -131,12 +114,12 @@ pub async fn run_shop_loop(
             let mut icon_x = x_mid - row_w / 2.0;
             let icon_y = 150.0;
 
-            for item_slot in &mut items {
+            for entry in entries.iter_mut() {
                 let rect = Rect::new(icon_x, icon_y, icon_w, icon_w);
 
-                if let Some((equipment_entry, cost)) = item_slot {
+                if !entry.has_been_bought {
                     draw_rectangle(rect.x, rect.y, rect.w, rect.h, BLUE);
-                    let texture = &equipment_icons[&equipment_entry.icon()];
+                    let texture = &equipment_icons[&entry.item.icon()];
                     draw_texture_ex(
                         texture,
                         rect.x,
@@ -150,14 +133,14 @@ pub async fn run_shop_loop(
 
                     let character = &characters[ui.selected_character_idx()];
 
-                    let can_afford = party.money.get() >= *cost;
+                    let can_afford = party.money.get() >= entry.cost;
 
                     let cost_color = if can_afford { WHITE } else { RED };
-                    let text = format!("{cost}");
+                    let text = format!("{}", entry.cost);
                     let font_size = 24;
                     let text_dim = measure_text(&text, Some(&font), font_size, 1.0);
                     TextLine::new(
-                        format!("{}", cost),
+                        format!("{}", entry.cost),
                         font_size,
                         cost_color,
                         Some(font.clone()),
@@ -165,7 +148,7 @@ pub async fn run_shop_loop(
                     .with_depth(DARKGRAY, 1.0)
                     .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
-                    let tooltip_lines = equipment_tooltip_lines(equipment_entry);
+                    let tooltip_lines = equipment_tooltip_lines(&entry.item);
                     draw_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
@@ -184,10 +167,10 @@ pub async fn run_shop_loop(
                             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
 
                             if is_mouse_button_pressed(MouseButton::Left) {
-                                let success = character.try_gain_equipment(*equipment_entry);
+                                let success = character.try_gain_equipment(entry.item);
                                 assert!(success);
-                                party.spend_money(*cost);
-                                *item_slot = None;
+                                party.spend_money(entry.cost);
+                                entry.has_been_bought = true;
                             }
                         } else {
                             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, RED);
@@ -226,4 +209,35 @@ pub async fn run_shop_loop(
         .into_iter()
         .map(|character| Rc::into_inner(character).unwrap())
         .collect()
+}
+
+pub fn generate_shop_contents() -> Vec<ShopEntry> {
+    let candidate_items = vec![
+        (EquipmentEntry::Weapon(WAR_HAMMER), 3),
+        (EquipmentEntry::Weapon(DAGGER), 3),
+        (EquipmentEntry::Weapon(SWORD), 8),
+        (EquipmentEntry::Weapon(RAPIER), 8),
+        (EquipmentEntry::Weapon(BOW), 11),
+        (EquipmentEntry::Armor(LEATHER_ARMOR), 4),
+        (EquipmentEntry::Armor(CHAIN_MAIL), 12),
+        (EquipmentEntry::Shield(SMALL_SHIELD), 5),
+        (EquipmentEntry::Consumable(HEALTH_POTION), 4),
+        (EquipmentEntry::Consumable(MANA_POTION), 4),
+    ];
+
+    select_n_random(candidate_items, 5)
+        .into_iter()
+        .map(|(item, cost)| ShopEntry {
+            item,
+            cost,
+            has_been_bought: false,
+        })
+        .collect()
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct ShopEntry {
+    item: EquipmentEntry,
+    cost: u32,
+    has_been_bought: bool,
 }

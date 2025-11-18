@@ -11,12 +11,16 @@ use macroquad::{
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
+use rand::Rng;
 
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
-    core::{Character, EquipmentEntry},
-    data::{BONE_CRUSHER, ELUSIVE_BOW, HEALTH_POTION, LIGHT_CHAIN_MAIL, MANA_POTION},
+    core::{Character, EquipEffect, EquipmentEntry},
+    data::{
+        BONE_CRUSHER, CHAIN_MAIL, DAGGER, ELUSIVE_BOW, HEALTH_POTION, LEATHER_ARMOR,
+        LIGHT_CHAIN_MAIL, MANA_POTION, RAPIER, SMALL_SHIELD, SWORD,
+    },
     equipment_ui::equipment_tooltip_lines,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
@@ -29,6 +33,7 @@ pub async fn run_chest_loop(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
+    items: &mut Vec<ChestEntry>,
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
@@ -46,24 +51,6 @@ pub async fn run_chest_loop(
 
         let transition_duration = 0.5;
         let mut transition_countdown = None;
-
-        let candidate_items = vec![
-            /*
-            EquipmentEntry::Weapon(WAR_HAMMER),
-            EquipmentEntry::Weapon(DAGGER),
-            EquipmentEntry::Armor(LEATHER_ARMOR),
-             */
-            EquipmentEntry::Consumable(HEALTH_POTION),
-            EquipmentEntry::Consumable(MANA_POTION),
-            EquipmentEntry::Weapon(BONE_CRUSHER),
-            EquipmentEntry::Weapon(ELUSIVE_BOW),
-            EquipmentEntry::Armor(LIGHT_CHAIN_MAIL),
-        ];
-
-        let mut items: Vec<Option<EquipmentEntry>> = select_n_random(candidate_items, 1)
-            .into_iter()
-            .map(Some)
-            .collect();
 
         let icon_margin = 140.0;
         let icon_w = 40.0;
@@ -94,13 +81,13 @@ pub async fn run_chest_loop(
             let icon_y = 150.0;
 
             let mut some_remaining_rewards = false;
-            for item_slot in &mut items {
+            for entry in items.iter_mut() {
                 let rect = Rect::new(icon_x, icon_y, icon_w, icon_w);
 
-                if let Some(equipment_entry) = item_slot {
+                if !entry.has_been_grabbed {
                     some_remaining_rewards = true;
                     draw_rectangle(rect.x, rect.y, rect.w, rect.h, BLUE);
-                    let texture = &equipment_icons[&equipment_entry.icon()];
+                    let texture = &equipment_icons[&entry.item.icon()];
                     draw_texture_ex(
                         texture,
                         rect.x,
@@ -112,7 +99,7 @@ pub async fn run_chest_loop(
                         },
                     );
 
-                    let tooltip_lines = equipment_tooltip_lines(equipment_entry);
+                    let tooltip_lines = equipment_tooltip_lines(&entry.item);
                     draw_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
@@ -131,9 +118,9 @@ pub async fn run_chest_loop(
 
                         if is_mouse_button_pressed(MouseButton::Left) {
                             let character = &characters[ui.selected_character_idx()];
-                            let success = character.try_gain_equipment(*equipment_entry);
+                            let success = character.try_gain_equipment(entry.item);
                             assert!(success);
-                            *item_slot = None;
+                            entry.has_been_grabbed = true;
                         }
                     }
                 } else {
@@ -206,4 +193,26 @@ pub async fn run_chest_loop(
         .into_iter()
         .map(|character| Rc::into_inner(character).unwrap())
         .collect()
+}
+
+#[derive(Clone, Debug)]
+pub struct ChestEntry {
+    item: EquipmentEntry,
+    has_been_grabbed: bool,
+}
+
+pub fn generate_chest_content() -> Vec<ChestEntry> {
+    let candidate_chest_rewards = vec![
+        EquipmentEntry::Armor(CHAIN_MAIL),
+        EquipmentEntry::Armor(LEATHER_ARMOR),
+        EquipmentEntry::Weapon(DAGGER),
+        EquipmentEntry::Weapon(SWORD),
+        EquipmentEntry::Weapon(RAPIER),
+        EquipmentEntry::Shield(SMALL_SHIELD),
+    ];
+    let mut rng = rand::rng();
+    vec![ChestEntry {
+        item: candidate_chest_rewards[rng.random_range(..candidate_chest_rewards.len())],
+        has_been_grabbed: false,
+    }]
 }
