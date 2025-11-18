@@ -4804,7 +4804,7 @@ impl EquipmentEntry {
     pub fn icon(&self) -> EquipmentIconId {
         match self {
             EquipmentEntry::Weapon(weapon) => weapon.icon,
-            EquipmentEntry::Shield(_shield) => EquipmentIconId::SmallShield,
+            EquipmentEntry::Shield(shield) => shield.icon,
             EquipmentEntry::Armor(armor) => armor.icon,
             EquipmentEntry::Consumable(consumable) => consumable.icon,
         }

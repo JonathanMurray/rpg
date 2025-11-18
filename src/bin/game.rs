@@ -29,9 +29,10 @@ use rpg::core::{
 use rpg::data::{
     PassiveSkill, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO,
     HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH,
-    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, NECROTIC_INFLUENCE,
-    NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SHACKLED_MIND,
-    SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
+    NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM,
+    SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK,
+    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -128,6 +129,7 @@ async fn main() {
         .borrow_mut()
         .push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_ability_enhancements.push(LUNGE_ATTACK_REACH);
+    bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements
     //.push(LUNGE_ATTACK_HEAVY_IMPACT);
@@ -138,6 +140,15 @@ async fn main() {
     //bob.health.lose(2);
 
     let mut player_characters = vec![bob, alice];
+
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::EasyCluster,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
 
     loop {
         let map_choice = map_scene

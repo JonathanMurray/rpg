@@ -17,8 +17,8 @@ use crate::{
     base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{Character, EquipmentEntry, Party},
     data::{
-        BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, RAPIER, SMALL_SHIELD,
-        SWORD, WAR_HAMMER,
+        BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, MEDIUM_SHIELD, RAPIER,
+        SMALL_SHIELD, SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip_lines,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
@@ -221,6 +221,7 @@ pub fn generate_shop_contents() -> Vec<ShopEntry> {
         (EquipmentEntry::Armor(LEATHER_ARMOR), 4),
         (EquipmentEntry::Armor(CHAIN_MAIL), 12),
         (EquipmentEntry::Shield(SMALL_SHIELD), 5),
+        (EquipmentEntry::Shield(MEDIUM_SHIELD), 5),
         (EquipmentEntry::Consumable(HEALTH_POTION), 4),
         (EquipmentEntry::Consumable(MANA_POTION), 4),
     ];

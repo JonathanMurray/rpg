@@ -331,6 +331,26 @@ pub const SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
+pub const MEDIUM_SHIELD: Shield = Shield {
+    name: "Medium shield",
+    sprite: Some(SpriteId::Shield),
+    icon: EquipmentIconId::MediumShield,
+    evasion: 5,
+    on_hit_reaction: None,
+    on_attacked_reaction: Some(OnAttackedReaction {
+        id: OnAttackedReactionId::Block,
+        name: "Block",
+        description: "Attempt to block an incoming ranged attack",
+        // TODO: make better icon
+        icon: IconId::RangedAttack,
+        action_point_cost: 1,
+        stamina_cost: 1,
+        effect: OnAttackedReactionEffect { bonus_evasion: 5 },
+        required_circumstance: Some(AttackCircumstance::Ranged),
+    }),
+    weight: 3,
+};
+
 pub const QUICK: AttackEnhancement = AttackEnhancement {
     name: "Quick strike",
     description: "", //"Strike more quickly",
