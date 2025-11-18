@@ -702,7 +702,7 @@ impl GameGrid {
         let pressed_left_mouse = is_mouse_button_pressed(MouseButton::Left);
 
         let mouse_state = match ui_state {
-            UiState::ChoosingAction => MouseState::MayInputMovement,
+            UiState::ChoosingAction => MouseState::None,
 
             UiState::ConfiguringAction(base_action) => match base_action {
                 ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
