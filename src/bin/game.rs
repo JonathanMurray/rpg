@@ -109,7 +109,7 @@ async fn main() {
     );
     bob.set_weapon(HandType::MainHand, BONE_CRUSHER);
     //bob.set_shield(SMALL_SHIELD);
-    bob.armor_piece.set(Some(LEATHER_ARMOR));
+    bob.armor_piece.set(Some(SHIRT));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
     bob.known_actions

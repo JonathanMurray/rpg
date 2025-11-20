@@ -1565,48 +1565,32 @@ impl CoreGame {
                 }
             }
 
-            let armored_defense = evasion + armor_value;
-
             if attack_result < evasion {
                 attack_hit_type = AttackHitType::Graze;
-                let line = "  Graze!".to_string();
-                dmg_str.push_str(" -1 (graze)");
-                dmg_calculation -= 1;
-
-                if armor_value > 0 {
-                    //line.push_str(&format!(", {} mitigated", armor_value));
-                    dmg_str.push_str(&format!(" -{armor_value} (armor)"));
-                    dmg_calculation -= armor_value as i32;
-                }
-
-                //line.push_str(")");
-                detail_lines.push(line);
-            } else if attack_result < armored_defense {
-                let mitigated = armored_defense - attack_result;
-
-                detail_lines.push(format!("  Mitigated hit ({} armor)", mitigated));
-                dmg_str.push_str(&format!(" -{mitigated} (armor)"));
-                dmg_calculation -= mitigated as i32;
+                dmg_str.push_str(" -25% (graze)");
+                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                detail_lines.push("  Graze!".to_string());
             } else {
                 on_true_hit_effect = weapon.on_true_hit;
 
-                let degree_of_success = (attack_result - armored_defense) / 5;
+                let degree_of_success = (attack_result - evasion) / 5;
 
-                if degree_of_success > 1 {
+                if degree_of_success > 0 {
                     attack_hit_type = AttackHitType::Critical;
                     detail_lines.push(format!("  Critical hit ({})", degree_of_success));
-                    dmg_str.push_str(&format!(" +{degree_of_success} (crit)"));
-                    dmg_calculation += degree_of_success as i32;
-                } else if degree_of_success == 1 {
-                    attack_hit_type = AttackHitType::Critical;
-                    detail_lines.push("  Critical hit".to_string());
-                    dmg_str.push_str(" +1 (crit)");
-                    dmg_calculation += 1;
-                } else if armor_value > 0 {
-                    detail_lines.push("  Penetrating hit".to_string());
+                    let bonus_percentage = degree_of_success * 25;
+                    dmg_str.push_str(&format!(" +{bonus_percentage}% (crit)"));
+                    dmg_calculation +=
+                        (dmg_calculation as f32 * 0.25 * degree_of_success as f32).ceil() as i32;
                 } else {
-                    detail_lines.push("  Neutral hit".to_string());
+                    detail_lines.push("  Hit".to_string());
                 }
+            }
+
+            if armor_value > 0 {
+                //line.push_str(&format!(", {} mitigated", armor_value));
+                dmg_str.push_str(&format!(" -{armor_value} (armor)"));
+                dmg_calculation -= armor_value as i32;
             }
 
             let damage = dmg_calculation.max(0) as u32;
