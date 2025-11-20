@@ -13,7 +13,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, TooltipPositionPreference},
+    action_button::{draw_regular_tooltip, draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{Character, EquipmentEntry, Party},
     data::{
@@ -149,7 +149,7 @@ pub async fn run_shop_loop(
                     .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
                     let tooltip_lines = equipment_tooltip_lines(&entry.item);
-                    draw_tooltip(
+                    draw_regular_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,

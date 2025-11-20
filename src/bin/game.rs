@@ -96,6 +96,7 @@ async fn main() {
     alice.armor_piece.set(Some(SHIRT));
     alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
     alice.known_attack_enhancements.push(LONGER_REACH);
+    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
     alice.known_passive_skills.push(PassiveSkill::Honorless);
 
     let mut bob = Character::new(
@@ -118,6 +119,13 @@ async fn main() {
         .borrow_mut()
         .push(BaseAction::UseAbility(SEARING_LIGHT));
     bob.known_ability_enhancements.push(SEARING_LIGHT_BURN);
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(FIREBALL));
+    bob.known_ability_enhancements.push(FIREBALL_INFERNO);
+    bob.known_actions
+        .borrow_mut()
+        .push(BaseAction::UseAbility(SHACKLED_MIND));
     bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements

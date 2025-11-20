@@ -8,7 +8,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, Side, TooltipPositionPreference},
+    action_button::{draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
 };
@@ -96,7 +96,7 @@ fn draw_conditions(
     }
 
     if let Some((rect, condition)) = tooltip {
-        draw_tooltip(
+        draw_regular_tooltip(
             font,
             TooltipPositionPreference::RelativeToRect(rect, Side::Right),
             condition.name,

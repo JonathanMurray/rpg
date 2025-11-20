@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, RED, SKYBLUE, WHITE, YELLOW},
+    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, SKYBLUE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -22,7 +22,7 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
+        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
         OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Weapon, WeaponType,
     },
     data::PassiveSkill,
@@ -36,6 +36,7 @@ pub struct ActionButtonTooltip {
     pub description: Option<&'static str>,
     pub error: Option<&'static str>,
     pub technical_description: Vec<String>,
+    pub keywords: Vec<Condition>,
 }
 
 fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
@@ -84,6 +85,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
         description: Some(reaction.description),
         error: None,
         technical_description,
+        keywords: vec![],
     }
 }
 
@@ -109,11 +111,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
 }
 
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
-    let mut technical_description = vec![];
-
-    describe_attack_enhancement_effect(&enhancement.effect, &mut technical_description);
-
-    ActionButtonTooltip {
+    let mut t = ActionButtonTooltip {
         header: format!(
             "{} {}",
             enhancement.name,
@@ -125,45 +123,47 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
         ),
         description: Some(enhancement.description),
         error: None,
-        technical_description,
-    }
+        technical_description: vec![],
+        keywords: vec![],
+    };
+
+    describe_attack_enhancement_effect(&enhancement.effect, &mut t);
+
+    t
 }
 
 fn describe_attack_enhancement_effect(
     effect: &AttackEnhancementEffect,
-    technical_description: &mut Vec<String>,
+    t: &mut ActionButtonTooltip,
 ) {
-    /*
-    if let Some(weapon_requirement) = enhancement.weapon_requirement {
-        match weapon_requirement {
-            WeaponType::Melee => technical_description.push("[ melee ]".to_string()),
-            WeaponType::Ranged => technical_description.push("[ ranged ]".to_string()),
-        }
-    }
-     */
-
     if effect.roll_modifier != 0 {
         if effect.roll_modifier > 0 {
-            technical_description.push(format!("+ {} to attack roll", effect.roll_modifier));
+            t.technical_description
+                .push(format!("+ {} to attack roll", effect.roll_modifier));
         } else {
-            technical_description.push(format!("- {} to attack roll", -effect.roll_modifier));
+            t.technical_description
+                .push(format!("- {} to attack roll", -effect.roll_modifier));
         }
     }
 
     if effect.action_point_discount > 0 {
-        technical_description.push(format!("- {} AP cost", effect.action_point_discount));
+        t.technical_description
+            .push(format!("- {} AP cost", effect.action_point_discount));
     }
     if effect.bonus_damage > 0 {
-        technical_description.push(format!("+ {} damage", effect.bonus_damage));
+        t.technical_description
+            .push(format!("+ {} damage", effect.bonus_damage));
     }
     if effect.roll_advantage > 0 {
-        technical_description.push(format!("+ {} advantage", effect.roll_advantage));
+        t.technical_description
+            .push(format!("+ {} advantage", effect.roll_advantage));
     } else if effect.roll_advantage < 0 {
-        technical_description.push(format!("- {} advantage", -effect.roll_advantage));
+        t.technical_description
+            .push(format!("- {} advantage", -effect.roll_advantage));
     }
     if let Some(mut condition) = effect.inflict_condition_per_damage {
         let stacks = *condition.stacks().unwrap();
-        technical_description.push(format!(
+        t.technical_description.push(format!(
             "Inflicts {} {} per damage dealt",
             stacks,
             condition.name()
@@ -171,76 +171,30 @@ fn describe_attack_enhancement_effect(
     }
 
     if effect.armor_penetration > 0 {
-        technical_description.push(format!("{} armor penetration", effect.armor_penetration));
+        t.technical_description
+            .push(format!("{} armor penetration", effect.armor_penetration));
     }
 
     if let Some(effect) = effect.on_target {
-        technical_description.push("Target:".to_string());
-        describe_apply_effect(effect, technical_description);
+        t.technical_description.push("Target:".to_string());
+        describe_apply_effect(effect, t);
     }
 
     if let Some(effect) = effect.on_damage_effect {
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
-                technical_description.push("Regain AP".to_string())
+                t.technical_description.push("Regain AP".to_string())
             }
             AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                technical_description.push("Target (on hit):".to_string());
-                describe_apply_effect(apply_effect, technical_description);
+                t.technical_description.push("Target (on hit):".to_string());
+                describe_apply_effect(apply_effect, t);
             }
         }
     }
 }
 
 fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButtonTooltip {
-    let mut technical_description = vec![];
-
-    if let Some(effect) = enhancement.spell_effect {
-        if effect.roll_bonus > 0 {
-            technical_description.push(format!("+ {} to dice roll", effect.roll_bonus));
-        }
-
-        if effect.bonus_advantage > 0 {
-            technical_description.push(format!("+ {} advantage", effect.bonus_advantage));
-        }
-
-        if effect.bonus_target_damage > 0 {
-            technical_description.push(format!("+ {} damage (target)", effect.bonus_target_damage));
-        }
-
-        if effect.bonus_area_damage > 0 {
-            technical_description.push(format!("+ {} damage (area)", effect.bonus_area_damage));
-        }
-
-        for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-            technical_description.push("Target:".to_string());
-            describe_apply_effect(*apply_effect, &mut technical_description);
-        }
-        for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
-            technical_description.push("Area:".to_string());
-            describe_apply_effect(*apply_effect, &mut technical_description);
-        }
-
-        if effect.increased_range_tenths > 0 {
-            technical_description.push(format!(
-                "+ {} range",
-                effect.increased_range_tenths as f32 * 0.1
-            ));
-        }
-
-        if effect.increased_radius_tenths > 0 {
-            technical_description.push(format!(
-                "+ {} radius",
-                effect.increased_radius_tenths as f32 * 0.1
-            ));
-        }
-    }
-
-    if let Some(effect) = enhancement.attack_effect {
-        describe_attack_enhancement_effect(&effect, &mut technical_description);
-    }
-
-    ActionButtonTooltip {
+    let mut t = ActionButtonTooltip {
         header: format!(
             "{} {}",
             enhancement.name,
@@ -252,8 +206,60 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButton
         ),
         description: Some(enhancement.description),
         error: None,
-        technical_description,
+        technical_description: vec![],
+        keywords: vec![],
+    };
+
+    if let Some(effect) = enhancement.spell_effect {
+        if effect.roll_bonus > 0 {
+            t.technical_description
+                .push(format!("+ {} to dice roll", effect.roll_bonus));
+        }
+
+        if effect.bonus_advantage > 0 {
+            t.technical_description
+                .push(format!("+ {} advantage", effect.bonus_advantage));
+        }
+
+        if effect.bonus_target_damage > 0 {
+            t.technical_description
+                .push(format!("+ {} damage (target)", effect.bonus_target_damage));
+        }
+
+        if effect.bonus_area_damage > 0 {
+            t.technical_description
+                .push(format!("+ {} damage (area)", effect.bonus_area_damage));
+        }
+
+        for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
+            t.technical_description.push("Target:".to_string());
+            describe_apply_effect(*apply_effect, &mut t);
+        }
+        for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
+            t.technical_description.push("Area:".to_string());
+            describe_apply_effect(*apply_effect, &mut t);
+        }
+
+        if effect.increased_range_tenths > 0 {
+            t.technical_description.push(format!(
+                "+ {} range",
+                effect.increased_range_tenths as f32 * 0.1
+            ));
+        }
+
+        if effect.increased_radius_tenths > 0 {
+            t.technical_description.push(format!(
+                "+ {} radius",
+                effect.increased_radius_tenths as f32 * 0.1
+            ));
+        }
     }
+
+    if let Some(effect) = enhancement.attack_effect {
+        describe_attack_enhancement_effect(&effect, &mut t);
+    }
+
+    t
 }
 
 fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
@@ -288,27 +294,28 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
     }
 }
 
-fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<String>) {
+fn describe_apply_effect(effect: ApplyEffect, t: &mut ActionButtonTooltip) {
     match effect {
         ApplyEffect::RemoveActionPoints(n) => {
-            technical_description.push(format!("  Loses {}+ AP", n))
+            t.technical_description.push(format!("  Loses {}+ AP", n))
         }
-        ApplyEffect::GainStamina(n) => {
-            technical_description.push(format!("  Gains {}+ stamina", n))
-        }
+        ApplyEffect::GainStamina(n) => t
+            .technical_description
+            .push(format!("  Gains {}+ stamina", n)),
         ApplyEffect::Condition(mut condition) => {
             let line = if let Some(stacks) = condition.stacks().copied() {
                 format!("  {} ({})", condition.name(), stacks)
             } else {
                 format!("  {}", condition.name())
             };
-            technical_description.push(line);
+            t.technical_description.push(line);
+            t.keywords.push(condition);
         }
         ApplyEffect::PerBleeding {
             damage,
             caster_healing_percentage,
         } => {
-            technical_description.push(format!(
+            t.technical_description.push(format!(
                 "  {} damage per stack of Bleeding. Caster heals for {}% of the damage dealt.",
                 damage, caster_healing_percentage
             ));
@@ -320,7 +327,8 @@ fn describe_apply_effect(effect: ApplyEffect, technical_description: &mut Vec<St
                 format!("  Loses {}", condition.name())
             };
 
-            technical_description.push(line);
+            t.technical_description.push(line);
+            t.keywords.push(condition);
         }
     }
 }
@@ -335,7 +343,14 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             ability.mana_cost
         )
     );
-    let mut technical_description = vec![];
+
+    let mut t = ActionButtonTooltip {
+        header,
+        description: Some(ability.description),
+        error: None,
+        technical_description: vec![],
+        keywords: vec![],
+    };
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
@@ -348,7 +363,7 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             }
             AbilityRollType::Attack(_) => "[ attack roll ]".to_string(),
         };
-        technical_description.push(s);
+        t.technical_description.push(s);
     }
 
     match ability.target {
@@ -359,13 +374,15 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
         } => {
             match reach {
                 AbilityReach::Range(range) => {
-                    technical_description.push(format!("Target enemy (range {}) :", range));
+                    t.technical_description
+                        .push(format!("Target enemy (range {}) :", range));
                 }
                 AbilityReach::MoveIntoMelee(range) => {
-                    technical_description.push(format!("Engage enemy (range {}) :", range));
+                    t.technical_description
+                        .push(format!("Engage enemy (range {}) :", range));
                 }
             }
-            describe_ability_enemy_effect(effect, &mut technical_description);
+            describe_ability_enemy_effect(effect, &mut t);
 
             if let Some((range, acquisition, effect)) = area {
                 let targets_str = match acquisition {
@@ -373,17 +390,18 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                     AreaTargetAcquisition::Everyone => "EVERYONE",
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
-                technical_description.push(format!(
+                t.technical_description.push(format!(
                     "{} in impact area (radius {}) :",
                     targets_str, range
                 ));
-                describe_ability_enemy_effect(effect, &mut technical_description);
+                describe_ability_enemy_effect(effect, &mut t);
             }
         }
 
         AbilityTarget::Ally { range, effect } => {
-            technical_description.push(format!("Target ally (range {}) :", range));
-            describe_ability_ally_effect(effect, &mut technical_description);
+            t.technical_description
+                .push(format!("Target ally (range {}) :", range));
+            describe_ability_ally_effect(effect, &mut t);
         }
 
         AbilityTarget::None {
@@ -391,8 +409,8 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
             self_effect,
         } => {
             if let Some(effect) = self_effect {
-                technical_description.push("Self :".to_string());
-                describe_ability_ally_effect(effect, &mut technical_description);
+                t.technical_description.push("Self :".to_string());
+                describe_ability_ally_effect(effect, &mut t);
             }
 
             if let Some((radius, acquisition, effect)) = self_area {
@@ -406,12 +424,14 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
 
                 match effect {
                     AbilityEffect::Negative(effect) => {
-                        technical_description.push(format!("Enemies ({radius_str}) :"));
-                        describe_ability_enemy_effect(effect, &mut technical_description);
+                        t.technical_description
+                            .push(format!("Enemies ({radius_str}) :"));
+                        describe_ability_enemy_effect(effect, &mut t);
                     }
                     AbilityEffect::Positive(effect) => {
-                        technical_description.push(format!("Allies ({radius_str}) :"));
-                        describe_ability_ally_effect(effect, &mut technical_description);
+                        t.technical_description
+                            .push(format!("Allies ({radius_str}) :"));
+                        describe_ability_ally_effect(effect, &mut t);
                     }
                 }
             }
@@ -429,77 +449,67 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
                     AreaTargetAcquisition::Everyone => "EVERYONE",
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
-                technical_description.push(format!(
+                t.technical_description.push(format!(
                     "{} (range {}, radius {}) :",
                     targets_str, range, radius
                 ));
-                describe_ability_enemy_effect(effect, &mut technical_description);
+                describe_ability_enemy_effect(effect, &mut t);
             }
             AbilityEffect::Positive(effect) => {
                 assert!(acquisition == AreaTargetAcquisition::Allies);
-                technical_description
+                t.technical_description
                     .push(format!("Allies (range {}, radius {}) :", range, radius));
-                describe_ability_ally_effect(effect, &mut technical_description);
+                describe_ability_ally_effect(effect, &mut t);
             }
         },
     };
-    ActionButtonTooltip {
-        header,
-        description: Some(ability.description),
-        error: None,
-        technical_description,
-    }
+    t
 }
 
-fn describe_ability_enemy_effect(
-    effect: AbilityNegativeEffect,
-    technical_description: &mut Vec<String>,
-) {
+fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut ActionButtonTooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
-                Some(DefenseType::Will) => technical_description.push("  [ will ]".to_string()),
+                Some(DefenseType::Will) => t.technical_description.push("  [ will ]".to_string()),
                 Some(DefenseType::Evasion) => {
-                    technical_description.push("  [ evasion ]".to_string())
+                    t.technical_description.push("  [ evasion ]".to_string())
                 }
                 Some(DefenseType::Toughness) => {
-                    technical_description.push("  [ toughness ]".to_string())
+                    t.technical_description.push("  [ toughness ]".to_string())
                 }
                 None => {}
             };
 
             match effect.damage {
                 Some(AbilityDamage::Static(n)) => {
-                    technical_description.push(format!("  {} damage", n))
+                    t.technical_description.push(format!("  {} damage", n))
                 }
                 Some(AbilityDamage::AtLeast(n)) => {
-                    technical_description.push(format!("  {}+ damage", n))
+                    t.technical_description.push(format!("  {}+ damage", n))
                 }
                 None => {}
             }
 
             for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
-                describe_apply_effect(*apply_effect, technical_description);
+                describe_apply_effect(*apply_effect, t);
             }
         }
 
         AbilityNegativeEffect::Attack => {
-            technical_description.push("  [ evasion ]".to_string());
-            technical_description.push("  weapon damage".to_string());
+            t.technical_description.push("  [ evasion ]".to_string());
+            t.technical_description.push("  weapon damage".to_string());
         }
     }
 }
 
-fn describe_ability_ally_effect(
-    effect: AbilityPositiveEffect,
-    technical_description: &mut Vec<String>,
-) {
+fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut ActionButtonTooltip) {
     if effect.healing > 0 {
-        technical_description.push(format!("  {}+ healing", effect.healing));
+        t.technical_description
+            .push(format!("  {}+ healing", effect.healing));
     }
 
     if let Some(apply) = effect.apply {
-        describe_apply_effect(apply, technical_description);
+        describe_apply_effect(apply, t);
     }
 }
 
@@ -1087,6 +1097,8 @@ pub fn draw_button_tooltip(
         &tooltip.header,
         tooltip.error,
         &lines,
+        &tooltip.keywords,
+        false,
     );
 }
 
@@ -1094,6 +1106,7 @@ pub fn draw_button_tooltip(
 pub enum TooltipPositionPreference {
     RelativeToRect(Rect, Side),
     HorCenteredAt((f32, f32)),
+    At((f32, f32)),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -1104,38 +1117,59 @@ pub enum Side {
     Left,
 }
 
+pub fn draw_regular_tooltip(
+    font: &Font,
+    pos_preference: TooltipPositionPreference,
+    header: &str,
+    error: Option<&'static str>,
+    content_lines: &[String],
+) -> (f32, f32) {
+    draw_tooltip(
+        font,
+        pos_preference,
+        header,
+        error,
+        content_lines,
+        &[],
+        false,
+    )
+}
+
 pub fn draw_tooltip(
     font: &Font,
     pos_preference: TooltipPositionPreference,
     header: &str,
     error: Option<&'static str>,
     content_lines: &[String],
-) {
-    let font_size = 18;
+    keywords: &[Condition],
+    is_keyword_tooltip: bool,
+) -> (f32, f32) {
+    let header_font_size = if is_keyword_tooltip { 16 } else { 24 };
+    let font_size = 16;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
 
-    let mut measure_width = |line| {
-        let dimensions = measure_text(line, Some(font), font_size, 1.0);
+    let mut measure_width = |line, size| {
+        let dimensions = measure_text(line, Some(font), size, 1.0);
         if dimensions.width > max_line_w {
             max_line_w = dimensions.width;
         }
     };
 
-    measure_width(header);
+    measure_width(header, header_font_size);
     if let Some(error) = error.as_ref() {
-        measure_width(error)
+        measure_width(error, font_size)
     }
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
     // the width of the tooltip window.
+    let line_width_limit = if is_keyword_tooltip { 30 } else { 40 };
     let mut physical_content_lines = vec![];
     for line in content_lines {
         let mut line = &line[..];
-        let limit = 40;
-        while line.len() > limit {
-            if let Some(whitespace_i) = line[limit..].find(" ") {
-                let (left, right) = line.split_at(limit + whitespace_i);
+        while line.len() > line_width_limit {
+            if let Some(whitespace_i) = line[line_width_limit..].find(" ") {
+                let (left, right) = line.split_at(line_width_limit + whitespace_i);
                 physical_content_lines.push(left);
                 line = &right[1..];
             } else {
@@ -1147,7 +1181,7 @@ pub fn draw_tooltip(
     }
 
     for line in &physical_content_lines {
-        measure_width(line);
+        measure_width(line, font_size);
     }
 
     let tooltip_w = max_line_w + text_margin * 2.0;
@@ -1201,6 +1235,7 @@ pub fn draw_tooltip(
             }
         }
         TooltipPositionPreference::HorCenteredAt((x, y)) => (x - tooltip_w / 2.0, y),
+        TooltipPositionPreference::At(pos) => pos,
     };
 
     let tooltip_rect = (x, y, tooltip_w, tooltip_h);
@@ -1229,10 +1264,13 @@ pub fn draw_tooltip(
 
     let mut line_y = tooltip_rect.1 + text_margin * 2.0 + 5.0;
 
-    let mut draw_line = |line, color: Option<Color>| {
+    let mut draw_line = |line, color: Option<Color>, is_header: bool| {
         let mut params = text_params.clone();
         if let Some(c) = color {
             params.color = c;
+        }
+        if is_header {
+            params.font_size = header_font_size;
         }
         draw_text_rounded(line, tooltip_rect.0 + text_margin, line_y, params);
         if line.is_empty() {
@@ -1242,11 +1280,31 @@ pub fn draw_tooltip(
         }
     };
 
-    draw_line(header, Some(YELLOW));
+    let header_color = if is_keyword_tooltip { ORANGE } else { YELLOW };
+
+    draw_line(header, Some(header_color), true);
     if let Some(error) = error {
-        draw_line(error, Some(RED))
+        draw_line(error, Some(RED), false)
     }
     for line in physical_content_lines {
-        draw_line(line, None)
+        draw_line(line, None, false)
     }
+
+    let space = 1.0;
+    let keyword_x = x + tooltip_w + space;
+    let mut keyword_y = y;
+    for keyword in keywords {
+        let size = draw_tooltip(
+            font,
+            TooltipPositionPreference::At((keyword_x, keyword_y)),
+            keyword.name(),
+            None,
+            &[keyword.description().to_string()],
+            &[],
+            true,
+        );
+        keyword_y += size.1;
+    }
+
+    (tooltip_w, tooltip_h)
 }

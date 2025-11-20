@@ -20,7 +20,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, Side, TooltipPositionPreference},
+    action_button::{draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference},
     base_ui::{
         table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
         TextLine,
@@ -852,7 +852,7 @@ impl Drawable for EquipmentSlot {
         let rect = Rect::new(x, y, self.size.0, self.size.1);
         if let Some(content) = &self.content {
             if hover && !content.tooltip_lines.is_empty() {
-                draw_tooltip(
+                draw_regular_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     content.tooltip_lines[0].as_ref(),
@@ -862,7 +862,7 @@ impl Drawable for EquipmentSlot {
             }
         } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
             if hover {
-                draw_tooltip(
+                draw_regular_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                     tooltip_lines[0].as_ref(),
