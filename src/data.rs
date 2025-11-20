@@ -1,3 +1,5 @@
+use std::default;
+
 use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
 
 use crate::{
@@ -1080,10 +1082,24 @@ pub const KILL: Ability = Ability {
     animation_color: BLACK,
 };
 
+pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::SearingLight,
+    name: "Burn",
+    description: "",
+    icon: IconId::Inferno,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    spell_effect: Some(SpellEnhancementEffect {
+        target_on_hit: Some([Some(ApplyEffect::Condition(Condition::Burning(2))), None]),
+        ..SpellEnhancementEffect::default()
+    }),
+    attack_effect: None,
+};
 pub const SEARING_LIGHT: Ability = Ability {
     id: AbilityId::SearingLight,
     name: "Searing light",
-    description: "todo",
+    description: "Envelops the target in blinding light",
     icon: IconId::SearingLight,
     action_point_cost: 3,
     mana_cost: 1,
@@ -1091,7 +1107,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     weapon_requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None; 3],
+    possible_enhancements: [Some(SEARING_LIGHT_BURN), None, None],
     target: AbilityTarget::Enemy {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),

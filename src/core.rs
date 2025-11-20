@@ -2376,7 +2376,6 @@ pub enum Condition {
     BloodRage,
     ArcaneSurge,
     ThrillOfBattle,
-    
 }
 
 impl Condition {
@@ -2404,7 +2403,6 @@ impl Condition {
             BloodRage => None,
             ArcaneSurge => None,
             ThrillOfBattle => None,
-            
         }
     }
 
