@@ -89,7 +89,7 @@ impl CharacterSheet {
                     },
                     children: vec![
                         Element::Text(
-                            TextLine::new("Spell book", 22, WHITE, Some(font.clone()))
+                            TextLine::new("Skills", 22, WHITE, Some(font.clone()))
                                 .with_depth(BLACK, 2.0),
                         ),
                         Element::Container(spell_book_rows),

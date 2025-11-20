@@ -6,7 +6,7 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
-        ApplyEffect, AreaTargetAcquisition, ArmorPiece, AttackAttribute, AttackCircumstance,
+        ApplyEffect, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackCircumstance,
         AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
         Condition, Consumable, DefenseType, EquipEffect, OnAttackedReaction,
         OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
@@ -293,6 +293,13 @@ pub const ELUSIVE_BOW: Weapon = Weapon {
     sprite: Some(SpriteId::Bow),
     icon: EquipmentIconId::Bow,
     weight: 2,
+};
+
+pub const PENETRATING_ARROWS: Arrow = Arrow {
+    name: "Penetrating arrows",
+    sprite: None,
+    icon: EquipmentIconId::PenetratingArrow,
+    bonus_penetration: 3,
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {

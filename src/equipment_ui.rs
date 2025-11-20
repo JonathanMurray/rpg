@@ -27,15 +27,15 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ArmorPiece, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType, Party,
-        Shield, Weapon, WeaponGrip, WeaponRange,
+        ArmorPiece, Arrow, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType,
+        Party, Shield, Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     textures::EquipmentIconId,
 };
 
 const INVENTORY_SIZE: usize = 6;
-const EQUIPPED_SIZE: usize = 3;
+const EQUIPPED_SIZE: usize = 4;
 
 pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
     match entry {
@@ -43,7 +43,17 @@ pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
         EquipmentEntry::Shield(shield) => shield_tooltip(shield),
         EquipmentEntry::Armor(armor) => armor_tooltip(armor),
         EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
+        EquipmentEntry::Arrow(arrow) => arrow_tooltip(arrow),
     }
+}
+
+fn arrow_tooltip(arrow: &Arrow) -> Vec<String> {
+    let mut lines = vec![arrow.name.to_string()];
+    let penetration = arrow.bonus_penetration;
+    if penetration > 0 {
+        lines.push(format!("{} armor penetration", penetration));
+    }
+    lines
 }
 
 fn consumable_tooltip(consumable: &Consumable) -> Vec<String> {
@@ -158,7 +168,7 @@ impl EquipmentSection {
             InventoryType::Personal,
         );
 
-        let (slots_container, equipped_slots, equipment_stats_table) =
+        let (equipped_section, equipped_slots, equipment_stats_table) =
             build_equipped_section(font, character, &equipment_icons);
         equipment_slots.extend_from_slice(&equipped_slots);
 
@@ -214,17 +224,7 @@ impl EquipmentSection {
                 Element::Text(
                     TextLine::new("Equipped", 22, WHITE, Some(font.clone())).with_depth(BLACK, 2.0),
                 ),
-                Element::Container(Container {
-                    // TODO
-                    layout_dir: LayoutDirection::Horizontal,
-                    children: vec![
-                        slots_container,
-                        //Element::RcRefCell(equipment_stats_table.clone()),
-                    ],
-                    align: Align::Center,
-                    margin: 15.0,
-                    ..Default::default()
-                }),
+                equipped_section,
                 Element::Empty(0.0, 2.0),
                 Element::Box(Box::new(money_text)),
             ],
@@ -286,6 +286,7 @@ impl EquipmentSection {
             EquipmentSlotRole::MainHand,
             EquipmentSlotRole::Armor,
             EquipmentSlotRole::OffHand,
+            EquipmentSlotRole::Arrows,
         ];
         for (i, role) in roles.iter().enumerate() {
             self.equipment_slots[INVENTORY_SIZE + i]
@@ -555,7 +556,6 @@ fn build_inventory_section(
     let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
 
     let mut rows = vec![];
-
     while !slots.is_empty() {
         let slots_in_row = slots
             .drain(0..3)
@@ -592,7 +592,7 @@ pub fn build_equipped_section(
     Rc<RefCell<EquipmentStatsTable>>,
 ) {
     let placeholder_text = "Draw something from your inventory to equip it";
-    let mut slots = [
+    let mut slots: Vec<Rc<RefCell<EquipmentSlot>>> = [
         EquipmentSlot::new(
             font.clone(),
             None,
@@ -620,12 +620,24 @@ pub fn build_equipped_section(
                 vec!["(Off-hand)".to_string(), placeholder_text.to_string()],
             )),
         ),
-    ];
+        EquipmentSlot::new(
+            font.clone(),
+            None,
+            EquipmentSlotRole::Arrows,
+            Some((
+                equipment_icons[&EquipmentIconId::PlaceholderArrows].clone(),
+                vec!["(Arrows)".to_string(), placeholder_text.to_string()],
+            )),
+        ),
+    ]
+    .into_iter()
+    .map(|slot| Rc::new(RefCell::new(slot)))
+    .collect();
 
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
             let texture = equipment_icons[&weapon.icon].clone();
-            slots[0].content = Some(EquipmentSlotContent::new(
+            slots[0].borrow_mut().content = Some(EquipmentSlotContent::new(
                 texture,
                 EquipmentEntry::Weapon(weapon),
             ));
@@ -633,33 +645,48 @@ pub fn build_equipped_section(
     }
     if let Some(shield) = character.shield() {
         let texture = equipment_icons[&shield.icon].clone();
-        slots[2].content = Some(EquipmentSlotContent::new(
+        slots[2].borrow_mut().content = Some(EquipmentSlotContent::new(
             texture,
             EquipmentEntry::Shield(shield),
         ));
     }
     if let Some(armor) = character.armor_piece.get() {
         let texture = equipment_icons[&armor.icon].clone();
-        slots[1].content = Some(EquipmentSlotContent::new(
+        slots[1].borrow_mut().content = Some(EquipmentSlotContent::new(
             texture,
             EquipmentEntry::Armor(armor),
         ));
     }
-
-    let slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots
-        .into_iter()
-        .map(|slot| Rc::new(RefCell::new(slot)))
-        .collect();
+    if let Some(arrow) = character.arrow.get() {
+        let texture = equipment_icons[&arrow.icon].clone();
+        slots[3].borrow_mut().content = Some(EquipmentSlotContent::new(
+            texture,
+            EquipmentEntry::Arrow(arrow),
+        ));
+    }
 
     let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
 
+    let mut rows = vec![];
+    while !slots.is_empty() {
+        let slots_in_row = slots
+            .drain(0..(3).min(slots.len()))
+            .take(3)
+            .map(|cell| Element::RcRefCell(cell))
+            .collect();
+        let row = Container {
+            layout_dir: LayoutDirection::Horizontal,
+            children: slots_in_row,
+            margin: 2.0,
+            ..Default::default()
+        };
+        rows.push(Element::Container(row))
+    }
+
     let slots_container = Element::Container(Container {
-        layout_dir: LayoutDirection::Horizontal,
-        children: slots
-            .into_iter()
-            .map(|slot| Element::RcRefCell(slot))
-            .collect(),
-        margin: 2.0,
+        layout_dir: LayoutDirection::Vertical,
+        children: rows,
+        margin: 5.0,
         ..Default::default()
     });
 

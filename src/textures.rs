@@ -192,6 +192,7 @@ pub enum EquipmentIconId {
     ChainMail,
     Shirt,
     Robe,
+    PenetratingArrow,
 
     HealthPotion,
     ManaPotion,
@@ -199,6 +200,7 @@ pub enum EquipmentIconId {
     PlaceholderOffhand,
     PlaceholderMainhand,
     PlaceholderArmor,
+    PlaceholderArrows,
 }
 
 pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
@@ -214,6 +216,10 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
         (EquipmentIconId::Shirt, "eq_shirt.png"),
         (EquipmentIconId::Robe, "eq_robe.png"),
+        (
+            EquipmentIconId::PenetratingArrow,
+            "eq_penetrating_arrow.png",
+        ),
         (EquipmentIconId::HealthPotion, "eq_health_potion.png"),
         (EquipmentIconId::ManaPotion, "eq_mana_potion.png"),
         (
@@ -227,6 +233,10 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (
             EquipmentIconId::PlaceholderArmor,
             "eq_placeholder_armor.png",
+        ),
+        (
+            EquipmentIconId::PlaceholderArrows,
+            "eq_placeholder_arrows.png",
         ),
     ])
     .await

@@ -1504,6 +1504,12 @@ impl CoreGame {
         }
 
         let mut armor_penetrators = vec![];
+        if let Some(arrow) = attacker.arrow.get() {
+            let penetration = arrow.bonus_penetration;
+            if penetration > 0 {
+                armor_penetrators.push((penetration, arrow.name));
+            }
+        }
         for (name, effect) in &enhancements {
             let penetration = effect.armor_penetration;
             if penetration > 0 {
@@ -3176,6 +3182,7 @@ pub struct Character {
     pub armor_piece: Cell<Option<ArmorPiece>>,
     main_hand: Cell<Hand>,
     off_hand: Cell<Hand>,
+    pub arrow: Cell<Option<Arrow>>,
     conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub stamina: NumberedResource,
@@ -3226,6 +3233,7 @@ impl Character {
             armor_piece: Default::default(),
             main_hand: Default::default(),
             off_hand: Default::default(),
+            arrow: Default::default(),
             conditions: Default::default(),
             action_points,
             stamina: NumberedResource::new(max_stamina),
@@ -3419,6 +3427,7 @@ impl Character {
                 }
             }
             EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
+            EquipmentEntry::Arrow(..) => role == EquipmentSlotRole::Arrows,
             _ => false,
         }
     }
@@ -3533,6 +3542,7 @@ impl Character {
             }
             EquipmentSlotRole::OffHand => self.shield().map(EquipmentEntry::Shield),
             EquipmentSlotRole::Armor => self.armor_piece.get().map(EquipmentEntry::Armor),
+            EquipmentSlotRole::Arrows => self.arrow.get().map(EquipmentEntry::Arrow),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
             EquipmentSlotRole::PartyStash(idx) => self.party_stash()[idx].get(),
         }
@@ -3592,6 +3602,7 @@ impl Character {
     }
 
     pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
+        dbg!(entry, slot_role);
         match slot_role {
             EquipmentSlotRole::MainHand => match entry {
                 Some(EquipmentEntry::Weapon(weapon)) => {
@@ -3610,6 +3621,11 @@ impl Character {
             EquipmentSlotRole::Armor => match entry {
                 Some(EquipmentEntry::Armor(armor)) => self.armor_piece.set(Some(armor)),
                 None => self.armor_piece.set(None),
+                _ => panic!(),
+            },
+            EquipmentSlotRole::Arrows => match entry {
+                Some(EquipmentEntry::Arrow(arrow)) => self.arrow.set(Some(arrow)),
+                None => self.arrow.set(None),
                 _ => panic!(),
             },
             EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
@@ -4628,6 +4644,14 @@ impl Weapon {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub struct Arrow {
+    pub name: &'static str,
+    pub sprite: Option<SpriteId>,
+    pub icon: EquipmentIconId,
+    pub bonus_penetration: u32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Shield {
     pub name: &'static str,
     pub sprite: Option<SpriteId>,
@@ -4796,6 +4820,7 @@ pub enum EquipmentEntry {
     Weapon(Weapon),
     Shield(Shield),
     Armor(ArmorPiece),
+    Arrow(Arrow),
     Consumable(Consumable),
 }
 
@@ -4815,6 +4840,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.name,
             EquipmentEntry::Armor(armor) => armor.name,
             EquipmentEntry::Consumable(consumable) => consumable.name,
+            EquipmentEntry::Arrow(arrow) => arrow.name,
         }
     }
 
@@ -4824,6 +4850,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.icon,
             EquipmentEntry::Armor(armor) => armor.icon,
             EquipmentEntry::Consumable(consumable) => consumable.icon,
+            EquipmentEntry::Arrow(arrow) => arrow.icon,
         }
     }
 
@@ -4833,6 +4860,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.weight,
             EquipmentEntry::Armor(armor) => armor.weight,
             EquipmentEntry::Consumable(consumable) => consumable.weight,
+            EquipmentEntry::Arrow(..) => 0,
         }
     }
 }
@@ -4842,6 +4870,7 @@ pub enum EquipmentSlotRole {
     MainHand,
     OffHand,
     Armor,
+    Arrows,
     Inventory(usize),
     PartyStash(usize),
 }
@@ -4857,7 +4886,7 @@ impl EquipmentSlotRole {
     pub fn is_equipped(&self) -> bool {
         use EquipmentSlotRole::*;
         match self {
-            MainHand | OffHand | Armor => true,
+            MainHand | OffHand | Armor | Arrows => true,
             Inventory(..) | PartyStash(..) => false,
         }
     }

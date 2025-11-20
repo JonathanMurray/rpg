@@ -5,7 +5,7 @@ BR          B
 B           B
 B   0      SB
 B  S1      SB
-B  P   W   SB
+B  PP  W   SB
 B      WW   B
 BB         BB
  BBBBBBBBBBB

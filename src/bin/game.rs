@@ -30,9 +30,9 @@ use rpg::data::{
     PassiveSkill, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO,
     HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH,
     LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
-    NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM,
-    SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT, SIDE_STEP,
-    SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS, RAGE,
+    ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT,
+    SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -94,7 +94,8 @@ async fn main() {
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.inventory[0].set(Some(EquipmentEntry::Weapon(DAGGER)));
+    alice.arrow.set(Some(PENETRATING_ARROWS));
+    alice.inventory[0].set(Some(EquipmentEntry::Arrow(PENETRATING_ARROWS)));
     alice.known_attack_enhancements.push(LONGER_REACH);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
     alice.known_passive_skills.push(PassiveSkill::Honorless);
@@ -136,11 +137,11 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    let mut player_characters = vec![alice, bob];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::EasyCluster,
+        FightId::Test,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

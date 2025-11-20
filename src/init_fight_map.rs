@@ -274,6 +274,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             );
             enemy1.health.change_max_value_to(20);
             enemy1.set_weapon(HandType::MainHand, BAD_BOW);
+            enemy1.armor_piece.set(Some(CHAIN_MAIL));
 
             let enemy2 = Character::new(
                 Behaviour::Bot(BotBehaviour::Normal),
