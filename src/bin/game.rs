@@ -22,17 +22,18 @@ use macroquad::{
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Action, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition, CoreGame,
-    EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, Party,
+    Action, ArrowStack, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition,
+    CoreGame, EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, Party,
 };
 
 use rpg::data::{
-    PassiveSkill, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO,
-    HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH,
-    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
-    NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS, RAGE,
-    ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT,
-    SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    PassiveSkill, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL,
+    FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR,
+    LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION,
+    MEDIUM_SHIELD, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING,
+    PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
+    SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -94,8 +95,13 @@ async fn main() {
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.arrow.set(Some(PENETRATING_ARROWS));
-    alice.inventory[0].set(Some(EquipmentEntry::Arrow(PENETRATING_ARROWS)));
+    alice
+        .arrows
+        .set(Some(ArrowStack::new(PENETRATING_ARROWS, 3)));
+    alice.inventory[0].set(Some(EquipmentEntry::Arrows(ArrowStack::new(
+        BARBED_ARROWS,
+        2,
+    ))));
     alice.known_attack_enhancements.push(LONGER_REACH);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
     alice.known_passive_skills.push(PassiveSkill::Honorless);

@@ -9,6 +9,7 @@ use macroquad::{
     input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
+    text::{measure_text, TextParams},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -20,15 +21,18 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference},
+    action_button::{
+        describe_apply_effect, draw_regular_tooltip, draw_tooltip, Side, Tooltip,
+        TooltipPositionPreference,
+    },
     base_ui::{
-        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
-        TextLine,
+        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
+        TableCell, TableStyle, TextLine,
     },
     character_sheet::MoneyText,
     core::{
-        ArmorPiece, Arrow, Character, Consumable, EquipmentEntry, EquipmentSlotRole, HandType,
-        Party, Shield, Weapon, WeaponGrip, WeaponRange,
+        ArmorPiece, Arrow, ArrowStack, Character, Consumable, EquipmentEntry, EquipmentSlotRole,
+        HandType, Party, Shield, Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     textures::EquipmentIconId,
@@ -37,99 +41,117 @@ use crate::{
 const INVENTORY_SIZE: usize = 6;
 const EQUIPPED_SIZE: usize = 4;
 
-pub fn equipment_tooltip_lines(entry: &EquipmentEntry) -> Vec<String> {
+pub fn equipment_tooltip(entry: &EquipmentEntry) -> Tooltip {
     match entry {
         EquipmentEntry::Weapon(weapon) => weapon_tooltip(weapon),
         EquipmentEntry::Shield(shield) => shield_tooltip(shield),
         EquipmentEntry::Armor(armor) => armor_tooltip(armor),
         EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
-        EquipmentEntry::Arrow(arrow) => arrow_tooltip(arrow),
+        EquipmentEntry::Arrows(stack) => arrow_tooltip(stack),
     }
 }
 
-fn arrow_tooltip(arrow: &Arrow) -> Vec<String> {
-    let mut lines = vec![arrow.name.to_string()];
-    let penetration = arrow.bonus_penetration;
+fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
+    let mut t = Tooltip::new(stack.arrow.name);
+    let penetration = stack.arrow.bonus_penetration;
     if penetration > 0 {
-        lines.push(format!("{} armor penetration", penetration));
+        t.technical_description
+            .push(format!("{} armor penetration", penetration));
     }
-    lines
+    if let Some(effect) = stack.arrow.on_damage_apply {
+        t.technical_description.push("Target:".to_string());
+        describe_apply_effect(effect, &mut t);
+    }
+    t
 }
 
-fn consumable_tooltip(consumable: &Consumable) -> Vec<String> {
-    let mut lines = vec![consumable.name.to_string()];
+fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
+    let mut t = Tooltip::new(consumable.name);
 
     if consumable.health_gain > 0 {
-        lines.push(format!("Restores {} health", consumable.health_gain));
+        t.technical_description
+            .push(format!("Restores {} health", consumable.health_gain));
     }
     if consumable.mana_gain > 0 {
-        lines.push(format!("Restores {} mana", consumable.mana_gain));
+        t.technical_description
+            .push(format!("Restores {} mana", consumable.mana_gain));
     }
     //lines.push("<Right-click to use>".to_string());
-    lines.push(format!("Weight: {}", consumable.weight));
+    t.technical_description
+        .push(format!("Weight: {}", consumable.weight));
 
-    lines
+    t
 }
 
-fn weapon_tooltip(weapon: &Weapon) -> Vec<String> {
-    let mut lines = vec![
-        weapon.name.to_string(),
-        format!("{} damage / {} AP", weapon.damage, weapon.action_point_cost),
-    ];
+fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
+    let mut t = Tooltip::new(weapon.name);
+    t.technical_description.push(format!(
+        "{} damage / {} AP",
+        weapon.damage, weapon.action_point_cost
+    ));
 
     if weapon.grip == WeaponGrip::TwoHanded {
-        lines.push("Two-handed".to_string());
+        t.technical_description.push("Two-handed".to_string());
     }
 
     if weapon.range != WeaponRange::Melee {
-        lines.push(format!("Range: {}", weapon.range));
+        t.technical_description
+            .push(format!("Range: {}", weapon.range));
     }
     if let Some(effect) = weapon.on_true_hit {
-        lines.push(format!("[true hit] {effect}"));
+        t.technical_description.push(format!("[true hit] {effect}"));
     }
     if let Some(reaction) = weapon.on_attacked_reaction {
-        lines.push(format!("[attacked?] {}", reaction.name));
+        t.technical_description
+            .push(format!("[attacked?] {}", reaction.name));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
-        lines.push(format!("~ {}", enhancement.name));
+        t.technical_description
+            .push(format!("~ {}", enhancement.name));
     }
-    lines.push(format!("Weight: {}", weapon.weight));
+    t.technical_description
+        .push(format!("Weight: {}", weapon.weight));
 
-    lines
+    t
 }
 
-fn shield_tooltip(shield: &Shield) -> Vec<String> {
-    let mut lines = vec![
-        shield.name.to_string(),
-        format!("+{} evasion", shield.evasion),
-    ];
+fn shield_tooltip(shield: &Shield) -> Tooltip {
+    let mut t = Tooltip::new(shield.name);
+    t.technical_description
+        .push(format!("+{} evasion", shield.evasion));
     if shield.armor > 0 {
-        lines.push(format!("+{} armor", shield.armor));
+        t.technical_description
+            .push(format!("+{} armor", shield.armor));
     }
 
     if let Some(reaction) = shield.on_attacked_reaction {
-        lines.push(format!("[attacked?] {}", reaction.name));
+        t.technical_description
+            .push(format!("[attacked?] {}", reaction.name));
     }
     if let Some(reaction) = shield.on_hit_reaction {
-        lines.push(format!("[hit?] {}", reaction.name));
+        t.technical_description
+            .push(format!("[hit?] {}", reaction.name));
     }
-    lines.push(format!("Weight: {}", shield.weight));
-    lines
+    t.technical_description
+        .push(format!("Weight: {}", shield.weight));
+    t
 }
 
-fn armor_tooltip(armor: &ArmorPiece) -> Vec<String> {
-    let mut lines = vec![
-        armor.name.to_string(),
-        format!("{} armor", armor.protection),
-    ];
+fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
+    let mut t = Tooltip::new(armor.name);
+    t.technical_description
+        .push(format!("{} armor", armor.protection));
     if let Some(limit) = armor.limit_evasion_from_agi {
-        lines.push(format!("Max {} evasion from agi", limit));
+        t.technical_description
+            .push(format!("Max {} evasion from agi", limit));
     }
     if armor.equip.bonus_spell_modifier > 0 {
-        lines.push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
+        t.technical_description
+            .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
     }
-    lines.push(format!("Weight: {}", armor.weight));
-    lines
+    t.technical_description
+        .push(format!("Weight: {}", armor.weight));
+    t
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -657,11 +679,11 @@ pub fn build_equipped_section(
             EquipmentEntry::Armor(armor),
         ));
     }
-    if let Some(arrow) = character.arrow.get() {
-        let texture = equipment_icons[&arrow.icon].clone();
+    if let Some(stack) = character.arrows.get() {
+        let texture = equipment_icons[&stack.arrow.icon].clone();
         slots[3].borrow_mut().content = Some(EquipmentSlotContent::new(
             texture,
-            EquipmentEntry::Arrow(arrow),
+            EquipmentEntry::Arrows(stack),
         ));
     }
 
@@ -794,14 +816,14 @@ pub struct EquipmentSlot {
 pub struct EquipmentSlotContent {
     pub equipment: EquipmentEntry,
     pub texture: Texture2D,
-    tooltip_lines: Vec<String>,
+    tooltip: Tooltip,
 }
 
 impl EquipmentSlotContent {
     pub fn new(texture: Texture2D, equipment: EquipmentEntry) -> Self {
         Self {
             texture,
-            tooltip_lines: equipment_tooltip_lines(&equipment),
+            tooltip: equipment_tooltip(&equipment),
             equipment,
         }
     }
@@ -857,6 +879,39 @@ impl Drawable for EquipmentSlot {
         };
         if let Some(content) = &self.content {
             draw_texture_ex(&content.texture, x, y, WHITE, params);
+
+            let quantity = match content.equipment {
+                EquipmentEntry::Arrows(arrow_stack) => Some(arrow_stack.quantity),
+                _ => None,
+            };
+
+            if let Some(q) = quantity {
+                let text = format!("{}", q);
+                let margin = 1.0;
+                let font_size = 16;
+                let text_dim = measure_text(&text, Some(&self.font), font_size, 1.0);
+                let x0 = x + margin;
+                let y0 = y + margin;
+                let padding = 2.0;
+                draw_rectangle(
+                    x0,
+                    y0,
+                    text_dim.width + padding * 2.0,
+                    text_dim.height + padding * 2.0,
+                    Color::new(0.0, 0.0, 0.0, 0.4),
+                );
+                draw_text_rounded(
+                    &text,
+                    x0 + padding,
+                    y0 + padding + text_dim.offset_y,
+                    TextParams {
+                        font: Some(&self.font),
+                        font_size,
+                        color: WHITE,
+                        ..Default::default()
+                    },
+                );
+            }
         } else if let Some((texture, _tooltip)) = &self.placeholder {
             draw_rectangle(
                 x,
@@ -878,13 +933,15 @@ impl Drawable for EquipmentSlot {
             (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
         let rect = Rect::new(x, y, self.size.0, self.size.1);
         if let Some(content) = &self.content {
-            if hover && !content.tooltip_lines.is_empty() {
-                draw_regular_tooltip(
+            if hover {
+                draw_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
-                    content.tooltip_lines[0].as_ref(),
+                    &content.tooltip.header,
                     None,
-                    &content.tooltip_lines[1..],
+                    &content.tooltip.technical_description,
+                    &content.tooltip.keywords,
+                    false,
                 );
             }
         } else if let Some((_texture, tooltip_lines)) = &self.placeholder {

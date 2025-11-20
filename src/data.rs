@@ -300,6 +300,15 @@ pub const PENETRATING_ARROWS: Arrow = Arrow {
     sprite: None,
     icon: EquipmentIconId::PenetratingArrow,
     bonus_penetration: 3,
+    on_damage_apply: None,
+};
+
+pub const BARBED_ARROWS: Arrow = Arrow {
+    name: "Barbed arrows",
+    sprite: None,
+    icon: EquipmentIconId::BarbedArrow,
+    bonus_penetration: 0,
+    on_damage_apply: Some(ApplyEffect::Condition(Condition::Bleeding(3))),
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {

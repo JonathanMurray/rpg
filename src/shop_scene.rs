@@ -15,12 +15,12 @@ use macroquad::{
 use crate::{
     action_button::{draw_regular_tooltip, draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable, TextLine},
-    core::{Character, EquipmentEntry, Party},
+    core::{ArrowStack, Character, EquipmentEntry, Party},
     data::{
-        BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, MEDIUM_SHIELD, RAPIER,
-        SMALL_SHIELD, SWORD, WAR_HAMMER,
+        BARBED_ARROWS, BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION,
+        MEDIUM_SHIELD, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
     },
-    equipment_ui::equipment_tooltip_lines,
+    equipment_ui::equipment_tooltip,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
@@ -148,16 +148,16 @@ pub async fn run_shop_loop(
                     .with_depth(DARKGRAY, 1.0)
                     .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
-                    let tooltip_lines = equipment_tooltip_lines(&entry.item);
+                    let tooltip = equipment_tooltip(&entry.item);
                     draw_regular_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
                             icon_y + 50.0,
                         )),
-                        &tooltip_lines[0],
+                        &tooltip.header,
                         None,
-                        &tooltip_lines[1..],
+                        &tooltip.technical_description,
                     );
 
                     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
@@ -224,6 +224,11 @@ pub fn generate_shop_contents() -> Vec<ShopEntry> {
         (EquipmentEntry::Shield(MEDIUM_SHIELD), 5),
         (EquipmentEntry::Consumable(HEALTH_POTION), 4),
         (EquipmentEntry::Consumable(MANA_POTION), 4),
+        (
+            EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
+            4,
+        ),
+        (EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)), 4),
     ];
 
     select_n_random(candidate_items, 5)

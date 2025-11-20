@@ -1504,10 +1504,14 @@ impl CoreGame {
         }
 
         let mut armor_penetrators = vec![];
-        if let Some(arrow) = attacker.arrow.get() {
-            let penetration = arrow.bonus_penetration;
-            if penetration > 0 {
-                armor_penetrators.push((penetration, arrow.name));
+        let weapon = attacker.weapon(hand_type).unwrap();
+        if !weapon.is_melee() {
+            if let Some(stack) = attacker.arrows.get() {
+                let penetration = stack.arrow.bonus_penetration;
+                if penetration > 0 {
+                    armor_penetrators.push((penetration, stack.arrow.name));
+                }
+                attacker.spend_one_arrow();
             }
         }
         for (name, effect) in &enhancements {
@@ -1650,6 +1654,19 @@ impl CoreGame {
                         *condition.stacks().unwrap() = damage;
                         let line = self.perform_receive_condition(condition, defender);
                         detail_lines.push(format!("{} ({})", line, name))
+                    }
+                }
+
+                if !weapon.is_melee() {
+                    if let Some(stack) = attacker.arrows.get() {
+                        if let Some(apply_effect) = stack.arrow.on_damage_apply {
+                            let (log_line, _damage) = self.perform_effect_application(
+                                apply_effect,
+                                Some(attacker),
+                                defender,
+                            );
+                            detail_lines.push(format!("{} ({})", log_line, stack.arrow.name))
+                        }
                     }
                 }
             }
@@ -1823,7 +1840,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
-                source: "Burning",
+                source: "Bleeding",
             })
             .await;
             conditions.borrow_mut().bleeding -= decay;
@@ -3182,7 +3199,7 @@ pub struct Character {
     pub armor_piece: Cell<Option<ArmorPiece>>,
     main_hand: Cell<Hand>,
     off_hand: Cell<Hand>,
-    pub arrow: Cell<Option<Arrow>>,
+    pub arrows: Cell<Option<ArrowStack>>,
     conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub stamina: NumberedResource,
@@ -3233,7 +3250,7 @@ impl Character {
             armor_piece: Default::default(),
             main_hand: Default::default(),
             off_hand: Default::default(),
-            arrow: Default::default(),
+            arrows: Default::default(),
             conditions: Default::default(),
             action_points,
             stamina: NumberedResource::new(max_stamina),
@@ -3427,7 +3444,7 @@ impl Character {
                 }
             }
             EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
-            EquipmentEntry::Arrow(..) => role == EquipmentSlotRole::Arrows,
+            EquipmentEntry::Arrows(..) => role == EquipmentSlotRole::Arrows,
             _ => false,
         }
     }
@@ -3542,7 +3559,7 @@ impl Character {
             }
             EquipmentSlotRole::OffHand => self.shield().map(EquipmentEntry::Shield),
             EquipmentSlotRole::Armor => self.armor_piece.get().map(EquipmentEntry::Armor),
-            EquipmentSlotRole::Arrows => self.arrow.get().map(EquipmentEntry::Arrow),
+            EquipmentSlotRole::Arrows => self.arrows.get().map(EquipmentEntry::Arrows),
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
             EquipmentSlotRole::PartyStash(idx) => self.party_stash()[idx].get(),
         }
@@ -3624,8 +3641,8 @@ impl Character {
                 _ => panic!(),
             },
             EquipmentSlotRole::Arrows => match entry {
-                Some(EquipmentEntry::Arrow(arrow)) => self.arrow.set(Some(arrow)),
-                None => self.arrow.set(None),
+                Some(EquipmentEntry::Arrows(stack)) => self.arrows.set(Some(stack)),
+                None => self.arrows.set(None),
                 _ => panic!(),
             },
             EquipmentSlotRole::Inventory(i) => self.inventory[i].set(entry),
@@ -3638,6 +3655,25 @@ impl Character {
     pub fn swap_equipment_slots(&self, from: EquipmentSlotRole, to: EquipmentSlotRole) {
         let from_content = self.equipment(from);
         let to_content = self.equipment(to);
+
+        match (from_content, to_content) {
+            (Some(EquipmentEntry::Arrows(from_arrow)), Some(EquipmentEntry::Arrows(to_arrow))) => {
+                if from_arrow.arrow == to_arrow.arrow {
+                    // Merge the stacks
+                    let quantity = from_arrow.quantity + to_arrow.quantity;
+                    self.set_equipment(
+                        Some(EquipmentEntry::Arrows(ArrowStack::new(
+                            to_arrow.arrow,
+                            quantity,
+                        ))),
+                        to,
+                    );
+                    self.set_equipment(None, from);
+                    return;
+                }
+            }
+            _ => {}
+        }
         self.set_equipment(from_content, to);
         self.set_equipment(to_content, from);
     }
@@ -3653,6 +3689,21 @@ impl Character {
         }
 
         false
+    }
+
+    pub fn spend_one_arrow(&self) {
+        let stack = self.arrows.get().unwrap();
+        let quantity = stack.quantity;
+        assert!(quantity > 0);
+        if quantity == 1 {
+            self.arrows.set(None);
+        } else {
+            self.arrows.set(Some(ArrowStack {
+                arrow: stack.arrow,
+                quantity: quantity - 1,
+            }));
+        }
+        self.on_changed_equipment();
     }
 
     pub fn attack_action_point_cost(&self, hand: HandType) -> u32 {
@@ -4649,6 +4700,7 @@ pub struct Arrow {
     pub sprite: Option<SpriteId>,
     pub icon: EquipmentIconId,
     pub bonus_penetration: u32,
+    pub on_damage_apply: Option<ApplyEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -4820,8 +4872,20 @@ pub enum EquipmentEntry {
     Weapon(Weapon),
     Shield(Shield),
     Armor(ArmorPiece),
-    Arrow(Arrow),
+    Arrows(ArrowStack),
     Consumable(Consumable),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct ArrowStack {
+    pub arrow: Arrow,
+    pub quantity: u32,
+}
+
+impl ArrowStack {
+    pub fn new(arrow: Arrow, quantity: u32) -> Self {
+        Self { arrow, quantity }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -4840,7 +4904,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.name,
             EquipmentEntry::Armor(armor) => armor.name,
             EquipmentEntry::Consumable(consumable) => consumable.name,
-            EquipmentEntry::Arrow(arrow) => arrow.name,
+            EquipmentEntry::Arrows(stack) => stack.arrow.name,
         }
     }
 
@@ -4850,7 +4914,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.icon,
             EquipmentEntry::Armor(armor) => armor.icon,
             EquipmentEntry::Consumable(consumable) => consumable.icon,
-            EquipmentEntry::Arrow(arrow) => arrow.icon,
+            EquipmentEntry::Arrows(stack) => stack.arrow.icon,
         }
     }
 
@@ -4860,7 +4924,7 @@ impl EquipmentEntry {
             EquipmentEntry::Shield(shield) => shield.weight,
             EquipmentEntry::Armor(armor) => armor.weight,
             EquipmentEntry::Consumable(consumable) => consumable.weight,
-            EquipmentEntry::Arrow(..) => 0,
+            EquipmentEntry::Arrows(..) => 0,
         }
     }
 }

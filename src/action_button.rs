@@ -30,8 +30,8 @@ use crate::{
     textures::IconId,
 };
 
-#[derive(Default)]
-pub struct ActionButtonTooltip {
+#[derive(Default, Debug)]
+pub struct Tooltip {
     pub header: String,
     pub description: Option<&'static str>,
     pub error: Option<&'static str>,
@@ -39,18 +39,30 @@ pub struct ActionButtonTooltip {
     pub keywords: Vec<Condition>,
 }
 
-fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
+impl Tooltip {
+    pub fn new(header: impl Into<String>) -> Self {
+        Self {
+            header: header.into(),
+            description: None,
+            error: None,
+            technical_description: vec![],
+            keywords: vec![],
+        }
+    }
+}
+
+fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
         ButtonAction::AbilityEnhancement(enhancement) => ability_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => on_attacked_reaction_tooltip(reaction),
         ButtonAction::OnHitReaction(reaction) => on_hit_reaction_tooltip(reaction),
-        ButtonAction::Proceed => ActionButtonTooltip {
+        ButtonAction::Proceed => Tooltip {
             header: "Proceed".to_string(),
             ..Default::default()
         },
-        ButtonAction::OpportunityAttack => ActionButtonTooltip {
+        ButtonAction::OpportunityAttack => Tooltip {
             header: "THIS SHOULD NOT BE SHOWN".to_string(), // This is replaced on-the-fly if needed
             ..Default::default()
         },
@@ -58,15 +70,15 @@ fn button_action_tooltip(action: &ButtonAction) -> ActionButtonTooltip {
     }
 }
 
-fn passive_skill_tooltip(skill: &PassiveSkill) -> ActionButtonTooltip {
-    ActionButtonTooltip {
+fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {
+    Tooltip {
         header: skill.name().to_string(),
         description: Some(skill.description()),
         ..Default::default()
     }
 }
 
-fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTooltip {
+fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect.bonus_evasion > 0 {
@@ -76,7 +88,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
         technical_description.push(format!("+ {} armor", reaction.effect.bonus_armor));
     }
 
-    ActionButtonTooltip {
+    Tooltip {
         header: format!(
             "{} {}",
             reaction.name,
@@ -89,7 +101,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
     }
 }
 
-fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
+fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect == OnHitReactionEffect::ShieldBash {
@@ -98,7 +110,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
         technical_description.push("  [ toughness ]".to_string());
         technical_description.push("  Dazed (2+)".to_string());
     }
-    ActionButtonTooltip {
+    Tooltip {
         header: format!(
             "{} {}",
             reaction.name,
@@ -110,8 +122,8 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> ActionButtonTooltip {
     }
 }
 
-fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTooltip {
-    let mut t = ActionButtonTooltip {
+fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
+    let mut t = Tooltip {
         header: format!(
             "{} {}",
             enhancement.name,
@@ -132,10 +144,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> ActionButtonTo
     t
 }
 
-fn describe_attack_enhancement_effect(
-    effect: &AttackEnhancementEffect,
-    t: &mut ActionButtonTooltip,
-) {
+fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut Tooltip) {
     if effect.roll_modifier != 0 {
         if effect.roll_modifier > 0 {
             t.technical_description
@@ -193,8 +202,8 @@ fn describe_attack_enhancement_effect(
     }
 }
 
-fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButtonTooltip {
-    let mut t = ActionButtonTooltip {
+fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
+    let mut t = Tooltip {
         header: format!(
             "{} {}",
             enhancement.name,
@@ -262,31 +271,31 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> ActionButton
     t
 }
 
-fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
+fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
     match base_action {
-        BaseAction::Attack { .. } => ActionButtonTooltip {
+        BaseAction::Attack { .. } => Tooltip {
             header: "No weapon equipped".to_string(), // This is replaced on-the-fly if needed
             ..Default::default()
         },
         BaseAction::UseAbility(ability) => ability_tooltip(ability),
-        BaseAction::Move => ActionButtonTooltip {
+        BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
                 "Move a limited distance for free every turn. Spend AP and stamina to move further.",
             ),
             ..Default::default()
         },
-        BaseAction::ChangeEquipment => ActionButtonTooltip {
+        BaseAction::ChangeEquipment => Tooltip {
             header: "Equip/unequip (1 AP)".to_string(),
             description: Some("Change your weapon, shield or armor."),
             ..Default::default()
         },
-        BaseAction::UseConsumable => ActionButtonTooltip {
+        BaseAction::UseConsumable => Tooltip {
             header: "Use consumable (1 AP)".to_string(),
             description: Some("Use a consumable from your inventory (e.g. a potion)."),
             ..Default::default()
         },
-        BaseAction::EndTurn => ActionButtonTooltip {
+        BaseAction::EndTurn => Tooltip {
             header: "End your turn".to_string(),
             description: Some("Regain 4 AP and some of your stamina."),
             ..Default::default()
@@ -294,7 +303,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> ActionButtonTooltip {
     }
 }
 
-fn describe_apply_effect(effect: ApplyEffect, t: &mut ActionButtonTooltip) {
+pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     match effect {
         ApplyEffect::RemoveActionPoints(n) => {
             t.technical_description.push(format!("  Loses {}+ AP", n))
@@ -333,7 +342,7 @@ fn describe_apply_effect(effect: ApplyEffect, t: &mut ActionButtonTooltip) {
     }
 }
 
-fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
+fn ability_tooltip(ability: &Ability) -> Tooltip {
     let header = format!(
         "{} {}",
         ability.name,
@@ -344,7 +353,7 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
         )
     );
 
-    let mut t = ActionButtonTooltip {
+    let mut t = Tooltip {
         header,
         description: Some(ability.description),
         error: None,
@@ -466,7 +475,7 @@ fn ability_tooltip(ability: &Ability) -> ActionButtonTooltip {
     t
 }
 
-fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut ActionButtonTooltip) {
+fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
@@ -502,7 +511,7 @@ fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut ActionBu
     }
 }
 
-fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut ActionButtonTooltip) {
+fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut Tooltip) {
     if effect.healing > 0 {
         t.technical_description
             .push(format!("  {}+ healing", effect.healing));
@@ -534,7 +543,7 @@ pub struct ActionButton {
     pub event_sender: Option<EventSender>,
     icon: Texture2D,
     dynamic_icons: HashMap<IconId, Texture2D>,
-    tooltip: RefCell<ActionButtonTooltip>,
+    tooltip: RefCell<Tooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
@@ -623,7 +632,7 @@ impl ActionButton {
         }
     }
 
-    pub fn tooltip(&self) -> Ref<ActionButtonTooltip> {
+    pub fn tooltip(&self) -> Ref<Tooltip> {
         // TODO: if action requires melee weapon and none is equipped, add error message to tooltip
         if let ButtonAction::Action(BaseAction::UseAbility(ability)) = self.action {
             if ability.weapon_requirement == Some(WeaponType::Melee) {
@@ -657,14 +666,14 @@ impl ActionButton {
                     technical_description.push(format!("Target ({})", range));
                     technical_description.push("  [ evasion ]".to_string());
                     technical_description.push(format!("  {} damage", weapon.damage));
-                    ActionButtonTooltip {
+                    Tooltip {
                         header: format!("{} attack ({} AP)", attack_type, weapon.action_point_cost),
 
                         technical_description,
                         ..Default::default()
                     }
                 } else {
-                    ActionButtonTooltip {
+                    Tooltip {
                         header: "No weapon equipped".to_string(),
                         ..Default::default()
                     }
@@ -678,7 +687,7 @@ impl ActionButton {
         if let ButtonAction::OpportunityAttack = self.action {
             let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
-                *self.tooltip.borrow_mut() = ActionButtonTooltip {
+                *self.tooltip.borrow_mut() = Tooltip {
                     header: "Opportunity attack (1 AP)".to_string(),
                     technical_description: vec![
                         format!("{} damage", equipped_weapon.unwrap().damage),
@@ -807,13 +816,27 @@ impl Drawable for ActionButton {
         draw_texture_ex(icon, x + 2.0, y + 2.0, WHITE, params);
 
         if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
+            let text = hotkey_string(keycode);
+            let margin = 3.0;
+            let font_size = 16;
+            let text_dim = measure_text(&text, Some(font), font_size, 1.0);
+            let x0 = x + margin;
+            let y0 = y + margin;
+            let padding = 2.0;
+            draw_rectangle(
+                x0,
+                y0,
+                text_dim.width + padding * 2.0,
+                text_dim.height + padding * 2.0,
+                Color::new(0.0, 0.0, 0.0, 0.6),
+            );
             draw_text_rounded(
-                hotkey_string(keycode),
-                x + 5.0,
-                y + 15.0,
+                &text,
+                x0 + padding,
+                y0 + padding + text_dim.offset_y,
                 TextParams {
                     font: Some(font),
-                    font_size: 16,
+                    font_size,
                     color: WHITE,
                     ..Default::default()
                 },
@@ -1064,11 +1087,7 @@ pub enum InternalUiEvent {
     ButtonClicked(u32, ButtonAction),
 }
 
-pub fn draw_button_tooltip(
-    font: &Font,
-    button_position: (f32, f32),
-    tooltip: &ActionButtonTooltip,
-) {
+pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &Tooltip) {
     let mut lines = vec![];
     if let Some(description) = tooltip.description {
         if !description.is_empty() {

@@ -16,12 +16,12 @@ use rand::Rng;
 use crate::{
     action_button::{draw_regular_tooltip, draw_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
-    core::{Character, EquipEffect, EquipmentEntry},
+    core::{ArrowStack, Character, EquipEffect, EquipmentEntry},
     data::{
-        BONE_CRUSHER, CHAIN_MAIL, DAGGER, ELUSIVE_BOW, HEALTH_POTION, LEATHER_ARMOR,
-        LIGHT_CHAIN_MAIL, MANA_POTION, RAPIER, SMALL_SHIELD, SWORD,
+        BARBED_ARROWS, BONE_CRUSHER, CHAIN_MAIL, DAGGER, ELUSIVE_BOW, HEALTH_POTION, LEATHER_ARMOR,
+        LIGHT_CHAIN_MAIL, MANA_POTION, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD,
     },
-    equipment_ui::equipment_tooltip_lines,
+    equipment_ui::equipment_tooltip,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
@@ -99,16 +99,16 @@ pub async fn run_chest_loop(
                         },
                     );
 
-                    let tooltip_lines = equipment_tooltip_lines(&entry.item);
+                    let tooltip = equipment_tooltip(&entry.item);
                     draw_regular_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
                             icon_y + 50.0,
                         )),
-                        &tooltip_lines[0],
+                        &tooltip.header,
                         None,
-                        &tooltip_lines[1..],
+                        &tooltip.technical_description,
                     );
 
                     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
@@ -209,6 +209,8 @@ pub fn generate_chest_content() -> Vec<ChestEntry> {
         EquipmentEntry::Weapon(SWORD),
         EquipmentEntry::Weapon(RAPIER),
         EquipmentEntry::Shield(SMALL_SHIELD),
+        EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
+        EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)),
     ];
     let mut rng = rand::rng();
     vec![ChestEntry {
