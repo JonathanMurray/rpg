@@ -71,6 +71,9 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> ActionButtonTo
     if reaction.effect.bonus_evasion > 0 {
         technical_description.push(format!("+ {} evasion", reaction.effect.bonus_evasion));
     }
+    if reaction.effect.bonus_armor > 0 {
+        technical_description.push(format!("+ {} armor", reaction.effect.bonus_armor));
+    }
 
     ActionButtonTooltip {
         header: format!(

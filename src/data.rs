@@ -76,8 +76,8 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
 pub const BAD_DAGGER: Weapon = Weapon {
     name: "Bad dagger",
     range: WeaponRange::Melee,
-    action_point_cost: 2,
-    damage: 4,
+    action_point_cost: 3,
+    damage: 3,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(STABBING),
@@ -297,7 +297,8 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Bad small shield",
     sprite: Some(SpriteId::Shield),
     icon: EquipmentIconId::SmallShield,
-    evasion: 1,
+    evasion: 2,
+    armor: 0,
     on_hit_reaction: None,
     on_attacked_reaction: None,
     weight: 2,
@@ -308,6 +309,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     sprite: Some(SpriteId::Shield),
     icon: EquipmentIconId::SmallShield,
     evasion: 3,
+    armor: 0,
     on_hit_reaction: Some(OnHitReaction {
         name: "Shield bash",
         description: "Strike back at the attacker with your shield",
@@ -317,17 +319,7 @@ pub const SMALL_SHIELD: Shield = Shield {
         effect: OnHitReactionEffect::ShieldBash,
         required_circumstance: Some(AttackCircumstance::Melee),
     }),
-    on_attacked_reaction: Some(OnAttackedReaction {
-        id: OnAttackedReactionId::Block,
-        name: "Block",
-        description: "Attempt to block an incoming ranged attack",
-        // TODO: make better icon
-        icon: IconId::RangedAttack,
-        action_point_cost: 1,
-        stamina_cost: 1,
-        effect: OnAttackedReactionEffect { bonus_evasion: 5 },
-        required_circumstance: Some(AttackCircumstance::Ranged),
-    }),
+    on_attacked_reaction: None,
     weight: 2,
 };
 
@@ -335,7 +327,8 @@ pub const MEDIUM_SHIELD: Shield = Shield {
     name: "Medium shield",
     sprite: Some(SpriteId::Shield),
     icon: EquipmentIconId::MediumShield,
-    evasion: 5,
+    evasion: 3,
+    armor: 1,
     on_hit_reaction: None,
     on_attacked_reaction: Some(OnAttackedReaction {
         id: OnAttackedReactionId::Block,
@@ -345,7 +338,10 @@ pub const MEDIUM_SHIELD: Shield = Shield {
         icon: IconId::RangedAttack,
         action_point_cost: 1,
         stamina_cost: 1,
-        effect: OnAttackedReactionEffect { bonus_evasion: 5 },
+        effect: OnAttackedReactionEffect {
+            bonus_evasion: 5,
+            bonus_armor: 1,
+        },
         required_circumstance: Some(AttackCircumstance::Ranged),
     }),
     weight: 3,
@@ -450,7 +446,10 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     icon: IconId::Parry,
     action_point_cost: 1,
     stamina_cost: 1,
-    effect: OnAttackedReactionEffect { bonus_evasion: 5 },
+    effect: OnAttackedReactionEffect {
+        bonus_evasion: 5,
+        bonus_armor: 1,
+    },
     required_circumstance: Some(AttackCircumstance::Melee),
 };
 
@@ -461,7 +460,10 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     icon: IconId::Sidestep,
     action_point_cost: 1,
     stamina_cost: 2,
-    effect: OnAttackedReactionEffect { bonus_evasion: 5 },
+    effect: OnAttackedReactionEffect {
+        bonus_evasion: 5,
+        bonus_armor: 0,
+    },
     required_circumstance: None,
 };
 

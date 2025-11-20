@@ -93,6 +93,9 @@ fn shield_tooltip(shield: &Shield) -> Vec<String> {
         shield.name.to_string(),
         format!("+{} evasion", shield.evasion),
     ];
+    if shield.armor > 0 {
+        lines.push(format!("+{} armor", shield.armor));
+    }
 
     if let Some(reaction) = shield.on_attacked_reaction {
         lines.push(format!("[attacked?] {}", reaction.name));
@@ -708,17 +711,7 @@ impl EquipmentStatsTable {
             cells.push(format!("{}", shield.evasion).into());
         }
         cells.push("Armor".into());
-        cells.push(
-            format!(
-                "{}",
-                character
-                    .armor_piece
-                    .get()
-                    .map(|armor| armor.protection)
-                    .unwrap_or(0)
-            )
-            .into(),
-        );
+        cells.push(format!("{}", character.protection_from_armor()).into());
 
         cells.push("Weight".into());
 

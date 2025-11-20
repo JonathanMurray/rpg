@@ -1701,7 +1701,8 @@ impl UserInterface {
                 }
             } else {
                 println!("warning: tried to use {:?}, when not allowed", base_action);
-                todo!("can this still happen? button clicks should not be registered if the button is disabled");
+                // yes this can still happen, for example if spam clicking "End Turn" (probably there's a short window after end of turn when
+                // the button click still registers, even though it shouldn't.)
             }
         }
 

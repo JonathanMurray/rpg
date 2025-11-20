@@ -1446,14 +1446,16 @@ impl CoreGame {
 
         let mut evasion = defender.evasion();
 
-        let mut evasion_added_by_parry = 0;
-        let mut evasion_added_by_sidestep = 0;
-        let mut evasion_added_by_block = 0;
+        let mut evasion_from_parry = 0;
+        let mut evasion_from_sidestep = 0;
+        let mut evasion_from_block = 0;
         let mut skip_attack_exertion = false;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
 
         let mut detail_lines = vec![];
+
+        let mut armor_value = defender.protection_from_armor();
 
         if let Some(reaction) = defender_reaction {
             defender.action_points.spend(reaction.action_point_cost);
@@ -1461,9 +1463,8 @@ impl CoreGame {
 
             detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
 
-            if reaction.effect.bonus_evasion > 0 {
-                let bonus_evasion = reaction.effect.bonus_evasion;
-
+            let bonus_evasion = reaction.effect.bonus_evasion;
+            if bonus_evasion > 0 {
                 detail_lines.push(format!(
                     "  Evasion: {} +{} ({}) = {}",
                     evasion,
@@ -1476,16 +1477,22 @@ impl CoreGame {
                 detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
             }
 
+            let bonus_armor = reaction.effect.bonus_armor;
+            if bonus_armor > 0 {
+                detail_lines.push(format!(
+                    "  Armor: {} +{} ({}) = {}",
+                    armor_value,
+                    bonus_armor,
+                    reaction.name,
+                    armor_value + bonus_armor
+                ));
+                armor_value += bonus_armor;
+            }
+
             match reaction.id {
-                OnAttackedReactionId::Parry => {
-                    evasion_added_by_parry = reaction.effect.bonus_evasion;
-                }
-                OnAttackedReactionId::SideStep => {
-                    evasion_added_by_sidestep = reaction.effect.bonus_evasion;
-                }
-                OnAttackedReactionId::Block => {
-                    evasion_added_by_block = reaction.effect.bonus_evasion
-                }
+                OnAttackedReactionId::Parry => evasion_from_parry = bonus_evasion,
+                OnAttackedReactionId::SideStep => evasion_from_sidestep = bonus_evasion,
+                OnAttackedReactionId::Block => evasion_from_block = bonus_evasion,
             }
         }
 
@@ -1509,7 +1516,7 @@ impl CoreGame {
         {
             armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
         }
-        let mut armor_value = defender.protection_from_armor();
+
         let mut armor_str = armor_value.to_string();
         for (penetration, label) in armor_penetrators {
             armor_value = armor_value.saturating_sub(penetration);
@@ -1647,24 +1654,23 @@ impl CoreGame {
 
             AttackOutcome::Hit(damage, attack_hit_type)
         } else if attack_result
-            < evasion.saturating_sub(
-                evasion_added_by_parry + evasion_added_by_sidestep + evasion_added_by_block + 5,
-            )
+            < evasion
+                .saturating_sub(evasion_from_parry + evasion_from_sidestep + evasion_from_block + 5)
         {
             detail_lines.push("  Missed!".to_string());
             AttackOutcome::Miss
-        } else if evasion_added_by_parry > 0 {
+        } else if evasion_from_parry > 0 {
             detail_lines.push("  Parried!".to_string());
             AttackOutcome::Parry
-        } else if evasion_added_by_sidestep > 0 {
+        } else if evasion_from_sidestep > 0 {
             detail_lines.push("  Side stepped!".to_string());
             AttackOutcome::Dodge
-        } else if evasion_added_by_block > 0 {
+        } else if evasion_from_block > 0 {
             detail_lines.push("  Blocked!".to_string());
             AttackOutcome::Block
         } else {
             unreachable!(
-                "{attack_result}, {evasion}, {evasion_added_by_parry}, {evasion_added_by_sidestep}"
+                "{attack_result}, {evasion}, {evasion_from_parry}, {evasion_from_sidestep}"
             );
         };
 
@@ -2304,6 +2310,7 @@ pub enum OnAttackedReactionId {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct OnAttackedReactionEffect {
     pub bonus_evasion: u32,
+    pub bonus_armor: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3088,7 +3095,7 @@ impl Attributes {
     }
 
     fn max_health(&self) -> u32 {
-        8 + self.strength.get()
+        10 + self.strength.get()
     }
 
     fn max_mana(&self) -> u32 {
@@ -4045,6 +4052,9 @@ impl Character {
         if let Some(armor) = self.armor_piece.get() {
             protection += armor.protection;
         }
+        if let Some(shield) = self.shield() {
+            protection += shield.armor;
+        }
 
         if self.conditions.borrow().protected > 0 {
             protection += self.conditions.borrow().protected;
@@ -4601,6 +4611,7 @@ pub struct Shield {
     pub sprite: Option<SpriteId>,
     pub icon: EquipmentIconId,
     pub evasion: u32,
+    pub armor: u32,
     pub on_hit_reaction: Option<OnHitReaction>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
     pub weight: u32,
