@@ -2359,6 +2359,7 @@ pub enum Condition {
     Dazed(u32),
     Bleeding(u32),
     Burning(u32),
+    Blinded(u32),
     Braced,
     Raging,
     Distracted,
@@ -2375,6 +2376,7 @@ pub enum Condition {
     BloodRage,
     ArcaneSurge,
     ThrillOfBattle,
+    
 }
 
 impl Condition {
@@ -2385,6 +2387,7 @@ impl Condition {
             Dazed(n) => Some(n),
             Bleeding(n) => Some(n),
             Burning(n) => Some(n),
+            Blinded(n) => Some(n),
             Braced => None,
             Raging => None,
             Distracted => None,
@@ -2401,6 +2404,7 @@ impl Condition {
             BloodRage => None,
             ArcaneSurge => None,
             ThrillOfBattle => None,
+            
         }
     }
 
@@ -2411,6 +2415,7 @@ impl Condition {
             Dazed(_) => "Dazed",
             Bleeding(_) => "Bleeding",
             Burning(_) => "Burning",
+            Blinded(_) => "Blinded",
             Braced => "Braced",
             Raging => "Raging",
             Distracted => "Distracted",
@@ -2437,6 +2442,7 @@ impl Condition {
             Dazed(_) => "-3 evasion and attacks with disadvantage",
             Bleeding(_) => "End of turn: 50% stacks decay, lose 1 health for each decayed",
             Burning(_) => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
+            Blinded(_) => "Disadvantage on dice rolls; always counts as Flanked when being attacked",
             Braced => "Gain +3 evasion against the next incoming attack",
             Raging => "Gains advantage on melee attack rolls until end of turn",
             Distracted => "-6 evasion against the next incoming attack",
@@ -2444,7 +2450,7 @@ impl Condition {
             MainHandExertion(_) => "-x on further similar actions",
             OffHandExertion(_) => "-x on further similar actions",
             Encumbered(_) => "-x to Evasion and -x/2 to dice rolls",
-            NearDeath => "< 25% HP: Reduced AP, disadvantage on everything",
+            NearDeath => "< 25% HP: Reduced AP, disadvantage on dice rolls, enemies have advantage",
             Dead => "This character has reached 0 HP and is dead",
             Slowed(_) => "Gains 2 less AP per turn",
             Exposed(_) => "-3 to all defenses",
@@ -2463,6 +2469,7 @@ impl Condition {
             Dazed(_) => false,
             Bleeding(_) => false,
             Burning(_) => false,
+            Blinded(_) => false,
             Braced => true,
             Raging => true,
             Distracted => false,
@@ -2514,6 +2521,7 @@ struct Conditions {
     dazed: u32,
     bleeding: u32,
     burning: u32,
+    blinded: u32,
     braced: bool,
     raging: bool,
     distracted: bool,
@@ -2546,6 +2554,9 @@ impl Conditions {
         }
         if self.burning > 0 {
             result.push(Condition::Burning(self.burning).info());
+        }
+        if self.blinded > 0 {
+            result.push(Condition::Blinded(self.blinded).info());
         }
         if self.braced {
             result.push(Condition::Braced.info());
@@ -2739,7 +2750,8 @@ pub enum AbilityId {
     HealingNova,
     SelfHeal,
     HealingRain,
-    Fireballl,
+    Fireball,
+    SearingLight,
     Kill,
 
     MagiHeal,
@@ -4210,6 +4222,9 @@ impl Character {
         if conditions.near_death {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
+        if conditions.blinded > 0 {
+            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+        }
 
         if conditions.blood_rage {
             // applied from attack_modifer()
@@ -4268,6 +4283,9 @@ impl Character {
 
         if conditions.near_death {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
+        }
+        if conditions.blinded > 0 {
+            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
         }
 
         bonuses
@@ -4359,6 +4377,7 @@ impl Character {
             Dazed(n) => conditions.dazed += n,
             Bleeding(n) => conditions.bleeding += n,
             Burning(n) => conditions.burning += n,
+            Blinded(n) => conditions.blinded += n,
             Braced => conditions.braced = true,
             Raging => conditions.raging = true,
             Distracted => conditions.distracted = true,
@@ -4402,6 +4421,7 @@ impl Character {
             Dazed(..) => clear_u32(&mut conditions.dazed),
             Bleeding(..) => clear_u32(&mut conditions.bleeding),
             Burning(..) => clear_u32(&mut conditions.burning),
+            Blinded(..) => clear_u32(&mut conditions.blinded),
             Braced => clear_bool(&mut conditions.braced),
             Raging => clear_bool(&mut conditions.raging),
             Distracted => clear_bool(&mut conditions.distracted),
@@ -4429,6 +4449,10 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
 
     if target_is_immune_to_flanking {
         return false;
+    }
+
+    if target.conditions.borrow().blinded > 0 {
+        return true;
     }
 
     target

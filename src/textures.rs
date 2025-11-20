@@ -51,6 +51,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,
+    SearingLight,
     MeleeAttack,
     RangedAttack,
     Brace,
@@ -103,6 +104,7 @@ pub enum IconId {
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
     load_and_init_textures(vec![
         (IconId::Fireball, "fireball_icon.png"),
+        (IconId::SearingLight, "searing_light_icon.png"),
         (IconId::MeleeAttack, "attack_icon.png"),
         (IconId::RangedAttack, "ranged_attack_icon.png"),
         (IconId::Brace, "brace_icon.png"),

@@ -27,12 +27,7 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    PassiveSkill, BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO,
-    HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH,
-    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
-    NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, RAGE, ROBE, SCREAM,
-    SCREAM_SHRIEK, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK,
-    SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE,
+    BONE_CRUSHER, BOW, BRACE, CRIPPLING_SHOT, DAGGER, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PassiveSkill, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -112,23 +107,11 @@ async fn main() {
     bob.armor_piece.set(Some(SHIRT));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(FIREBALL));
-    bob.known_ability_enhancements.push(FIREBALL_INFERNO);
-    //bob.receive_condition(Condition::Burning(5));
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions
         .borrow_mut()
-        .push(BaseAction::UseAbility(SWEEP_ATTACK));
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(SCREAM));
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(LUNGE_ATTACK));
-    bob.known_ability_enhancements.push(LUNGE_ATTACK_REACH);
+        .push(BaseAction::UseAbility(SEARING_LIGHT));
     bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements

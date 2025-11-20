@@ -1,4 +1,4 @@
-use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED};
+use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
 
 use crate::{
     core::{
@@ -977,7 +977,7 @@ pub const HEALING_RAIN: Ability = Ability {
 };
 
 pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireballl,
+    ability_id: AbilityId::Fireball,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
@@ -992,7 +992,7 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
 };
 
 pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireballl,
+    ability_id: AbilityId::Fireball,
     name: "Massive",
     description: "",
     icon: IconId::Radius,
@@ -1006,7 +1006,7 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     }),
 };
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::Fireballl,
+    ability_id: AbilityId::Fireball,
     name: "Inferno",
     description: "Targets hit by the impact start burning",
     icon: IconId::Inferno,
@@ -1020,7 +1020,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     }),
 };
 pub const FIREBALL: Ability = Ability {
-    id: AbilityId::Fireballl,
+    id: AbilityId::Fireball,
     name: "Fireball",
     description: "Hurl fire at an enemy, dealing area damage",
     icon: IconId::Fireball,
@@ -1078,6 +1078,30 @@ pub const KILL: Ability = Ability {
         reach: AbilityReach::Range(Range::Ranged(10)),
     },
     animation_color: BLACK,
+};
+
+pub const SEARING_LIGHT: Ability = Ability {
+    id: AbilityId::SearingLight,
+    name: "Searing light",
+    description: "todo",
+    icon: IconId::SearingLight,
+    action_point_cost: 3,
+    mana_cost: 1,
+    stamina_cost: 0,
+    weapon_requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::Enemy {
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: Some(AbilityDamage::AtLeast(3)),
+            on_hit: Some([Some(ApplyEffect::Condition(Condition::Blinded(1))), None]),
+        }),
+        impact_area: None,
+        reach: AbilityReach::Range(Range::Ranged(3)),
+    },
+    animation_color: YELLOW,
 };
 
 pub const HEALTH_POTION: Consumable = Consumable {
