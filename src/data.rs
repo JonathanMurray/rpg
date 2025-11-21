@@ -313,6 +313,15 @@ pub const BARBED_ARROWS: Arrow = Arrow {
     area_effect: None,
 };
 
+pub const COLD_ARROWS: Arrow = Arrow {
+    name: "Cold arrows",
+    sprite: None,
+    icon: EquipmentIconId::ColdArrow,
+    bonus_penetration: 0,
+    on_damage_apply: Some(ApplyEffect::Condition(Condition::Hindered(1))),
+    area_effect: None,
+};
+
 pub const EXPLODING_ARROWS: Arrow = Arrow {
     name: "Exploding arrows",
     sprite: None,

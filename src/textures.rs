@@ -194,6 +194,7 @@ pub enum EquipmentIconId {
     Robe,
     PenetratingArrow,
     BarbedArrow,
+    ColdArrow,
     ExplodingArrow,
 
     HealthPotion,
@@ -223,6 +224,7 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
             "eq_penetrating_arrow.png",
         ),
         (EquipmentIconId::BarbedArrow, "eq_barbed_arrow.png"),
+        (EquipmentIconId::ColdArrow, "eq_cold_arrow.png"),
         (EquipmentIconId::ExplodingArrow, "eq_exploding_arrow.png"),
         (EquipmentIconId::HealthPotion, "eq_health_potion.png"),
         (EquipmentIconId::ManaPotion, "eq_mana_potion.png"),
