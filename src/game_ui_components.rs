@@ -6,6 +6,7 @@ use std::{
 
 use macroquad::{
     color::SKYBLUE,
+    input::{is_key_pressed, KeyCode},
     shapes::{draw_triangle, draw_triangle_lines},
     texture::{draw_texture_ex, DrawTextureParams},
 };
@@ -369,15 +370,32 @@ impl PlayerPortraits {
         self.set_active_character(game.active_character_id);
     }
 
-    pub fn draw(&self, x: f32, y: f32) {
+    pub fn draw(&self, x: f32, y: f32) -> bool {
         self.row.draw(x, y);
+
+        let mut did_change_character = false;
 
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.take() {
                 self.set_selected_id(*i);
+                did_change_character = true;
                 break;
             }
         }
+
+        if is_key_pressed(KeyCode::Tab) {
+            self.toggle_active_id();
+            did_change_character = true;
+        }
+
+        did_change_character
+    }
+
+    fn toggle_active_id(&self) {
+        let idx = self.portraits.get_index_of(&self.selected_i.get()).unwrap();
+        let new_idx = (idx + 1) % self.portraits.len();
+        let (new_character_id, _) = self.portraits.get_index(new_idx).unwrap();
+        self.set_selected_id(*new_character_id);
     }
 
     pub fn set_statuses(&mut self, character_id: CharacterId, statuses: Vec<bool>) {
@@ -385,16 +403,6 @@ impl PlayerPortraits {
             portrait.borrow_mut().set_statuses(statuses);
         }
     }
-
-    /*
-    pub fn mark_as_dead(&mut self, character_id: CharacterId) {
-        self.portraits
-            .get(&character_id)
-            .unwrap()
-            .borrow_mut()
-            .is_character_dead = true;
-    }
-     */
 }
 
 struct PlayerCharacterPortrait {

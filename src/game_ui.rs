@@ -515,8 +515,15 @@ impl UserInterface {
 
         self.activity_popup.draw(20.0, ui_y + 1.0);
 
-        self.player_portraits.draw(570.0, ui_y + 25.0);
+        let did_change_selected_character = self.player_portraits.draw(570.0, ui_y + 25.0);
         self.character_sheet_toggle.draw(570.0, ui_y + 110.0);
+
+        if did_change_selected_character {
+            self.on_new_selected_character();
+            if matches!(*self.state.borrow(), UiState::ConfiguringAction(..)) {
+                self.set_state(UiState::ChoosingAction);
+            }
+        }
 
         let selected_character_id = self.player_portraits.selected_id();
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
@@ -1616,15 +1623,18 @@ impl UserInterface {
             );
             if self.characters.get(new_active_id).player_controlled() {
                 self.player_portraits.set_selected_id(new_active_id);
-
-                // In case we're hovering a button that will no longer be shown due to the character switch,
-                // we need to clear it, so that we don't panic trying to render its tooltip for example
-                self.hovered_button = None;
+                self.on_new_selected_character();
             }
             self.character_sheet_toggle.shown.set(false);
         }
 
         self.active_character_id = new_active_id;
+    }
+
+    fn on_new_selected_character(&mut self) {
+        // In case we're hovering a button that will no longer be shown due to the character switch,
+        // we need to clear it, so that we don't panic trying to render its tooltip for example
+        self.hovered_button = None;
     }
 
     pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
