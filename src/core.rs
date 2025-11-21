@@ -304,6 +304,7 @@ impl CoreGame {
                                     None,
                                     0,
                                 );
+
                                 self.ui_handle_event(GameEvent::Attacked(event)).await;
                             }
                         }
@@ -749,36 +750,32 @@ impl CoreGame {
                         detail_lines.push(line.to_string());
                     }
 
-                    let outcome = self
-                        .perform_ability_enemy_effect(
-                            caster,
-                            ability.name,
-                            &ability_roll,
-                            &enhancements,
-                            effect,
-                            target,
-                            &mut detail_lines,
-                            true,
-                        )
-                        .await;
+                    let outcome = self.perform_ability_enemy_effect(
+                        caster,
+                        ability.name,
+                        &ability_roll,
+                        &enhancements,
+                        effect,
+                        target,
+                        &mut detail_lines,
+                        true,
+                    );
                     target_outcome = Some((*target_id, outcome));
 
                     if let Some((radius, acquisition, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
 
-                        let area_target_outcomes = self
-                            .perform_ability_area_enemy_effect(
-                                radius,
-                                "AoE",
-                                ability_roll,
-                                &enhancements,
-                                caster,
-                                target.position.get(),
-                                &mut detail_lines,
-                                area_effect,
-                                acquisition,
-                            )
-                            .await;
+                        let area_target_outcomes = self.perform_ability_area_enemy_effect(
+                            radius,
+                            "AoE",
+                            ability_roll,
+                            &enhancements,
+                            caster,
+                            target.position.get(),
+                            &mut detail_lines,
+                            area_effect,
+                            acquisition,
+                        );
 
                         area_outcomes = Some((target.position.get(), area_target_outcomes));
                     }
@@ -817,9 +814,7 @@ impl CoreGame {
 
                 AbilityTarget::Area {
                     range: _,
-                    radius,
-                    effect,
-                    acquisition,
+                    area_effect,
                 } => {
                     let target_pos = selected_target.unwrap_position();
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
@@ -828,19 +823,15 @@ impl CoreGame {
                     let (_ability_result, dice_roll_line) = ability_roll.unwrap_spell();
                     detail_lines.push(dice_roll_line.to_string());
 
-                    let outcomes = self
-                        .perform_ability_area_effect(
-                            ability.name,
-                            ability_roll,
-                            &enhancements,
-                            caster,
-                            target_pos,
-                            radius,
-                            &mut detail_lines,
-                            effect,
-                            acquisition,
-                        )
-                        .await;
+                    let outcomes = self.perform_ability_area_effect(
+                        ability.name,
+                        ability_roll,
+                        &enhancements,
+                        caster,
+                        target_pos,
+                        area_effect,
+                        &mut detail_lines,
+                    );
 
                     area_outcomes = Some((target_pos, outcomes));
                 }
@@ -876,24 +867,20 @@ impl CoreGame {
                         target_outcome = Some((caster_id, outcome));
                     }
 
-                    if let Some((radius, acquisition, effect)) = self_area {
-                        dbg!("SELF AREA ", radius);
+                    if let Some(area_effect) = self_area {
+                        dbg!("SELF AREA ", area_effect.radius);
 
                         let ability_roll = maybe_ability_roll.unwrap();
 
-                        let outcomes = self
-                            .perform_ability_area_effect(
-                                ability.name,
-                                ability_roll,
-                                &enhancements,
-                                caster,
-                                caster.position.get(),
-                                radius,
-                                &mut detail_lines,
-                                effect,
-                                acquisition,
-                            )
-                            .await;
+                        let outcomes = self.perform_ability_area_effect(
+                            ability.name,
+                            ability_roll,
+                            &enhancements,
+                            caster,
+                            caster.position.get(),
+                            area_effect,
+                            &mut detail_lines,
+                        );
                         area_outcomes = Some((caster.position.get(), outcomes));
                     }
                 }
@@ -931,39 +918,34 @@ impl CoreGame {
         enemies_hit
     }
 
-    async fn perform_ability_area_effect(
+    fn perform_ability_area_effect(
         &self,
         name: &'static str,
         ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
         caster: &Character,
         area_center: Position,
-        radius: Range,
+        area_effect: AreaEffect,
         detail_lines: &mut Vec<String>,
-        effect: AbilityEffect,
-        acquisition: AreaTargetAcquisition,
-    ) -> Vec<(u32, AbilityTargetOutcome)> {
-        match effect {
-            AbilityEffect::Negative(effect) => {
-                self.perform_ability_area_enemy_effect(
-                    radius,
-                    name,
-                    ability_roll,
-                    enhancements,
-                    caster,
-                    area_center,
-                    detail_lines,
-                    effect,
-                    acquisition,
-                )
-                .await
-            }
+    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
+        match area_effect.effect {
+            AbilityEffect::Negative(effect) => self.perform_ability_area_enemy_effect(
+                area_effect.radius,
+                name,
+                ability_roll,
+                enhancements,
+                caster,
+                area_center,
+                detail_lines,
+                effect,
+                area_effect.acquisition,
+            ),
 
             AbilityEffect::Positive(effect) => {
-                assert!(acquisition == AreaTargetAcquisition::Allies);
+                assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
 
                 self.perform_ability_area_ally_effect(
-                    radius,
+                    area_effect.radius,
                     name,
                     enhancements,
                     caster,
@@ -986,7 +968,7 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
         ability_roll: AbilityRoll,
         effect: AbilityPositiveEffect,
-    ) -> Vec<(u32, AbilityTargetOutcome)> {
+    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         let mut target_outcomes = vec![];
 
         for enhancement in enhancements {
@@ -1091,7 +1073,7 @@ impl CoreGame {
         }
     }
 
-    async fn perform_ability_area_enemy_effect(
+    fn perform_ability_area_enemy_effect(
         &self,
         mut radius: Range,
         name: &'static str,
@@ -1102,7 +1084,7 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
         effect: AbilityNegativeEffect,
         acquisition: AreaTargetAcquisition,
-    ) -> Vec<(u32, AbilityTargetOutcome)> {
+    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         assert!(acquisition != AreaTargetAcquisition::Allies);
 
         let mut target_outcomes = vec![];
@@ -1144,25 +1126,23 @@ impl CoreGame {
                             }
                         }
                     }
-                    AbilityNegativeEffect::Attack => {
+                    AbilityNegativeEffect::PerformAttack => {
                         // The relevant details will come from perform_attack, not from here.
                     }
                 }
 
                 detail_lines.push(line);
 
-                let outcome = self
-                    .perform_ability_enemy_effect(
-                        caster,
-                        name,
-                        &ability_roll,
-                        enhancements,
-                        effect,
-                        other_char,
-                        detail_lines,
-                        false,
-                    )
-                    .await;
+                let outcome = self.perform_ability_enemy_effect(
+                    caster,
+                    name,
+                    &ability_roll,
+                    enhancements,
+                    effect,
+                    other_char,
+                    detail_lines,
+                    false,
+                );
 
                 target_outcomes.push((other_char.id(), outcome));
             }
@@ -1171,7 +1151,7 @@ impl CoreGame {
         target_outcomes
     }
 
-    async fn perform_ability_enemy_effect(
+    fn perform_ability_enemy_effect(
         &self,
         caster: &Character,
         ability_name: &'static str,
@@ -1193,7 +1173,7 @@ impl CoreGame {
                 detail_lines,
                 is_direct_target,
             ),
-            AbilityNegativeEffect::Attack => {
+            AbilityNegativeEffect::PerformAttack => {
                 let attack_enhancement_effects = enhancements
                     .iter()
                     .filter_map(|e| e.attack_enhancement_effect())
@@ -1226,10 +1206,9 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
         is_direct_target: bool,
     ) -> AbilityTargetOutcome {
-        let ability_result = ability_roll.unwrap_spell().0;
-
         let success = match spell_enemy_effect.defense_type {
             Some(contest) => {
+                let ability_result = ability_roll.unwrap_spell().0;
                 let defense = match contest {
                     DefenseType::Will => target.will(),
                     DefenseType::Evasion => target.evasion(),
@@ -1496,8 +1475,9 @@ impl CoreGame {
             }
         }
 
-        let roll = roll_d20_with_advantage(attack_bonus.advantage);
-        let attack_result = ((roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
+        let unmodified_roll = roll_d20_with_advantage(attack_bonus.advantage);
+        let roll_result =
+            ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
 
         if let Some(description) = roll_description(attack_bonus.advantage) {
             detail_lines.push(description);
@@ -1505,15 +1485,21 @@ impl CoreGame {
 
         let mut armor_penetrators = vec![];
         let weapon = attacker.weapon(hand_type).unwrap();
+        let mut used_arrow = None;
         if !weapon.is_melee() {
             if let Some(stack) = attacker.arrows.get() {
-                let penetration = stack.arrow.bonus_penetration;
-                if penetration > 0 {
-                    armor_penetrators.push((penetration, stack.arrow.name));
-                }
+                used_arrow = Some(stack.arrow);
                 attacker.spend_one_arrow();
             }
         }
+
+        if let Some(arrow) = used_arrow {
+            let penetration = arrow.bonus_penetration;
+            if penetration > 0 {
+                armor_penetrators.push((penetration, arrow.name));
+            }
+        }
+
         for (name, effect) in &enhancements {
             let penetration = effect.armor_penetration;
             if penetration > 0 {
@@ -1535,7 +1521,7 @@ impl CoreGame {
 
         detail_lines.push(format!(
             "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}, armor={}",
-            roll,
+            unmodified_roll,
             attack_modifier,
             if attack_bonus.flat_amount > 0 {
                 format!("(+{}) ", attack_bonus.flat_amount)
@@ -1544,13 +1530,13 @@ impl CoreGame {
             } else {
                 "".to_string()
             },
-            attack_result,
+            roll_result,
             evasion,
             armor_str
         ));
 
         let weapon = attacker.weapon(hand_type).unwrap();
-        let outcome = if attack_result >= evasion.saturating_sub(5) {
+        let outcome = if roll_result >= evasion.saturating_sub(5) {
             let mut on_true_hit_effect = None;
             let mut dmg_calculation = weapon.damage as i32;
 
@@ -1582,7 +1568,7 @@ impl CoreGame {
                 }
             }
 
-            if attack_result < evasion {
+            if roll_result < evasion {
                 attack_hit_type = AttackHitType::Graze;
                 dmg_str.push_str(" -25% (graze)");
                 dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
@@ -1590,7 +1576,7 @@ impl CoreGame {
             } else {
                 on_true_hit_effect = weapon.on_true_hit;
 
-                let degree_of_success = (attack_result - evasion) / 5;
+                let degree_of_success = (roll_result - evasion) / 5;
 
                 if degree_of_success > 0 {
                     attack_hit_type = AttackHitType::Critical;
@@ -1657,16 +1643,11 @@ impl CoreGame {
                     }
                 }
 
-                if !weapon.is_melee() {
-                    if let Some(stack) = attacker.arrows.get() {
-                        if let Some(apply_effect) = stack.arrow.on_damage_apply {
-                            let (log_line, _damage) = self.perform_effect_application(
-                                apply_effect,
-                                Some(attacker),
-                                defender,
-                            );
-                            detail_lines.push(format!("{} ({})", log_line, stack.arrow.name))
-                        }
+                if let Some(arrow) = used_arrow {
+                    if let Some(apply_effect) = arrow.on_damage_apply {
+                        let (log_line, _damage) =
+                            self.perform_effect_application(apply_effect, Some(attacker), defender);
+                        detail_lines.push(format!("{} ({})", log_line, arrow.name))
                     }
                 }
             }
@@ -1676,7 +1657,7 @@ impl CoreGame {
             }
 
             AttackOutcome::Hit(damage, attack_hit_type)
-        } else if attack_result
+        } else if roll_result
             < evasion
                 .saturating_sub(evasion_from_parry + evasion_from_sidestep + evasion_from_block + 5)
         {
@@ -1692,9 +1673,7 @@ impl CoreGame {
             detail_lines.push("  Blocked!".to_string());
             AttackOutcome::Block
         } else {
-            unreachable!(
-                "{attack_result}, {evasion}, {evasion_from_parry}, {evasion_from_sidestep}"
-            );
+            unreachable!("{roll_result}, {evasion}, {evasion_from_parry}, {evasion_from_sidestep}");
         };
 
         if defender.lose_distracted() {
@@ -1706,6 +1685,26 @@ impl CoreGame {
                 let (log_line, _damage) =
                     self.perform_effect_application(effect, Some(attacker), defender);
                 detail_lines.push(format!("{} ({})", log_line, name));
+            }
+        }
+
+        let mut area_outcomes = None;
+        if let Some(arrow) = used_arrow {
+            if let Some(area_effect) = arrow.area_effect {
+                detail_lines.push("".to_string());
+                let area_target_outcomes = self.perform_ability_area_effect(
+                    arrow.name,
+                    AbilityRoll::Spell {
+                        result: roll_result,
+                        line: "".to_string(),
+                    },
+                    &[],
+                    &attacker,
+                    defender.pos(),
+                    area_effect,
+                    &mut detail_lines,
+                );
+                area_outcomes = Some(area_target_outcomes);
             }
         }
 
@@ -1740,6 +1739,7 @@ impl CoreGame {
             target: defender_id,
             outcome,
             detail_lines,
+            area_outcomes,
         }
     }
 
@@ -2044,6 +2044,7 @@ pub struct AttackedEvent {
     pub target: CharacterId,
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
+    pub area_outcomes: Option<Vec<(CharacterId, AbilityTargetOutcome)>>,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -2073,7 +2074,7 @@ pub struct OffensiveHitReactionOutcome {
     pub inflicted_condition: Option<Condition>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum AbilityTargetOutcome {
     HitEnemy {
         damage: Option<u32>,
@@ -2808,14 +2809,14 @@ pub struct SpellNegativeEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityNegativeEffect {
     Spell(SpellNegativeEffect),
-    Attack,
+    PerformAttack,
 }
 
 impl AbilityNegativeEffect {
     fn unwrap_spell(&self) -> &SpellNegativeEffect {
         match self {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => spell_enemy_effect,
-            AbilityNegativeEffect::Attack => panic!(),
+            AbilityNegativeEffect::PerformAttack => panic!(),
         }
     }
 }
@@ -2847,15 +2848,20 @@ pub enum AbilityTarget {
 
     Area {
         range: Range,
-        radius: Range,
-        acquisition: AreaTargetAcquisition,
-        effect: AbilityEffect,
+        area_effect: AreaEffect,
     },
 
     None {
-        self_area: Option<(Range, AreaTargetAcquisition, AbilityEffect)>,
+        self_area: Option<AreaEffect>,
         self_effect: Option<AbilityPositiveEffect>,
     },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub struct AreaEffect {
+    pub radius: Range,
+    pub acquisition: AreaTargetAcquisition,
+    pub effect: AbilityEffect,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -2895,9 +2901,9 @@ impl AbilityTarget {
 
     fn base_radius(&self) -> Option<Range> {
         match self {
-            AbilityTarget::None { self_area, .. } => self_area
-                .as_ref()
-                .map(|(radius, _acquisition, _effect)| *radius),
+            AbilityTarget::None { self_area, .. } => {
+                self_area.as_ref().map(|area_effect| area_effect.radius)
+            }
             _ => None,
         }
     }
@@ -3870,9 +3876,13 @@ impl Character {
     }
 
     pub fn can_use_opportunity_attack(&self, target: CharacterId) -> bool {
-        if !self.known_passive_skills.contains(&PassiveSkill::Vigilant) && !self.is_engaging(target)
-        {
-            return false;
+        if !self.known_passive_skills.contains(&PassiveSkill::Vigilant) {
+            if let Some(engaged_target) = self.engagement_target.get() {
+                if engaged_target != target {
+                    // If you're engaging someone else, you're focused on that and miss the opportunity
+                    return false;
+                }
+            }
         }
 
         if let Some(weapon) = self.weapon(HandType::MainHand) {
@@ -4701,6 +4711,7 @@ pub struct Arrow {
     pub icon: EquipmentIconId,
     pub bonus_penetration: u32,
     pub on_damage_apply: Option<ApplyEffect>,
+    pub area_effect: Option<AreaEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

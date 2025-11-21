@@ -6,7 +6,7 @@ use macroquad::{
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
-    text::{Font, TextParams},
+    text::{draw_text_ex, Font, TextParams},
     window::{screen_height, screen_width},
 };
 use rand::Rng;
@@ -748,8 +748,8 @@ impl GameGrid {
                         }
                     }
                     AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                    AbilityTarget::Area { radius, .. } => {
-                        MouseState::RequiresPositionTarget(radius)
+                    AbilityTarget::Area { area_effect, .. } => {
+                        MouseState::RequiresPositionTarget(area_effect.radius)
                     }
                     AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                 },
@@ -1262,8 +1262,6 @@ impl GameGrid {
             );
         }
 
-        self.draw_effects();
-
         if !matches!(
             ui_state,
             UiState::ReactingToMovementAttackOpportunity { .. }
@@ -1279,6 +1277,8 @@ impl GameGrid {
                 self.draw_character_label(char, false);
             }
         }
+
+        self.draw_effects();
 
         if self.players_inspect_target != previous_inspect_target {
             outcome.switched_inspect_target = Some(self.players_inspect_target);
@@ -2175,7 +2175,13 @@ impl EffectGraphics {
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
                 let y0 = y - cell_w * 0.3 * t;
 
-                let alpha = if t > 0.5 { 1.0 - (t - 0.5) * 2.0 } else { 1.0 };
+                let remaining = effect.end_time - effect.age;
+                let fade_duration = 0.4;
+                let alpha = if remaining < fade_duration {
+                    remaining / fade_duration
+                } else {
+                    1.0
+                };
 
                 let mut text_params = TextParams {
                     font: Some(font),
@@ -2184,12 +2190,12 @@ impl EffectGraphics {
                     ..Default::default()
                 };
                 // First draw shadow
-                draw_text_rounded(text, x0 + 3.0, y0 + 3.0, text_params.clone());
+                draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
                 text_params.color = *color;
                 text_params.color.a = alpha;
 
                 // Then the regular text
-                draw_text_rounded(text, x0, y0, text_params);
+                draw_text_ex(text, x0, y0, text_params);
             }
         }
     }

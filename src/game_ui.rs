@@ -7,7 +7,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
+    color::{Color, BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
     input::{get_keys_pressed, is_key_pressed, mouse_position, KeyCode},
     shapes::{draw_line, draw_rectangle},
     text::Font,
@@ -810,7 +810,7 @@ impl UserInterface {
 
                                 as_percentage(prob)
                             }
-                            AbilityNegativeEffect::Attack => {
+                            AbilityNegativeEffect::PerformAttack => {
                                 let enhancements: Vec<(&'static str, AttackEnhancementEffect)> =
                                     selected_enhancements
                                         .iter()
@@ -1329,34 +1329,12 @@ impl UserInterface {
                 }
 
                 if let Some((area_center_pos, outcomes)) = &area_outcomes {
-                    let area_duration = 0.2;
-
-                    for (target_id, outcome) in outcomes {
-                        let target_pos = self.characters.get(*target_id).pos();
-
-                        self.game_grid.add_effect(
-                            (area_center_pos.0, area_center_pos.1),
-                            target_pos,
-                            Effect {
-                                start_time: duration,
-                                end_time: duration + area_duration,
-                                variant: EffectVariant::At(
-                                    EffectPosition::Destination,
-                                    EffectGraphics::Circle {
-                                        radius: 20.0,
-                                        stroke: Some((animation_color, 4.0)),
-                                        end_radius: Some(25.0),
-                                        fill: None,
-                                    },
-                                ),
-                            },
-                        );
-
-                        self.add_text_effect_for_ability_target_outcome(
-                            outcome, duration, target_pos,
-                        );
-                        self.animation_stopwatch.set_to_at_least(duration + 0.3);
-                    }
+                    self.add_effects_for_area_outcomes(
+                        duration,
+                        animation_color,
+                        area_center_pos,
+                        outcomes,
+                    );
                 }
 
                 for event in attacks {
@@ -1422,7 +1400,7 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    1.0,
+                    1.5,
                     format!("{}", amount),
                     TextEffectStyle::HostileHit,
                 );
@@ -1435,11 +1413,46 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    1.0,
+                    1.5,
                     condition.name().to_string(),
                     TextEffectStyle::HostileHit,
                 );
             }
+        }
+    }
+
+    fn add_effects_for_area_outcomes(
+        &mut self,
+        start_time: f32,
+        animation_color: Color,
+        area_center_pos: &(i32, i32),
+        outcomes: &[(CharacterId, AbilityTargetOutcome)],
+    ) {
+        let area_duration = 0.2;
+
+        for (target_id, outcome) in outcomes {
+            let target_pos = self.characters.get(*target_id).pos();
+
+            self.game_grid.add_effect(
+                (area_center_pos.0, area_center_pos.1),
+                target_pos,
+                Effect {
+                    start_time,
+                    end_time: start_time + area_duration,
+                    variant: EffectVariant::At(
+                        EffectPosition::Destination,
+                        EffectGraphics::Circle {
+                            radius: 20.0,
+                            stroke: Some((animation_color, 4.0)),
+                            end_radius: Some(25.0),
+                            fill: None,
+                        },
+                    ),
+                },
+            );
+
+            self.add_text_effect_for_ability_target_outcome(outcome, start_time, target_pos);
+            self.animation_stopwatch.set_to_at_least(start_time + 0.3);
         }
     }
 
@@ -1480,7 +1493,6 @@ impl UserInterface {
 
         self.animation_stopwatch
             .set_to_at_least(projectile_duration + 0.6);
-        // TODO handle crit
         let (impact_text, text_style) = match outcome {
             AttackOutcome::Hit(damage, AttackHitType::Regular) => {
                 (format!("{}", damage), TextEffectStyle::HostileHit)
@@ -1536,6 +1548,10 @@ impl UserInterface {
             impact_text,
             text_style,
         );
+
+        if let Some(outcomes) = &event.area_outcomes {
+            self.add_effects_for_area_outcomes(projectile_duration, MAGENTA, &target_pos, outcomes);
+        }
     }
 
     fn add_text_effect_for_ability_target_outcome(
@@ -1583,7 +1599,7 @@ impl UserInterface {
 
         if let Some((target_text, goodness)) = effect {
             self.game_grid
-                .add_text_effect(target_pos, start_time, 1.0, target_text, goodness);
+                .add_text_effect(target_pos, start_time, 2.0, target_text, goodness);
         }
     }
 

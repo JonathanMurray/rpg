@@ -22,8 +22,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        describe_apply_effect, draw_regular_tooltip, draw_tooltip, Side, Tooltip,
-        TooltipPositionPreference,
+        describe_apply_effect, describe_area_effect, draw_regular_tooltip, draw_tooltip, Side,
+        Tooltip, TooltipPositionPreference,
     },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
@@ -61,6 +61,9 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
     if let Some(effect) = stack.arrow.on_damage_apply {
         t.technical_description.push("Target:".to_string());
         describe_apply_effect(effect, &mut t);
+    }
+    if let Some(area_effect) = stack.arrow.area_effect {
+        describe_area_effect(None, area_effect, &mut t);
     }
     t
 }

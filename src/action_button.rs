@@ -21,7 +21,7 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
-        AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
+        AreaEffect, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
         OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Weapon, WeaponType,
     },
@@ -391,7 +391,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                         .push(format!("Engage enemy (range {}) :", range));
                 }
             }
-            describe_ability_enemy_effect(effect, &mut t);
+            describe_ability_negative_effect(effect, &mut t);
 
             if let Some((range, acquisition, effect)) = area {
                 let targets_str = match acquisition {
@@ -403,7 +403,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                     "{} in impact area (radius {}) :",
                     targets_str, range
                 ));
-                describe_ability_enemy_effect(effect, &mut t);
+                describe_ability_negative_effect(effect, &mut t);
             }
         }
 
@@ -422,7 +422,12 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                 describe_ability_ally_effect(effect, &mut t);
             }
 
-            if let Some((radius, acquisition, effect)) = self_area {
+            if let Some(AreaEffect {
+                radius,
+                acquisition,
+                effect,
+            }) = self_area
+            {
                 // There's no use-case for this yet (?)
                 assert!(acquisition != AreaTargetAcquisition::Everyone);
 
@@ -435,7 +440,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                     AbilityEffect::Negative(effect) => {
                         t.technical_description
                             .push(format!("Enemies ({radius_str}) :"));
-                        describe_ability_enemy_effect(effect, &mut t);
+                        describe_ability_negative_effect(effect, &mut t);
                     }
                     AbilityEffect::Positive(effect) => {
                         t.technical_description
@@ -446,36 +451,46 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             }
         }
 
-        AbilityTarget::Area {
-            range,
-            radius,
-            effect,
-            acquisition,
-        } => match effect {
-            AbilityEffect::Negative(effect) => {
-                let targets_str = match acquisition {
-                    AreaTargetAcquisition::Enemies => "Enemies",
-                    AreaTargetAcquisition::Everyone => "EVERYONE",
-                    AreaTargetAcquisition::Allies => unreachable!(),
-                };
-                t.technical_description.push(format!(
-                    "{} (range {}, radius {}) :",
-                    targets_str, range, radius
-                ));
-                describe_ability_enemy_effect(effect, &mut t);
-            }
-            AbilityEffect::Positive(effect) => {
-                assert!(acquisition == AreaTargetAcquisition::Allies);
-                t.technical_description
-                    .push(format!("Allies (range {}, radius {}) :", range, radius));
-                describe_ability_ally_effect(effect, &mut t);
-            }
-        },
+        AbilityTarget::Area { range, area_effect } => {
+            describe_area_effect(Some(range), area_effect, &mut t)
+        }
     };
     t
 }
 
-fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
+pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &mut Tooltip) {
+    match area_effect.effect {
+        AbilityEffect::Negative(effect) => {
+            let targets_str = match area_effect.acquisition {
+                AreaTargetAcquisition::Enemies => "Enemies",
+                AreaTargetAcquisition::Everyone => "EVERYONE",
+                AreaTargetAcquisition::Allies => unreachable!(),
+            };
+            let line = if let Some(range) = range {
+                format!(
+                    "{} (range {}, radius {}) :",
+                    targets_str, range, area_effect.radius
+                )
+            } else {
+                format!("{} (radius {}) :", targets_str, area_effect.radius)
+            };
+            t.technical_description.push(line);
+            describe_ability_negative_effect(effect, t);
+        }
+        AbilityEffect::Positive(effect) => {
+            assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
+            let line = if let Some(range) = range {
+                format!("Allies (range {}, radius {}) :", range, area_effect.radius)
+            } else {
+                format!("Allies (radius {}) :", area_effect.radius)
+            };
+            t.technical_description.push(line);
+            describe_ability_ally_effect(effect, t);
+        }
+    }
+}
+
+fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
@@ -504,7 +519,7 @@ fn describe_ability_enemy_effect(effect: AbilityNegativeEffect, t: &mut Tooltip)
             }
         }
 
-        AbilityNegativeEffect::Attack => {
+        AbilityNegativeEffect::PerformAttack => {
             t.technical_description.push("  [ evasion ]".to_string());
             t.technical_description.push("  weapon damage".to_string());
         }

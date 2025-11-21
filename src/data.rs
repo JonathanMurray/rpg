@@ -6,12 +6,12 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
-        ApplyEffect, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackCircumstance,
-        AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect,
-        Condition, Consumable, DefenseType, EquipEffect, OnAttackedReaction,
-        OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange,
-        WeaponType,
+        ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute,
+        AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, AttackHitEffect, Condition, Consumable, DefenseType,
+        EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
+        OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnhancementEffect,
+        SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -301,6 +301,7 @@ pub const PENETRATING_ARROWS: Arrow = Arrow {
     icon: EquipmentIconId::PenetratingArrow,
     bonus_penetration: 3,
     on_damage_apply: None,
+    area_effect: None,
 };
 
 pub const BARBED_ARROWS: Arrow = Arrow {
@@ -309,6 +310,24 @@ pub const BARBED_ARROWS: Arrow = Arrow {
     icon: EquipmentIconId::BarbedArrow,
     bonus_penetration: 0,
     on_damage_apply: Some(ApplyEffect::Condition(Condition::Bleeding(3))),
+    area_effect: None,
+};
+
+pub const EXPLODING_ARROWS: Arrow = Arrow {
+    name: "Exploding arrows",
+    sprite: None,
+    icon: EquipmentIconId::ExplodingArrow,
+    bonus_penetration: 0,
+    on_damage_apply: None,
+    area_effect: Some(AreaEffect {
+        radius: Range::Melee,
+        acquisition: AreaTargetAcquisition::Everyone,
+        effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: Some(AbilityDamage::Static(2)),
+            on_hit: None,
+        })),
+    }),
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {
@@ -522,11 +541,11 @@ pub const SWEEP_ATTACK: Ability = Ability {
     roll: Some(AbilityRollType::Attack(-3)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
-        self_area: Some((
-            Range::Melee,
-            AreaTargetAcquisition::Enemies,
-            AbilityEffect::Negative(AbilityNegativeEffect::Attack),
-        )),
+        self_area: Some(AreaEffect {
+            radius: Range::Melee,
+            acquisition: AreaTargetAcquisition::Enemies,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
+        }),
         self_effect: None,
     },
     animation_color: MAGENTA,
@@ -584,7 +603,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     target: AbilityTarget::Enemy {
         //reach: AbilityReach::MoveIntoMelee(Range::Float(3.99)),
         reach: AbilityReach::MoveIntoMelee(Range::Float(2.5)),
-        effect: AbilityNegativeEffect::Attack,
+        effect: AbilityNegativeEffect::PerformAttack,
         impact_area: None,
     },
     animation_color: MAGENTA,
@@ -637,15 +656,15 @@ pub const SCREAM: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
-        self_area: Some((
-            Range::Float(2.5),
-            AreaTargetAcquisition::Enemies,
-            AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+        self_area: Some(AreaEffect {
+            radius: Range::Float(2.5),
+            acquisition: AreaTargetAcquisition::Enemies,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: None,
                 on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
             })),
-        )),
+        }),
         self_effect: None,
     },
     possible_enhancements: [Some(SCREAM_SHRIEK), None, None],
@@ -935,14 +954,14 @@ pub const HEALING_NOVA: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
-        self_area: Some((
-            Range::Ranged(4),
-            AreaTargetAcquisition::Allies,
-            AbilityEffect::Positive(AbilityPositiveEffect {
+        self_area: Some(AreaEffect {
+            radius: Range::Ranged(4),
+            acquisition: AreaTargetAcquisition::Allies,
+            effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
                 apply: None,
             }),
-        )),
+        }),
         self_effect: None,
     },
     animation_color: GREEN,
@@ -984,12 +1003,14 @@ pub const HEALING_RAIN: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Area {
         range: Range::Ranged(5),
-        radius: Range::Float(1.95),
-        acquisition: AreaTargetAcquisition::Allies,
-        effect: AbilityEffect::Positive(AbilityPositiveEffect {
-            healing: 1,
-            apply: None,
-        }),
+        area_effect: AreaEffect {
+            radius: Range::Float(1.95),
+            acquisition: AreaTargetAcquisition::Allies,
+            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+                healing: 1,
+                apply: None,
+            }),
+        },
     },
     animation_color: GREEN,
 };
