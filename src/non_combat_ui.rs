@@ -352,10 +352,16 @@ impl NonCombatCharacterUi {
         let pos = (0.0, screen_h - UI_HEIGHT);
         self.bottom_panel.draw(pos.0, pos.1);
 
+        let is_allowed_to_change_equipment = true;
+
         let outcome = self
             .equipment_section
             .borrow_mut()
-            .handle_equipment_drag_and_consumption(self.equipment_drag, None);
+            .handle_equipment_drag_and_consumption(
+                self.equipment_drag,
+                None,
+                is_allowed_to_change_equipment,
+            );
         self.equipment_drag = outcome.equipment_drag;
         //requested_consumption = outcome.requested_consumption;
         if let Some(drag) = self.equipment_drag {

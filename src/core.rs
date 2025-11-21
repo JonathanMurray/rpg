@@ -3625,7 +3625,6 @@ impl Character {
     }
 
     pub fn set_equipment(&self, entry: Option<EquipmentEntry>, slot_role: EquipmentSlotRole) {
-        dbg!(entry, slot_role);
         match slot_role {
             EquipmentSlotRole::MainHand => match entry {
                 Some(EquipmentEntry::Weapon(weapon)) => {

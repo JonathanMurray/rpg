@@ -27,7 +27,13 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE, COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS, PassiveSkill, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD, TRUE_STRIKE
+    PassiveSkill, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE, COLD_ARROWS, CRIPPLING_SHOT, DAGGER,
+    EXPLODING_ARROWS, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION,
+    KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH,
+    MANA_POTION, MEDIUM_SHIELD, NECROTIC_INFLUENCE, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING,
+    PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
+    SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    TRUE_STRIKE,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -90,14 +96,8 @@ async fn main() {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
-        BARBED_ARROWS,
-        2,
-    )));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
-        COLD_ARROWS,
-        10,
-    )));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(COLD_ARROWS, 10)));
     alice.known_attack_enhancements.push(LONGER_REACH);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
     alice.known_passive_skills.push(PassiveSkill::Honorless);

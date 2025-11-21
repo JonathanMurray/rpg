@@ -37,6 +37,8 @@ pub struct CharacterSheet {
 
     container: Container,
     top_bar_h: f32,
+
+    pub drag: Rc<RefCell<Option<EquipmentDrag>>>,
 }
 
 impl CharacterSheet {
@@ -134,10 +136,16 @@ impl CharacterSheet {
             equipment_changed,
 
             equipment_section,
+
+            drag: Default::default(),
         }
     }
 
-    pub fn draw(&mut self, ui_state: &mut UiState) -> CharacterSheetOutcome {
+    pub fn draw(
+        &mut self,
+        ui_state: &mut UiState,
+        is_active_character: bool,
+    ) -> CharacterSheetOutcome {
         if self.equipment_changed.take() {
             println!("CHAR EQUIPMENT CHANGED. UPDATING CHARACTER SHEET...");
             self.equipment_section
@@ -150,8 +158,6 @@ impl CharacterSheet {
         let clicked_close = self.draw_close_button(x, y);
 
         let (mouse_x, mouse_y) = mouse_position();
-
-        self.container.draw_tooltips(x, y);
 
         if let Some((x_offset, y_offset)) = self.sheet_dragged_offset.get() {
             if is_mouse_button_down(MouseButton::Left) {
@@ -174,21 +180,18 @@ impl CharacterSheet {
             self.sheet_dragged_offset.set(None);
         }
 
-        let is_allowed_to_change_equipment = matches!(
-            ui_state,
-            UiState::ConfiguringAction(..) | UiState::ChoosingAction
-        );
+        let is_allowed_to_change_equipment = is_active_character
+            && matches!(
+                ui_state,
+                UiState::ConfiguringAction(..) | UiState::ChoosingAction
+            );
         let is_allowed_to_use_consumable = matches!(
             ui_state,
             UiState::ConfiguringAction(..) | UiState::ChoosingAction
         );
 
-        let mut equipment_drag = None;
         let mut requested_consumption = None;
         match ui_state {
-            UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
-                equipment_drag = *drag
-            }
             UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
                 requested_consumption = *consumption
             }
@@ -198,15 +201,34 @@ impl CharacterSheet {
         let outcome = self
             .equipment_section
             .borrow_mut()
-            .handle_equipment_drag_and_consumption(equipment_drag, requested_consumption);
+            .handle_equipment_drag_and_consumption(
+                *self.drag.borrow(),
+                requested_consumption,
+                is_allowed_to_change_equipment,
+            );
 
-        if outcome.equipment_drag != equipment_drag && is_allowed_to_change_equipment {
-            // TODO: currently it's not possible to move around items even in the inventory on another character's
-            // turn. Ideally that should be possible.
-            // TODO: ^ and it should also be possible from the chest/shop/victory scenes.
-            *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
-                drag: outcome.equipment_drag,
-            });
+        let mut changed_state = false;
+
+        if outcome.equipment_drag != *self.drag.borrow() {
+            *self.drag.borrow_mut() = outcome.equipment_drag;
+
+            if let Some(EquipmentDrag {
+                to_idx: Some(..), ..
+            }) = outcome.equipment_drag
+            {
+                assert!(is_allowed_to_change_equipment);
+                *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
+                    drag: Rc::clone(&self.drag),
+                });
+                changed_state = true;
+            } else if matches!(
+                ui_state,
+                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { .. })
+            ) && is_allowed_to_change_equipment
+            {
+                // Since we modified the drag that's shared (through Rc) with the UiState
+                changed_state = true;
+            }
         } else if requested_consumption.is_none()
             && outcome.requested_consumption.is_some()
             && is_allowed_to_use_consumable
@@ -214,11 +236,14 @@ impl CharacterSheet {
             *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
                 outcome.requested_consumption,
             ));
+            changed_state = true;
         }
+
+        self.container.draw_tooltips(x, y);
 
         CharacterSheetOutcome {
             clicked_close,
-            changed_state: outcome.changed,
+            changed_state,
         }
     }
 
@@ -415,11 +440,4 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
         children: buttons,
         ..Default::default()
     })
-}
-
-fn has_drag(ui_state: &UiState) -> bool {
-    matches!(
-        ui_state,
-        UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag: Some(_) })
-    )
 }

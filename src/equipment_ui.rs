@@ -383,6 +383,7 @@ impl EquipmentSection {
         &mut self,
         mut drag: Option<EquipmentDrag>,
         mut requested_consumption: Option<EquipmentConsumption>,
+        is_allowed_to_change_equipment: bool,
     ) -> EquipmentSectionOutcome {
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -399,25 +400,34 @@ impl EquipmentSection {
             let drag_validity = match drag {
                 Some(EquipmentDrag { from_idx, .. }) if from_idx != idx => {
                     let dragged_slot = &mut self.equipment_slots[from_idx].borrow_mut();
-                    let valid_forward = dragged_slot
-                        .content
-                        .as_ref()
-                        .map(|content| {
-                            self.character
-                                .can_equipment_fit(content.equipment, slot.role())
-                        })
-                        .unwrap_or(true);
 
-                    let valid_reverse = slot
-                        .content
-                        .as_ref()
-                        .map(|content| {
-                            self.character
-                                .can_equipment_fit(content.equipment, dragged_slot.role())
-                        })
-                        .unwrap_or(true);
+                    if !is_allowed_to_change_equipment
+                        && [dragged_slot, &slot]
+                            .iter()
+                            .any(|slot| slot.role().is_equipped())
+                    {
+                        Some(false)
+                    } else {
+                        let valid_forward = dragged_slot
+                            .content
+                            .as_ref()
+                            .map(|content| {
+                                self.character
+                                    .can_equipment_fit(content.equipment, slot.role())
+                            })
+                            .unwrap_or(true);
 
-                    Some(valid_forward && valid_reverse)
+                        let valid_reverse = slot
+                            .content
+                            .as_ref()
+                            .map(|content| {
+                                self.character
+                                    .can_equipment_fit(content.equipment, dragged_slot.role())
+                            })
+                            .unwrap_or(true);
+
+                        Some(valid_forward && valid_reverse)
+                    }
                 }
                 _ => None,
             };

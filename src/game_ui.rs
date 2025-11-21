@@ -142,7 +142,7 @@ pub enum ConfiguredAction {
         cost: u32,
     },
     ChangeEquipment {
-        drag: Option<EquipmentDrag>,
+        drag: Rc<RefCell<Option<EquipmentDrag>>>,
     },
     UseConsumable(Option<EquipmentConsumption>),
 }
@@ -217,7 +217,7 @@ impl ConfiguredAction {
             } => !selected_movement_path.is_empty(),
 
             ConfiguredAction::ChangeEquipment { drag } => matches!(
-                drag,
+                *drag.borrow(),
                 Some(EquipmentDrag {
                     to_idx: Some(_),
                     ..
@@ -244,7 +244,9 @@ impl ConfiguredAction {
                 cost: 0,
                 selected_movement_path: Default::default(),
             }),
-            BaseAction::ChangeEquipment => Some(Self::ChangeEquipment { drag: None }),
+            BaseAction::ChangeEquipment => Some(Self::ChangeEquipment {
+                drag: Rc::new(RefCell::new(None)),
+            }),
             BaseAction::UseConsumable => Some(Self::UseConsumable(None)),
             BaseAction::EndTurn => None,
         }
@@ -516,10 +518,8 @@ impl UserInterface {
         self.player_portraits.draw(570.0, ui_y + 25.0);
         self.character_sheet_toggle.draw(570.0, ui_y + 110.0);
 
-        let character_ui = self
-            .character_uis
-            .get_mut(&self.player_portraits.selected_id())
-            .unwrap();
+        let selected_character_id = self.player_portraits.selected_id();
+        let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
 
         character_ui.draw(ui_y + 5.0);
 
@@ -537,9 +537,11 @@ impl UserInterface {
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
         if self.character_sheet_toggle.shown.get() {
+            let is_showing_active = self.active_character_id == selected_character_id;
+
             let outcome = character_ui
                 .character_sheet
-                .draw(&mut self.state.borrow_mut());
+                .draw(&mut self.state.borrow_mut(), is_showing_active);
 
             self.character_sheet_toggle
                 .shown
@@ -1071,13 +1073,15 @@ impl UserInterface {
                 self.target_ui
                     .set_action("Change equipment".to_string(), vec![], false);
 
-                if let Some(EquipmentDrag {
-                    to_idx: Some(_), ..
-                }) = drag
+                if let Some(
+                    drag @ EquipmentDrag {
+                        to_idx: Some(_), ..
+                    },
+                ) = *drag.borrow()
                 {
                     let description = self.character_uis[&self.active_character_id]
                         .character_sheet
-                        .describe_requested_equipment_change(drag.unwrap());
+                        .describe_requested_equipment_change(drag);
                     self.activity_popup.additional_line = Some(description);
                 } else {
                     self.activity_popup.additional_line =
@@ -1817,7 +1821,9 @@ impl UserInterface {
                             .get_mut(&self.active_character_id)
                             .unwrap()
                             .character_sheet
-                            .resolve_drag_to_slots(drag.unwrap());
+                            .resolve_drag_to_slots(drag.borrow().unwrap());
+
+                        *drag.borrow_mut() = None;
 
                         Some(Action::ChangeEquipment { from, to })
                     }
