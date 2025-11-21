@@ -1231,4 +1231,12 @@ impl PassiveSkill {
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
         }
     }
+
+    pub fn keywords(&self) -> &'static [Condition] {
+        use PassiveSkill::*;
+        match self {
+            BloodRage => &[Condition::NearDeath],
+            _ => &[],
+        }
+    }
 }

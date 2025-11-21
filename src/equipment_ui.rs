@@ -31,8 +31,9 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ArmorPiece, Arrow, ArrowStack, Character, Consumable, EquipmentEntry, EquipmentSlotRole,
-        HandType, Party, Shield, Weapon, WeaponGrip, WeaponRange,
+        ApplyEffect, ArmorPiece, Arrow, ArrowStack, AttackHitEffect, Character, Consumable,
+        EquipmentEntry, EquipmentSlotRole, HandType, Party, Shield, Weapon, WeaponGrip,
+        WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     textures::EquipmentIconId,
@@ -103,6 +104,13 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
     if let Some(effect) = weapon.on_true_hit {
         t.technical_description.push(format!("[true hit] {effect}"));
+        if let AttackHitEffect::Apply(apply_effect) = effect {
+            match apply_effect {
+                ApplyEffect::Condition(condition) => t.keywords.push(condition),
+                ApplyEffect::ConsumeCondition { condition } => t.keywords.push(condition),
+                _ => {}
+            }
+        }
     }
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description

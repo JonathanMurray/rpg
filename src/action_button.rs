@@ -74,6 +74,7 @@ fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {
     Tooltip {
         header: skill.name().to_string(),
         description: Some(skill.description()),
+        keywords: skill.keywords().to_vec(),
         ..Default::default()
     }
 }

@@ -40,7 +40,7 @@ use rpg::game_ui_connection::GameUserInterfaceConnection;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::rest_scene::run_rest_loop;
-use rpg::shop_scene::run_shop_loop;
+use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
@@ -118,6 +118,7 @@ async fn main() {
     bob.armor_piece.set(Some(SHIRT));
     bob.known_attack_enhancements.push(TRUE_STRIKE);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
+    bob.known_passive_skills.push(PassiveSkill::BloodRage);
 
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions
@@ -141,11 +142,11 @@ async fn main() {
     //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
     //bob.health.lose(2);
 
-    let mut player_characters = vec![alice, bob];
+    let mut player_characters = vec![bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Test,
+        FightId::EasyGuard,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
