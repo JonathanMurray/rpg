@@ -181,6 +181,7 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum EquipmentIconId {
+    Undefined,
     Rapier,
     Warhammer,
     Bow,
@@ -199,6 +200,9 @@ pub enum EquipmentIconId {
 
     HealthPotion,
     ManaPotion,
+    AdrenalinPotion,
+    EnergyPotion,
+    ArcanePotion,
 
     PlaceholderOffhand,
     PlaceholderMainhand,
@@ -228,6 +232,9 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
         (EquipmentIconId::ExplodingArrow, "eq_exploding_arrow.png"),
         (EquipmentIconId::HealthPotion, "eq_health_potion.png"),
         (EquipmentIconId::ManaPotion, "eq_mana_potion.png"),
+        (EquipmentIconId::AdrenalinPotion, "eq_adrenaline_potion.png"),
+        (EquipmentIconId::EnergyPotion, "eq_energy_potion.png"),
+        (EquipmentIconId::ArcanePotion, "eq_arcane_potion.png"),
         (
             EquipmentIconId::PlaceholderOffhand,
             "eq_placeholder_offhand.png",

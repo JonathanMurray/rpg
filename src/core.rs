@@ -12,7 +12,7 @@ use macroquad::rand::ChooseRandom;
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::PassiveSkill;
+use crate::data::{PassiveSkill, ADRENALIN_POTION};
 use crate::game_ui_connection::GameUserInterfaceConnection;
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::PathfindGrid;
@@ -458,6 +458,10 @@ impl CoreGame {
                 if consumable.mana_gain > 0 {
                     character.mana.gain(consumable.mana_gain);
                     character.on_mana_changed();
+                }
+                if let Some(apply_effect) = consumable.effect {
+                    // TODO: log it?
+                    self.perform_effect_application(apply_effect, None, character);
                 }
 
                 character.set_equipment(None, slot_role);
@@ -1985,6 +1989,9 @@ impl CoreGame {
 
         //let mut new_ap = MAX_ACTION_POINTS;
         let mut gain_ap = ACTION_POINTS_PER_TURN;
+        if conditions.borrow().has(&Condition::Adrenalin) {
+            gain_ap += 1;
+        }
         if conditions.borrow().has(&Condition::NearDeath) {
             gain_ap = gain_ap.saturating_sub(1);
         }
@@ -1997,7 +2004,7 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::MainHandExertion);
         conditions.borrow_mut().remove(&Condition::OffHandExertion);
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
-        let stamina_gain = (character.stamina.max() as f32 / 3.0).ceil() as u32;
+        let stamina_gain = (character.stamina.max() as f32 / 4.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
 
         character.regain_movement();
@@ -2459,6 +2466,8 @@ pub enum Condition {
     BloodRage,
     ArcaneSurge,
     ThrillOfBattle,
+    Adrenalin,
+    ArcaneProwess,
 }
 
 impl Condition {
@@ -2486,6 +2495,8 @@ impl Condition {
             BloodRage => "Blood rage",
             ArcaneSurge => "Arcane surge",
             ThrillOfBattle => "Thrill of battle",
+            Adrenalin => "Adrenalin",
+            ArcaneProwess => "Arcane prowess",
         }
     }
 
@@ -2513,6 +2524,8 @@ impl Condition {
             BloodRage => "+3 attack modifier (from passive skill)",
             ArcaneSurge => "+3 spell modifier (from passive skill)",
             ThrillOfBattle => "+3 attack/spell modifier (from passive skill)",
+            Adrenalin => "Gains 1 more AP per turn",
+            ArcaneProwess => "+5 spell modifier"
         }
     }
 
@@ -2540,6 +2553,8 @@ impl Condition {
             BloodRage => true,
             ArcaneSurge => true,
             ThrillOfBattle => true,
+            Adrenalin => true,
+            ArcaneProwess => true,
         }
     }
 }
@@ -4167,6 +4182,9 @@ impl Character {
         if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;
         }
+        if conditions.has(&Condition::ArcaneProwess) {
+            res += 5;
+        }
 
         res
     }
@@ -4983,8 +5001,22 @@ pub struct Consumable {
     pub name: &'static str,
     pub health_gain: u32,
     pub mana_gain: u32,
+    pub effect: Option<ApplyEffect>,
     pub icon: EquipmentIconId,
     pub weight: u32,
+}
+
+impl Consumable {
+    pub const fn default() -> Self {
+        Self {
+            name: "",
+            health_gain: 0,
+            mana_gain: 0,
+            effect: None,
+            icon: EquipmentIconId::Undefined,
+            weight: 0,
+        }
+    }
 }
 
 impl EquipmentEntry {

@@ -80,6 +80,10 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
         t.technical_description
             .push(format!("Restores {} mana", consumable.mana_gain));
     }
+    if let Some(apply_effect) = consumable.effect {
+        t.technical_description.push("Self:".to_string());
+        describe_apply_effect(apply_effect, &mut t);
+    }
     //lines.push("<Right-click to use>".to_string());
     t.technical_description
         .push(format!("Weight: {}", consumable.weight));

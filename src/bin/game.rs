@@ -27,13 +27,13 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    PassiveSkill, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE, COLD_ARROWS, CRIPPLING_SHOT, DAGGER,
-    EMPOWER, EXPLODING_ARROWS, FIREBALL, FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN,
-    HEALTH_POTION, INFLICT_WOUNDS, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK,
-    LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
-    NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE, SCREAM,
-    SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT, SIDE_STEP,
-    SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
+    COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL,
+    FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, INFLICT_WOUNDS, KILL,
+    LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH,
+    MANA_POTION, MEDIUM_SHIELD, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS,
+    RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT,
+    SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -130,6 +130,11 @@ async fn main() {
         .borrow_mut()
         .push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(ENERGY_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements
     //.push(LUNGE_ATTACK_HEAVY_IMPACT);
@@ -141,12 +146,14 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_fight_loop(
+    player_characters = run_shop_loop(
         player_characters,
-        FightId::EasyGuard,
+        font.clone(),
         &equipment_icons,
         icons.clone(),
-        portrait_textures.clone(),
+        &portrait_textures,
+        &party,
+        &mut generate_shop_contents(),
     )
     .await;
 

@@ -13,12 +13,15 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_regular_tooltip, draw_tooltip, TooltipPositionPreference},
+    action_button::{
+        draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, TooltipPositionPreference,
+    },
     base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{ArrowStack, Character, EquipmentEntry, Party},
     data::{
-        BARBED_ARROWS, BOW, CHAIN_MAIL, DAGGER, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION,
-        MEDIUM_SHIELD, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
+        ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BOW, CHAIN_MAIL, COLD_ARROWS, DAGGER,
+        ENERGY_POTION, EXPLODING_ARROWS, HEALTH_POTION, LEATHER_ARMOR, MANA_POTION, MEDIUM_SHIELD,
+        PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
@@ -114,6 +117,8 @@ pub async fn run_shop_loop(
             let mut icon_x = x_mid - row_w / 2.0;
             let icon_y = 150.0;
 
+            let mut hovered = None;
+
             for entry in entries.iter_mut() {
                 let rect = Rect::new(icon_x, icon_y, icon_w, icon_w);
 
@@ -149,7 +154,7 @@ pub async fn run_shop_loop(
                     .draw(icon_x + icon_w / 2.0 - text_dim.width / 2.0, icon_y - 22.0);
 
                     let tooltip = equipment_tooltip(&entry.item);
-                    draw_regular_tooltip(
+                    let tooltip_rect = draw_regular_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
@@ -168,6 +173,7 @@ pub async fn run_shop_loop(
 
                             if is_mouse_button_pressed(MouseButton::Left) {
                                 let success = character.try_gain_equipment(entry.item);
+                                // TODO: It should end up in stash, or buying should not be allowed in the first place
                                 assert!(success);
                                 party.spend_money(entry.cost);
                                 entry.has_been_bought = true;
@@ -175,12 +181,20 @@ pub async fn run_shop_loop(
                         } else {
                             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, RED);
                         }
+
+                        hovered = Some((tooltip, tooltip_rect));
                     }
                 } else {
                     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
                 }
 
                 icon_x += icon_w + icon_margin;
+            }
+
+            if let Some((tooltip, rect)) = hovered {
+                if !tooltip.keywords.is_empty() {
+                    draw_keyword_tooltips(&font, &tooltip.keywords, rect.x, rect.bottom() + 2.0);
+                }
             }
 
             // Transition to other scene
@@ -224,11 +238,19 @@ pub fn generate_shop_contents() -> Vec<ShopEntry> {
         (EquipmentEntry::Shield(MEDIUM_SHIELD), 5),
         (EquipmentEntry::Consumable(HEALTH_POTION), 4),
         (EquipmentEntry::Consumable(MANA_POTION), 4),
+        (EquipmentEntry::Consumable(ADRENALIN_POTION), 6),
+        (EquipmentEntry::Consumable(ENERGY_POTION), 6),
+        (EquipmentEntry::Consumable(ARCANE_POTION), 4),
         (
             EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
             4,
         ),
         (EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)), 4),
+        (EquipmentEntry::Arrows(ArrowStack::new(COLD_ARROWS, 3)), 4),
+        (
+            EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3)),
+            4,
+        ),
     ];
 
     select_n_random(candidate_items, 5)

@@ -14,12 +14,15 @@ use macroquad::{
 use rand::Rng;
 
 use crate::{
-    action_button::{draw_regular_tooltip, draw_tooltip, TooltipPositionPreference},
+    action_button::{
+        draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference,
+    },
     base_ui::{draw_text_rounded, Drawable},
     core::{ArrowStack, Character, EquipEffect, EquipmentEntry},
     data::{
-        BARBED_ARROWS, BONE_CRUSHER, CHAIN_MAIL, DAGGER, ELUSIVE_BOW, HEALTH_POTION, LEATHER_ARMOR,
-        LIGHT_CHAIN_MAIL, MANA_POTION, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD,
+        ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, CHAIN_MAIL, DAGGER,
+        ELUSIVE_BOW, ENERGY_POTION, HEALTH_POTION, LEATHER_ARMOR, LIGHT_CHAIN_MAIL, MANA_POTION,
+        MEDIUM_SHIELD, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD,
     },
     equipment_ui::equipment_tooltip,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
@@ -100,7 +103,7 @@ pub async fn run_chest_loop(
                     );
 
                     let tooltip = equipment_tooltip(&entry.item);
-                    draw_regular_tooltip(
+                    let tooltip_rect = draw_regular_tooltip(
                         &font,
                         TooltipPositionPreference::HorCenteredAt((
                             icon_x + icon_w / 2.0,
@@ -115,6 +118,15 @@ pub async fn run_chest_loop(
 
                     if rect.contains(mouse_position().into()) {
                         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
+
+                        if !tooltip.keywords.is_empty() {
+                            draw_keyword_tooltips(
+                                &font,
+                                &tooltip.keywords,
+                                tooltip_rect.right() + 2.0,
+                                tooltip_rect.y,
+                            );
+                        }
 
                         if is_mouse_button_pressed(MouseButton::Left) {
                             let character = &characters[ui.selected_character_idx()];
@@ -204,13 +216,12 @@ pub struct ChestEntry {
 pub fn generate_chest_content() -> Vec<ChestEntry> {
     let candidate_chest_rewards = vec![
         EquipmentEntry::Armor(CHAIN_MAIL),
-        EquipmentEntry::Armor(LEATHER_ARMOR),
-        EquipmentEntry::Weapon(DAGGER),
-        EquipmentEntry::Weapon(SWORD),
-        EquipmentEntry::Weapon(RAPIER),
-        EquipmentEntry::Shield(SMALL_SHIELD),
+        EquipmentEntry::Shield(MEDIUM_SHIELD),
         EquipmentEntry::Arrows(ArrowStack::new(PENETRATING_ARROWS, 3)),
         EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)),
+        EquipmentEntry::Consumable(ARCANE_POTION),
+        EquipmentEntry::Consumable(ENERGY_POTION),
+        EquipmentEntry::Consumable(ADRENALIN_POTION),
     ];
     let mut rng = rand::rng();
     vec![ChestEntry {

@@ -1170,7 +1170,7 @@ pub fn draw_regular_tooltip(
     header: &str,
     error: Option<&'static str>,
     content_lines: &[String],
-) -> (f32, f32) {
+) -> Rect {
     draw_tooltip(
         font,
         pos_preference,
@@ -1190,7 +1190,7 @@ pub fn draw_tooltip(
     content_lines: &[String],
     keywords: &[Condition],
     is_keyword_tooltip: bool,
-) -> (f32, f32) {
+) -> Rect {
     let header_font_size = if is_keyword_tooltip { 16 } else { 24 };
     let font_size = 16;
     let mut max_line_w = 0.0;
@@ -1285,19 +1285,19 @@ pub fn draw_tooltip(
         TooltipPositionPreference::At(pos) => pos,
     };
 
-    let tooltip_rect = (x, y, tooltip_w, tooltip_h);
+    let tooltip_rect = Rect::new(x, y, tooltip_w, tooltip_h);
     draw_rectangle(
-        tooltip_rect.0,
-        tooltip_rect.1,
-        tooltip_rect.2,
-        tooltip_rect.3,
+        tooltip_rect.x,
+        tooltip_rect.y,
+        tooltip_rect.w,
+        tooltip_rect.h,
         Color::new(0.0, 0.0, 0.0, 0.9),
     );
     draw_rectangle_lines(
-        tooltip_rect.0,
-        tooltip_rect.1,
-        tooltip_rect.2,
-        tooltip_rect.3,
+        tooltip_rect.x,
+        tooltip_rect.y,
+        tooltip_rect.w,
+        tooltip_rect.h,
         1.0,
         GRAY,
     );
@@ -1309,7 +1309,7 @@ pub fn draw_tooltip(
         ..Default::default()
     };
 
-    let mut line_y = tooltip_rect.1 + text_margin * 2.0 + 5.0;
+    let mut line_y = tooltip_rect.y + text_margin * 2.0 + 5.0;
 
     let mut draw_line = |line, color: Option<Color>, is_header: bool| {
         let mut params = text_params.clone();
@@ -1319,7 +1319,7 @@ pub fn draw_tooltip(
         if is_header {
             params.font_size = header_font_size;
         }
-        draw_text_rounded(line, tooltip_rect.0 + text_margin, line_y, params);
+        draw_text_rounded(line, tooltip_rect.x + text_margin, line_y, params);
         if line.is_empty() {
             line_y += empty_line_h;
         } else {
@@ -1337,21 +1337,22 @@ pub fn draw_tooltip(
         draw_line(line, None, false)
     }
 
-    let space = 1.0;
-    let keyword_x = x + tooltip_w + space;
-    let mut keyword_y = y;
+    draw_keyword_tooltips(font, keywords, x + tooltip_w + 1.0, y);
+
+    tooltip_rect
+}
+
+pub fn draw_keyword_tooltips(font: &Font, keywords: &[Condition], x: f32, mut y: f32) {
     for keyword in keywords {
-        let size = draw_tooltip(
+        let rect = draw_tooltip(
             font,
-            TooltipPositionPreference::At((keyword_x, keyword_y)),
+            TooltipPositionPreference::At((x, y)),
             keyword.name(),
             None,
             &[keyword.description().to_string()],
             &[],
             true,
         );
-        keyword_y += size.1;
+        y += rect.h;
     }
-
-    (tooltip_w, tooltip_h)
 }

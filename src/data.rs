@@ -1253,18 +1253,45 @@ pub const SEARING_LIGHT: Ability = Ability {
 
 pub const HEALTH_POTION: Consumable = Consumable {
     name: "Health potion",
-    health_gain: 4,
-    mana_gain: 0,
     icon: EquipmentIconId::HealthPotion,
-    weight: 0,
+    health_gain: 4,
+    ..Consumable::default()
 };
 
 pub const MANA_POTION: Consumable = Consumable {
     name: "Mana potion",
-    health_gain: 0,
-    mana_gain: 5,
     icon: EquipmentIconId::ManaPotion,
-    weight: 0,
+    mana_gain: 5,
+    ..Consumable::default()
+};
+
+pub const ADRENALIN_POTION: Consumable = Consumable {
+    name: "Adrenalin potion",
+    icon: EquipmentIconId::AdrenalinPotion,
+    effect: Some(ApplyEffect::Condition(ApplyCondition {
+        condition: Condition::Adrenalin,
+        stacks: None,
+        duration_rounds: Some(3),
+    })),
+    ..Consumable::default()
+};
+
+pub const ENERGY_POTION: Consumable = Consumable {
+    name: "Energy potion",
+    icon: EquipmentIconId::EnergyPotion,
+    effect: Some(ApplyEffect::GainStamina(10)),
+    ..Consumable::default()
+};
+
+pub const ARCANE_POTION: Consumable = Consumable {
+    name: "Arcane potion",
+    icon: EquipmentIconId::ArcanePotion,
+    effect: Some(ApplyEffect::Condition(ApplyCondition {
+        condition: Condition::ArcaneProwess,
+        stacks: None,
+        duration_rounds: Some(2),
+    })),
+    ..Consumable::default()
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
