@@ -22,8 +22,9 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Weapon, WeaponType,
+        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType,
+        EquipmentRequirement, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect,
+        Range, Shield, Weapon, WeaponType,
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
@@ -556,6 +557,7 @@ pub struct ActionButton {
     tooltip: RefCell<Tooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
+    tooltip_is_based_on_equipped_shield: Cell<Option<Shield>>,
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
 }
 
@@ -638,14 +640,14 @@ impl ActionButton {
             tooltip: RefCell::new(tooltip),
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
+            tooltip_is_based_on_equipped_shield: Default::default(),
             hotkey: RefCell::new(None),
         }
     }
 
     pub fn tooltip(&self) -> Ref<Tooltip> {
-        // TODO: if action requires melee weapon and none is equipped, add error message to tooltip
         if let ButtonAction::Action(BaseAction::UseAbility(ability)) = self.action {
-            if ability.weapon_requirement == Some(WeaponType::Melee) {
+            if ability.requires_melee_weapon() {
                 let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
 
                 if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
@@ -657,6 +659,20 @@ impl ActionButton {
 
                     self.tooltip_is_based_on_equipped_weapon
                         .set(equipped_weapon);
+                }
+            } else if ability.requires_shield() {
+                let equipped_shield = self.character.as_ref().unwrap().shield();
+
+                if self.tooltip_is_based_on_equipped_shield.get() != equipped_shield {
+                    dbg!(&self.tooltip_is_based_on_equipped_shield);
+                    if equipped_shield.is_some() {
+                        self.tooltip.borrow_mut().error = None;
+                    } else {
+                        self.tooltip.borrow_mut().error = Some("Requires shield");
+                    }
+
+                    self.tooltip_is_based_on_equipped_shield
+                        .set(equipped_shield);
                 }
             }
         }
@@ -688,10 +704,9 @@ impl ActionButton {
                         ..Default::default()
                     }
                 };
+                self.tooltip_is_based_on_equipped_weapon
+                    .set(equipped_weapon);
             }
-
-            self.tooltip_is_based_on_equipped_weapon
-                .set(equipped_weapon);
         }
 
         if let ButtonAction::OpportunityAttack = self.action {
@@ -705,10 +720,9 @@ impl ActionButton {
                     ],
                     ..Default::default()
                 };
+                self.tooltip_is_based_on_equipped_weapon
+                    .set(equipped_weapon);
             }
-
-            self.tooltip_is_based_on_equipped_weapon
-                .set(equipped_weapon);
         }
 
         self.tooltip.borrow()

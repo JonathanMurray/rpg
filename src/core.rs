@@ -2492,7 +2492,7 @@ impl Condition {
             Slowed => "Gains 2 less AP per turn",
             Exposed => "-3 to all defenses",
             Hindered => "Half movement speed",
-            Protected => "+x armor against the next attack that hits",
+            Protected => "+x armor against the next attack",
             Bleeding => "End of turn: 50% stacks decay, lose 1 health for each decayed",
             Burning => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
             Braced => "Gain +3 evasion against the next incoming attack",
@@ -2742,15 +2742,6 @@ pub struct AttackAction {
 }
 
 impl BaseAction {
-    pub fn requires_equipped_melee_weapon(&self) -> bool {
-        match self {
-            BaseAction::UseAbility(ability) => {
-                matches!(ability.weapon_requirement, Some(WeaponType::Melee))
-            }
-            _ => false,
-        }
-    }
-
     pub fn action_point_cost(&self) -> i32 {
         match self {
             BaseAction::Attack(attack) => attack.action_point_cost as i32,
@@ -2800,12 +2791,31 @@ pub struct Ability {
     pub action_point_cost: u32,
     pub mana_cost: u32,
     pub stamina_cost: u32,
-    pub weapon_requirement: Option<WeaponType>,
+    pub requirement: Option<EquipmentRequirement>,
 
     pub roll: Option<AbilityRollType>,
     pub target: AbilityTarget,
     pub possible_enhancements: [Option<AbilityEnhancement>; 3],
     pub animation_color: Color,
+}
+
+impl Ability {
+    pub fn requires_melee_weapon(&self) -> bool {
+        matches!(
+            self.requirement,
+            Some(EquipmentRequirement::Weapon(WeaponType::Melee))
+        )
+    }
+
+    pub fn requires_shield(&self) -> bool {
+        matches!(self.requirement, Some(EquipmentRequirement::Shield))
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum EquipmentRequirement {
+    Weapon(WeaponType),
+    Shield,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3898,9 +3908,10 @@ impl Character {
                 matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
             }
             BaseAction::UseAbility(ability) => {
-                if matches!(ability.weapon_requirement, Some(WeaponType::Melee))
-                    && !self.has_equipped_melee_weapon()
-                {
+                if ability.requires_shield() && self.shield().is_none() {
+                    return false;
+                }
+                if ability.requires_melee_weapon() && !self.has_equipped_melee_weapon() {
                     return false;
                 }
                 ap >= ability.action_point_cost

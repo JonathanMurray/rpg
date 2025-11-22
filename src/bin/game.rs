@@ -111,8 +111,8 @@ async fn main() {
         Attributes::new(6, 3, 3, 3),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, BONE_CRUSHER);
-    //bob.set_shield(SMALL_SHIELD);
+    bob.set_weapon(HandType::MainHand, DAGGER);
+    bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(SHIRT));
     bob.known_attack_enhancements.push(EMPOWER);
     bob.known_passive_skills.push(PassiveSkill::Vigilant);
@@ -121,8 +121,7 @@ async fn main() {
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions
         .borrow_mut()
-        .push(BaseAction::UseAbility(SEARING_LIGHT));
-    bob.known_ability_enhancements.push(SEARING_LIGHT_BURN);
+        .push(BaseAction::UseAbility(BRACE));
     bob.known_actions
         .borrow_mut()
         .push(BaseAction::UseAbility(FIREBALL));

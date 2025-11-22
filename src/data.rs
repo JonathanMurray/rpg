@@ -9,9 +9,9 @@ use crate::{
         ApplyCondition, ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow,
         AttackAttribute, AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, AttackHitEffect, Condition, Consumable, DefenseType,
-        EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
-        OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnhancementEffect,
-        SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
+        EquipEffect, EquipmentRequirement, OnAttackedReaction, OnAttackedReactionEffect,
+        OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
+        SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -565,7 +565,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 1,
-    weapon_requirement: Some(WeaponType::Melee),
+    requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::Attack(-3)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
@@ -621,7 +621,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 2,
-    weapon_requirement: Some(WeaponType::Melee),
+    requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::Attack(0)),
     possible_enhancements: [
@@ -641,12 +641,12 @@ pub const LUNGE_ATTACK: Ability = Ability {
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
-    description: Condition::Protected.description(),
+    description: "",
     icon: IconId::Brace,
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 1,
-    weapon_requirement: None,
+    requirement: Some(EquipmentRequirement::Shield),
     roll: None,
     possible_enhancements: [None; 3],
     target: AbilityTarget::None {
@@ -655,7 +655,7 @@ pub const BRACE: Ability = Ability {
             healing: 0,
             apply: Some(ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Protected,
-                stacks: Some(1),
+                stacks: Some(2),
                 duration_rounds: None,
             })),
         }),
@@ -685,7 +685,7 @@ pub const SCREAM: Ability = Ability {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
@@ -720,7 +720,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
@@ -786,7 +786,7 @@ pub const MIND_BLAST: Ability = Ability {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [
@@ -849,7 +849,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(NECROTIC_INFLUENCE_ENHANCEMENT), None, None],
@@ -880,7 +880,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
@@ -911,7 +911,7 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
@@ -942,7 +942,7 @@ pub const MAGI_HEAL: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
@@ -964,7 +964,7 @@ pub const HEAL: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
@@ -1018,7 +1018,7 @@ pub const HEALING_NOVA: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
@@ -1044,7 +1044,7 @@ pub const SELF_HEAL: Ability = Ability {
     action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
@@ -1070,7 +1070,7 @@ pub const HEALING_RAIN: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 2,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
@@ -1146,7 +1146,7 @@ pub const FIREBALL: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
@@ -1183,7 +1183,7 @@ pub const KILL: Ability = Ability {
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
@@ -1228,7 +1228,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
-    weapon_requirement: None,
+    requirement: None,
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(SEARING_LIGHT_BURN), None, None],
