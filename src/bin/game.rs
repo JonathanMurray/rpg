@@ -128,7 +128,7 @@ async fn main() {
     bob.known_ability_enhancements.push(FIREBALL_INFERNO);
     bob.known_actions
         .borrow_mut()
-        .push(BaseAction::UseAbility(SHACKLED_MIND));
+        .push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
     //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
     //bob.known_ability_enhancements

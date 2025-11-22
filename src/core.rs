@@ -1,6 +1,7 @@
 use std::cell::{Cell, RefCell};
 
 use std::collections::{HashMap, HashSet};
+use std::default;
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
@@ -21,7 +22,7 @@ use crate::util::are_adjacent;
 pub type Position = (i32, i32);
 
 pub const MAX_ACTION_POINTS: u32 = 5;
-pub const ACTION_POINTS_PER_TURN: u32 = 4;
+pub const ACTION_POINTS_PER_TURN: u32 = 3;
 
 #[derive(Debug)]
 enum ActionOutcome {
@@ -147,9 +148,12 @@ impl CoreGame {
                     }
                 }
 
+                /*
+                No, don't end turn automatically; what if the player wants to move when having 0 AP?
                 if self.active_character().action_points.current() == 0 {
                     ending_turn = true;
                 }
+                 */
             } else {
                 let name = self.active_character().name;
                 self.log(format!("{} ended their turn", name)).await;
@@ -1550,8 +1554,16 @@ impl CoreGame {
         let mut armor_penetrators = vec![];
         let weapon = attacker.weapon(hand_type).unwrap();
         let mut used_arrow = None;
-        if !weapon.is_melee() {
-            if let Some(stack) = attacker.arrows.get() {
+
+        for (name, effect) in &enhancements {
+            let penetration = effect.armor_penetration;
+            if penetration > 0 {
+                armor_penetrators.push((penetration, *name));
+            }
+            if effect.consume_equipped_arrow {
+                assert!(used_arrow.is_none());
+                assert!(!weapon.is_melee());
+                let stack = attacker.arrows.get().unwrap();
                 used_arrow = Some(stack.arrow);
                 attacker.spend_one_arrow();
             }
@@ -1564,12 +1576,6 @@ impl CoreGame {
             }
         }
 
-        for (name, effect) in &enhancements {
-            let penetration = effect.armor_penetration;
-            if penetration > 0 {
-                armor_penetrators.push((penetration, *name));
-            }
-        }
         if attacker
             .known_passive_skills
             .contains(&PassiveSkill::WeaponProficiency)
@@ -2489,7 +2495,7 @@ impl Condition {
             Dazed => "-3 evasion and attacks with disadvantage",
             Blinded => "Disadvantage on dice rolls; always counts as Flanked when being attacked",
             Raging => "Gains advantage on melee attack rolls until end of turn",
-            Slowed => "Gains 2 less AP per turn",
+            Slowed => "Gains 1 less AP per turn",
             Exposed => "-3 to all defenses",
             Hindered => "Half movement speed",
             Protected => "+x armor against the next attack",
@@ -2543,7 +2549,7 @@ const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 3;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
-const SLOWED_AP_PENALTY: u32 = 2;
+const SLOWED_AP_PENALTY: u32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -3064,6 +3070,8 @@ pub struct AttackEnhancementEffect {
 
     // Gets applied on the target regardless if the attack hits
     pub on_target: Option<ApplyEffect>,
+
+    pub consume_equipped_arrow: bool,
 }
 
 impl AttackEnhancementEffect {
@@ -3080,6 +3088,7 @@ impl AttackEnhancementEffect {
             range_bonus: 0,
             on_self: None,
             on_target: None,
+            consume_equipped_arrow: false,
         }
     }
 }
@@ -3947,7 +3956,8 @@ impl Character {
     }
 
     pub fn usable_attack_enhancements(&self, attack_hand: HandType) -> Vec<AttackEnhancement> {
-        self.known_attack_enhancements(attack_hand)
+        let mut usable: Vec<AttackEnhancement> = self
+            .known_attack_enhancements(attack_hand)
             .iter()
             .filter_map(|(_, e)| {
                 if self.can_use_attack_enhancement(attack_hand, e) {
@@ -3956,7 +3966,24 @@ impl Character {
                     None
                 }
             })
-            .collect()
+            .collect();
+
+        if let Some(arrows) = self.arrows.get() {
+            assert!(arrows.quantity > 0);
+            usable.push(AttackEnhancement {
+                name: "Use special arrow",
+                description: arrows.arrow.name,
+                icon: IconId::RangedAttack,
+                weapon_requirement: Some(WeaponType::Ranged),
+                effect: AttackEnhancementEffect {
+                    consume_equipped_arrow: true,
+                    ..AttackEnhancementEffect::default()
+                },
+                ..AttackEnhancement::default()
+            })
+        }
+
+        usable
     }
 
     pub fn can_use_opportunity_attack(&self, target: CharacterId) -> bool {

@@ -165,6 +165,10 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         t.technical_description
             .push(format!("+ {} damage", effect.bonus_damage));
     }
+    if effect.range_bonus > 0 {
+        t.technical_description
+            .push(format!("+ {} range", effect.range_bonus));
+    }
     if effect.roll_advantage > 0 {
         t.technical_description
             .push(format!("+ {} advantage", effect.roll_advantage));
@@ -295,7 +299,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         },
         BaseAction::EndTurn => Tooltip {
             header: "End your turn".to_string(),
-            description: Some("Regain 4 AP and some of your stamina."),
+            description: Some("Regain 3 AP and some of your stamina."),
             ..Default::default()
         },
     }
