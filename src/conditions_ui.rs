@@ -15,12 +15,12 @@ use crate::{
 
 pub struct ConditionsList {
     pub font: Font,
-    pub descriptions: Vec<(ConditionInfo, Option<u32>)>,
+    pub descriptions: Vec<ConditionInfo>,
     size: Cell<(f32, f32)>,
 }
 
 impl ConditionsList {
-    pub fn new(font: Font, descriptions: Vec<(ConditionInfo, Option<u32>)>) -> Self {
+    pub fn new(font: Font, descriptions: Vec<ConditionInfo>) -> Self {
         Self {
             font,
             descriptions,
@@ -40,12 +40,7 @@ impl Drawable for ConditionsList {
     }
 }
 
-fn draw_conditions(
-    x: f32,
-    y: f32,
-    font: &Font,
-    condition_descriptions: &[(ConditionInfo, Option<u32>)],
-) -> (f32, f32) {
+fn draw_conditions(x: f32, y: f32, font: &Font, condition_infos: &[ConditionInfo]) -> (f32, f32) {
     let text_params = TextParams {
         font: Some(font),
         font_size: 18,
@@ -62,19 +57,12 @@ fn draw_conditions(
 
     let mut y_offset = 0.0;
 
-    for (condition, stacks) in condition_descriptions {
+    for condition_info in condition_infos {
         y_offset += line_height;
         let y0 = y + y_offset;
-        let dimensions = if let Some(stacks) = stacks {
-            draw_text_rounded(
-                &format!("{} ({})", condition.name, stacks),
-                x,
-                y0,
-                text_params.clone(),
-            )
-        } else {
-            draw_text_rounded(condition.name, x, y0, text_params.clone())
-        };
+
+        let dimensions =
+            draw_text_rounded(&format!("{}", condition_info), x, y0, text_params.clone());
 
         if (x..x + dimensions.width).contains(&mouse_x)
             && (y0 - dimensions.height..y0).contains(&mouse_y)
@@ -86,7 +74,7 @@ fn draw_conditions(
                     dimensions.width,
                     dimensions.height,
                 ),
-                condition,
+                condition_info,
             ));
         }
 

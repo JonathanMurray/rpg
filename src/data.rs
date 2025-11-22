@@ -6,8 +6,8 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
-        ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute,
-        AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
+        ApplyCondition, ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow,
+        AttackAttribute, AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, AttackHitEffect, Condition, Consumable, DefenseType,
         EquipEffect, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
         OnHitReaction, OnHitReactionEffect, Range, Shield, SpellEnhancementEffect,
@@ -69,7 +69,7 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
     icon: IconId::Stabbing,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
-        inflict_condition_per_damage: Some(Condition::Weakened(1)),
+        inflict_condition_per_damage: Some(Condition::Weakened),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -110,7 +110,7 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
     icon: IconId::Slashing,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
-        inflict_condition_per_damage: Some(Condition::Bleeding(1)),
+        inflict_condition_per_damage: Some(Condition::Bleeding),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -152,7 +152,11 @@ const FEINT: AttackEnhancement = AttackEnhancement {
     icon: IconId::Feint,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
-        on_target: Some(ApplyEffect::Condition(Condition::Distracted)),
+        on_target: Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::Distracted,
+            stacks: None,
+            duration_rounds: Some(1),
+        })),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -243,7 +247,11 @@ pub const BONE_CRUSHER: Weapon = Weapon {
     attack_enhancement: Some(ALL_IN),
     on_attacked_reaction: Some(PARRY),
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
-        Condition::Dazed(1),
+        ApplyCondition {
+            condition: Condition::Dazed,
+            stacks: None,
+            duration_rounds: Some(1),
+        },
     ))),
     sprite: Some(SpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
@@ -309,7 +317,11 @@ pub const BARBED_ARROWS: Arrow = Arrow {
     sprite: None,
     icon: EquipmentIconId::BarbedArrow,
     bonus_penetration: 0,
-    on_damage_apply: Some(ApplyEffect::Condition(Condition::Bleeding(3))),
+    on_damage_apply: Some(ApplyEffect::Condition(ApplyCondition {
+        condition: Condition::Bleeding,
+        stacks: Some(3),
+        duration_rounds: None,
+    })),
     area_effect: None,
 };
 
@@ -318,7 +330,11 @@ pub const COLD_ARROWS: Arrow = Arrow {
     sprite: None,
     icon: EquipmentIconId::ColdArrow,
     bonus_penetration: 0,
-    on_damage_apply: Some(ApplyEffect::Condition(Condition::Hindered(1))),
+    on_damage_apply: Some(ApplyEffect::Condition(ApplyCondition {
+        condition: Condition::Hindered,
+        stacks: None,
+        duration_rounds: Some(1),
+    })),
     area_effect: None,
 };
 
@@ -459,7 +475,7 @@ pub const LONGER_REACH: AttackEnhancement = AttackEnhancement {
     ..AttackEnhancement::default()
 };
 
-pub const TRUE_STRIKE: AttackEnhancement = AttackEnhancement {
+pub const EMPOWER: AttackEnhancement = AttackEnhancement {
     name: "Empower",
     icon: IconId::TrueStrike,
     stamina_cost: 1,
@@ -477,7 +493,11 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
-            ApplyEffect::Condition(Condition::Hindered(1)),
+            ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Hindered,
+                stacks: None,
+                duration_rounds: Some(1),
+            }),
         )),
         ..AttackEnhancementEffect::default()
     },
@@ -621,7 +641,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
-    description: Condition::Protected(1).description(),
+    description: Condition::Protected.description(),
     icon: IconId::Brace,
     action_point_cost: 1,
     mana_cost: 0,
@@ -633,7 +653,11 @@ pub const BRACE: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some(ApplyEffect::Condition(Condition::Protected(2))),
+            apply: Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(1),
+                duration_rounds: None,
+            })),
         }),
     },
     animation_color: MAGENTA,
@@ -671,7 +695,14 @@ pub const SCREAM: Ability = Ability {
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
                 damage: None,
-                on_hit: Some([Some(ApplyEffect::Condition(Condition::Dazed(1))), None]),
+                on_hit: Some([
+                    Some(ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Dazed,
+                        stacks: None,
+                        duration_rounds: Some(1),
+                    })),
+                    None,
+                ]),
             })),
         }),
         self_effect: None,
@@ -698,8 +729,16 @@ pub const SHACKLED_MIND: Ability = Ability {
             defense_type: Some(DefenseType::Will),
             damage: None,
             on_hit: Some([
-                Some(ApplyEffect::Condition(Condition::Slowed(2))),
-                Some(ApplyEffect::Condition(Condition::Exposed(2))),
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Slowed,
+                    stacks: None,
+                    duration_rounds: Some(2),
+                })),
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Exposed,
+                    stacks: None,
+                    duration_rounds: Some(2),
+                })),
             ]),
         }),
         impact_area: None,
@@ -781,7 +820,7 @@ pub const MIND_BLAST: Ability = Ability {
 };
 
 pub const NECROTIC_INFLUENCE_ENHANCEMENT: AbilityEnhancement = AbilityEnhancement {
-    ability_id: AbilityId::NecroticInfluence,
+    ability_id: AbilityId::InflictWounds,
     name: "Necrotic influence",
     description: "Converts all bleeding to immediate damage and life-drain",
     icon: IconId::NecroticInfluence,
@@ -795,15 +834,15 @@ pub const NECROTIC_INFLUENCE_ENHANCEMENT: AbilityEnhancement = AbilityEnhancemen
                 caster_healing_percentage: 40,
             }),
             Some(ApplyEffect::ConsumeCondition {
-                condition: Condition::Bleeding(0),
+                condition: Condition::Bleeding,
             }),
         ]),
         ..SpellEnhancementEffect::default()
     }),
     attack_effect: None,
 };
-pub const NECROTIC_INFLUENCE: Ability = Ability {
-    id: AbilityId::NecroticInfluence,
+pub const INFLICT_WOUNDS: Ability = Ability {
+    id: AbilityId::InflictWounds,
     name: "Inflict wounds",
     description: "",
     icon: IconId::NecroticInfluence,
@@ -818,7 +857,14 @@ pub const NECROTIC_INFLUENCE: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
-            on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(4))), None]),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Bleeding,
+                    stacks: Some(4),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
         }),
         impact_area: None,
         reach: AbilityReach::Range(Range::Float(4.5)),
@@ -842,7 +888,14 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
-            on_hit: Some([Some(ApplyEffect::Condition(Condition::Bleeding(3))), None]),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Bleeding,
+                    stacks: Some(3),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
         }),
         impact_area: None,
         reach: AbilityReach::Range(Range::Ranged(5)),
@@ -866,7 +919,14 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
-            on_hit: Some([Some(ApplyEffect::Condition(Condition::Slowed(1))), None]),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Slowed,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })),
+                None,
+            ]),
         }),
         impact_area: None,
         reach: AbilityReach::Range(Range::Ranged(5)),
@@ -992,7 +1052,11 @@ pub const SELF_HEAL: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
-            apply: Some(ApplyEffect::Condition(Condition::Protected(1))),
+            apply: Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Protected,
+                stacks: Some(1),
+                duration_rounds: None,
+            })),
         }),
     },
     animation_color: GREEN,
@@ -1063,7 +1127,14 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        area_on_hit: Some([Some(ApplyEffect::Condition(Condition::Burning(2))), None]),
+        area_on_hit: Some([
+            Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Burning,
+                stacks: Some(2),
+                duration_rounds: None,
+            })),
+            None,
+        ]),
         ..SpellEnhancementEffect::default()
     }),
 };
@@ -1137,7 +1208,14 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
     mana_cost: 1,
     stamina_cost: 0,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([Some(ApplyEffect::Condition(Condition::Burning(2))), None]),
+        target_on_hit: Some([
+            Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Burning,
+                stacks: Some(2),
+                duration_rounds: None,
+            })),
+            None,
+        ]),
         ..SpellEnhancementEffect::default()
     }),
     attack_effect: None,
@@ -1158,7 +1236,14 @@ pub const SEARING_LIGHT: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::AtLeast(3)),
-            on_hit: Some([Some(ApplyEffect::Condition(Condition::Blinded(1))), None]),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Blinded,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })),
+                None,
+            ]),
         }),
         impact_area: None,
         reach: AbilityReach::Range(Range::Ranged(3)),

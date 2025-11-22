@@ -171,13 +171,9 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         t.technical_description
             .push(format!("- {} advantage", -effect.roll_advantage));
     }
-    if let Some(mut condition) = effect.inflict_condition_per_damage {
-        let stacks = *condition.stacks().unwrap();
-        t.technical_description.push(format!(
-            "Inflicts {} {} per damage dealt",
-            stacks,
-            condition.name()
-        ));
+    if let Some(condition) = effect.inflict_condition_per_damage {
+        t.technical_description
+            .push(format!("Inflicts 1 {} per damage dealt", condition.name()));
     }
 
     if effect.armor_penetration > 0 {
@@ -312,14 +308,16 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         ApplyEffect::GainStamina(n) => t
             .technical_description
             .push(format!("  Gains {}+ stamina", n)),
-        ApplyEffect::Condition(mut condition) => {
-            let line = if let Some(stacks) = condition.stacks().copied() {
-                format!("  {} ({})", condition.name(), stacks)
-            } else {
-                format!("  {}", condition.name())
-            };
+        ApplyEffect::Condition(apply_condition) => {
+            let mut line = format!("  {}", apply_condition.condition.name());
+            if let Some(stacks) = apply_condition.stacks {
+                line.push_str(&format!(" x {}", stacks));
+            }
+            if let Some(rounds) = apply_condition.duration_rounds {
+                line.push_str(&format!(" for {} rounds", rounds));
+            }
             t.technical_description.push(line);
-            t.keywords.push(condition);
+            t.keywords.push(apply_condition.condition);
         }
         ApplyEffect::PerBleeding {
             damage,
@@ -331,11 +329,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             ));
         }
         ApplyEffect::ConsumeCondition { mut condition } => {
-            let line = if condition.stacks().is_some() {
-                format!("  Loses all {}", condition.name())
-            } else {
-                format!("  Loses {}", condition.name())
-            };
+            let line = format!("  Loses {}", condition.name());
 
             t.technical_description.push(line);
             t.keywords.push(condition);

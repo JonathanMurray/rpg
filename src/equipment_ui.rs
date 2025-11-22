@@ -106,7 +106,9 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description.push(format!("[true hit] {effect}"));
         if let AttackHitEffect::Apply(apply_effect) = effect {
             match apply_effect {
-                ApplyEffect::Condition(condition) => t.keywords.push(condition),
+                ApplyEffect::Condition(apply_condition) => {
+                    t.keywords.push(apply_condition.condition)
+                }
                 ApplyEffect::ConsumeCondition { condition } => t.keywords.push(condition),
                 _ => {}
             }

@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
+use indexmap::IndexMap;
 use macroquad::color::Color;
 use macroquad::rand::ChooseRandom;
 
@@ -34,15 +35,21 @@ pub struct CoreGame {
     pub active_character_id: CharacterId,
     user_interface: GameUserInterfaceConnection,
     pub pathfind_grid: Rc<PathfindGrid>,
+    round_index: u32,
+    round_length: u32,
 }
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection, init_state: &GameInitState) -> Self {
+        let characters = init_state.characters.clone();
+        let round_length = characters.iter().count() as u32;
         Self {
-            characters: init_state.characters.clone(),
+            characters,
             active_character_id: init_state.active_character_id,
             user_interface,
             pathfind_grid: init_state.pathfind_grid.clone(),
+            round_index: 0,
+            round_length,
         }
     }
 
@@ -81,6 +88,8 @@ impl CoreGame {
             }
 
             let action = self.ui_select_action().await;
+
+            let mut ending_turn = false;
 
             if let Some(action) = action {
                 let mut killed_by_action = HashSet::new();
@@ -139,16 +148,39 @@ impl CoreGame {
                 }
 
                 if self.active_character().action_points.current() == 0 {
-                    self.perform_end_of_turn_character().await;
-                    self.active_character_id = self.characters.next_id(self.active_character_id);
-                    self.notify_ui_of_new_turn().await;
+                    ending_turn = true;
                 }
             } else {
                 let name = self.active_character().name;
                 self.log(format!("{} ended their turn", name)).await;
+                ending_turn = true;
+            }
+
+            if ending_turn {
                 self.perform_end_of_turn_character().await;
+                let prev_index_in_round = self.active_character().index_in_round.unwrap();
                 self.active_character_id = self.characters.next_id(self.active_character_id);
                 self.notify_ui_of_new_turn().await;
+
+                let index_in_round = self.active_character().index_in_round.unwrap();
+
+                if index_in_round < prev_index_in_round {
+                    println!("NEW ROUND STARTED!");
+                    self.round_index += 1;
+                }
+
+                let game_time = self.current_time();
+                dbg!(
+                    self.round_index,
+                    self.round_length,
+                    index_in_round,
+                    game_time
+                );
+
+                println!("Expiring character conditions...");
+                for character in self.characters.iter() {
+                    character.set_current_game_time(game_time);
+                }
             }
 
             // We must make sure to have a valid (alive, existing) active_character_id before handing over control
@@ -555,7 +587,10 @@ impl CoreGame {
                     }
                 }
                 dbg!(num_adjacent_enemies);
-                character.conditions.borrow_mut().thrill_of_battle = num_adjacent_enemies >= 2;
+                character
+                    .conditions
+                    .borrow_mut()
+                    .add_or_remove(Condition::ThrillOfBattle, num_adjacent_enemies >= 2);
             }
         }
     }
@@ -576,14 +611,19 @@ impl CoreGame {
                 let amount_gained = receiver.stamina.gain(n);
                 format!("  {} gained {} stamina", receiver.name, amount_gained)
             }
-            ApplyEffect::Condition(condition) => {
-                self.perform_receive_condition(condition, receiver)
+            ApplyEffect::Condition(apply_condition) => {
+                self.perform_receive_condition(apply_condition, receiver)
             }
             ApplyEffect::PerBleeding {
                 damage,
                 caster_healing_percentage,
             } => {
-                let stacks = receiver.conditions.borrow().bleeding;
+                let stacks = receiver
+                    .conditions
+                    .borrow()
+                    .get(&Condition::Bleeding)
+                    .map(|state| state.stacks.unwrap())
+                    .unwrap_or(0);
                 damage_dealt = self.perform_losing_health(receiver, damage * stacks);
                 let healing_amount = damage_dealt * caster_healing_percentage / 100;
                 self.perform_gain_health(giver.unwrap(), healing_amount);
@@ -598,8 +638,8 @@ impl CoreGame {
             ApplyEffect::ConsumeCondition { condition } => {
                 let stacks_cleared = receiver.clear_condition(condition);
                 let mut line = format!("  {} lost {}", receiver.name, condition.name());
-                if let Some(stacks) = stacks_cleared {
-                    line.push_str(&format!(" ({})", stacks));
+                if stacks_cleared > 0 {
+                    line.push_str(&format!(" ({})", stacks_cleared));
                 }
                 line
             }
@@ -608,11 +648,31 @@ impl CoreGame {
         (line, damage_dealt)
     }
 
-    fn perform_receive_condition(&self, mut condition: Condition, receiver: &Character) -> String {
-        receiver.receive_condition(condition);
-        let mut line = format!("  {} received {}", receiver.name, condition.name());
-        if let Some(stacks) = condition.stacks() {
-            line.push_str(&format!(" ({})", stacks));
+    fn current_time(&self) -> u32 {
+        self.round_index * self.round_length + self.active_character().index_in_round.unwrap()
+    }
+
+    fn perform_receive_condition(
+        &self,
+        apply_condition: ApplyCondition,
+        receiver: &Character,
+    ) -> String {
+        let ends_at = apply_condition
+            .duration_rounds
+            .map(|rounds| self.current_time() + (rounds * self.round_length));
+        receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
+        let mut line = format!(
+            "  {} received {}",
+            receiver.name,
+            apply_condition.condition.name()
+        );
+
+        if let Some(stacks) = apply_condition.stacks {
+            line.push_str(&format!(" x {}", stacks));
+        }
+
+        if let Some(duration) = apply_condition.duration_rounds {
+            line.push_str(&format!(" ({})", duration));
         }
         line
     }
@@ -1044,10 +1104,12 @@ impl CoreGame {
             match effect {
                 ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                 ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
-                ApplyEffect::Condition(ref mut condition) => {
+                ApplyEffect::Condition(ref apply_condition) => {
+                    /*
                     if let Some(stacks) = condition.stacks() {
                         *stacks += degree_of_success;
                     }
+                     */
                 }
                 ApplyEffect::PerBleeding { .. } => {}
                 ApplyEffect::ConsumeCondition { .. } => {}
@@ -1327,10 +1389,12 @@ impl CoreGame {
                     ApplyEffect::GainStamina(ref mut n) => {
                         apply_degree_of_success(n, degree_of_success)
                     }
-                    ApplyEffect::Condition(ref mut condition) => {
+                    ApplyEffect::Condition(ref mut apply_condition) => {
+                        /*
                         if let Some(stacks) = condition.stacks() {
                             apply_degree_of_success(stacks, degree_of_success)
                         }
+                         */
                     }
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
@@ -1637,8 +1701,15 @@ impl CoreGame {
                     }
 
                     if let Some(mut condition) = effect.inflict_condition_per_damage {
-                        *condition.stacks().unwrap() = damage;
-                        let line = self.perform_receive_condition(condition, defender);
+                        //*condition.stacks().unwrap() = damage;
+                        let line = self.perform_receive_condition(
+                            ApplyCondition {
+                                condition,
+                                stacks: Some(damage),
+                                duration_rounds: None,
+                            },
+                            defender,
+                        );
                         detail_lines.push(format!("{} ({})", line, name))
                     }
                 }
@@ -1713,11 +1784,11 @@ impl CoreGame {
         } else {
             let exertion = match hand_type {
                 HandType::MainHand => {
-                    attacker.receive_condition(Condition::MainHandExertion(1));
+                    attacker.receive_condition(Condition::MainHandExertion, Some(1), None);
                     attacker.hand_exertion(HandType::MainHand)
                 }
                 HandType::OffHand => {
-                    attacker.receive_condition(Condition::OffHandExertion(1));
+                    attacker.receive_condition(Condition::OffHandExertion, Some(1), None);
                     attacker.hand_exertion(HandType::OffHand)
                 }
             };
@@ -1751,21 +1822,21 @@ impl CoreGame {
 
         match reaction.effect {
             OnHitReactionEffect::Rage => {
-                let condition = Condition::Raging;
+                let raging = Condition::Raging;
 
                 self.ui_handle_event(GameEvent::CharacterReactedToHit {
                     main_line: format!("{} reacted with Rage", reactor_name),
                     detail_lines: vec![],
                     reactor: reactor_id,
                     outcome: HitReactionOutcome {
-                        received_condition: Some(condition),
+                        received_condition: Some(raging),
                         offensive: None,
                     },
                 })
                 .await;
 
                 let reactor = self.characters.get(reactor_id);
-                reactor.receive_condition(condition);
+                reactor.receive_condition(raging, None, None);
             }
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
@@ -1789,19 +1860,21 @@ impl CoreGame {
                             n => (format!("Critical hit ({n})"), n),
                         };
 
-                        // It's important that at least 2 stacks are applied. Since 1 decays at end of attacker's turn, just 1 would
-                        // be very weak.
-                        let stacks = 2 + bonus;
+                        let duration = 1 + bonus;
                         lines.push(label);
 
-                        Some(Condition::Dazed(stacks))
+                        Some((Condition::Dazed, Some(duration)))
                     } else {
                         None
                     };
 
-                    if let Some(condition) = condition {
+                    if let Some((condition, duration)) = condition {
                         let (log_line, _damage) = self.perform_effect_application(
-                            ApplyEffect::Condition(condition),
+                            ApplyEffect::Condition(ApplyCondition {
+                                condition,
+                                stacks: None,
+                                duration_rounds: duration,
+                            }),
                             Some(reactor),
                             attacker,
                         );
@@ -1833,7 +1906,7 @@ impl CoreGame {
         let name = character.name;
         let conditions = &character.conditions;
 
-        let bleed_stacks = conditions.borrow().bleeding;
+        let bleed_stacks = conditions.borrow().get_stacks(&Condition::Bleeding);
         if bleed_stacks > 0 {
             let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
             let damage = self.perform_losing_health(character, decay);
@@ -1843,13 +1916,15 @@ impl CoreGame {
                 source: "Bleeding",
             })
             .await;
-            conditions.borrow_mut().bleeding -= decay;
-            if conditions.borrow().bleeding == 0 {
+            if conditions
+                .borrow_mut()
+                .lose_stacks(&Condition::Bleeding, decay)
+            {
                 self.log(format!("{} stopped Bleeding", name)).await;
             }
         }
 
-        let burn_stacks = conditions.borrow().burning;
+        let burn_stacks = conditions.borrow().get_stacks(&Condition::Burning);
         if burn_stacks > 0 {
             let damage = self.perform_losing_health(character, burn_stacks);
             self.ui_handle_event(GameEvent::CharacterTookDamage {
@@ -1858,7 +1933,7 @@ impl CoreGame {
                 source: "Burning",
             })
             .await;
-            conditions.borrow_mut().burning = 0;
+            conditions.borrow_mut().remove(&Condition::Burning);
 
             let mut adj_others: Vec<&Rc<Character>> = self
                 .characters
@@ -1881,13 +1956,13 @@ impl CoreGame {
                         } else {
                             per_unit
                         };
-                        let condition = Condition::Burning(stacks);
+                        let burning = Condition::Burning;
                         self.ui_handle_event(GameEvent::CharacterReceivedCondition {
                             character: other.id(),
-                            condition,
+                            condition: burning,
                         })
                         .await;
-                        other.receive_condition(condition);
+                        other.receive_condition(burning, Some(stacks), None);
                     }
                 }
                 self.log(format!("The fire spread to {} other(s)", adj_others.len()))
@@ -1895,54 +1970,27 @@ impl CoreGame {
             }
         }
 
-        if conditions.borrow().weakened > 0 {
-            conditions.borrow_mut().weakened = 0;
+        if conditions.borrow_mut().remove(&Condition::Weakened) {
             self.log(format!("{} is no longer Weakened", name)).await;
         }
-        if conditions.borrow().raging {
-            conditions.borrow_mut().raging = false;
+        if conditions.borrow_mut().remove(&Condition::Raging) {
             self.log(format!("{} stopped Raging", name)).await;
-        }
-        if conditions.borrow().exposed > 0 {
-            conditions.borrow_mut().exposed -= 1;
-            if conditions.borrow().exposed == 0 {
-                self.log(format!("{} is no longer Exposed", name)).await;
-            }
-        }
-        if conditions.borrow().hindered > 0 {
-            conditions.borrow_mut().hindered -= 1;
-            if conditions.borrow().hindered == 0 {
-                self.log(format!("{} is no longer Hindered", name)).await;
-            }
-        }
-        if conditions.borrow().dazed > 0 {
-            conditions.borrow_mut().dazed -= 1;
-            if conditions.borrow().dazed == 0 {
-                self.log(format!("{} is no longer Dazed", name)).await;
-            }
-        }
-
-        if conditions.borrow().slowed > 0 {
-            conditions.borrow_mut().slowed -= 1;
-            if conditions.borrow().slowed == 0 {
-                self.log(format!("{} is no longer Slowed", name)).await;
-            }
         }
 
         //let mut new_ap = MAX_ACTION_POINTS;
         let mut gain_ap = ACTION_POINTS_PER_TURN;
-        if conditions.borrow().near_death {
+        if conditions.borrow().has(&Condition::NearDeath) {
             gain_ap = gain_ap.saturating_sub(1);
         }
-        if conditions.borrow().slowed > 0 {
+        if conditions.borrow().has(&Condition::Slowed) {
             gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
         }
         character.action_points.gain(gain_ap);
         //character.action_points.current.set(new_ap);
 
-        conditions.borrow_mut().mainhand_exertion = 0;
-        conditions.borrow_mut().offhand_exertion = 0;
-        conditions.borrow_mut().reaper_ap_cooldown = false;
+        conditions.borrow_mut().remove(&Condition::MainHandExertion);
+        conditions.borrow_mut().remove(&Condition::OffHandExertion);
+        conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
         let stamina_gain = (character.stamina.max() as f32 / 3.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
 
@@ -2071,7 +2119,7 @@ pub struct HitReactionOutcome {
 
 #[derive(Debug, Copy, Clone)]
 pub struct OffensiveHitReactionOutcome {
-    pub inflicted_condition: Option<Condition>,
+    pub inflicted_condition: Option<(Condition, Option<u32>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -2196,6 +2244,7 @@ pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
 
 impl Characters {
     pub fn new(characters: Vec<Character>) -> Self {
+        let round_length = characters.len() as u32;
         Self(
             characters
                 .into_iter()
@@ -2203,6 +2252,8 @@ impl Characters {
                 .map(|(i, mut ch)| {
                     let id = i as CharacterId;
                     ch.id = Some(id);
+                    ch.index_in_round = Some(i as u32);
+                    ch.round_length = Some(round_length);
                     (id, Rc::new(ch))
                 })
                 .collect(),
@@ -2279,7 +2330,7 @@ impl Characters {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
-    Condition(Condition),
+    Condition(ApplyCondition),
     GainStamina(u32),
     PerBleeding {
         damage: u32,
@@ -2295,7 +2346,9 @@ impl Display for ApplyEffect {
         match self {
             ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("+{n} stamina")),
-            ApplyEffect::Condition(condition) => f.write_fmt(format_args!("{}", condition.name())),
+            ApplyEffect::Condition(apply_condition) => {
+                f.write_fmt(format_args!("{}", apply_condition.condition.name()))
+            }
             ApplyEffect::PerBleeding {
                 damage,
                 caster_healing_percentage,
@@ -2377,25 +2430,25 @@ impl Display for AttackHitEffect {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
 pub enum Condition {
-    Protected(u32),
-    Dazed(u32),
-    Bleeding(u32),
-    Burning(u32),
-    Blinded(u32),
+    Protected,
+    Dazed,
+    Bleeding,
+    Burning,
+    Blinded,
     Braced,
     Raging,
     Distracted,
-    Weakened(u32),
-    MainHandExertion(u32),
-    OffHandExertion(u32),
-    Encumbered(u32),
+    Weakened,
+    MainHandExertion,
+    OffHandExertion,
+    Encumbered,
     NearDeath,
     Dead,
-    Slowed(u32),
-    Exposed(u32),
-    Hindered(u32),
+    Slowed,
+    Exposed,
+    Hindered,
     ReaperApCooldown,
     BloodRage,
     ArcaneSurge,
@@ -2403,53 +2456,26 @@ pub enum Condition {
 }
 
 impl Condition {
-    pub const fn stacks(&mut self) -> Option<&mut u32> {
-        use Condition::*;
-        match self {
-            Protected(n) => Some(n),
-            Dazed(n) => Some(n),
-            Bleeding(n) => Some(n),
-            Burning(n) => Some(n),
-            Blinded(n) => Some(n),
-            Braced => None,
-            Raging => None,
-            Distracted => None,
-            Weakened(n) => Some(n),
-            MainHandExertion(n) => Some(n),
-            OffHandExertion(n) => Some(n),
-            Encumbered(n) => Some(n),
-            NearDeath => None,
-            Dead => None,
-            Slowed(n) => Some(n),
-            Exposed(n) => Some(n),
-            Hindered(n) => Some(n),
-            ReaperApCooldown => None,
-            BloodRage => None,
-            ArcaneSurge => None,
-            ThrillOfBattle => None,
-        }
-    }
-
     pub const fn name(&self) -> &'static str {
         use Condition::*;
         match self {
-            Protected(_) => "Protected",
-            Dazed(_) => "Dazed",
-            Bleeding(_) => "Bleeding",
-            Burning(_) => "Burning",
-            Blinded(_) => "Blinded",
+            Protected => "Protected",
+            Dazed => "Dazed",
+            Bleeding => "Bleeding",
+            Burning => "Burning",
+            Blinded => "Blinded",
             Braced => "Braced",
             Raging => "Raging",
             Distracted => "Distracted",
-            Weakened(_) => "Weakened",
-            MainHandExertion(_) => "Exerted (main-hand)",
-            OffHandExertion(_) => "Exerted (off-hand)",
-            Encumbered(_) => "Encumbered",
+            Weakened => "Weakened",
+            MainHandExertion => "Exerted (main-hand)",
+            OffHandExertion => "Exerted (off-hand)",
+            Encumbered => "Encumbered",
             NearDeath => "Near-death",
             Dead => "Dead",
-            Slowed(..) => "Slowed",
-            Exposed(..) => "Exposed",
-            Hindered(..) => "Hindered",
+            Slowed => "Slowed",
+            Exposed => "Exposed",
+            Hindered => "Hindered",
             ReaperApCooldown => "Reaper",
             BloodRage => "Blood rage",
             ArcaneSurge => "Arcane surge",
@@ -2460,23 +2486,23 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Protected(_) => "+x armor against the next attack that hits",
-            Dazed(_) => "-3 evasion and attacks with disadvantage",
-            Bleeding(_) => "End of turn: 50% stacks decay, lose 1 health for each decayed",
-            Burning(_) => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
-            Blinded(_) => "Disadvantage on dice rolls; always counts as Flanked when being attacked",
-            Braced => "Gain +3 evasion against the next incoming attack",
+            Dazed => "-3 evasion and attacks with disadvantage",
+            Blinded => "Disadvantage on dice rolls; always counts as Flanked when being attacked",
             Raging => "Gains advantage on melee attack rolls until end of turn",
+            Slowed => "Gains 2 less AP per turn",
+            Exposed => "-3 to all defenses",
+            Hindered => "Half movement speed",
+            Protected => "+x armor against the next attack that hits",
+            Bleeding => "End of turn: 50% stacks decay, lose 1 health for each decayed",
+            Burning => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
+            Braced => "Gain +3 evasion against the next incoming attack",
             Distracted => "-6 evasion against the next incoming attack",
-            Weakened(_) => "-x to all defenses and dice rolls",
-            MainHandExertion(_) => "-x on further similar actions",
-            OffHandExertion(_) => "-x on further similar actions",
-            Encumbered(_) => "-x to Evasion and -x/2 to dice rolls",
+            Weakened => "-x to all defenses and dice rolls",
+            MainHandExertion => "-x on further similar actions",
+            OffHandExertion => "-x on further similar actions",
+            Encumbered => "-x to Evasion and -x/2 to dice rolls",
             NearDeath => "< 25% HP: Reduced AP, disadvantage on dice rolls, enemies have advantage",
             Dead => "This character has reached 0 HP and is dead",
-            Slowed(_) => "Gains 2 less AP per turn",
-            Exposed(_) => "-3 to all defenses",
-            Hindered(..) => "Half movement speed",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn",
             BloodRage => "+3 attack modifier (from passive skill)",
             ArcaneSurge => "+3 spell modifier (from passive skill)",
@@ -2487,39 +2513,28 @@ impl Condition {
     pub const fn is_positive(&self) -> bool {
         use Condition::*;
         match self {
-            Protected(_) => true,
-            Dazed(_) => false,
-            Bleeding(_) => false,
-            Burning(_) => false,
-            Blinded(_) => false,
+            Protected => true,
+            Dazed => false,
+            Bleeding => false,
+            Burning => false,
+            Blinded => false,
             Braced => true,
             Raging => true,
             Distracted => false,
-            Weakened(_) => false,
-            MainHandExertion(_) => false,
-            OffHandExertion(_) => false,
-            Encumbered(_) => false,
+            Weakened => false,
+            MainHandExertion => false,
+            OffHandExertion => false,
+            Encumbered => false,
             NearDeath => false,
             Dead => false,
-            Slowed(_) => false,
-            Exposed(_) => false,
-            Hindered(..) => false,
+            Slowed => false,
+            Exposed => false,
+            Hindered => false,
             ReaperApCooldown => false,
             BloodRage => true,
             ArcaneSurge => true,
             ThrillOfBattle => true,
         }
-    }
-
-    pub const fn info(&mut self) -> (ConditionInfo, Option<u32>) {
-        (
-            ConditionInfo {
-                name: self.name(),
-                description: self.description(),
-                is_positive: self.is_positive(),
-            },
-            self.stacks().copied(),
-        )
     }
 }
 
@@ -2535,98 +2550,132 @@ pub struct ConditionInfo {
     pub name: &'static str,
     pub description: &'static str,
     pub is_positive: bool,
+    pub stacks: Option<u32>,
+    pub remaining_rounds: Option<u32>,
 }
 
-#[derive(Debug, Copy, Clone, Default)]
+impl Display for ConditionInfo {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some(stacks) = self.stacks {
+            write!(f, " x {}", stacks)?;
+        }
+        if let Some(remaining_rounds) = self.remaining_rounds {
+            write!(f, " (remaining: {})", remaining_rounds)?;
+        }
+
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct ConditionState {
+    stacks: Option<u32>,
+    ends_at: Option<u32>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct ApplyCondition {
+    pub condition: Condition,
+    pub stacks: Option<u32>,
+    pub duration_rounds: Option<u32>,
+}
+
+impl ApplyCondition {
+    pub const fn new(condition: Condition) -> Self {
+        Self {
+            condition,
+            stacks: None,
+            duration_rounds: None,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
 struct Conditions {
-    protected: u32,
-    dazed: u32,
-    bleeding: u32,
-    burning: u32,
-    blinded: u32,
-    braced: bool,
-    raging: bool,
-    distracted: bool,
-    weakened: u32,
-    mainhand_exertion: u32,
-    offhand_exertion: u32,
-    encumbered: u32,
-    near_death: bool,
-    dead: bool,
-    slowed: u32,
-    exposed: u32,
-    hindered: u32,
-    reaper_ap_cooldown: bool,
-    blood_rage: bool,
-    arcane_surge: bool,
-    thrill_of_battle: bool,
+    map: IndexMap<Condition, ConditionState>,
 }
 
 impl Conditions {
-    pub fn infos(&mut self) -> Vec<(ConditionInfo, Option<u32>)> {
-        let mut result = vec![];
-        if self.protected > 0 {
-            result.push(Condition::Protected(self.protected).info());
-        }
-        if self.dazed > 0 {
-            result.push(Condition::Dazed(self.dazed).info());
-        }
-        if self.bleeding > 0 {
-            result.push(Condition::Bleeding(self.bleeding).info());
-        }
-        if self.burning > 0 {
-            result.push(Condition::Burning(self.burning).info());
-        }
-        if self.blinded > 0 {
-            result.push(Condition::Blinded(self.blinded).info());
-        }
-        if self.braced {
-            result.push(Condition::Braced.info());
-        }
-        if self.raging {
-            result.push(Condition::Raging.info());
-        }
-        if self.distracted {
-            result.push(Condition::Distracted.info());
-        }
-        if self.weakened > 0 {
-            result.push(Condition::Weakened(self.weakened).info());
-        }
-        if self.mainhand_exertion > 0 {
-            result.push(Condition::MainHandExertion(self.mainhand_exertion).info());
-        }
-        if self.offhand_exertion > 0 {
-            result.push(Condition::OffHandExertion(self.offhand_exertion).info());
-        }
-        if self.encumbered > 0 {
-            result.push(Condition::Encumbered(self.encumbered).info());
-        }
-        if self.near_death {
-            result.push(Condition::NearDeath.info());
-        }
-        if self.dead {
-            result.push(Condition::Dead.info());
-        }
-        if self.slowed > 0 {
-            result.push(Condition::Slowed(self.slowed).info())
-        }
-        if self.exposed > 0 {
-            result.push(Condition::Exposed(self.exposed).info())
-        }
-        if self.hindered > 0 {
-            result.push(Condition::Hindered(self.hindered).info())
-        }
-        if self.reaper_ap_cooldown {
-            result.push(Condition::ReaperApCooldown.info())
-        }
-        if self.blood_rage {
-            result.push(Condition::BloodRage.info())
-        }
-        if self.thrill_of_battle {
-            result.push(Condition::ThrillOfBattle.info())
-        }
+    pub fn remove(&mut self, condition: &Condition) -> bool {
+        self.map.shift_remove(condition).is_some()
+    }
 
-        result
+    pub fn get(&self, condition: &Condition) -> Option<&ConditionState> {
+        self.map.get(condition)
+    }
+
+    pub fn has(&self, condition: &Condition) -> bool {
+        self.map.contains_key(condition)
+    }
+
+    pub fn add(&mut self, condition: Condition) {
+        self.map.insert(
+            condition,
+            ConditionState {
+                stacks: None,
+                ends_at: None,
+            },
+        );
+    }
+
+    fn maybe_expire(&mut self, game_time: u32) {
+        self.map.retain(|condition, state| {
+            let keep = state
+                .ends_at
+                .map(|ends_at| ends_at > game_time)
+                .unwrap_or(true);
+            println!("{:?}: {:?} {:?}", condition, state, keep);
+            keep
+        });
+    }
+
+    pub fn add_or_remove(&mut self, condition: Condition, add: bool) {
+        if add {
+            self.add(condition);
+        } else {
+            self.remove(&condition);
+        }
+    }
+
+    pub fn get_stacks(&self, condition: &Condition) -> u32 {
+        self.map
+            .get(condition)
+            .map(|state| state.stacks.unwrap())
+            .unwrap_or(0)
+    }
+
+    pub fn set_stacks(&mut self, condition: Condition, stacks: u32) {
+        if stacks == 0 {
+            self.map.shift_remove(&condition);
+        } else if let Some(state) = self.map.get_mut(&condition) {
+            *state.stacks.as_mut().unwrap() = stacks;
+        } else {
+            self.map.insert(
+                condition,
+                ConditionState {
+                    stacks: Some(stacks),
+                    ends_at: None,
+                },
+            );
+        }
+    }
+
+    pub fn lose_stacks(&mut self, condition: &Condition, stacks: u32) -> bool {
+        let current_stacks = self
+            .map
+            .get_mut(condition)
+            .unwrap()
+            .stacks
+            .as_mut()
+            .unwrap();
+        *current_stacks = current_stacks.saturating_sub(stacks);
+        if *current_stacks == 0 {
+            self.map.shift_remove(condition);
+            true
+        } else {
+            false
+        }
     }
 }
 
@@ -2767,7 +2816,7 @@ pub enum AbilityId {
     Scream,
     ShackledMind,
     MindBlast,
-    NecroticInfluence,
+    InflictWounds,
     Heal,
     HealingNova,
     SelfHeal,
@@ -3185,6 +3234,10 @@ impl Party {
 #[derive(Debug, Clone)]
 pub struct Character {
     id: Option<CharacterId>,
+    index_in_round: Option<u32>,
+    current_game_time: Cell<u32>,
+    round_length: Option<u32>,
+
     pub name: &'static str,
     pub portrait: PortraitId,
 
@@ -3241,6 +3294,8 @@ impl Character {
         action_points.current.set(ACTION_POINTS_PER_TURN);
         Self {
             id: None,
+            index_in_round: None,
+            round_length: None,
             portrait,
             sprite,
             behaviour,
@@ -3258,6 +3313,7 @@ impl Character {
             off_hand: Default::default(),
             arrows: Default::default(),
             conditions: Default::default(),
+            current_game_time: Default::default(),
             action_points,
             stamina: NumberedResource::new(max_stamina),
             known_attack_enhancements: Default::default(),
@@ -3282,6 +3338,11 @@ impl Character {
         }
     }
 
+    fn set_current_game_time(&self, game_time: u32) {
+        self.current_game_time.set(game_time);
+        self.conditions.borrow_mut().maybe_expire(game_time);
+    }
+
     pub fn party_money(&self) -> u32 {
         match &self.behaviour {
             Behaviour::Player(party) => party.money.get(),
@@ -3300,20 +3361,31 @@ impl Character {
         let health_ratio = self.health.ratio();
         let has_blood_rage_passive = self.known_passive_skills.contains(&PassiveSkill::BloodRage);
 
-        self.conditions.borrow_mut().blood_rage = has_blood_rage_passive && health_ratio <= 0.5;
-        self.conditions.borrow_mut().near_death = !has_blood_rage_passive && health_ratio < 0.25;
+        if has_blood_rage_passive && health_ratio <= 0.5 {
+            self.conditions.borrow_mut().add(Condition::BloodRage);
+        } else {
+            self.conditions.borrow_mut().remove(&Condition::BloodRage);
+        }
+        if !has_blood_rage_passive && health_ratio < 0.25 {
+            self.conditions.borrow_mut().add(Condition::NearDeath);
+        } else {
+            self.conditions.borrow_mut().remove(&Condition::NearDeath);
+        }
 
         if self.health.current() == 0 {
-            self.conditions.borrow_mut().near_death = false;
-            self.conditions.borrow_mut().dead = true;
+            self.conditions.borrow_mut().remove(&Condition::NearDeath);
+            self.conditions.borrow_mut().add(Condition::Dead);
         }
     }
 
     fn on_mana_changed(&self) {
-        self.conditions.borrow_mut().arcane_surge = self
+        let add = self
             .known_passive_skills
             .contains(&PassiveSkill::ArcaneSurge)
             && self.mana.ratio() <= 0.5;
+        self.conditions
+            .borrow_mut()
+            .add_or_remove(Condition::ArcaneSurge, add);
     }
 
     fn regain_movement(&self) {
@@ -3329,12 +3401,12 @@ impl Character {
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
         if self.known_passive_skills.contains(&PassiveSkill::Reaper) {
             let sta = self.stamina.gain(num_killed);
-            let ap = if self.conditions.borrow().reaper_ap_cooldown {
+            let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 0
             } else {
                 self.action_points.gain(1)
             };
-            self.receive_condition(Condition::ReaperApCooldown);
+            self.receive_condition(Condition::ReaperApCooldown, None, None);
             Some((sta, ap))
         } else {
             None
@@ -3363,7 +3435,7 @@ impl Character {
 
     pub fn move_speed(&self) -> f32 {
         let mut speed = self.base_move_speed.get();
-        if self.conditions.borrow().hindered > 0 {
+        if self.conditions.borrow().has(&Condition::Hindered) {
             speed /= 2.0;
         }
         speed
@@ -3421,7 +3493,7 @@ impl Character {
     }
 
     pub fn is_dead(&self) -> bool {
-        self.conditions.borrow().dead
+        self.conditions.borrow().has(&Condition::Dead)
     }
 
     pub fn listen_to_changed_equipment(&self) -> Rc<Cell<bool>> {
@@ -3456,23 +3528,11 @@ impl Character {
     }
 
     fn lose_protected(&self) -> bool {
-        let mut conditions = self.conditions.borrow_mut();
-        if conditions.protected > 0 {
-            conditions.protected = 0;
-            true
-        } else {
-            false
-        }
+        self.conditions.borrow_mut().remove(&Condition::Protected)
     }
 
     fn lose_distracted(&self) -> bool {
-        let mut conditions = self.conditions.borrow_mut();
-        if conditions.distracted {
-            conditions.distracted = false;
-            true
-        } else {
-            false
-        }
+        self.conditions.borrow_mut().remove(&&Condition::Distracted)
     }
 
     pub fn equipment_weight(&self) -> u32 {
@@ -3496,8 +3556,25 @@ impl Character {
         sum
     }
 
-    pub fn condition_infos(&self) -> Vec<(ConditionInfo, Option<u32>)> {
-        self.conditions.borrow_mut().infos()
+    pub fn condition_infos(&self) -> Vec<ConditionInfo> {
+        let mut result = vec![];
+
+        for (condition, state) in self.conditions.borrow().map.iter() {
+            let remaining_rounds = state.ends_at.map(|ends_at| {
+                let remaining = ends_at - self.current_game_time.get();
+                (remaining as f32 / self.round_length.unwrap() as f32).ceil() as u32
+            });
+            let info = ConditionInfo {
+                name: condition.name(),
+                description: condition.description(),
+                is_positive: condition.is_positive(),
+                stacks: state.stacks,
+                remaining_rounds,
+            };
+            result.push(info);
+        }
+
+        result
     }
 
     pub fn pos(&self) -> Position {
@@ -3572,13 +3649,10 @@ impl Character {
     }
 
     fn update_encumbrance(&self) {
-        let encumbrance = self.equipment_weight() as i32 - self.capacity.get() as i32;
-        dbg!(encumbrance);
-        if encumbrance > 0 {
-            self.conditions.borrow_mut().encumbered = encumbrance as u32;
-        } else {
-            self.conditions.borrow_mut().encumbered = 0;
-        }
+        let encumbrance = self.equipment_weight().saturating_sub(self.capacity.get());
+        self.conditions
+            .borrow_mut()
+            .set_stacks(Condition::Encumbered, encumbrance as u32);
     }
 
     fn has_any_consumable_in_inventory(&self) -> bool {
@@ -3974,7 +4048,7 @@ impl Character {
 
     pub fn can_use_on_hit_reaction(&self, reaction: OnHitReaction, is_within_melee: bool) -> bool {
         if let OnHitReactionEffect::Rage = reaction.effect {
-            if self.conditions.borrow().raging {
+            if self.conditions.borrow().has(&Condition::Raging) {
                 // Can't use this reaction while already raging
                 return false;
             }
@@ -4049,10 +4123,10 @@ impl Character {
         }
 
         let conditions = self.conditions.borrow();
-        if conditions.arcane_surge {
+        if conditions.has(&Condition::ArcaneSurge) {
             res += 3;
         }
-        if conditions.thrill_of_battle {
+        if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;
         }
 
@@ -4060,7 +4134,8 @@ impl Character {
     }
 
     fn is_dazed(&self) -> bool {
-        self.conditions.borrow().dazed > 0
+        self.conditions.borrow().get(&Condition::Dazed).is_some()
+        //self.conditions.borrow().dazed > 0
     }
 
     pub fn evasion(&self) -> u32 {
@@ -4070,24 +4145,26 @@ impl Character {
         res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
 
         let conditions = self.conditions.borrow();
-        if conditions.braced {
+        if conditions.has(&Condition::Braced) {
             res += BRACED_DEFENSE_BONUS;
         }
 
-        if conditions.distracted {
+        if conditions.has(&Condition::Distracted) {
             res = res.saturating_sub(DISTRACTED_DEFENSE_PENALTY);
         }
         if self.is_dazed() {
             res = res.saturating_sub(DAZED_EVASION_PENALTY);
         }
-        res = res.saturating_sub(conditions.encumbered);
 
-        if conditions.exposed > 0 {
+        res = res.saturating_sub(conditions.get_stacks(&Condition::Encumbered));
+
+        if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
 
-        if conditions.weakened > 0 {
-            res = res.saturating_sub(conditions.weakened)
+        let weakened = conditions.get_stacks(&Condition::Weakened);
+        if weakened > 0 {
+            res = res.saturating_sub(weakened)
         }
 
         res
@@ -4111,24 +4188,20 @@ impl Character {
     pub fn will(&self) -> u32 {
         let mut res = 10 + self.intellect() * 2;
         let conditions = self.conditions.borrow();
-        if conditions.exposed > 0 {
+        if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
-        if conditions.weakened > 0 {
-            res = res.saturating_sub(conditions.weakened)
-        }
+        res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
         res
     }
 
     pub fn toughness(&self) -> u32 {
         let mut res = 10 + self.strength() * 2;
         let conditions = self.conditions.borrow();
-        if conditions.exposed > 0 {
+        if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
-        if conditions.weakened > 0 {
-            res = res.saturating_sub(conditions.weakened)
-        }
+        res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
 
         res
     }
@@ -4142,8 +4215,8 @@ impl Character {
             protection += shield.armor;
         }
 
-        if self.conditions.borrow().protected > 0 {
-            protection += self.conditions.borrow().protected;
+        if let Some(state) = self.conditions.borrow().get(&Condition::Protected) {
+            protection += state.stacks.unwrap();
         }
 
         if self
@@ -4173,10 +4246,10 @@ impl Character {
         let mut res = physical_attr + self.intellect();
 
         let conditions = self.conditions.borrow();
-        if conditions.blood_rage {
+        if conditions.has(&Condition::BloodRage) {
             res += 3;
         }
-        if conditions.thrill_of_battle {
+        if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;
         }
 
@@ -4185,8 +4258,14 @@ impl Character {
 
     fn hand_exertion(&self, hand_type: HandType) -> u32 {
         match hand_type {
-            HandType::MainHand => self.conditions.borrow().mainhand_exertion,
-            HandType::OffHand => self.conditions.borrow().offhand_exertion,
+            HandType::MainHand => self
+                .conditions
+                .borrow()
+                .get_stacks(&Condition::MainHandExertion),
+            HandType::OffHand => self
+                .conditions
+                .borrow()
+                .get_stacks(&Condition::OffHandExertion),
         }
     }
 
@@ -4277,15 +4356,17 @@ impl Character {
             bonuses.push(("Dazed", RollBonusContributor::Advantage(-1)));
         }
         let conditions = self.conditions.borrow();
-        if conditions.raging && self.weapon(hand_type).unwrap().range == WeaponRange::Melee {
+        if conditions.has(&Condition::Raging)
+            && self.weapon(hand_type).unwrap().range == WeaponRange::Melee
+        {
             bonuses.push(("Raging", RollBonusContributor::Advantage(1)));
         }
-        if conditions.weakened > 0 {
+        if conditions.has(&Condition::Weakened) {
             // TODO: this seems wrong, shouldn't the penalty be applied here? If not here, then where?
             bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
         }
 
-        let encumbrance_penalty = (conditions.encumbered / 2) as i32;
+        let encumbrance_penalty = (conditions.get_stacks(&Condition::Encumbered) / 2) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",
@@ -4293,18 +4374,18 @@ impl Character {
             ));
         }
 
-        if conditions.near_death {
+        if conditions.has(&Condition::NearDeath) {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
-        if conditions.blinded > 0 {
+        if conditions.has(&Condition::Blinded) {
             bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
         }
 
-        if conditions.blood_rage {
+        if conditions.has(&Condition::BloodRage) {
             // applied from attack_modifer()
             bonuses.push(("Blood rage", RollBonusContributor::OtherPositive));
         }
-        if conditions.thrill_of_battle {
+        if conditions.has(&Condition::ThrillOfBattle) {
             // applied from attack_modifer()
             bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
         }
@@ -4331,23 +4412,24 @@ impl Character {
         }
 
         let conditions = self.conditions.borrow();
-        if conditions.weakened > 0 {
+        let weakened = conditions.get_stacks(&Condition::Weakened);
+        if weakened > 0 {
             bonuses.push((
                 "Weakened",
-                RollBonusContributor::FlatAmount(-(conditions.weakened as i32)),
+                RollBonusContributor::FlatAmount(-(weakened as i32)),
             ));
         }
 
-        if is_spell && conditions.arcane_surge {
+        if is_spell && conditions.has(&Condition::ArcaneSurge) {
             // It's applied from spell_modifier()
             bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
         }
-        if conditions.thrill_of_battle {
+        if conditions.has(&Condition::ThrillOfBattle) {
             // It's applied from spell_modifier()
             bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
         }
 
-        let encumbrance_penalty = (conditions.encumbered / 2) as i32;
+        let encumbrance_penalty = (conditions.get_stacks(&Condition::Encumbered) / 2) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",
@@ -4355,10 +4437,10 @@ impl Character {
             ));
         }
 
-        if conditions.near_death {
+        if conditions.has(&Condition::NearDeath) {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
-        if conditions.blinded > 0 {
+        if conditions.has(&Condition::Blinded) {
             bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
         }
 
@@ -4399,19 +4481,19 @@ impl Character {
             terms.push(("Dazed", RollBonusContributor::OtherPositive));
         }
         let conditions = self.conditions.borrow();
-        if conditions.weakened > 0 {
+        if conditions.has(&Condition::Weakened) {
             terms.push(("Weakened", RollBonusContributor::OtherPositive));
         }
-        if conditions.braced {
+        if conditions.has(&Condition::Braced) {
             terms.push(("Braced", RollBonusContributor::OtherNegative));
         }
-        if conditions.distracted {
+        if conditions.has(&Condition::Distracted) {
             terms.push(("Distracted", RollBonusContributor::OtherPositive));
         }
-        if conditions.near_death {
+        if conditions.has(&Condition::NearDeath) {
             terms.push(("Near-death", RollBonusContributor::Advantage(1)))
         }
-        if conditions.exposed > 0 {
+        if conditions.has(&Condition::Exposed) {
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
         }
 
@@ -4427,92 +4509,52 @@ impl Character {
     pub fn incoming_ability_bonuses(&self) -> Vec<(&'static str, RollBonusContributor)> {
         let mut terms = vec![];
         let conditions = self.conditions.borrow();
-        if conditions.weakened > 0 {
+        if conditions.has(&Condition::Weakened) {
             terms.push(("Weakened", RollBonusContributor::OtherPositive));
         }
-        if conditions.near_death {
+        if conditions.has(&Condition::NearDeath) {
             terms.push(("Near-death", RollBonusContributor::Advantage(1)))
         }
-        if conditions.exposed > 0 {
+        if conditions.has(&Condition::Exposed) {
             terms.push(("Exposed", RollBonusContributor::OtherPositive));
         }
         terms
     }
 
     pub fn is_bleeding(&self) -> bool {
-        self.conditions.borrow().bleeding > 0
+        self.conditions.borrow().get(&Condition::Bleeding).is_some()
     }
 
-    pub fn receive_condition(&self, condition: Condition) {
+    pub fn receive_condition(
+        &self,
+        condition: Condition,
+        stacks: Option<u32>,
+        ends_at: Option<u32>,
+    ) {
         let mut conditions = self.conditions.borrow_mut();
-        use Condition::*;
-        match condition {
-            Protected(n) => conditions.protected += n,
-            Dazed(n) => conditions.dazed += n,
-            Bleeding(n) => conditions.bleeding += n,
-            Burning(n) => conditions.burning += n,
-            Blinded(n) => conditions.blinded += n,
-            Braced => conditions.braced = true,
-            Raging => conditions.raging = true,
-            Distracted => conditions.distracted = true,
-            Weakened(n) => conditions.weakened += n,
-            MainHandExertion(n) => conditions.mainhand_exertion += n,
-            OffHandExertion(n) => conditions.offhand_exertion += n,
-            Encumbered(n) => conditions.encumbered += n,
-            NearDeath => conditions.near_death = true,
-            Dead => conditions.dead = true,
-            Slowed(n) => {
-                if conditions.slowed == 0 && n > 0 {
-                    // Since a character receives max AP at end-of-turn, if they are then slowed by an enemy
-                    // that debuff must reasonably affect the character's next turn.
-                    self.action_points.lose(SLOWED_AP_PENALTY);
-                }
-                conditions.slowed += n;
+
+        if let Some(state) = conditions.map.get_mut(&condition) {
+            if let Some(ends_at) = ends_at {
+                state.ends_at = Some(state.ends_at.unwrap().max(ends_at));
             }
-            Exposed(n) => conditions.exposed += n,
-            Hindered(n) => conditions.hindered += n,
-            ReaperApCooldown => conditions.reaper_ap_cooldown = true,
-            BloodRage => conditions.blood_rage = true,
-            ArcaneSurge => conditions.arcane_surge = true,
-            ThrillOfBattle => conditions.thrill_of_battle = true,
+            if let Some(stacks) = stacks {
+                *state.stacks.as_mut().unwrap() += stacks;
+            }
+        } else {
+            conditions
+                .map
+                .insert(condition, ConditionState { stacks, ends_at });
         }
     }
 
-    pub fn clear_condition(&self, condition: Condition) -> Option<u32> {
+    fn clear_condition(&self, condition: Condition) -> u32 {
         let mut conditions = self.conditions.borrow_mut();
-        use Condition::*;
-        fn clear_u32(value: &mut u32) -> Option<u32> {
-            let prev = *value;
-            *value = 0;
-            Some(prev)
-        }
-        fn clear_bool(value: &mut bool) -> Option<u32> {
-            *value = false;
-            None
-        }
-        match condition {
-            Protected(..) => clear_u32(&mut conditions.protected),
-            Dazed(..) => clear_u32(&mut conditions.dazed),
-            Bleeding(..) => clear_u32(&mut conditions.bleeding),
-            Burning(..) => clear_u32(&mut conditions.burning),
-            Blinded(..) => clear_u32(&mut conditions.blinded),
-            Braced => clear_bool(&mut conditions.braced),
-            Raging => clear_bool(&mut conditions.raging),
-            Distracted => clear_bool(&mut conditions.distracted),
-            Weakened(..) => clear_u32(&mut conditions.weakened),
-            MainHandExertion(..) => clear_u32(&mut conditions.mainhand_exertion),
-            OffHandExertion(..) => clear_u32(&mut conditions.offhand_exertion),
-            Encumbered(..) => clear_u32(&mut conditions.encumbered),
-            NearDeath => clear_bool(&mut conditions.near_death),
-            Dead => clear_bool(&mut conditions.dead),
-            Slowed(..) => clear_u32(&mut conditions.slowed),
-            Exposed(..) => clear_u32(&mut conditions.exposed),
-            Hindered(..) => clear_u32(&mut conditions.hindered),
-            ReaperApCooldown => clear_bool(&mut conditions.reaper_ap_cooldown),
-            BloodRage => clear_bool(&mut conditions.blood_rage),
-            ArcaneSurge => clear_bool(&mut conditions.arcane_surge),
-            ThrillOfBattle => clear_bool(&mut conditions.thrill_of_battle),
-        }
+
+        let prev_stacks = conditions.get_stacks(&condition);
+
+        conditions.remove(&condition);
+
+        prev_stacks
     }
 }
 
@@ -4525,7 +4567,7 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
         return false;
     }
 
-    if target.conditions.borrow().blinded > 0 {
+    if target.conditions.borrow().has(&Condition::Blinded) {
         return true;
     }
 

@@ -1175,7 +1175,7 @@ impl UserInterface {
 
                 let attacker_pos = self.active_character().pos();
                 if let Some(offensive) = outcome.offensive {
-                    if let Some(condition) = offensive.inflicted_condition {
+                    if let Some((condition, _duration)) = offensive.inflicted_condition {
                         self.game_grid.add_text_effect(
                             attacker_pos,
                             0.0,
@@ -1883,7 +1883,7 @@ impl UserInterface {
                     .conditions_list
                     .descriptions
                     .iter()
-                    .map(|(info, _)| info.is_positive)
+                    .map(|info| info.is_positive)
                     .collect();
                 self.player_portraits.set_statuses(*id, statuses);
             }
