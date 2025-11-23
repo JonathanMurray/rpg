@@ -168,12 +168,12 @@ pub async fn run_shop_loop(
                     draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
 
                     if rect.contains(mouse_position().into()) {
-                        if can_afford {
+                        let has_space = character.has_space_in_inventory();
+                        if can_afford && has_space {
                             draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
 
                             if is_mouse_button_pressed(MouseButton::Left) {
                                 let success = character.try_gain_equipment(entry.item);
-                                // TODO: It should end up in stash, or buying should not be allowed in the first place
                                 assert!(success);
                                 party.spend_money(entry.cost);
                                 entry.has_been_bought = true;

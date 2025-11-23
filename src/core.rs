@@ -3792,7 +3792,6 @@ impl Character {
     }
 
     pub fn try_gain_equipment(&self, entry: EquipmentEntry) -> bool {
-        dbg!(self.name, entry);
         for slot in &self.inventory {
             if slot.get().is_none() {
                 slot.set(Some(entry));
@@ -3802,6 +3801,10 @@ impl Character {
         }
 
         false
+    }
+
+    pub fn has_space_in_inventory(&self) -> bool {
+        self.inventory.iter().any(|slot| slot.get().is_none())
     }
 
     pub fn spend_one_arrow(&self) {
