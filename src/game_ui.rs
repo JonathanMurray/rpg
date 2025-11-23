@@ -24,7 +24,7 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, prob_ability_hit, prob_attack_hit,
+        as_percentage, distance_between, predict_attack, prob_ability_hit, prob_attack_hit,
         prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityNegativeEffect,
         AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
         AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
@@ -700,27 +700,20 @@ impl UserInterface {
                 // We cannot know yet if the defender will react
                 let defender_reaction = None;
 
-                // TODO: perhaps instead of "chance to hit", we should show "chance to deal at least 1 damage"?
-                // (That would account for grazing and armor.)
                 let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
                     selected_enhancements
                         .iter()
                         .map(|e| (e.name, e.effect))
                         .collect();
-                let hit_chance = as_percentage(prob_attack_hit(
+
+                let prediction = predict_attack(
                     self.active_character(),
                     attack.hand,
-                    target_char,
                     &selected_enhancement_effects,
-                    defender_reaction,
-                ));
-                let full_penetration_chance = as_percentage(prob_attack_penetrating_hit(
-                    self.active_character(),
-                    attack.hand,
                     target_char,
-                    &selected_enhancement_effects,
                     defender_reaction,
-                ));
+                    0,
+                );
 
                 for (term, bonus) in self.active_character().outgoing_attack_bonuses(
                     attack.hand,
@@ -733,11 +726,11 @@ impl UserInterface {
                     details.push((term.to_string(), bonus.goodness()));
                 }
 
-                let header = if hit_chance == full_penetration_chance {
-                    format!("Attack: {}", hit_chance)
-                } else {
-                    format!("Attack: {} / {}", hit_chance, full_penetration_chance)
-                };
+                let header = format!(
+                    "Chance to damage: {}%",
+                    prediction.percentage_chance_deal_damage,
+                );
+
                 self.target_ui.set_action(header, details, true);
             }
 
@@ -854,7 +847,7 @@ impl UserInterface {
                             }
                         };
 
-                        format!("{}: {}", ability.name, chance)
+                        format!("Chance to hit: {}", chance)
                     }
                     AbilityTarget::Ally { .. } => ability.name.to_string(),
                     AbilityTarget::None { .. } | AbilityTarget::Area { .. } => {

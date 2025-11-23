@@ -1474,6 +1474,9 @@ impl CoreGame {
         self.ui_handle_event(GameEvent::LogLine(line.into())).await;
     }
 
+    /**
+     * Note: lots of duplication with predict_attack
+     */
     fn perform_attack(
         &self,
         attacker_id: CharacterId,
@@ -1594,7 +1597,7 @@ impl CoreGame {
         }
 
         detail_lines.push(format!(
-            "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}, armor={}",
+            "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}",
             unmodified_roll,
             attack_modifier,
             if attack_bonus.flat_amount > 0 {
@@ -1606,11 +1609,10 @@ impl CoreGame {
             },
             roll_result,
             evasion,
-            armor_str
         ));
 
         let weapon = attacker.weapon(hand_type).unwrap();
-        let outcome = if roll_result >= evasion.saturating_sub(5) {
+        let outcome = if roll_result >= evasion.saturating_sub(10) {
             let mut on_true_hit_effect = None;
             let mut dmg_calculation = weapon.damage as i32;
 
@@ -1650,22 +1652,20 @@ impl CoreGame {
             } else {
                 on_true_hit_effect = weapon.on_true_hit;
 
-                let degree_of_success = (roll_result - evasion) / 5;
+                let crit = roll_result >= evasion + 10;
 
-                if degree_of_success > 0 {
+                if crit {
                     attack_hit_type = AttackHitType::Critical;
-                    detail_lines.push(format!("  Critical hit ({})", degree_of_success));
-                    let bonus_percentage = degree_of_success * 25;
+                    detail_lines.push(format!("  Critical hit"));
+                    let bonus_percentage = 50;
                     dmg_str.push_str(&format!(" +{bonus_percentage}% (crit)"));
-                    dmg_calculation +=
-                        (dmg_calculation as f32 * 0.25 * degree_of_success as f32).ceil() as i32;
+                    dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                 } else {
                     detail_lines.push("  Hit".to_string());
                 }
             }
 
             if armor_value > 0 {
-                //line.push_str(&format!(", {} mitigated", armor_value));
                 dmg_str.push_str(&format!(" -{armor_value} (armor)"));
                 dmg_calculation -= armor_value as i32;
             }
@@ -2021,6 +2021,160 @@ fn roll_description(advantage: i32) -> Option<String> {
         std::cmp::Ordering::Greater => {
             Some(format!("Rolled {} dice with advantage...", advantage + 1))
         }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct AttackPrediction {
+    pub percentage_chance_deal_damage: u32,
+    pub min_damage: u32,
+    pub max_damage: u32,
+    pub avg_damage: f32,
+}
+
+/**
+ * Note: lots of duplication with perform_attack
+ */
+pub fn predict_attack(
+    attacker: &Character,
+    hand_type: HandType,
+    enhancements: &[(&'static str, AttackEnhancementEffect)],
+    defender: &Character,
+    defender_reaction: Option<OnAttackedReaction>,
+    ability_roll_modifier: i32,
+) -> AttackPrediction {
+    let mut attack_bonus = attack_roll_bonus(
+        attacker,
+        hand_type,
+        defender,
+        enhancements,
+        defender_reaction,
+    );
+    attack_bonus.flat_amount += ability_roll_modifier;
+
+    let mut evasion = defender.evasion();
+
+    let attack_modifier = attacker.attack_modifier(hand_type);
+
+    let mut armor_value = defender.protection_from_armor();
+
+    if let Some(reaction) = defender_reaction {
+        let bonus_evasion = reaction.effect.bonus_evasion;
+        if bonus_evasion > 0 {
+            evasion += bonus_evasion;
+        }
+
+        let bonus_armor = reaction.effect.bonus_armor;
+        if bonus_armor > 0 {
+            armor_value += bonus_armor;
+        }
+    }
+
+    let mut armor_penetrators = vec![];
+    let weapon = attacker.weapon(hand_type).unwrap();
+    let mut used_arrow = None;
+
+    for (name, effect) in enhancements {
+        let penetration = effect.armor_penetration;
+        if penetration > 0 {
+            armor_penetrators.push((penetration, *name));
+        }
+        if effect.consume_equipped_arrow {
+            assert!(used_arrow.is_none());
+            assert!(!weapon.is_melee());
+            let stack = attacker.arrows.get().unwrap();
+            used_arrow = Some(stack.arrow);
+        }
+    }
+
+    if let Some(arrow) = used_arrow {
+        let penetration = arrow.bonus_penetration;
+        if penetration > 0 {
+            armor_penetrators.push((penetration, arrow.name));
+        }
+    }
+
+    if attacker
+        .known_passive_skills
+        .contains(&PassiveSkill::WeaponProficiency)
+    {
+        armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
+    }
+
+    for (penetration, _label) in armor_penetrators {
+        armor_value = armor_value.saturating_sub(penetration);
+    }
+
+    let weapon = attacker.weapon(hand_type).unwrap();
+
+    let mut damage_outcomes = vec![];
+    let mut min_dmg = None;
+    let mut max_dmg = 0;
+    let mut percentage_deal_damage = 0;
+
+    for unmodified_roll in 1..=20 {
+        let roll_result =
+            ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
+        let damage = if roll_result >= evasion.saturating_sub(10) {
+            let mut dmg_calculation = weapon.damage as i32;
+
+            if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
+                let bonus_dmg = 1;
+                dmg_calculation += bonus_dmg;
+            }
+
+            for (_name, effect) in enhancements {
+                let bonus_dmg = effect.bonus_damage;
+                if bonus_dmg > 0 {
+                    dmg_calculation += bonus_dmg as i32;
+                }
+            }
+
+            if attacker
+                .known_passive_skills
+                .contains(&PassiveSkill::Honorless)
+            {
+                let bonus_dmg = 1;
+                if is_target_flanked(attacker.pos(), defender) {
+                    dmg_calculation += bonus_dmg as i32;
+                }
+            }
+
+            if roll_result < evasion {
+                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+            } else if roll_result >= evasion + 10 {
+                dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+            }
+
+            if armor_value > 0 {
+                dmg_calculation -= armor_value as i32;
+            }
+
+            dmg_calculation.max(0) as u32
+        } else {
+            0
+        };
+
+        if min_dmg.is_none() {
+            min_dmg = Some(damage);
+        }
+        max_dmg = damage;
+        if damage > 0 && percentage_deal_damage == 0 {
+            percentage_deal_damage = (21 - unmodified_roll) * 100 / 20;
+        }
+
+        damage_outcomes.push(damage);
+    }
+
+    dbg!(&damage_outcomes);
+
+    let avg_damage = damage_outcomes.iter().map(|dmg| *dmg as f32).sum::<f32>() / 20.0;
+
+    AttackPrediction {
+        percentage_chance_deal_damage: percentage_deal_damage,
+        min_damage: min_dmg.unwrap(),
+        max_damage: max_dmg,
+        avg_damage,
     }
 }
 
