@@ -25,6 +25,7 @@ enum UiOutcome {
     ChoseOnHitReaction(Option<OnHitReaction>),
     ChoseOnAttackedReaction(Option<OnAttackedReaction>),
     ChoseOpportunityAttack(bool),
+    SwitchedTo(CharacterId),
     None,
 }
 
@@ -57,6 +58,11 @@ enum MessageFromGame {
     Event(GameEvent),
 }
 
+pub enum ActionOrSwitchTo {
+    Action(Option<Action>),
+    SwitchTo(CharacterId),
+}
+
 #[derive(Clone)]
 pub struct GameUserInterfaceConnection {
     inner: Rc<RefCell<Option<_GameUserInterfaceConnection>>>,
@@ -80,13 +86,14 @@ impl GameUserInterfaceConnection {
         inner_ref.as_ref().unwrap().run_ui(game, message).await
     }
 
-    pub async fn select_action(&self, game: &CoreGame) -> Option<Action> {
+    pub async fn select_action(&self, game: &CoreGame) -> ActionOrSwitchTo {
         match self
             .run_ui(game, MessageFromGame::AwaitingChooseAction)
             .await
         {
-            UiOutcome::ChoseAction(action) => action,
-            unexpected => panic!("Expected action but got: {:?}", unexpected),
+            UiOutcome::ChoseAction(action) => ActionOrSwitchTo::Action(action),
+            UiOutcome::SwitchedTo(character_id) => ActionOrSwitchTo::SwitchTo(character_id),
+            unexpected => panic!("Expected action (or char change) but got: {:?}", unexpected),
         }
     }
 
@@ -324,6 +331,10 @@ impl _GameUserInterfaceConnection {
 
             if let Some(player_choice) = player_choice {
                 user_interface.set_state(UiState::Idle);
+                // Need to call next_frame here, to make sure UI events aren't lingering when
+                // PlayerChose::SwitchTo leads us back into selecting the action for the newly
+                // selected character (?)
+                next_frame().await;
                 match player_choice {
                     PlayerChose::AttackedReaction(reaction) => {
                         return UiOutcome::ChoseOnAttackedReaction(reaction);
@@ -335,8 +346,10 @@ impl _GameUserInterfaceConnection {
                         return UiOutcome::ChoseOpportunityAttack(choice)
                     }
                     PlayerChose::Action(action) => {
-                        dbg!(&action);
                         return UiOutcome::ChoseAction(action);
+                    }
+                    PlayerChose::SwitchTo(character_id) => {
+                        return UiOutcome::SwitchedTo(character_id)
                     }
                 }
             }

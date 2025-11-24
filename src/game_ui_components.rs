@@ -8,6 +8,7 @@ use macroquad::{
     color::SKYBLUE,
     input::{is_key_pressed, KeyCode},
     shapes::{draw_triangle, draw_triangle_lines},
+    text::{measure_text, TextParams},
     texture::{draw_texture_ex, DrawTextureParams},
 };
 
@@ -22,8 +23,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style,
-        TextLine,
+        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Rectangle, Style, TextLine,
     },
     core::{Character, CharacterId, Characters, CoreGame, MAX_ACTION_POINTS},
     drawing::draw_cross,
@@ -141,6 +142,7 @@ struct TopCharacterPortrait {
     padding: f32,
     container: Container,
     character: Rc<Character>,
+    font: Font,
 }
 
 impl TopCharacterPortrait {
@@ -205,13 +207,14 @@ impl TopCharacterPortrait {
             padding: 0.0,
             container,
             character: character.clone(),
+            font,
         }
     }
 }
 
 impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
-        let (w, _h) = self.size();
+        let (w, h) = self.size();
         let (portrait_w, portrait_h) = self.container.children[0].size();
         self.container.draw(x + self.padding, y + self.padding);
 
@@ -239,6 +242,24 @@ impl Drawable for TopCharacterPortrait {
                 portrait_h - 2.0,
                 2.0,
                 LIGHTGRAY,
+            );
+        }
+
+        if self.character.has_taken_a_turn_this_round.get() {
+            let text = "DONE";
+            let font_size = 16;
+            let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
+            draw_rectangle(x, y, w, h, Color::new(0.0, 0.0, 0.0, 0.3));
+            draw_text_rounded(
+                text,
+                x + w / 2.0 - text_dim.width / 2.0,
+                y + 50.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
             );
         }
     }
@@ -373,22 +394,26 @@ impl PlayerPortraits {
     pub fn draw(&self, x: f32, y: f32) -> bool {
         self.row.draw(x, y);
 
-        let mut did_change_character = false;
+        let prev_selected = self.selected_i.get();
+
+        let mut change_attempt = false;
 
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.take() {
+                println!("Portrait has been clicked {i}");
                 self.set_selected_id(*i);
-                did_change_character = true;
+                change_attempt = true;
                 break;
             }
         }
 
         if is_key_pressed(KeyCode::Tab) {
             self.toggle_active_id();
-            did_change_character = true;
+            change_attempt = true;
         }
 
-        did_change_character
+        // Return true if we did truly change
+        change_attempt && self.selected_i.get() != prev_selected
     }
 
     fn toggle_active_id(&self) {
@@ -538,6 +563,12 @@ impl Drawable for PlayerCharacterPortrait {
         if hovered {
             draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
             if is_mouse_button_pressed(MouseButton::Left) {
+                println!(
+                    "Set portrait has been clicked mouse={:?}, {},{}",
+                    (mouse_x, mouse_y),
+                    x,
+                    y
+                );
                 self.has_been_clicked.set(true);
             }
         }

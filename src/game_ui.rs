@@ -508,7 +508,7 @@ impl UserInterface {
             hovered_action,
         );
 
-        let player_chose = self.handle_grid_outcome(grid_outcome);
+        let mut player_chose = self.handle_grid_outcome(grid_outcome);
 
         draw_rectangle(0.0, ui_y, screen_width(), screen_height() - ui_y, BLACK);
         draw_line(0.0, ui_y, screen_width(), ui_y, 1.0, ORANGE);
@@ -518,14 +518,26 @@ impl UserInterface {
         let did_change_selected_character = self.player_portraits.draw(570.0, ui_y + 25.0);
         self.character_sheet_toggle.draw(570.0, ui_y + 110.0);
 
+        let selected_character_id = self.player_portraits.selected_id();
         if did_change_selected_character {
             self.on_new_selected_character();
             if matches!(*self.state.borrow(), UiState::ConfiguringAction(..)) {
                 self.set_state(UiState::ChoosingAction);
             }
+
+            let new_selected_char = self.characters.get(selected_character_id);
+
+            if selected_character_id != self.active_character_id
+                && matches!(*self.state.borrow(), UiState::ChoosingAction)
+                && !new_selected_char.has_taken_a_turn_this_round.get()
+            {
+                if player_chose.is_some() {
+                    println!("Warning: overriding {:?} with new choice", player_chose);
+                }
+                player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
+            }
         }
 
-        let selected_character_id = self.player_portraits.selected_id();
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
 
         character_ui.draw(ui_y + 5.0);
@@ -567,13 +579,13 @@ impl UserInterface {
             .unwrap();
 
         if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
-            let btn = character_ui
+            if let Some(btn) = character_ui
                 .hoverable_buttons
                 .iter()
                 .find(|btn| btn.id == btn_id)
-                .unwrap();
-
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
+            {
+                draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
+            }
         }
 
         player_chose
@@ -936,7 +948,7 @@ impl UserInterface {
 
         if self.active_character().player_controlled() {
             if self.player_portraits.selected_id() != self.active_character_id {
-                println!("SWITCHING");
+                println!("SWITCHING CHAR IN PORTRAITS");
                 self.player_portraits
                     .set_selected_id(self.active_character_id);
             }
@@ -1043,7 +1055,7 @@ impl UserInterface {
 
         if let Some(reactor) = is_reacting {
             self.target_ui
-                .set_action("React?".to_string(), vec![], false);
+                .set_action("Reaction!".to_string(), vec![], false);
             self.set_allowed_to_use_action_buttons(false);
             self.player_portraits.set_selected_id(reactor);
 
@@ -1371,10 +1383,11 @@ impl UserInterface {
                     self.set_new_active_character_id(new_active);
                 }
             }
-            GameEvent::NewTurn { new_active } => {
-                self.log.add("---".to_string());
-                self.animation_stopwatch.set_to_at_least(0.5);
+            GameEvent::NewActiveCharacter { new_active } => {
                 self.set_new_active_character_id(new_active);
+                if !self.active_character().player_controlled() {
+                    self.animation_stopwatch.set_to_at_least(1.0);
+                }
             }
             GameEvent::Moved {
                 character,
@@ -2197,4 +2210,5 @@ pub enum PlayerChose {
     HitReaction(Option<OnHitReaction>),
     OpportunityAttack(bool),
     Action(Option<Action>),
+    SwitchTo(CharacterId),
 }

@@ -13,7 +13,7 @@ use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::{PassiveSkill, ADRENALIN_POTION};
-use crate::game_ui_connection::GameUserInterfaceConnection;
+use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::PathfindGrid;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
@@ -60,6 +60,7 @@ impl CoreGame {
             character.action_points.current.set(ACTION_POINTS_PER_TURN);
             character.regain_movement();
             character.on_health_changed();
+            character.has_taken_a_turn_this_round.set(false);
         }
         self.on_character_positions_changed();
 
@@ -79,6 +80,7 @@ impl CoreGame {
 
                 // If the active character is player controlled, it's important that it runs end-of-turn
                 // to let debuffs decay.
+                // TODO: extremely iffy. We should instead have a proper 'end of fight' cleanup.
                 self.perform_end_of_turn_character().await;
 
                 for character in self.characters.iter() {
@@ -88,7 +90,26 @@ impl CoreGame {
                 return self.characters.player_characters();
             }
 
-            let action = self.ui_select_action().await;
+            let action_or_character_change = self.user_interface.select_action(&self).await;
+
+            let action = match action_or_character_change {
+                ActionOrSwitchTo::Action(action) => action,
+                ActionOrSwitchTo::SwitchTo(character_id) => {
+                    println!(
+                        "SWITCHING CHAR FROM {} TO {}",
+                        self.active_character_id, character_id
+                    );
+                    assert!(self.active_character_id != character_id);
+                    assert!(!self
+                        .characters
+                        .get(character_id)
+                        .has_taken_a_turn_this_round
+                        .get());
+                    self.active_character_id = character_id;
+                    self.notify_ui_of_new_active_char().await;
+                    continue;
+                }
+            };
 
             let mut ending_turn = false;
 
@@ -162,14 +183,22 @@ impl CoreGame {
 
             if ending_turn {
                 self.perform_end_of_turn_character().await;
-                let prev_index_in_round = self.active_character().index_in_round.unwrap();
+                //let prev_index_in_round = self.active_character().index_in_round.unwrap();
                 self.active_character_id = self.characters.next_id(self.active_character_id);
-                self.notify_ui_of_new_turn().await;
+                self.notify_ui_of_new_active_char().await;
 
                 let index_in_round = self.active_character().index_in_round.unwrap();
 
-                if index_in_round < prev_index_in_round {
+                let new_round = self
+                    .characters
+                    .iter()
+                    .all(|ch| ch.has_taken_a_turn_this_round.get());
+
+                if new_round {
                     println!("NEW ROUND STARTED!");
+                    for character in self.characters.iter() {
+                        character.has_taken_a_turn_this_round.set(false);
+                    }
                     self.round_index += 1;
                 }
 
@@ -193,6 +222,7 @@ impl CoreGame {
             if active_character_died {
                 println!("ACTIVE CHAR DIED");
                 dbg!(self.active_character_id);
+                self.active_character().has_taken_a_turn_this_round.set(true);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
                 dbg!(self.active_character_id);
             }
@@ -224,13 +254,13 @@ impl CoreGame {
             // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
             // before the character died.
             if active_character_died {
-                self.notify_ui_of_new_turn().await;
+                self.notify_ui_of_new_active_char().await;
             }
         }
     }
 
-    async fn notify_ui_of_new_turn(&self) {
-        self.ui_handle_event(GameEvent::NewTurn {
+    async fn notify_ui_of_new_active_char(&self) {
+        self.ui_handle_event(GameEvent::NewActiveCharacter {
             new_active: self.active_character_id,
         })
         .await;
@@ -424,11 +454,15 @@ impl CoreGame {
                 positions,
                 total_distance,
             } => {
+                dbg!("Action::Move", extra_cost, total_distance);
                 let character = self.active_character();
-                let free_movement = total_distance - extra_cost as f32 * character.move_speed();
                 character.action_points.spend(extra_cost);
                 character.stamina.spend(extra_cost);
-                character.spend_movement(free_movement);
+                let paid_distance = extra_cost as f32 * character.move_speed();
+                if total_distance > paid_distance {
+                    let free_distance = total_distance - paid_distance;
+                    character.spend_movement(free_distance);
+                }
 
                 self.perform_movement(positions).await;
                 ActionOutcome::Default
@@ -481,10 +515,6 @@ impl CoreGame {
         self.user_interface.handle_event(self, event).await;
     }
 
-    async fn ui_select_action(&self) -> Option<Action> {
-        self.user_interface.select_action(self).await
-    }
-
     async fn perform_movement(&self, mut positions: Vec<Position>) {
         let start_position = positions.remove(0);
         assert!(start_position == self.active_character().pos());
@@ -509,6 +539,7 @@ impl CoreGame {
                 let leaving_melee = within_meele(character.pos(), other_char.pos())
                     && !within_meele(new_position, other_char.pos());
 
+                // Movement opportunity attack
                 if unfriendly && leaving_melee {
                     if other_char.can_use_opportunity_attack(character.id()) {
                         let reactor = other_char;
@@ -1913,6 +1944,7 @@ impl CoreGame {
 
     async fn perform_end_of_turn_character(&mut self) {
         let character = self.active_character();
+        character.has_taken_a_turn_this_round.set(true);
         let name = character.name;
         let conditions = &character.conditions;
 
@@ -2166,8 +2198,6 @@ pub fn predict_attack(
         damage_outcomes.push(damage);
     }
 
-    dbg!(&damage_outcomes);
-
     let avg_damage = damage_outcomes.iter().map(|dmg| *dmg as f32).sum::<f32>() / 20.0;
 
     AttackPrediction {
@@ -2239,7 +2269,7 @@ pub enum GameEvent {
         character: CharacterId,
         new_active: Option<CharacterId>,
     },
-    NewTurn {
+    NewActiveCharacter {
         new_active: CharacterId,
     },
     CharacterTookDamage {
@@ -2407,6 +2437,7 @@ pub fn prob_ability_hit(
 }
 
 #[derive(Clone)]
+// TODO: Remove the CharacterId from the tuple? Not needed anymore now that Character has interior mutability
 pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
 
 impl Characters {
@@ -2428,6 +2459,15 @@ impl Characters {
     }
 
     fn next_id(&self, current_id: CharacterId) -> CharacterId {
+        for ch in self.iter() {
+            dbg!(ch.name, &ch.has_taken_a_turn_this_round);
+            if !ch.has_taken_a_turn_this_round.get() {
+                return ch.id();
+            }
+        }
+        return self.0[0].0;
+
+        /*
         let mut i = 0;
         let mut passed_current = false;
         loop {
@@ -2446,6 +2486,7 @@ impl Characters {
 
             i = (i + 1) % self.0.len();
         }
+         */
     }
 
     pub fn contains(&self, character_id: CharacterId) -> bool {
@@ -3425,6 +3466,7 @@ pub struct Character {
     index_in_round: Option<u32>,
     current_game_time: Cell<u32>,
     round_length: Option<u32>,
+    pub has_taken_a_turn_this_round: Cell<bool>,
 
     pub name: &'static str,
     pub portrait: PortraitId,
@@ -3484,6 +3526,7 @@ impl Character {
             id: None,
             index_in_round: None,
             round_length: None,
+            has_taken_a_turn_this_round: Cell::new(false),
             portrait,
             sprite,
             behaviour,
@@ -3582,7 +3625,8 @@ impl Character {
 
     fn spend_movement(&self, distance: f32) {
         let remaining = self.remaining_movement.get();
-        assert!(distance <= remaining);
+        assert!(distance > 0.0 && distance <= remaining);
+        dbg!("Spend movement", distance, remaining);
         self.remaining_movement.set(remaining - distance);
     }
 

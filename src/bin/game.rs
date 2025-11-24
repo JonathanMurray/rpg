@@ -16,7 +16,7 @@ use macroquad::{
     miniquad,
     rand::{self},
     time::get_frame_time,
-    window::{clear_background, next_frame, Conf},
+    window::{clear_background, Conf},
 };
 
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
@@ -148,7 +148,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::EasyGuard,
+        FightId::EasyPair,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
