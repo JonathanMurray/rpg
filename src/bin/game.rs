@@ -41,6 +41,7 @@ use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
+use rpg::skill_tree::run_skill_tree_scene;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
@@ -146,14 +147,7 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    player_characters = run_fight_loop(
-        player_characters,
-        FightId::EasyPair,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-    )
-    .await;
+    run_skill_tree_scene().await;
 
     loop {
         let map_choice = map_scene
@@ -298,7 +292,7 @@ async fn init_fight_scene(
 
 fn window_conf() -> Conf {
     Conf {
-        window_title: "UI test".to_owned(),
+        window_title: "RPG".to_owned(),
         window_width: 1280,
         //window_height: 960,
         window_height: 1060,

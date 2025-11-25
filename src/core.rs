@@ -222,7 +222,9 @@ impl CoreGame {
             if active_character_died {
                 println!("ACTIVE CHAR DIED");
                 dbg!(self.active_character_id);
-                self.active_character().has_taken_a_turn_this_round.set(true);
+                self.active_character()
+                    .has_taken_a_turn_this_round
+                    .set(true);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
                 dbg!(self.active_character_id);
             }

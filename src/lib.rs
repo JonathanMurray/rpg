@@ -1,4 +1,4 @@
-mod action_button;
+pub mod action_button;
 mod activity_popup;
 pub mod base_ui;
 pub mod bot;
@@ -20,6 +20,7 @@ mod non_combat_ui;
 pub mod pathfind;
 pub mod rest_scene;
 pub mod shop_scene;
+pub mod skill_tree;
 pub mod stats_ui;
 pub mod target_ui;
 pub mod textures;

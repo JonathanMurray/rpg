@@ -548,7 +548,7 @@ pub struct ActionButton {
     pub id: u32,
     pub action: ButtonAction,
     pub size: (f32, f32),
-    texture_draw_size: (f32, f32),
+    pub texture_draw_size: (f32, f32),
     style: Style,
     hover_border_color: Color,
     points_row: Container,
@@ -989,7 +989,7 @@ impl ButtonAction {
         }
     }
 
-    fn icon(&self, character: Option<&Character>) -> IconId {
+    pub fn icon(&self, character: Option<&Character>) -> IconId {
         match self {
             ButtonAction::Action(base_action) => match base_action {
                 BaseAction::Attack(..) => {
