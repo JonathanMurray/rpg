@@ -2720,7 +2720,7 @@ impl Condition {
             Weakened => "-x to all defenses and dice rolls",
             MainHandExertion => "-x on further similar actions",
             OffHandExertion => "-x on further similar actions",
-            Encumbered => "-x to Evasion and -x/2 to dice rolls",
+            Encumbered => "-x to Evasion and -x to dice rolls",
             NearDeath => "< 25% HP: Reduced AP, disadvantage on dice rolls, enemies have advantage",
             Dead => "This character has reached 0 HP and is dead",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn",
@@ -4631,7 +4631,7 @@ impl Character {
             bonuses.push(("Weakened", RollBonusContributor::OtherNegative));
         }
 
-        let encumbrance_penalty = (conditions.get_stacks(&Condition::Encumbered) / 2) as i32;
+        let encumbrance_penalty = conditions.get_stacks(&Condition::Encumbered) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",
@@ -4694,7 +4694,7 @@ impl Character {
             bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
         }
 
-        let encumbrance_penalty = (conditions.get_stacks(&Condition::Encumbered) / 2) as i32;
+        let encumbrance_penalty = (conditions.get_stacks(&Condition::Encumbered)) as i32;
         if encumbrance_penalty > 0 {
             bonuses.push((
                 "Encumbered",

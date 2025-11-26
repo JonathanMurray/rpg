@@ -1665,8 +1665,7 @@ impl UserInterface {
                 self.player_portraits.set_selected_id(new_active_id);
                 self.on_new_selected_character();
             }
-            // TODO: This should not happen if the character change was explicitly triggered by the player
-            self.character_sheet_toggle.shown.set(false);
+            //self.character_sheet_toggle.shown.set(false);
         }
 
         self.active_character_id = new_active_id;
