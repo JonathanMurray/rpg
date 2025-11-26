@@ -16,7 +16,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ButtonAction, ButtonSelected, EventSender, InternalUiEvent,
+        draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
+        InternalUiEvent,
     },
     base_ui::{draw_text_rounded, Drawable},
     core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
@@ -66,7 +67,7 @@ impl ActivityPopup {
         let mut next_button_id = 0;
         let proceed_button = ActionButton::new(
             ButtonAction::Proceed,
-            &proceed_button_events,
+            Some(Rc::clone(&proceed_button_events)),
             next_button_id,
             &icons,
             None,
@@ -298,7 +299,9 @@ impl ActivityPopup {
         let mut changed_attack_enhancements = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(id, _button_action, hovered_pos) => {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id, hovered_pos, ..
+                }) => {
                     if hovered_pos.is_some() {
                         self.hovered_choice_button_id = Some(id);
                     } else if self.hovered_choice_button_id == Some(id) {
@@ -306,7 +309,7 @@ impl ActivityPopup {
                     }
                 }
 
-                InternalUiEvent::ButtonClicked(id, _button_action) => {
+                InternalUiEvent::ButtonClicked { id, .. } => {
                     let clicked_btn = &self.choice_buttons[&id];
                     clicked_btn.toggle_selected();
 
@@ -386,7 +389,7 @@ impl ActivityPopup {
         self.refresh_enabled_state();
 
         for event in self.proceed_button_events.borrow_mut().drain(..) {
-            if matches!(event, InternalUiEvent::ButtonClicked(..)) {
+            if matches!(event, InternalUiEvent::ButtonClicked { .. }) {
                 return Some(ActivityPopupOutcome::ClickedProceed);
             }
         }
@@ -585,7 +588,7 @@ impl ActivityPopup {
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
-            &self.choice_button_events,
+            Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
             &self.icons,
             None,
@@ -601,7 +604,7 @@ impl ActivityPopup {
     ) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
-            &self.choice_button_events,
+            Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
             &self.icons,
             Some(character),

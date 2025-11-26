@@ -17,7 +17,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
+        ButtonSelected, InternalUiEvent,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
@@ -365,7 +366,7 @@ pub struct UserInterface {
 
     font: Font,
 
-    hovered_button: Option<(u32, ButtonAction, (f32, f32))>,
+    hovered_button: Option<ButtonHovered>,
     active_character_id: CharacterId,
     remembered_attack_enhancements: HashMap<CharacterId, Vec<AttackEnhancement>>,
 
@@ -495,8 +496,13 @@ impl UserInterface {
 
         let hovered_action = self
             .hovered_button
-            .map(|(_btn_id, btn_action, _btn_pos)| match btn_action {
-                ButtonAction::Action(base_action) => Some(base_action),
+            .as_ref()
+            .map(|btn_hovered| match btn_hovered.action {
+                ButtonAction::Action(base_action)
+                    if btn_hovered.context != Some(ButtonContext::CharacterSheet) =>
+                {
+                    Some(base_action)
+                }
                 _ => None,
             })
             .flatten();
@@ -578,13 +584,13 @@ impl UserInterface {
             .get_mut(&self.player_portraits.selected_id())
             .unwrap();
 
-        if let Some((btn_id, _btn_action, btn_pos)) = self.hovered_button {
+        if let Some(btn_hovered) = &self.hovered_button {
             if let Some(btn) = character_ui
                 .hoverable_buttons
                 .iter()
-                .find(|btn| btn.id == btn_id)
+                .find(|btn| btn.id == btn_hovered.id)
             {
-                draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
+                draw_button_tooltip(&self.font, btn_hovered.hovered_pos.unwrap(), &btn.tooltip());
             }
         }
 
@@ -1685,22 +1691,34 @@ impl UserInterface {
             .take()
             .into_iter()
             .for_each(|event| match event {
-                InternalUiEvent::ButtonHovered(button_id, button_action, hovered) => {
-                    if let Some(pos) = hovered {
-                        self.hovered_button = Some((button_id, button_action, pos));
-                    } else if let Some(previously_hovered_button) = self.hovered_button {
-                        if button_id == previously_hovered_button.0 {
+                InternalUiEvent::ButtonHovered(
+                    event @ ButtonHovered {
+                        id, hovered_pos, ..
+                    },
+                ) => {
+                    if hovered_pos.is_some() {
+                        self.hovered_button = Some(event);
+                    } else if let Some(previously_hovered_button) = &self.hovered_button {
+                        if id == previously_hovered_button.id {
                             self.hovered_button = None
                         }
                     }
                 }
 
-                InternalUiEvent::ButtonClicked(_button_id, btn_action) => match btn_action {
-                    ButtonAction::Action(base_action) => {
-                        action_button_clicked = Some(base_action);
+                InternalUiEvent::ButtonClicked {
+                    action: btn_action,
+                    context,
+                    ..
+                } => {
+                    if context != Some(ButtonContext::CharacterSheet) {
+                        match btn_action {
+                            ButtonAction::Action(base_action) => {
+                                action_button_clicked = Some(base_action);
+                            }
+                            unexpected => panic!("{:?}", unexpected),
+                        }
                     }
-                    _ => unreachable!(),
-                },
+                }
             });
 
         let character_ui = self
@@ -1751,19 +1769,21 @@ impl UserInterface {
             .character_uis
             .get_mut(&self.player_portraits.selected_id())
             .unwrap();
-        if let Some(hovered_btn) = self.hovered_button {
-            character_ui.action_points_row.reserved_and_hovered_ap = (
-                self.activity_popup.reserved_and_hovered_action_points().0,
-                hovered_btn.1.action_point_cost(),
-            );
-            character_ui
-                .mana_bar
-                .borrow_mut()
-                .set_reserved(hovered_btn.1.mana_cost());
-            character_ui
-                .stamina_bar
-                .borrow_mut()
-                .set_reserved(hovered_btn.1.stamina_cost());
+        if let Some(hovered_btn) = &self.hovered_button {
+            if hovered_btn.context != Some(ButtonContext::CharacterSheet) {
+                character_ui.action_points_row.reserved_and_hovered_ap = (
+                    self.activity_popup.reserved_and_hovered_action_points().0,
+                    hovered_btn.action.action_point_cost(),
+                );
+                character_ui
+                    .mana_bar
+                    .borrow_mut()
+                    .set_reserved(hovered_btn.action.mana_cost());
+                character_ui
+                    .stamina_bar
+                    .borrow_mut()
+                    .set_reserved(hovered_btn.action.stamina_cost());
+            }
         } else {
             character_ui.action_points_row.reserved_and_hovered_ap =
                 self.activity_popup.reserved_and_hovered_action_points();
@@ -1935,10 +1955,15 @@ pub fn build_character_ui(
     character: &Rc<Character>,
     next_button_id: &mut u32,
 ) -> CharacterUi {
-    let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
-        let btn = ActionButton::new(btn_action, event_queue, *next_button_id, icons, character);
-        btn.enabled.set(enabled);
+    let mut new_button = |btn_action,
+                          character: Option<Rc<Character>>,
+                          in_character_sheet: bool| {
+        let event_queue = Some(Rc::clone(event_queue));
+        let mut btn = ActionButton::new(btn_action, event_queue, *next_button_id, icons, character);
         *next_button_id += 1;
+        if in_character_sheet {
+            btn.context = Some(ButtonContext::CharacterSheet);
+        }
         btn
     };
 
@@ -1964,7 +1989,7 @@ pub fn build_character_ui(
 
     for action in character.known_actions() {
         let btn_action = ButtonAction::Action(action);
-        let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
+        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
         tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
         hoverable_buttons.push(Rc::clone(&btn));
         match action {
@@ -1974,7 +1999,7 @@ pub fn build_character_ui(
                     .map(|key| (*key, simple_font.clone()));
                 basic_buttons.push(btn);
 
-                let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+                let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
                 attack_button_for_character_sheet = Some(btn.clone());
                 hoverable_buttons.push(btn);
             }
@@ -1984,7 +2009,7 @@ pub fn build_character_ui(
                     .map(|key| (*key, simple_font.clone()));
                 ability_buttons.push(btn);
 
-                let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+                let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
 
                 let enhancement_buttons: Vec<Rc<ActionButton>> = ability
                     .possible_enhancements
@@ -1995,7 +2020,7 @@ pub fn build_character_ui(
                             let enhancement_btn = Rc::new(new_button(
                                 ButtonAction::AbilityEnhancement(enhancement),
                                 None,
-                                false,
+                                true,
                             ));
                             hoverable_buttons.push(enhancement_btn.clone());
                             Some(enhancement_btn)
@@ -2021,13 +2046,13 @@ pub fn build_character_ui(
     let mut reaction_buttons_for_character_sheet = vec![];
     for (_subtext, reaction) in character.known_on_attacked_reactions() {
         let btn_action = ButtonAction::OnAttackedReaction(reaction);
-        let btn = Rc::new(new_button(btn_action, None, false));
+        let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));
         reaction_buttons_for_character_sheet.push(btn);
     }
     for (_subtext, reaction) in character.known_on_hit_reactions() {
         let btn_action = ButtonAction::OnHitReaction(reaction);
-        let btn = Rc::new(new_button(btn_action, None, false));
+        let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));
         reaction_buttons_for_character_sheet.push(btn);
     }
@@ -2036,14 +2061,14 @@ pub fn build_character_ui(
     // without the character sheet being updated)
     for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
         let btn_action = ButtonAction::AttackEnhancement(enhancement);
-        let btn = Rc::new(new_button(btn_action, None, false));
+        let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));
         attack_enhancement_buttons_for_character_sheet.push(btn);
     }
 
     for passive_skill in &character.known_passive_skills {
         let btn_action = ButtonAction::Passive(*passive_skill);
-        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+        let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
         hoverable_buttons.push(Rc::clone(&btn));
         passive_buttons_for_character_sheet.push(Rc::clone(&btn));
     }

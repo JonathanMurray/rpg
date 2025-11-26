@@ -15,7 +15,9 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
+    action_button::{
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
+    },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
     character_sheet::{build_spell_book, MoneyText},
     core::{BaseAction, Character, HandType},
@@ -175,7 +177,13 @@ impl NonCombatCharacterUi {
         let mut next_button_id = 0;
 
         let mut new_button = |btn_action, character: Option<Rc<Character>>, enabled: bool| {
-            let btn = ActionButton::new(btn_action, &event_queue, next_button_id, icons, character);
+            let btn = ActionButton::new(
+                btn_action,
+                Some(Rc::clone(&event_queue)),
+                next_button_id,
+                icons,
+                character,
+            );
             btn.enabled.set(enabled);
             next_button_id += 1;
             btn
@@ -375,7 +383,11 @@ impl NonCombatCharacterUi {
         // Note: we have to drain the UI events, to prevent memory leak
         for event in self.event_queue.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(button_id, _button_action, btn_pos) => {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id: button_id,
+                    hovered_pos: btn_pos,
+                    ..
+                }) => {
                     if let Some(btn_pos) = btn_pos {
                         self.hovered_button = Some((button_id, btn_pos));
                     } else if let Some(previously_hovered_button) = self.hovered_button {

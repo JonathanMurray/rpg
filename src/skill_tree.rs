@@ -36,7 +36,7 @@ use macroquad::{
 
 use crate::action_button::{
     button_action_tooltip, draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction,
-    InternalUiEvent, Side, TooltipPositionPreference,
+    ButtonHovered, InternalUiEvent, Side, TooltipPositionPreference,
 };
 use crate::base_ui::{
     draw_text_rounded, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
@@ -206,7 +206,11 @@ pub async fn run_editor() {
     let btn_id = 0;
     let create_action_btn = |btn_action| {
         Element::Box(Box::new(ActionButton::new(
-            btn_action, &ui_events, btn_id, &icons, None,
+            btn_action,
+            Some(Rc::clone(&ui_events)),
+            btn_id,
+            &icons,
+            None,
         )))
     };
 
@@ -488,10 +492,8 @@ pub async fn run_editor() {
 
         for event in grid_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(id, button_action, hovered_pos) => {
-                    dbg!("HOVERED", hovered_pos);
-                }
-                InternalUiEvent::ButtonClicked(id, button_action) => {
+                InternalUiEvent::ButtonHovered { .. } => {}
+                InternalUiEvent::ButtonClicked { id, action, .. } => {
                     dbg!("grid button CLICKED", id);
                 }
             }
@@ -499,11 +501,11 @@ pub async fn run_editor() {
 
         for event in ui_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(id, button_action, hovered_pos) => {
+                InternalUiEvent::ButtonHovered { .. } => {
                     //dbg!("HOVERED", hovered_pos);
                 }
-                InternalUiEvent::ButtonClicked(_id, button_action) => {
-                    state = State::PlacingSkill(btn_action_to_skill(button_action));
+                InternalUiEvent::ButtonClicked { action, .. } => {
+                    state = State::PlacingSkill(btn_action_to_skill(action));
                 }
             }
         }
@@ -739,7 +741,12 @@ pub async fn run_skill_tree_scene() {
 
         for event in grid_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(id, button_action, hovered_pos) => {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id,
+                    action: button_action,
+                    hovered_pos,
+                    ..
+                }) => {
                     if let Some(pos) = hovered_pos {
                         let rect = Rect::new(pos.0, pos.1, cell_w, cell_w);
                         let tooltip = button_action_tooltip(&button_action);
@@ -754,7 +761,7 @@ pub async fn run_skill_tree_scene() {
                         );
                     }
                 }
-                InternalUiEvent::ButtonClicked(id, button_action) => {
+                InternalUiEvent::ButtonClicked { id, .. } => {
                     dbg!("grid button CLICKED", id);
                 }
             }
@@ -816,7 +823,13 @@ fn draw_skill_node(
     y: f32,
     skill: Skill,
 ) {
-    let mut btn = ActionButton::new(skill_to_btn_action(skill), grid_events, 0, icons, None);
+    let mut btn = ActionButton::new(
+        skill_to_btn_action(skill),
+        Some(Rc::clone(grid_events)),
+        0,
+        icons,
+        None,
+    );
     btn.change_scale(icon_w / 60.0);
     btn.hover_border_color = LIGHTGRAY;
     let x = x - btn.size.0 / 2.0;

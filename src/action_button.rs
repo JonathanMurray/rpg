@@ -558,6 +558,12 @@ pub enum ButtonSelected {
     Yes,
 }
 
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ButtonContext {
+    // Used to give a hint (in ui events) where the button is
+    CharacterSheet,
+}
+
 pub struct ActionButton {
     pub id: u32,
     pub action: ButtonAction,
@@ -577,12 +583,13 @@ pub struct ActionButton {
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
     tooltip_is_based_on_equipped_shield: Cell<Option<Shield>>,
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
+    pub context: Option<ButtonContext>,
 }
 
 impl ActionButton {
     pub fn new(
         action: ButtonAction,
-        event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
+        event_queue: Option<Rc<RefCell<Vec<InternalUiEvent>>>>,
         id: u32,
         icons: &HashMap<IconId, Texture2D>,
         character: Option<Rc<Character>>,
@@ -650,9 +657,7 @@ impl ActionButton {
             hovered: Cell::new(false),
             enabled: Cell::new(true),
             selected: Cell::new(ButtonSelected::No),
-            event_sender: Some(EventSender {
-                queue: Rc::clone(event_queue),
-            }),
+            event_sender: event_queue.map(|queue| EventSender { queue }),
             icon,
             dynamic_icons,
             tooltip: RefCell::new(tooltip),
@@ -660,6 +665,7 @@ impl ActionButton {
             tooltip_is_based_on_equipped_weapon: Default::default(),
             tooltip_is_based_on_equipped_shield: Default::default(),
             hotkey: RefCell::new(None),
+            context: None,
         }
     }
 
@@ -770,7 +776,12 @@ impl ActionButton {
         if self.hovered.get() {
             if let Some(event_sender) = &self.event_sender {
                 // Since this button has become hidden, it's no longer hovered
-                event_sender.send(InternalUiEvent::ButtonHovered(self.id, self.action, None));
+                event_sender.send(InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id: self.id,
+                    action: self.action,
+                    hovered_pos: None,
+                    context: self.context,
+                }));
             }
         }
     }
@@ -818,11 +829,12 @@ impl Drawable for ActionButton {
         if hovered != self.hovered.get() {
             self.hovered.set(hovered);
             if let Some(event_sender) = &self.event_sender {
-                event_sender.send(InternalUiEvent::ButtonHovered(
-                    self.id,
-                    self.action,
-                    if hovered { Some((x, y)) } else { None },
-                ));
+                event_sender.send(InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id: self.id,
+                    action: self.action,
+                    hovered_pos: if hovered { Some((x, y)) } else { None },
+                    context: self.context,
+                }));
             }
         }
 
@@ -929,7 +941,11 @@ impl Drawable for ActionButton {
         if self.enabled.get() && hovered {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(event_sender) = &self.event_sender {
-                    event_sender.send(InternalUiEvent::ButtonClicked(self.id, self.action));
+                    event_sender.send(InternalUiEvent::ButtonClicked {
+                        id: self.id,
+                        action: self.action,
+                        context: self.context,
+                    });
                 }
             }
             let margin = -1.0;
@@ -1134,8 +1150,20 @@ impl EventSender {
 
 #[derive(Debug)]
 pub enum InternalUiEvent {
-    ButtonHovered(u32, ButtonAction, Option<(f32, f32)>),
-    ButtonClicked(u32, ButtonAction),
+    ButtonHovered(ButtonHovered),
+    ButtonClicked {
+        id: u32,
+        action: ButtonAction,
+        context: Option<ButtonContext>,
+    },
+}
+
+#[derive(Debug)]
+pub struct ButtonHovered {
+    pub id: u32,
+    pub action: ButtonAction,
+    pub hovered_pos: Option<(f32, f32)>,
+    pub context: Option<ButtonContext>,
 }
 
 pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &Tooltip) {

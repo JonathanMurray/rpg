@@ -18,7 +18,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonSelected, InternalUiEvent,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, ButtonSelected,
+        InternalUiEvent,
     },
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
@@ -110,7 +111,7 @@ impl RewardSelectionUi {
                 let btn = RewardButton {
                     action_button: ActionButton::new(
                         action,
-                        &event_queue,
+                        Some(Rc::clone(&event_queue)),
                         id,
                         &icons,
                         Some(Rc::clone(&character)),
@@ -332,14 +333,18 @@ impl RewardSelectionUi {
 
         for event in self.event_queue.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered(btn_id, _button_action, maybe_btn_pos) => {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id: btn_id,
+                    hovered_pos: maybe_btn_pos,
+                    ..
+                }) => {
                     if let Some(btn_pos) = maybe_btn_pos {
                         self.hovered_btn = Some((btn_id, btn_pos));
                     } else {
                         self.hovered_btn = None;
                     }
                 }
-                InternalUiEvent::ButtonClicked(btn_id, _btn_action) => {
+                InternalUiEvent::ButtonClicked { id: btn_id, .. } => {
                     let reward_btn = self
                         .reward_buttons
                         .iter()
