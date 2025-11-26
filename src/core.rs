@@ -517,7 +517,11 @@ impl CoreGame {
         self.user_interface.handle_event(self, event).await;
     }
 
-    async fn perform_movement(&self, mut positions: Vec<Position>, can_trigger_opportunity_attack: bool) {
+    async fn perform_movement(
+        &self,
+        mut positions: Vec<Position>,
+        can_trigger_opportunity_attack: bool,
+    ) {
         let start_position = positions.remove(0);
         assert!(start_position == self.active_character().pos());
         assert!(
@@ -543,7 +547,9 @@ impl CoreGame {
 
                 if unfriendly && leaving_melee {
                     // Movement opportunity attack
-                    if can_trigger_opportunity_attack && other_char.can_use_opportunity_attack(character.id()) {
+                    if can_trigger_opportunity_attack
+                        && other_char.can_use_opportunity_attack(character.id())
+                    {
                         let reactor = other_char;
 
                         let chooses_to_use_opportunity_attack = self

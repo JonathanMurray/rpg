@@ -229,8 +229,8 @@ impl CharacterSheet {
                 // Since we modified the drag that's shared (through Rc) with the UiState
                 changed_state = true;
             }
-        } else if requested_consumption.is_none()
-            && outcome.requested_consumption.is_some()
+        } else if outcome.requested_consumption.is_some()
+            && outcome.requested_consumption != requested_consumption
             && is_allowed_to_use_consumable
         {
             *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(

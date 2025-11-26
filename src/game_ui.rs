@@ -577,6 +577,24 @@ impl UserInterface {
                 // Maybe drag was changed, or maybe the entire state; should be fine to assume the latter
                 self.on_new_state();
             }
+        } else {
+            // Some actions don't make sense to show unless the character sheet is shown
+            let mut should_cancel_action = false;
+            if matches!(
+                *self.state.borrow(),
+                UiState::ConfiguringAction(ConfiguredAction::UseConsumable(None))
+            ) {
+                should_cancel_action = true;
+            } else if let UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) =
+                &*self.state.borrow()
+            {
+                if drag.borrow().is_none() {
+                    should_cancel_action = true;
+                }
+            }
+            if should_cancel_action {
+                self.set_state(UiState::ChoosingAction);
+            }
         }
 
         let character_ui = self
@@ -976,7 +994,17 @@ impl UserInterface {
     }
 
     pub fn set_state(&mut self, state: UiState) {
-        dbg!(&state);
+        match &*self.state.borrow() {
+            UiState::ConfiguringAction(configured_action) => match configured_action {
+                ConfiguredAction::ChangeEquipment { drag } => {
+                    // Clear the drag; it's shared with the character sheet equipment UI
+                    *drag.borrow_mut() = None;
+                }
+                _ => {}
+            },
+            _ => {}
+        }
+
         *self.state.borrow_mut() = state;
 
         self.on_new_state();
@@ -1637,6 +1665,7 @@ impl UserInterface {
                 self.player_portraits.set_selected_id(new_active_id);
                 self.on_new_selected_character();
             }
+            // TODO: This should not happen if the character change was explicitly triggered by the player
             self.character_sheet_toggle.shown.set(false);
         }
 
