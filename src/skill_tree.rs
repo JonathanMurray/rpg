@@ -10,9 +10,10 @@ use macroquad::color::{
     YELLOW,
 };
 use macroquad::input::{
-    get_keys_pressed, is_key_down, is_key_pressed, is_key_released, is_mouse_button_pressed,
-    is_mouse_button_released, mouse_position, mouse_wheel,
+    get_keys_pressed, is_key_down, is_key_pressed, is_key_released, is_mouse_button_down,
+    is_mouse_button_pressed, is_mouse_button_released, mouse_position, mouse_wheel,
 };
+use macroquad::math::Rect;
 use macroquad::miniquad::window::{self, screen_size, set_window_position, set_window_size};
 use macroquad::miniquad::{KeyCode, MouseButton};
 
@@ -33,7 +34,10 @@ use macroquad::{
     window::{clear_background, Conf},
 };
 
-use crate::action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent};
+use crate::action_button::{
+    button_action_tooltip, draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction,
+    InternalUiEvent, Side, TooltipPositionPreference,
+};
 use crate::base_ui::{
     draw_text_rounded, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
 };
@@ -77,8 +81,8 @@ async fn load_font(path: &str) -> Font {
 }
 
 const COLOR_STR: Color = Color::new(0.70, 0.1, 0.1, 1.00);
-const COLOR_AGI: Color = Color::new(0.0, 0.7, 0.2, 1.0);
-const COLOR_INT: Color = Color::new(0.8, 0.8, 0.00, 1.00);
+const COLOR_AGI: Color = Color::new(0.0, 0.6, 0.2, 1.0);
+const COLOR_INT: Color = Color::new(0.6, 0.5, 0.1, 1.00);
 const COLOR_SPI: Color = Color::new(0.00, 0.3, 0.8, 1.00);
 
 const SAVE_FILE_NAME: &'static str = "skill_tree.json";
@@ -274,7 +278,7 @@ pub async fn run_editor() {
     let cell_widths = [25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 70.0, 80.0, 120.0, 160.0];
     let mut zoom_i = 4;
 
-    let mut draw_grid = true;
+    let mut show_grid = true;
 
     loop {
         let mid = (screen_w / 2.0, screen_h / 2.0);
@@ -356,7 +360,7 @@ pub async fn run_editor() {
                 }
             }
         } else if is_key_pressed(KeyCode::G) {
-            draw_grid = !draw_grid;
+            show_grid = !show_grid;
         } else if is_key_pressed(KeyCode::Space) {
             if matches!(state, State::DeletingNode) {
                 state = State::None;
@@ -388,37 +392,15 @@ pub async fn run_editor() {
         }
 
         clear_background(BLACK);
-        if draw_grid {
-            let grid_color = Color::new(0.1, 0.1, 0.1, 1.00);
-
-            for x in min_x..=max_x + 1 {
-                let x0 = mid.0 + (x as f32 - 0.5) * cell_w;
-                let y1 = mid.1 + (min_y as f32 - 0.5) * cell_w;
-                let y2 = mid.1 + (max_y as f32 + 0.5) * cell_w;
-                draw_line(x0, y1, x0, y2, 1.0, grid_color);
-            }
-            for y in min_y..=max_y + 1 {
-                let y0 = mid.1 + (y as f32 - 0.5) * cell_w;
-                let x1 = mid.0 + (min_x as f32 - 0.5) * cell_w;
-                let x2 = mid.0 + (max_x as f32 + 0.5) * cell_w;
-                draw_line(x1, y0, x2, y0, 1.0, grid_color);
-            }
+        if show_grid {
+            draw_grid_lines(mid, cell_w, min_x, max_x, min_y, max_y);
         }
 
         for (from, to) in &edges {
             let node = nodes.iter().find(|n| n.borrow().id == *from).unwrap();
             let neighbor = nodes.iter().find(|n| n.borrow().id == *to).unwrap();
 
-            let node = node;
-            let neighbor = neighbor;
-            let x1 = mid.0 + node.borrow().pos.0 as f32 * cell_w;
-            let y1 = mid.1 + node.borrow().pos.1 as f32 * cell_w;
-            let x2 = mid.0 + neighbor.borrow().pos.0 as f32 * cell_w;
-            let y2 = mid.1 + neighbor.borrow().pos.1 as f32 * cell_w;
-
-            let color = LIGHTGRAY;
-
-            draw_line(x1, y1, x2, y2, 1.0, GOLD);
+            draw_edge(mid, cell_w, &node.borrow(), &neighbor.borrow(), 1.0, GOLD);
         }
 
         for node in &nodes {
@@ -426,51 +408,25 @@ pub async fn run_editor() {
             let y = mid.1 + node.borrow().pos().1 as f32 * cell_w;
             match node.borrow().content {
                 NodeContent::Origin => {
-                    draw_circle(x, y, origin_r, DARKGRAY);
-                    draw_circle_lines(x, y, origin_r, 1.0, LIGHTGRAY);
-                    let texture = &portraits[&PortraitId::Alice];
-                    draw_texture_ex(
-                        texture,
-                        x - cell_w / 2.0,
-                        y - cell_w / 2.0,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some((cell_w, cell_w).into()),
-                            ..Default::default()
-                        },
-                    );
+                    draw_origin_node(&portraits, cell_w, origin_r, x, y);
                 }
                 NodeContent::Attr(attribute) => {
-                    let color = match attribute {
-                        Attribute::Str => COLOR_STR,
-                        Attribute::Agi => COLOR_AGI,
-                        Attribute::Int => COLOR_INT,
-                        Attribute::Spi => COLOR_SPI,
-                    };
-                    draw_circle_lines(x, y, attr_r, 1.0, GRAY);
-                    draw_circle(x, y, attr_r, color);
+                    draw_attr_node(attr_r, x, y, attribute);
                 }
                 NodeContent::Skill(skill) => {
-                    let x = x - icon_w / 2.0;
-                    let y = y - icon_w / 2.0;
-                    draw_rectangle(x, y, icon_w, icon_w, DARKGRAY);
-
-                    let mut btn = ActionButton::new(
-                        skill_to_btn_action(skill),
-                        &grid_events,
-                        0,
+                    draw_skill_node(
                         &icons,
-                        None,
+                        &grid_events,
+                        skill_to_btn_action,
+                        icon_w,
+                        x,
+                        y,
+                        skill,
                     );
-                    btn.size = (icon_w, icon_w);
-                    btn.texture_draw_size = (icon_w, icon_w / 1.25);
-
-                    btn.draw(x, y);
                 }
             }
         }
 
-        let ui_size = ui.size();
         ui.draw(5.0, 5.0);
 
         let mut text = None;
@@ -533,7 +489,7 @@ pub async fn run_editor() {
         for event in grid_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, button_action, hovered_pos) => {
-                    //dbg!("HOVERED", hovered_pos);
+                    dbg!("HOVERED", hovered_pos);
                 }
                 InternalUiEvent::ButtonClicked(id, button_action) => {
                     dbg!("grid button CLICKED", id);
@@ -560,6 +516,15 @@ pub async fn run_editor() {
     }
 }
 
+fn draw_edge(mid: (f32, f32), cell_w: f32, from: &Node, to: &Node, thickness: f32, color: Color) {
+    let x1 = mid.0 + from.pos.0 as f32 * cell_w;
+    let y1 = mid.1 + from.pos.1 as f32 * cell_w;
+    let x2 = mid.0 + to.pos.0 as f32 * cell_w;
+    let y2 = mid.1 + to.pos.1 as f32 * cell_w;
+
+    draw_line(x1, y1, x2, y2, thickness, color);
+}
+
 pub async fn run_skill_tree_scene() {
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
@@ -570,8 +535,8 @@ pub async fn run_skill_tree_scene() {
 
     let (screen_w, screen_h) = screen_size();
 
-    let mut nodes: Vec<Rc<RefCell<Node>>> = Default::default();
-    let mut edges: HashSet<(u32, u32)> = Default::default();
+    let nodes: Vec<Rc<RefCell<Node>>>;
+    let edges: HashSet<(u32, u32)>;
 
     let file_contents = fs::read(SAVE_FILE_NAME).expect("Reading from save file");
     let json: String = String::from_utf8(file_contents).expect("Valid file json");
@@ -597,18 +562,23 @@ pub async fn run_skill_tree_scene() {
 
     let skill_to_btn_action = |skill| skills.iter().find(|(s, _)| s == &skill).unwrap().1;
 
-    let cell_widths = [25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 70.0, 80.0, 120.0, 160.0];
-    let mut zoom_i = 4;
+    let cell_widths = [40.0, 50.0, 60.0, 70.0, 80.0];
+    let mut zoom_i = 1;
 
-    let mut draw_grid = true;
+    let mut show_grid = false;
+
+    let mut claimed_nodes: HashSet<u32> = [0, 1].into();
+
+    let mut dragging_camera_from = None;
+    let mut camera_pos = (0.0, 0.0);
 
     loop {
-        let mid = (screen_w / 2.0, screen_h / 2.0);
+        let mid = (screen_w / 2.0 + camera_pos.0, screen_h / 2.0 + camera_pos.1);
+
         let (mouse_x, mouse_y) = mouse_position();
 
         let cell_w = cell_widths[zoom_i];
         let icon_w = cell_w * 1.0;
-        let origin_r = cell_w / 3.0;
         let attr_r = cell_w * 0.13;
 
         let mouse_grid_x: i32 = ((mouse_x - mid.0) / cell_w).round() as i32;
@@ -630,96 +600,139 @@ pub async fn run_skill_tree_scene() {
             zoom_i = (zoom_i + 1).min(cell_widths.len() - 1);
         }
 
-        if is_mouse_button_pressed(MouseButton::Right) {
-        } else if is_mouse_button_pressed(MouseButton::Left) && is_mouse_within_grid {
-        } else if is_key_pressed(KeyCode::G) {
-            draw_grid = !draw_grid;
-        } else if is_key_pressed(KeyCode::Space) {
-        } else if is_key_pressed(KeyCode::S) {
-        } else if is_key_pressed(KeyCode::LeftShift) {
-        } else if is_mouse_button_released(MouseButton::Left) {
-        }
-
         clear_background(BLACK);
 
-        if draw_grid {
-            let grid_color = Color::new(0.1, 0.1, 0.1, 1.00);
-
-            for x in min_x..=max_x + 1 {
-                let x0 = mid.0 + (x as f32 - 0.5) * cell_w;
-                let y1 = mid.1 + (min_y as f32 - 0.5) * cell_w;
-                let y2 = mid.1 + (max_y as f32 + 0.5) * cell_w;
-                draw_line(x0, y1, x0, y2, 1.0, grid_color);
-            }
-            for y in min_y..=max_y + 1 {
-                let y0 = mid.1 + (y as f32 - 0.5) * cell_w;
-                let x1 = mid.0 + (min_x as f32 - 0.5) * cell_w;
-                let x2 = mid.0 + (max_x as f32 + 0.5) * cell_w;
-                draw_line(x1, y0, x2, y0, 1.0, grid_color);
-            }
+        if show_grid {
+            draw_grid_lines(mid, cell_w, min_x, max_x, min_y, max_y);
         }
+
+        let mut claimable = vec![];
+
+        let hovered_node_id: Option<u32> = nodes
+            .iter()
+            .find(|node| {
+                node.borrow().pos() == mouse_grid_pos
+                    && node.borrow().content != NodeContent::Origin
+            })
+            .map(|node| node.borrow().id);
 
         for (from, to) in &edges {
             let node = nodes.iter().find(|n| n.borrow().id == *from).unwrap();
             let neighbor = nodes.iter().find(|n| n.borrow().id == *to).unwrap();
 
-            let node = node;
-            let neighbor = neighbor;
-            let x1 = mid.0 + node.borrow().pos.0 as f32 * cell_w;
-            let y1 = mid.1 + node.borrow().pos.1 as f32 * cell_w;
-            let x2 = mid.0 + neighbor.borrow().pos.0 as f32 * cell_w;
-            let y2 = mid.1 + neighbor.borrow().pos.1 as f32 * cell_w;
+            let color;
+            let thickness;
+            let node = node.borrow();
+            let claimed_node = claimed_nodes.contains(&node.id);
+            let neighbor = neighbor.borrow();
+            let claimed_neighbor = claimed_nodes.contains(&neighbor.id);
+            if claimed_node && claimed_neighbor {
+                color = GOLD;
+                thickness = 5.0;
+            } else if claimed_node || claimed_neighbor {
+                if (hovered_node_id == Some(node.id) && !claimed_nodes.contains(&node.id))
+                    || (hovered_node_id == Some(neighbor.id)
+                        && !claimed_nodes.contains(&neighbor.id))
+                {
+                    color = WHITE;
+                    thickness = 2.0;
+                } else {
+                    color = DARKGRAY;
+                    thickness = 1.0;
+                }
 
-            let color = LIGHTGRAY;
+                if claimed_node {
+                    claimable.push(neighbor.id);
+                } else {
+                    claimable.push(node.id);
+                }
+            } else {
+                color = DARKGRAY;
+                thickness = 1.0;
+            }
 
-            draw_line(x1, y1, x2, y2, 1.0, GOLD);
+            draw_edge(mid, cell_w, &node, &neighbor, thickness, color);
+        }
+
+        let mut text = None;
+
+        if is_mouse_button_pressed(MouseButton::Left) && is_mouse_within_grid {
+            if let Some(id) = hovered_node_id {
+                if claimable.contains(&id) {
+                    claimed_nodes.insert(id);
+                }
+            }
+        } else if is_key_pressed(KeyCode::G) {
+            show_grid = !show_grid;
+        } else if is_mouse_button_pressed(MouseButton::Right) {
+            dragging_camera_from = Some((mouse_x, mouse_y));
+        } else if is_mouse_button_down(MouseButton::Right) {
+            if let Some((from_x, from_y)) = dragging_camera_from {
+                let dx = mouse_x - from_x;
+                let dy = mouse_y - from_y;
+                let min_allowed = -250.0;
+                let max_allowed = 250.0;
+                camera_pos = (
+                    (camera_pos.0 + dx).max(min_allowed).min(max_allowed),
+                    (camera_pos.1 + dy).max(min_allowed).min(max_allowed),
+                );
+                dragging_camera_from = Some((mouse_x, mouse_y));
+            }
+        } else {
+            dragging_camera_from = None;
         }
 
         for node in &nodes {
-            let x = mid.0 + node.borrow().pos().0 as f32 * cell_w;
-            let y = mid.1 + node.borrow().pos().1 as f32 * cell_w;
-            match node.borrow().content {
+            let node = node.borrow();
+            let x = mid.0 + node.pos().0 as f32 * cell_w;
+            let y = mid.1 + node.pos().1 as f32 * cell_w;
+            match node.content {
                 NodeContent::Origin => {
-                    draw_circle(x, y, origin_r, DARKGRAY);
-                    draw_circle_lines(x, y, origin_r, 1.0, LIGHTGRAY);
                     let texture = &portraits[&PortraitId::Alice];
+                    let x = x - icon_w / 2.0;
+                    let y = y - icon_w / 2.0;
+                    draw_rectangle(x, y, cell_w, cell_w, DARKGRAY);
+
                     draw_texture_ex(
                         texture,
-                        x - cell_w / 2.0,
-                        y - cell_w / 2.0,
+                        x,
+                        y,
                         WHITE,
                         DrawTextureParams {
                             dest_size: Some((cell_w, cell_w).into()),
                             ..Default::default()
                         },
                     );
+
+                    draw_rectangle_lines(x, y, icon_w, icon_w, 5.0, WHITE);
                 }
                 NodeContent::Attr(attribute) => {
-                    let color = match attribute {
-                        Attribute::Str => COLOR_STR,
-                        Attribute::Agi => COLOR_AGI,
-                        Attribute::Int => COLOR_INT,
-                        Attribute::Spi => COLOR_SPI,
-                    };
-                    draw_circle_lines(x, y, attr_r, 1.0, GRAY);
-                    draw_circle(x, y, attr_r, color);
+                    draw_attr_node(attr_r, x, y, attribute);
+
+                    if claimed_nodes.contains(&node.id) {
+                        draw_circle_lines(x, y, attr_r, 4.0, GOLD);
+                    } else if hovered_node_id == Some(node.id) && claimable.contains(&node.id) {
+                        draw_circle_lines(x, y, attr_r, 2.0, WHITE);
+                    } else if hovered_node_id == Some(node.id) {
+                        draw_circle_lines(x, y, attr_r, 1.0, LIGHTGRAY);
+                    }
                 }
                 NodeContent::Skill(skill) => {
-                    let x = x - icon_w / 2.0;
-                    let y = y - icon_w / 2.0;
-                    draw_rectangle(x, y, icon_w, icon_w, DARKGRAY);
-
-                    let mut btn = ActionButton::new(
-                        skill_to_btn_action(skill),
-                        &grid_events,
-                        0,
+                    draw_skill_node(
                         &icons,
-                        None,
+                        &grid_events,
+                        skill_to_btn_action,
+                        icon_w,
+                        x,
+                        y,
+                        skill,
                     );
-                    btn.size = (icon_w, icon_w);
-                    btn.texture_draw_size = (icon_w, icon_w / 1.25);
 
-                    btn.draw(x, y);
+                    if claimed_nodes.contains(&node.id) {
+                        let x = x - icon_w / 2.0;
+                        let y = y - icon_w / 2.0;
+                        draw_rectangle_lines(x, y, icon_w, icon_w, 5.0, WHITE);
+                    }
                 }
             }
         }
@@ -727,7 +740,19 @@ pub async fn run_skill_tree_scene() {
         for event in grid_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(id, button_action, hovered_pos) => {
-                    //dbg!("HOVERED", hovered_pos);
+                    if let Some(pos) = hovered_pos {
+                        let rect = Rect::new(pos.0, pos.1, cell_w, cell_w);
+                        let tooltip = button_action_tooltip(&button_action);
+                        draw_tooltip(
+                            &font,
+                            TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                            &tooltip.header,
+                            tooltip.error,
+                            &tooltip.content_lines(),
+                            &tooltip.keywords,
+                            false,
+                        );
+                    }
                 }
                 InternalUiEvent::ButtonClicked(id, button_action) => {
                     dbg!("grid button CLICKED", id);
@@ -735,7 +760,107 @@ pub async fn run_skill_tree_scene() {
             }
         }
 
+        if let Some(id) = hovered_node_id {
+            let node = nodes.iter().find(|n| n.borrow().id == id).unwrap().borrow();
+            match node.content {
+                NodeContent::Origin => {}
+                NodeContent::Attr(attribute) => {
+                    let (header, description) = attribute.tooltip();
+                    draw_tooltip(
+                        &font,
+                        TooltipPositionPreference::At((mouse_x + 20.0, mouse_y)),
+                        header,
+                        None,
+                        &[description.to_string()],
+                        &[],
+                        false,
+                    );
+                    if claimable.contains(&id) {
+                        text = Some("Click to allocate attribute point");
+                    }
+                }
+                NodeContent::Skill(_skill) => {
+                    if claimable.contains(&id) {
+                        text = Some("Click to acquire skill");
+                    }
+                }
+            }
+        }
+
+        if let Some(text) = &text {
+            let font_size = 32;
+            let text_dim = measure_text(&text, Some(&font), font_size, 1.0);
+            draw_text_ex(
+                &text,
+                mid.0 - text_dim.width / 2.0,
+                40.0,
+                TextParams {
+                    font: Some(&font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
+        }
+
         next_frame().await;
+    }
+}
+
+fn draw_skill_node(
+    icons: &HashMap<IconId, Texture2D>,
+    grid_events: &Rc<RefCell<Vec<InternalUiEvent>>>,
+    skill_to_btn_action: impl Fn(Skill) -> ButtonAction,
+    icon_w: f32,
+    x: f32,
+    y: f32,
+    skill: Skill,
+) {
+    let mut btn = ActionButton::new(skill_to_btn_action(skill), grid_events, 0, icons, None);
+    btn.change_scale(icon_w / 60.0);
+    btn.hover_border_color = LIGHTGRAY;
+    let x = x - btn.size.0 / 2.0;
+    let y = y - btn.size.1 / 2.0;
+    btn.draw(x, y);
+}
+
+fn draw_attr_node(attr_r: f32, x: f32, y: f32, attribute: Attribute) {
+    let color = match attribute {
+        Attribute::Str => COLOR_STR,
+        Attribute::Agi => COLOR_AGI,
+        Attribute::Int => COLOR_INT,
+        Attribute::Spi => COLOR_SPI,
+    };
+    draw_circle_lines(x, y, attr_r, 1.0, GRAY);
+    draw_circle(x, y, attr_r, color);
+}
+
+fn draw_origin_node(
+    portraits: &HashMap<PortraitId, Texture2D>,
+    cell_w: f32,
+    origin_r: f32,
+    x: f32,
+    y: f32,
+) {
+    draw_circle(x, y, origin_r, DARKGRAY);
+    draw_circle_lines(x, y, origin_r, 1.0, LIGHTGRAY);
+    let texture = &portraits[&PortraitId::Alice];
+}
+
+fn draw_grid_lines(mid: (f32, f32), cell_w: f32, min_x: i32, max_x: i32, min_y: i32, max_y: i32) {
+    let grid_color = Color::new(0.1, 0.1, 0.1, 1.00);
+
+    for x in min_x..=max_x + 1 {
+        let x0 = mid.0 + (x as f32 - 0.5) * cell_w;
+        let y1 = mid.1 + (min_y as f32 - 0.5) * cell_w;
+        let y2 = mid.1 + (max_y as f32 + 0.5) * cell_w;
+        draw_line(x0, y1, x0, y2, 1.0, grid_color);
+    }
+    for y in min_y..=max_y + 1 {
+        let y0 = mid.1 + (y as f32 - 0.5) * cell_w;
+        let x1 = mid.0 + (min_x as f32 - 0.5) * cell_w;
+        let x2 = mid.0 + (max_x as f32 + 0.5) * cell_w;
+        draw_line(x1, y0, x2, y0, 1.0, grid_color);
     }
 }
 
@@ -860,6 +985,21 @@ impl Attribute {
             Attribute::Agi => COLOR_AGI,
             Attribute::Int => COLOR_INT,
             Attribute::Spi => COLOR_SPI,
+        }
+    }
+
+    fn tooltip(&self) -> (&'static str, &'static str) {
+        match self {
+            Attribute::Str => (
+                "Strength",
+                "Max health, Toughness, Stamina, carrying capacity, attack modifier",
+            ),
+            Attribute::Agi => ("Agility", "Move speed, Evasion, Stamina, attack modifier"),
+            Attribute::Int => (
+                "Intellect",
+                "Will, Evasion, attack modifier, spell modifier",
+            ),
+            Attribute::Spi => ("Spirit", "Max mana, spell modifier"),
         }
     }
 }

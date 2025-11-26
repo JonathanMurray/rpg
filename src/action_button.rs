@@ -50,9 +50,23 @@ impl Tooltip {
             keywords: vec![],
         }
     }
+
+    pub fn content_lines(&self) -> Vec<String> {
+        let mut lines = vec![];
+        if let Some(description) = self.description {
+            if !description.is_empty() {
+                lines.push(description.to_string());
+                if !self.technical_description.is_empty() {
+                    lines.push("".to_string());
+                }
+            }
+        }
+        lines.extend_from_slice(&self.technical_description);
+        lines
+    }
 }
 
-fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
+pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
     match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
@@ -550,7 +564,7 @@ pub struct ActionButton {
     pub size: (f32, f32),
     pub texture_draw_size: (f32, f32),
     style: Style,
-    hover_border_color: Color,
+    pub hover_border_color: Color,
     points_row: Container,
     hovered: Cell<bool>,
     pub enabled: Cell<bool>,
@@ -647,6 +661,14 @@ impl ActionButton {
             tooltip_is_based_on_equipped_shield: Default::default(),
             hotkey: RefCell::new(None),
         }
+    }
+
+    pub fn change_scale(&mut self, scale_factor: f32) {
+        self.texture_draw_size = (
+            self.texture_draw_size.0 * scale_factor,
+            self.texture_draw_size.1 * scale_factor,
+        );
+        self.size = (self.size.0 * scale_factor, self.size.1 * scale_factor);
     }
 
     pub fn tooltip(&self) -> Ref<Tooltip> {
@@ -790,16 +812,6 @@ impl Drawable for ActionButton {
         let points_row_size = self.points_row.size();
         let points_row_h_pad = 3.0;
 
-        if points_row_size.1 > 0.0 {
-            draw_rectangle(
-                x + 1.0,
-                y + h - points_row_size.1 - points_row_h_pad * 2.0,
-                w - 2.0,
-                points_row_size.1 + points_row_h_pad * 2.0 - 1.0,
-                Color::new(0.1, 0.1, 0.1, 1.0),
-            );
-        }
-
         let (mouse_x, mouse_y) = mouse_position();
 
         let hovered = (x..=x + w).contains(&mouse_x) && (y..=y + h).contains(&mouse_y);
@@ -820,8 +832,6 @@ impl Drawable for ActionButton {
 
         let params = DrawTextureParams {
             dest_size: Some(self.texture_draw_size.into()),
-            //dest_size: Some((240.0, 192.0).into()),
-            //dest_size: Some((24.0, 19.2).into()),
             ..Default::default()
         };
 
@@ -898,6 +908,24 @@ impl Drawable for ActionButton {
             ButtonSelected::No => {}
         }
 
+        // When viewed in the skill tree, we can be so zoomed out that the points row doesn't fit well. In that case, don't show it.
+        if self.size.0 > 50.0 {
+            if points_row_size.1 > 0.0 {
+                draw_rectangle(
+                    x + 1.0,
+                    y + h - points_row_size.1 - points_row_h_pad * 2.0,
+                    w - 2.0,
+                    points_row_size.1 + points_row_h_pad * 2.0 - 1.0,
+                    Color::new(0.1, 0.1, 0.1, 1.0),
+                );
+            }
+
+            self.points_row.draw(
+                x + w - points_row_size.0 - 4.0,
+                y + h - points_row_h_pad - points_row_size.1 - 1.0,
+            );
+        }
+
         if self.enabled.get() && hovered {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(event_sender) = &self.event_sender {
@@ -915,11 +943,6 @@ impl Drawable for ActionButton {
                 self.hover_border_color,
             );
         }
-
-        self.points_row.draw(
-            x + w - points_row_size.0 - 4.0,
-            y + h - points_row_h_pad - points_row_size.1 - 1.0,
-        );
 
         draw_debug(x, y, w, h);
     }
@@ -1116,18 +1139,6 @@ pub enum InternalUiEvent {
 }
 
 pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &Tooltip) {
-    let mut lines = vec![];
-    if let Some(description) = tooltip.description {
-        if !description.is_empty() {
-            lines.push(description.to_string());
-            if !tooltip.technical_description.is_empty() {
-                lines.push("".to_string());
-            }
-        }
-    }
-
-    lines.extend_from_slice(&tooltip.technical_description);
-
     let button_size = (64.0, 64.0);
 
     draw_tooltip(
@@ -1143,7 +1154,7 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &T
         ),
         &tooltip.header,
         tooltip.error,
-        &lines,
+        &tooltip.content_lines(),
         &tooltip.keywords,
         false,
     );
@@ -1337,6 +1348,8 @@ pub fn draw_tooltip(
         draw_line(line, None, false)
     }
 
+    // TODO: The drawing position here also needs to account for screen space. If the main tooltip was pressed
+    // against the right side of the screen, we shouldn't draw this one even further to the right!
     draw_keyword_tooltips(font, keywords, x + tooltip_w + 1.0, y);
 
     tooltip_rect

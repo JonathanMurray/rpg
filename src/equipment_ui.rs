@@ -85,8 +85,10 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
         describe_apply_effect(apply_effect, &mut t);
     }
     //lines.push("<Right-click to use>".to_string());
-    t.technical_description
-        .push(format!("Weight: {}", consumable.weight));
+    if consumable.weight > 0 {
+        t.technical_description
+            .push(format!("Weight: {}", consumable.weight));
+    }
 
     t
 }

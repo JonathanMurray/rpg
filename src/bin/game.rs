@@ -122,7 +122,7 @@ async fn main() {
     //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
     bob.known_actions
         .borrow_mut()
-        .push(BaseAction::UseAbility(BRACE));
+        .push(BaseAction::UseAbility(HEAL));
     bob.known_actions
         .borrow_mut()
         .push(BaseAction::UseAbility(FIREBALL));
@@ -147,7 +147,16 @@ async fn main() {
 
     let mut player_characters = vec![bob, alice];
 
-    run_skill_tree_scene().await;
+    player_characters = run_fight_loop(
+        player_characters,
+        FightId::EasyCluster,
+        &equipment_icons,
+        icons.clone(),
+        portrait_textures.clone(),
+    )
+    .await;
+
+    //run_skill_tree_scene().await;
 
     loop {
         let map_choice = map_scene
