@@ -348,6 +348,7 @@ impl GameGrid {
             ),
             source_pos: pos,
             destination_pos: pos,
+            original_camera_pos: (self.camera_position.0.get(), self.camera_position.1.get()),
         };
 
         self.effects.push(effect);
@@ -370,6 +371,7 @@ impl GameGrid {
             source_pos,
             destination_pos,
             variant: effect.variant,
+            original_camera_pos: (self.camera_position.0.get(), self.camera_position.1.get()),
         };
 
         self.effects.push(concrete_effect);
@@ -1620,9 +1622,15 @@ impl GameGrid {
                 continue;
             }
             let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
+
+            let camera_adjustment = (
+                self.camera_position.0.get() - effect.original_camera_pos.0,
+                self.camera_position.1.get() - effect.original_camera_pos.1,
+            );
+
             match &effect.variant {
                 EffectVariant::At(position, graphics) => {
-                    let (x, y) = match position {
+                    let (mut x, mut y) = match position {
                         EffectPosition::Source => effect.source_pos,
                         EffectPosition::Destination => effect.destination_pos,
                         EffectPosition::Projectile => {
@@ -1633,6 +1641,10 @@ impl GameGrid {
                             (x, y)
                         }
                     };
+
+                    x -= camera_adjustment.0;
+                    y -= camera_adjustment.1;
+
                     graphics.draw(x, y, effect, self.cell_w);
                 }
                 EffectVariant::Line {
@@ -1642,12 +1654,12 @@ impl GameGrid {
                     extend_gradually,
                 } => {
                     let from = (
-                        effect.source_pos.0 + self.cell_w / 2.0,
-                        effect.source_pos.1 + self.cell_w / 2.0,
+                        effect.source_pos.0 + self.cell_w / 2.0 - camera_adjustment.0,
+                        effect.source_pos.1 + self.cell_w / 2.0 - camera_adjustment.1,
                     );
                     let mut to = (
-                        effect.destination_pos.0 + self.cell_w / 2.0,
-                        effect.destination_pos.1 + self.cell_w / 2.0,
+                        effect.destination_pos.0 + self.cell_w / 2.0 - camera_adjustment.0,
+                        effect.destination_pos.1 + self.cell_w / 2.0 - camera_adjustment.1,
                     );
 
                     if *extend_gradually {
@@ -2048,6 +2060,7 @@ pub enum NewState {
     ChoosingAction,
 }
 
+#[derive(Debug)]
 struct ConcreteEffect {
     age: f32,
     start_time: f32,
@@ -2055,6 +2068,7 @@ struct ConcreteEffect {
     source_pos: (f32, f32),
     destination_pos: (f32, f32),
     variant: EffectVariant,
+    original_camera_pos: (f32, f32),
 }
 
 pub struct Effect {
@@ -2063,6 +2077,7 @@ pub struct Effect {
     pub variant: EffectVariant,
 }
 
+#[derive(Debug)]
 pub enum EffectVariant {
     At(EffectPosition, EffectGraphics),
     Line {
@@ -2072,13 +2087,14 @@ pub enum EffectVariant {
         extend_gradually: bool,
     },
 }
-
+#[derive(Debug)]
 pub enum EffectPosition {
     Source,
     Destination,
     Projectile,
 }
 
+#[derive(Debug)]
 pub enum EffectGraphics {
     Circle {
         radius: f32,
