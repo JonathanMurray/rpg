@@ -466,7 +466,7 @@ impl CoreGame {
                     character.spend_movement(free_distance);
                 }
 
-                self.perform_movement(positions).await;
+                self.perform_movement(positions, true).await;
                 ActionOutcome::Default
             }
 
@@ -517,7 +517,7 @@ impl CoreGame {
         self.user_interface.handle_event(self, event).await;
     }
 
-    async fn perform_movement(&self, mut positions: Vec<Position>) {
+    async fn perform_movement(&self, mut positions: Vec<Position>, can_trigger_opportunity_attack: bool) {
         let start_position = positions.remove(0);
         assert!(start_position == self.active_character().pos());
         assert!(
@@ -541,9 +541,9 @@ impl CoreGame {
                 let leaving_melee = within_meele(character.pos(), other_char.pos())
                     && !within_meele(new_position, other_char.pos());
 
-                // Movement opportunity attack
                 if unfriendly && leaving_melee {
-                    if other_char.can_use_opportunity_attack(character.id()) {
+                    // Movement opportunity attack
+                    if can_trigger_opportunity_attack && other_char.can_use_opportunity_attack(character.id()) {
                         let reactor = other_char;
 
                         let chooses_to_use_opportunity_attack = self
@@ -821,7 +821,7 @@ impl CoreGame {
                     };
 
                     if let Some(positions) = movement {
-                        self.perform_movement(positions.clone()).await;
+                        self.perform_movement(positions.clone(), false).await;
                     }
 
                     let target = self.characters.get(*target_id);

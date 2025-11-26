@@ -631,7 +631,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     ],
     target: AbilityTarget::Enemy {
         //reach: AbilityReach::MoveIntoMelee(Range::Float(3.99)),
-        reach: AbilityReach::MoveIntoMelee(Range::Float(2.5)),
+        reach: AbilityReach::MoveIntoMelee(Range::Float(3.5)),
         effect: AbilityNegativeEffect::PerformAttack,
         impact_area: None,
     },
