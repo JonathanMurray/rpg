@@ -247,7 +247,12 @@ impl ActivityPopup {
             let movement = character.remaining_movement.get() + cost as f32;
             //let dim = draw_text_rounded(&format!("Move:"), x0, y0, base_text_params.clone());
             //y0 += dim.offset_y + line_margin;
-            draw_text_rounded(&format!("{:.1}", movement), x0 + 3.0, y0, base_text_params.clone());
+            draw_text_rounded(
+                &format!("{:.1}", movement),
+                x0 + 3.0,
+                y0,
+                base_text_params.clone(),
+            );
         }
 
         if let Some(slider) = &mut self.movement_cost_slider {
@@ -431,9 +436,7 @@ impl ActivityPopup {
 
         if let Some(slider) = self.movement_cost_slider.as_mut() {
             let character = self.characters.get(self.relevant_character_id);
-            let max_cost = character
-                .stamina
-                .current();
+            let max_cost = character.stamina.current();
             dbg!(max_cost);
             slider.set_max_allowed(max_cost);
 
@@ -675,8 +678,7 @@ impl ActivityPopup {
                         //lines.push(format!("Speed: {:.1}", speed));
                         let stamina = &active_char.stamina;
                         if stamina.max() > 0 {
-                            let max_stamina_spend =
-                                stamina.current();
+                            let max_stamina_spend = stamina.current();
                             stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));
                         }
                     }

@@ -1858,9 +1858,7 @@ impl GameGrid {
             .get(self.active_character_id)
             .remaining_movement
             .get();
-        let ap = self
-            .movement_range
-            .cost(distance, char_remaining_movement);
+        let ap = self.movement_range.cost(distance, char_remaining_movement);
         if ap > 0 {
             let text = format!("-{}", ap);
             self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);

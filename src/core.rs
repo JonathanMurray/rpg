@@ -410,6 +410,12 @@ impl CoreGame {
 
                     let enhancements = enhancements.iter().map(|e| (e.name, e.effect)).collect();
 
+                    self.ui_handle_event(GameEvent::AttackWasInitiated {
+                        actor: self.active_character_id,
+                        target,
+                    })
+                    .await;
+
                     let event = self.perform_attack(
                         self.active_character_id,
                         hand,
@@ -838,6 +844,13 @@ impl CoreGame {
                         target.position.get()
                     ));
 
+                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
+                        actor: caster_id,
+                        ability,
+                        target: Some(*target_id),
+                    })
+                    .await;
+
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
                     if let AbilityRoll::Spell { result: _, line } = &mut ability_roll {
@@ -900,6 +913,13 @@ impl CoreGame {
                         target.position.get()
                     ));
 
+                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
+                        actor: caster_id,
+                        ability,
+                        target: Some(*target_id),
+                    })
+                    .await;
+
                     let ability_roll = maybe_ability_roll.unwrap();
                     let (ability_result, dice_roll_line) = ability_roll.unwrap_spell();
                     detail_lines.push(dice_roll_line.to_string());
@@ -924,6 +944,13 @@ impl CoreGame {
                     range: _,
                     area_effect,
                 } => {
+                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
+                        actor: caster_id,
+                        ability,
+                        target: None,
+                    })
+                    .await;
+
                     let target_pos = selected_target.unwrap_position();
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
 
@@ -948,6 +975,13 @@ impl CoreGame {
                     self_area,
                     self_effect,
                 } => {
+                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
+                        actor: caster_id,
+                        ability,
+                        target: None,
+                    })
+                    .await;
+
                     if let Some(AbilityRoll::Spell { result: _, line }) = &maybe_ability_roll {
                         detail_lines.push(line.clone());
                     }
@@ -1013,7 +1047,7 @@ impl CoreGame {
 
             let caster_id = caster_ref.id();
             // TODO also communicate if the caster healed from hitting the target (e.g. necrotic influence)
-            self.ui_handle_event(GameEvent::AbilityWasUsed {
+            self.ui_handle_event(GameEvent::AbilityResolved {
                 actor: caster_id,
                 target_outcome,
                 area_outcomes,
@@ -2263,8 +2297,17 @@ pub enum GameEvent {
     CharacterReactedWithOpportunityAttack {
         reactor: CharacterId,
     },
+    AttackWasInitiated {
+        actor: CharacterId,
+        target: CharacterId,
+    },
     Attacked(AttackedEvent),
-    AbilityWasUsed {
+    AbilityWasInitiated {
+        actor: CharacterId,
+        ability: Ability,
+        target: Option<CharacterId>,
+    },
+    AbilityResolved {
         actor: CharacterId,
         target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
         area_outcomes: Option<(Position, Vec<(CharacterId, AbilityTargetOutcome)>)>,

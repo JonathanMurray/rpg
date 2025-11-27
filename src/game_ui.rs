@@ -1234,10 +1234,83 @@ impl UserInterface {
                 }
                 self.animation_stopwatch.set_to_at_least(0.5);
             }
+            GameEvent::AttackWasInitiated { actor, target } => {
+                self.handle_attack_initiated(actor, target);
+            }
             GameEvent::Attacked(event) => {
                 self.handle_attacked_event(&event);
             }
-            GameEvent::AbilityWasUsed {
+            GameEvent::AbilityWasInitiated {
+                actor,
+                ability,
+                target,
+            } => {
+                let duration;
+
+                let animation_color = ability.animation_color;
+                if let Some(target) = &target {
+                    let caster_pos = self.characters.get(actor).pos();
+                    let target_pos = self.characters.get(*target).pos();
+
+                    duration = 0.15 * distance_between(caster_pos, target_pos);
+
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.0,
+                            end_time: duration,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 10.0,
+                                    end_radius: Some(15.0),
+                                    fill: Some(animation_color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.025,
+                            end_time: duration + 0.025,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 8.0,
+                                    end_radius: Some(13.0),
+                                    fill: Some(animation_color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
+                    self.game_grid.add_effect(
+                        caster_pos,
+                        target_pos,
+                        Effect {
+                            start_time: 0.05,
+                            end_time: duration + 0.05,
+                            variant: EffectVariant::At(
+                                EffectPosition::Projectile,
+                                EffectGraphics::Circle {
+                                    radius: 6.0,
+                                    end_radius: Some(11.0),
+                                    fill: Some(animation_color),
+                                    stroke: None,
+                                },
+                            ),
+                        },
+                    );
+                } else {
+                    duration = 0.2;
+                }
+                self.animation_stopwatch.set_to_at_least(duration);
+            }
+            GameEvent::AbilityResolved {
                 actor,
                 target_outcome,
                 area_outcomes,
@@ -1313,74 +1386,16 @@ impl UserInterface {
 
                 self.log.add_with_details(line, &detail_lines);
 
-                let mut duration = 0.0;
-
                 let animation_color = ability.animation_color;
                 if let Some((target, outcome)) = &target_outcome {
-                    let caster_pos = self.characters.get(actor).pos();
                     let target_pos = self.characters.get(*target).pos();
-
-                    duration = 0.15 * distance_between(caster_pos, target_pos);
-
-                    self.game_grid.add_effect(
-                        caster_pos,
-                        target_pos,
-                        Effect {
-                            start_time: 0.0,
-                            end_time: duration,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 10.0,
-                                    end_radius: Some(15.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
-                                },
-                            ),
-                        },
-                    );
-                    self.game_grid.add_effect(
-                        caster_pos,
-                        target_pos,
-                        Effect {
-                            start_time: 0.025,
-                            end_time: duration + 0.025,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 8.0,
-                                    end_radius: Some(13.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
-                                },
-                            ),
-                        },
-                    );
-                    self.game_grid.add_effect(
-                        caster_pos,
-                        target_pos,
-                        Effect {
-                            start_time: 0.05,
-                            end_time: duration + 0.05,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 6.0,
-                                    end_radius: Some(11.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
-                                },
-                            ),
-                        },
-                    );
-
-                    self.add_text_effect_for_ability_target_outcome(outcome, duration, target_pos);
-                    self.animation_stopwatch.set_to_at_least(duration + 0.3);
+                    self.add_text_effect_for_ability_target_outcome(outcome, 0.0, target_pos);
+                    self.animation_stopwatch.set_to_at_least(0.3);
                 }
 
                 if let Some((area_center_pos, outcomes)) = &area_outcomes {
                     self.add_effects_for_area_outcomes(
-                        duration,
+                        0.0,
                         animation_color,
                         area_center_pos,
                         outcomes,
@@ -1420,7 +1435,7 @@ impl UserInterface {
             GameEvent::NewActiveCharacter { new_active } => {
                 self.set_new_active_character_id(new_active);
                 if !self.active_character().player_controlled() {
-                    self.animation_stopwatch.set_to_at_least(1.0);
+                    self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
             GameEvent::Moved {
@@ -1507,58 +1522,11 @@ impl UserInterface {
         }
     }
 
-    fn handle_attacked_event(&mut self, event: &AttackedEvent) {
-        let attacker = event.attacker;
-        let target = event.target;
-        let outcome = event.outcome;
-        let detail_lines = &event.detail_lines;
-
-        let verb = match outcome {
-            AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",
-            AttackOutcome::Hit(_, AttackHitType::Graze) => "grazed",
-            AttackOutcome::Hit(_, AttackHitType::Critical) => "crit",
-            _ => "missed",
-        };
-
-        let mut line = format!(
-            "{} {} {}",
-            self.characters.get(attacker).name,
-            verb,
-            self.characters.get(target).name
-        );
-
-        match outcome {
-            AttackOutcome::Hit(dmg, _) => line.push_str(&format!(" ({} damage)", dmg)),
-            AttackOutcome::Dodge => line.push_str(" (dodge)"),
-            AttackOutcome::Parry => line.push_str(" (parry)"),
-            AttackOutcome::Block => line.push_str(" (block)"),
-            AttackOutcome::Miss => {}
-        }
-
-        self.log.add_with_details(line, detail_lines);
-
+    fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
         let projectile_duration = 0.08 * distance_between(attacker_pos, target_pos);
-
-        self.animation_stopwatch
-            .set_to_at_least(projectile_duration + 0.6);
-        let (impact_text, text_style) = match outcome {
-            AttackOutcome::Hit(damage, AttackHitType::Regular) => {
-                (format!("{}", damage), TextEffectStyle::HostileHit)
-            }
-            AttackOutcome::Hit(damage, AttackHitType::Graze) => {
-                (format!("{}", damage), TextEffectStyle::HostileGraze)
-            }
-            AttackOutcome::Hit(damage, AttackHitType::Critical) => {
-                (format!("{}", damage), TextEffectStyle::HostileCrit)
-            }
-            AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Block => ("Block".to_string(), TextEffectStyle::Miss),
-        };
 
         self.game_grid.add_effect(
             attacker_pos,
@@ -1592,17 +1560,67 @@ impl UserInterface {
             },
         );
 
-        self.game_grid.add_text_effect(
-            target_pos,
-            projectile_duration,
-            1.5,
-            impact_text,
-            text_style,
+        self.animation_stopwatch
+            .set_to_at_least(projectile_duration);
+    }
+
+    fn handle_attacked_event(&mut self, event: &AttackedEvent) {
+        let attacker = event.attacker;
+        let target = event.target;
+        let outcome = event.outcome;
+        let detail_lines = &event.detail_lines;
+
+        let verb = match outcome {
+            AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",
+            AttackOutcome::Hit(_, AttackHitType::Graze) => "grazed",
+            AttackOutcome::Hit(_, AttackHitType::Critical) => "crit",
+            _ => "missed",
+        };
+
+        let mut line = format!(
+            "{} {} {}",
+            self.characters.get(attacker).name,
+            verb,
+            self.characters.get(target).name
         );
 
-        if let Some(outcomes) = &event.area_outcomes {
-            self.add_effects_for_area_outcomes(projectile_duration, MAGENTA, &target_pos, outcomes);
+        match outcome {
+            AttackOutcome::Hit(dmg, _) => line.push_str(&format!(" ({} damage)", dmg)),
+            AttackOutcome::Dodge => line.push_str(" (dodge)"),
+            AttackOutcome::Parry => line.push_str(" (parry)"),
+            AttackOutcome::Block => line.push_str(" (block)"),
+            AttackOutcome::Miss => {}
         }
+
+        self.log.add_with_details(line, detail_lines);
+
+        let attacker_pos = self.characters.get(attacker).pos();
+        let target_pos = self.characters.get(target).pos();
+
+        let (impact_text, text_style) = match outcome {
+            AttackOutcome::Hit(damage, AttackHitType::Regular) => {
+                (format!("{}", damage), TextEffectStyle::HostileHit)
+            }
+            AttackOutcome::Hit(damage, AttackHitType::Graze) => {
+                (format!("{}", damage), TextEffectStyle::HostileGraze)
+            }
+            AttackOutcome::Hit(damage, AttackHitType::Critical) => {
+                (format!("{}", damage), TextEffectStyle::HostileCrit)
+            }
+            AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
+            AttackOutcome::Block => ("Block".to_string(), TextEffectStyle::Miss),
+        };
+
+        self.game_grid
+            .add_text_effect(target_pos, 0.0, 1.5, impact_text, text_style);
+
+        if let Some(outcomes) = &event.area_outcomes {
+            self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, outcomes);
+        }
+
+        self.animation_stopwatch.set_to_at_least(0.6);
     }
 
     fn add_text_effect_for_ability_target_outcome(
