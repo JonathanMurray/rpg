@@ -367,15 +367,15 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 };
 
 const SHIELD_BASH: OnHitReaction = OnHitReaction {
-        name: "Shield bash",
-        description: "Strike back at the attacker with your shield",
-        icon: IconId::ShieldBash,
-        action_point_cost: 1,
-        stamina_cost: 0,
-        effect: OnHitReactionEffect::ShieldBash,
-        required_circumstance: Some(AttackCircumstance::Melee),
-    };
-    
+    name: "Shield bash",
+    description: "Strike back at the attacker with your shield",
+    icon: IconId::ShieldBash,
+    action_point_cost: 1,
+    stamina_cost: 0,
+    effect: OnHitReactionEffect::ShieldBash,
+    required_circumstance: Some(AttackCircumstance::Melee),
+};
+
 pub const SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),
@@ -552,7 +552,7 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Precision,
     action_point_cost: 0,
     mana_cost: 0,
-    stamina_cost: 2,
+    stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
         roll_modifier: 3,
         ..AttackEnhancementEffect::default()
@@ -566,7 +566,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     icon: IconId::SweepAttack,
     action_point_cost: 3,
     mana_cost: 0,
-    stamina_cost: 1,
+    stamina_cost: 3,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::Attack(-3)),

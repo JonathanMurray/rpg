@@ -30,11 +30,11 @@ use rpg::data::{
     PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
     COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL,
     FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, HEAL_ENERGIZE,
-    INFLICT_WOUNDS, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, INFLICT_WOUNDS_NECROTIC_INFLUENCE, OVERWHELMING,
-    PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
-    SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE,
-    SWORD,
+    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, KILL, LEATHER_ARMOR, LONGER_REACH,
+    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
+    OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT,
+    SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK,
+    SWEEP_ATTACK_PRECISE, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -120,7 +120,6 @@ async fn main() {
     bob.known_attack_enhancements.push(SMITE);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
-    
     let mut clara = Character::new(
         Behaviour::Player(Rc::clone(&party)),
         "Clara",
@@ -136,10 +135,12 @@ async fn main() {
     clara.known_ability_enhancements.push(FIREBALL_INFERNO);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
-    clara.known_ability_enhancements.push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
+    clara
+        .known_ability_enhancements
+        .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    let mut player_characters = vec![bob, alice, clara];
+    let mut player_characters = vec![clara, bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,

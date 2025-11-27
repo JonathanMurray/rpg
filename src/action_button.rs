@@ -5,7 +5,10 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, SKYBLUE, WHITE, YELLOW},
+    color::{
+        Color, BLACK, BLUE, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, SKYBLUE, WHITE,
+        YELLOW,
+    },
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -16,7 +19,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, Circle, Container, Drawable, Element, LayoutDirection, Style,
+        draw_debug, draw_text_rounded, Align, Circle, Container, Drawable, Element,
+        LayoutDirection, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
@@ -627,20 +631,57 @@ impl ActionButton {
         for _ in 0..action_points {
             point_icons.push(Element::Circle(Circle { r, color: GOLD }))
         }
-        for _ in 0..mana_points {
-            point_icons.push(Element::Circle(Circle { r, color: SKYBLUE }))
+
+        if mana_points > 0 {
+            let font = None; //TODO
+            let text =
+                TextLine::new(format!("{}", mana_points), 16, WHITE, font).with_depth(BLACK, 1.0);
+
+            let element = Element::Container(Container {
+                children: vec![Element::Text(text)],
+                style: Style {
+                    background_color: Some(Color::new(0.0, 0.4, 0.8, 1.00)),
+                    padding: 1.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+            if !point_icons.is_empty() {
+                point_icons.push(Element::Empty(0.0, 0.0)); // For some extra margin
+            }
+            point_icons.push(element);
         }
-        for _ in 0..stamina_points {
-            point_icons.push(Element::Circle(Circle { r, color: GREEN }))
+        if stamina_points > 0 {
+            let font = None; //TODO
+            let text = TextLine::new(format!("{}", stamina_points), 16, WHITE, font)
+                .with_depth(BLACK, 1.0);
+
+            let element = Element::Container(Container {
+                children: vec![Element::Text(text)],
+                style: Style {
+                    background_color: Some(Color::new(0.00, 0.5, 0.05, 1.00)),
+                    padding: 1.0,
+                    ..Default::default()
+                },
+                ..Default::default()
+            });
+
+            if !point_icons.is_empty() {
+                point_icons.push(Element::Empty(0.0, 0.0)); // For some extra margin
+            }
+            point_icons.push(element);
         }
 
-        let padding = if point_icons.is_empty() { 0.0 } else { 1.0 };
+        let padding = if point_icons.is_empty() { 0.0 } else { 4.0 };
         let points_row = Container {
             children: point_icons,
             margin: 4.0,
             layout_dir: LayoutDirection::Horizontal,
+            align: Align::Center,
             style: Style {
                 padding,
+                background_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
                 ..Default::default()
             },
             ..Default::default()
@@ -830,7 +871,6 @@ impl Drawable for ActionButton {
         self.style.draw(x, y, self.size);
 
         let points_row_size = self.points_row.size();
-        let points_row_h_pad = 3.0;
 
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -931,19 +971,21 @@ impl Drawable for ActionButton {
 
         // When viewed in the skill tree, we can be so zoomed out that the points row doesn't fit well. In that case, don't show it.
         if self.size.0 > 50.0 {
+            let points_row_h_pad = 2.0;
+
             if points_row_size.1 > 0.0 {
                 draw_rectangle(
                     x + 1.0,
-                    y + h - points_row_size.1 - points_row_h_pad * 2.0,
+                    y + h - points_row_size.1 - points_row_h_pad,
                     w - 2.0,
-                    points_row_size.1 + points_row_h_pad * 2.0 - 1.0,
-                    Color::new(0.1, 0.1, 0.1, 1.0),
+                    points_row_size.1,
+                    Color::new(0.1, 0.1, 0.1, 0.8),
                 );
             }
 
             self.points_row.draw(
-                x + w - points_row_size.0 - 4.0,
-                y + h - points_row_h_pad - points_row_size.1 - 1.0,
+                x + w - points_row_size.0 - 2.0,
+                y + h - points_row_h_pad - points_row_size.1,
             );
         }
 
