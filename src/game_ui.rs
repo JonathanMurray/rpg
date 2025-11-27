@@ -1443,7 +1443,7 @@ impl UserInterface {
                 from,
                 to,
             } => {
-                let mut duration = 0.3;
+                let mut duration = 0.5;
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;

@@ -415,6 +415,7 @@ impl GameGrid {
                 let from = self.grid_pos_to_screen(motion.from);
                 let to = self.grid_pos_to_screen(motion.to);
                 let remaining = motion.remaining_duration / motion.duration;
+                //let remaining = (remaining * 4.0).floor() / 4.0;
                 return (
                     to.0 - (to.0 - from.0) * remaining,
                     to.1 - (to.1 - from.1) * remaining,
@@ -504,12 +505,31 @@ impl GameGrid {
     }
 
     fn draw_character(&self, character: &Character) {
-        let params = DrawTextureParams {
+        let mut params = DrawTextureParams {
             dest_size: Some((self.cell_w, self.cell_w).into()),
             ..Default::default()
         };
 
-        let (x, y) = self.character_screen_pos(character);
+        
+        let (x, mut y) = self.character_screen_pos(character);
+
+        if let Some(motion) = self.character_motion {
+            if motion.character_id == character.id() {
+                let remaining = motion.remaining_duration / motion.duration;
+                let remaining = (remaining * 4.0).floor() / 4.0;
+                if remaining < 0.25 {
+                    y += 2.0;
+                } else if remaining < 0.5 {
+                    params.rotation = -0.05;
+                } else if remaining < 0.75{
+                    y += 1.0;
+                } else {
+                    params.rotation = 0.05;
+                }
+                
+            }
+        }
+
 
         draw_texture_ex(
             &self.sprites[&character.sprite],
