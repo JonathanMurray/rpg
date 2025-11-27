@@ -458,9 +458,10 @@ impl CoreGame {
             } => {
                 dbg!("Action::Move", extra_cost, total_distance);
                 let character = self.active_character();
-                character.action_points.spend(extra_cost);
+                //character.action_points.spend(extra_cost);
                 character.stamina.spend(extra_cost);
-                let paid_distance = extra_cost as f32 * character.move_speed();
+                // Costs 1 per extra distance
+                let paid_distance = extra_cost as f32;
                 if total_distance > paid_distance {
                     let free_distance = total_distance - paid_distance;
                     character.spend_movement(free_distance);

@@ -100,12 +100,14 @@ impl MovementRange {
         self.max_range = max_range;
     }
 
-    fn ap_cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
+    fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
         let extra_range = range - character_remaining_movement;
         if extra_range <= 0.0 {
             0
         } else {
-            (extra_range / self.speed).ceil() as u32
+            // Costs 1 per extra range
+            extra_range.ceil() as u32
+            //(extra_range / self.speed).ceil() as u32
         }
         //self.options.iter().position(|(_, r)| range <= *r).unwrap()
     }
@@ -1025,16 +1027,16 @@ impl GameGrid {
                             .get(self.active_character_id)
                             .remaining_movement
                             .get();
-                        let ap_cost = self
+                        let cost = self
                             .movement_range
-                            .ap_cost(hovered_route.distance_from_start, char_remaining_movement);
+                            .cost(hovered_route.distance_from_start, char_remaining_movement);
 
                         let commit_movement = matches!(
                             ui_state,
                             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
                         );
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
-                            cost: ap_cost,
+                            cost,
                             selected_movement_path: path.positions,
                         });
                         outcome.switched_state = Some(NewState::Move { commit_movement });
@@ -1858,7 +1860,7 @@ impl GameGrid {
             .get();
         let ap = self
             .movement_range
-            .ap_cost(distance, char_remaining_movement);
+            .cost(distance, char_remaining_movement);
         if ap > 0 {
             let text = format!("-{}", ap);
             self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);

@@ -184,7 +184,7 @@ impl ActivityPopup {
             width += margin_between_choices_and_proceed;
         }
 
-        let sprint_stamina_text = "Extend range:";
+        let sprint_stamina_text = "Spend stamina to go further:";
         let sprint_stamina_margin = 15.0;
         if let Some(slider) = &self.movement_cost_slider {
             let text_dimensions = measure_text(
@@ -245,9 +245,9 @@ impl ActivityPopup {
             let cost = self.movement_cost_slider.as_ref().unwrap().selected();
             let character = self.characters.get(self.relevant_character_id);
             let movement = character.remaining_movement.get() + cost as f32;
-            let text = format!("Reach: {:.1}", movement);
-
-            draw_text_rounded(&text, x0, y0, base_text_params.clone());
+            //let dim = draw_text_rounded(&format!("Move:"), x0, y0, base_text_params.clone());
+            //y0 += dim.offset_y + line_margin;
+            draw_text_rounded(&format!("{:.1}", movement), x0 + 3.0, y0, base_text_params.clone());
         }
 
         if let Some(slider) = &mut self.movement_cost_slider {
@@ -427,13 +427,14 @@ impl ActivityPopup {
         else {
             panic!()
         };
+        dbg!(cost);
 
         if let Some(slider) = self.movement_cost_slider.as_mut() {
             let character = self.characters.get(self.relevant_character_id);
             let max_cost = character
                 .stamina
-                .current()
-                .min(character.action_points.current());
+                .current();
+            dbg!(max_cost);
             slider.set_max_allowed(max_cost);
 
             assert!(cost <= max_cost);
@@ -450,10 +451,12 @@ impl ActivityPopup {
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (i32, i32) {
+        /*
         let movement_cost = self.movement_cost();
         if movement_cost > 0 {
             return (movement_cost as i32, 0);
         }
+         */
 
         let borrowed_state = self.ui_state.borrow();
         let base_action = match &*borrowed_state {
@@ -668,12 +671,12 @@ impl ActivityPopup {
 
                     ConfiguredAction::Move { .. } => {
                         let active_char = self.characters.get(active_character_id);
-                        let speed = active_char.move_speed();
-                        lines.push(format!("Speed: {:.1}", speed));
+                        //let speed = active_char.move_speed();
+                        //lines.push(format!("Speed: {:.1}", speed));
                         let stamina = &active_char.stamina;
                         if stamina.max() > 0 {
                             let max_stamina_spend =
-                                stamina.current().min(active_char.action_points.current());
+                                stamina.current();
                             stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));
                         }
                     }
