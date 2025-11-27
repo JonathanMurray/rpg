@@ -29,11 +29,12 @@ use rpg::core::{
 use rpg::data::{
     PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
     COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, INFLICT_WOUNDS, KILL,
-    LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH,
-    MANA_POTION, MEDIUM_SHIELD, NECROTIC_INFLUENCE_ENHANCEMENT, OVERWHELMING, PENETRATING_ARROWS,
-    RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT,
-    SIDE_STEP, SMALL_SHIELD, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, HEAL_ENERGIZE,
+    INFLICT_WOUNDS, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
+    LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, INFLICT_WOUNDS_NECROTIC_INFLUENCE, OVERWHELMING,
+    PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
+    SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE,
+    SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -90,62 +91,55 @@ async fn main() {
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
-        Attributes::new(3, 4, 4, 2),
+        Attributes::new(2, 4, 4, 3),
         (1, 10),
     );
-    alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(COLD_ARROWS, 10)));
-    alice.known_attack_enhancements.push(LONGER_REACH);
+    alice.learn_ability(HEAL);
+    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
-    alice.known_passive_skills.push(PassiveSkill::Honorless);
+    alice
+        .known_passive_skills
+        .push(PassiveSkill::WeaponProficiency);
 
     let mut bob = Character::new(
         Behaviour::Player(Rc::clone(&party)),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        //Attributes::new(4, 3, 3, 3),
-        Attributes::new(6, 3, 3, 3),
+        Attributes::new(4, 3, 3, 3),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, DAGGER);
+    bob.set_weapon(HandType::MainHand, SWORD);
     bob.set_shield(SMALL_SHIELD);
-    bob.armor_piece.set(Some(SHIRT));
-    bob.known_attack_enhancements.push(EMPOWER);
-    bob.known_passive_skills.push(PassiveSkill::Vigilant);
-    bob.known_passive_skills.push(PassiveSkill::BloodRage);
-
-    //bob.known_actions.push(BaseAction::UseAbility(LUNGE_ATTACK));
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(HEAL));
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(FIREBALL));
-    bob.known_ability_enhancements.push(FIREBALL_INFERNO);
-    bob.known_actions
-        .borrow_mut()
-        .push(BaseAction::UseAbility(LUNGE_ATTACK));
-    bob.try_gain_equipment(EquipmentEntry::Shield(MEDIUM_SHIELD));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(ENERGY_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    bob.armor_piece.set(Some(LEATHER_ARMOR));
+    bob.known_passive_skills.push(PassiveSkill::Reaper);
+    bob.learn_ability(SWEEP_ATTACK);
+    bob.known_attack_enhancements.push(SMITE);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
-    //bob.known_ability_enhancements.push(SWEEP_ATTACK_PRECISE);
-    //bob.known_ability_enhancements
-    //.push(LUNGE_ATTACK_HEAVY_IMPACT);
-    //bob.known_on_hit_reactions.push(RAGE);
-    //bob.add_to_agility(5);
-    //bob.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
-    //bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
-    //bob.health.lose(2);
 
-    let mut player_characters = vec![bob, alice];
+    
+    let mut clara = Character::new(
+        Behaviour::Player(Rc::clone(&party)),
+        "Clara",
+        PortraitId::Portrait3,
+        SpriteId::Clara,
+        Attributes::new(2, 2, 4, 5),
+        (3, 10),
+    );
+    clara.set_weapon(HandType::MainHand, DAGGER);
+    clara.armor_piece.set(Some(SHIRT));
+    clara.known_passive_skills.push(PassiveSkill::ArcaneSurge);
+    clara.learn_ability(FIREBALL);
+    clara.known_ability_enhancements.push(FIREBALL_INFERNO);
+    clara.learn_ability(SHACKLED_MIND);
+    clara.learn_ability(INFLICT_WOUNDS);
+    clara.known_ability_enhancements.push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
+    clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+
+    let mut player_characters = vec![bob, alice, clara];
 
     player_characters = run_fight_loop(
         player_characters,

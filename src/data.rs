@@ -9,7 +9,7 @@ use crate::{
         ApplyCondition, ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow,
         AttackAttribute, AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, AttackHitEffect, Condition, Consumable, DefenseType,
-        EquipEffect, EquipmentRequirement, OnAttackedReaction, OnAttackedReactionEffect,
+        EquipEffect, EquipmentRequirement, Fraction, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
         SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
@@ -69,7 +69,7 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
     icon: IconId::Stabbing,
     effect: AttackEnhancementEffect {
         roll_modifier: -3,
-        inflict_condition_per_damage: Some(Condition::Weakened),
+        inflict_x_condition_per_damage: Some((Fraction::new(1, 1), Condition::Weakened)),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -108,9 +108,9 @@ pub const DAGGER: Weapon = Weapon {
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
     name: "Slashing",
     icon: IconId::Slashing,
+    stamina_cost: 2,
     effect: AttackEnhancementEffect {
-        roll_modifier: -3,
-        inflict_condition_per_damage: Some(Condition::Bleeding),
+        inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -366,13 +366,7 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
-pub const SMALL_SHIELD: Shield = Shield {
-    name: "Small shield",
-    sprite: Some(SpriteId::Shield),
-    icon: EquipmentIconId::SmallShield,
-    evasion: 3,
-    armor: 0,
-    on_hit_reaction: Some(OnHitReaction {
+const SHIELD_BASH: OnHitReaction = OnHitReaction {
         name: "Shield bash",
         description: "Strike back at the attacker with your shield",
         icon: IconId::ShieldBash,
@@ -380,7 +374,15 @@ pub const SMALL_SHIELD: Shield = Shield {
         stamina_cost: 0,
         effect: OnHitReactionEffect::ShieldBash,
         required_circumstance: Some(AttackCircumstance::Melee),
-    }),
+    };
+    
+pub const SMALL_SHIELD: Shield = Shield {
+    name: "Small shield",
+    sprite: Some(SpriteId::Shield),
+    icon: EquipmentIconId::SmallShield,
+    evasion: 3,
+    armor: 0,
+    on_hit_reaction: None,
     on_attacked_reaction: None,
     weight: 2,
 };
@@ -428,7 +430,7 @@ pub const SMITE: AttackEnhancement = AttackEnhancement {
     icon: IconId::Smite,
     mana_cost: 1,
     effect: AttackEnhancementEffect {
-        bonus_damage: 1,
+        bonus_damage: 2,
         armor_penetration: 1,
         ..AttackEnhancementEffect::default()
     },
@@ -653,11 +655,14 @@ pub const BRACE: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 0,
-            apply: Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Protected,
-                stacks: Some(2),
-                duration_rounds: None,
-            })),
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: Some(2),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
         }),
     },
     animation_color: MAGENTA,
@@ -819,7 +824,7 @@ pub const MIND_BLAST: Ability = Ability {
     animation_color: PURPLE,
 };
 
-pub const NECROTIC_INFLUENCE_ENHANCEMENT: AbilityEnhancement = AbilityEnhancement {
+pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::InflictWounds,
     name: "Necrotic influence",
     description: "Converts all bleeding to immediate damage and life-drain",
@@ -852,7 +857,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [Some(NECROTIC_INFLUENCE_ENHANCEMENT), None, None],
+    possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
     target: AbilityTarget::Enemy {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -956,6 +961,20 @@ pub const MAGI_HEAL: Ability = Ability {
     animation_color: LIME,
 };
 
+pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Heal,
+    name: "Energize",
+    description: "",
+    icon: IconId::Energize,
+    action_point_cost: 0,
+    mana_cost: 1,
+    stamina_cost: 0,
+    attack_effect: None,
+    spell_effect: Some(SpellEnhancementEffect {
+        target_on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
+        ..SpellEnhancementEffect::default()
+    }),
+};
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
@@ -971,7 +990,14 @@ pub const HEAL: Ability = Ability {
         range: Range::Ranged(3),
         effect: AbilityPositiveEffect {
             healing: 2,
-            apply: None,
+            apply: Some([
+                Some(ApplyEffect::ConsumeCondition {
+                    condition: Condition::Bleeding,
+                }),
+                Some(ApplyEffect::ConsumeCondition {
+                    condition: Condition::Burning,
+                }),
+            ]),
         },
     },
     possible_enhancements: [
@@ -990,20 +1016,7 @@ pub const HEAL: Ability = Ability {
             }),
         }),
         // TODO add enhancement that heals over time (1 per round for 3 turns?)
-        Some(AbilityEnhancement {
-            ability_id: AbilityId::Heal,
-            name: "Energize",
-            description: "",
-            icon: IconId::Energize,
-            action_point_cost: 0,
-            mana_cost: 1,
-            stamina_cost: 0,
-            attack_effect: None,
-            spell_effect: Some(SpellEnhancementEffect {
-                target_on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
-                ..SpellEnhancementEffect::default()
-            }),
-        }),
+        Some(HEAL_ENERGIZE),
         None,
     ],
 
@@ -1052,11 +1065,14 @@ pub const SELF_HEAL: Ability = Ability {
         self_area: None,
         self_effect: Some(AbilityPositiveEffect {
             healing: 1,
-            apply: Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Protected,
-                stacks: Some(1),
-                duration_rounds: None,
-            })),
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: Some(1),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
         }),
     },
     animation_color: GREEN,

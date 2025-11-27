@@ -190,9 +190,18 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         t.technical_description
             .push(format!("- {} advantage", -effect.roll_advantage));
     }
-    if let Some(condition) = effect.inflict_condition_per_damage {
-        t.technical_description
-            .push(format!("Inflicts 1 {} per damage dealt", condition.name()));
+    if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
+        t.technical_description.push(format!(
+            "Inflicts {} {} per {}damage dealt",
+            x.num,
+            condition.name(),
+            if x.den == 1 {
+                "".to_string()
+            } else {
+                format!("{} ", x.den)
+            }
+        ));
+        t.keywords.push(condition);
     }
 
     if effect.armor_penetration > 0 {
@@ -546,7 +555,7 @@ fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut Tooltip) 
             .push(format!("  {}+ healing", effect.healing));
     }
 
-    if let Some(apply) = effect.apply {
+    for apply in effect.apply.iter().flatten().flatten().copied() {
         describe_apply_effect(apply, t);
     }
 }

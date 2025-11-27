@@ -1147,7 +1147,7 @@ impl CoreGame {
             maybe_healing = Some(health_gained);
         };
 
-        if let Some(mut effect) = ally_effect.apply {
+        for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
             match effect {
                 ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                 ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
@@ -1749,12 +1749,13 @@ impl CoreGame {
                         detail_lines.push(format!("{} ({})", log_line, name))
                     }
 
-                    if let Some(mut condition) = effect.inflict_condition_per_damage {
+                    if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
                         //*condition.stacks().unwrap() = damage;
+                        let stacks = (damage * x.num) / x.den;
                         let line = self.perform_receive_condition(
                             ApplyCondition {
                                 condition,
-                                stacks: Some(damage),
+                                stacks: Some(stacks),
                                 duration_rounds: None,
                             },
                             defender,
@@ -3113,7 +3114,7 @@ pub enum AbilityDamage {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityPositiveEffect {
     pub healing: u32,
-    pub apply: Option<ApplyEffect>,
+    pub apply: Option<[Option<ApplyEffect>; 2]>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -3271,12 +3272,24 @@ impl AbilityEnhancement {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct Fraction {
+    pub num: u32,
+    pub den: u32,
+}
+
+impl Fraction {
+    pub const fn new(num: u32, den: u32) -> Self {
+        Self { num, den }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AttackEnhancementEffect {
     pub roll_modifier: i32,
     pub roll_advantage: i32,
     pub bonus_damage: u32,
     pub action_point_discount: u32,
-    pub inflict_condition_per_damage: Option<Condition>,
+    pub inflict_x_condition_per_damage: Option<(Fraction, Condition)>,
     pub armor_penetration: u32,
     pub range_bonus: u32,
 
@@ -3301,7 +3314,7 @@ impl AttackEnhancementEffect {
             roll_advantage: 0,
             on_damage_effect: None,
             roll_modifier: 0,
-            inflict_condition_per_damage: None,
+            inflict_x_condition_per_damage: None,
             armor_penetration: 0,
             range_bonus: 0,
             on_self: None,
@@ -3420,7 +3433,7 @@ impl Attributes {
     }
 
     fn max_health(&self) -> u32 {
-        10 + self.strength.get()
+        10 + self.strength.get() * 2
     }
 
     fn max_mana(&self) -> u32 {
@@ -3575,6 +3588,12 @@ impl Character {
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
         }
+    }
+
+    pub fn learn_ability(&self, ability: Ability) {
+        self.known_actions
+            .borrow_mut()
+            .push(BaseAction::UseAbility(ability));
     }
 
     fn set_current_game_time(&self, game_time: u32) {
