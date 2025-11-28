@@ -349,9 +349,13 @@ impl GameGrid {
             self.grid_y_to_screen(position.1),
         );
 
+        let mut pos = (position.0 as f32, position.1 as f32);
+
         let mut rng = rand::rng();
-        let dx = rng.random_range(-10..=10) as f32;
-        let dy = rng.random_range(-10..=10) as f32;
+        let dx = rng.random_range(-0.3..=0.3);
+        let dy = rng.random_range(-0.3..=0.3);
+        //let dx = rng.random_range(-10..=10) as f32;
+        //let dy = rng.random_range(-10..=10) as f32;
         pos = (pos.0 + dx, pos.1 + dy);
 
         let color = match style {
@@ -380,14 +384,8 @@ impl GameGrid {
     }
 
     pub fn add_effect(&mut self, source: Position, destination: Position, effect: Effect) {
-        let source_pos = (
-            self.grid_x_to_screen(source.0),
-            self.grid_y_to_screen(source.1),
-        );
-        let destination_pos = (
-            self.grid_x_to_screen(destination.0),
-            self.grid_y_to_screen(destination.1),
-        );
+        let source_pos = (source.0 as f32, source.1 as f32);
+        let destination_pos = (destination.0 as f32, destination.1 as f32);
 
         let concrete_effect = ConcreteEffect {
             age: 0.0,
@@ -422,9 +420,20 @@ impl GameGrid {
         x.round()
     }
 
+    fn grid_x_f32_to_screen(&self, grid_x: f32) -> f32 {
+        let x = self.position_on_screen.0 + grid_x * self.cell_w - self.camera_position.0.get();
+
+        x.round()
+    }
+
     fn grid_y_to_screen(&self, grid_y: i32) -> f32 {
         let y =
             self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get();
+        y.round()
+    }
+
+    fn grid_y_f32_to_screen(&self, grid_y: f32) -> f32 {
+        let y = self.position_on_screen.1 + grid_y * self.cell_w - self.camera_position.1.get();
         y.round()
     }
 
@@ -569,9 +578,6 @@ impl GameGrid {
             WHITE,
             params.clone(),
         );
-
-        //TODO
-        draw_rectangle(x, y, 5.0, 5.0, MAGENTA);
 
         if let Some(weapon) = character.weapon(HandType::MainHand) {
             if let Some(texture) = weapon.sprite {
@@ -1685,14 +1691,16 @@ impl GameGrid {
             }
             let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
 
+            /*
             let camera_adjustment = (
                 self.camera_position.0.get() - effect.original_camera_pos.0,
                 self.camera_position.1.get() - effect.original_camera_pos.1,
             );
+            */
 
             match &effect.variant {
                 EffectVariant::At(position, graphics) => {
-                    let (mut x, mut y) = match position {
+                    let (x, y) = match position {
                         EffectPosition::Source => effect.source_pos,
                         EffectPosition::Destination => effect.destination_pos,
                         EffectPosition::Projectile => {
@@ -1704,8 +1712,8 @@ impl GameGrid {
                         }
                     };
 
-                    x -= camera_adjustment.0;
-                    y -= camera_adjustment.1;
+                    let x = self.grid_x_f32_to_screen(x);
+                    let y = self.grid_y_f32_to_screen(y);
 
                     graphics.draw(x, y, effect, self.cell_w);
                 }
@@ -1716,12 +1724,12 @@ impl GameGrid {
                     extend_gradually,
                 } => {
                     let from = (
-                        effect.source_pos.0 + self.cell_w / 2.0 - camera_adjustment.0,
-                        effect.source_pos.1 + self.cell_w / 2.0 - camera_adjustment.1,
+                        self.grid_x_f32_to_screen(effect.source_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_pos.1 + 0.5),
                     );
                     let mut to = (
-                        effect.destination_pos.0 + self.cell_w / 2.0 - camera_adjustment.0,
-                        effect.destination_pos.1 + self.cell_w / 2.0 - camera_adjustment.1,
+                        self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
+                        self.grid_x_f32_to_screen(effect.destination_pos.1 + 0.5),
                     );
 
                     if *extend_gradually {
