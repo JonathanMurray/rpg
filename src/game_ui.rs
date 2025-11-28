@@ -1245,6 +1245,8 @@ impl UserInterface {
                 ability,
                 target,
             } => {
+                self.game_grid.animate_character_acting(actor, 0.2);
+
                 let duration;
 
                 let animation_color = ability.animation_color;
@@ -1389,6 +1391,7 @@ impl UserInterface {
                 let animation_color = ability.animation_color;
                 if let Some((target, outcome)) = &target_outcome {
                     let target_pos = self.characters.get(*target).pos();
+                    self.game_grid.animate_character_shaking(*target, 0.2);
                     self.add_text_effect_for_ability_target_outcome(outcome, 0.0, target_pos);
                     self.animation_stopwatch.set_to_at_least(0.3);
                 }
@@ -1522,12 +1525,17 @@ impl UserInterface {
                 },
             );
 
+            self.game_grid.animate_character_shaking(*target_id, 0.2);
+
             self.add_text_effect_for_ability_target_outcome(outcome, start_time, target_pos);
+
             self.animation_stopwatch.set_to_at_least(start_time + 0.3);
         }
     }
 
     fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
+        self.game_grid.animate_character_acting(attacker, 0.2);
+
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
@@ -1619,6 +1627,8 @@ impl UserInterface {
 
         self.game_grid
             .add_text_effect(target_pos, 0.0, 1.5, impact_text, text_style);
+
+        self.game_grid.animate_character_shaking(target, 0.2);
 
         if let Some(outcomes) = &event.area_outcomes {
             self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, outcomes);

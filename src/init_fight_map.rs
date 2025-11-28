@@ -282,6 +282,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
             ));
+            /*
             enemies.push(Character::new(
                 bot(BotBehaviour::Normal, 4.0),
                 "Enemy 1",
@@ -314,6 +315,11 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&4].choose().unwrap(),
             ));
+             */
+
+            for e in &enemies {
+                e.set_weapon(HandType::MainHand, BAD_SWORD);
+            }
 
             characters.extend_from_slice(&enemies);
         }

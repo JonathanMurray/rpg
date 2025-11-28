@@ -151,8 +151,6 @@ async fn main() {
     )
     .await;
 
-    //run_skill_tree_scene().await;
-
     loop {
         let map_choice = map_scene
             .run_map_loop(font.clone(), &player_characters[..])

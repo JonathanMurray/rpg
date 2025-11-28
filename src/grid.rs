@@ -9,7 +9,7 @@ use macroquad::{
     text::{draw_text_ex, Font, TextParams},
     window::{screen_height, screen_width},
 };
-use rand::Rng;
+use rand::{random_range, rng, Rng};
 
 use std::cell::Cell;
 
@@ -77,19 +77,30 @@ const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
 #[derive(Debug, Copy, Clone)]
-struct CharacterMotion {
+struct CharacterAnimation {
     character_id: CharacterId,
-    from: Position,
-    to: Position,
-    remaining_duration: f32,
     duration: f32,
+    remaining_duration: f32,
+    kind: AnimationKind,
+}
+
+impl CharacterAnimation {
+    fn new(character_id: CharacterId, duration: f32, kind: AnimationKind) -> CharacterAnimation {
+        Self {
+            character_id,
+            duration,
+            remaining_duration: duration,
+            kind,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
-struct CharacterDeathAnimation {
-    character_id: CharacterId,
-    remaining_duration: f32,
-    duration: f32,
+enum AnimationKind {
+    Motion { from: Position, to: Position },
+    Shake { random_time_offset: f32 },
+    Death,
+    Act { random_rotation: f32 },
 }
 
 struct MovementRange {
@@ -149,9 +160,7 @@ pub struct GameGrid {
     routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
-    character_motion: Option<CharacterMotion>,
-    character_death_animations: Vec<CharacterDeathAnimation>,
-
+    character_animations: Vec<CharacterAnimation>,
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
 
@@ -214,8 +223,13 @@ impl GameGrid {
             cell_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
+            character_animations: Default::default(),
+            /*
             character_motion: None,
-            character_death_animations: vec![],
+            character_dying_animations: vec![],
+            character_shake_animations: vec![],
+            character_act_animations: vec![],
+             */
             big_font,
             simple_font,
             terrain_atlas,
@@ -231,23 +245,38 @@ impl GameGrid {
         to: Position,
         duration: f32,
     ) {
-        assert!(self.character_motion.is_none());
-        self.character_motion = Some(CharacterMotion {
+        self.character_animations.push(CharacterAnimation::new(
             character_id,
-            from: (from.0, from.1),
-            to: (to.0, to.1),
-            remaining_duration: duration,
             duration,
-        });
+            AnimationKind::Motion { from, to },
+        ));
     }
 
     pub fn animate_death(&mut self, character_id: CharacterId, duration: f32) {
-        self.character_death_animations
-            .push(CharacterDeathAnimation {
-                character_id,
-                remaining_duration: duration,
-                duration,
-            })
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationKind::Death,
+        ));
+    }
+
+    pub fn animate_character_acting(&mut self, character_id: CharacterId, duration: f32) {
+        let random_rotation = random_range(-0.05..0.05);
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationKind::Act { random_rotation },
+        ));
+    }
+
+    pub fn animate_character_shaking(&mut self, character_id: CharacterId, duration: f32) {
+        let random_time_offset = random_range(0.0..1.0);
+
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationKind::Shake { random_time_offset },
+        ));
     }
 
     pub fn remove_dead(&mut self) {
@@ -288,17 +317,31 @@ impl GameGrid {
         }
         self.effects.retain(|e| e.age <= e.end_time);
 
+        for a in self.character_animations.iter_mut() {
+            a.remaining_duration -= elapsed;
+        }
+        self.character_animations
+            .retain(|a| a.remaining_duration > 0.0);
+
+        /*
         if let Some(motion) = &mut self.character_motion {
             motion.remaining_duration -= elapsed;
             if motion.remaining_duration <= 0.0 {
                 self.character_motion = None;
             }
         }
-        for animation in self.character_death_animations.iter_mut() {
+        for animation in self.character_dying_animations.iter_mut() {
             animation.remaining_duration -= elapsed;
         }
-        self.character_death_animations
+        self.character_dying_animations
             .retain(|a| a.remaining_duration > 0.0);
+        for animation in self.character_shake_animations.iter_mut() {
+            animation.remaining_duration -= elapsed;
+        }
+        self.character_shake_animations
+            .retain(|a| a.remaining_duration > 0.0);
+
+             */
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
@@ -344,18 +387,11 @@ impl GameGrid {
         text: impl Into<String>,
         style: TextEffectStyle,
     ) {
-        let mut pos = (
-            self.grid_x_to_screen(position.0),
-            self.grid_y_to_screen(position.1),
-        );
-
         let mut pos = (position.0 as f32, position.1 as f32);
 
         let mut rng = rand::rng();
         let dx = rng.random_range(-0.3..=0.3);
         let dy = rng.random_range(-0.3..=0.3);
-        //let dx = rng.random_range(-10..=10) as f32;
-        //let dy = rng.random_range(-10..=10) as f32;
         pos = (pos.0 + dx, pos.1 + dy);
 
         let color = match style {
@@ -377,7 +413,6 @@ impl GameGrid {
             ),
             source_pos: pos,
             destination_pos: pos,
-            original_camera_pos: (self.camera_position.0.get(), self.camera_position.1.get()),
         };
 
         self.effects.push(effect);
@@ -394,7 +429,6 @@ impl GameGrid {
             source_pos,
             destination_pos,
             variant: effect.variant,
-            original_camera_pos: (self.camera_position.0.get(), self.camera_position.1.get()),
         };
 
         self.effects.push(concrete_effect);
@@ -442,16 +476,18 @@ impl GameGrid {
     }
 
     fn character_screen_pos(&self, character: &Character) -> (f32, f32) {
-        if let Some(motion) = self.character_motion {
-            if motion.character_id == character.id() {
-                let from = self.grid_pos_to_screen(motion.from);
-                let to = self.grid_pos_to_screen(motion.to);
-                let remaining = motion.remaining_duration / motion.duration;
-                //let remaining = (remaining * 4.0).floor() / 4.0;
-                return (
-                    to.0 - (to.0 - from.0) * remaining,
-                    to.1 - (to.1 - from.1) * remaining,
-                );
+        for animation in &self.character_animations {
+            if let AnimationKind::Motion { from, to } = animation.kind {
+                if animation.character_id == character.id() {
+                    let from = self.grid_pos_to_screen(from);
+                    let to = self.grid_pos_to_screen(to);
+                    let remaining = animation.remaining_duration / animation.duration;
+                    //let remaining = (remaining * 4.0).floor() / 4.0;
+                    return (
+                        to.0 - (to.0 - from.0) * remaining,
+                        to.1 - (to.1 - from.1) * remaining,
+                    );
+                }
             }
         }
         self.grid_pos_to_screen(character.pos())
@@ -542,35 +578,52 @@ impl GameGrid {
             ..Default::default()
         };
 
-        let (x, mut y) = self.character_screen_pos(character);
+        let (mut x, mut y) = self.character_screen_pos(character);
 
-        if let Some(motion) = self.character_motion {
-            if motion.character_id == character.id() {
-                let remaining = motion.remaining_duration / motion.duration;
-                let remaining = (remaining * 4.0).floor() / 4.0;
-                if remaining < 0.25 {
-                    y += 1.0;
-                } else if remaining < 0.5 {
-                    params.rotation = -0.05;
-                } else if remaining < 0.75 {
-                    y += 1.0;
-                } else {
-                    params.rotation = 0.05;
+        let mut dying = false;
+
+        for animation in self
+            .character_animations
+            .iter()
+            .filter(|a| a.character_id == character.id())
+        {
+            let remaining = animation.remaining_duration;
+            let duration = animation.duration;
+            match animation.kind {
+                AnimationKind::Motion { from, to } => {
+                    let remaining_part = remaining / duration;
+                    let quantized = (remaining_part * 4.0).floor() / 4.0;
+                    if quantized < 0.25 {
+                        y += 1.0;
+                    } else if quantized < 0.5 {
+                        params.rotation = -0.05;
+                    } else if quantized < 0.75 {
+                        y += 1.0;
+                    } else {
+                        params.rotation = 0.05;
+                    }
+                }
+                AnimationKind::Shake { random_time_offset } => {
+                    if (((remaining + random_time_offset) / 0.1).floor()) as i32 % 2 == 0 {
+                        x -= 3.0;
+                    } else {
+                        x += 3.0;
+                    }
+                }
+                AnimationKind::Death => {
+                    params.rotation = PI * 0.5;
+                    dying = true;
+                }
+                AnimationKind::Act { random_rotation } => {
+                    y -= self.cell_w * 0.07;
+                    params.rotation = random_rotation;
                 }
             }
         }
 
-        let dying = self
-            .character_death_animations
-            .iter()
-            .any(|a| a.character_id == character.id());
-
-        if dying {
-            params.rotation = PI * 0.5;
-        } else {
+        if !dying {
             y -= self.cell_w * 0.2;
         }
-
         draw_texture_ex(
             &self.sprites[&character.sprite],
             x,
@@ -1699,13 +1752,6 @@ impl GameGrid {
             }
             let t = (effect.age - effect.start_time) / (effect.end_time - effect.start_time);
 
-            /*
-            let camera_adjustment = (
-                self.camera_position.0.get() - effect.original_camera_pos.0,
-                self.camera_position.1.get() - effect.original_camera_pos.1,
-            );
-            */
-
             match &effect.variant {
                 EffectVariant::At(position, graphics) => {
                     let (x, y) = match position {
@@ -1737,7 +1783,7 @@ impl GameGrid {
                     );
                     let mut to = (
                         self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
-                        self.grid_x_f32_to_screen(effect.destination_pos.1 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_pos.1 + 0.5),
                     );
 
                     if *extend_gradually {
@@ -2137,7 +2183,6 @@ struct ConcreteEffect {
     source_pos: (f32, f32),
     destination_pos: (f32, f32),
     variant: EffectVariant,
-    original_camera_pos: (f32, f32),
 }
 
 pub struct Effect {
