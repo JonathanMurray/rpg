@@ -30,7 +30,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
     assert!(!character.player_controlled());
 
-    match character.behaviour.unwrap_bot_behaviour() {
+    match character.kind.unwrap_bot_behaviour() {
         BotBehaviour::Normal => run_normal_behaviour(game),
         BotBehaviour::Magi(magi_behaviour) => run_magi_behaviour(game, magi_behaviour),
     }
@@ -204,7 +204,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
         };
 
         if let Some(path) = maybe_path {
-            dbg!(bot_pos, player_pos, &path);
+            //dbg!(bot_pos, player_pos, &path);
             if let Some(shortest) = &shortest_path_to_some_player {
                 if path.total_distance < shortest.total_distance {
                     shortest_path_to_some_player = Some(path);
@@ -225,20 +225,18 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 
 pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<Action> {
     let remaining_free_movement = character.remaining_movement.get();
-    let max_sprint_usage = character
-        .action_points
-        .current()
-        .min(character.stamina.current());
+    dbg!(remaining_free_movement);
+    //let max_sprint_usage = character.stamina.current();
     let mut positions = vec![];
     let mut total_distance = 0.0;
     for (dist, pos) in path.positions {
-        if dist <= remaining_free_movement + max_sprint_usage as f32 {
+        if dist <= remaining_free_movement {
             positions.push(pos);
             total_distance = dist;
         }
     }
 
-    let extra_cost = ((total_distance - remaining_free_movement).ceil() as u32).max(0);
+    let extra_cost = 0; // ((total_distance - remaining_free_movement).ceil() as u32).max(0);
 
     if total_distance > 0.0 {
         Some(Action::Move {

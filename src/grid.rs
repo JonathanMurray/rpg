@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, collections::HashMap, iter, rc::Rc};
+use std::{cmp::Ordering, collections::HashMap, f32::consts::PI, iter, rc::Rc};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -85,6 +85,13 @@ struct CharacterMotion {
     duration: f32,
 }
 
+#[derive(Debug, Copy, Clone)]
+struct CharacterDeathAnimation {
+    character_id: CharacterId,
+    remaining_duration: f32,
+    duration: f32,
+}
+
 struct MovementRange {
     speed: f32,
     max_range: f32,
@@ -143,6 +150,7 @@ pub struct GameGrid {
     characters: Characters,
 
     character_motion: Option<CharacterMotion>,
+    character_death_animations: Vec<CharacterDeathAnimation>,
 
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
@@ -207,6 +215,7 @@ impl GameGrid {
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
             character_motion: None,
+            character_death_animations: vec![],
             big_font,
             simple_font,
             terrain_atlas,
@@ -230,6 +239,15 @@ impl GameGrid {
             remaining_duration: duration,
             duration,
         });
+    }
+
+    pub fn animate_death(&mut self, character_id: CharacterId, duration: f32) {
+        self.character_death_animations
+            .push(CharacterDeathAnimation {
+                character_id,
+                remaining_duration: duration,
+                duration,
+            })
     }
 
     pub fn remove_dead(&mut self) {
@@ -276,6 +294,11 @@ impl GameGrid {
                 self.character_motion = None;
             }
         }
+        for animation in self.character_death_animations.iter_mut() {
+            animation.remaining_duration -= elapsed;
+        }
+        self.character_death_animations
+            .retain(|a| a.remaining_duration > 0.0);
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
@@ -510,7 +533,6 @@ impl GameGrid {
             ..Default::default()
         };
 
-        
         let (x, mut y) = self.character_screen_pos(character);
 
         if let Some(motion) = self.character_motion {
@@ -521,15 +543,24 @@ impl GameGrid {
                     y += 2.0;
                 } else if remaining < 0.5 {
                     params.rotation = -0.05;
-                } else if remaining < 0.75{
+                } else if remaining < 0.75 {
                     y += 1.0;
                 } else {
                     params.rotation = 0.05;
                 }
-                
             }
         }
 
+        let dying = self
+            .character_death_animations
+            .iter()
+            .any(|a| a.character_id == character.id());
+
+        if dying {
+            params.rotation = PI * 0.5;
+        } else {
+            y -= self.cell_w * 0.2;
+        }
 
         draw_texture_ex(
             &self.sprites[&character.sprite],
@@ -1627,6 +1658,7 @@ impl GameGrid {
         margin: f32,
         thickness: f32,
     ) {
+        let len = self.cell_w * 0.25;
         draw_cornered_rectangle_lines(
             screen_pos.0,
             screen_pos.1,
@@ -1635,6 +1667,7 @@ impl GameGrid {
             thickness,
             color,
             margin,
+            len,
         );
     }
 

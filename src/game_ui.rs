@@ -1413,6 +1413,11 @@ impl UserInterface {
                     consumable.name
                 ));
             }
+            GameEvent::CharacterDying { character } => {
+                let duration = 0.5;
+                self.game_grid.animate_death(character, duration);
+                self.animation_stopwatch.set_to_at_least(duration);
+            }
             GameEvent::CharacterDied {
                 character,
                 new_active,
@@ -1594,7 +1599,6 @@ impl UserInterface {
 
         self.log.add_with_details(line, detail_lines);
 
-        let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
         let (impact_text, text_style) = match outcome {
@@ -1620,7 +1624,7 @@ impl UserInterface {
             self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, outcomes);
         }
 
-        self.animation_stopwatch.set_to_at_least(0.6);
+        self.animation_stopwatch.set_to_at_least(0.2);
     }
 
     fn add_text_effect_for_ability_target_outcome(

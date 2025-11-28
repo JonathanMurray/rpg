@@ -44,9 +44,9 @@ use crate::base_ui::{
 use crate::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use crate::chest_scene::run_chest_loop;
 use crate::core::{
-    Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Behaviour, Character,
-    CharacterId, Condition, CoreGame, EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction,
-    Party,
+    Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Character, CharacterId,
+    CharacterKind, Condition, CoreGame, EquipmentEntry, HandType, OnAttackedReaction,
+    OnHitReaction, Party,
 };
 
 use crate::data::{

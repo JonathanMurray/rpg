@@ -139,12 +139,12 @@ pub fn draw_cornered_rectangle_lines(
     thickness: f32,
     color: Color,
     margin: f32,
+    len: f32,
 ) {
     let left = x + margin;
     let top = y + margin;
     let right = x + w - margin;
     let bot = y + h - margin;
-    let len = 15.0;
 
     draw_line(left, top, left, top + len, thickness, color);
     draw_line(left, top, left + len, top, thickness, color);

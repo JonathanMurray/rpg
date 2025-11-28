@@ -40,9 +40,9 @@ use rpg::base_ui::{
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Behaviour, Character,
-    CharacterId, Condition, CoreGame, EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction,
-    Party,
+    Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Character, CharacterId,
+    CharacterKind, Condition, CoreGame, EquipmentEntry, HandType, OnAttackedReaction,
+    OnHitReaction, Party,
 };
 
 use rpg::data::{

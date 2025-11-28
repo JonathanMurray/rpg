@@ -22,7 +22,7 @@ use macroquad::{
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Action, ArrowStack, Attributes, BaseAction, Behaviour, Character, CharacterId, Condition,
+    Action, ArrowStack, Attributes, BaseAction, Character, CharacterId, CharacterKind, Condition,
     CoreGame, EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, Party,
 };
 
@@ -87,7 +87,7 @@ async fn main() {
     });
 
     let mut alice = Character::new(
-        Behaviour::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party)),
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
@@ -105,7 +105,7 @@ async fn main() {
         .push(PassiveSkill::WeaponProficiency);
 
     let mut bob = Character::new(
-        Behaviour::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party)),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -121,7 +121,7 @@ async fn main() {
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
     let mut clara = Character::new(
-        Behaviour::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party)),
         "Clara",
         PortraitId::Portrait3,
         SpriteId::Clara,
@@ -144,7 +144,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::EasyCluster,
+        FightId::EasyGuard,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

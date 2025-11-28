@@ -241,6 +241,11 @@ impl CoreGame {
                     ch.set_not_engaging(*dead_id);
                 }
 
+                self.ui_handle_event(GameEvent::CharacterDying {
+                    character: *dead_id,
+                })
+                .await;
+
                 let new_active = if active_character_died {
                     Some(self.active_character_id)
                 } else {
@@ -2082,7 +2087,6 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
         let stamina_gain = (character.stamina.max() as f32 / 4.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
-
         character.regain_movement();
     }
 }
@@ -2317,6 +2321,9 @@ pub enum GameEvent {
     ConsumableWasUsed {
         user: CharacterId,
         consumable: Consumable,
+    },
+    CharacterDying {
+        character: CharacterId,
     },
     CharacterDied {
         character: CharacterId,
@@ -3494,16 +3501,22 @@ impl Attributes {
 }
 
 #[derive(Debug, Clone, PartialEq)]
-pub enum Behaviour {
+pub enum CharacterKind {
     Player(Rc<Party>),
-    Bot(BotBehaviour),
+    Bot(Bot),
 }
 
-impl Behaviour {
+#[derive(Debug, Clone, PartialEq)]
+pub struct Bot {
+    pub behaviour: BotBehaviour,
+    pub base_movement: f32,
+}
+
+impl CharacterKind {
     pub fn unwrap_bot_behaviour(&self) -> &BotBehaviour {
         match self {
-            Behaviour::Player(..) => panic!(),
-            Behaviour::Bot(bot_behaviour) => bot_behaviour,
+            CharacterKind::Player(..) => panic!(),
+            CharacterKind::Bot(bot) => &bot.behaviour,
         }
     }
 }
@@ -3537,7 +3550,7 @@ pub struct Character {
     pub portrait: PortraitId,
 
     pub sprite: SpriteId,
-    pub behaviour: Behaviour,
+    pub kind: CharacterKind,
     pub position: Cell<Position>,
     pub base_attributes: Attributes,
     pub health: NumberedResource,
@@ -3572,7 +3585,7 @@ pub struct Character {
 
 impl Character {
     pub fn new(
-        behaviour: Behaviour,
+        kind: CharacterKind,
         name: &'static str,
         portrait: PortraitId,
         sprite: SpriteId,
@@ -3582,7 +3595,12 @@ impl Character {
         let max_health = base_attributes.max_health();
         let max_mana = base_attributes.max_mana();
 
-        let move_speed = base_attributes.move_speed();
+        let move_speed = if let CharacterKind::Bot(bot) = &kind {
+            bot.base_movement
+        } else {
+            base_attributes.move_speed()
+        };
+
         let max_stamina = base_attributes.max_stamina();
         let capacity = base_attributes.capacity();
         let action_points = NumberedResource::new(MAX_ACTION_POINTS);
@@ -3594,7 +3612,7 @@ impl Character {
             has_taken_a_turn_this_round: Cell::new(false),
             portrait,
             sprite,
-            behaviour,
+            kind,
             position: Cell::new(position),
             name,
             base_attributes,
@@ -3646,16 +3664,16 @@ impl Character {
     }
 
     pub fn party_money(&self) -> u32 {
-        match &self.behaviour {
-            Behaviour::Player(party) => party.money.get(),
-            Behaviour::Bot(..) => panic!(),
+        match &self.kind {
+            CharacterKind::Player(party) => party.money.get(),
+            CharacterKind::Bot(..) => panic!(),
         }
     }
 
     pub fn party_stash(&self) -> &[Cell<Option<EquipmentEntry>>; 6] {
-        match &self.behaviour {
-            Behaviour::Player(party) => &party.stash,
-            Behaviour::Bot(..) => panic!(),
+        match &self.kind {
+            CharacterKind::Player(party) => &party.stash,
+            CharacterKind::Bot(..) => panic!(),
         }
     }
 
@@ -3691,14 +3709,18 @@ impl Character {
     }
 
     fn regain_movement(&self) {
+        dbg!((self.name, self.move_speed()));
         self.remaining_movement.set(self.move_speed());
     }
 
     fn spend_movement(&self, distance: f32) {
+        dbg!((self.name, &self.remaining_movement));
         let remaining = self.remaining_movement.get();
         assert!(distance > 0.0 && distance <= remaining);
-        dbg!("Spend movement", distance, remaining);
+        dbg!(("Spend movement", distance, remaining));
         self.remaining_movement.set(remaining - distance);
+        dbg!(&self.remaining_movement);
+        println!("end of spend_movement()");
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
@@ -3745,7 +3767,7 @@ impl Character {
     }
 
     pub fn player_controlled(&self) -> bool {
-        matches!(self.behaviour, Behaviour::Player(..))
+        matches!(self.kind, CharacterKind::Player(..))
     }
 
     pub fn add_to_strength(&self, amount: i32) {
@@ -4214,7 +4236,7 @@ impl Character {
                     && self.stamina.current() >= ability.stamina_cost
                     && self.mana.current() >= ability.mana_cost
             }
-            BaseAction::Move => self.remaining_movement.get() > 0.0 || ap.min(sta) > 0,
+            BaseAction::Move => self.remaining_movement.get() > 1.0 || sta > 0,
             BaseAction::ChangeEquipment => {
                 ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
             }
@@ -4869,6 +4891,13 @@ impl Character {
                 *state.stacks.as_mut().unwrap() += stacks;
             }
         } else {
+            if condition == Condition::Hindered {
+                self.remaining_movement
+                    .set(self.remaining_movement.get() * 0.5);
+            } else if condition == Condition::Slowed {
+                self.action_points.lose(1);
+            }
+
             conditions
                 .map
                 .insert(condition, ConditionState { stacks, ends_at });
