@@ -2192,6 +2192,7 @@ pub fn predict_attack(
     let mut max_dmg = 0;
     let mut percentage_deal_damage = 0;
 
+    // TODO: This doesn't account for advantage! (?)
     for unmodified_roll in 1..=20 {
         let roll_result =
             ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
