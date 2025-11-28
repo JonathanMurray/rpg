@@ -50,6 +50,30 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
     .await
 }
 
+pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
+    match sprite_id {
+        SpriteId::Clara => 26,
+        SpriteId::Bob => 28,
+        SpriteId::Alice => 28,
+        SpriteId::Skeleton => 26,
+        SpriteId::Skeleton2 => 26,
+        SpriteId::Ogre => 26,
+        SpriteId::Magi => 25,
+        SpriteId::Ghoul => 24,
+
+        // TODO:
+        SpriteId::PinkMan => 25,
+        SpriteId::AlsoWeirdOrangeMan => 25,
+        SpriteId::WeirdOrangeMan => 25,
+        SpriteId::Warhammer => panic!(),
+        SpriteId::Bow => panic!(),
+        SpriteId::Sword => panic!(),
+        SpriteId::Rapier => panic!(),
+        SpriteId::Dagger => panic!(),
+        SpriteId::Shield => panic!(),
+    }
+}
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,

@@ -3,10 +3,10 @@ BBBBBBBBBBBBB
 BRR         B
 BR          B
 B           B
-B   0      SB
-B  S1      SB
+B   024    SB
+B  S135    SB
 B  PP  W   SB
-B      WW   B
+B  P   WW   B
 BB         BB
  BBBBBBBBBBB
 +----------------------------

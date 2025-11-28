@@ -272,29 +272,50 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
 
         FightId::Test => {
-            let enemy1 = Character::new(
+            let mut enemies = vec![];
+
+            enemies.push(Character::new(
+                bot(BotBehaviour::Normal, 4.0),
+                "Enemy 1",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(1, 1, 1, 1),
+                *enemy_positions[&0].choose().unwrap(),
+            ));
+            enemies.push(Character::new(
                 bot(BotBehaviour::Normal, 4.0),
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton2,
                 Attributes::new(1, 1, 1, 1),
-                *enemy_positions[&0].choose().unwrap(),
-            );
-            enemy1.health.change_max_value_to(20);
-            enemy1.set_weapon(HandType::MainHand, BAD_BOW);
-            enemy1.armor_piece.set(Some(CHAIN_MAIL));
-
-            let enemy2 = Character::new(
-                bot(BotBehaviour::Normal, 4.0),
-                "Enemy 2",
-                PortraitId::Skeleton,
-                SpriteId::Skeleton2,
-                Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&1].choose().unwrap(),
-            );
-            enemy2.set_weapon(HandType::MainHand, SWORD);
+            ));
+            enemies.push(Character::new(
+                bot(BotBehaviour::Normal, 4.0),
+                "Enemy 1",
+                PortraitId::Ghoul,
+                SpriteId::Ghoul,
+                Attributes::new(1, 1, 1, 1),
+                *enemy_positions[&2].choose().unwrap(),
+            ));
+            enemies.push(Character::new(
+                bot(BotBehaviour::Normal, 4.0),
+                "Enemy 1",
+                PortraitId::Skeleton,
+                SpriteId::Ogre,
+                Attributes::new(1, 1, 1, 1),
+                *enemy_positions[&3].choose().unwrap(),
+            ));
+            enemies.push(Character::new(
+                bot(BotBehaviour::Normal, 4.0),
+                "Enemy 1",
+                PortraitId::Skeleton,
+                SpriteId::Magi,
+                Attributes::new(1, 1, 1, 1),
+                *enemy_positions[&4].choose().unwrap(),
+            ));
 
-            characters.extend_from_slice(&[enemy1, enemy2]);
+            characters.extend_from_slice(&enemies);
         }
     }
 

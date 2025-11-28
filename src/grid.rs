@@ -38,7 +38,7 @@ use crate::{
     game_ui_components::ActionPointsRow,
     game_ui_connection::DEBUG,
     pathfind::{build_path_from_chart, ChartNode, PathfindGrid},
-    textures::{draw_terrain, SpriteId, TerrainId},
+    textures::{character_sprite_height, draw_terrain, SpriteId, TerrainId},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -540,7 +540,7 @@ impl GameGrid {
                 let remaining = motion.remaining_duration / motion.duration;
                 let remaining = (remaining * 4.0).floor() / 4.0;
                 if remaining < 0.25 {
-                    y += 2.0;
+                    y += 1.0;
                 } else if remaining < 0.5 {
                     params.rotation = -0.05;
                 } else if remaining < 0.75 {
@@ -569,6 +569,9 @@ impl GameGrid {
             WHITE,
             params.clone(),
         );
+
+        //TODO
+        draw_rectangle(x, y, 5.0, 5.0, MAGENTA);
 
         if let Some(weapon) = character.weapon(HandType::MainHand) {
             if let Some(texture) = weapon.sprite {
@@ -1556,7 +1559,11 @@ impl GameGrid {
         discrete_healthbar: bool,
     ) {
         let (x, y) = self.character_screen_pos(character);
-        let y = y - 5.0;
+        let sprite_h = character_sprite_height(character.sprite);
+        let texture_h = 32.0;
+
+        let y = y - self.cell_w * 0.3;
+        let y = y + (texture_h - sprite_h as f32) / texture_h * self.cell_w;
 
         let margin = 2.0;
         let health_w = (self.cell_w - 10.0).min(90.0);
