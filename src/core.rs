@@ -4193,7 +4193,9 @@ impl Character {
     pub fn attack_action(&self) -> Option<AttackAction> {
         for action in self.known_actions.borrow().iter() {
             if let BaseAction::Attack(attack_action) = action {
-                return Some(*attack_action);
+                if self.weapon(attack_action.hand).is_some() {
+                    return Some(*attack_action);
+                }
             }
         }
         None

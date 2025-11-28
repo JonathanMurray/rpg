@@ -702,9 +702,6 @@ impl GameGrid {
         }) = ui_state
         {
             self.draw_movement_path_background();
-            if !selected_movement_path.is_empty() {
-                self.draw_movement_path(selected_movement_path, false);
-            }
         }
 
         for character in self.characters.iter() {
@@ -754,6 +751,17 @@ impl GameGrid {
                 if within_range_squared(range.squared(), active_char_pos, character.pos()) {
                     self.draw_character_label(character, false);
                 }
+            }
+        }
+
+        if let UiState::ConfiguringAction(ConfiguredAction::Move {
+            selected_movement_path,
+            ..
+        }) = ui_state
+        {
+            if !selected_movement_path.is_empty() {
+                println!("Draw movement selected");
+                self.draw_movement_path(selected_movement_path, false);
             }
         }
 
@@ -966,6 +974,15 @@ impl GameGrid {
             _ => {}
         }
 
+        if !matches!(
+            ui_state,
+            UiState::ReactingToMovementAttackOpportunity { .. }
+        ) {
+            let active_char = self.characters.get(self.active_character_id);
+            let draw_action_points = !active_char.player_controlled();
+            self.draw_character_label(active_char, draw_action_points);
+        }
+
         if is_mouse_within_grid && receptive_to_input {
             for character in self.characters.iter() {
                 if character.pos() == mouse_grid_pos {
@@ -1071,12 +1088,12 @@ impl GameGrid {
             let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement)
                 && hovered_character_id.is_none()
             {
-                self.routes.get(&mouse_grid_pos)
+                self.routes.get(&mouse_grid_pos).copied()
             } else {
                 None
             };
 
-            if let Some(hovered_route) = hovered_move_route {
+            if let Some(hovered_route) = &hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
                     let path = build_path_from_chart(&self.routes, active_char_pos, mouse_grid_pos);
                     self.draw_movement_path(&path.positions, true);
@@ -1324,15 +1341,6 @@ impl GameGrid {
                 ENEMYS_TARGET_CROSSHAIR_COLOR,
                 7.0,
             );
-        }
-
-        if !matches!(
-            ui_state,
-            UiState::ReactingToMovementAttackOpportunity { .. }
-        ) {
-            let active_char = self.characters.get(self.active_character_id);
-            let draw_action_points = !active_char.player_controlled();
-            self.draw_character_label(active_char, draw_action_points);
         }
 
         if let Some(id) = hovered_character_id {
@@ -1873,17 +1881,10 @@ impl GameGrid {
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
         for (pos, route) in &self.routes {
-            //if route.distance_from_start < self.movement_range.speed {
-
             if self.is_within_grid(*pos) && *pos != active_char_pos {
                 let color = MOVEMENT_PREVIEW_GRID_COLOR;
-                // color.g -= route.distance_from_start * 0.2;
-                // color.b -= route.distance_from_start * 0.2;
-
-                //self.draw_cell_outline(*pos, MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR, 1.0, 2.0);
                 self.fill_cell(*pos, color, self.cell_w / 20.0);
             }
-            //}
         }
     }
 
