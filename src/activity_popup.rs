@@ -432,12 +432,10 @@ impl ActivityPopup {
         else {
             panic!()
         };
-        dbg!(cost);
 
         if let Some(slider) = self.movement_cost_slider.as_mut() {
             let character = self.characters.get(self.relevant_character_id);
             let max_cost = character.stamina.current();
-            dbg!(max_cost);
             slider.set_max_allowed(max_cost);
 
             assert!(cost <= max_cost);

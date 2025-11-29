@@ -11,14 +11,15 @@ use rand::{
 };
 
 use crate::{
-    bot::{BotBehaviour, MagiBehaviour},
+    bot::{BotBehaviour, FighterBehaviour, MagiBehaviour},
     core::{
         Ability, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters,
         HandType, Position,
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BOW, BRACE,
-        CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        CHAIN_MAIL, ENEMY_BRACE, ENEMY_SELF_HEAL, ENEMY_TACKLE, LEATHER_ARMOR, MAGI_HEAL,
+        MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::PathfindGrid,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -43,6 +44,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::EliteOgre => "map_elite.txt",
         FightId::EliteMagi => "map_elite2.txt",
         FightId::Test => "map_test.txt",
+        FightId::VerticalSlice => "map_vertical_slice.txt",
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
     let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
@@ -120,7 +122,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
             characters.extend_from_slice(&[melee, ranged]);
         }
-
         FightId::EasyGuard => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
@@ -138,7 +139,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
             characters.extend_from_slice(&[tanky]);
         }
-
         FightId::EasyCluster => {
             for i in 0..4 {
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -158,7 +158,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(enemy);
             }
         }
-
         FightId::EasySurrounded => {
             for i in 0..4 {
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -175,7 +174,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(enemy);
             }
         }
-
         FightId::EasyRiver => {
             for i in 0..6 {
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -197,10 +195,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(enemy);
             }
         }
-
         FightId::EliteOgre => {
             let pos = *enemy_positions[&0].choose().unwrap();
-            let tanky = Character::new(
+            let ogre = Character::new(
                 bot(BotBehaviour::Normal, 4.0),
                 "Ogre",
                 PortraitId::Ogre,
@@ -208,11 +205,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Attributes::new(4, 1, 1, 1),
                 pos,
             );
-            tanky.health.change_max_value_to(25);
-            tanky.armor_piece.set(Some(CHAIN_MAIL));
-            tanky.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
-            //tanky.base_move_speed.set(0.7);
-            characters.push(tanky);
+            ogre.health.change_max_value_to(25);
+            ogre.armor_piece.set(Some(CHAIN_MAIL));
+            ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
+            characters.push(ogre);
 
             for i in 1..5 {
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -228,7 +224,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(archer);
             }
         }
-
         FightId::EliteMagi => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let magi = Character::new(
@@ -270,7 +265,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(tanky);
             }
         }
-
         FightId::Test => {
             let mut enemies = vec![];
 
@@ -324,6 +318,93 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             }
 
             characters.extend_from_slice(&enemies);
+        }
+        FightId::VerticalSlice => {
+            for i in 0..=2 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let ghoul = Character::new(
+                    bot(BotBehaviour::Fighter(Default::default()), 4.0),
+                    "Ghoul",
+                    PortraitId::Ghoul,
+                    SpriteId::Ghoul,
+                    Attributes::new(1, 2, 1, 1),
+                    pos,
+                );
+                ghoul.health.change_max_value_to(14 + i);
+                ghoul.armor_piece.set(Some(SHIRT));
+                ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+                if i % 2 == 0 {
+                    ghoul.set_shield(BAD_SMALL_SHIELD);
+                    ghoul.learn_ability(ENEMY_BRACE);
+                }
+                characters.push(ghoul);
+            }
+            for i in 3..=4 {
+                // TODO these should have archer behaviour, i.e. run away from melee
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let archer = Character::new(
+                    bot(BotBehaviour::Fighter(Default::default()), 3.0),
+                    "Ghoul",
+                    PortraitId::Ghoul,
+                    SpriteId::Ghoul,
+                    Attributes::new(1, 2, 2, 1),
+                    pos,
+                );
+                archer.health.change_max_value_to(12);
+                archer.set_weapon(HandType::MainHand, BAD_BOW);
+                characters.push(archer);
+            }
+            for i in 5..=5 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let skeleton = Character::new(
+                    bot(BotBehaviour::Fighter(Default::default()), 4.0),
+                    "Skeleton",
+                    PortraitId::Skeleton,
+                    SpriteId::Skeleton,
+                    Attributes::new(3, 3, 3, 1),
+                    pos,
+                );
+                skeleton.health.change_max_value_to(18 + i - 5);
+                skeleton.armor_piece.set(Some(LEATHER_ARMOR));
+                skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
+                skeleton.set_shield(BAD_SMALL_SHIELD);
+                skeleton.learn_ability(ENEMY_BRACE);
+                characters.push(skeleton);
+            }
+            for i in 6..=7 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let ghoul = Character::new(
+                    bot(BotBehaviour::Fighter(Default::default()), 4.0),
+                    "Ghoul",
+                    PortraitId::Ghoul,
+                    SpriteId::Ghoul,
+                    Attributes::new(1, 2, 1, 1),
+                    pos,
+                );
+                ghoul.health.change_max_value_to(14 + i - 6);
+                ghoul.armor_piece.set(Some(SHIRT));
+                ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+                if i % 2 == 0 {
+                    ghoul.set_weapon(HandType::MainHand, BAD_DAGGER);
+                }
+                characters.push(ghoul);
+            }
+            for i in 8..=8 {
+                let pos = *enemy_positions[&i].choose().unwrap();
+                let ogre = Character::new(
+                    bot(BotBehaviour::Normal, 3.5),
+                    "Ogre",
+                    PortraitId::Ogre,
+                    SpriteId::Ogre,
+                    Attributes::new(4, 2, 1, 1),
+                    pos,
+                );
+                ogre.health.change_max_value_to(25);
+                ogre.armor_piece.set(Some(CHAIN_MAIL));
+                ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
+                ogre.learn_ability(ENEMY_TACKLE);
+                characters.push(ogre);
+            }
         }
     }
 
@@ -412,4 +493,5 @@ pub enum FightId {
     EliteOgre,
     EliteMagi,
     Test,
+    VerticalSlice,
 }

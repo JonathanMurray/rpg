@@ -1,0 +1,16 @@
++----------------------------
+BBBBBBBBBBBBBBBBBBBB
+BRR   WWW          B
+BR     WW          B
+B      WW          B
+B      W    R     SB
+B  S        R3    SB
+B  PP      5    8 SB
+B  P   WW          B
+B           R4     B
+B            RR    B
+B                  B
+B   0 2         67 B
+BB   1   S        BB
+ BBBBBBBBBBBBBBBBBB
++----------------------------

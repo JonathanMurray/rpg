@@ -25,7 +25,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{BaseAction, Character, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::IconId,
+    textures::{IconId, StatusId},
 };
 
 pub struct TargetUi {
@@ -40,10 +40,16 @@ pub struct TargetUi {
     button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
+    status_textures: HashMap<StatusId, Texture2D>,
 }
 
 impl TargetUi {
-    pub fn new(big_font: Font, simple_font: Font, icons: HashMap<IconId, Texture2D>) -> Self {
+    pub fn new(
+        big_font: Font,
+        simple_font: Font,
+        icons: HashMap<IconId, Texture2D>,
+        status_textures: HashMap<StatusId, Texture2D>,
+    ) -> Self {
         Self {
             target: Default::default(),
             big_font,
@@ -54,6 +60,7 @@ impl TargetUi {
             button_events: Default::default(),
             hovered_btn: Default::default(),
             buttons: Default::default(),
+            status_textures,
         }
     }
 
@@ -79,8 +86,11 @@ impl TargetUi {
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
-            let conditions_list =
-                ConditionsList::new(self.simple_font.clone(), char.condition_infos());
+            let conditions_list = ConditionsList::new(
+                self.simple_font.clone(),
+                char.condition_infos(),
+                self.status_textures.clone(),
+            );
 
             let armor_text_line = TextLine::new(
                 format!("Armor: {}", char.protection_from_armor()),
@@ -195,46 +205,47 @@ impl TargetUi {
                 actions_row = Some(row);
             }
 
-            let movement_text_line = TextLine::new(
-                format!("Movement: {:.1}", char.move_speed()),
-                16,
-                LIGHTGRAY,
-                Some(self.simple_font.clone()),
-            );
-            let attack_text_line = TextLine::new(
-                format!("Attack mod: +{}", char.attack_modifier(HandType::MainHand)),
-                16,
-                LIGHTGRAY,
-                Some(self.simple_font.clone()),
-            );
-            let mut detailed_stats_lines = vec![
-                Element::Text(movement_text_line),
-                Element::Text(attack_text_line),
-            ];
-            if bot_using_spells {
-                detailed_stats_lines.push(Element::Text(TextLine::new(
-                    format!("Spell mod: +{}", char.spell_modifier()),
+            let mut rows = vec![Element::Container(centered_list)];
+
+            if !char.player_controlled() {
+                let movement_text_line = TextLine::new(
+                    format!("Movement: {:.1}", char.move_speed()),
                     16,
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),
-                )));
-            }
+                );
+                let attack_text_line = TextLine::new(
+                    format!("Attack mod: +{}", char.attack_modifier(HandType::MainHand)),
+                    16,
+                    LIGHTGRAY,
+                    Some(self.simple_font.clone()),
+                );
+                let mut detailed_stats_lines = vec![
+                    Element::Text(movement_text_line),
+                    Element::Text(attack_text_line),
+                ];
+                if bot_using_spells {
+                    detailed_stats_lines.push(Element::Text(TextLine::new(
+                        format!("Spell mod: +{}", char.spell_modifier()),
+                        16,
+                        LIGHTGRAY,
+                        Some(self.simple_font.clone()),
+                    )));
+                }
 
-            let detailed_stats = Container {
-                layout_dir: LayoutDirection::Vertical,
-                children: detailed_stats_lines,
-                margin: 7.0,
-                style: Style {
-                    padding: 5.0,
+                let detailed_stats = Container {
+                    layout_dir: LayoutDirection::Vertical,
+                    children: detailed_stats_lines,
+                    margin: 7.0,
+                    style: Style {
+                        padding: 5.0,
+                        ..Default::default()
+                    },
                     ..Default::default()
-                },
-                ..Default::default()
-            };
+                };
 
-            let mut rows = vec![
-                Element::Container(centered_list),
-                Element::Container(detailed_stats),
-            ];
+                rows.push(Element::Container(detailed_stats));
+            }
 
             if let Some(actions_row) = actions_row {
                 rows.push(actions_row);

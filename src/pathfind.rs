@@ -42,7 +42,10 @@ impl PathfindGrid {
     pub fn set_blocked(&self, pos: Position, blocked: bool) {
         let mut positions = self.blocked_positions.borrow_mut();
         if blocked {
-            assert!(!positions.contains(&pos), "{positions:?}, {pos:?}");
+            assert!(
+                !positions.contains(&pos),
+                "{pos:?} is already blocked: {positions:?}"
+            );
             positions.insert(pos);
         } else {
             assert!(positions.contains(&pos));

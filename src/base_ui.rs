@@ -369,11 +369,24 @@ impl Drawable for TextLine {
 pub struct Rectangle {
     pub size: (f32, f32),
     pub style: Style,
+    pub texture: Option<Texture2D>,
 }
 
 impl Drawable for Rectangle {
     fn draw(&self, x: f32, y: f32) {
         self.style.draw(x, y, self.size);
+        if let Some(texture) = &self.texture {
+            draw_texture_ex(
+                texture,
+                x,
+                y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(self.size.into()),
+                    ..Default::default()
+                },
+            );
+        }
     }
 
     fn size(&self) -> (f32, f32) {

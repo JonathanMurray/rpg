@@ -75,6 +75,41 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum StatusId {
+    PlaceholderNegative,
+    PlaceholderPositive,
+
+    Burning,
+    Protected,
+    Dazed,
+    Bleeding,
+    Healing,
+    Blinded,
+    Exposed,
+    Slowed,
+    NearDeath,
+    Dead
+}
+
+pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
+    load_and_init_textures(vec![
+        (StatusId::PlaceholderNegative, "status_placeholder_negative.png"),
+        (StatusId::PlaceholderPositive, "status_placeholder_positive.png"),
+        (StatusId::Burning, "status_burning.png"),
+        (StatusId::Protected, "status_protected.png"),
+        (StatusId::Dazed, "status_dazed.png"),
+        (StatusId::Bleeding, "status_bleeding.png"),
+        (StatusId::Healing, "status_healing.png"),
+        (StatusId::Blinded, "status_blinded.png"),
+        (StatusId::Exposed, "status_exposed.png"),
+        (StatusId::Slowed, "status_slowed.png"),
+        (StatusId::NearDeath, "status_near_death.png"),
+        (StatusId::Dead, "status_dead.png"),
+    ])
+    .await
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,
     SearingLight,
@@ -87,12 +122,14 @@ pub enum IconId {
     NecroticInfluence,
     Parry,
     Sidestep,
+    Tackle,
     ShieldBash,
     Rage,
     CrushingStrike,
     CarefulAim,
     CripplingShot,
     TrueStrike,
+
     SpellAdvantage,
     Banshee,
     Dualcast,
@@ -142,6 +179,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::EndTurn, "endturn_icon.png"),
         (IconId::Parry, "parry_icon.png"),
         (IconId::Sidestep, "sidestep_icon.png"),
+        (IconId::Tackle, "shove_icon.png"),
         (IconId::ShieldBash, "shieldbash_icon.png"),
         (IconId::Rage, "rage_icon.png"),
         (IconId::CrushingStrike, "crushing_strike_icon.png"),

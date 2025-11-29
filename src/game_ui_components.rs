@@ -26,9 +26,9 @@ use crate::{
         draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
         Rectangle, Style, TextLine,
     },
-    core::{Character, CharacterId, Characters, CoreGame, MAX_ACTION_POINTS},
+    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::draw_cross,
-    textures::PortraitId,
+    textures::{PortraitId, StatusId},
 };
 
 pub struct CharacterPortraits {
@@ -319,6 +319,7 @@ impl PlayerPortraits {
         active_id: CharacterId,
         font: Font,
         portrait_textures: HashMap<PortraitId, Texture2D>,
+        status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
@@ -333,6 +334,7 @@ impl PlayerPortraits {
                         character,
                         font.clone(),
                         texture,
+                        status_textures.clone(),
                     ))),
                 );
             }
@@ -423,7 +425,7 @@ impl PlayerPortraits {
         self.set_selected_id(*new_character_id);
     }
 
-    pub fn set_statuses(&mut self, character_id: CharacterId, statuses: Vec<bool>) {
+    pub fn set_statuses(&mut self, character_id: CharacterId, statuses: &[ConditionInfo]) {
         if let Some(portrait) = self.portraits.get_mut(&character_id) {
             portrait.borrow_mut().set_statuses(statuses);
         }
@@ -439,33 +441,33 @@ struct PlayerCharacterPortrait {
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
     status_column: Element,
-    icons: Vec<Rc<RefCell<Rectangle>>>,
+    status_rects: Vec<Rc<RefCell<Rectangle>>>,
+    status_textures: HashMap<StatusId, Texture2D>,
 }
 
 impl PlayerCharacterPortrait {
-    fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
+    fn new(
+        character: &Rc<Character>,
+        font: Font,
+        texture: Texture2D,
+        status_textures: HashMap<StatusId, Texture2D>,
+    ) -> Self {
         let mut text = TextLine::new(character.name, 20, WHITE, Some(font));
         text.set_depth(BLACK, 2.0);
 
-        let mut icons = vec![];
-        let mut icon_elements = vec![];
-        for i in 0..6 {
-            let color = if i < 3 {
-                Color::new(0.3, 0.7, 0.3, 0.5)
-            } else if i < 5 {
-                Color::new(0.7, 0.3, 0.3, 0.5)
-            } else {
-                BLACK
-            };
-            let icon = Rc::new(RefCell::new(Rectangle {
+        let mut status_rects = vec![];
+        let mut status_elements = vec![];
+        for _ in 0..6 {
+            let rect = Rc::new(RefCell::new(Rectangle {
                 size: (STATUS_ICON_W, STATUS_ICON_W),
                 style: Style {
-                    background_color: Some(color),
+                    background_color: Some(BLACK),
                     ..Default::default()
                 },
+                texture: None,
             }));
-            icons.push(icon.clone());
-            icon_elements.push(Element::RcRefCell(icon));
+            status_rects.push(rect.clone());
+            status_elements.push(Element::RcRefCell(rect));
         }
 
         let status_column = Element::Container(Container {
@@ -476,7 +478,7 @@ impl PlayerCharacterPortrait {
                 padding: 2.0,
                 ..Default::default()
             },
-            children: icon_elements,
+            children: status_elements,
             ..Default::default()
         });
 
@@ -489,18 +491,25 @@ impl PlayerCharacterPortrait {
             has_been_clicked: Cell::new(false),
             texture,
             status_column,
-            icons,
+            status_rects,
+            status_textures,
         }
     }
 
-    fn set_statuses(&mut self, statuses: Vec<bool>) {
-        for (i, icon) in self.icons.iter().enumerate() {
-            let color = match statuses.get(i) {
-                Some(true) => Color::new(0.3, 0.7, 0.3, 0.5),
-                Some(false) => Color::new(0.7, 0.3, 0.3, 0.5),
-                None => BLACK,
+    fn set_statuses(&mut self, statuses: &[ConditionInfo]) {
+        for (i, status_rect) in self.status_rects.iter().enumerate() {
+            match statuses.get(i) {
+                Some(info) => {
+                    status_rect.borrow_mut().style.background_color = Some(BLACK);
+
+                    status_rect.borrow_mut().texture =
+                        Some(self.status_textures[&info.condition.status_icon()].clone());
+                }
+                None => {
+                    status_rect.borrow_mut().style.background_color = Some(BLACK);
+                    status_rect.borrow_mut().texture = None;
+                }
             };
-            icon.borrow_mut().style.background_color = Some(color);
         }
     }
 }

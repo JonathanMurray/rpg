@@ -34,9 +34,7 @@ use macroquad::{
 };
 
 use rpg::action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent};
-use rpg::base_ui::{
-    draw_text_rounded, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-};
+use rpg::base_ui::{draw_text_rounded, Container, Drawable, Element, LayoutDirection, Style};
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{

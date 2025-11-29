@@ -16,7 +16,7 @@ use crate::data::{PassiveSkill, ADRENALIN_POTION};
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::PathfindGrid;
-use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId};
+use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::util::are_adjacent;
 
 pub type Position = (i32, i32);
@@ -56,7 +56,7 @@ impl CoreGame {
 
     pub async fn run(mut self) -> Vec<Character> {
         for character in self.characters.iter() {
-            character.update_encumbrance();
+            character.update_player_encumbrance();
             character.action_points.current.set(ACTION_POINTS_PER_TURN);
             character.regain_movement();
             character.on_health_changed();
@@ -95,10 +95,6 @@ impl CoreGame {
             let action = match action_or_character_change {
                 ActionOrSwitchTo::Action(action) => action,
                 ActionOrSwitchTo::SwitchTo(character_id) => {
-                    println!(
-                        "SWITCHING CHAR FROM {} TO {}",
-                        self.active_character_id, character_id
-                    );
                     assert!(self.active_character_id != character_id);
                     assert!(!self
                         .characters
@@ -187,8 +183,6 @@ impl CoreGame {
                 self.active_character_id = self.characters.next_id(self.active_character_id);
                 self.notify_ui_of_new_active_char().await;
 
-                let index_in_round = self.active_character().index_in_round.unwrap();
-
                 let new_round = self
                     .characters
                     .iter()
@@ -203,14 +197,7 @@ impl CoreGame {
                 }
 
                 let game_time = self.current_time();
-                dbg!(
-                    self.round_index,
-                    self.round_length,
-                    index_in_round,
-                    game_time
-                );
 
-                println!("Expiring character conditions...");
                 for character in self.characters.iter() {
                     character.set_current_game_time(game_time);
                 }
@@ -467,7 +454,6 @@ impl CoreGame {
                 positions,
                 total_distance,
             } => {
-                dbg!("Action::Move", extra_cost, total_distance);
                 let character = self.active_character();
                 //character.action_points.spend(extra_cost);
                 character.stamina.spend(extra_cost);
@@ -1889,6 +1875,7 @@ impl CoreGame {
             }
         }
 
+        /*
         if skip_attack_exertion {
             detail_lines.push("  The attack did not lead to exertion (true hit)".to_string());
         } else {
@@ -1904,6 +1891,7 @@ impl CoreGame {
             };
             detail_lines.push(format!("  The attack led to exertion ({})", exertion));
         }
+         */
 
         if weapon.is_melee() {
             if let Some(previously_engaged) = attacker.engagement_target.take() {
@@ -2561,7 +2549,6 @@ impl Characters {
 
     fn next_id(&self, current_id: CharacterId) -> CharacterId {
         for ch in self.iter() {
-            dbg!(ch.name, &ch.has_taken_a_turn_this_round);
             if !ch.has_taken_a_turn_this_round.get() {
                 return ch.id();
             }
@@ -2817,7 +2804,7 @@ impl Condition {
             OffHandExertion => "-x on further similar actions",
             Encumbered => "-x to Evasion and -x to dice rolls",
             NearDeath => "< 25% HP: Reduced AP, disadvantage on dice rolls, enemies have advantage",
-            Dead => "This character has reached 0 HP and is dead",
+            Dead => "This character is dead",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn",
             BloodRage => "+3 attack modifier (from passive skill)",
             ArcaneSurge => "+3 spell modifier (from passive skill)",
@@ -2832,11 +2819,11 @@ impl Condition {
         use Condition::*;
         match self {
             Protected => true,
+            Braced => true,
             Dazed => false,
             Bleeding => false,
             Burning => false,
             Blinded => false,
-            Braced => true,
             Raging => true,
             Distracted => false,
             Weakened => false,
@@ -2857,6 +2844,38 @@ impl Condition {
             HealthPotionHealing => true,
         }
     }
+
+    pub const fn has_cumulative_stacking(&self) -> bool {
+        use Condition::*;
+        match self {
+            Bleeding | Burning => true,
+            _ => false,
+        }
+    }
+
+    pub const fn status_icon(&self) -> StatusId {
+        use Condition::*;
+        match self {
+            Protected => StatusId::Protected,
+            Braced => StatusId::Protected,
+            Dazed => StatusId::Dazed,
+            Bleeding => StatusId::Bleeding,
+            Burning => StatusId::Burning,
+            HealthPotionHealing => StatusId::Healing,
+            Blinded => StatusId::Blinded,
+            Exposed => StatusId::Exposed,
+            Slowed => StatusId::Slowed,
+            NearDeath => StatusId::NearDeath,
+            Dead => StatusId::Dead,
+            _ => {
+                if self.is_positive() {
+                    StatusId::PlaceholderPositive
+                } else {
+                    StatusId::PlaceholderNegative
+                }
+            }
+        }
+    }
 }
 
 const PROTECTED_ARMOR_BONUS: u32 = 1;
@@ -2868,6 +2887,7 @@ const SLOWED_AP_PENALTY: u32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
+    pub condition: Condition,
     pub name: &'static str,
     pub description: &'static str,
     pub is_positive: bool,
@@ -2913,7 +2933,7 @@ impl ApplyCondition {
 }
 
 #[derive(Debug, Clone, Default)]
-struct Conditions {
+pub struct Conditions {
     map: IndexMap<Condition, ConditionState>,
 }
 
@@ -2946,7 +2966,6 @@ impl Conditions {
                 .ends_at
                 .map(|ends_at| ends_at > game_time)
                 .unwrap_or(true);
-            println!("{:?}: {:?} {:?}", condition, state, keep);
             keep
         });
     }
@@ -3131,6 +3150,10 @@ impl Ability {
     pub fn requires_shield(&self) -> bool {
         matches!(self.requirement, Some(EquipmentRequirement::Shield))
     }
+
+    pub fn targets_single_enemy(&self) -> bool {
+        matches!(self.target, AbilityTarget::Enemy { .. })
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3141,6 +3164,7 @@ pub enum EquipmentRequirement {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityId {
+    Tackle,
     ShieldBash,
     SweepAttack,
     LungeAttack,
@@ -3614,7 +3638,7 @@ pub struct Character {
     main_hand: Cell<Hand>,
     off_hand: Cell<Hand>,
     pub arrows: Cell<Option<ArrowStack>>,
-    conditions: RefCell<Conditions>,
+    pub conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub stamina: NumberedResource,
     pub known_attack_enhancements: Vec<AttackEnhancement>,
@@ -3756,18 +3780,13 @@ impl Character {
     }
 
     fn regain_movement(&self) {
-        dbg!((self.name, self.move_speed()));
         self.remaining_movement.set(self.move_speed());
     }
 
     fn spend_movement(&self, distance: f32) {
-        dbg!((self.name, &self.remaining_movement));
         let remaining = self.remaining_movement.get();
         assert!(distance > 0.0 && distance <= remaining);
-        dbg!(("Spend movement", distance, remaining));
         self.remaining_movement.set(remaining - distance);
-        dbg!(&self.remaining_movement);
-        println!("end of spend_movement()");
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
@@ -3937,6 +3956,7 @@ impl Character {
                 (remaining as f32 / self.round_length.unwrap() as f32).ceil() as u32
             });
             let info = ConditionInfo {
+                condition: *condition,
                 name: condition.name(),
                 description: condition.description(),
                 is_positive: condition.is_positive(),
@@ -4020,11 +4040,13 @@ impl Character {
         }
     }
 
-    fn update_encumbrance(&self) {
-        let encumbrance = self.equipment_weight().saturating_sub(self.capacity.get());
-        self.conditions
-            .borrow_mut()
-            .set_stacks(Condition::Encumbered, encumbrance as u32);
+    fn update_player_encumbrance(&self) {
+        if self.player_controlled() {
+            let encumbrance = self.equipment_weight().saturating_sub(self.capacity.get());
+            self.conditions
+                .borrow_mut()
+                .set_stacks(Condition::Encumbered, encumbrance as u32);
+        }
     }
 
     fn has_any_consumable_in_inventory(&self) -> bool {
@@ -4034,7 +4056,7 @@ impl Character {
     }
 
     fn on_changed_equipment(&self) {
-        self.update_encumbrance();
+        self.update_player_encumbrance();
 
         self.changed_equipment_listeners
             .borrow_mut()
@@ -4295,6 +4317,32 @@ impl Character {
             }
             BaseAction::EndTurn => true,
         }
+    }
+
+    pub fn usable_abilities(&self) -> Vec<Ability> {
+        return self
+            .known_actions
+            .borrow()
+            .iter()
+            .filter(|a| self.can_use_action(**a))
+            .filter_map(|action| match action {
+                BaseAction::UseAbility(ability) => Some(*ability),
+                _ => None,
+            })
+            .collect();
+    }
+
+    pub fn usable_single_target_abilities(&self) -> Vec<Ability> {
+        return self
+            .known_actions
+            .borrow()
+            .iter()
+            .filter(|a| self.can_use_action(**a))
+            .filter_map(|action| match action {
+                BaseAction::UseAbility(ability) if ability.targets_single_enemy() => Some(*ability),
+                _ => None,
+            })
+            .collect();
     }
 
     pub fn known_attack_enhancements(
@@ -4941,7 +4989,12 @@ impl Character {
                 state.ends_at = Some(state.ends_at.unwrap().max(ends_at));
             }
             if let Some(stacks) = stacks {
-                *state.stacks.as_mut().unwrap() += stacks;
+                let current = state.stacks.as_mut().unwrap();
+                if condition.has_cumulative_stacking() {
+                    *current += stacks;
+                } else {
+                    *current = (*current).max(stacks);
+                }
             }
         } else {
             if condition == Condition::Hindered {

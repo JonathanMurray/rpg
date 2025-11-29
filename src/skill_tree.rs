@@ -38,9 +38,7 @@ use crate::action_button::{
     button_action_tooltip, draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction,
     ButtonHovered, InternalUiEvent, Side, TooltipPositionPreference,
 };
-use crate::base_ui::{
-    draw_text_rounded, Container, Drawable, Element, LayoutDirection, Rectangle, Style,
-};
+use crate::base_ui::{draw_text_rounded, Container, Drawable, Element, LayoutDirection, Style};
 use crate::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use crate::chest_scene::run_chest_loop;
 use crate::core::{

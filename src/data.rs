@@ -1,6 +1,6 @@
 use std::default;
 
-use macroquad::color::{BLACK, BLUE, BROWN, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
+use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
 
 use crate::{
     core::{
@@ -393,6 +393,37 @@ pub const SHIELD_BASH: Ability = Ability {
         }),
         impact_area: None,
     },
+    animation_color: GRAY,
+    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
+};
+
+pub const ENEMY_TACKLE: Ability = Ability {
+    id: AbilityId::Tackle,
+    name: "Tackle",
+    description: "",
+    icon: IconId::Tackle,
+    action_point_cost: 2,
+    stamina_cost: 0,
+    mana_cost: 0,
+    requirement: None,
+    possible_enhancements: [None, None, None],
+
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: Some(AbilityDamage::AtLeast(1)),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Dazed,
+                    duration_rounds: Some(1),
+                    stacks: None,
+                })),
+                None,
+            ]),
+        }),
+        impact_area: None,
+    },
     animation_color: RED,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
 };
@@ -661,6 +692,35 @@ pub const LUNGE_ATTACK: Ability = Ability {
     animation_color: MAGENTA,
 };
 
+// TODO Should not be possible to use Brace if you already have that number of Protected stacks
+pub const ENEMY_BRACE: Ability = Ability {
+    id: AbilityId::Brace,
+    name: "Brace",
+    description: "",
+    icon: IconId::Brace,
+    action_point_cost: 1,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: Some(EquipmentRequirement::Shield),
+    roll: None,
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: Some(AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: Some(2),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
+        }),
+    },
+    animation_color: MAGENTA,
+};
+
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
@@ -744,7 +804,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     description: "Shackle an enemy's mind, slowing them and lowering their defenses",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
-    mana_cost: 1,
+    mana_cost: 2,
     stamina_cost: 0,
     requirement: None,
 
@@ -1066,6 +1126,35 @@ pub const HEALING_NOVA: Ability = Ability {
             }),
         }),
         self_effect: None,
+    },
+    animation_color: GREEN,
+};
+
+pub const ENEMY_SELF_HEAL: Ability = Ability {
+    id: AbilityId::SelfHeal,
+    name: "Self heal",
+    description: "Restore the caster's health and grants protection",
+    icon: IconId::PlusPlus,
+    action_point_cost: 2,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: Some(AbilityPositiveEffect {
+            healing: 1,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: Some(1),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
+        }),
     },
     animation_color: GREEN,
 };

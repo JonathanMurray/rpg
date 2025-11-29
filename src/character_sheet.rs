@@ -15,7 +15,8 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::base_ui::{draw_text_rounded, Drawable};
+use crate::base_ui::{draw_text_rounded, Drawable, Rectangle};
+use crate::conditions_ui::ConditionsList;
 use crate::core::EquipmentSlotRole;
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
@@ -39,6 +40,7 @@ pub struct CharacterSheet {
     top_bar_h: f32,
 
     pub drag: Rc<RefCell<Option<EquipmentDrag>>>,
+    pub conditions_list: Rc<RefCell<ConditionsList>>,
 }
 
 impl CharacterSheet {
@@ -51,6 +53,7 @@ impl CharacterSheet {
         attack_enhancement_buttons: Vec<Rc<ActionButton>>,
         ability_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
         passive_skill_buttons: Vec<Rc<ActionButton>>,
+        conditions_list: ConditionsList,
     ) -> Self {
         let spell_book_rows = build_spell_book(
             font,
@@ -62,7 +65,19 @@ impl CharacterSheet {
             450.0,
         );
 
+        let conditions_list = Rc::new(RefCell::new(conditions_list));
+
         let stats_table = build_character_stats_table(font, Rc::clone(&character));
+
+        let stats_column = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            margin: 5.0,
+            children: vec![
+                Element::Box(Box::new(stats_table)),
+                Element::RcRefCell(conditions_list.clone()),
+            ],
+            ..Default::default()
+        });
 
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
             font,
@@ -98,7 +113,7 @@ impl CharacterSheet {
                     ],
                     ..Default::default()
                 }),
-                Element::Box(Box::new(stats_table)),
+                stats_column,
                 Element::RcRefCell(equipment_section.clone()),
             ],
             ..Default::default()
@@ -138,6 +153,7 @@ impl CharacterSheet {
             equipment_section,
 
             drag: Default::default(),
+            conditions_list,
         }
     }
 

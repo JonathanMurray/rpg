@@ -1,4 +1,10 @@
-use std::{cmp::Ordering, collections::HashMap, f32::consts::PI, iter, rc::Rc};
+use std::{
+    cmp::Ordering,
+    collections::{HashMap, HashSet},
+    f32::consts::PI,
+    iter,
+    rc::Rc,
+};
 
 use indexmap::IndexMap;
 use macroquad::{
@@ -7,6 +13,7 @@ use macroquad::{
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
+    texture::draw_texture,
     window::{screen_height, screen_width},
 };
 use rand::{random_range, rng, Rng};
@@ -29,8 +36,9 @@ use crate::{
     bot::convert_path_to_move_action,
     core::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
-        BaseAction, Character, Goodness, Position,
+        BaseAction, Character, Condition, Goodness, Position,
     },
+    data::BOW,
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
     },
@@ -38,7 +46,7 @@ use crate::{
     game_ui_components::ActionPointsRow,
     game_ui_connection::DEBUG,
     pathfind::{build_path_from_chart, ChartNode, PathfindGrid},
-    textures::{character_sprite_height, draw_terrain, SpriteId, TerrainId},
+    textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -64,7 +72,7 @@ const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
 const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
-const SELECTED_CHARACTER_COLOR: Color = WHITE;
+const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
@@ -176,6 +184,7 @@ pub struct GameGrid {
 
     players_inspect_target: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
+    status_textures: HashMap<StatusId, Texture2D>,
 }
 
 const ZOOM_LEVELS: [f32; 6] = [40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
@@ -201,6 +210,7 @@ impl GameGrid {
         pathfind_grid: Rc<PathfindGrid>,
         background: HashMap<Position, TerrainId>,
         terrain_objects: HashMap<Position, TerrainId>,
+        status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
         let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
@@ -224,17 +234,12 @@ impl GameGrid {
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
             character_animations: Default::default(),
-            /*
-            character_motion: None,
-            character_dying_animations: vec![],
-            character_shake_animations: vec![],
-            character_act_animations: vec![],
-             */
             big_font,
             simple_font,
             terrain_atlas,
             background,
             terrain_objects,
+            status_textures,
         }
     }
 
@@ -792,9 +797,10 @@ impl GameGrid {
             }
         }
 
+        let mut labelled_char_ids: HashSet<CharacterId> = Default::default();
+
         for character in self.characters.iter() {
             self.draw_character(character);
-            self.draw_character_healthbar(character);
         }
 
         if let Some((range, indicator)) = range_indicator {
@@ -802,7 +808,7 @@ impl GameGrid {
 
             for character in self.characters.iter() {
                 if within_range_squared(range.squared(), active_char_pos, character.pos()) {
-                    self.draw_character_label(character, false);
+                    labelled_char_ids.insert(character.id());
                 }
             }
         }
@@ -955,8 +961,9 @@ impl GameGrid {
                     );
                 }
 
-                self.draw_character_label(target, false);
-                self.draw_character_label(reactor, false);
+                labelled_char_ids.insert(target.id());
+                labelled_char_ids.insert(reactor.id());
+
                 self.draw_overhead_question_mark(reactor);
             }
 
@@ -988,8 +995,9 @@ impl GameGrid {
                     );
                 }
 
-                self.draw_character_label(attacker, false);
-                self.draw_character_label(reactor, false);
+                labelled_char_ids.insert(attacker.id());
+                labelled_char_ids.insert(reactor.id());
+
                 self.draw_overhead_question_mark(reactor);
             }
 
@@ -1011,8 +1019,9 @@ impl GameGrid {
                     Color::new(0.90, 0.16, 0.22, 0.8),
                     4.0,
                 );
-                self.draw_character_label(attacker, false);
-                self.draw_character_label(reactor, false);
+                labelled_char_ids.insert(attacker.id());
+                labelled_char_ids.insert(reactor.id());
+
                 self.draw_overhead_question_mark(reactor);
             }
 
@@ -1025,7 +1034,7 @@ impl GameGrid {
                     2.0,
                 );
 
-                self.draw_character_label(reactor, false);
+                labelled_char_ids.insert(reactor.id());
                 self.draw_overhead_question_mark(reactor);
             }
 
@@ -1036,9 +1045,7 @@ impl GameGrid {
             ui_state,
             UiState::ReactingToMovementAttackOpportunity { .. }
         ) {
-            let active_char = self.characters.get(self.active_character_id);
-            let draw_action_points = !active_char.player_controlled();
-            self.draw_character_label(active_char, draw_action_points);
+            labelled_char_ids.insert(self.active_character_id);
         }
 
         if is_mouse_within_grid && receptive_to_input {
@@ -1344,8 +1351,6 @@ impl GameGrid {
                 }
             } else if had_non_empty_movement_path && self.dragging_camera_from.is_none() {
                 self.fill_cell(mouse_grid_pos, Color::new(1.0, 0.0, 0.0, 0.2), 4.0);
-                //self.draw_invalid_target_marker(mouse_grid_pos);
-                //self.draw_cell_outline(mouse_grid_pos, HOVER_INVALID_MOVEMENT_COLOR, 0.0, 1.0);
             }
         }
 
@@ -1374,11 +1379,11 @@ impl GameGrid {
                         active_char_pos,
                         target_pos,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
+                        5.0,
                     );
                 }
 
-                self.draw_character_label(target, false);
+                labelled_char_ids.insert(target.id());
             }
             ActionTarget::Position(target_pos) => {
                 self.draw_target_crosshair(
@@ -1404,7 +1409,15 @@ impl GameGrid {
         if let Some(id) = hovered_character_id {
             if id != self.active_character_id {
                 let char = self.characters.get(id);
+                labelled_char_ids.insert(char.id());
+            }
+        }
+
+        for char in self.characters.iter() {
+            if labelled_char_ids.contains(&char.id()) {
                 self.draw_character_label(char, false);
+            } else {
+                self.draw_character_healthbar(char);
             }
         }
 
@@ -1653,13 +1666,18 @@ impl GameGrid {
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
-        let box_h = text_dimensions.height + text_pad * 2.0;
+        let status_w = 20.0;
+        let box_h = (text_dimensions.height + text_pad * 2.0);
+
+        let condition_infos = character.condition_infos();
 
         let box_x = x - (box_w - self.cell_w) / 2.0;
         let box_y = y - health_h - margin - box_h;
 
+        let status_y;
+
         if draw_name {
-            draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.5));
+            draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
             draw_text_rounded(
                 header,
                 box_x + text_pad,
@@ -1671,6 +1689,31 @@ impl GameGrid {
                     ..Default::default()
                 },
             );
+
+            status_y = box_y - -1.0 - status_w;
+        } else {
+            status_y = health_y - 1.0 - status_w;
+        }
+
+        if !condition_infos.is_empty() {
+            let mut status_x =
+                box_x + box_w / 2.0 - (condition_infos.len() as f32 * status_w) / 2.0;
+            for info in condition_infos {
+                let texture = &self.status_textures[&info.condition.status_icon()];
+                draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
+                draw_texture_ex(
+                    texture,
+                    status_x,
+                    status_y,
+                    WHITE,
+                    DrawTextureParams {
+                        dest_size: Some((status_w, status_w).into()),
+                        ..Default::default()
+                    },
+                );
+                draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, YELLOW);
+                status_x += status_w;
+            }
         }
 
         let mut healthbar_bg = BLACK;
@@ -1701,6 +1744,8 @@ impl GameGrid {
             );
         }
 
+        // TODO: Maybe it's not necessary to see AP above enemies? It takes a lot of screen space, and blocks statuses.
+        /*
         if draw_action_points {
             let mut action_points_row = ActionPointsRow::new(
                 (10.0, 10.0),
@@ -1716,6 +1761,7 @@ impl GameGrid {
                 box_y - action_points_row.size().1 - 3.0,
             );
         }
+         */
     }
 
     fn draw_active_character_highlight(&self) {
@@ -1869,23 +1915,24 @@ impl GameGrid {
         crosshair_color: Color,
         thickness: f32,
     ) {
-        let actor_x = self.grid_x_to_screen(actor_pos.0);
-        let actor_y = self.grid_y_to_screen(actor_pos.1);
-        let target_x = self.grid_x_to_screen(target_pos.0);
-        let target_y = self.grid_y_to_screen(target_pos.1);
+        let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
+        let actor_y = self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0;
+        let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0;
+        let target_y = self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0;
         let depth = 2.0;
 
         draw_dashed_line(
-            (actor_x + self.cell_w / 2.0, actor_y + self.cell_w / 2.0),
-            (target_x + self.cell_w / 2.0, target_y + self.cell_w / 2.0),
+            (actor_x, actor_y),
+            (target_x, target_y),
             thickness,
             crosshair_color,
-            5.0,
+            10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
         );
 
-        draw_crosshair((target_x + depth, target_y + depth), self.cell_w, BLACK);
-        draw_crosshair((target_x, target_y), self.cell_w, crosshair_color);
+        let cross_hair_r = self.cell_w * 0.15;
+        draw_crosshair((target_x + depth, target_y + depth), cross_hair_r, BLACK);
+        draw_crosshair((target_x, target_y), cross_hair_r, crosshair_color);
     }
 
     fn draw_static_text(

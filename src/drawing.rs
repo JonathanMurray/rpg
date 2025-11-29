@@ -197,16 +197,11 @@ pub fn draw_dashed_rectangle_sides(
     }
 }
 
-pub fn draw_crosshair((x, y): (f32, f32), width: f32, crosshair_color: Color) {
-    draw_circle_lines(
-        x + width / 2.0,
-        y + width / 2.0,
-        width * 0.15,
-        3.0,
-        crosshair_color,
-    );
-    draw_arrow((x, y), width, (1, 1), crosshair_color, 2.0);
-    draw_arrow((x, y), width, (-1, -1), crosshair_color, 2.0);
+pub fn draw_crosshair((x, y): (f32, f32), r: f32, color: Color) {
+    draw_circle_lines(x, y, r, 3.0, color);
+    let len = r * 1.7;
+    draw_line(x - len, y, x + len, y, 2.0, color);
+    draw_line(x, y - len, x, y + len, 2.0, color);
 }
 
 pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, margin: f32) {

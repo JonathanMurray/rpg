@@ -45,7 +45,7 @@ use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
 use rpg::skill_tree::run_skill_tree_scene;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-    load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
+    load_all_status_textures, load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
 };
 use rpg::victory_scene::{run_victory_loop, Learning};
 
@@ -121,6 +121,12 @@ async fn main() {
     bob.known_attack_enhancements.push(SMITE);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
+    //TODO
+    bob.receive_condition(Condition::Burning, Some(5), None);
+    bob.receive_condition(Condition::Protected, Some(5), None);
+    bob.receive_condition(Condition::Slowed, Some(5), None);
+    bob.health.lose(15);
+
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Clara",
@@ -141,11 +147,11 @@ async fn main() {
         .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    let mut player_characters = vec![clara, bob, alice];
+    let mut player_characters = vec![alice, bob, clara];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::EliteMagi,
+        FightId::VerticalSlice,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
@@ -275,6 +281,8 @@ async fn init_fight_scene(
 
     let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
 
+    let status_textures = load_all_status_textures().await;
+
     let gfx_user_interface = UserInterface::new(
         &core_game,
         sprites,
@@ -286,6 +294,7 @@ async fn init_fight_scene(
         decorative_font,
         grid_big_font,
         init_state,
+        status_textures,
     );
 
     game_ui.init(gfx_user_interface);

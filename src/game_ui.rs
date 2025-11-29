@@ -43,7 +43,7 @@ use crate::{
     },
     init_fight_map::GameInitState,
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -344,7 +344,6 @@ pub struct CharacterUi {
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     pub resource_bars: Container,
-    conditions_list: ConditionsList,
 }
 
 impl CharacterUi {
@@ -392,6 +391,7 @@ impl UserInterface {
         decorative_font: Font,
         big_font: Font,
         init_state: GameInitState,
+        status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -404,6 +404,7 @@ impl UserInterface {
             &event_queue,
             &simple_font,
             characters.iter(),
+            status_textures.clone(),
         );
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
@@ -427,6 +428,7 @@ impl UserInterface {
             init_state.pathfind_grid.clone(),
             background,
             terrain_objects,
+            status_textures.clone(),
         );
 
         let player_portraits = PlayerPortraits::new(
@@ -435,6 +437,7 @@ impl UserInterface {
             active_character_id,
             decorative_font.clone(),
             portrait_textures.clone(),
+            status_textures.clone(),
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
@@ -451,7 +454,12 @@ impl UserInterface {
             portrait_textures,
         );
 
-        let target_ui = TargetUi::new(big_font.clone(), simple_font.clone(), icons.clone());
+        let target_ui = TargetUi::new(
+            big_font.clone(),
+            simple_font.clone(),
+            icons.clone(),
+            status_textures.clone(),
+        );
 
         let activity_popup = ActivityPopup::new(
             simple_font.clone(),
@@ -551,9 +559,6 @@ impl UserInterface {
         let log_x = 950.0;
         self.log.draw(log_x, ui_y);
 
-        // We draw this late to ensure that any hover popups are shown above other UI elements
-        character_ui.conditions_list.draw(760.0, ui_y + 5.0);
-
         self.log.draw_tooltips(log_x, ui_y);
 
         self.character_portraits.draw(0.0, 0.0);
@@ -621,13 +626,11 @@ impl UserInterface {
             .set_hovered_character_id(outcome.hovered_character_id);
 
         if let Some(new_inspect_target) = outcome.switched_inspect_target {
-            dbg!(new_inspect_target);
             let target = new_inspect_target.map(|id| self.characters.get_rc(id));
             self.target_ui.set_character(target);
         }
 
         if let Some(grid_switched_to) = outcome.switched_state {
-            dbg!(&grid_switched_to);
             self.on_new_state();
             if let NewState::Move { commit_movement } = grid_switched_to {
                 if commit_movement {
@@ -763,8 +766,8 @@ impl UserInterface {
                 }
 
                 let header = format!(
-                    "Chance to damage: {}%",
-                    prediction.percentage_chance_deal_damage,
+                    "Damage: {}-{}",
+                    prediction.min_damage, prediction.max_damage,
                 );
 
                 self.target_ui.set_action(header, details, true);
@@ -1319,8 +1322,6 @@ impl UserInterface {
                 ability,
                 mut detail_lines,
             } => {
-                dbg!(&target_outcome);
-
                 let actor_name = self.characters.get(actor).name;
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
@@ -1689,15 +1690,10 @@ impl UserInterface {
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {
         if new_active_id != self.active_character_id {
             // When control switches to a new player controlled character, make the UI show that character
-            println!(
-                "Switching shown char from {} to {}",
-                self.active_character_id, new_active_id
-            );
             if self.characters.get(new_active_id).player_controlled() {
                 self.player_portraits.set_selected_id(new_active_id);
                 self.on_new_selected_character();
             }
-            //self.character_sheet_toggle.shown.set(false);
         }
 
         self.active_character_id = new_active_id;
@@ -1956,7 +1952,7 @@ impl UserInterface {
                     .borrow_mut()
                     .set_current(character.stamina.current());
 
-                ui.conditions_list.descriptions = character.condition_infos();
+                ui.character_sheet.conditions_list.borrow_mut().infos = character.condition_infos();
 
                 ui.action_points_row.current_ap = self
                     .characters
@@ -1965,12 +1961,7 @@ impl UserInterface {
                     .current();
                 ui.action_points_row.is_characters_turn = *id == self.active_character_id;
 
-                let statuses = ui
-                    .conditions_list
-                    .descriptions
-                    .iter()
-                    .map(|info| info.is_positive)
-                    .collect();
+                let statuses = &character.condition_infos();
                 self.player_portraits.set_statuses(*id, statuses);
             }
         }
@@ -1983,6 +1974,7 @@ fn build_character_uis<'a>(
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
+    status_textures: HashMap<StatusId, Texture2D>,
 ) -> HashMap<u32, CharacterUi> {
     let mut next_button_id = 1;
 
@@ -2000,6 +1992,7 @@ fn build_character_uis<'a>(
             simple_font,
             character,
             &mut next_button_id,
+            status_textures.clone(),
         );
 
         character_uis.insert(character.id(), character_ui);
@@ -2007,13 +2000,14 @@ fn build_character_uis<'a>(
     character_uis
 }
 
-pub fn build_character_ui(
+fn build_character_ui(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: &HashMap<IconId, Texture2D>,
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     character: &Rc<Character>,
     next_button_id: &mut u32,
+    status_textures: HashMap<StatusId, Texture2D>,
 ) -> CharacterUi {
     let mut new_button = |btn_action,
                           character: Option<Rc<Character>>,
@@ -2142,6 +2136,7 @@ pub fn build_character_ui(
         attack_enhancement_buttons_for_character_sheet,
         ability_buttons_for_character_sheet,
         passive_buttons_for_character_sheet,
+        ConditionsList::new(simple_font.clone(), vec![], status_textures.clone()),
     );
 
     let mut upper_buttons = basic_buttons;
@@ -2192,7 +2187,6 @@ pub fn build_character_ui(
         mana_bar: resource_bars.mana_bar,
         stamina_bar: resource_bars.stamina_bar,
         resource_bars: resource_bars.container,
-        conditions_list: ConditionsList::new(simple_font.clone(), vec![]),
     }
 }
 
