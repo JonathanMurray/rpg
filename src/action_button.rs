@@ -583,7 +583,9 @@ pub enum ButtonContext {
 pub struct ActionButton {
     pub id: u32,
     pub action: ButtonAction,
+    original_size: (f32, f32),
     pub size: (f32, f32),
+    original_texture_draw_size: (f32, f32),
     pub texture_draw_size: (f32, f32),
     style: Style,
     pub hover_border_color: Color,
@@ -702,7 +704,9 @@ impl ActionButton {
         Self {
             id,
             action,
+            original_size: size,
             size,
+            original_texture_draw_size: texture_draw_size,
             texture_draw_size,
             style,
             hover_border_color,
@@ -724,16 +728,22 @@ impl ActionButton {
 
     pub fn change_scale(&mut self, scale_factor: f32) {
         self.texture_draw_size = (
-            self.texture_draw_size.0 * scale_factor,
-            self.texture_draw_size.1 * scale_factor,
+            self.original_texture_draw_size.0 * scale_factor,
+            self.original_texture_draw_size.1 * scale_factor,
         );
-        self.size = (self.size.0 * scale_factor, self.size.1 * scale_factor);
+        self.size = (
+            self.original_size.0 * scale_factor,
+            self.original_size.1 * scale_factor,
+        );
     }
 
     pub fn tooltip(&self) -> Ref<Tooltip> {
         if let ButtonAction::Action(BaseAction::UseAbility(ability)) = self.action {
             if ability.requires_melee_weapon() {
-                let equipped_weapon = self.character.as_ref().unwrap().weapon(HandType::MainHand);
+                let equipped_weapon = match &self.character {
+                    Some(ch) => ch.weapon(HandType::MainHand),
+                    None => None,
+                };
 
                 if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                     if self.character.as_ref().unwrap().has_equipped_melee_weapon() {
@@ -746,7 +756,10 @@ impl ActionButton {
                         .set(equipped_weapon);
                 }
             } else if ability.requires_shield() {
-                let equipped_shield = self.character.as_ref().unwrap().shield();
+                let equipped_shield = match &self.character {
+                    Some(ch) => ch.shield(),
+                    None => None,
+                };
 
                 if self.tooltip_is_based_on_equipped_shield.get() != equipped_shield {
                     dbg!(&self.tooltip_is_based_on_equipped_shield);
@@ -972,8 +985,8 @@ impl Drawable for ActionButton {
             ButtonSelected::No => {}
         }
 
-        // When viewed in the skill tree, we can be so zoomed out that the points row doesn't fit well. In that case, don't show it.
-        if self.size.0 > 50.0 {
+        // When viewed in the skill tree (editor), we can be so zoomed out that the points row doesn't fit well. In that case, don't show it.
+        if self.size.0 > 45.0 {
             let points_row_h_pad = 2.0;
 
             if points_row_size.1 > 0.0 {

@@ -644,12 +644,12 @@ impl ActivityPopup {
                         selected_enhancements,
                         ..
                     } => {
-                        let usable_attack_enhancements = self
+                        let known_attack_enhancements = self
                             .characters
                             .get(active_character_id)
-                            .usable_attack_enhancements(attack.hand);
+                            .known_attack_enhancements(attack.hand);
 
-                        for enhancement in usable_attack_enhancements {
+                        for (_label, enhancement) in known_attack_enhancements {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
                             if selected_enhancements.contains(&enhancement) {
                                 self.selected_choice_button_ids.push(btn.id);

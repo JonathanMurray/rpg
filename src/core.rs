@@ -4292,12 +4292,31 @@ impl Character {
             for enhancement in &self.known_attack_enhancements {
                 known.push(("".to_owned(), *enhancement))
             }
+
+            if let Some(arrows) = self.arrows.get() {
+                assert!(arrows.quantity > 0);
+                known.push((
+                    arrows.arrow.name.to_string(),
+                    AttackEnhancement {
+                        name: "Use special arrow",
+                        description: arrows.arrow.name,
+                        icon: IconId::RangedAttack,
+                        weapon_requirement: Some(WeaponType::Ranged),
+                        effect: AttackEnhancementEffect {
+                            consume_equipped_arrow: true,
+                            ..AttackEnhancementEffect::default()
+                        },
+                        ..AttackEnhancement::default()
+                    },
+                ));
+            }
         }
+
         known
     }
 
     pub fn usable_attack_enhancements(&self, attack_hand: HandType) -> Vec<AttackEnhancement> {
-        let mut usable: Vec<AttackEnhancement> = self
+        let usable: Vec<AttackEnhancement> = self
             .known_attack_enhancements(attack_hand)
             .iter()
             .filter_map(|(_, e)| {
@@ -4308,21 +4327,6 @@ impl Character {
                 }
             })
             .collect();
-
-        if let Some(arrows) = self.arrows.get() {
-            assert!(arrows.quantity > 0);
-            usable.push(AttackEnhancement {
-                name: "Use special arrow",
-                description: arrows.arrow.name,
-                icon: IconId::RangedAttack,
-                weapon_requirement: Some(WeaponType::Ranged),
-                effect: AttackEnhancementEffect {
-                    consume_equipped_arrow: true,
-                    ..AttackEnhancementEffect::default()
-                },
-                ..AttackEnhancement::default()
-            })
-        }
 
         usable
     }

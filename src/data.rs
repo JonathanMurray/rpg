@@ -880,20 +880,20 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
     target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Float(3.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Bleeding,
-                    stacks: Some(4),
+                    stacks: Some(6),
                     duration_rounds: None,
                 })),
                 None,
             ]),
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Float(4.5)),
     },
     animation_color: PURPLE,
 };
@@ -917,7 +917,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Bleeding,
-                    stacks: Some(3),
+                    stacks: Some(6),
                     duration_rounds: None,
                 })),
                 None,
@@ -974,7 +974,7 @@ pub const MAGI_HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Ranged(5),
         effect: AbilityPositiveEffect {
-            healing: 3,
+            healing: 5,
             apply: None,
         },
     },
@@ -1010,7 +1010,7 @@ pub const HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Ranged(3),
         effect: AbilityPositiveEffect {
-            healing: 2,
+            healing: 4,
             apply: Some([
                 Some(ApplyEffect::ConsumeCondition {
                     condition: Condition::Bleeding,
@@ -1167,7 +1167,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
         area_on_hit: Some([
             Some(ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Burning,
-                stacks: Some(2),
+                stacks: Some(3),
                 duration_rounds: None,
             })),
             None,
@@ -1190,7 +1190,7 @@ pub const FIREBALL: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(4.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::AtLeast(2)),
+            damage: Some(AbilityDamage::AtLeast(3)),
             on_hit: None,
         }),
         impact_area: Some((
@@ -1198,7 +1198,7 @@ pub const FIREBALL: Ability = Ability {
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(1)),
+                damage: Some(AbilityDamage::AtLeast(3)),
                 on_hit: None,
             }),
         )),

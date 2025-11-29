@@ -87,6 +87,8 @@ const COLOR_SPI: Color = Color::new(0.00, 0.3, 0.8, 1.00);
 
 const SAVE_FILE_NAME: &'static str = "skill_tree.json";
 
+const CELL_WIDTHS: [f32; 5] = [40.0, 50.0, 60.0, 70.0, 80.0];
+
 pub async fn run_editor() {
     // Seed the random numbers
     rand::srand(miniquad::date::now() as u64);
@@ -109,22 +111,69 @@ pub async fn run_editor() {
     let file_contents = fs::read(SAVE_FILE_NAME).expect("Reading from save file");
     let json: String = String::from_utf8(file_contents).expect("Valid file json");
 
+    let grid_events = Rc::new(RefCell::new(vec![]));
+
+    let skill_buttons: RefCell<HashMap<u32, ActionButton>> = Default::default();
+
+    let skills = skills_mapping();
+
+    let skill_to_btn_action = |skill| skills.iter().find(|(s, _)| s == &skill).unwrap().1;
+
     let mut next_node_id = 0;
+
+    let mut create_node = |content, pos| {
+        let n: Node = Node::new(next_node_id, content, pos);
+        next_node_id += 1;
+
+        if let NodeContent::Skill(skill) = &content {
+            let mut btn = ActionButton::new(
+                skill_to_btn_action(*skill),
+                Some(Rc::clone(&grid_events)),
+                n.id,
+                &icons,
+                None,
+            );
+            btn.hover_border_color = LIGHTGRAY;
+
+            skill_buttons.borrow_mut().insert(n.id, btn);
+        }
+
+        Rc::new(RefCell::new(n))
+    };
 
     match serde_json::from_str::<FlatTree>(&json) {
         Ok(tree) => {
+            let mut id_mappings: HashMap<u32, u32> = Default::default();
             nodes = tree
                 .nodes
                 .iter()
-                .map(|node| Rc::new(RefCell::new(*node)))
+                .map(|node| {
+                    let new_node = create_node(node.content, node.pos);
+
+                    id_mappings.insert(node.id, new_node.borrow().id);
+                    new_node
+                    //Rc::new(RefCell::new(*node))
+                })
                 .collect();
-            edges = tree.edges;
-            next_node_id = nodes.iter().map(|node| node.borrow().id).max().unwrap() + 1;
+            // The edges stored in the file may have had gaps between them, whereas our new nodes have
+            // monotonically increasing IDs; so the edges must be updated or they would point completely
+            // wrong
+            edges = tree
+                .edges
+                .iter()
+                .map(|(from, to)| (id_mappings[from], id_mappings[to]))
+                .collect();
+            //next_node_id = nodes.iter().map(|node| node.borrow().id).max().unwrap() + 1;
         }
         Err(e) => {
             println!("File contents: {}", json);
             println!("Failed to read from file: {:?}", e);
 
+            nodes.push(create_node(NodeContent::Origin, (0, 0)));
+            nodes.push(create_node(NodeContent::Attr(Attribute::Str), (1, 0)));
+            edges.insert((0, 1));
+
+            /*
             nodes.push(Rc::new(RefCell::new(Node::new(
                 0,
                 NodeContent::Origin,
@@ -135,18 +184,10 @@ pub async fn run_editor() {
                 NodeContent::Attr(Attribute::Str),
                 (1, 0),
             ))));
-            edges.insert((0, 1));
             next_node_id = 2;
+             */
         }
     }
-
-    let mut create_node = |content, pos| {
-        let n: Node = Node::new(next_node_id, content, pos);
-        next_node_id += 1;
-        Rc::new(RefCell::new(n))
-    };
-
-    let grid_events = Rc::new(RefCell::new(vec![]));
 
     let mut abilities = vec![
         SWEEP_ATTACK,
@@ -161,9 +202,6 @@ pub async fn run_editor() {
         FIREBALL,
     ];
 
-    let skills = skills_mapping();
-
-    let skill_to_btn_action = |skill| skills.iter().find(|(s, _)| s == &skill).unwrap().1;
     let btn_action_to_skill = |btn_action| {
         skills
             .iter()
@@ -279,16 +317,17 @@ pub async fn run_editor() {
         ..Default::default()
     };
 
-    let cell_widths = [25.0, 30.0, 35.0, 40.0, 50.0, 60.0, 70.0, 80.0, 120.0, 160.0];
-    let mut zoom_i = 4;
+    let mut zoom_i = 2;
 
     let mut show_grid = true;
+
+    let mut hovered_btn_id_pos = None;
 
     loop {
         let mid = (screen_w / 2.0, screen_h / 2.0);
         let (mouse_x, mouse_y) = mouse_position();
 
-        let cell_w = cell_widths[zoom_i];
+        let cell_w = CELL_WIDTHS[zoom_i];
         let icon_w = cell_w * 1.0;
         let origin_r = cell_w / 3.0;
         let attr_r = cell_w * 0.13;
@@ -309,7 +348,7 @@ pub async fn run_editor() {
         if dy < 0.0 {
             zoom_i = zoom_i.saturating_sub(1);
         } else if dy > 0.0 {
-            zoom_i = (zoom_i + 1).min(cell_widths.len() - 1);
+            zoom_i = (zoom_i + 1).min(CELL_WIDTHS.len() - 1);
         }
 
         if is_mouse_button_pressed(MouseButton::Right) {
@@ -417,16 +456,10 @@ pub async fn run_editor() {
                 NodeContent::Attr(attribute) => {
                     draw_attr_node(attr_r, x, y, attribute);
                 }
-                NodeContent::Skill(skill) => {
-                    draw_skill_node(
-                        &icons,
-                        &grid_events,
-                        skill_to_btn_action,
-                        icon_w,
-                        x,
-                        y,
-                        skill,
-                    );
+                NodeContent::Skill(..) => {
+                    let mut skill_buttons = skill_buttons.borrow_mut();
+                    let btn = skill_buttons.get_mut(&node.borrow().id).unwrap();
+                    draw_skill_node2(icon_w, x, y, btn);
                 }
             }
         }
@@ -492,8 +525,23 @@ pub async fn run_editor() {
 
         for event in grid_events.borrow_mut().drain(..) {
             match event {
-                InternalUiEvent::ButtonHovered { .. } => {}
-                InternalUiEvent::ButtonClicked { id, action, .. } => {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id,
+                    action,
+                    hovered_pos,
+                    ..
+                }) => {
+                    if let Some(pos) = hovered_pos {
+                        hovered_btn_id_pos = Some((id, pos));
+                    } else {
+                        if let Some(already_hovered) = hovered_btn_id_pos {
+                            if already_hovered.0 == id {
+                                hovered_btn_id_pos = None;
+                            }
+                        }
+                    }
+                }
+                InternalUiEvent::ButtonClicked { id, .. } => {
                     dbg!("grid button CLICKED", id);
                 }
             }
@@ -508,6 +556,11 @@ pub async fn run_editor() {
                     state = State::PlacingSkill(btn_action_to_skill(action));
                 }
             }
+        }
+
+        if let Some((btn_id, pos)) = hovered_btn_id_pos {
+            let btn = &skill_buttons.borrow()[&btn_id];
+            draw_button_tooltip(&font, pos, &btn.tooltip());
         }
 
         for attribute in clicked_attributes.borrow_mut().drain(..) {
@@ -564,7 +617,6 @@ pub async fn run_skill_tree_scene() {
 
     let skill_to_btn_action = |skill| skills.iter().find(|(s, _)| s == &skill).unwrap().1;
 
-    let cell_widths = [40.0, 50.0, 60.0, 70.0, 80.0];
     let mut zoom_i = 1;
 
     let mut show_grid = false;
@@ -579,7 +631,7 @@ pub async fn run_skill_tree_scene() {
 
         let (mouse_x, mouse_y) = mouse_position();
 
-        let cell_w = cell_widths[zoom_i];
+        let cell_w = CELL_WIDTHS[zoom_i];
         let icon_w = cell_w * 1.0;
         let attr_r = cell_w * 0.13;
 
@@ -599,7 +651,7 @@ pub async fn run_skill_tree_scene() {
         if dy < 0.0 {
             zoom_i = zoom_i.saturating_sub(1);
         } else if dy > 0.0 {
-            zoom_i = (zoom_i + 1).min(cell_widths.len() - 1);
+            zoom_i = (zoom_i + 1).min(CELL_WIDTHS.len() - 1);
         }
 
         clear_background(BLACK);
@@ -812,6 +864,13 @@ pub async fn run_skill_tree_scene() {
 
         next_frame().await;
     }
+}
+
+fn draw_skill_node2(icon_w: f32, x: f32, y: f32, btn: &mut ActionButton) {
+    btn.change_scale(icon_w / 60.0);
+    let x = x - btn.size.0 / 2.0;
+    let y = y - btn.size.1 / 2.0;
+    btn.draw(x, y);
 }
 
 fn draw_skill_node(
