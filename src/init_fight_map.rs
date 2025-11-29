@@ -13,11 +13,11 @@ use rand::{
 use crate::{
     bot::{BotBehaviour, MagiBehaviour},
     core::{
-        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters, HandType,
-        Position,
+        Ability, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters,
+        HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BOW,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BOW, BRACE,
         CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::PathfindGrid,
@@ -274,14 +274,16 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Test => {
             let mut enemies = vec![];
 
-            enemies.push(Character::new(
+            let mut e1 = Character::new(
                 bot(BotBehaviour::Normal, 4.0),
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
                 Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
-            ));
+            );
+            e1.learn_ability(BRACE);
+            enemies.push(e1);
             /*
             enemies.push(Character::new(
                 bot(BotBehaviour::Normal, 4.0),

@@ -366,14 +366,35 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
-const SHIELD_BASH: OnHitReaction = OnHitReaction {
+pub const SHIELD_BASH: Ability = Ability {
+    id: AbilityId::ShieldBash,
     name: "Shield bash",
-    description: "Strike back at the attacker with your shield",
+    description: "Strike at the enemy with your shield, dazing them",
     icon: IconId::ShieldBash,
-    action_point_cost: 1,
-    stamina_cost: 0,
-    effect: OnHitReactionEffect::ShieldBash,
-    required_circumstance: Some(AttackCircumstance::Melee),
+    action_point_cost: 2,
+    stamina_cost: 1,
+    mana_cost: 0,
+    requirement: Some(EquipmentRequirement::Shield),
+    possible_enhancements: [None, None, None],
+
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Toughness),
+            damage: Some(AbilityDamage::AtLeast(2)),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Dazed,
+                    duration_rounds: Some(1),
+                    stacks: None,
+                })),
+                None,
+            ]),
+        }),
+        impact_area: None,
+    },
+    animation_color: RED,
+    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
@@ -569,7 +590,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     stamina_cost: 3,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
-    roll: Some(AbilityRollType::Attack(-3)),
+    roll: Some(AbilityRollType::RollDuringAttack(-3)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
@@ -625,7 +646,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     stamina_cost: 2,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
-    roll: Some(AbilityRollType::Attack(0)),
+    roll: Some(AbilityRollType::RollDuringAttack(0)),
     possible_enhancements: [
         Some(LUNGE_ATTACK_HEAVY_IMPACT),
         Some(LUNGE_ATTACK_REACH),
@@ -980,7 +1001,7 @@ pub const HEAL: Ability = Ability {
     name: "Heal",
     description: "Restore an ally's health",
     icon: IconId::Heal,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
     requirement: None,

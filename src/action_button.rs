@@ -391,13 +391,16 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
             AbilityRollType::Spell => "[ spell roll ]".to_string(),
-            AbilityRollType::Attack(bonus) if bonus < 0 => {
-                format!("[ attack roll - {} ]", -bonus)
+            AbilityRollType::RollAbilityWithAttackModifier => "[ attack roll ]".to_string(),
+            AbilityRollType::RollDuringAttack(bonus) => {
+                if bonus < 0 {
+                    format!("[ attack roll - {} ]", -bonus)
+                } else if bonus > 0 {
+                    format!("[ attack roll + {} ]", bonus)
+                } else {
+                    "[ attack roll ]".to_string()
+                }
             }
-            AbilityRollType::Attack(bonus) if bonus > 0 => {
-                format!("[ attack roll + {} ]", bonus)
-            }
-            AbilityRollType::Attack(_) => "[ attack roll ]".to_string(),
         };
         t.technical_description.push(s);
     }

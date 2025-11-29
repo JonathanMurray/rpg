@@ -72,7 +72,7 @@ const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
 const RANGE_INDICATOR_SEMI_BAD_COLOR: Color = ORANGE;
 const RANGE_INDICATOR_BAD_COLOR: Color = RED;
 
-const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = WHITE;
+const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
@@ -1005,7 +1005,12 @@ impl GameGrid {
                     5.0,
                     2.0,
                 );
-                self.draw_target_crosshair(attacker.pos(), reactor.pos(), RED, 4.0);
+                self.draw_target_crosshair(
+                    attacker.pos(),
+                    reactor.pos(),
+                    Color::new(0.90, 0.16, 0.22, 0.8),
+                    4.0,
+                );
                 self.draw_character_label(attacker, false);
                 self.draw_character_label(reactor, false);
                 self.draw_overhead_question_mark(reactor);

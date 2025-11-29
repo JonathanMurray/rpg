@@ -1,20 +1,31 @@
-use std::{rc::Rc, vec};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+    vec,
+};
 
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
+    texture::Texture2D,
     window::screen_width,
 };
 
 use crate::{
+    action_button::{
+        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
+        InternalUiEvent, Tooltip,
+    },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
         TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{Character, Goodness, HandType},
+    core::{BaseAction, Character, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
+    textures::IconId,
 };
 
 pub struct TargetUi {
@@ -25,16 +36,24 @@ pub struct TargetUi {
     container: Container,
 
     action: Option<(String, Vec<(String, Goodness)>, bool)>,
+    icons: HashMap<IconId, Texture2D>,
+    button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
+    hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
+    buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
 }
 
 impl TargetUi {
-    pub fn new(big_font: Font, simple_font: Font) -> Self {
+    pub fn new(big_font: Font, simple_font: Font, icons: HashMap<IconId, Texture2D>) -> Self {
         Self {
             target: Default::default(),
             big_font,
             simple_font,
             container: Container::default(),
             action: None,
+            icons,
+            button_events: Default::default(),
+            hovered_btn: Default::default(),
+            buttons: Default::default(),
         }
     }
 
@@ -132,6 +151,50 @@ impl TargetUi {
                 ..Default::default()
             };
 
+            let mut actions_row = None;
+            let mut bot_using_spells = false;
+
+            self.buttons.clear();
+            if !char.player_controlled() {
+                let mut next_btn_id = 0;
+                let mut new_btn = |base_action| {
+                    let btn = ActionButton::new(
+                        ButtonAction::Action(base_action),
+                        Some(Rc::clone(&self.button_events)),
+                        next_btn_id,
+                        &self.icons,
+                        Some(Rc::clone(char)),
+                    );
+                    next_btn_id += 1;
+                    btn
+                };
+                let mut children: Vec<Element> = vec![];
+
+                if let Some(attack) = char.attack_action() {
+                    let btn = new_btn(BaseAction::Attack(attack));
+                    let id = btn.id;
+                    let btn = Rc::new(RefCell::new(btn));
+                    children.push(Element::RcRefCell(btn.clone()));
+                    self.buttons.insert(id, btn);
+                }
+                for ability in char.known_abilities() {
+                    bot_using_spells = true;
+                    let btn = new_btn(BaseAction::UseAbility(ability));
+                    let id = btn.id;
+                    let btn = Rc::new(RefCell::new(btn));
+                    children.push(Element::RcRefCell(btn.clone()));
+                    self.buttons.insert(id, btn);
+                }
+
+                let row = Element::Container(Container {
+                    layout_dir: LayoutDirection::Horizontal,
+                    children,
+                    ..Default::default()
+                });
+
+                actions_row = Some(row);
+            }
+
             let movement_text_line = TextLine::new(
                 format!("Movement: {:.1}", char.move_speed()),
                 16,
@@ -144,12 +207,22 @@ impl TargetUi {
                 LIGHTGRAY,
                 Some(self.simple_font.clone()),
             );
+            let mut detailed_stats_lines = vec![
+                Element::Text(movement_text_line),
+                Element::Text(attack_text_line),
+            ];
+            if bot_using_spells {
+                detailed_stats_lines.push(Element::Text(TextLine::new(
+                    format!("Spell mod: {}", char.spell_modifier()),
+                    16,
+                    LIGHTGRAY,
+                    Some(self.simple_font.clone()),
+                )));
+            }
+
             let detailed_stats = Container {
                 layout_dir: LayoutDirection::Vertical,
-                children: vec![
-                    Element::Text(movement_text_line),
-                    Element::Text(attack_text_line),
-                ],
+                children: detailed_stats_lines,
                 margin: 7.0,
                 style: Style {
                     padding: 5.0,
@@ -158,14 +231,21 @@ impl TargetUi {
                 ..Default::default()
             };
 
+            let mut rows = vec![
+                Element::Container(centered_list),
+                Element::Container(detailed_stats),
+            ];
+
+            if let Some(actions_row) = actions_row {
+                rows.push(actions_row);
+            }
+
+            rows.push(Element::Box(Box::new(conditions_list)));
+
             self.container = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Start,
-                children: vec![
-                    Element::Container(centered_list),
-                    Element::Container(detailed_stats),
-                    Element::Box(Box::new(conditions_list)),
-                ],
+                children: rows,
                 margin: 10.0,
                 style: Style {
                     background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
@@ -333,6 +413,39 @@ impl Drawable for TargetUi {
         }
 
         self.draw_action((screen_width() / 2.0, 60.0));
+
+        for event in self.button_events.borrow_mut().drain(..) {
+            match event {
+                InternalUiEvent::ButtonHovered(ButtonHovered {
+                    id,
+                    action,
+                    hovered_pos,
+                    ..
+                }) => {
+                    if let Some(pos) = hovered_pos {
+                        *self.hovered_btn.borrow_mut() = Some((id, pos));
+                    } else {
+                        let mut was_hovered = false;
+                        if let Some(existing) = self.hovered_btn.borrow_mut().as_ref() {
+                            if existing.0 == id {
+                                was_hovered = true;
+                            }
+                        }
+
+                        if was_hovered {
+                            *self.hovered_btn.borrow_mut() = None;
+                        }
+                    }
+                }
+                InternalUiEvent::ButtonClicked { .. } => {}
+            }
+        }
+
+        if let Some((id, pos)) = self.hovered_btn.borrow().as_ref() {
+            let btn = self.buttons.get(id).unwrap();
+
+            draw_button_tooltip(&self.simple_font, *pos, &btn.borrow().tooltip());
+        }
     }
 
     fn size(&self) -> (f32, f32) {

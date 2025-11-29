@@ -814,13 +814,36 @@ impl CoreGame {
                         let ability_result = roll_calculation as u32;
                         dice_roll_line.push_str(&format!(" = {}", ability_result));
 
-                        maybe_ability_roll = Some(AbilityRoll::Spell {
+                        maybe_ability_roll = Some(AbilityRoll::RolledWithSpellModifier {
                             result: ability_result,
                             line: dice_roll_line,
                         });
                     }
-                    AbilityRollType::Attack(bonus) => {
-                        maybe_ability_roll = Some(AbilityRoll::Attack { bonus });
+                    AbilityRollType::RollAbilityWithAttackModifier => {
+                        let modifier = caster_ref.attack_modifier(HandType::MainHand) as i32;
+                        roll_calculation += modifier;
+                        dice_roll_line.push_str(&format!(" (+{} attack mod)", modifier));
+
+                        for enhancement in &enhancements {
+                            if let Some(e) = enhancement.spell_effect {
+                                let bonus = e.roll_bonus;
+                                if bonus > 0 {
+                                    roll_calculation += bonus as i32;
+                                    dice_roll_line
+                                        .push_str(&format!(" +{} ({})", bonus, enhancement.name,));
+                                }
+                            }
+                        }
+                        let ability_result = roll_calculation as u32;
+                        dice_roll_line.push_str(&format!(" = {}", ability_result));
+
+                        maybe_ability_roll = Some(AbilityRoll::RolledWithAttackModifier {
+                            result: ability_result,
+                            line: dice_roll_line,
+                        });
+                    }
+                    AbilityRollType::RollDuringAttack(bonus) => {
+                        maybe_ability_roll = Some(AbilityRoll::WillRollDuringAttack { bonus });
                     }
                 };
             }
@@ -858,7 +881,9 @@ impl CoreGame {
 
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
-                    if let AbilityRoll::Spell { result: _, line } = &mut ability_roll {
+                    if let AbilityRoll::RolledWithSpellModifier { result: _, line } =
+                        &mut ability_roll
+                    {
                         let spell_enemy_effect = effect.unwrap_spell();
                         if let Some(contest) = spell_enemy_effect.defense_type {
                             match contest {
@@ -926,7 +951,7 @@ impl CoreGame {
                     .await;
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                    let (ability_result, dice_roll_line) = ability_roll.unwrap_roll();
                     detail_lines.push(dice_roll_line.to_string());
 
                     let degree_of_success = ability_result / 10;
@@ -960,7 +985,7 @@ impl CoreGame {
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (_ability_result, dice_roll_line) = ability_roll.unwrap_spell();
+                    let (_ability_result, dice_roll_line) = ability_roll.unwrap_roll();
                     detail_lines.push(dice_roll_line.to_string());
 
                     let outcomes = self.perform_ability_area_effect(
@@ -987,13 +1012,15 @@ impl CoreGame {
                     })
                     .await;
 
-                    if let Some(AbilityRoll::Spell { result: _, line }) = &maybe_ability_roll {
+                    if let Some(AbilityRoll::RolledWithSpellModifier { result: _, line }) =
+                        &maybe_ability_roll
+                    {
                         detail_lines.push(line.clone());
                     }
 
                     if let Some(effect) = self_effect {
                         let degree_of_success = if let Some(ability_roll) = &maybe_ability_roll {
-                            let (ability_result, _dice_roll_line) = ability_roll.unwrap_spell();
+                            let (ability_result, _dice_roll_line) = ability_roll.unwrap_roll();
                             ability_result / 10
                         } else {
                             0
@@ -1125,7 +1152,7 @@ impl CoreGame {
             }
         }
 
-        let roll_result = ability_roll.unwrap_spell().0;
+        let roll_result = ability_roll.unwrap_roll().0;
 
         let degree_of_success = roll_result / 10;
         if degree_of_success > 0 {
@@ -1357,7 +1384,7 @@ impl CoreGame {
     ) -> AbilityTargetOutcome {
         let success = match spell_enemy_effect.defense_type {
             Some(contest) => {
-                let ability_result = ability_roll.unwrap_spell().0;
+                let ability_result = ability_roll.unwrap_roll().0;
                 let defense = match contest {
                     DefenseType::Will => target.will(),
                     DefenseType::Evasion => target.evasion(),
@@ -1365,8 +1392,8 @@ impl CoreGame {
                 };
 
                 if ability_result >= defense {
-                    Some(((ability_result - defense) / 5) as i32)
-                } else if ability_result >= defense - 5 {
+                    Some(((ability_result - defense) / 10) as i32)
+                } else if ability_result >= defense - 10 {
                     // graze
                     Some(-1)
                 } else {
@@ -1383,12 +1410,8 @@ impl CoreGame {
                     "Graze".to_string()
                 }
                 0 => "".to_string(),
-                1 => {
+                _ => {
                     detail_lines.push("  Crit".to_string());
-                    "Crit".to_string()
-                }
-                n => {
-                    detail_lines.push(format!("  Crit ({})", n));
                     "Crit".to_string()
                 }
             };
@@ -1411,11 +1434,6 @@ impl CoreGame {
                     }
                 };
 
-                if increased_by_good_roll && degree_of_success > 0 {
-                    dmg_str.push_str(&format!(" +{degree_of_success} ({success_label})"));
-                    dmg_calculation += degree_of_success;
-                }
-
                 for enhancement in enhancements {
                     let e = enhancement.spell_effect.unwrap();
                     let bonus_dmg = if is_direct_target {
@@ -1432,9 +1450,11 @@ impl CoreGame {
                 let graze = degree_of_success == -1;
 
                 if graze {
-                    dmg_str.push_str(" -1 (Graze)");
-                    // Since there's no armor/protection against spells, rounding up would make the spell too powerful.
-                    dmg_calculation -= 1;
+                    dmg_str.push_str(" -25% (Graze)");
+                    dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                } else if increased_by_good_roll && degree_of_success > 0 {
+                    dmg_str.push_str(&format!(" +50% ({success_label})"));
+                    dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                 }
 
                 let damage = dmg_calculation.max(0) as u32;
@@ -1855,7 +1875,7 @@ impl CoreGame {
                 detail_lines.push("".to_string());
                 let area_target_outcomes = self.perform_ability_area_effect(
                     arrow.name,
-                    AbilityRoll::Spell {
+                    AbilityRoll::RolledWithSpellModifier {
                         result: roll_result,
                         line: "".to_string(),
                     },
@@ -2259,21 +2279,23 @@ pub fn predict_attack(
 
 #[derive(Debug)]
 enum AbilityRoll {
-    Spell { result: u32, line: String },
-    Attack { bonus: i32 },
+    RolledWithSpellModifier { result: u32, line: String },
+    RolledWithAttackModifier { result: u32, line: String },
+    WillRollDuringAttack { bonus: i32 },
 }
 
 impl AbilityRoll {
-    fn unwrap_spell(&self) -> (u32, &str) {
+    fn unwrap_roll(&self) -> (u32, &str) {
         match self {
-            AbilityRoll::Spell { result, line } => (*result, line),
-            _ => panic!(),
+            AbilityRoll::RolledWithSpellModifier { result, line } => (*result, line),
+            AbilityRoll::RolledWithAttackModifier { result, line } => (*result, line),
+            unexpected => panic!("haven't rolled: {:?}", unexpected),
         }
     }
     fn unwrap_attack_bonus(&self) -> i32 {
         match self {
-            AbilityRoll::Attack { bonus } => *bonus,
-            _ => panic!(),
+            AbilityRoll::WillRollDuringAttack { bonus } => *bonus,
+            unexpected => panic!("Not attack roll: {:?}", unexpected),
         }
     }
 }
@@ -2490,7 +2512,12 @@ pub fn prob_ability_hit(
 
     let modifier_value = match modifier {
         AbilityRollType::Spell => caster.spell_modifier() as i32,
-        AbilityRollType::Attack(bonus) => caster.attack_modifier(HandType::MainHand) as i32 + bonus,
+        AbilityRollType::RollAbilityWithAttackModifier => {
+            caster.attack_modifier(HandType::MainHand) as i32
+        }
+        AbilityRollType::RollDuringAttack(bonus) => {
+            caster.attack_modifier(HandType::MainHand) as i32 + bonus
+        }
     };
 
     let target = (def as i32 - modifier_value).max(1) as u32;
@@ -3097,6 +3124,7 @@ pub enum EquipmentRequirement {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityId {
+    ShieldBash,
     SweepAttack,
     LungeAttack,
     Brace,
@@ -3126,7 +3154,8 @@ pub enum WeaponType {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AbilityRollType {
     Spell,
-    Attack(i32),
+    RollDuringAttack(i32),
+    RollAbilityWithAttackModifier,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

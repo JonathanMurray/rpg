@@ -33,8 +33,8 @@ use rpg::data::{
     INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, KILL, LEATHER_ARMOR, LONGER_REACH,
     LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
     OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT,
-    SEARING_LIGHT_BURN, SHACKLED_MIND, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK,
-    SWEEP_ATTACK_PRECISE, SWORD,
+    SEARING_LIGHT_BURN, SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE,
+    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -117,6 +117,7 @@ async fn main() {
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_passive_skills.push(PassiveSkill::Reaper);
     bob.learn_ability(SWEEP_ATTACK);
+    bob.learn_ability(SHIELD_BASH);
     bob.known_attack_enhancements.push(SMITE);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
@@ -144,7 +145,7 @@ async fn main() {
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::Test,
+        FightId::EliteMagi,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

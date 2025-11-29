@@ -451,7 +451,7 @@ impl UserInterface {
             portrait_textures,
         );
 
-        let target_ui = TargetUi::new(big_font.clone(), simple_font.clone());
+        let target_ui = TargetUi::new(big_font.clone(), simple_font.clone(), icons.clone());
 
         let activity_popup = ActivityPopup::new(
             simple_font.clone(),
