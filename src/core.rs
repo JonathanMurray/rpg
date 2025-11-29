@@ -2081,6 +2081,19 @@ impl CoreGame {
             }
         }
 
+        if conditions.borrow().has(&Condition::HealthPotionHealing) {
+            conditions
+                .borrow_mut()
+                .lose_stacks(&Condition::HealthPotionHealing, 1);
+            let health_gained = self.perform_gain_health(character, 2);
+            // TODO Make this show on grid
+            self.log(format!(
+                "  {} gained {} health (healing potion)",
+                character.name, health_gained
+            ))
+            .await;
+        }
+
         if conditions.borrow_mut().remove(&Condition::Weakened) {
             self.log(format!("{} is no longer Weakened", name)).await;
         }
@@ -2751,6 +2764,7 @@ pub enum Condition {
     ThrillOfBattle,
     Adrenalin,
     ArcaneProwess,
+    HealthPotionHealing,
 }
 
 impl Condition {
@@ -2780,6 +2794,7 @@ impl Condition {
             ThrillOfBattle => "Thrill of battle",
             Adrenalin => "Adrenalin",
             ArcaneProwess => "Arcane prowess",
+            HealthPotionHealing => "Healing",
         }
     }
 
@@ -2808,7 +2823,8 @@ impl Condition {
             ArcaneSurge => "+3 spell modifier (from passive skill)",
             ThrillOfBattle => "+3 attack/spell modifier (from passive skill)",
             Adrenalin => "Gains 1 more AP per turn",
-            ArcaneProwess => "+5 spell modifier"
+            ArcaneProwess => "+5 spell modifier",
+            HealthPotionHealing => "End of turn: gain 2 health (from health potion)",
         }
     }
 
@@ -2838,6 +2854,7 @@ impl Condition {
             ThrillOfBattle => true,
             Adrenalin => true,
             ArcaneProwess => true,
+            HealthPotionHealing => true,
         }
     }
 }

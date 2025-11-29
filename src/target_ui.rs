@@ -202,7 +202,7 @@ impl TargetUi {
                 Some(self.simple_font.clone()),
             );
             let attack_text_line = TextLine::new(
-                format!("Attack mod: {}", char.attack_modifier(HandType::MainHand)),
+                format!("Attack mod: +{}", char.attack_modifier(HandType::MainHand)),
                 16,
                 LIGHTGRAY,
                 Some(self.simple_font.clone()),
@@ -213,7 +213,7 @@ impl TargetUi {
             ];
             if bot_using_spells {
                 detailed_stats_lines.push(Element::Text(TextLine::new(
-                    format!("Spell mod: {}", char.spell_modifier()),
+                    format!("Spell mod: +{}", char.spell_modifier()),
                     16,
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),

@@ -1291,7 +1291,11 @@ pub const SEARING_LIGHT: Ability = Ability {
 pub const HEALTH_POTION: Consumable = Consumable {
     name: "Health potion",
     icon: EquipmentIconId::HealthPotion,
-    health_gain: 4,
+    effect: Some(ApplyEffect::Condition(ApplyCondition {
+        condition: Condition::HealthPotionHealing,
+        stacks: Some(3),
+        duration_rounds: None,
+    })),
     ..Consumable::default()
 };
 
