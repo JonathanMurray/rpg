@@ -65,14 +65,27 @@ pub fn draw_dashed_line(
     segment_len: f32,
     depth: Option<(Color, f32)>,
 ) {
+    draw_dashed_line_ex(from, to, thickness, color, segment_len, depth, None);
+}
+
+pub fn draw_dashed_line_ex(
+    from: (f32, f32),
+    to: (f32, f32),
+    thickness: f32,
+    color: Color,
+    segment_len: f32,
+    depth: Option<(Color, f32)>,
+    trim_start_and_end: Option<f32>,
+) {
     if let Some((color, offset)) = depth {
-        draw_dashed_line(
+        draw_dashed_line_ex(
             (from.0 + offset, from.1 + offset),
             (to.0 + offset, to.1 + offset),
             thickness,
             color,
             segment_len,
             None,
+            trim_start_and_end,
         );
     }
 
@@ -80,14 +93,23 @@ pub fn draw_dashed_line(
 
     // "Segments" alternate between "drawn" and "skipped over" to create the dash effect
     let num_segments = (line_len / segment_len) as u32;
-    //let num_dashes = (len / 2.0) as u32;
-    //let num_segments = 8;
     let (mut prev_x, mut prev_y) = from;
     for i in 0..num_segments {
         let x = from.0 + (to.0 - from.0) * i as f32 / num_segments as f32;
         let y = from.1 + (to.1 - from.1) * i as f32 / num_segments as f32;
         if i % 2 == 0 {
-            draw_line(prev_x, prev_y, x, y, thickness, color);
+            let mut skip = false;
+            if let Some(trim) = trim_start_and_end {
+                if (prev_x - from.0).abs() < trim && (prev_y - from.1).abs() < trim {
+                    skip = true;
+                }
+                if (x - to.0).abs() < trim && (y - to.1).abs() < trim {
+                    skip = true;
+                }
+            }
+            if !skip {
+                draw_line(prev_x, prev_y, x, y, thickness, color);
+            }
         }
         prev_x = x;
         prev_y = y;

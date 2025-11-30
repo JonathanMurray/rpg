@@ -88,13 +88,19 @@ pub enum StatusId {
     Exposed,
     Slowed,
     NearDeath,
-    Dead
+    Dead,
 }
 
 pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
     load_and_init_textures(vec![
-        (StatusId::PlaceholderNegative, "status_placeholder_negative.png"),
-        (StatusId::PlaceholderPositive, "status_placeholder_positive.png"),
+        (
+            StatusId::PlaceholderNegative,
+            "status_placeholder_negative.png",
+        ),
+        (
+            StatusId::PlaceholderPositive,
+            "status_placeholder_positive.png",
+        ),
         (StatusId::Burning, "status_burning.png"),
         (StatusId::Protected, "status_protected.png"),
         (StatusId::Dazed, "status_dazed.png"),

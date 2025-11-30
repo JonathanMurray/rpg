@@ -2069,10 +2069,10 @@ impl CoreGame {
             }
         }
 
-        if conditions.borrow().has(&Condition::HealthPotionHealing) {
+        if conditions.borrow().has(&Condition::HealthPotionRecovering) {
             conditions
                 .borrow_mut()
-                .lose_stacks(&Condition::HealthPotionHealing, 1);
+                .lose_stacks(&Condition::HealthPotionRecovering, 1);
             let health_gained = self.perform_gain_health(character, 2);
             // TODO Make this show on grid
             self.log(format!(
@@ -2751,7 +2751,7 @@ pub enum Condition {
     ThrillOfBattle,
     Adrenalin,
     ArcaneProwess,
-    HealthPotionHealing,
+    HealthPotionRecovering,
 }
 
 impl Condition {
@@ -2781,37 +2781,37 @@ impl Condition {
             ThrillOfBattle => "Thrill of battle",
             Adrenalin => "Adrenalin",
             ArcaneProwess => "Arcane prowess",
-            HealthPotionHealing => "Healing",
+            HealthPotionRecovering => "Recovering",
         }
     }
 
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "-3 evasion and attacks with disadvantage",
-            Blinded => "Disadvantage on dice rolls; always counts as Flanked when being attacked",
-            Raging => "Gains advantage on melee attack rolls until end of turn",
-            Slowed => "Gains 1 less AP per turn",
-            Exposed => "-3 to all defenses",
-            Hindered => "Half movement speed",
-            Protected => "+x armor against the next attack",
-            Bleeding => "End of turn: 50% stacks decay, lose 1 health for each decayed",
-            Burning => "End of turn: lose x health; lose all stacks; 50% of them are distributed evenly to adjacent entities",
-            Braced => "Gain +3 evasion against the next incoming attack",
-            Distracted => "-6 evasion against the next incoming attack",
-            Weakened => "-x to all defenses and dice rolls",
-            MainHandExertion => "-x on further similar actions",
-            OffHandExertion => "-x on further similar actions",
-            Encumbered => "-x to Evasion and -x to dice rolls",
-            NearDeath => "< 25% HP: Reduced AP, disadvantage on dice rolls, enemies have advantage",
-            Dead => "This character is dead",
-            ReaperApCooldown => "Can not gain more AP from Reaper this turn",
-            BloodRage => "+3 attack modifier (from passive skill)",
-            ArcaneSurge => "+3 spell modifier (from passive skill)",
-            ThrillOfBattle => "+3 attack/spell modifier (from passive skill)",
-            Adrenalin => "Gains 1 more AP per turn",
-            ArcaneProwess => "+5 spell modifier",
-            HealthPotionHealing => "End of turn: gain 2 health (from health potion)",
+            Dazed => "-3 Evasion, Disadvantage on attacks.",
+            Blinded => "Disadvantage, always Flanked when attacked.",
+            Raging => "Advantage on melee attacks (until end of turn).",
+            Slowed => "-1 AP per turn.",
+            Exposed => "-3 to all defenses.",
+            Hindered => "Half movement speed.",
+            Protected => "+x armor against the next attack.",
+            Bleeding => "End of turn: 50% converts to damage.",
+            Burning => "End of turn: converts to damage, 50% spreads to adjacent.",
+            Braced => "+3 Evasion against the next attack.",
+            Distracted => "-6 Evasion against the next attack.",
+            Weakened => "-x to all defenses and actions.",
+            MainHandExertion => "-x on further similar actions.",
+            OffHandExertion => "-x on further similar actions.",
+            Encumbered => "-x Evasion, -x on actions.",
+            NearDeath => "-1 AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 25% health)",
+            Dead => "This character is dead.",
+            ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
+            BloodRage => "+3 attack modifier (passive skill).",
+            ArcaneSurge => "+3 spell modifier (passive skill).",
+            ThrillOfBattle => "+3 attack/spell modifier (passive skill).",
+            Adrenalin => "+1 AP per turn.",
+            ArcaneProwess => "+5 spell modifier.",
+            HealthPotionRecovering => "End of turn: heal 2.",
         }
     }
 
@@ -2841,7 +2841,7 @@ impl Condition {
             ThrillOfBattle => true,
             Adrenalin => true,
             ArcaneProwess => true,
-            HealthPotionHealing => true,
+            HealthPotionRecovering => true,
         }
     }
 
@@ -2861,7 +2861,7 @@ impl Condition {
             Dazed => StatusId::Dazed,
             Bleeding => StatusId::Bleeding,
             Burning => StatusId::Burning,
-            HealthPotionHealing => StatusId::Healing,
+            HealthPotionRecovering => StatusId::Healing,
             Blinded => StatusId::Blinded,
             Exposed => StatusId::Exposed,
             Slowed => StatusId::Slowed,

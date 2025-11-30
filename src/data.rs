@@ -1381,7 +1381,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
     name: "Health potion",
     icon: EquipmentIconId::HealthPotion,
     effect: Some(ApplyEffect::Condition(ApplyCondition {
-        condition: Condition::HealthPotionHealing,
+        condition: Condition::HealthPotionRecovering,
         stacks: Some(3),
         duration_rounds: None,
     })),

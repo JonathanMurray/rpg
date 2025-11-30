@@ -40,7 +40,8 @@ use crate::{
     },
     data::BOW,
     drawing::{
-        draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_rectangle_sides,
+        draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
+        draw_dashed_rectangle_sides,
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
@@ -1921,13 +1922,14 @@ impl GameGrid {
         let target_y = self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0;
         let depth = 2.0;
 
-        draw_dashed_line(
+        draw_dashed_line_ex(
             (actor_x, actor_y),
             (target_x, target_y),
             thickness,
             crosshair_color,
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
+            Some(self.cell_w * 0.4),
         );
 
         let cross_hair_r = self.cell_w * 0.15;

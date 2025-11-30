@@ -1618,7 +1618,7 @@ impl UserInterface {
                 (format!("{}", damage), TextEffectStyle::HostileGraze)
             }
             AttackOutcome::Hit(damage, AttackHitType::Critical) => {
-                (format!("{}", damage), TextEffectStyle::HostileCrit)
+                (format!("{}!", damage), TextEffectStyle::HostileCrit)
             }
             AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
