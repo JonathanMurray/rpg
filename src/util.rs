@@ -1,12 +1,12 @@
 use rand::Rng;
 
-use crate::core::Position;
+use crate::core::{sq_distance_between, Position, MELEE_RANGE_SQUARED};
 
-pub fn are_adjacent(a: Position, b: Position) -> bool {
-    a != b && (b.0 - a.0).abs() <= 1 && (b.1 - a.1).abs() <= 1
+pub fn are_entities_within_melee(a: Position, b: Position) -> bool {
+    sq_distance_between(a, b) <= MELEE_RANGE_SQUARED
 }
 
-pub fn adjacent_positions((x, y): Position) -> Vec<Position> {
+pub fn adjacent_cells((x, y): Position) -> Vec<Position> {
     vec![
         (x, y - 1),
         (x + 1, y - 1),

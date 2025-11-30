@@ -121,12 +121,6 @@ async fn main() {
     bob.known_attack_enhancements.push(SMITE);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
-    //TODO
-    bob.receive_condition(Condition::Burning, Some(5), None);
-    bob.receive_condition(Condition::Protected, Some(5), None);
-    bob.receive_condition(Condition::Slowed, Some(5), None);
-    bob.health.lose(15);
-
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Clara",
@@ -147,7 +141,7 @@ async fn main() {
         .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    let mut player_characters = vec![alice, bob, clara];
+    let mut player_characters = vec![clara, bob, alice];
 
     player_characters = run_fight_loop(
         player_characters,

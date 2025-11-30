@@ -163,7 +163,7 @@ impl ConfiguredAction {
             } => match target {
                 Some(target_id) => {
                     let target_char = characters.get(*target_id);
-                    let (_range, reach) = relevant_character.attack_reaches(
+                    let (_range, reach) = relevant_character.reaches_with_attack(
                         attack.hand,
                         target_char.position.get(),
                         selected_enhancements.iter().map(|e| e.effect),
@@ -663,7 +663,13 @@ impl UserInterface {
         }
 
         if outcome.switched_movement_path {
+            // TODO: does this ever happen?
+            println!("GRID SWITCHED MOVE PATH");
             self.refresh_movement_state();
+        }
+
+        if let Some(move_cost) = outcome.hovered_move_path_cost {
+            self.activity_popup.set_movement_ap_cost(move_cost);
         }
 
         player_chose
@@ -724,7 +730,7 @@ impl UserInterface {
             Some(target_id) => {
                 let target_char = self.characters.get(*target_id);
 
-                let (_range, reach) = self.active_character().attack_reaches(
+                let (_range, reach) = self.active_character().reaches_with_attack(
                     attack.hand,
                     target_char.position.get(),
                     selected_enhancements.iter().map(|e| e.effect),
@@ -1257,7 +1263,7 @@ impl UserInterface {
                     let caster_pos = self.characters.get(actor).pos();
                     let target_pos = self.characters.get(*target).pos();
 
-                    duration = 0.15 * distance_between(caster_pos, target_pos);
+                    duration = 0.05 * distance_between(caster_pos, target_pos);
 
                     self.game_grid.add_effect(
                         caster_pos,
@@ -1452,7 +1458,7 @@ impl UserInterface {
                 from,
                 to,
             } => {
-                let mut duration = 0.5;
+                let mut duration = 0.15;
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;
@@ -1540,7 +1546,7 @@ impl UserInterface {
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
-        let projectile_duration = 0.08 * distance_between(attacker_pos, target_pos);
+        let projectile_duration = 0.03 * distance_between(attacker_pos, target_pos);
 
         self.game_grid.add_effect(
             attacker_pos,

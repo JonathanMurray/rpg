@@ -13,7 +13,7 @@ use crate::{
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     game_ui::PlayerChose,
     pathfind::Path,
-    util::{adjacent_positions, are_adjacent},
+    util::{adjacent_cells, are_entities_within_melee},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -34,17 +34,23 @@ pub struct FighterBehaviour {
     chance_of_switching_target: Cell<f32>,
 }
 
-const EXPLORATION_RANGE: f32 = 20.0;
+const EXPLORATION_RANGE: f32 = 60.0;
 
 pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let character = game.active_character();
     assert!(!character.player_controlled());
 
-    match character.kind.unwrap_bot_behaviour() {
+    dbg!("BOT CHOOSING ACTION ...");
+
+    let result = match character.kind.unwrap_bot_behaviour() {
         BotBehaviour::Normal => run_normal_behaviour(game),
         BotBehaviour::Magi(magi) => run_magi_behaviour(game, magi),
         BotBehaviour::Fighter(fighter) => run_fighter_behaviour(game, fighter),
-    }
+    };
+
+    dbg!("BOT CHOSE.");
+
+    result
 }
 
 fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Option<Action> {
@@ -66,9 +72,10 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
             let distance_to = game
                 .pathfind_grid
                 .find_shortest_path_to_proximity(
+                    bot.id(),
                     bot_pos,
                     ch.pos(),
-                    weapon_range.into_range().into(),
+                    weapon_range.squared(),
                     EXPLORATION_RANGE,
                 )
                 .map(|p| p.total_distance)
@@ -112,9 +119,10 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
             println!("switching to new target?: {}", new_target.id());
 
             let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
+                bot.id(),
                 bot_pos,
                 new_target.pos(),
-                weapon_range.into_range().into(),
+                weapon_range.squared(),
                 EXPLORATION_RANGE,
             );
 
@@ -181,9 +189,10 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     }
 
     let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
+        bot.id(),
         bot_pos,
         target.pos(),
-        weapon_range.into_range().into(),
+        weapon_range.squared(),
         EXPLORATION_RANGE,
     );
 
@@ -262,59 +271,64 @@ fn simple_targetted_ability_action(ability: Ability, target: &Character) -> Acti
 }
 
 fn attack_reaches(bot: &Character, target: &Character) -> bool {
-    bot.attack_reaches(HandType::MainHand, target.pos(), iter::empty())
+    bot.reaches_with_attack(HandType::MainHand, target.pos(), iter::empty())
         .1
         != ActionReach::No
 }
 
 fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
-    let character = game.active_character();
-    assert!(!character.player_controlled());
+    let bot = game.active_character();
+    assert!(!bot.player_controlled());
 
     let mut attack_range = None;
 
-    let is_ranged_attacker = character
+    let is_ranged_attacker = bot
         .weapon(HandType::MainHand)
         .map(|weapon| !weapon.is_melee())
         .unwrap_or(false);
 
     let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
 
-    let bot_pos = character.position.get();
+    let bot_pos = bot.position.get();
 
     // Flee out of melee
     if is_ranged_attacker {
         if let Some(adj_player_char) = player_chars
             .iter()
-            .find(|ch| are_adjacent(bot_pos, ch.pos()))
+            .find(|ch| are_entities_within_melee(bot_pos, ch.pos()))
         {
-            let safe_adjacent_positions: Vec<Position> = adjacent_positions(bot_pos)
+            let safe_adjacent_positions: Vec<Position> = adjacent_cells(bot_pos)
                 .into_iter()
                 .filter(|pos| {
-                    !game.pathfind_grid.blocked_positions().contains(pos)
-                        && !player_chars.iter().any(|ch| are_adjacent(ch.pos(), *pos))
+                    game.pathfind_grid.is_free_for(bot.id(), *pos)
+                        && !player_chars
+                            .iter()
+                            .any(|ch| are_entities_within_melee(ch.pos(), *pos))
                 })
                 .collect();
 
             if let Some(safe_pos) = ChooseRandom::choose(&safe_adjacent_positions[..]) {
-                if let Some(path) = game.pathfind_grid.find_shortest_path_to(bot_pos, *safe_pos) {
+                if let Some(path) =
+                    game.pathfind_grid
+                        .find_shortest_path_to(bot.id(), bot_pos, *safe_pos)
+                {
                     println!("Bot flees from {}: {:?}", adj_player_char.name, path);
-                    return convert_path_to_move_action(character, path);
+                    return convert_path_to_move_action(bot, path);
                 }
             }
         }
     }
 
-    if let Some(attack) = character.attack_action() {
-        attack_range = Some(character.weapon(attack.hand).unwrap().range);
+    if let Some(attack) = bot.attack_action() {
+        attack_range = Some(bot.weapon(attack.hand).unwrap().range);
         ChooseRandom::shuffle(&mut player_chars[..]);
         for player_char in player_chars {
-            if character
-                .attack_reaches(attack.hand, player_char.position.get(), iter::empty())
+            if bot
+                .reaches_with_attack(attack.hand, player_char.position.get(), iter::empty())
                 .1
                 != ActionReach::No
             {
-                if character.can_attack(attack) {
+                if bot.can_attack(attack) {
                     return Some(simple_attack_action(&player_char));
                 } else {
                     println!("bot reaches a player char but doesn't have enough AP to attack. Let it chill.");
@@ -329,13 +343,15 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     for player_pos in &game.player_positions() {
         let maybe_path = if let Some(range) = attack_range {
             game.pathfind_grid.find_shortest_path_to_proximity(
+                bot.id(),
                 bot_pos,
                 *player_pos,
-                range.into_range().into(),
+                range.squared(),
                 EXPLORATION_RANGE,
             )
         } else {
             game.pathfind_grid.find_shortest_path_to_adjacent(
+                bot.id(),
                 bot_pos,
                 *player_pos,
                 EXPLORATION_RANGE,
@@ -355,7 +371,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     }
 
     if let Some(path) = shortest_path_to_some_player {
-        return convert_path_to_move_action(character, path);
+        return convert_path_to_move_action(bot, path);
     }
 
     // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
@@ -363,7 +379,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 }
 
 fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Action> {
-    let character = game.active_character();
+    let bot = game.active_character();
 
     if let Some((_, target_id)) = behaviour.current_goal.get() {
         if !game.characters.contains(target_id) {
@@ -415,10 +431,10 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
 
     let (ability, target_id) = behaviour.current_goal.get().unwrap();
 
-    if !character.can_use_action(BaseAction::UseAbility(ability)) {
+    if !bot.can_use_action(BaseAction::UseAbility(ability)) {
         dbg!(
             "MAGI cannot use ability; not enough AP?",
-            &character.action_points
+            &bot.action_points
         );
         return None;
     }
@@ -427,16 +443,17 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
 
     let target = game.characters.get(target_id);
 
-    if !character.reaches_with_ability(ability, &enhancements, target.pos()) {
-        let ability_range = ability.target.range(&enhancements).unwrap().into();
+    if !bot.reaches_with_ability(ability, &enhancements, target.pos()) {
+        let ability_range_sq = ability.target.range(&enhancements).unwrap().squared();
         let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
-            character.pos(),
+            bot.id(),
+            bot.pos(),
             target.pos(),
-            ability_range,
+            ability_range_sq,
             EXPLORATION_RANGE,
         );
         if let Some(path) = maybe_path {
-            return convert_path_to_move_action(character, path);
+            return convert_path_to_move_action(bot, path);
         } else {
             return None;
         }

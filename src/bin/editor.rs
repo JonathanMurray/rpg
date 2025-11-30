@@ -56,7 +56,6 @@ use rpg::data::{
 use rpg::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
-use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::{generate_shop_contents, run_shop_loop};

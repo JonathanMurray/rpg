@@ -1,4 +1,5 @@
 use std::{
+    cell::Ref,
     cmp::Ordering,
     collections::{HashMap, HashSet},
     f32::consts::PI,
@@ -46,7 +47,7 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
     game_ui_connection::DEBUG,
-    pathfind::{build_path_from_chart, ChartNode, PathfindGrid},
+    pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
 };
 use crate::{
@@ -123,20 +124,25 @@ impl MovementRange {
     }
 
     fn set(&mut self, speed: f32, max_range: f32) {
+        dbg!(("movement_range.set()", speed, max_range));
         self.speed = speed;
         self.max_range = max_range;
     }
 
     fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
         let extra_range = range - character_remaining_movement;
-        if extra_range <= 0.0 {
+        let result = if extra_range <= 0.0 {
             0
         } else {
-            // Costs 1 per extra range
+            // TODO: 1 stamina should afford 3 (or maybe 2) extra range, not just 1.
+            // 1 made sense previously, but now each cell is 3 times smaller than back then.
+            // There are also other places that have this cost assumption, that need to be updated
+
             extra_range.ceil() as u32
-            //(extra_range / self.speed).ceil() as u32
-        }
-        //self.options.iter().position(|(_, r)| range <= *r).unwrap()
+        };
+
+        //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
+        result
     }
 }
 
@@ -166,7 +172,7 @@ pub struct GameGrid {
     terrain_objects: HashMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: Rc<PathfindGrid>,
-    routes: IndexMap<Position, ChartNode>,
+    //routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
     character_animations: Vec<CharacterAnimation>,
@@ -188,7 +194,7 @@ pub struct GameGrid {
     status_textures: HashMap<StatusId, Texture2D>,
 }
 
-const ZOOM_LEVELS: [f32; 6] = [40.0, 48.0, 64.0, 96.0, 112.0, 128.0];
+const ZOOM_LEVELS: [f32; 6] = [16.0, 24.0, 32.0, 40.0, 48.0, 64.0];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
@@ -213,14 +219,14 @@ impl GameGrid {
         terrain_objects: HashMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
-        let zoom_index = 2;
+        let zoom_index = 1;
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();
         Self {
             sprites,
             pathfind_grid,
-            routes: Default::default(),
+            //routes: Default::default(),
             dragging_camera_from: None,
             camera_position: (Cell::new(0.0), Cell::new(0.0)),
             characters,
@@ -303,6 +309,20 @@ impl GameGrid {
         }
     }
 
+    fn routes(&self) -> Ref<IndexMap<(i32, i32), ChartNode>> {
+        let pos: (i32, i32) = self.characters.get(self.active_character_id).pos();
+        let routes = self.pathfind_grid.explore_outward(
+            self.active_character_id,
+            pos,
+            self.movement_range.max(),
+            None,
+        );
+
+        //dbg!(routes.len());
+
+        routes
+    }
+
     pub fn update(
         &mut self,
         active_character_id: CharacterId,
@@ -313,10 +333,10 @@ impl GameGrid {
 
         self.selected_player_character_id = selected_player_character_id;
 
-        let pos = self.characters.get(self.active_character_id).pos();
-        self.routes = self
-            .pathfind_grid
-            .explore_outward(pos, self.movement_range.max());
+        //let pos: (i32, i32) = self.characters.get(self.active_character_id).pos();
+        //self.routes =
+        //    self.pathfind_grid
+        //        .explore_outward(active_character_id, pos, self.movement_range.max());
 
         for effect in &mut self.effects {
             effect.age += elapsed;
@@ -328,26 +348,6 @@ impl GameGrid {
         }
         self.character_animations
             .retain(|a| a.remaining_duration > 0.0);
-
-        /*
-        if let Some(motion) = &mut self.character_motion {
-            motion.remaining_duration -= elapsed;
-            if motion.remaining_duration <= 0.0 {
-                self.character_motion = None;
-            }
-        }
-        for animation in self.character_dying_animations.iter_mut() {
-            animation.remaining_duration -= elapsed;
-        }
-        self.character_dying_animations
-            .retain(|a| a.remaining_duration > 0.0);
-        for animation in self.character_shake_animations.iter_mut() {
-            animation.remaining_duration -= elapsed;
-        }
-        self.character_shake_animations
-            .retain(|a| a.remaining_duration > 0.0);
-
-             */
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
@@ -444,13 +444,10 @@ impl GameGrid {
         let active_char = self.characters.get(active_char_id);
 
         let speed = active_char.move_speed();
-        let max_range = active_char.remaining_movement.get() + (sprint_usage as f32);
+        let max_range =
+            active_char.remaining_movement.get() + (active_char.stamina.current() as f32);
 
         self.movement_range.set(speed, max_range);
-        let pos = self.characters.get(self.active_character_id).pos();
-        self.routes = self
-            .pathfind_grid
-            .explore_outward(pos, self.movement_range.max());
     }
 
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
@@ -540,19 +537,6 @@ impl GameGrid {
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     let terrain_id = self.background.get(&(col, row)).unwrap();
                     draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
-
-                    /*
-                    let dest_size = Vec2::new(self.cell_w, self.cell_w);
-                    let params = DrawTextureParams {
-                        dest_size: Some(dest_size),
-                        ..Default::default()
-                    };
-
-                    let i =
-                        self.cell_backgrounds[(row * self.grid_dimensions.0 as i32 + col) as usize];
-                    let texture = &self.background_textures[i];
-                    draw_texture_ex(texture, x0, y0, WHITE, params);
-                     */
                 }
             }
         }
@@ -571,7 +555,8 @@ impl GameGrid {
             }
         }
 
-        for pos in self.pathfind_grid.blocked_positions().iter() {
+        for pos in self.pathfind_grid.occupied_positions().iter() {
+            // TODO
             if false {
                 self.draw_cell_outline(*pos, MAGENTA, 0.0, 5.0);
             }
@@ -580,11 +565,19 @@ impl GameGrid {
 
     fn draw_character(&self, character: &Character) {
         let mut params = DrawTextureParams {
-            dest_size: Some((self.cell_w, self.cell_w).into()),
+            dest_size: Some(
+                (
+                    self.cell_w * CELLS_PER_ENTITY as f32,
+                    self.cell_w * CELLS_PER_ENTITY as f32,
+                )
+                    .into(),
+            ),
             ..Default::default()
         };
 
         let (mut x, mut y) = self.character_screen_pos(character);
+        x -= self.cell_w;
+        y -= self.cell_w;
 
         let mut dying = false;
 
@@ -753,13 +746,7 @@ impl GameGrid {
             if let Some(BaseAction::Move) = hovered_base_action {
                 self.draw_movement_path_background();
             }
-        }
-
-        if let UiState::ConfiguringAction(ConfiguredAction::Move {
-            selected_movement_path,
-            ..
-        }) = ui_state
-        {
+        } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
             self.draw_movement_path_background();
         }
 
@@ -820,12 +807,23 @@ impl GameGrid {
         }) = ui_state
         {
             if !selected_movement_path.is_empty() {
+                // TODO This never occurs anymore? (since you immediately commit the movement path when clicking on ground?)
                 println!("Draw movement selected");
                 self.draw_movement_path(selected_movement_path, false);
             }
         }
 
         let mut hovered_character_id = None;
+
+        if is_mouse_within_grid && receptive_to_input {
+            for character in self.characters.iter() {
+                if character.occupies_cell(mouse_grid_pos) {
+                    let id = character.id();
+                    outcome.hovered_character_id = Some(id);
+                    hovered_character_id = Some(id);
+                }
+            }
+        }
 
         if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
             self.enemys_target = None;
@@ -896,7 +894,7 @@ impl GameGrid {
 
         match mouse_state {
             MouseState::RequiresEnemyTarget {
-                area_radius: Some(radius),
+                area_radius: Some(aoe_radius),
                 ..
             } => {
                 if let ActionTarget::Character(target_id, _movement) =
@@ -905,17 +903,26 @@ impl GameGrid {
                     // TODO draw movement?
                     self.draw_range_indicator(
                         self.characters.get(target_id).pos(),
-                        radius,
+                        aoe_radius,
                         RangeIndicator::TargetAreaEffect,
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
-                    self.draw_range_indicator(
-                        mouse_grid_pos,
-                        radius,
-                        RangeIndicator::TargetAreaEffect,
-                    );
+                    if let Some(hovered_id) = hovered_character_id {
+                        self.draw_range_indicator(
+                            self.characters.get(hovered_id).pos(),
+                            aoe_radius,
+                            RangeIndicator::TargetAreaEffect,
+                        );
+                    } else {
+                        self.draw_range_indicator(
+                            mouse_grid_pos,
+                            aoe_radius,
+                            RangeIndicator::TargetAreaEffect,
+                        );
+                    }
                 }
             }
+
             MouseState::RequiresPositionTarget(range) => {
                 if let ActionTarget::Position(pos) = ui_state.players_action_target() {
                     self.draw_range_indicator(
@@ -931,6 +938,7 @@ impl GameGrid {
                     );
                 }
             }
+
             _ => {}
         }
 
@@ -1050,14 +1058,6 @@ impl GameGrid {
         }
 
         if is_mouse_within_grid && receptive_to_input {
-            for character in self.characters.iter() {
-                if character.pos() == mouse_grid_pos {
-                    let id = character.id();
-                    outcome.hovered_character_id = Some(id);
-                    hovered_character_id = Some(id);
-                }
-            }
-
             let pressed_terrain = pressed_left_mouse && hovered_character_id.is_none();
 
             if pressed_terrain {
@@ -1151,29 +1151,26 @@ impl GameGrid {
                 _ => {}
             }
 
-            let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement)
-                && hovered_character_id.is_none()
-            {
-                self.routes.get(&mouse_grid_pos).copied()
+            let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement) {
+                self.determine_hovered_route_position(mouse_grid_pos)
             } else {
                 None
             };
 
-            if let Some(hovered_route) = &hovered_move_route {
+            if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
-                    let path = build_path_from_chart(&self.routes, active_char_pos, mouse_grid_pos);
+                    //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
+                    let path =
+                        build_path_from_chart(&self.routes(), active_char_pos, *hovered_route_dst);
                     self.draw_movement_path(&path.positions, true);
 
-                    if pressed_left_mouse {
-                        let char_remaining_movement = self
-                            .characters
-                            .get(self.active_character_id)
-                            .remaining_movement
-                            .get();
-                        let cost = self
-                            .movement_range
-                            .cost(hovered_route.distance_from_start, char_remaining_movement);
+                    let remaining_movement = self.active_char_remaining_movement();
 
+                    let cost = self
+                        .movement_range
+                        .cost(hovered_route_node.distance_from_start, remaining_movement);
+
+                    if pressed_left_mouse {
                         let commit_movement = matches!(
                             ui_state,
                             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
@@ -1183,12 +1180,13 @@ impl GameGrid {
                             selected_movement_path: path.positions,
                         });
                         outcome.switched_state = Some(NewState::Move { commit_movement });
+                    } else {
+                        outcome.hovered_move_path_cost = Some(cost);
                     }
                 }
             } else if let Some(hovered_id) = hovered_character_id {
-                let hovers_player = self.characters.get(hovered_id).player_controlled();
-
-                if hovers_player {
+                let hovered_char = self.characters.get(hovered_id);
+                if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_cornered_outline(
                             self.grid_pos_to_screen(mouse_grid_pos),
@@ -1232,10 +1230,11 @@ impl GameGrid {
                     }
                 } else {
                     if let MouseState::RequiresEnemyTarget {
-                        move_into_melee, ..
+                        move_into_melee: maybe_move_to_target,
+                        ..
                     } = mouse_state
                     {
-                        if let Some(move_range) = move_into_melee {
+                        if let Some(move_range) = maybe_move_to_target {
                             let positions = if within_range_squared(
                                 move_range.squared(),
                                 active_char_pos,
@@ -1257,14 +1256,14 @@ impl GameGrid {
                             );
                         } else {
                             self.draw_cornered_outline(
-                                self.grid_pos_to_screen(mouse_grid_pos),
+                                self.grid_pos_to_screen(hovered_char.pos()),
                                 HOVER_ENEMY_COLOR,
                                 5.0,
                                 3.0,
                             );
                             self.draw_target_crosshair(
                                 active_char_pos,
-                                mouse_grid_pos,
+                                hovered_char.pos(),
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                                 4.0,
                             );
@@ -1435,6 +1434,69 @@ impl GameGrid {
         outcome
     }
 
+    fn determine_hovered_route_position(
+        &self,
+        mouse_grid_pos: (i32, i32),
+    ) -> Option<((i32, i32), ChartNode)> {
+        match self.routes().get(&mouse_grid_pos) {
+            // distance_from_start == 0, means we're hovering the character's current position
+            Some(node)
+                if node.distance_from_start > 0.0
+                    && node.distance_from_start <= self.movement_range.max() =>
+            {
+                return Some((mouse_grid_pos, *node));
+            }
+            _ => {}
+        }
+
+        // When hovering a cell adjacent to an occupied cell, the hovered cell is not
+        // considered free for a character, since a character takes up multiple cells.
+        // However, if there's a free cell somewhere else adjacent to the hovered cell,
+        // the user's intention is probably to hover that one.
+        let (mx, my) = mouse_grid_pos;
+        let adjacency_lists = [
+            // first straight
+            [(mx - 1, my), (mx + 1, my), (mx, my - 1), (mx, my + 1)],
+            // then diagonal
+            [
+                (mx - 1, my - 1),
+                (mx + 1, my - 1),
+                (mx + 1, my + 1),
+                (mx - 1, my + 1),
+            ],
+        ];
+        for adjacent_cells in adjacency_lists {
+            let mut result: Option<(Position, ChartNode)> = None;
+            for adj in adjacent_cells {
+                if let Some(node) = self.routes().get(&adj) {
+                    if node.distance_from_start > 0.0
+                        && node.distance_from_start <= self.movement_range.max()
+                    {
+                        //dbg!((mouse_grid_pos, adj, node));
+
+                        // When weighing between two cells that are both either straight or diagonal,
+                        // prefer the one closest to the mover
+                        let should_use = result
+                            .map(|existing| {
+                                node.distance_from_start < existing.1.distance_from_start
+                            })
+                            .unwrap_or(true);
+
+                        if should_use {
+                            result = Some((adj, *node));
+                        }
+                    }
+                }
+            }
+
+            if result.is_some() {
+                return result;
+            }
+        }
+
+        None
+    }
+
     fn draw_movement_to_target(
         &self,
         actor_pos: (i32, i32),
@@ -1465,7 +1527,9 @@ impl GameGrid {
         actor_pos: (i32, i32),
         move_range: Range,
     ) -> Vec<Position> {
+        let actor_id = self.active_character_id;
         let maybe_path = self.pathfind_grid.find_shortest_path_to_adjacent(
+            actor_id,
             actor_pos,
             target_pos,
             f32::from(move_range) - 1.0,
@@ -1477,30 +1541,6 @@ impl GameGrid {
         } else {
             vec![]
         }
-
-        /*
-        let mut movement = vec![];
-        for (dx, dy) in [
-            (-1, 0),
-            (0, -1),
-            (1, 0),
-            (0, 1),
-            (-1, -1),
-            (1, -1),
-            (1, 1),
-            (-1, 1),
-        ] {
-            let x = actor_pos.0 + dx;
-            let y = actor_pos.1 + dy;
-            let blocked = self.pathfind_grid.blocked_positions().contains(&(x, y));
-
-            if !blocked && (x - target_pos.0).abs() <= 1 && (y - target_pos.1).abs() <= 1 {
-                movement = vec![(x, y)];
-                break;
-            }
-        }
-        movement
-         */
     }
 
     fn determine_range_indicator(
@@ -1520,7 +1560,7 @@ impl GameGrid {
                         let (range, reach) = self
                             .characters
                             .get(self.active_character_id)
-                            .attack_reaches(
+                            .reaches_with_attack(
                                 attack.hand,
                                 self.characters.get(*target).position.get(),
                                 selected_enhancements.iter().map(|e| e.effect),
@@ -1553,7 +1593,7 @@ impl GameGrid {
                     selected_enhancements,
                     target,
                 } => match target {
-                    ActionTarget::Character(target_char_id, movement) => {
+                    ActionTarget::Character(target_char_id, ..) => {
                         let maybe_indicator = if self
                             .characters
                             .get(self.active_character_id)
@@ -1573,6 +1613,7 @@ impl GameGrid {
                             )
                         })
                     }
+
                     ActionTarget::Position(target_pos) => {
                         let maybe_indicator = if self
                             .characters
@@ -1590,6 +1631,7 @@ impl GameGrid {
                             )
                         })
                     }
+
                     ActionTarget::None => {
                         let radius = ability.target.radius(selected_enhancements);
                         let range = ability.target.range(selected_enhancements);
@@ -1648,11 +1690,11 @@ impl GameGrid {
         let sprite_h = character_sprite_height(character.sprite);
         let texture_h = 32.0;
 
-        let y = y - self.cell_w * 0.3;
+        let y = y - self.cell_w * 1.3;
         let y = y + (texture_h - sprite_h as f32) / texture_h * self.cell_w;
 
         let margin = 2.0;
-        let health_w = (self.cell_w - 10.0).min(90.0);
+        let health_w = (self.cell_w * CELLS_PER_ENTITY as f32 - 10.0).min(90.0);
         let mut health_h = 10.0;
         let health_x = x + (self.cell_w - health_w) * 0.5;
         let mut health_y = y - health_h;
@@ -1769,10 +1811,10 @@ impl GameGrid {
         let (x, y) = self.character_screen_pos(self.characters.get(self.active_character_id));
         let margin = 3.0;
         draw_rectangle(
-            x + margin,
-            y + margin,
-            self.cell_w - margin * 2.0,
-            self.cell_w - margin * 2.0,
+            x - self.cell_w + margin,
+            y - self.cell_w + margin,
+            self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
+            self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
             ACTIVE_CHARACTER_COLOR,
         );
     }
@@ -1784,12 +1826,12 @@ impl GameGrid {
         margin: f32,
         thickness: f32,
     ) {
-        let len = self.cell_w * 0.25;
+        let len = self.cell_w * 0.7;
         draw_cornered_rectangle_lines(
-            screen_pos.0,
-            screen_pos.1,
-            self.cell_w,
-            self.cell_w,
+            screen_pos.0 - self.cell_w,
+            screen_pos.1 - self.cell_w,
+            self.cell_w * CELLS_PER_ENTITY as f32,
+            self.cell_w * CELLS_PER_ENTITY as f32,
             thickness,
             color,
             margin,
@@ -1932,7 +1974,7 @@ impl GameGrid {
             Some(self.cell_w * 0.4),
         );
 
-        let cross_hair_r = self.cell_w * 0.15;
+        let cross_hair_r = self.cell_w * 0.4;
         draw_crosshair((target_x + depth, target_y + depth), cross_hair_r, BLACK);
         draw_crosshair((target_x, target_y), cross_hair_r, crosshair_color);
     }
@@ -1978,12 +2020,27 @@ impl GameGrid {
     }
 
     fn draw_movement_path_background(&self) {
-        let active_char_pos = self.characters.get(self.active_character_id).pos();
+        //let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        for (pos, route) in &self.routes {
-            if self.is_within_grid(*pos) && *pos != active_char_pos {
-                let color = MOVEMENT_PREVIEW_GRID_COLOR;
-                self.fill_cell(*pos, color, self.cell_w / 20.0);
+        let active_char = self.characters.get(self.active_character_id);
+
+        for (pos, chart_node) in self.routes().iter() {
+            if chart_node.distance_from_start <= active_char.remaining_movement.get() {
+                self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+            } else if chart_node.distance_from_start <= self.movement_range.max() {
+                //if self.is_within_grid(*pos) && *pos != active_char_pos {
+                self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), self.cell_w / 20.0);
+                //}
+            }
+        }
+
+        for (pos, occupation) in self.pathfind_grid.occupied().iter() {
+            let draw_occupation = match occupation {
+                Occupation::Character(id) => *id != self.active_character_id,
+                Occupation::Terrain => true,
+            };
+            if draw_occupation {
+                self.fill_cell(*pos, Color::new(0.9, 0.1, 0.2, 0.1), 0.0);
             }
         }
     }
@@ -2015,6 +2072,10 @@ impl GameGrid {
             self.grid_y_to_screen(destination.1),
         );
 
+        self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0);
+
+        //self.draw_cell_outline(destination, MAGENTA, 5.0, 2.0);
+
         let text_color = if hover { LIGHTGRAY } else { WHITE };
         let bg_color = if hover {
             Color::new(0.0, 0.0, 0.0, 0.5)
@@ -2022,16 +2083,20 @@ impl GameGrid {
             Color::new(0.0, 0.0, 0.0, 0.7)
         };
 
-        let char_remaining_movement = self
-            .characters
-            .get(self.active_character_id)
-            .remaining_movement
-            .get();
-        let ap = self.movement_range.cost(distance, char_remaining_movement);
+        let ap = self
+            .movement_range
+            .cost(distance, self.active_char_remaining_movement());
         if ap > 0 {
             let text = format!("-{}", ap);
             self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
         }
+    }
+
+    fn active_char_remaining_movement(&self) -> f32 {
+        self.characters
+            .get(self.active_character_id)
+            .remaining_movement
+            .get()
     }
 
     fn draw_movement_path_arrow(
@@ -2219,6 +2284,10 @@ pub struct GridOutcome {
     pub hovered_character_id: Option<CharacterId>,
     pub switched_inspect_target: Option<Option<CharacterId>>,
     pub switched_players_action_target: bool,
+
+    pub hovered_move_path_cost: Option<u32>,
+
+    // TODO: is this relevant still?
     pub switched_movement_path: bool,
 }
 

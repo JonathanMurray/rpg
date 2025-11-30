@@ -6,6 +6,8 @@ use macroquad::{
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
 };
 
+use crate::pathfind::CELLS_PER_ENTITY;
+
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
     PinkMan,
@@ -446,8 +448,8 @@ pub fn draw_terrain(
     );
     let src_rect_size = src_rect.size();
     let dst_size = (
-        cell_w * src_rect_size.x / 32.0,
-        cell_w * src_rect_size.y / 32.0,
+        cell_w * src_rect_size.x / w * CELLS_PER_ENTITY as f32,
+        cell_w * src_rect_size.y / h * CELLS_PER_ENTITY as f32,
     );
 
     let params = DrawTextureParams {
@@ -456,7 +458,7 @@ pub fn draw_terrain(
         ..Default::default()
     };
 
-    draw_texture_ex(texture, x, y, WHITE, params);
+    draw_texture_ex(texture, x - cell_w, y - cell_w, WHITE, params);
 }
 
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {

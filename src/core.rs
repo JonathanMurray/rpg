@@ -15,9 +15,9 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 use crate::data::{PassiveSkill, ADRENALIN_POTION};
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::PathfindGrid;
+use crate::pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY};
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
-use crate::util::are_adjacent;
+use crate::util::are_entities_within_melee;
 
 pub type Position = (i32, i32);
 
@@ -218,7 +218,7 @@ impl CoreGame {
 
             for ch in self.characters.iter() {
                 if ch.is_dead() {
-                    self.pathfind_grid.set_blocked(ch.pos(), false);
+                    self.pathfind_grid.set_occupied(ch.pos(), None);
                 }
             }
             let dead_character_ids = self.characters.remove_dead();
@@ -299,7 +299,7 @@ impl CoreGame {
 
                 assert!(
                     attacker
-                        .attack_reaches(
+                        .reaches_with_attack(
                             hand,
                             defender.position.get(),
                             enhancements.iter().map(|e| e.effect)
@@ -520,6 +520,7 @@ impl CoreGame {
         mut positions: Vec<Position>,
         can_trigger_opportunity_attack: bool,
     ) {
+        //dbg!(("perform movement: {:?}", &positions));
         let start_position = positions.remove(0);
         assert!(start_position == self.active_character().pos());
         assert!(
@@ -596,8 +597,9 @@ impl CoreGame {
             let prev_position = character.position.get();
             let id = character.id();
 
-            self.pathfind_grid.set_blocked(prev_position, false);
-            self.pathfind_grid.set_blocked(new_position, true);
+            self.pathfind_grid.set_occupied(prev_position, None);
+            self.pathfind_grid
+                .set_occupied(new_position, Some(Occupation::Character(id)));
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
@@ -608,6 +610,8 @@ impl CoreGame {
 
             self.active_character().position.set(new_position);
         }
+
+        dbg!(self.active_character().pos());
 
         self.on_character_positions_changed();
     }
@@ -626,7 +630,7 @@ impl CoreGame {
                 let mut num_adjacent_enemies = 0;
                 for (pos, player_controlled) in &positions {
                     if *player_controlled != character.player_controlled() {
-                        if are_adjacent(*pos, character.pos()) {
+                        if are_entities_within_melee(*pos, character.pos()) {
                             num_adjacent_enemies += 1;
                         }
                     }
@@ -2038,7 +2042,8 @@ impl CoreGame {
                 .characters
                 .iter()
                 .filter(|other| {
-                    other.id != character.id && are_adjacent(other.pos(), character.pos())
+                    other.id != character.id
+                        && are_entities_within_melee(other.pos(), character.pos())
                 })
                 .collect();
             if !adj_others.is_empty() {
@@ -3551,7 +3556,7 @@ impl Attributes {
     }
 
     fn move_speed(&self) -> f32 {
-        2.0 + self.agility.get() as f32 * 0.2
+        6.0 + self.agility.get() as f32 * 0.5
     }
 
     fn max_health(&self) -> u32 {
@@ -3973,6 +3978,11 @@ impl Character {
         self.position.get()
     }
 
+    pub fn occupies_cell(&self, pos: Position) -> bool {
+        self.pos() == pos
+            || ((pos.0 - self.pos().0).abs() <= 1 && (pos.1 - self.pos().1).abs() <= 1)
+    }
+
     pub fn id(&self) -> CharacterId {
         self.id.unwrap()
     }
@@ -4186,7 +4196,7 @@ impl Character {
         self.hand(hand).get().weapon.unwrap().action_point_cost
     }
 
-    pub fn attack_reaches(
+    pub fn reaches_with_attack(
         &self,
         hand: HandType,
         target_position: Position,
@@ -4776,7 +4786,7 @@ impl Character {
             bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
         }
 
-        let (_range, reach) = self.attack_reaches(
+        let (_range, reach) = self.reaches_with_attack(
             hand_type,
             target_pos,
             enhancement_effects.iter().map(|(_, e)| *e),
@@ -5042,21 +5052,47 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
 }
 
 fn are_flanking_target(attacker: Position, melee_engager: Position, target: Position) -> bool {
-    // Note: engagement is always melee, which is why this vector is also a direction
-    let engage_dir = (melee_engager.0 - target.0, melee_engager.1 - target.1);
+    let engaged_from = (melee_engager.0 - target.0, melee_engager.1 - target.1);
     let (dx, dy) = (attacker.0 - target.0, attacker.1 - target.1);
     assert!((dx, dy) != (0, 0));
 
-    match engage_dir {
-        (1, 0) => dx < 0 && dy.abs() <= dx.abs(),
-        (1, -1) => dx <= 0 && dy >= 0,
-        (0, -1) => dy > 0 && dx.abs() <= dy.abs(),
-        (-1, -1) => dx >= 0 && dy >= 0,
-        (-1, 0) => dx > 0 && dy.abs() <= dx.abs(),
-        (-1, 1) => dx >= 0 && dy <= 0,
-        (0, 1) => dy < 0 && dx.abs() <= dy.abs(),
-        (1, 1) => dx <= 0 && dy <= 0,
-        _ => unreachable!("Engagement not melee: {engage_dir:?}"),
+    match engaged_from {
+        // from east
+        (3, eng_y) if (-1..=1).contains(&eng_y) => dx < 0 && dy.abs() <= dx.abs(),
+        // from west
+        (-3, eng_y) if (-1..=1).contains(&eng_y) => dx > 0 && dy.abs() <= dx.abs(),
+        // from north
+        (eng_x, -3) if (-1..=1).contains(&eng_x) => dy > 0 && dx.abs() <= dy.abs(),
+        // from south
+        (eng_x, 3) if (-1..=1).contains(&eng_x) => dy < 0 && dx.abs() <= dy.abs(),
+        // from some diagonal
+        (eng_x, eng_y) => {
+            // from northwest
+            if eng_x < 0 && eng_y < 0 {
+                dx >= 0 && dy >= 0
+            }
+            // from northeast
+            else if eng_x > 0 && eng_y < 0 {
+                dx <= 0 && dy >= 0
+            }
+            // from southwest
+            else if eng_x < 0 && eng_y > 0 {
+                dx >= 0 && dy <= 0
+            }
+            // from southeast
+            else if eng_x > 0 && eng_y > 0 {
+                dx <= 0 && dy <= 0
+            }
+            // invalid
+            else {
+                panic!(
+                    "Invalid engagement direction: {:?}. Engager={:?}, target={:?}",
+                    (eng_x, eng_y),
+                    melee_engager,
+                    target
+                );
+            }
+        }
     }
 }
 
@@ -5076,15 +5112,22 @@ pub enum ActionReach {
 
 pub fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
     let distance_squared = (destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2);
+    //dbg!(("within range squared", range_squared, source, destination, distance_squared));
     distance_squared as f32 <= range_squared
 }
 
+pub const MELEE_RANGE_SQUARED: f32 = 13.0;
+
 fn within_meele(source: Position, destination: Position) -> bool {
-    within_range_squared(2.0, source, destination)
+    within_range_squared(MELEE_RANGE_SQUARED, source, destination)
+}
+
+pub fn sq_distance_between(source: Position, destination: Position) -> f32 {
+    ((destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2)) as f32
 }
 
 pub fn distance_between(source: Position, destination: Position) -> f32 {
-    (((destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2)) as f32).sqrt()
+    sq_distance_between(source, destination).sqrt()
 }
 
 #[derive(Debug, Clone)]
@@ -5273,7 +5316,19 @@ impl Display for WeaponRange {
 impl WeaponRange {
     pub fn squared(&self) -> f32 {
         match self {
-            Self::Melee => 2.0,
+            /*
+            This is the max distance to be considered melee:
+
+            AAA
+            AAA
+            AAABBB
+               BBB
+               BBB
+
+            I.e. two sides must be touching. The distance between the center point
+            is therefore sqrt(3^2 + 2^2)
+             */
+            Self::Melee => ((3u32).pow(2) + (2u32).pow(2)) as f32,
             Self::Ranged(range) => range.pow(2) as f32,
         }
     }
@@ -5310,7 +5365,7 @@ impl Display for Range {
 impl Range {
     pub fn squared(&self) -> f32 {
         match self {
-            Range::Melee => 2.0,
+            Range::Melee => MELEE_RANGE_SQUARED,
             Range::Ranged(range) => range.pow(2) as f32,
             Range::ExtendableRanged(range) => range.pow(2) as f32,
             Range::Float(range) => range.powf(2.0),
@@ -5319,7 +5374,7 @@ impl Range {
 
     pub fn plus(&self, n: u32) -> Range {
         match self {
-            Range::Melee => Range::Float(2f32.sqrt() + n as f32),
+            Range::Melee => Range::Float(MELEE_RANGE_SQUARED.sqrt() + n as f32),
             Range::Ranged(range) => Range::Ranged(range + n),
             Range::ExtendableRanged(range) => Range::Ranged(range + n),
             Range::Float(range) => Range::Float(range + n as f32),
@@ -5328,7 +5383,7 @@ impl Range {
 
     pub fn plusf(&self, n: f32) -> Range {
         match self {
-            Range::Melee => Range::Float(2f32.sqrt() + n),
+            Range::Melee => Range::Float(MELEE_RANGE_SQUARED.sqrt() + n),
             Range::Ranged(range) => Range::Float(*range as f32 + n),
             Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
             Range::Float(range) => Range::Float(range + n),
@@ -5339,7 +5394,7 @@ impl Range {
 impl From<Range> for f32 {
     fn from(range: Range) -> Self {
         match range {
-            Range::Melee => 2f32.sqrt(),
+            Range::Melee => MELEE_RANGE_SQUARED.sqrt(),
             Range::Ranged(r) => r as f32,
             Range::ExtendableRanged(r) => r as f32,
             Range::Float(f) => f,

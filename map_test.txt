@@ -1,12 +1,6 @@
 +----------------------------
-BBBBBBBBBBBBB
-BRR         B
-BR          B
-B           B
-B   024    SB
-B  S135    SB
-B  PP  W   SB
-B  P   WW   B
-BB         BB
- BBBBBBBBBBB
+
+                 W    WWW
+   P S0  WWW     W     W
+   P  1                WW
 +----------------------------

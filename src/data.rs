@@ -260,7 +260,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
 
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
-    range: WeaponRange::Ranged(5),
+    range: WeaponRange::Ranged(15),
     action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
@@ -275,7 +275,7 @@ pub const BAD_BOW: Weapon = Weapon {
 
 pub const BOW: Weapon = Weapon {
     name: "Bow",
-    range: WeaponRange::Ranged(5),
+    range: WeaponRange::Ranged(15),
     action_point_cost: 3,
     damage: 7,
     grip: WeaponGrip::TwoHanded,
@@ -290,7 +290,7 @@ pub const BOW: Weapon = Weapon {
 
 pub const ELUSIVE_BOW: Weapon = Weapon {
     name: "Elusive bow",
-    range: WeaponRange::Ranged(6),
+    range: WeaponRange::Ranged(18),
     action_point_cost: 3,
     damage: 7,
     grip: WeaponGrip::TwoHanded,
@@ -523,7 +523,7 @@ pub const LONGER_REACH: AttackEnhancement = AttackEnhancement {
     weapon_requirement: Some(WeaponType::Ranged),
     effect: AttackEnhancementEffect {
         roll_advantage: -1,
-        range_bonus: 2,
+        range_bonus: 6,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -658,6 +658,8 @@ pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
     action_point_cost: 0,
     mana_cost: 0,
     stamina_cost: 1,
+    // TODO surely we don't need to increase the range both with SpellEnhancementEffect and AttackEnhancementEffect
+    // One of them should be the correct way.
     spell_effect: Some(SpellEnhancementEffect {
         increased_range_tenths: 10,
         ..SpellEnhancementEffect::default()
@@ -684,8 +686,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
         None,
     ],
     target: AbilityTarget::Enemy {
-        //reach: AbilityReach::MoveIntoMelee(Range::Float(3.99)),
-        reach: AbilityReach::MoveIntoMelee(Range::Float(3.5)),
+        reach: AbilityReach::MoveIntoMelee(Range::Float(10.0)),
         effect: AbilityNegativeEffect::PerformAttack,
         impact_area: None,
     },
@@ -759,7 +760,7 @@ pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_radius_tenths: 15,
+        increased_radius_tenths: 45,
         ..SpellEnhancementEffect::default()
     }),
 };
@@ -776,7 +777,7 @@ pub const SCREAM: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Float(2.5),
+            radius: Range::Ranged(7),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
@@ -810,7 +811,7 @@ pub const SHACKLED_MIND: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(4.0)),
+        reach: AbilityReach::Range(Range::Float(12.0)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
@@ -894,13 +895,13 @@ pub const MIND_BLAST: Ability = Ability {
         None,
     ],
     target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Ranged(15)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Static(1)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Ranged(5)),
     },
     animation_color: PURPLE,
 };
@@ -940,7 +941,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(3.5)),
+        reach: AbilityReach::Range(Range::Float(10.0)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,
@@ -984,7 +985,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
             ]),
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Ranged(5)),
+        reach: AbilityReach::Range(Range::Ranged(15)),
     },
     animation_color: BROWN,
 };
@@ -1002,6 +1003,7 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Ranged(15)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
@@ -1015,7 +1017,6 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
             ]),
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Ranged(5)),
     },
     animation_color: PURPLE,
 };
@@ -1032,7 +1033,7 @@ pub const MAGI_HEAL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
-        range: Range::Ranged(5),
+        range: Range::Ranged(15),
         effect: AbilityPositiveEffect {
             healing: 5,
             apply: None,
@@ -1068,7 +1069,7 @@ pub const HEAL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
-        range: Range::Ranged(3),
+        range: Range::Ranged(9),
         effect: AbilityPositiveEffect {
             healing: 4,
             apply: Some([
@@ -1092,7 +1093,7 @@ pub const HEAL: Ability = Ability {
             stamina_cost: 0,
             attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
-                increased_range_tenths: 20,
+                increased_range_tenths: 60,
                 ..SpellEnhancementEffect::default()
             }),
         }),
@@ -1118,7 +1119,7 @@ pub const HEALING_NOVA: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Ranged(4),
+            radius: Range::Ranged(12),
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -1201,9 +1202,9 @@ pub const HEALING_RAIN: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Area {
-        range: Range::Ranged(5),
+        range: Range::Ranged(15),
         area_effect: AreaEffect {
-            radius: Range::Float(1.95),
+            radius: Range::Ranged(5),
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -1239,7 +1240,7 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_radius_tenths: 10,
+        increased_radius_tenths: 30,
         ..SpellEnhancementEffect::default()
     }),
 };
@@ -1276,14 +1277,14 @@ pub const FIREBALL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(4.5)),
+        reach: AbilityReach::Range(Range::Float(12.0)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
             damage: Some(AbilityDamage::AtLeast(3)),
             on_hit: None,
         }),
         impact_area: Some((
-            Range::Ranged(2),
+            Range::Ranged(6),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -1314,13 +1315,13 @@ pub const KILL: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
     target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Ranged(30)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: None,
             damage: Some(AbilityDamage::Static(99)),
             on_hit: None,
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Ranged(10)),
     },
     animation_color: BLACK,
 };
@@ -1359,6 +1360,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(SEARING_LIGHT_BURN), None, None],
     target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Ranged(9)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::AtLeast(3)),
@@ -1372,7 +1374,6 @@ pub const SEARING_LIGHT: Ability = Ability {
             ]),
         }),
         impact_area: None,
-        reach: AbilityReach::Range(Range::Ranged(3)),
     },
     animation_color: YELLOW,
 };

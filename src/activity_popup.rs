@@ -425,7 +425,7 @@ impl ActivityPopup {
             .map(|id| &self.choice_buttons[id].action)
     }
 
-    // TODO rename
+    // TODO get rid of this?
     pub fn on_new_movement_ap_cost(&mut self) {
         let UiState::ConfiguringAction(ConfiguredAction::Move { cost, .. }) =
             *self.ui_state.borrow()
@@ -442,6 +442,17 @@ impl ActivityPopup {
 
             slider.selected_i = cost;
         }
+    }
+
+    pub fn set_movement_ap_cost(&mut self, cost: u32) {
+        let slider = self.movement_cost_slider.as_mut().unwrap();
+        let character = self.characters.get(self.relevant_character_id);
+        let max_cost = character.stamina.current();
+        slider.set_max_allowed(max_cost);
+
+        assert!(cost <= max_cost);
+
+        slider.selected_i = cost;
     }
 
     fn movement_cost(&self) -> u32 {

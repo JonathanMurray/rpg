@@ -60,7 +60,6 @@ use crate::data::{
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::game_ui::{PlayerChose, UiState, UserInterface};
 use crate::game_ui_connection::GameUserInterfaceConnection;
-use crate::init_fight_map::{init_fight_map, FightId};
 use crate::map_scene::{MapChoice, MapScene};
 use crate::rest_scene::run_rest_loop;
 use crate::shop_scene::{generate_shop_contents, run_shop_loop};
