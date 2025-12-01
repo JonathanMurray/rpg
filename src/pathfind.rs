@@ -1,7 +1,6 @@
 use std::{
     cell::{Cell, Ref, RefCell},
     collections::{HashMap, HashSet},
-    ops::Deref,
     time::Instant,
 };
 
@@ -24,7 +23,13 @@ pub enum Occupation {
 struct CacheKey {
     from: Position,
     range: f32,
-    target_proximity_squared: Option<(Position, f32)>,
+    target: Option<Target>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Default)]
+pub struct Target {
+    pos: Position,
+    proximity_squared: f32,
 }
 
 pub struct PathfindGrid {
@@ -153,7 +158,10 @@ impl PathfindGrid {
             character_id,
             start,
             exploration_range,
-            Some((target, proximity_squared)),
+            Some(Target {
+                pos: target,
+                proximity_squared,
+            }),
         );
         let mut shortest_path: Option<Path> = None;
         for (pos, chart_node) in chart.iter() {
@@ -184,7 +192,7 @@ impl PathfindGrid {
         character_id: CharacterId,
         start: Position,
         range: f32,
-        target_proximity_squared: Option<(Position, f32)>,
+        target: Option<Target>,
     ) -> Ref<IndexMap<Position, ChartNode>> {
         /*
         println!(
@@ -195,7 +203,7 @@ impl PathfindGrid {
 
         if self.cache_key.get().from == start
             && self.cache_key.get().range >= range
-            && self.cache_key.get().target_proximity_squared == target_proximity_squared
+            && self.cache_key.get().target == target
         {
             /*
             println!(
@@ -211,12 +219,16 @@ impl PathfindGrid {
             *self.cached_exploration_chart.borrow_mut() = Default::default();
             self.cached_unexplored.borrow_mut().clear();
         }
-        if let Some((target, proximity_squared)) = target_proximity_squared {
+        if let Some(Target {
+            pos: target_pos,
+            proximity_squared,
+        }) = target
+        {
             for (pos, _chart_node) in self.cached_exploration_chart.borrow().iter() {
-                if within_range_squared(proximity_squared, *pos, target) {
+                if within_range_squared(proximity_squared, *pos, target_pos) {
                     println!(
                         "explore_outward(char={}, start={:?}, range={}, target={:?}. Found target within cache: pos={:?}",
-                        character_id, start, range, target_proximity_squared, pos
+                        character_id, start, range, target, pos
                     );
                     return self.cached_exploration_chart.borrow();
                 }
@@ -226,6 +238,7 @@ impl PathfindGrid {
         // Otherwise, we're free to re-use however much was explored previously, and just extend out from it
         let mut mut_chart = self.cached_exploration_chart.borrow_mut();
 
+        // TODO: This should be a PriorityQueue, so that heuristically good nodes are always explored before others
         let mut next = self.cached_unexplored.take();
 
         if next.is_empty() {
@@ -242,7 +255,7 @@ impl PathfindGrid {
         self.cache_key.set(CacheKey {
             from: start,
             range,
-            target_proximity_squared,
+            target,
         });
 
         let mut unexplored = vec![];
@@ -286,12 +299,15 @@ impl PathfindGrid {
                 ((x + 1, y + 1), dist + diagonal),
             ];
 
-            if let Some((target, _)) = target_proximity_squared {
+            if let Some(Target {
+                pos: target_pos, ..
+            }) = target
+            {
                 // The neighbors with lower heuristic (i.e. are likely to yield a good path to the target)
                 // should be visited before other neighbors
                 neighbors.sort_unstable_by(|(a, _), (b, _)| {
-                    let a_heuristic = sq_distance_between(*a, target);
-                    let b_heuristic = sq_distance_between(*b, target);
+                    let a_heuristic = sq_distance_between(*a, target_pos);
+                    let b_heuristic = sq_distance_between(*b, target_pos);
                     a_heuristic.total_cmp(&b_heuristic)
                 });
             }
@@ -309,9 +325,13 @@ impl PathfindGrid {
 
                     let mut should_explore_neighbor = true;
 
-                    if let Some((target, proximity_squared)) = target_proximity_squared {
+                    if let Some(Target {
+                        pos: target_pos,
+                        proximity_squared,
+                    }) = target
+                    {
                         // It's impossible to reach the target within the allowed exploration range, with a path passing this neighbor
-                        if neighbor_dist + distance_between(neighbor_pos, target)
+                        if neighbor_dist + distance_between(neighbor_pos, target_pos)
                             - proximity_squared.sqrt()
                             > range
                         {
@@ -332,12 +352,15 @@ impl PathfindGrid {
                 }
             }
 
-            if let Some((target, proximity_squared)) = target_proximity_squared {
-                if sq_distance_between(pos, target) <= proximity_squared {
+            if let Some(Target {
+                pos: target_pos,
+                proximity_squared,
+            }) = target
+            {
+                if sq_distance_between(pos, target_pos) <= proximity_squared {
                     println!(
-                        "Found a path to proximity ({:?}, proxy={}), pos={:?}. Chart size={}",
+                        "Found a path to proximity ({:?}), pos={:?}. Chart size={}",
                         target,
-                        proximity_squared,
                         pos,
                         mut_chart.len()
                     );
