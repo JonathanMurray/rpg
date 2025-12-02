@@ -785,6 +785,10 @@ impl GameGrid {
 
         for character in self.characters.iter() {
             self.draw_character(character);
+
+            if is_key_down(KeyCode::LeftAlt) {
+                labelled_char_ids.insert(character.id());
+            }
         }
 
         if let Some((range, indicator)) = range_indicator {
