@@ -673,7 +673,7 @@ impl UserInterface {
         }
 
         if let Some(move_cost) = outcome.hovered_move_path_cost {
-            self.activity_popup.set_movement_ap_cost(move_cost);
+            self.activity_popup.set_movement_cost(move_cost);
         }
 
         player_chose
@@ -1033,7 +1033,6 @@ impl UserInterface {
 
         let mut is_reacting = None;
         let mut is_reacting_to_attack = false;
-        let mut movement_cost = 0;
 
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
@@ -1066,7 +1065,7 @@ impl UserInterface {
                         *selected_enhancements = remembered.clone();
                     }
                 } else if let ConfiguredAction::Move { cost, .. } = configured_action {
-                    movement_cost = *cost;
+                    //movement_cost = *cost;
                 }
             }
 
@@ -1119,8 +1118,7 @@ impl UserInterface {
         self.refresh_target_state();
         self.refresh_movement_state();
 
-        self.game_grid
-            .update_move_speed(self.active_character_id, movement_cost);
+        self.game_grid.update_move_speed(self.active_character_id);
 
         self.refresh_selected_action_button();
         self.target_ui.rebuild_character_ui();
@@ -1748,9 +1746,8 @@ impl UserInterface {
             Some(ActivityPopupOutcome::ChangedAttackEnhancements) => {
                 self.refresh_attack_state();
             }
-            Some(ActivityPopupOutcome::ChangedMovementSprint(sprint_usage)) => {
-                self.game_grid
-                    .update_move_speed(self.active_character_id, sprint_usage);
+            Some(ActivityPopupOutcome::ChangedMovementSprint(_sprint_usage)) => {
+                self.game_grid.update_move_speed(self.active_character_id);
             }
             None => {}
         }

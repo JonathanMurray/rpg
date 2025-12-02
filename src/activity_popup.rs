@@ -444,7 +444,7 @@ impl ActivityPopup {
         }
     }
 
-    pub fn set_movement_ap_cost(&mut self, cost: u32) {
+    pub fn set_movement_cost(&mut self, cost: u32) {
         let slider = self.movement_cost_slider.as_mut().unwrap();
         let character = self.characters.get(self.relevant_character_id);
         let max_cost = character.stamina.current();
@@ -827,7 +827,7 @@ struct MovementStaminaSlider {
     max: u32,
     max_allowed: u32,
     selected_i: u32,
-    is_sliding: bool,
+    //is_sliding: bool,
     cell_w: f32,
     cell_h: f32,
     has_changed: Cell<bool>,
@@ -839,7 +839,7 @@ impl MovementStaminaSlider {
             max,
             max_allowed: 0,
             selected_i: 0,
-            is_sliding: false,
+            //is_sliding: false,
             cell_w: 35.0,
             cell_h: 28.0,
             has_changed: Cell::new(false),
@@ -889,6 +889,7 @@ impl MovementStaminaSlider {
             YELLOW,
         );
 
+        /*
         let (mouse_x, mouse_y) = mouse_position();
         if !is_mouse_button_down(MouseButton::Left) {
             self.is_sliding = false;
@@ -915,6 +916,7 @@ impl MovementStaminaSlider {
                 self.selected_i = new_value;
             }
         }
+         */
 
         draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
     }

@@ -37,7 +37,7 @@ use crate::{
     bot::convert_path_to_move_action,
     core::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
-        BaseAction, Character, Condition, Goodness, Position,
+        BaseAction, Character, Condition, Goodness, Position, MOVE_DISTANCE_PER_STAMINA,
     },
     data::BOW,
     drawing::{
@@ -130,15 +130,11 @@ impl MovementRange {
     }
 
     fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
-        let extra_range = range - character_remaining_movement;
-        let result = if extra_range <= 0.0 {
+        let additional_range = range - character_remaining_movement;
+        let result = if additional_range <= 0.0 {
             0
         } else {
-            // TODO: 1 stamina should afford 3 (or maybe 2) extra range, not just 1.
-            // 1 made sense previously, but now each cell is 3 times smaller than back then.
-            // There are also other places that have this cost assumption, that need to be updated
-
-            extra_range.ceil() as u32
+            (additional_range / MOVE_DISTANCE_PER_STAMINA as f32).ceil() as u32
         };
 
         //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
@@ -440,12 +436,12 @@ impl GameGrid {
         self.effects.push(concrete_effect);
     }
 
-    pub fn update_move_speed(&mut self, active_char_id: CharacterId, sprint_usage: u32) {
+    pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
         let active_char = self.characters.get(active_char_id);
 
         let speed = active_char.move_speed();
-        let max_range =
-            active_char.remaining_movement.get() + (active_char.stamina.current() as f32);
+        let max_range = active_char.remaining_movement.get()
+            + (active_char.stamina.current() * MOVE_DISTANCE_PER_STAMINA) as f32;
 
         self.movement_range.set(speed, max_range);
     }
@@ -807,10 +803,14 @@ impl GameGrid {
         }) = ui_state
         {
             if !selected_movement_path.is_empty() {
+                todo!("can this ever happen?");
                 // TODO This never occurs anymore? (since you immediately commit the movement path when clicking on ground?)
                 println!("Draw movement selected");
                 self.draw_movement_path(selected_movement_path, false);
             }
+
+            // If we're hovering an actual movement path, this cost will be updated further down in the code
+            outcome.hovered_move_path_cost = Some(0);
         }
 
         let mut hovered_character_id = None;

@@ -24,6 +24,8 @@ pub type Position = (i32, i32);
 pub const MAX_ACTION_POINTS: u32 = 5;
 pub const ACTION_POINTS_PER_TURN: u32 = 3;
 
+pub const MOVE_DISTANCE_PER_STAMINA: u32 = 3;
+
 #[derive(Debug)]
 enum ActionOutcome {
     AttackHit { victim_id: CharacterId, damage: u32 },
