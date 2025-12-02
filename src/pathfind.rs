@@ -194,13 +194,6 @@ impl PathfindGrid {
         range: f32,
         target: Option<Target>,
     ) -> Ref<IndexMap<Position, ChartNode>> {
-        /*
-        println!(
-            "explore_outward(char={}, start={:?}, range={}, target={:?} ...",
-            character_id, start, range, target_proximity_squared
-        );
-         */
-
         if self.cache_key.get().from == start
             && self.cache_key.get().range >= range
             && self.cache_key.get().target == target
@@ -213,6 +206,13 @@ impl PathfindGrid {
              */
             return self.cached_exploration_chart.borrow();
         }
+
+        /*
+        println!(
+            "explore_outward(char={}, start={:?}, range={}, target={:?} ...",
+            character_id, start, range, target
+        );
+         */
 
         // If we're exploring from a new starting point than previous exploration, we must clear the cached results
         if self.cache_key.get().from != start {
@@ -373,7 +373,7 @@ impl PathfindGrid {
         /*
         println!(
             "explore_outward(char={}, start={:?}, range={} DONE.",
-            character_id, start, exploration_range
+            character_id, start, range
         );
          */
 

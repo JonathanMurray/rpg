@@ -4,7 +4,7 @@ use macroquad::{
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{self, draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -21,6 +21,7 @@ pub trait Drawable {
 pub enum Element {
     Empty(f32, f32),
     Texture(Texture2D, Option<(f32, f32)>),
+    ResizableTexture(Texture2D, Rc<RefCell<(f32, f32)>>),
     Container(Container),
     Text(TextLine),
     Circle(Circle),
@@ -37,6 +38,7 @@ impl Element {
         let size = match self {
             Element::Empty(w, h) => (*w, *h),
             Element::Texture(texture, dest_size) => dest_size.unwrap_or(texture.size().into()),
+            Element::ResizableTexture(_texture, dest_size) => *dest_size.borrow(),
             Element::Container(container) => container.size(),
             Element::Text(text) => text.size(),
             Element::Circle(circle) => circle.size(),
@@ -59,6 +61,14 @@ impl Element {
                 let dest_size = dest_size.map(|s| s.into());
                 let params = DrawTextureParams {
                     dest_size,
+                    ..Default::default()
+                };
+                draw_texture_ex(texture, x, y, WHITE, params);
+            }
+            Element::ResizableTexture(texture, dest_size) => {
+                let dest_size = *dest_size.borrow();
+                let params = DrawTextureParams {
+                    dest_size: Some(dest_size.into()),
                     ..Default::default()
                 };
                 draw_texture_ex(texture, x, y, WHITE, params);

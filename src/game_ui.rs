@@ -630,8 +630,18 @@ impl UserInterface {
             self.target_ui.set_character(target);
         }
 
-        if let Some(new_selected_player_char) = outcome.switched_selected_player_char {
-            return Some(PlayerChose::SwitchTo(new_selected_player_char));
+        if let Some(new_selected_player_char) = outcome.tried_switching_selected_player_char {
+            if matches!(*self.state.borrow(), UiState::ChoosingAction)
+                && !self
+                    .characters
+                    .get(new_selected_player_char)
+                    .has_taken_a_turn_this_round
+                    .get()
+            {
+                return Some(PlayerChose::SwitchTo(new_selected_player_char));
+            } else {
+                self.set_selected_character(new_selected_player_char);
+            }
         }
 
         if let Some(grid_switched_to) = outcome.switched_state {
@@ -666,11 +676,13 @@ impl UserInterface {
             self.refresh_target_state();
         }
 
+        /*
         if outcome.switched_movement_path {
-            // TODO: does this ever happen?
             println!("GRID SWITCHED MOVE PATH");
+
             self.refresh_movement_state();
         }
+        */
 
         if let Some(move_cost) = outcome.hovered_move_path_cost {
             self.activity_popup.set_movement_cost(move_cost);

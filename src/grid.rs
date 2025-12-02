@@ -124,7 +124,7 @@ impl MovementRange {
     }
 
     fn set(&mut self, speed: f32, max_range: f32) {
-        dbg!(("movement_range.set()", speed, max_range));
+        //dbg!(("movement_range.set()", speed, max_range));
         self.speed = speed;
         self.max_range = max_range;
     }
@@ -1229,7 +1229,7 @@ impl GameGrid {
                                 ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                 outcome.switched_players_action_target = true;
                             } else {
-                                outcome.switched_selected_player_char = Some(hovered_id);
+                                outcome.tried_switching_selected_player_char = Some(hovered_id);
                             }
                             //self.players_inspect_target = Some(hovered_id);
                         }
@@ -1433,9 +1433,12 @@ impl GameGrid {
             outcome.switched_inspect_target = Some(self.players_inspect_target);
         }
 
+        /*
+        This should not be needed, since we immediately commit the movement action anyway?
         if has_non_empty_movement_path(ui_state) != had_non_empty_movement_path {
             outcome.switched_movement_path = true;
         }
+         */
 
         outcome
     }
@@ -2291,12 +2294,11 @@ pub struct GridOutcome {
     pub switched_inspect_target: Option<Option<CharacterId>>,
     pub switched_players_action_target: bool,
 
-    pub switched_selected_player_char: Option<CharacterId>,
+    pub tried_switching_selected_player_char: Option<CharacterId>,
 
     pub hovered_move_path_cost: Option<u32>,
-
     // TODO: is this relevant still?
-    pub switched_movement_path: bool,
+    //pub switched_movement_path: bool,
 }
 
 #[derive(Debug)]

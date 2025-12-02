@@ -299,9 +299,9 @@ async fn init_fight_scene(
 fn window_conf() -> Conf {
     Conf {
         window_title: "RPG".to_owned(),
-        window_width: 1280,
+        window_width: 1600,
         //window_height: 960,
-        window_height: 1060,
+        window_height: 1200,
         high_dpi: true,
 
         window_resizable: false,

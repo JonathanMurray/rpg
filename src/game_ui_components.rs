@@ -67,6 +67,7 @@ impl CharacterPortraits {
             layout_dir: LayoutDirection::Horizontal,
             margin: 2.0,
             children: elements,
+            /*
             style: Style {
                 padding: 2.0,
                 background_color: Some(Color::new(0.0, 0.0, 0.0, 0.5)),
@@ -74,6 +75,7 @@ impl CharacterPortraits {
                 //background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
                 ..Default::default()
             },
+             */
             ..Default::default()
         };
 
@@ -102,11 +104,13 @@ impl CharacterPortraits {
     pub fn update(&mut self, game: &CoreGame) {
         self.set_active_character(game.active_character_id);
         for (id, character) in game.characters.iter_with_ids() {
+            /*
             let portrait = self.portraits[id].borrow_mut();
             portrait.action_points_row.borrow_mut().current_ap = character.action_points.current();
             portrait.action_points_row.borrow_mut().is_characters_turn =
                 *id == game.active_character_id;
-            portrait.health_bar.borrow_mut().current = character.health.current();
+                 */
+            //portrait.health_bar.borrow_mut().current = character.health.current();
         }
     }
 
@@ -137,16 +141,18 @@ impl CharacterPortraits {
 struct TopCharacterPortrait {
     strong_highlight: bool,
     weak_highlight: bool,
-    action_points_row: Rc<RefCell<ActionPointsRow>>,
-    health_bar: Rc<RefCell<ResourceBar>>,
+    //action_points_row: Rc<RefCell<ActionPointsRow>>,
+    //health_bar: Rc<RefCell<ResourceBar>>,
     padding: f32,
     container: Container,
     character: Rc<Character>,
     font: Font,
+    texture_size: Rc<RefCell<(f32, f32)>>,
 }
 
 impl TopCharacterPortrait {
     fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
+        /*
         let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
             (10.0, 10.0),
             0.2,
@@ -156,6 +162,7 @@ impl TopCharacterPortrait {
             },
         )));
         let cloned_ap_row = Rc::clone(&action_points_row);
+         */
 
         let name_color = if character.player_controlled() {
             WHITE
@@ -166,48 +173,62 @@ impl TopCharacterPortrait {
         let mut name_text_line = TextLine::new(character.name, 16, name_color, Some(font.clone()));
         name_text_line.set_min_height(13.0);
 
+        /*
         let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
             character.health.max(),
             RED,
             (action_points_row.borrow().size().0, 8.0),
         )));
+         */
 
         //let texture_size = (48.0, 60.0);
-        let texture_size = (64.0, 80.0);
-        let container = Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
-            children: vec![
-                //Element::Text(name_text_line),
-                Element::Container(Container {
-                    style: Style {
-                        background_color: Some(DARKGRAY),
-                        ..Default::default()
-                    },
-                    children: vec![Element::Texture(texture, Some(texture_size))],
-                    ..Default::default()
-                }),
-                Element::RcRefCell(cloned_ap_row),
-                Element::RcRefCell(health_bar.clone()),
-            ],
-            margin: 1.0,
-            style: Style {
-                padding: 0.0,
+        let texture_size = Rc::new(RefCell::new((64.0, 80.0)));
+        /*
+           let container = Container {
+               layout_dir: LayoutDirection::Vertical,
+               align: Align::Center,
+               children: vec![
+                   //Element::Text(name_text_line),
+                   Element::Container(Container {
+                       style: Style {
+                           background_color: Some(DARKGRAY),
+                           ..Default::default()
+                       },
+                       children: vec![Element::ResizableTexture(texture, texture_size.clone())],
+                       ..Default::default()
+                   }),
+                   //Element::RcRefCell(cloned_ap_row),
+                   //Element::RcRefCell(health_bar.clone()),
+               ],
+               margin: 1.0,
+               style: Style {
+                   padding: 0.0,
 
+                   ..Default::default()
+               },
+               ..Default::default()
+           };
+        */
+
+        let container = Container {
+            style: Style {
+                background_color: Some(DARKGRAY),
                 ..Default::default()
             },
+            children: vec![Element::ResizableTexture(texture, texture_size.clone())],
             ..Default::default()
         };
 
         Self {
             strong_highlight: false,
             weak_highlight: false,
-            action_points_row,
-            health_bar,
+            //action_points_row,
+            //health_bar,
             padding: 0.0,
             container,
             character: character.clone(),
             font,
+            texture_size,
         }
     }
 }
@@ -245,7 +266,26 @@ impl Drawable for TopCharacterPortrait {
             );
         }
 
+        if !self.character.health.is_at_max() {
+            let margin = 1.0;
+            let w = 64.0 - margin * 2.0;
+            let damage_h = (80.0 - margin * 2.0) * (1.0 - self.character.health.ratio());
+            let x0 = x + margin;
+            let y0 = y + margin;
+            draw_rectangle(x0, y0, w, damage_h, Color::new(0.3, 0.0, 0.0, 0.5));
+            draw_line(
+                x0,
+                y0 + damage_h,
+                x0 + w,
+                y0 + damage_h,
+                3.0,
+                Color::new(0.6, 0.0, 0.0, 0.6),
+            );
+        }
+
+        /*
         if self.character.has_taken_a_turn_this_round.get() {
+            // TODO: draw some kind of hourglass instead?
             let text = "DONE";
             let font_size = 16;
             let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
@@ -253,7 +293,7 @@ impl Drawable for TopCharacterPortrait {
             draw_text_rounded(
                 text,
                 x + w / 2.0 - text_dim.width / 2.0,
-                y + 50.0,
+                y + 30.0,
                 TextParams {
                     font: Some(&self.font),
                     font_size,
@@ -262,9 +302,16 @@ impl Drawable for TopCharacterPortrait {
                 },
             );
         }
+         */
     }
 
     fn size(&self) -> (f32, f32) {
+        *self.texture_size.borrow_mut() = if !self.character.is_part_of_active_group.get() {
+            (48.0, 60.0)
+        } else {
+            (64.0, 80.0)
+        };
+
         let (w, h) = self.container.size();
         (w + self.padding * 2.0, h + self.padding * 2.0)
     }

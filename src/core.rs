@@ -64,6 +64,9 @@ impl CoreGame {
             character.on_health_changed();
             character.has_taken_a_turn_this_round.set(false);
         }
+        for player_char in self.player_characters() {
+            player_char.is_part_of_active_group.set(true);
+        }
         self.on_character_positions_changed();
 
         loop {
@@ -182,7 +185,9 @@ impl CoreGame {
             if ending_turn {
                 self.perform_end_of_turn_character().await;
                 //let prev_index_in_round = self.active_character().index_in_round.unwrap();
+                self.active_character().is_part_of_active_group.set(false);
                 self.active_character_id = self.characters.next_id(self.active_character_id);
+                self.active_character().is_part_of_active_group.set(true);
                 self.notify_ui_of_new_active_char().await;
 
                 let new_round = self
@@ -195,6 +200,14 @@ impl CoreGame {
                     for character in self.characters.iter() {
                         character.has_taken_a_turn_this_round.set(false);
                     }
+
+                    if self.active_character().player_controlled() {
+                        // Player chars can act "simultaneously"
+                        for player_char in self.player_characters() {
+                            player_char.is_part_of_active_group.set(true);
+                        }
+                    }
+
                     self.round_index += 1;
                 }
 
@@ -459,8 +472,7 @@ impl CoreGame {
                 let character = self.active_character();
                 //character.action_points.spend(extra_cost);
                 character.stamina.spend(extra_cost);
-                // Costs 1 per extra distance
-                let paid_distance = extra_cost as f32;
+                let paid_distance = (extra_cost * MOVE_DISTANCE_PER_STAMINA) as f32;
                 if total_distance > paid_distance {
                     let free_distance = total_distance - paid_distance;
                     character.spend_movement(free_distance);
@@ -3624,6 +3636,7 @@ pub struct Character {
     index_in_round: Option<u32>,
     current_game_time: Cell<u32>,
     round_length: Option<u32>,
+    pub is_part_of_active_group: Cell<bool>,
     pub has_taken_a_turn_this_round: Cell<bool>,
 
     pub name: &'static str,
@@ -3690,6 +3703,7 @@ impl Character {
             index_in_round: None,
             round_length: None,
             has_taken_a_turn_this_round: Cell::new(false),
+            is_part_of_active_group: Cell::new(false),
             portrait,
             sprite,
             kind,
@@ -3794,7 +3808,12 @@ impl Character {
 
     fn spend_movement(&self, distance: f32) {
         let remaining = self.remaining_movement.get();
-        assert!(distance > 0.0 && distance <= remaining);
+        assert!(
+            distance > 0.0 && distance <= remaining,
+            "{} {}",
+            distance,
+            remaining
+        );
         self.remaining_movement.set(remaining - distance);
     }
 
