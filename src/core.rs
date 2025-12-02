@@ -2042,6 +2042,8 @@ impl CoreGame {
                 .characters
                 .iter()
                 .filter(|other| {
+                    // TODO: if "melee" doesn't encompass diagonally adjancent, the spreading feels
+                    // a bit too unlikely
                     other.id != character.id
                         && are_entities_within_melee(other.pos(), character.pos())
                 })

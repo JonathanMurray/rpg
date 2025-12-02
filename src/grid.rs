@@ -1189,14 +1189,14 @@ impl GameGrid {
                 if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_cornered_outline(
-                            self.grid_pos_to_screen(mouse_grid_pos),
+                            self.grid_pos_to_screen(hovered_char.pos()),
                             HOVER_ALLY_COLOR,
                             5.0,
                             4.0,
                         );
                         self.draw_target_crosshair(
                             self.characters.get(self.active_character_id).pos(),
-                            mouse_grid_pos,
+                            hovered_char.pos(),
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                             4.0,
                         );
@@ -1224,8 +1224,10 @@ impl GameGrid {
                             if mouse_state == MouseState::RequiresAllyTarget {
                                 ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                 outcome.switched_players_action_target = true;
+                            } else {
+                                outcome.switched_selected_player_char = Some(hovered_id);
                             }
-                            self.players_inspect_target = Some(hovered_id);
+                            //self.players_inspect_target = Some(hovered_id);
                         }
                     }
                 } else {
@@ -2284,6 +2286,8 @@ pub struct GridOutcome {
     pub hovered_character_id: Option<CharacterId>,
     pub switched_inspect_target: Option<Option<CharacterId>>,
     pub switched_players_action_target: bool,
+
+    pub switched_selected_player_char: Option<CharacterId>,
 
     pub hovered_move_path_cost: Option<u32>,
 

@@ -630,6 +630,10 @@ impl UserInterface {
             self.target_ui.set_character(target);
         }
 
+        if let Some(new_selected_player_char) = outcome.switched_selected_player_char {
+            return Some(PlayerChose::SwitchTo(new_selected_player_char));
+        }
+
         if let Some(grid_switched_to) = outcome.switched_state {
             self.on_new_state();
             if let NewState::Move { commit_movement } = grid_switched_to {
@@ -1697,12 +1701,16 @@ impl UserInterface {
         if new_active_id != self.active_character_id {
             // When control switches to a new player controlled character, make the UI show that character
             if self.characters.get(new_active_id).player_controlled() {
-                self.player_portraits.set_selected_id(new_active_id);
-                self.on_new_selected_character();
+                self.set_selected_character(new_active_id);
             }
         }
 
         self.active_character_id = new_active_id;
+    }
+
+    fn set_selected_character(&mut self, new_active_id: CharacterId) {
+        self.player_portraits.set_selected_id(new_active_id);
+        self.on_new_selected_character();
     }
 
     fn on_new_selected_character(&mut self) {
