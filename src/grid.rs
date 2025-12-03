@@ -585,7 +585,13 @@ impl GameGrid {
             let remaining = animation.remaining_duration;
             let duration = animation.duration;
             match animation.kind {
-                AnimationKind::Motion { from, to } => {
+                AnimationKind::Motion { .. } => {
+                    // TODO: now that the cells are 3x smaller than before, this animation
+                    // is sadly also 3x faster than before, which looks a bit dumb. How to
+                    // animate the rotation across multiple cells of movement? Have to
+                    // remember (here in grid?) what the movement animation state of a char
+                    // was and then start from where it left off, when being instructed to
+                    // animate again?
                     let remaining_part = remaining / duration;
                     let quantized = (remaining_part * 4.0).floor() / 4.0;
                     if quantized < 0.25 {

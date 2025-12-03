@@ -2192,7 +2192,7 @@ fn build_character_ui(
 
     let action_points_row = ActionPointsRow::new(
         (20.0, 20.0),
-        0.3,
+        0.25,
         Style {
             border_color: Some(WHITE),
             ..Default::default()
