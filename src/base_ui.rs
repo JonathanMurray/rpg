@@ -745,6 +745,7 @@ pub struct TableStyle {
     pub row_font_sizes: &'static [u16],
     pub cell_padding: (f32, f32),
     pub default_text_color: Color,
+    pub min_width: Option<f32>,
 }
 
 impl Default for TableStyle {
@@ -757,6 +758,7 @@ impl Default for TableStyle {
             row_font_sizes: &[],
             cell_padding: (8.0, 8.0),
             default_text_color: WHITE,
+            min_width: None,
         }
     }
 }
@@ -869,6 +871,7 @@ pub fn table(
         },
         border_between_children: style.inner_border_color,
         children: columns,
+        min_width: style.min_width,
         ..Default::default()
     }
 }

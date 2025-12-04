@@ -814,6 +814,7 @@ impl EquipmentStatsTable {
             TableStyle {
                 background_color: Some(SKYBLUE),
                 default_text_color: BLACK,
+                min_width: Some(170.0),
                 ..Default::default()
             },
         )

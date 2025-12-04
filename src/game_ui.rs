@@ -10,7 +10,7 @@ use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
     input::{get_keys_pressed, is_key_pressed, mouse_position, KeyCode},
     shapes::{draw_line, draw_rectangle},
-    text::Font,
+    text::{draw_text, Font},
     texture::Texture2D,
     window::{screen_height, screen_width},
 };
@@ -2003,6 +2003,8 @@ fn build_character_uis<'a>(
 
     let mut character_uis: HashMap<CharacterId, CharacterUi> = Default::default();
 
+    let character_sheet_screen_pos = Rc::new(RefCell::new((100.0, 100.0)));
+
     for character in characters {
         if !character.player_controlled() {
             continue;
@@ -2016,6 +2018,7 @@ fn build_character_uis<'a>(
             character,
             &mut next_button_id,
             status_textures.clone(),
+            Rc::clone(&character_sheet_screen_pos),
         );
 
         character_uis.insert(character.id(), character_ui);
@@ -2031,6 +2034,7 @@ fn build_character_ui(
     character: &Rc<Character>,
     next_button_id: &mut u32,
     status_textures: HashMap<StatusId, Texture2D>,
+    character_sheet_screen_pos: Rc<RefCell<(f32, f32)>>,
 ) -> CharacterUi {
     let mut new_button = |btn_action,
                           character: Option<Rc<Character>>,
@@ -2160,6 +2164,7 @@ fn build_character_ui(
         ability_buttons_for_character_sheet,
         passive_buttons_for_character_sheet,
         ConditionsList::new(simple_font.clone(), vec![], status_textures.clone()),
+        character_sheet_screen_pos,
     );
 
     let mut upper_buttons = basic_buttons;

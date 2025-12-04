@@ -108,13 +108,12 @@ pub fn build_stats_table(
             " ".to_string()
         };
 
-        let attribute_text_line =
-            TextLine::new(text, attribute_font_size, WHITE, Some(font.clone()));
+        let attribute_text = TextLine::new(text, attribute_font_size, WHITE, Some(font.clone()));
 
-        if attribute_text_line.size().0 > attribute_text_width {
-            attribute_text_width = attribute_text_line.size().0;
+        if attribute_text.size().0 > attribute_text_width {
+            attribute_text_width = attribute_text.size().0;
         }
-        attribute_text_lines.push(attribute_text_line);
+        attribute_text_lines.push(attribute_text);
     }
 
     // Make the rows of the right colum aligned with eachother
@@ -192,6 +191,7 @@ fn attribute_row(
             padding: 5.0,
             ..Default::default()
         },
+        min_width: Some(200.0),
         ..Default::default()
     }
 }

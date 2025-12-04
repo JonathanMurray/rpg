@@ -30,7 +30,7 @@ use crate::{
 };
 
 pub struct CharacterSheet {
-    pub screen_position: Cell<(f32, f32)>,
+    pub screen_position: Rc<RefCell<(f32, f32)>>,
     sheet_dragged_offset: Cell<Option<(f32, f32)>>,
 
     equipment_changed: Rc<Cell<bool>>,
@@ -54,8 +54,9 @@ impl CharacterSheet {
         ability_buttons: Vec<(Rc<ActionButton>, Vec<Rc<ActionButton>>)>,
         passive_skill_buttons: Vec<Rc<ActionButton>>,
         conditions_list: ConditionsList,
+        screen_position: Rc<RefCell<(f32, f32)>>,
     ) -> Self {
-        let spell_book_rows = build_spell_book(
+        let spell_book = build_spell_book(
             font,
             attack_button,
             reaction_buttons,
@@ -109,7 +110,7 @@ impl CharacterSheet {
                             TextLine::new("Skills", 22, WHITE, Some(font.clone()))
                                 .with_depth(BLACK, 2.0),
                         ),
-                        Element::Container(spell_book_rows),
+                        Element::Container(spell_book),
                     ],
                     ..Default::default()
                 }),
@@ -146,7 +147,7 @@ impl CharacterSheet {
         Self {
             container,
             top_bar_h,
-            screen_position: Cell::new((100.0, 100.0)),
+            screen_position,
             sheet_dragged_offset: Cell::new(None),
             equipment_changed,
 
@@ -169,7 +170,7 @@ impl CharacterSheet {
                 .repopulate_character_equipment();
         }
 
-        let (x, y) = self.screen_position.get();
+        let (x, y) = *self.screen_position.borrow();
         let (w, h) = self.container.draw(x, y);
         let clicked_close = self.draw_close_button(x, y);
 
@@ -179,7 +180,7 @@ impl CharacterSheet {
             if is_mouse_button_down(MouseButton::Left) {
                 let new_x = (mouse_x - x_offset).max(0.0).min(screen_width() - w);
                 let new_y = (mouse_y - y_offset).max(0.0).min(screen_height() - h);
-                self.screen_position.set((new_x, new_y));
+                *self.screen_position.borrow_mut() = (new_x, new_y);
             } else {
                 self.sheet_dragged_offset.set(None);
             }
@@ -320,7 +321,7 @@ pub fn build_spell_book(
     passive_skill_buttons: Vec<Rc<ActionButton>>,
     max_height: f32,
 ) -> Container {
-    let mut spell_book_rows = Container {
+    let mut spell_book = Container {
         layout_dir: LayoutDirection::Vertical,
         margin: 5.0,
         children: vec![],
@@ -331,6 +332,7 @@ pub fn build_spell_book(
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         },
+        min_width: Some(300.0),
         ..Default::default()
     };
 
@@ -342,17 +344,17 @@ pub fn build_spell_book(
                 .collect(),
         );
 
-        spell_book_rows.children.push(Element::Text(TextLine::new(
+        spell_book.children.push(Element::Text(TextLine::new(
             "Reactions",
             16,
             WHITE,
             Some(font.clone()),
         )));
-        spell_book_rows.children.push(row);
+        spell_book.children.push(row);
     }
 
     if let Some(attack_button) = attack_button {
-        spell_book_rows.children.push(Element::Text(TextLine::new(
+        spell_book.children.push(Element::Text(TextLine::new(
             "Attack",
             16,
             WHITE,
@@ -364,12 +366,12 @@ pub fn build_spell_book(
 
         let row = buttons_row(buttons.into_iter().map(|btn| Element::Rc(btn)).collect());
 
-        spell_book_rows.children.push(row);
+        spell_book.children.push(row);
     }
 
     for (ability_btn, enhancement_buttons) in ability_buttons.into_iter() {
         let ability = ability_btn.action.unwrap_ability();
-        spell_book_rows.children.push(Element::Text(TextLine::new(
+        spell_book.children.push(Element::Text(TextLine::new(
             ability.name,
             16,
             WHITE,
@@ -386,7 +388,7 @@ pub fn build_spell_book(
                 .map(|btn| Element::Rc(btn))
                 .collect(),
         );
-        spell_book_rows.children.push(ability_row);
+        spell_book.children.push(ability_row);
     }
 
     if !passive_skill_buttons.is_empty() {
@@ -397,16 +399,16 @@ pub fn build_spell_book(
                 .collect(),
         );
 
-        spell_book_rows.children.push(Element::Text(TextLine::new(
+        spell_book.children.push(Element::Text(TextLine::new(
             "Passive",
             16,
             WHITE,
             Some(font.clone()),
         )));
-        spell_book_rows.children.push(row);
+        spell_book.children.push(row);
     }
 
-    spell_book_rows
+    spell_book
 }
 
 pub struct MoneyText {
