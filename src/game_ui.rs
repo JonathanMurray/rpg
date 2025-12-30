@@ -1383,7 +1383,7 @@ impl UserInterface {
 
                 let mut attacks = vec![];
 
-                if let Some((_target_id, outcome)) = &target_outcome {
+                if let Some((target, outcome)) = &target_outcome {
                     match outcome {
                         AbilityTargetOutcome::HitEnemy {
                             damage,
@@ -1440,7 +1440,7 @@ impl UserInterface {
                 if let Some((target, outcome)) = &target_outcome {
                     let target_pos = self.characters.get(*target).pos();
                     self.game_grid.animate_character_shaking(*target, 0.2);
-                    self.add_text_effect_for_ability_target_outcome(outcome, 0.0, target_pos);
+                    self.add_effect_for_ability_target_outcome(outcome, 0.0, *target, target_pos);
                     self.animation_stopwatch.set_to_at_least(0.3);
                 }
 
@@ -1547,6 +1547,12 @@ impl UserInterface {
         }
     }
 
+    fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
+        let prev_health = self.characters.get(character_id).health.current() + dmg;
+        self.game_grid
+            .animate_character_health_change(character_id, prev_health, 0.8);
+    }
+
     fn add_effects_for_area_outcomes(
         &mut self,
         start_time: f32,
@@ -1579,7 +1585,7 @@ impl UserInterface {
 
             self.game_grid.animate_character_shaking(*target_id, 0.2);
 
-            self.add_text_effect_for_ability_target_outcome(outcome, start_time, target_pos);
+            self.add_effect_for_ability_target_outcome(outcome, start_time, *target_id, target_pos);
 
             self.animation_stopwatch.set_to_at_least(start_time + 0.3);
         }
@@ -1660,7 +1666,10 @@ impl UserInterface {
         );
 
         match outcome {
-            AttackOutcome::Hit(dmg, _) => line.push_str(&format!(" ({} damage)", dmg)),
+            AttackOutcome::Hit(dmg, _) => {
+                self.animate_character_damage(target, dmg);
+                line.push_str(&format!(" ({} damage)", dmg))
+            }
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
             AttackOutcome::Parry => line.push_str(" (parry)"),
             AttackOutcome::Block => line.push_str(" (block)"),
@@ -1699,10 +1708,11 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(0.2);
     }
 
-    fn add_text_effect_for_ability_target_outcome(
+    fn add_effect_for_ability_target_outcome(
         &mut self,
         outcome: &AbilityTargetOutcome,
         start_time: f32,
+        target: CharacterId,
         target_pos: (i32, i32),
     ) {
         let effect = match &outcome {
@@ -1712,6 +1722,7 @@ impl UserInterface {
                 applied_effects,
             } => {
                 let effect = if let Some(dmg) = damage {
+                    self.animate_character_damage(target, *dmg);
                     (format!("{}", dmg), TextEffectStyle::HostileHit)
                 } else if applied_effects.is_empty() {
                     if *graze {

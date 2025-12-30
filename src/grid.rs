@@ -9,7 +9,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKBROWN, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, DARKBROWN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PURPLE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
@@ -111,6 +111,7 @@ enum AnimationKind {
     Shake { random_time_offset: f32 },
     Death,
     Act { random_rotation: f32 },
+    HealthChange { previous: u32 },
 }
 
 struct MovementRange {
@@ -274,6 +275,21 @@ impl GameGrid {
             character_id,
             duration,
             AnimationKind::Act { random_rotation },
+        ));
+    }
+
+    pub fn animate_character_health_change(
+        &mut self,
+        character_id: CharacterId,
+        previous_health: u32,
+        duration: f32,
+    ) {
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationKind::HealthChange {
+                previous: previous_health,
+            },
         ));
     }
 
@@ -618,6 +634,9 @@ impl GameGrid {
                 AnimationKind::Act { random_rotation } => {
                     y -= self.cell_w * 0.07;
                     params.rotation = random_rotation;
+                }
+                AnimationKind::HealthChange { .. } => {
+                    // This affects how the healthbar is drawn
                 }
             }
         }
@@ -1778,9 +1797,34 @@ impl GameGrid {
         healthbar_bg.a = 0.5;
 
         draw_rectangle(health_x, health_y, health_w, health_h, healthbar_bg);
-        let filled_health_w =
+
+        let mut prev_health = None;
+
+        for animation in &self.character_animations {
+            if let AnimationKind::HealthChange { previous } = animation.kind {
+                if animation.character_id == character.id() {
+                    prev_health = Some(previous);
+                }
+            }
+        }
+
+        let current_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
-        draw_rectangle(health_x, health_y, filled_health_w, health_h, RED);
+        draw_rectangle(health_x, health_y, current_health_w, health_h, RED);
+
+        if let Some(prev) = prev_health {
+            let prev_health_w = (health_w)
+                * ((prev as f32 - character.health.current() as f32)
+                    / character.health.max() as f32);
+            draw_rectangle(
+                health_x + current_health_w,
+                health_y,
+                prev_health_w,
+                health_h,
+                YELLOW,
+            );
+        }
+
         if !discrete_healthbar {
             draw_rectangle_lines(health_x, health_y, health_w, health_h, 1.0, LIGHTGRAY);
 
