@@ -5,7 +5,12 @@ use std::{
 };
 
 use macroquad::{
-    audio::Sound, color::SKYBLUE, input::{KeyCode, is_key_pressed}, shapes::{draw_triangle, draw_triangle_lines}, text::{TextParams, measure_text}, texture::{DrawTextureParams, draw_texture_ex}
+    audio::Sound,
+    color::SKYBLUE,
+    input::{is_key_pressed, KeyCode},
+    shapes::{draw_triangle, draw_triangle_lines},
+    text::{measure_text, TextParams},
+    texture::{draw_texture_ex, DrawTextureParams},
 };
 
 use indexmap::IndexMap;
@@ -19,8 +24,13 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine, draw_text_rounded
-    }, core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS}, drawing::draw_cross, sounds::{SoundId, SoundPlayer}, textures::{PortraitId, StatusId}
+        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Rectangle, Style, TextLine,
+    },
+    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
+    drawing::draw_cross,
+    sounds::{SoundId, SoundPlayer},
+    textures::{PortraitId, StatusId},
 };
 
 pub struct CharacterPortraits {
@@ -313,6 +323,24 @@ pub struct CharacterSheetToggle {
     pub shown: Cell<bool>,
     pub text_line: TextLine,
     pub padding: f32,
+    pub sound_player: SoundPlayer,
+}
+
+impl CharacterSheetToggle {
+    pub fn set_shown(&self, shown: bool) {
+        if self.shown.get() != shown {
+            self.shown.set(shown);
+            if shown {
+                self.sound_player.play(SoundId::SheetOpen);
+            } else {
+                self.sound_player.play(SoundId::SheetClose);
+            }
+        }
+    }
+
+    pub fn is_shown(&self) -> bool {
+        self.shown.get()
+    }
 }
 
 impl Drawable for CharacterSheetToggle {
@@ -324,7 +352,7 @@ impl Drawable for CharacterSheetToggle {
         let (mouse_x, mouse_y) = mouse_position();
         let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
         if hovered && is_mouse_button_pressed(MouseButton::Left) {
-            self.shown.set(!self.shown.get());
+            self.set_shown(!self.shown.get());
         }
 
         if self.shown.get() {
@@ -349,7 +377,7 @@ pub struct PlayerPortraits {
     selected_i: Cell<CharacterId>,
     active_i: Cell<CharacterId>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
-    sound_player: SoundPlayer
+    sound_player: SoundPlayer,
 }
 
 impl PlayerPortraits {
@@ -360,7 +388,7 @@ impl PlayerPortraits {
         font: Font,
         portrait_textures: HashMap<PortraitId, Texture2D>,
         status_textures: HashMap<StatusId, Texture2D>,
-        sound_player: SoundPlayer
+        sound_player: SoundPlayer,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
@@ -398,7 +426,7 @@ impl PlayerPortraits {
             selected_i: Cell::new(selected_id),
             active_i: Cell::new(active_id),
             portraits,
-            sound_player
+            sound_player,
         };
 
         this.set_selected_id(selected_id);

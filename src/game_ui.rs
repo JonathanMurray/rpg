@@ -436,8 +436,6 @@ impl UserInterface {
             status_textures.clone(),
         );
 
-        
-
         let player_portraits = PlayerPortraits::new(
             &characters,
             first_player_character_id,
@@ -445,13 +443,14 @@ impl UserInterface {
             decorative_font.clone(),
             portrait_textures.clone(),
             status_textures.clone(),
-            sound_player.clone()
+            sound_player.clone(),
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
             shown: Cell::new(false),
             text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
             padding: 10.0,
+            sound_player: sound_player.clone(),
         };
 
         let character_portraits = CharacterPortraits::new(
@@ -500,6 +499,10 @@ impl UserInterface {
         }
     }
 
+    fn set_character_sheet_shown(&self, shown: bool) {
+        self.character_sheet_toggle.set_shown(shown);
+    }
+
     pub fn draw(&mut self) -> Option<PlayerChose> {
         let ui_y = screen_height() - 160.0;
 
@@ -507,7 +510,7 @@ impl UserInterface {
 
         let mouse_pos = mouse_position();
         let is_grid_obstructed = popup_rectangle.contains(mouse_pos.into())
-            || self.character_sheet_toggle.shown.get()
+            || self.character_sheet_toggle.is_shown()
             || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
 
@@ -575,16 +578,14 @@ impl UserInterface {
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
-        if self.character_sheet_toggle.shown.get() {
+        if self.character_sheet_toggle.is_shown() {
             let is_showing_active = self.active_character_id == selected_character_id;
 
             let outcome = character_ui
                 .character_sheet
                 .draw(&mut self.state.borrow_mut(), is_showing_active);
 
-            self.character_sheet_toggle
-                .shown
-                .set(!outcome.clicked_close);
+            self.set_character_sheet_shown(!outcome.clicked_close);
 
             if outcome.changed_state {
                 println!("REQUESTED EQ CHANGE; new state");
@@ -1167,7 +1168,7 @@ impl UserInterface {
                 } else {
                     self.activity_popup.additional_line =
                         Some("Drag something to equip/unequip it".to_string());
-                    self.character_sheet_toggle.shown.set(true);
+                    self.set_character_sheet_shown(true);
                 }
             }
 
@@ -1181,7 +1182,7 @@ impl UserInterface {
                 } else {
                     self.activity_popup.additional_line =
                         Some("Right click a consumable in your inventory to use it".to_string());
-                    self.character_sheet_toggle.shown.set(true);
+                    self.set_character_sheet_shown(true);
                 }
             }
 
@@ -1280,7 +1281,6 @@ impl UserInterface {
                 ability,
                 target,
             } => {
-
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.play(sound_id);
                 }
@@ -1580,9 +1580,9 @@ impl UserInterface {
     }
 
     fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
-
-        self.sound_player.play(SoundId::ShootArrow);
-
+        if self.characters.get(attacker).has_equipped_ranged_weapon() {
+            self.sound_player.play(SoundId::ShootArrow);
+        }
 
         self.game_grid.animate_character_acting(attacker, 0.2);
 
@@ -1628,7 +1628,6 @@ impl UserInterface {
     }
 
     fn handle_attacked_event(&mut self, event: &AttackedEvent) {
-
         let attacker = event.attacker;
         let target = event.target;
         let outcome = event.outcome;
@@ -1637,10 +1636,8 @@ impl UserInterface {
         if self.characters.get(attacker).has_equipped_ranged_weapon() {
             self.sound_player.play(SoundId::HitArrow);
         } else {
-            self.sound_player.play(SoundId::Explosion);
+            self.sound_player.play(SoundId::MeleeAttack);
         }
-
-
 
         let verb = match outcome {
             AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",

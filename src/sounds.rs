@@ -16,12 +16,15 @@ impl SoundPlayer {
             (SoundId::ClickButton, "click_3"),
             (SoundId::Explosion, "explosion"),
             (SoundId::Powerup, "powerup"),
+            (SoundId::MeleeAttack, "melee_attack"),
             (SoundId::ShootArrow, "shoot_arrow_2"),
             (SoundId::HitArrow, "hit_arrow"),
             (SoundId::Walk, "walk"),
             (SoundId::Debuff, "debuff"),
             (SoundId::ShootSpell, "shoot_spell"),
             (SoundId::Death, "death"),
+            (SoundId::SheetOpen, "sheet_open"),
+            (SoundId::SheetClose, "sheet_close"),
         ] {
             let sound = load_sound(&format!("sounds/{name}.wav")).await.unwrap();
             sounds.insert(*id, sound);
@@ -41,10 +44,13 @@ pub enum SoundId {
     ClickButton,
     Explosion,
     Powerup,
+    MeleeAttack,
     ShootArrow,
     HitArrow,
     Walk,
     Debuff,
     ShootSpell,
-    Death
+    Death,
+    SheetOpen,
+    SheetClose,
 }

@@ -12,7 +12,7 @@ use macroquad::rand::ChooseRandom;
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{PassiveSkill, ADRENALIN_POTION};
+use crate::data::{PassiveSkill, ADRENALIN_POTION, HASTE};
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY};
@@ -2122,6 +2122,9 @@ impl CoreGame {
         if conditions.borrow().has(&Condition::Slowed) {
             gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
         }
+        if conditions.borrow().has(&Condition::Hastened) {
+            gain_ap += HASTENED_AP_BONUS;
+        }
         character.action_points.gain(gain_ap);
         //character.action_points.current.set(new_ap);
 
@@ -2765,6 +2768,7 @@ pub enum Condition {
     NearDeath,
     Dead,
     Slowed,
+    Hastened,
     Exposed,
     Hindered,
     ReaperApCooldown,
@@ -2795,6 +2799,7 @@ impl Condition {
             NearDeath => "Near-death",
             Dead => "Dead",
             Slowed => "Slowed",
+            Hastened => "Hastened",
             Exposed => "Exposed",
             Hindered => "Hindered",
             ReaperApCooldown => "Reaper",
@@ -2813,9 +2818,10 @@ impl Condition {
             Dazed => "-3 Evasion, Disadvantage on attacks.",
             Blinded => "Disadvantage, always Flanked when attacked.",
             Raging => "Advantage on melee attacks (until end of turn).",
-            Slowed => "-1 AP per turn.",
+            Slowed => "-1 AP per turn, -25% movement",
+            Hastened => "+1 AP per turn, +25% movement",
             Exposed => "-3 to all defenses.",
-            Hindered => "Half movement speed.",
+            Hindered => "-50% movement.",
             Protected => "+x armor against the next attack.",
             Bleeding => "End of turn: 50% converts to damage.",
             Burning => "End of turn: converts to damage, 50% spreads to adjacent.",
@@ -2855,6 +2861,7 @@ impl Condition {
             NearDeath => false,
             Dead => false,
             Slowed => false,
+            Hastened => true,
             Exposed => false,
             Hindered => false,
             ReaperApCooldown => false,
@@ -2887,8 +2894,10 @@ impl Condition {
             Blinded => StatusId::Blinded,
             Exposed => StatusId::Exposed,
             Slowed => StatusId::Slowed,
+            Hastened => StatusId::Hastened,
             NearDeath => StatusId::NearDeath,
             Dead => StatusId::Dead,
+            ArcaneSurge => StatusId::ArcaneSurge,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -2906,6 +2915,7 @@ const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 3;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 1;
+const HASTENED_AP_BONUS: u32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct ConditionInfo {
@@ -3160,7 +3170,7 @@ pub struct Ability {
     pub possible_enhancements: [Option<AbilityEnhancement>; 3],
     pub animation_color: Color,
     pub initiate_sound: Option<SoundId>,
-    pub resolve_sound: Option<SoundId>
+    pub resolve_sound: Option<SoundId>,
 }
 
 impl Ability {
@@ -3201,6 +3211,7 @@ pub enum AbilityId {
     HealingNova,
     SelfHeal,
     HealingRain,
+    Haste,
     Fireball,
     SearingLight,
     Kill,
@@ -3856,11 +3867,17 @@ impl Character {
     }
 
     pub fn move_speed(&self) -> f32 {
-        let mut speed = self.base_move_speed.get();
+        let mut modifier = 1.0;
         if self.conditions.borrow().has(&Condition::Hindered) {
-            speed /= 2.0;
+            modifier -= 0.5;
         }
-        speed
+        if self.conditions.borrow().has(&Condition::Slowed) {
+            modifier -= 0.25;
+        }
+        if self.conditions.borrow().has(&Condition::Hastened) {
+            modifier += 0.25;
+        }
+        self.base_move_speed.get() * modifier
     }
 
     pub fn player_controlled(&self) -> bool {
@@ -5035,9 +5052,15 @@ impl Character {
         } else {
             if condition == Condition::Hindered {
                 self.remaining_movement
-                    .set(self.remaining_movement.get() * 0.5);
+                    .set(self.remaining_movement.get() - self.base_move_speed.get() * 0.5);
             } else if condition == Condition::Slowed {
-                self.action_points.lose(1);
+                self.action_points.lose(SLOWED_AP_PENALTY);
+                self.remaining_movement
+                    .set(self.remaining_movement.get() - self.base_move_speed.get() * 0.25);
+            } else if condition == Condition::Hastened {
+                self.action_points.gain(HASTENED_AP_BONUS);
+                self.remaining_movement
+                    .set(self.remaining_movement.get() + self.base_move_speed.get() * 0.25);
             }
 
             conditions

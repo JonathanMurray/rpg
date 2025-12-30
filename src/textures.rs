@@ -89,6 +89,8 @@ pub enum StatusId {
     Blinded,
     Exposed,
     Slowed,
+    Hastened,
+    ArcaneSurge,
     NearDeath,
     Dead,
 }
@@ -111,6 +113,8 @@ pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
         (StatusId::Blinded, "status_blinded.png"),
         (StatusId::Exposed, "status_exposed.png"),
         (StatusId::Slowed, "status_slowed.png"),
+        (StatusId::Hastened, "status_hastened.png"),
+        (StatusId::ArcaneSurge, "status_arcane_surge.png"),
         (StatusId::NearDeath, "status_near_death.png"),
         (StatusId::Dead, "status_dead.png"),
     ])
@@ -155,6 +159,7 @@ pub enum IconId {
     Equip,
     UseConsumable,
     ShackledMind,
+    Haste,
     Smite,
     QuickStrike,
     SweepAttack,
@@ -210,6 +215,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Equip, "equip.png"),
         (IconId::UseConsumable, "use_consumable_icon.png"),
         (IconId::ShackledMind, "shackled_mind.png"),
+        (IconId::Haste, "haste_icon.png"),
         (IconId::QuickStrike, "quick_strike_icon.png"),
         (IconId::Heal, "heal_icon.png"),
         (IconId::SweepAttack, "sweep_attack_icon.png"),

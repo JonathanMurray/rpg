@@ -12,7 +12,9 @@ use crate::{
         EquipEffect, EquipmentRequirement, Fraction, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
         SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
-    }, sounds::SoundId, textures::{EquipmentIconId, IconId, SpriteId}
+    },
+    sounds::SoundId,
+    textures::{EquipmentIconId, IconId, SpriteId},
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {
@@ -395,7 +397,7 @@ pub const SHIELD_BASH: Ability = Ability {
     animation_color: GRAY,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const ENEMY_TACKLE: Ability = Ability {
@@ -428,7 +430,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
     animation_color: RED,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
@@ -636,7 +638,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     },
     animation_color: MAGENTA,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
@@ -697,7 +699,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     },
     animation_color: MAGENTA,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 // TODO Should not be possible to use Brace if you already have that number of Protected stacks
@@ -728,7 +730,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     },
     animation_color: MAGENTA,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const BRACE: Ability = Ability {
@@ -758,7 +760,7 @@ pub const BRACE: Ability = Ability {
     },
     animation_color: MAGENTA,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
@@ -809,7 +811,7 @@ pub const SCREAM: Ability = Ability {
 
     animation_color: BLUE,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const SHACKLED_MIND: Ability = Ability {
@@ -877,7 +879,7 @@ pub const SHACKLED_MIND: Ability = Ability {
 
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff)
+    resolve_sound: Some(SoundId::Debuff),
 };
 
 pub const MIND_BLAST: Ability = Ability {
@@ -920,7 +922,7 @@ pub const MIND_BLAST: Ability = Ability {
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff)
+    resolve_sound: Some(SoundId::Debuff),
 };
 
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
@@ -975,7 +977,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff)
+    resolve_sound: Some(SoundId::Debuff),
 };
 
 pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
@@ -1008,7 +1010,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     },
     animation_color: BROWN,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff)
+    resolve_sound: Some(SoundId::Debuff),
 };
 
 pub const MAGI_INFLICT_HORRORS: Ability = Ability {
@@ -1041,7 +1043,7 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Debuff)
+    resolve_sound: Some(SoundId::Debuff),
 };
 
 pub const MAGI_HEAL: Ability = Ability {
@@ -1065,7 +1067,7 @@ pub const MAGI_HEAL: Ability = Ability {
     possible_enhancements: [None, None, None],
     animation_color: LIME,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
@@ -1129,7 +1131,39 @@ pub const HEAL: Ability = Ability {
 
     animation_color: GREEN,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
+};
+
+pub const HASTE: Ability = Ability {
+    id: AbilityId::Haste,
+    name: "Haste",
+    description: "Grant an ally bonus AP and movement",
+    icon: IconId::Haste,
+    action_point_cost: 2,
+    mana_cost: 2,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    target: AbilityTarget::Ally {
+        range: Range::Ranged(9),
+        effect: AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Hastened,
+                    stacks: None,
+                    duration_rounds: Some(4),
+                })),
+                None,
+            ]),
+        },
+    },
+    possible_enhancements: [None, None, None],
+
+    animation_color: GREEN,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const HEALING_NOVA: Ability = Ability {
@@ -1157,7 +1191,7 @@ pub const HEALING_NOVA: Ability = Ability {
     },
     animation_color: GREEN,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const ENEMY_SELF_HEAL: Ability = Ability {
@@ -1188,7 +1222,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
     },
     animation_color: GREEN,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const SELF_HEAL: Ability = Ability {
@@ -1219,7 +1253,7 @@ pub const SELF_HEAL: Ability = Ability {
     },
     animation_color: GREEN,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const HEALING_RAIN: Ability = Ability {
@@ -1247,7 +1281,7 @@ pub const HEALING_RAIN: Ability = Ability {
     },
     animation_color: GREEN,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup)
+    resolve_sound: Some(SoundId::Powerup),
 };
 
 pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
@@ -1260,7 +1294,7 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_range_tenths: 30,
+        increased_range_tenths: 80,
         ..SpellEnhancementEffect::default()
     }),
 };
@@ -1275,7 +1309,7 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_radius_tenths: 30,
+        increased_radius_tenths: 40,
         ..SpellEnhancementEffect::default()
     }),
 };
@@ -1319,7 +1353,7 @@ pub const FIREBALL: Ability = Ability {
             on_hit: None,
         }),
         impact_area: Some((
-            Range::Ranged(6),
+            Range::Float(6.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -1336,7 +1370,7 @@ pub const FIREBALL: Ability = Ability {
 
     animation_color: RED,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const KILL: Ability = Ability {
@@ -1362,7 +1396,7 @@ pub const KILL: Ability = Ability {
     },
     animation_color: BLACK,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
@@ -1416,7 +1450,7 @@ pub const SEARING_LIGHT: Ability = Ability {
     },
     animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion)
+    resolve_sound: Some(SoundId::Explosion),
 };
 
 pub const HEALTH_POTION: Consumable = Consumable {
