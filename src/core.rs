@@ -16,6 +16,7 @@ use crate::data::{PassiveSkill, ADRENALIN_POTION};
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY};
+use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::util::are_entities_within_melee;
 
@@ -3158,6 +3159,8 @@ pub struct Ability {
     pub target: AbilityTarget,
     pub possible_enhancements: [Option<AbilityEnhancement>; 3],
     pub animation_color: Color,
+    pub initiate_sound: Option<SoundId>,
+    pub resolve_sound: Option<SoundId>
 }
 
 impl Ability {

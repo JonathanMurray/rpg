@@ -1,0 +1,50 @@
+use std::collections::HashMap;
+
+use macroquad::audio::{load_sound, play_sound, play_sound_once, Sound};
+
+#[derive(Clone)]
+pub struct SoundPlayer {
+    sounds: HashMap<SoundId, Sound>,
+}
+
+impl SoundPlayer {
+    pub async fn new() -> Self {
+        let mut sounds = HashMap::new();
+
+        for (id, name) in &[
+            (SoundId::HoverButton, "click_2"),
+            (SoundId::ClickButton, "click_3"),
+            (SoundId::Explosion, "explosion"),
+            (SoundId::Powerup, "powerup"),
+            (SoundId::ShootArrow, "shoot_arrow_2"),
+            (SoundId::HitArrow, "hit_arrow"),
+            (SoundId::Walk, "walk"),
+            (SoundId::Debuff, "debuff"),
+            (SoundId::ShootSpell, "shoot_spell"),
+            (SoundId::Death, "death"),
+        ] {
+            let sound = load_sound(&format!("sounds/{name}.wav")).await.unwrap();
+            sounds.insert(*id, sound);
+        }
+
+        Self { sounds }
+    }
+
+    pub fn play(&self, sound_id: SoundId) {
+        play_sound_once(&self.sounds[&sound_id]);
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Hash, Eq)]
+pub enum SoundId {
+    HoverButton,
+    ClickButton,
+    Explosion,
+    Powerup,
+    ShootArrow,
+    HitArrow,
+    Walk,
+    Debuff,
+    ShootSpell,
+    Death
+}

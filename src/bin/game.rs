@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::rc::Rc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+use macroquad::audio::load_sound;
 use macroquad::color::{Color, LIGHTGRAY, MAGENTA, WHITE};
 use macroquad::input::{get_keys_pressed, mouse_position};
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
@@ -27,14 +28,7 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
-    COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, HEAL, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, HEAL_ENERGIZE,
-    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, KILL, LEATHER_ARMOR, LONGER_REACH,
-    LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD,
-    OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT,
-    SEARING_LIGHT_BURN, SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE,
-    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE, COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL, FIREBALL_INFERNO, FIREBALL_REACH, HEAL, HEAL_ENERGIZE, HEALING_NOVA, HEALING_RAIN, HEALTH_POTION, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, OVERWHELMING, PENETRATING_ARROWS, PassiveSkill, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -43,6 +37,7 @@ use rpg::map_scene::{MapChoice, MapScene};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
 use rpg::skill_tree::run_skill_tree_scene;
+use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_all_status_textures, load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
@@ -134,6 +129,7 @@ async fn main() {
     clara.known_passive_skills.push(PassiveSkill::ArcaneSurge);
     clara.learn_ability(FIREBALL);
     clara.known_ability_enhancements.push(FIREBALL_INFERNO);
+    clara.known_ability_enhancements.push(FIREBALL_REACH);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
     clara
@@ -277,6 +273,8 @@ async fn init_fight_scene(
 
     let status_textures = load_all_status_textures().await;
 
+    let sound_player = SoundPlayer::new().await;
+
     let gfx_user_interface = UserInterface::new(
         &core_game,
         sprites,
@@ -289,6 +287,7 @@ async fn init_fight_scene(
         grid_big_font,
         init_state,
         status_textures,
+        sound_player,
     );
 
     game_ui.init(gfx_user_interface);

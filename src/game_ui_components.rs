@@ -5,11 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::SKYBLUE,
-    input::{is_key_pressed, KeyCode},
-    shapes::{draw_triangle, draw_triangle_lines},
-    text::{measure_text, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams},
+    audio::Sound, color::SKYBLUE, input::{KeyCode, is_key_pressed}, shapes::{draw_triangle, draw_triangle_lines}, text::{TextParams, measure_text}, texture::{DrawTextureParams, draw_texture_ex}
 };
 
 use indexmap::IndexMap;
@@ -23,12 +19,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, TextLine,
-    },
-    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
-    drawing::draw_cross,
-    textures::{PortraitId, StatusId},
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine, draw_text_rounded
+    }, core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS}, drawing::draw_cross, sounds::{SoundId, SoundPlayer}, textures::{PortraitId, StatusId}
 };
 
 pub struct CharacterPortraits {
@@ -357,6 +349,7 @@ pub struct PlayerPortraits {
     selected_i: Cell<CharacterId>,
     active_i: Cell<CharacterId>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
+    sound_player: SoundPlayer
 }
 
 impl PlayerPortraits {
@@ -367,6 +360,7 @@ impl PlayerPortraits {
         font: Font,
         portrait_textures: HashMap<PortraitId, Texture2D>,
         status_textures: HashMap<StatusId, Texture2D>,
+        sound_player: SoundPlayer
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
@@ -404,6 +398,7 @@ impl PlayerPortraits {
             selected_i: Cell::new(selected_id),
             active_i: Cell::new(active_id),
             portraits,
+            sound_player
         };
 
         this.set_selected_id(selected_id);
@@ -449,6 +444,7 @@ impl PlayerPortraits {
 
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.take() {
+                self.sound_player.play(SoundId::ClickButton);
                 println!("Portrait has been clicked {i}");
                 self.set_selected_id(*i);
                 change_attempt = true;

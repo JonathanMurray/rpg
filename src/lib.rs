@@ -21,6 +21,7 @@ pub mod pathfind;
 pub mod rest_scene;
 pub mod shop_scene;
 pub mod skill_tree;
+pub mod sounds;
 pub mod stats_ui;
 pub mod target_ui;
 pub mod textures;

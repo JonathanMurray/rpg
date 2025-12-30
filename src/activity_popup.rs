@@ -20,7 +20,10 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{draw_text_rounded, Drawable},
-    core::{as_percentage, prob_attack_hit, Character, CharacterId, Characters},
+    core::{
+        as_percentage, prob_attack_hit, Character, CharacterId, Characters,
+        MOVE_DISTANCE_PER_STAMINA,
+    },
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,
@@ -184,7 +187,7 @@ impl ActivityPopup {
             width += margin_between_choices_and_proceed;
         }
 
-        let sprint_stamina_text = "Spend stamina to go further:";
+        let sprint_stamina_text = "Stamina cost:";
         let sprint_stamina_margin = 15.0;
         if let Some(slider) = &self.movement_cost_slider {
             let text_dimensions = measure_text(
@@ -244,7 +247,8 @@ impl ActivityPopup {
         {
             let cost = self.movement_cost_slider.as_ref().unwrap().selected();
             let character = self.characters.get(self.relevant_character_id);
-            let movement = character.remaining_movement.get() + cost as f32;
+            let movement =
+                character.remaining_movement.get() + (cost * MOVE_DISTANCE_PER_STAMINA) as f32;
             //let dim = draw_text_rounded(&format!("Move:"), x0, y0, base_text_params.clone());
             //y0 += dim.offset_y + line_margin;
             draw_text_rounded(

@@ -15,6 +15,8 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
+use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams};
+
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
@@ -42,6 +44,7 @@ use crate::{
         TextEffectStyle,
     },
     init_fight_map::GameInitState,
+    sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId},
 };
@@ -377,6 +380,7 @@ pub struct UserInterface {
     character_uis: HashMap<CharacterId, CharacterUi>,
     target_ui: TargetUi,
     log: Log,
+    sound_player: SoundPlayer,
 }
 
 impl UserInterface {
@@ -392,6 +396,7 @@ impl UserInterface {
         big_font: Font,
         init_state: GameInitState,
         status_textures: HashMap<StatusId, Texture2D>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let characters = game.characters.clone();
         let active_character_id = game.active_character_id;
@@ -431,6 +436,8 @@ impl UserInterface {
             status_textures.clone(),
         );
 
+        
+
         let player_portraits = PlayerPortraits::new(
             &characters,
             first_player_character_id,
@@ -438,6 +445,7 @@ impl UserInterface {
             decorative_font.clone(),
             portrait_textures.clone(),
             status_textures.clone(),
+            sound_player.clone()
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
@@ -488,6 +496,7 @@ impl UserInterface {
             activity_popup,
             target_ui,
             state: ui_state,
+            sound_player,
         }
     }
 
@@ -1036,6 +1045,9 @@ impl UserInterface {
     }
 
     fn on_new_state(&mut self) {
+        // TODO
+        //self.sound_player.click();
+
         //dbg!(&self.state.borrow());
         //println!("^^^ on_new_state() ^^^");
 
@@ -1268,6 +1280,11 @@ impl UserInterface {
                 ability,
                 target,
             } => {
+
+                if let Some(sound_id) = ability.initiate_sound {
+                    self.sound_player.play(sound_id);
+                }
+
                 self.game_grid.animate_character_acting(actor, 0.2);
 
                 let duration;
@@ -1342,6 +1359,10 @@ impl UserInterface {
                 ability,
                 mut detail_lines,
             } => {
+                if let Some(sound_id) = ability.resolve_sound {
+                    self.sound_player.play(sound_id);
+                }
+
                 let actor_name = self.characters.get(actor).name;
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
@@ -1431,6 +1452,7 @@ impl UserInterface {
                 }
             }
             GameEvent::ConsumableWasUsed { user, consumable } => {
+                self.sound_player.play(SoundId::Powerup);
                 self.log.add(format!(
                     "{} used {}",
                     self.characters.get(user).name,
@@ -1446,6 +1468,7 @@ impl UserInterface {
                 character,
                 new_active,
             } => {
+                self.sound_player.play(SoundId::Death);
                 self.log
                     .add(format!("{} died", self.characters.get(character).name));
 
@@ -1480,6 +1503,8 @@ impl UserInterface {
 
                 self.game_grid
                     .set_character_motion(character, from, to, duration);
+                //TODO
+                self.sound_player.play(SoundId::Walk);
                 self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharacterTookDamage {
@@ -1555,6 +1580,10 @@ impl UserInterface {
     }
 
     fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
+
+        self.sound_player.play(SoundId::ShootArrow);
+
+
         self.game_grid.animate_character_acting(attacker, 0.2);
 
         let attacker_pos = self.characters.get(attacker).pos();
@@ -1599,10 +1628,19 @@ impl UserInterface {
     }
 
     fn handle_attacked_event(&mut self, event: &AttackedEvent) {
+
         let attacker = event.attacker;
         let target = event.target;
         let outcome = event.outcome;
         let detail_lines = &event.detail_lines;
+
+        if self.characters.get(attacker).has_equipped_ranged_weapon() {
+            self.sound_player.play(SoundId::HitArrow);
+        } else {
+            self.sound_player.play(SoundId::Explosion);
+        }
+
+
 
         let verb = match outcome {
             AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",
@@ -1776,6 +1814,7 @@ impl UserInterface {
                     },
                 ) => {
                     if hovered_pos.is_some() {
+                        self.sound_player.play(SoundId::HoverButton);
                         self.hovered_button = Some(event);
                     } else if let Some(previously_hovered_button) = &self.hovered_button {
                         if id == previously_hovered_button.id {
@@ -1792,6 +1831,7 @@ impl UserInterface {
                     if context != Some(ButtonContext::CharacterSheet) {
                         match btn_action {
                             ButtonAction::Action(base_action) => {
+                                self.sound_player.play(SoundId::ClickButton);
                                 action_button_clicked = Some(base_action);
                             }
                             unexpected => panic!("{:?}", unexpected),
@@ -1810,6 +1850,7 @@ impl UserInterface {
                 if btn.enabled.get() && is_key_pressed(*keycode) {
                     match btn.action {
                         ButtonAction::Action(base_action) => {
+                            self.sound_player.play(SoundId::ClickButton);
                             action_button_clicked = Some(base_action)
                         }
                         _ => unreachable!("button clicked via hotkey: {:?}", btn.action),
