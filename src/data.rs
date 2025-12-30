@@ -1346,10 +1346,10 @@ pub const FIREBALL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(12.0)),
+        reach: AbilityReach::Range(Range::Float(12.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::AtLeast(3)),
+            damage: Some(AbilityDamage::AtLeast(4)),
             on_hit: None,
         }),
         impact_area: Some((
@@ -1357,7 +1357,7 @@ pub const FIREBALL: Ability = Ability {
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(3)),
+                damage: Some(AbilityDamage::AtLeast(4)),
                 on_hit: None,
             }),
         )),

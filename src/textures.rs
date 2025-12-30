@@ -91,6 +91,7 @@ pub enum StatusId {
     Slowed,
     Hastened,
     ArcaneSurge,
+    ReaperApCooldown,
     NearDeath,
     Dead,
 }
@@ -115,6 +116,7 @@ pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
         (StatusId::Slowed, "status_slowed.png"),
         (StatusId::Hastened, "status_hastened.png"),
         (StatusId::ArcaneSurge, "status_arcane_surge.png"),
+        (StatusId::ReaperApCooldown, "status_reaper_cooldown.png"),
         (StatusId::NearDeath, "status_near_death.png"),
         (StatusId::Dead, "status_dead.png"),
     ])

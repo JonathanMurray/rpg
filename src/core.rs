@@ -2898,6 +2898,7 @@ impl Condition {
             NearDeath => StatusId::NearDeath,
             Dead => StatusId::Dead,
             ArcaneSurge => StatusId::ArcaneSurge,
+            ReaperApCooldown => StatusId::ReaperApCooldown,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
