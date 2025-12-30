@@ -54,6 +54,9 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 }
 
 fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Option<Action> {
+    println!("--------------------");
+    println!("Run fighter behaviour ({})", game.active_character_id);
+    println!("--------------------");
     let bot = game.active_character();
     assert!(!bot.player_controlled());
 

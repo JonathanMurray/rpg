@@ -5351,7 +5351,7 @@ pub enum WeaponGrip {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum WeaponRange {
     Melee,
-    Ranged(u32),
+    Ranged(f32),
 }
 
 impl Display for WeaponRange {
@@ -5379,14 +5379,14 @@ impl WeaponRange {
             is therefore sqrt(3^2 + 2^2)
              */
             Self::Melee => ((3u32).pow(2) + (2u32).pow(2)) as f32,
-            Self::Ranged(range) => range.pow(2) as f32,
+            Self::Ranged(range) => range.powf(2.0),
         }
     }
 
     pub fn into_range(self) -> Range {
         match self {
             Self::Melee => Range::Melee,
-            Self::Ranged(r) => Range::Ranged(r),
+            Self::Ranged(r) => Range::Float(r),
         }
     }
 }

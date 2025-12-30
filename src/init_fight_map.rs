@@ -330,6 +330,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             characters.extend_from_slice(&enemies);
         }
         FightId::VerticalSlice => {
+            /*
             for i in 0..=2 {
                 let pos = *enemy_positions[&i].choose().unwrap();
                 let ghoul = Character::new(
@@ -349,6 +350,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 }
                 characters.push(ghoul);
             }
+             */
             for i in 3..=4 {
                 // TODO these should have archer behaviour, i.e. run away from melee
                 let pos = *enemy_positions[&i].choose().unwrap();

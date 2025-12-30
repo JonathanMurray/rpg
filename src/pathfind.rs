@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, Ref, RefCell},
-    collections::{HashMap, HashSet},
+    cmp::Ordering,
+    collections::{BinaryHeap, HashMap, HashSet},
     time::Instant,
 };
 
@@ -37,12 +38,13 @@ pub struct PathfindGrid {
     occupied: RefCell<HashMap<Position, Occupation>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
-    cached_unexplored: RefCell<Vec<(Position, ChartNode)>>,
+    cached_unexplored: RefCell<Vec<ChartNode>>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct ChartNode {
     pub distance_from_start: f32,
+    pub position: Position,
     pub came_from: Position,
 }
 
@@ -147,13 +149,7 @@ impl PathfindGrid {
     ) -> Option<Path> {
         let before = Instant::now();
 
-        //println!("find shortest path to proxy ...");
-        // TODO: It's wildly inefficient to just "explore outward" in this case. We should instead
-        // explore toward the target location using an A* heuristic
-        // If the target is to the west, we should search west before east
-        // If unable to reach the target westward, we should only explore east as long as the
-        // "min distance to goal" heuristic is still below the exploration range
-        //
+        println!("find shortest path to proxy ...");
         let chart = self.explore_outward(
             character_id,
             start,
@@ -167,7 +163,7 @@ impl PathfindGrid {
         for (pos, chart_node) in chart.iter() {
             if within_range_squared(proximity_squared, *pos, target) {
                 //if distance_between(*pos, target) <= proximity {
-                //println!("Build path from chart... start={:?}, pos={:?}", start, pos);
+                println!("Build path from chart... start={:?}, pos={:?}", start, pos);
                 let path = build_path_from_chart(&chart, start, *pos);
 
                 //dbg!(&path);
@@ -182,7 +178,7 @@ impl PathfindGrid {
             }
         }
 
-        //println!("find shortest path to proxy ... DONE");
+        println!("find shortest path to proxy ... DONE");
 
         shortest_path
     }
@@ -238,17 +234,14 @@ impl PathfindGrid {
         // Otherwise, we're free to re-use however much was explored previously, and just extend out from it
         let mut mut_chart = self.cached_exploration_chart.borrow_mut();
 
-        // TODO: This should be a PriorityQueue, so that heuristically good nodes are always explored before others
-        let mut next = self.cached_unexplored.take();
+        let mut next = BinaryHeap::from(self.cached_unexplored.take());
 
         if next.is_empty() {
-            next.push((
-                start,
-                ChartNode {
-                    distance_from_start: 0.0,
-                    came_from: start,
-                },
-            ));
+            next.push(ChartNode {
+                distance_from_start: 0.0,
+                position: start,
+                came_from: start,
+            });
         }
 
         // (start, exploration_range)
@@ -271,20 +264,20 @@ impl PathfindGrid {
          */
 
         while !next.is_empty() {
-            let (pos, chart_node) = next.pop().unwrap();
+            let chart_node = next.pop().unwrap();
 
-            assert!(pos.0 >= 0 && pos.1 >= 0);
+            assert!(chart_node.position.0 >= 0 && chart_node.position.1 >= 0);
 
-            if let Some(prev_chart_node) = mut_chart.get(&pos) {
+            if let Some(prev_chart_node) = mut_chart.get(&chart_node.position) {
                 if prev_chart_node.distance_from_start <= chart_node.distance_from_start {
                     // We already know another shorter route to this node
                     continue;
                 }
             }
 
-            mut_chart.insert(pos, chart_node);
+            mut_chart.insert(chart_node.position, chart_node);
 
-            let (x, y) = pos;
+            let (x, y) = chart_node.position;
 
             let dist = chart_node.distance_from_start;
             let diagonal: f32 = 2f32.sqrt();
@@ -318,9 +311,10 @@ impl PathfindGrid {
                 let within_grid = (0..self.dimensions.0 as i32).contains(&neighbor_pos.0)
                     && (0..self.dimensions.1 as i32).contains(&neighbor_pos.1);
                 if within_grid && self.is_free_for(character_id, neighbor_pos) {
-                    let node = ChartNode {
+                    let neighbor_node = ChartNode {
                         distance_from_start: neighbor_dist,
-                        came_from: pos,
+                        position: neighbor_pos,
+                        came_from: chart_node.position,
                     };
 
                     let mut should_explore_neighbor = true;
@@ -345,9 +339,9 @@ impl PathfindGrid {
                     }
 
                     if should_explore_neighbor {
-                        next.push((neighbor_pos, node));
+                        next.push(neighbor_node);
                     } else {
-                        unexplored.push((neighbor_pos, node));
+                        unexplored.push(neighbor_node);
                     }
                 }
             }
@@ -357,13 +351,14 @@ impl PathfindGrid {
                 proximity_squared,
             }) = target
             {
-                if sq_distance_between(pos, target_pos) <= proximity_squared {
+                if sq_distance_between(chart_node.position, target_pos) <= proximity_squared {
                     println!(
                         "Found a path to proximity ({:?}), pos={:?}. Chart size={}",
                         target,
-                        pos,
+                        chart_node.position,
                         mut_chart.len()
                     );
+                    //dbg!(&next);
                     // We're done!
                     next.clear();
                 }
@@ -405,6 +400,23 @@ impl PathfindGrid {
             }
         }
         true
+    }
+}
+
+impl Ord for ChartNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .distance_from_start
+            .total_cmp(&self.distance_from_start)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+impl Eq for ChartNode {}
+
+impl PartialOrd for ChartNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 

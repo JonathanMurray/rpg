@@ -261,7 +261,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
 
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
-    range: WeaponRange::Ranged(15),
+    range: WeaponRange::Ranged(15.5),
     action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
@@ -276,7 +276,7 @@ pub const BAD_BOW: Weapon = Weapon {
 
 pub const BOW: Weapon = Weapon {
     name: "Bow",
-    range: WeaponRange::Ranged(15),
+    range: WeaponRange::Ranged(15.5),
     action_point_cost: 3,
     damage: 7,
     grip: WeaponGrip::TwoHanded,
@@ -291,7 +291,7 @@ pub const BOW: Weapon = Weapon {
 
 pub const ELUSIVE_BOW: Weapon = Weapon {
     name: "Elusive bow",
-    range: WeaponRange::Ranged(18),
+    range: WeaponRange::Ranged(18.5),
     action_point_cost: 3,
     damage: 7,
     grip: WeaponGrip::TwoHanded,
