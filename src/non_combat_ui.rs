@@ -350,7 +350,7 @@ impl NonCombatCharacterUi {
                 .iter()
                 .find(|btn| btn.id == id)
                 .unwrap();
-            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip());
+            draw_button_tooltip(&self.font, btn_pos, &btn.tooltip(), true);
         }
     }
 

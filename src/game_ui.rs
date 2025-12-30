@@ -8,7 +8,7 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
-    input::{get_keys_pressed, is_key_pressed, mouse_position, KeyCode},
+    input::{get_keys_pressed, is_key_down, is_key_pressed, mouse_position, KeyCode},
     shapes::{draw_line, draw_rectangle},
     text::{draw_text, Font},
     texture::Texture2D,
@@ -623,7 +623,13 @@ impl UserInterface {
                 .iter()
                 .find(|btn| btn.id == btn_hovered.id)
             {
-                draw_button_tooltip(&self.font, btn_hovered.hovered_pos.unwrap(), &btn.tooltip());
+                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
+                draw_button_tooltip(
+                    &self.font,
+                    btn_hovered.hovered_pos.unwrap(),
+                    &btn.tooltip(),
+                    detailed_tooltip,
+                );
             }
         }
 

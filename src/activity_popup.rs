@@ -7,7 +7,10 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
-    input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
+    input::{
+        is_key_down, is_mouse_button_down, is_mouse_button_pressed, mouse_position, KeyCode,
+        MouseButton,
+    },
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
@@ -277,7 +280,8 @@ impl ActivityPopup {
             btn.draw(x_btn, y_btn);
 
             if self.hovered_choice_button_id == Some(btn.id) {
-                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip());
+                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
+                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip(), detailed_tooltip);
             }
 
             x_btn += btn.size.0 + button_margin;

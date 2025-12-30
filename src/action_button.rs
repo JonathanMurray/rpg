@@ -55,17 +55,19 @@ impl Tooltip {
         }
     }
 
-    pub fn content_lines(&self) -> Vec<String> {
+    pub fn content_lines(&self, detailed: bool) -> Vec<String> {
         let mut lines = vec![];
         if let Some(description) = self.description {
             if !description.is_empty() {
                 lines.push(description.to_string());
-                if !self.technical_description.is_empty() {
+                if detailed && !self.technical_description.is_empty() {
                     lines.push("".to_string());
                 }
             }
         }
-        lines.extend_from_slice(&self.technical_description);
+        if detailed {
+            lines.extend_from_slice(&self.technical_description);
+        }
         lines
     }
 }
@@ -1233,7 +1235,12 @@ pub struct ButtonHovered {
     pub context: Option<ButtonContext>,
 }
 
-pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &Tooltip) {
+pub fn draw_button_tooltip(
+    font: &Font,
+    button_position: (f32, f32),
+    tooltip: &Tooltip,
+    detailed: bool,
+) {
     let button_size = (64.0, 64.0);
 
     draw_tooltip(
@@ -1249,7 +1256,7 @@ pub fn draw_button_tooltip(font: &Font, button_position: (f32, f32), tooltip: &T
         ),
         &tooltip.header,
         tooltip.error,
-        &tooltip.content_lines(),
+        &tooltip.content_lines(detailed),
         &tooltip.keywords,
         false,
     );

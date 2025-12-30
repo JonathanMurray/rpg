@@ -557,7 +557,7 @@ pub async fn run_editor() {
 
         if let Some((btn_id, pos)) = hovered_btn_id_pos {
             let btn = &skill_buttons.borrow()[&btn_id];
-            draw_button_tooltip(&font, pos, &btn.tooltip());
+            draw_button_tooltip(&font, pos, &btn.tooltip(), true);
         }
 
         for attribute in clicked_attributes.borrow_mut().drain(..) {
@@ -804,7 +804,7 @@ pub async fn run_skill_tree_scene() {
                             TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
                             &tooltip.header,
                             tooltip.error,
-                            &tooltip.content_lines(),
+                            &tooltip.content_lines(true),
                             &tooltip.keywords,
                             false,
                         );

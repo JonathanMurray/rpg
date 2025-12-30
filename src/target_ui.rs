@@ -15,8 +15,7 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
-        InternalUiEvent, Tooltip,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, Tooltip,
     },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
@@ -455,7 +454,7 @@ impl Drawable for TargetUi {
         if let Some((id, pos)) = self.hovered_btn.borrow().as_ref() {
             let btn = self.buttons.get(id).unwrap();
 
-            draw_button_tooltip(&self.simple_font, *pos, &btn.borrow().tooltip());
+            draw_button_tooltip(&self.simple_font, *pos, &btn.borrow().tooltip(), true);
         }
     }
 
