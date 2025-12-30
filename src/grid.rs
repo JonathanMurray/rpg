@@ -87,6 +87,13 @@ const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
 #[derive(Debug, Copy, Clone)]
+pub struct TargetDamagePreview {
+    pub character_id: CharacterId,
+    pub min: u32,
+    pub max: u32,
+}
+
+#[derive(Debug, Copy, Clone)]
 struct CharacterAnimation {
     character_id: CharacterId,
     duration: f32,
@@ -111,7 +118,7 @@ enum AnimationKind {
     Shake { random_time_offset: f32 },
     Death,
     Act { random_rotation: f32 },
-    HealthChange { previous: u32 },
+    HealthLost { previous: u32 },
 }
 
 struct MovementRange {
@@ -172,6 +179,7 @@ pub struct GameGrid {
     //routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
+    target_damage_previews: Vec<TargetDamagePreview>,
     character_animations: Vec<CharacterAnimation>,
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
@@ -237,6 +245,7 @@ impl GameGrid {
             cell_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
+            target_damage_previews: Default::default(),
             character_animations: Default::default(),
             big_font,
             simple_font,
@@ -245,6 +254,10 @@ impl GameGrid {
             terrain_objects,
             status_textures,
         }
+    }
+
+    pub fn set_target_damage_preview(&mut self, preview: Option<TargetDamagePreview>) {
+        self.target_damage_previews = preview.into_iter().collect();
     }
 
     pub fn set_character_motion(
@@ -287,7 +300,7 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::HealthChange {
+            AnimationKind::HealthLost {
                 previous: previous_health,
             },
         ));
@@ -635,7 +648,7 @@ impl GameGrid {
                     y -= self.cell_w * 0.07;
                     params.rotation = random_rotation;
                 }
-                AnimationKind::HealthChange { .. } => {
+                AnimationKind::HealthLost { .. } => {
                     // This affects how the healthbar is drawn
                 }
             }
@@ -703,12 +716,18 @@ impl GameGrid {
                     ConfiguredAction::Attack {
                         target: t @ Some(..),
                         ..
-                    } => *t = None,
+                    } => {
+                        outcome.switched_players_action_target = true;
+                        *t = None
+                    }
 
                     ConfiguredAction::UseAbility {
                         target: t @ (ActionTarget::Character(..) | ActionTarget::Position(..)),
                         ..
-                    } => *t = ActionTarget::None,
+                    } => {
+                        outcome.switched_players_action_target = true;
+                        *t = ActionTarget::None
+                    }
 
                     ConfiguredAction::Move {
                         selected_movement_path: p,
@@ -1798,31 +1817,50 @@ impl GameGrid {
 
         draw_rectangle(health_x, health_y, health_w, health_h, healthbar_bg);
 
-        let mut prev_health = None;
-
-        for animation in &self.character_animations {
-            if let AnimationKind::HealthChange { previous } = animation.kind {
-                if animation.character_id == character.id() {
-                    prev_health = Some(previous);
-                }
-            }
-        }
-
         let current_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, current_health_w, health_h, RED);
 
-        if let Some(prev) = prev_health {
-            let prev_health_w = (health_w)
-                * ((prev as f32 - character.health.current() as f32)
-                    / character.health.max() as f32);
-            draw_rectangle(
-                health_x + current_health_w,
-                health_y,
-                prev_health_w,
-                health_h,
-                YELLOW,
-            );
+        for damage_preview in &self.target_damage_previews {
+            if damage_preview.character_id == character.id() {
+                let effective_min = damage_preview.min.min(character.health.current());
+                let effective_max = damage_preview.max.min(character.health.current());
+                let guaranteed_damage_w =
+                    (health_w) * (effective_min as f32 / character.health.max() as f32);
+                draw_rectangle(
+                    health_x + current_health_w - guaranteed_damage_w,
+                    health_y,
+                    guaranteed_damage_w,
+                    health_h,
+                    GRAY,
+                );
+                let potential_damage_w = (health_w) * (effective_max - effective_min) as f32
+                    / character.health.max() as f32;
+                draw_rectangle(
+                    health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
+                    health_y,
+                    potential_damage_w,
+                    health_h,
+                    ORANGE,
+                );
+            }
+        }
+
+        for animation in &self.character_animations {
+            if let AnimationKind::HealthLost { previous } = animation.kind {
+                if animation.character_id == character.id() {
+                    let lost_health_w = (health_w)
+                        * ((previous as f32 - character.health.current() as f32)
+                            / character.health.max() as f32);
+                    draw_rectangle(
+                        health_x + current_health_w,
+                        health_y,
+                        lost_health_w,
+                        health_h,
+                        YELLOW,
+                    );
+                }
+            }
         }
 
         if !discrete_healthbar {

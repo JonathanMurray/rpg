@@ -41,7 +41,7 @@ use crate::{
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
-        TextEffectStyle,
+        TargetDamagePreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
@@ -761,6 +761,8 @@ impl UserInterface {
             unreachable!()
         };
 
+        dbg!(target);
+
         self.remembered_attack_enhancements
             .insert(self.active_character_id, selected_enhancements.clone());
 
@@ -814,10 +816,18 @@ impl UserInterface {
                     prediction.min_damage, prediction.max_damage,
                 );
 
+                self.game_grid
+                    .set_target_damage_preview(Some(TargetDamagePreview {
+                        character_id: *target_id,
+                        min: prediction.min_damage,
+                        max: prediction.max_damage,
+                    }));
+
                 self.target_ui.set_action(header, details, true);
             }
 
             None => {
+                self.game_grid.set_target_damage_preview(None);
                 self.target_ui
                     .set_action("Select an enemy".to_string(), vec![], false);
             }
@@ -1146,6 +1156,8 @@ impl UserInterface {
                 self.activity_popup.refresh_on_attacked_state();
             }
         }
+
+        self.game_grid.set_target_damage_preview(None);
 
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
