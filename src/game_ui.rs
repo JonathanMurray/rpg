@@ -700,8 +700,14 @@ impl UserInterface {
         }
         */
 
-        if let Some(move_cost) = outcome.hovered_move_path_cost {
-            self.activity_popup.set_movement_cost(move_cost);
+        if let Some(move_cost) = &outcome.hovered_move_path_cost {
+            let switched_state_from_movement = matches!(
+                outcome.switched_state,
+                Some(NewState::Attack | NewState::ChoosingAction)
+            );
+            if !switched_state_from_movement {
+                self.activity_popup.set_movement_cost(*move_cost);
+            }
         }
 
         player_chose

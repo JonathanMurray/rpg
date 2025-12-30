@@ -453,6 +453,7 @@ impl ActivityPopup {
     }
 
     pub fn set_movement_cost(&mut self, cost: u32) {
+        // TODO: bug: this unwrap panicked, when clicking on an enemy on the grid?
         let slider = self.movement_cost_slider.as_mut().unwrap();
         let character = self.characters.get(self.relevant_character_id);
         let max_cost = character.stamina.current();
@@ -648,6 +649,8 @@ impl ActivityPopup {
 
         let mut stamina_slider = None;
         self.selected_choice_button_ids.clear();
+
+        dbg!("ON NEW STATE", self.ui_state.borrow());
 
         match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {

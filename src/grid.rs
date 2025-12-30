@@ -2351,7 +2351,7 @@ pub struct GridOutcome {
     //pub switched_movement_path: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum NewState {
     Move { commit_movement: bool },
     Attack,
