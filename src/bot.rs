@@ -526,7 +526,7 @@ pub fn bot_choose_attack_reaction(
         .characters
         .get(reactor_id)
         .usable_on_attacked_reactions(is_within_melee);
-    if let Some((_, reaction)) = reactions.first() {
+    if let Some((reaction)) = reactions.first() {
         Some(*reaction)
     } else {
         None

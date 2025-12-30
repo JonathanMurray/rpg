@@ -24,7 +24,7 @@ use crate::{
     },
     base_ui::{draw_text_rounded, Drawable},
     core::{
-        as_percentage, prob_attack_hit, Character, CharacterId, Characters,
+        as_percentage, predict_attack, prob_attack_hit, Character, CharacterId, Characters,
         MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{draw_cross, draw_dashed_line},
@@ -593,18 +593,15 @@ impl ActivityPopup {
             explanation.push(' ');
         }
 
+        let prediction =
+            predict_attack(attacker, *hand, attack_enhancements, defender, reaction, 0);
+
         let mut line = format!(
-            "Hit chance: {}",
-            as_percentage(prob_attack_hit(
-                attacker,
-                *hand,
-                defender,
-                attack_enhancements,
-                reaction
-            ))
+            "Damage chance: {}%, {} - {}",
+            prediction.percentage_chance_deal_damage, prediction.min_damage, prediction.max_damage
         );
         if !explanation.is_empty() {
-            line.push_str(&format!("  {explanation}"));
+            line.push_str(&format!("  ({explanation})"));
         }
         self.additional_line = Some(line);
     }
@@ -730,8 +727,7 @@ impl ActivityPopup {
 
                 let defender = self.characters.get(*reactor_id);
 
-                for (_subtext, reaction) in defender.usable_on_attacked_reactions(*is_within_melee)
-                {
+                for reaction in defender.usable_on_attacked_reactions(*is_within_melee) {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);

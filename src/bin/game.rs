@@ -116,7 +116,7 @@ async fn main() {
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
-    bob.set_shield(SMALL_SHIELD);
+    bob.set_shield(MEDIUM_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.known_passive_skills.push(PassiveSkill::Reaper);
     bob.learn_ability(SWEEP_ATTACK);
@@ -152,11 +152,11 @@ async fn main() {
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    let mut player_characters = vec![clara, bob, alice];
+    let mut player_characters = vec![bob];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::VerticalSlice,
+        FightId::Test,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

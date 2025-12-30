@@ -231,7 +231,7 @@ impl NonCombatCharacterUi {
         }
 
         let mut reaction_buttons = vec![];
-        for (_subtext, reaction) in character.known_on_attacked_reactions() {
+        for reaction in character.known_on_attacked_reactions() {
             let btn_action = ButtonAction::OnAttackedReaction(reaction);
             let btn = Rc::new(new_button(btn_action, None, false));
             hoverable_buttons.push(Rc::clone(&btn));

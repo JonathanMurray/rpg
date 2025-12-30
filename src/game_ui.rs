@@ -2186,7 +2186,7 @@ fn build_character_ui(
     }
 
     let mut reaction_buttons_for_character_sheet = vec![];
-    for (_subtext, reaction) in character.known_on_attacked_reactions() {
+    for reaction in character.known_on_attacked_reactions() {
         let btn_action = ButtonAction::OnAttackedReaction(reaction);
         let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));

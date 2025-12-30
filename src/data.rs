@@ -7,9 +7,9 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
         ApplyCondition, ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow,
-        AttackAttribute, AttackCircumstance, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, AttackHitEffect, Condition, Consumable, DefenseType,
-        EquipEffect, EquipmentRequirement, Fraction, OnAttackedReaction, OnAttackedReactionEffect,
+        AttackAttribute, AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect,
+        AttackHitEffect, AttackType, Condition, Consumable, DefenseType, EquipEffect,
+        EquipmentRequirement, Fraction, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
         SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
@@ -455,15 +455,14 @@ pub const MEDIUM_SHIELD: Shield = Shield {
         id: OnAttackedReactionId::Block,
         name: "Block",
         description: "Attempt to block an incoming ranged attack",
-        // TODO: make better icon
-        icon: IconId::RangedAttack,
+        icon: IconId::Block,
         action_point_cost: 1,
         stamina_cost: 1,
         effect: OnAttackedReactionEffect {
             bonus_evasion: 5,
             bonus_armor: 1,
         },
-        required_circumstance: Some(AttackCircumstance::Ranged),
+        required_attack_type: Some(AttackType::Ranged),
     }),
     weight: 3,
 };
@@ -575,7 +574,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
         bonus_evasion: 5,
         bonus_armor: 1,
     },
-    required_circumstance: Some(AttackCircumstance::Melee),
+    required_attack_type: Some(AttackType::Melee),
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
@@ -589,7 +588,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
         bonus_evasion: 5,
         bonus_armor: 0,
     },
-    required_circumstance: None,
+    required_attack_type: None,
 };
 
 pub const RAGE: OnHitReaction = OnHitReaction {
@@ -599,7 +598,7 @@ pub const RAGE: OnHitReaction = OnHitReaction {
     action_point_cost: 1,
     stamina_cost: 1,
     effect: OnHitReactionEffect::Rage,
-    required_circumstance: None,
+    required_attack_type: None,
 };
 
 pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {

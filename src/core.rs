@@ -1750,22 +1750,28 @@ impl CoreGame {
 
             if roll_result < evasion {
                 attack_hit_type = AttackHitType::Graze;
-                dmg_str.push_str(" -25% (graze)");
-                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
-                detail_lines.push("  Graze!".to_string());
             } else {
-                on_true_hit_effect = weapon.on_true_hit;
-
-                let crit = roll_result >= evasion + 10;
-
-                if crit {
+                if roll_result >= evasion + 10 {
                     attack_hit_type = AttackHitType::Critical;
+                }
+            }
+
+            match attack_hit_type {
+                AttackHitType::Graze => {
+                    dmg_str.push_str(" -25% (graze)");
+                    dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                    detail_lines.push("  Graze!".to_string());
+                }
+                AttackHitType::Regular => {
+                    on_true_hit_effect = weapon.on_true_hit;
+                    detail_lines.push("  Hit".to_string());
+                }
+                AttackHitType::Critical => {
+                    on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push(format!("  Critical hit"));
                     let bonus_percentage = 50;
                     dmg_str.push_str(&format!(" +{bonus_percentage}% (crit)"));
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
-                } else {
-                    detail_lines.push("  Hit".to_string());
                 }
             }
 
@@ -1893,24 +1899,6 @@ impl CoreGame {
                 area_outcomes = Some(area_target_outcomes);
             }
         }
-
-        /*
-        if skip_attack_exertion {
-            detail_lines.push("  The attack did not lead to exertion (true hit)".to_string());
-        } else {
-            let exertion = match hand_type {
-                HandType::MainHand => {
-                    attacker.receive_condition(Condition::MainHandExertion, Some(1), None);
-                    attacker.hand_exertion(HandType::MainHand)
-                }
-                HandType::OffHand => {
-                    attacker.receive_condition(Condition::OffHandExertion, Some(1), None);
-                    attacker.hand_exertion(HandType::OffHand)
-                }
-            };
-            detail_lines.push(format!("  The attack led to exertion ({})", exertion));
-        }
-         */
 
         if weapon.is_melee() {
             if let Some(previously_engaged) = attacker.engagement_target.take() {
@@ -2410,7 +2398,7 @@ pub enum AttackOutcome {
     Miss,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AttackHitType {
     Regular,
     Graze,
@@ -2695,7 +2683,7 @@ pub struct OnAttackedReaction {
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
-    pub required_circumstance: Option<AttackCircumstance>,
+    pub required_attack_type: Option<AttackType>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2719,11 +2707,11 @@ pub struct OnHitReaction {
     pub action_point_cost: u32,
     pub stamina_cost: u32,
     pub effect: OnHitReactionEffect,
-    pub required_circumstance: Option<AttackCircumstance>,
+    pub required_attack_type: Option<AttackType>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum AttackCircumstance {
+pub enum AttackType {
     Melee,
     Ranged,
 }
@@ -4495,30 +4483,27 @@ impl Character {
             && self.mana.current() >= enhancement.mana_cost
     }
 
-    pub fn known_on_attacked_reactions(&self) -> Vec<(String, OnAttackedReaction)> {
+    pub fn known_on_attacked_reactions(&self) -> Vec<OnAttackedReaction> {
         let mut known = vec![];
         for reaction in &self.known_attacked_reactions {
-            known.push(("".to_string(), *reaction));
+            known.push(*reaction);
         }
         if let Some(weapon) = &self.weapon(HandType::MainHand) {
             if let Some(reaction) = weapon.on_attacked_reaction {
-                known.push((weapon.name.to_string(), reaction));
+                known.push(reaction);
             }
         }
         if let Some(shield) = &self.shield() {
             if let Some(reaction) = shield.on_attacked_reaction {
-                known.push((shield.name.to_string(), reaction));
+                known.push(reaction);
             }
         }
         known
     }
 
-    pub fn usable_on_attacked_reactions(
-        &self,
-        is_within_melee: bool,
-    ) -> Vec<(String, OnAttackedReaction)> {
+    pub fn usable_on_attacked_reactions(&self, is_within_melee: bool) -> Vec<OnAttackedReaction> {
         let mut usable = self.known_on_attacked_reactions();
-        usable.retain(|reaction| self.can_use_on_attacked_reaction(reaction.1, is_within_melee));
+        usable.retain(|reaction| self.can_use_on_attacked_reaction(*reaction, is_within_melee));
         usable
     }
 
@@ -4527,10 +4512,10 @@ impl Character {
         reaction: OnAttackedReaction,
         is_within_melee: bool,
     ) -> bool {
-        let allowed = match reaction.required_circumstance {
+        let allowed = match reaction.required_attack_type {
             None => true,
-            Some(AttackCircumstance::Melee) => is_within_melee,
-            Some(AttackCircumstance::Ranged) => !is_within_melee,
+            Some(AttackType::Melee) => is_within_melee,
+            Some(AttackType::Ranged) => !is_within_melee,
         };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
@@ -4564,10 +4549,10 @@ impl Character {
                 return false;
             }
         }
-        let allowed = match reaction.required_circumstance {
+        let allowed = match reaction.required_attack_type {
             None => true,
-            Some(AttackCircumstance::Melee) => is_within_melee,
-            Some(AttackCircumstance::Ranged) => !is_within_melee,
+            Some(AttackType::Melee) => is_within_melee,
+            Some(AttackType::Ranged) => !is_within_melee,
         };
         let ap = self.action_points.current();
         ap >= reaction.action_point_cost
