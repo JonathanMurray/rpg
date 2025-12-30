@@ -2769,6 +2769,7 @@ pub enum Condition {
     Dead,
     Slowed,
     Hastened,
+    Inspired,
     Exposed,
     Hindered,
     ReaperApCooldown,
@@ -2800,6 +2801,7 @@ impl Condition {
             Dead => "Dead",
             Slowed => "Slowed",
             Hastened => "Hastened",
+            Inspired => "Inspired",
             Exposed => "Exposed",
             Hindered => "Hindered",
             ReaperApCooldown => "Reaper",
@@ -2820,6 +2822,7 @@ impl Condition {
             Raging => "Advantage on melee attacks (until end of turn).",
             Slowed => "-1 AP per turn, -25% movement",
             Hastened => "+1 AP per turn, +25% movement",
+            Inspired => "+3 Will, +3 attack/spell modifier",
             Exposed => "-3 to all defenses.",
             Hindered => "-50% movement.",
             Protected => "+x armor against the next attack.",
@@ -2862,6 +2865,7 @@ impl Condition {
             Dead => false,
             Slowed => false,
             Hastened => true,
+            Inspired => true,
             Exposed => false,
             Hindered => false,
             ReaperApCooldown => false,
@@ -2895,10 +2899,13 @@ impl Condition {
             Exposed => StatusId::Exposed,
             Slowed => StatusId::Slowed,
             Hastened => StatusId::Hastened,
+            Inspired => StatusId::Inspired,
             NearDeath => StatusId::NearDeath,
             Dead => StatusId::Dead,
             ArcaneSurge => StatusId::ArcaneSurge,
             ReaperApCooldown => StatusId::ReaperApCooldown,
+            BloodRage => StatusId::Rage,
+            Raging => StatusId::Rage,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -2915,6 +2922,7 @@ const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 3;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
+const INSPIRED_WILL_BONUS: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 1;
 const HASTENED_AP_BONUS: u32 = 1;
 
@@ -3212,6 +3220,7 @@ pub enum AbilityId {
     HealingNova,
     SelfHeal,
     HealingRain,
+    Inspire,
     Haste,
     Fireball,
     SearingLight,
@@ -4625,6 +4634,9 @@ impl Character {
         }
 
         let conditions = self.conditions.borrow();
+        if conditions.has(&Condition::Inspired) {
+            res += 3;
+        }
         if conditions.has(&Condition::ArcaneSurge) {
             res += 3;
         }
@@ -4693,6 +4705,9 @@ impl Character {
     pub fn will(&self) -> u32 {
         let mut res = 10 + self.intellect() * 2;
         let conditions = self.conditions.borrow();
+        if conditions.has(&Condition::Inspired) {
+            res += INSPIRED_WILL_BONUS;
+        }
         if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
         }
@@ -4751,6 +4766,9 @@ impl Character {
         let mut res = physical_attr + self.intellect();
 
         let conditions = self.conditions.borrow();
+        if conditions.has(&Condition::Inspired) {
+            res += 3;
+        }
         if conditions.has(&Condition::BloodRage) {
             res += 3;
         }

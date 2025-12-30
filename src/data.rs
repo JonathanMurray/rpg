@@ -415,7 +415,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(1)),
+            damage: Some(AbilityDamage::AtLeast(3)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
@@ -826,7 +826,7 @@ pub const SHACKLED_MIND: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(12.0)),
+        reach: AbilityReach::Range(Range::Float(12.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
@@ -1096,7 +1096,7 @@ pub const HEAL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
-        range: Range::Ranged(9),
+        range: Range::Float(9.5),
         effect: AbilityPositiveEffect {
             healing: 4,
             apply: Some([
@@ -1146,7 +1146,7 @@ pub const HASTE: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
-        range: Range::Ranged(9),
+        range: Range::Float(9.5),
         effect: AbilityPositiveEffect {
             healing: 0,
             apply: Some([
@@ -1163,6 +1163,76 @@ pub const HASTE: Ability = Ability {
 
     animation_color: GREEN,
     initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Powerup),
+};
+
+pub const INSPIRE: Ability = Ability {
+    id: AbilityId::Inspire,
+    name: "Inspire",
+    description: "Inspire nearby allies",
+    icon: IconId::Inspire,
+    action_point_cost: 3,
+    mana_cost: 1,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::None {
+        self_area: Some(AreaEffect {
+            radius: Range::Float(12.5),
+            acquisition: AreaTargetAcquisition::Allies,
+            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+                healing: 0,
+                apply: Some([
+                    Some(ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Inspired,
+                        stacks: None,
+                        duration_rounds: Some(3),
+                    })),
+                    None,
+                ]),
+            }),
+        }),
+        self_effect: None,
+    },
+    animation_color: GREEN,
+    initiate_sound: None,
+    resolve_sound: Some(SoundId::Powerup),
+};
+
+pub const ENEMY_INSPIRE: Ability = Ability {
+    id: AbilityId::Inspire,
+    name: "Inspire",
+    description: "Inspire nearby allies",
+    icon: IconId::Inspire,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::None {
+        self_area: Some(AreaEffect {
+            radius: Range::Float(12.5),
+            acquisition: AreaTargetAcquisition::Allies,
+            effect: AbilityEffect::Positive(AbilityPositiveEffect {
+                healing: 0,
+                apply: Some([
+                    Some(ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Inspired,
+                        stacks: None,
+                        duration_rounds: Some(2),
+                    })),
+                    None,
+                ]),
+            }),
+        }),
+        self_effect: None,
+    },
+    animation_color: GREEN,
+    initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
 };
 

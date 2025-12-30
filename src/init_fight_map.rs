@@ -17,9 +17,9 @@ use crate::{
         HandType, Position,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BOW, BRACE,
-        CHAIN_MAIL, ENEMY_BRACE, ENEMY_SELF_HEAL, ENEMY_TACKLE, LEATHER_ARMOR, MAGI_HEAL,
-        MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
+        BOW, BRACE, CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SELF_HEAL, ENEMY_TACKLE, INSPIRE,
+        LEATHER_ARMOR, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
@@ -285,6 +285,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 *enemy_positions[&0].choose().unwrap(),
             );
             e1.learn_ability(ENEMY_BRACE);
+            e1.known_passive_skills.push(PassiveSkill::BloodRage);
             enemies.push(e1);
 
             enemies.push(Character::new(
@@ -330,7 +331,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             characters.extend_from_slice(&enemies);
         }
         FightId::VerticalSlice => {
-            /*
             for i in 0..=2 {
                 let pos = *enemy_positions[&i].choose().unwrap();
                 let ghoul = Character::new(
@@ -350,7 +350,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 }
                 characters.push(ghoul);
             }
-             */
             for i in 3..=4 {
                 // TODO these should have archer behaviour, i.e. run away from melee
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -381,6 +380,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
                 skeleton.set_shield(BAD_SMALL_SHIELD);
                 skeleton.learn_ability(ENEMY_BRACE);
+                skeleton.learn_ability(ENEMY_INSPIRE);
                 characters.push(skeleton);
             }
             for i in 6..=7 {
@@ -403,7 +403,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             }
             for i in 8..=8 {
                 let pos = *enemy_positions[&i].choose().unwrap();
-                let ogre = Character::new(
+                let mut ogre = Character::new(
                     bot(BotBehaviour::Normal, 10.0),
                     "Ogre",
                     PortraitId::Ogre,
@@ -415,6 +415,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 ogre.armor_piece.set(Some(CHAIN_MAIL));
                 ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
                 ogre.learn_ability(ENEMY_TACKLE);
+                ogre.known_passive_skills.push(PassiveSkill::BloodRage);
                 characters.push(ogre);
             }
         }

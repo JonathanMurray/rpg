@@ -31,7 +31,7 @@ use rpg::data::{
     PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
     COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL,
     FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HASTE, HEAL, HEALING_NOVA, HEALING_RAIN,
-    HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, KILL,
+    HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, KILL,
     LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT, LUNGE_ATTACK_REACH,
     MANA_POTION, MEDIUM_SHIELD, OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE, SCREAM,
     SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP,
@@ -102,6 +102,7 @@ async fn main() {
     alice.learn_ability(HEAL);
     alice.known_ability_enhancements.push(HEAL_ENERGIZE);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
+    alice.known_attack_enhancements.push(EMPOWER);
     alice
         .known_passive_skills
         .push(PassiveSkill::WeaponProficiency);
@@ -120,7 +121,9 @@ async fn main() {
     bob.known_passive_skills.push(PassiveSkill::Reaper);
     bob.learn_ability(SWEEP_ATTACK);
     bob.learn_ability(SHIELD_BASH);
+    bob.learn_ability(INSPIRE);
     bob.known_attack_enhancements.push(SMITE);
+    bob.known_attack_enhancements.push(EMPOWER);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
     let mut clara = Character::new(

@@ -92,6 +92,17 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         player_chars.shuffle();
     }
 
+    if let Some(target_id) = behaviour.current_target.get() {
+        if player_chars
+            .iter()
+            .find(|ch| ch.id() == target_id)
+            .is_none()
+        {
+            // Player char must have died. Force a target switch.
+            behaviour.current_target.set(None);
+        }
+    }
+
     if behaviour.current_target.get().is_none() {
         behaviour.current_target.set(Some(player_chars[0].id()));
     }

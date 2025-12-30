@@ -317,12 +317,12 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {
-            header: "Equip/unequip (1 AP)".to_string(),
+            header: "Equip/unequip".to_string(),
             description: Some("Change your weapon, shield or armor."),
             ..Default::default()
         },
         BaseAction::UseConsumable => Tooltip {
-            header: "Use consumable (1 AP)".to_string(),
+            header: "Use consumable".to_string(),
             description: Some("Use a consumable from your inventory (e.g. a potion)."),
             ..Default::default()
         },
@@ -793,7 +793,7 @@ impl ActionButton {
                     technical_description.push("  [ evasion ]".to_string());
                     technical_description.push(format!("  {} damage", weapon.damage));
                     Tooltip {
-                        header: format!("{} attack ({} AP)", attack_type, weapon.action_point_cost),
+                        header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
 
                         technical_description,
                         ..Default::default()
@@ -876,7 +876,9 @@ fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     if !s.is_empty() {
         s = format!("({s})");
     }
-    s
+    // TODO let's try without showing cost in tooltip
+    "".to_string()
+    //s
 }
 
 impl Drawable for ActionButton {
@@ -1449,12 +1451,29 @@ pub fn draw_tooltip(
     for line in physical_content_lines {
         draw_line(line, None, false)
     }
-
-    // TODO: The drawing position here also needs to account for screen space. If the main tooltip was pressed
-    // against the right side of the screen, we shouldn't draw this one even further to the right!
-    draw_keyword_tooltips(font, keywords, x + tooltip_w + 1.0, y);
+    draw_keyword_tooltips_relative_to_rect(font, keywords, tooltip_rect);
 
     tooltip_rect
+}
+
+pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Condition], mut rect: Rect) {
+    for (i, keyword) in keywords.iter().enumerate() {
+        let pos_preference = if i == 0 {
+            TooltipPositionPreference::RelativeToRect(rect, Side::Right)
+        } else {
+            TooltipPositionPreference::At((rect.x, rect.y + rect.h))
+        };
+        rect = draw_tooltip(
+            font,
+            pos_preference,
+            keyword.name(),
+            None,
+            &[keyword.description().to_string()],
+            &[],
+            true,
+        );
+        //y += rect.h;
+    }
 }
 
 pub fn draw_keyword_tooltips(font: &Font, keywords: &[Condition], x: f32, mut y: f32) {
