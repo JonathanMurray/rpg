@@ -456,7 +456,7 @@ pub const MEDIUM_SHIELD: Shield = Shield {
         name: "Block",
         description: "Attempt to block an incoming ranged attack",
         icon: IconId::Block,
-        action_point_cost: 1,
+        action_point_cost: 0,
         stamina_cost: 1,
         effect: OnAttackedReactionEffect {
             bonus_evasion: 5,
@@ -568,7 +568,7 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     name: "Parry",
     description: "Attempt to parry an incoming melee attack",
     icon: IconId::Parry,
-    action_point_cost: 1,
+    action_point_cost: 0,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect {
         bonus_evasion: 5,

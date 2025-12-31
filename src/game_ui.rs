@@ -27,12 +27,13 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, predict_attack, prob_ability_hit, prob_attack_hit,
-        prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityNegativeEffect,
-        AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget,
-        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, CoreGame, GameEvent,
-        Goodness, HandType, OnAttackedReaction, OnHitReaction, Position,
+        as_percentage, distance_between, predict_ability, predict_attack, prob_ability_hit,
+        prob_attack_hit, prob_attack_penetrating_hit, Ability, AbilityEnhancement,
+        AbilityNegativeEffect, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
+        AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
+        Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
+        OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -792,6 +793,7 @@ impl UserInterface {
                         .collect();
 
                 let prediction = predict_attack(
+                    &self.characters,
                     self.characters.get_rc(self.active_character_id),
                     attack.hand,
                     &selected_enhancement_effects,
@@ -816,18 +818,19 @@ impl UserInterface {
                     prediction.min_damage, prediction.max_damage,
                 );
 
+                self.game_grid.clear_target_damage_previews();
                 self.game_grid
-                    .set_target_damage_preview(Some(TargetDamagePreview {
+                    .set_target_damage_preview(TargetDamagePreview {
                         character_id: *target_id,
                         min: prediction.min_damage,
                         max: prediction.max_damage,
-                    }));
+                    });
 
                 self.target_ui.set_action(header, details, true);
             }
 
             None => {
-                self.game_grid.set_target_damage_preview(None);
+                self.game_grid.clear_target_damage_previews();
                 self.target_ui
                     .set_action("Select an enemy".to_string(), vec![], false);
             }
@@ -837,11 +840,15 @@ impl UserInterface {
     }
 
     fn refresh_use_ability_state(&mut self) {
-        let UiState::ConfiguringAction(ConfiguredAction::UseAbility {
+        let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() else {
+            panic!()
+        };
+
+        let ConfiguredAction::UseAbility {
             ability,
             selected_enhancements,
             target,
-        }) = &*self.state.borrow()
+        } = configured_action
         else {
             panic!()
         };
@@ -886,6 +893,7 @@ impl UserInterface {
 
                 let action_text = match ability.target {
                     AbilityTarget::Enemy { effect, .. } => {
+                        /*
                         let ability_roll = ability.roll.unwrap();
 
                         let chance = match effect {
@@ -939,8 +947,10 @@ impl UserInterface {
                                 }
                             }
                         };
+                         */
 
-                        format!("Chance to hit: {}", chance)
+                        // TODO: The above code should no longer be needed, since we instead use predict_ability further down in the code?
+                        format!("TODO: this should not be shown!")
                     }
                     AbilityTarget::Ally { .. } => ability.name.to_string(),
                     AbilityTarget::None { .. } | AbilityTarget::Area { .. } => {
@@ -979,6 +989,36 @@ impl UserInterface {
                             .set_action("Select an area".to_string(), vec![], false);
                     }
                 };
+            }
+        }
+
+        self.game_grid.clear_target_damage_previews();
+        if configured_action.has_required_player_input(self.active_character(), &self.characters) {
+            let prediction = predict_ability(
+                &self.characters,
+                self.characters.get_rc(self.active_character_id),
+                ability,
+                selected_enhancements,
+                target,
+            );
+
+            if let Some(target_id) = target.target_id() {
+                if let Some(dmg) = prediction.targets.get(&target_id) {
+                    self.target_ui.set_action(
+                        format!("Damage: {}-{}", dmg.min, dmg.max),
+                        vec![],
+                        false,
+                    );
+                }
+            }
+
+            for (target_id, dmg) in prediction.targets {
+                self.game_grid
+                    .set_target_damage_preview(TargetDamagePreview {
+                        character_id: target_id,
+                        min: dmg.min,
+                        max: dmg.max,
+                    });
             }
         }
     }
@@ -1157,7 +1197,7 @@ impl UserInterface {
             }
         }
 
-        self.game_grid.set_target_damage_preview(None);
+        self.game_grid.clear_target_damage_previews();
 
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
@@ -1376,13 +1416,13 @@ impl UserInterface {
                 }
                 self.animation_stopwatch.set_to_at_least(duration);
             }
-            GameEvent::AbilityResolved {
+            GameEvent::AbilityResolved(AbilityResolvedEvent {
                 actor,
                 target_outcome,
                 area_outcomes,
                 ability,
                 mut detail_lines,
-            } => {
+            }) => {
                 if let Some(sound_id) = ability.resolve_sound {
                     self.sound_player.play(sound_id);
                 }
@@ -1539,8 +1579,13 @@ impl UserInterface {
                 let character = self.characters.get(character);
                 self.log.add(format!(
                     "{} took {} damage from {}",
-                    character.name, amount, source
+                    character.name,
+                    amount,
+                    source.name()
                 ));
+                if source == Condition::Burning {
+                    self.sound_player.play(SoundId::Burning);
+                }
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
@@ -1568,7 +1613,7 @@ impl UserInterface {
     fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
         let prev_health = self.characters.get(character_id).health.current() + dmg;
         self.game_grid
-            .animate_character_health_change(character_id, prev_health, 0.8);
+            .animate_character_health_change(character_id, prev_health, 0.5);
     }
 
     fn add_effects_for_area_outcomes(

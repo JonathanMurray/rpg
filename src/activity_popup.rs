@@ -593,8 +593,15 @@ impl ActivityPopup {
             explanation.push(' ');
         }
 
-        let prediction =
-            predict_attack(attacker, *hand, attack_enhancements, defender, reaction, 0);
+        let prediction = predict_attack(
+            &self.characters,
+            attacker,
+            *hand,
+            attack_enhancements,
+            defender,
+            reaction,
+            0,
+        );
 
         let mut line = format!(
             "Damage chance: {}%, {} - {}",

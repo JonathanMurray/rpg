@@ -341,6 +341,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     Attributes::new(1, 2, 1, 1),
                     pos,
                 );
+
+                if i == 2 {
+                    ghoul.position.set((pos.0 - 2, pos.1));
+                }
                 ghoul.health.change_max_value_to(14 + i);
                 ghoul.armor_piece.set(Some(SHIRT));
                 ghoul.set_weapon(HandType::MainHand, BAD_SWORD);

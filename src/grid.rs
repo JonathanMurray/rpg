@@ -179,7 +179,7 @@ pub struct GameGrid {
     //routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
-    target_damage_previews: Vec<TargetDamagePreview>,
+    target_damage_previews: HashMap<CharacterId, TargetDamagePreview>,
     character_animations: Vec<CharacterAnimation>,
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
@@ -256,8 +256,13 @@ impl GameGrid {
         }
     }
 
-    pub fn set_target_damage_preview(&mut self, preview: Option<TargetDamagePreview>) {
-        self.target_damage_previews = preview.into_iter().collect();
+    pub fn set_target_damage_preview(&mut self, preview: TargetDamagePreview) {
+        self.target_damage_previews
+            .insert(preview.character_id, preview);
+    }
+
+    pub fn clear_target_damage_previews(&mut self) {
+        self.target_damage_previews.clear();
     }
 
     pub fn set_character_motion(
@@ -1821,29 +1826,27 @@ impl GameGrid {
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, current_health_w, health_h, RED);
 
-        for damage_preview in &self.target_damage_previews {
-            if damage_preview.character_id == character.id() {
-                let effective_min = damage_preview.min.min(character.health.current());
-                let effective_max = damage_preview.max.min(character.health.current());
-                let guaranteed_damage_w =
-                    (health_w) * (effective_min as f32 / character.health.max() as f32);
-                draw_rectangle(
-                    health_x + current_health_w - guaranteed_damage_w,
-                    health_y,
-                    guaranteed_damage_w,
-                    health_h,
-                    GRAY,
-                );
-                let potential_damage_w = (health_w) * (effective_max - effective_min) as f32
-                    / character.health.max() as f32;
-                draw_rectangle(
-                    health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
-                    health_y,
-                    potential_damage_w,
-                    health_h,
-                    ORANGE,
-                );
-            }
+        if let Some(damage_preview) = self.target_damage_previews.get(&character.id()) {
+            let effective_min = damage_preview.min.min(character.health.current());
+            let effective_max = damage_preview.max.min(character.health.current());
+            let guaranteed_damage_w =
+                (health_w) * (effective_min as f32 / character.health.max() as f32);
+            draw_rectangle(
+                health_x + current_health_w - guaranteed_damage_w,
+                health_y,
+                guaranteed_damage_w,
+                health_h,
+                GRAY,
+            );
+            let potential_damage_w =
+                (health_w) * (effective_max - effective_min) as f32 / character.health.max() as f32;
+            draw_rectangle(
+                health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
+                health_y,
+                potential_damage_w,
+                health_h,
+                ORANGE,
+            );
         }
 
         for animation in &self.character_animations {

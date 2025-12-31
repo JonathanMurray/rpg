@@ -7,6 +7,7 @@ use std::rc::{Rc, Weak};
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
+use macroquad::miniquad::window::blocking_event_loop;
 use macroquad::rand::ChooseRandom;
 
 use crate::bot::BotBehaviour;
@@ -379,7 +380,7 @@ impl CoreGame {
                                     attacker,
                                     None,
                                     0,
-                                    AttackPerformanceMode::Real(self),
+                                    ActionPerformanceMode::Real(self),
                                 );
 
                                 self.ui_handle_event(GameEvent::Attacked(event)).await;
@@ -433,7 +434,7 @@ impl CoreGame {
                         defender,
                         reaction,
                         0,
-                        AttackPerformanceMode::Real(self),
+                        ActionPerformanceMode::Real(self),
                     );
                     self.ui_handle_event(GameEvent::Attacked(event.clone()))
                         .await;
@@ -458,7 +459,21 @@ impl CoreGame {
                 enhancements,
                 target,
             } => {
-                let enemies_hit = self.perform_ability(ability, enhancements, target).await;
+                let caster = self.characters.get_rc(self.active_character_id);
+                let ability_resolved_events = Self::perform_ability(
+                    caster,
+                    ability,
+                    &enhancements,
+                    &target,
+                    ActionPerformanceMode::Real(self),
+                )
+                .await;
+
+                let mut enemies_hit = vec![];
+                for event in ability_resolved_events {
+                    event.enemies_hit(&mut enemies_hit);
+                }
+
                 if enemies_hit.is_empty() {
                     ActionOutcome::Default
                 } else {
@@ -598,7 +613,7 @@ impl CoreGame {
                                 character,
                                 None,
                                 0,
-                                AttackPerformanceMode::Real(self),
+                                ActionPerformanceMode::Real(self),
                             );
                             self.ui_handle_event(GameEvent::Attacked(event)).await;
                         }
@@ -746,30 +761,33 @@ impl CoreGame {
     }
 
     async fn perform_ability(
-        &mut self,
+        caster: &Rc<Character>,
         ability: Ability,
-        enhancements: Vec<AbilityEnhancement>,
-        selected_target: ActionTarget,
-    ) -> Vec<CharacterId> {
-        let caster = self.characters.get_rc(self.active_character_id);
+        enhancements: &[AbilityEnhancement],
+        selected_target: &ActionTarget,
+        mode: ActionPerformanceMode<'_>,
+    ) -> Vec<AbilityResolvedEvent> {
         let caster_id = caster.id();
 
-        caster.action_points.spend(ability.action_point_cost);
-        caster.mana.spend(ability.mana_cost);
-        caster.on_mana_changed();
-        caster.stamina.spend(ability.stamina_cost);
+        let real_game: Option<&CoreGame> = mode.real_game();
+        let simulated_roll = mode.simulated_roll();
 
-        let mut enemies_hit = vec![];
-
-        for enhancement in &enhancements {
-            caster.action_points.spend(enhancement.action_point_cost);
-            caster.mana.spend(enhancement.mana_cost);
-            caster.on_mana_changed();
-            caster.stamina.spend(enhancement.stamina_cost);
+        if real_game.is_some() {
+            caster.action_points.spend(ability.action_point_cost);
+            caster.spend_mana(ability.mana_cost);
+            caster.stamina.spend(ability.stamina_cost);
+            for enhancement in enhancements {
+                caster.action_points.spend(enhancement.action_point_cost);
+                caster.spend_mana(enhancement.mana_cost);
+                caster.stamina.spend(enhancement.stamina_cost);
+            }
         }
 
+        let mut enemies_hit = vec![];
+        let mut resolve_events = vec![];
+
         let mut cast_n_times = 1;
-        for enhancement in &enhancements {
+        for enhancement in enhancements {
             if let Some(e) = enhancement.spell_effect {
                 if e.cast_twice {
                     cast_n_times = 2;
@@ -778,13 +796,11 @@ impl CoreGame {
         }
 
         for i in 0..cast_n_times {
-            let caster_ref = self.characters.get(caster_id);
-
             let mut detail_lines = vec![];
 
             let mut advantange_level = 0_i32;
 
-            for enhancement in &enhancements {
+            for enhancement in enhancements {
                 if let Some(e) = enhancement.spell_effect {
                     let bonus = e.bonus_advantage;
                     if bonus > 0 {
@@ -796,7 +812,7 @@ impl CoreGame {
             let mut maybe_ability_roll = None;
 
             if let Some(roll_type) = ability.roll {
-                let dice_roll = roll_d20_with_advantage(advantange_level);
+                let dice_roll = simulated_roll.unwrap_or(roll_d20_with_advantage(advantange_level));
 
                 if let Some(description) = roll_description(advantange_level) {
                     detail_lines.push(description);
@@ -806,11 +822,11 @@ impl CoreGame {
                 let mut roll_calculation = dice_roll as i32;
                 match roll_type {
                     AbilityRollType::Spell => {
-                        let modifier = caster_ref.spell_modifier() as i32;
+                        let modifier = caster.spell_modifier() as i32;
                         roll_calculation += modifier;
                         dice_roll_line.push_str(&format!(" (+{} spell mod)", modifier));
 
-                        for enhancement in &enhancements {
+                        for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
                                 let bonus = e.roll_bonus;
                                 if bonus > 0 {
@@ -829,11 +845,11 @@ impl CoreGame {
                         });
                     }
                     AbilityRollType::RollAbilityWithAttackModifier => {
-                        let modifier = caster_ref.attack_modifier(HandType::MainHand) as i32;
+                        let modifier = caster.attack_modifier(HandType::MainHand) as i32;
                         roll_calculation += modifier;
                         dice_roll_line.push_str(&format!(" (+{} attack mod)", modifier));
 
-                        for enhancement in &enhancements {
+                        for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
                                 let bonus = e.roll_bonus;
                                 if bonus > 0 {
@@ -870,23 +886,27 @@ impl CoreGame {
                         unreachable!()
                     };
 
-                    if let Some(positions) = movement {
-                        self.perform_movement(positions.clone(), false).await;
+                    if let Some(game) = real_game {
+                        if let Some(positions) = movement {
+                            game.perform_movement(positions.clone(), false).await;
+                        }
                     }
 
-                    let target = self.characters.get(*target_id);
+                    let target = mode.characters().get(*target_id);
                     assert!(caster.reaches_with_ability(
                         ability,
                         &enhancements,
                         target.position.get()
                     ));
 
-                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
-                        actor: caster_id,
-                        ability,
-                        target: Some(*target_id),
-                    })
-                    .await;
+                    if let Some(game) = real_game {
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: caster_id,
+                            ability,
+                            target: Some(*target_id),
+                        })
+                        .await;
+                    }
 
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
@@ -910,7 +930,7 @@ impl CoreGame {
                         detail_lines.push(line.to_string());
                     }
 
-                    let outcome = self.perform_ability_enemy_effect(
+                    let outcome = Self::perform_ability_enemy_effect(
                         caster,
                         ability.name,
                         &ability_roll,
@@ -919,13 +939,14 @@ impl CoreGame {
                         target,
                         &mut detail_lines,
                         true,
+                        mode,
                     );
                     target_outcome = Some((*target_id, outcome));
 
                     if let Some((radius, acquisition, area_effect)) = impact_area {
                         detail_lines.push("Area of effect:".to_string());
 
-                        let area_target_outcomes = self.perform_ability_area_enemy_effect(
+                        let area_target_outcomes = Self::perform_ability_area_enemy_effect(
                             radius,
                             "AoE",
                             ability_roll,
@@ -935,6 +956,7 @@ impl CoreGame {
                             &mut detail_lines,
                             area_effect,
                             acquisition,
+                            mode,
                         );
 
                         area_outcomes = Some((target.position.get(), area_target_outcomes));
@@ -945,19 +967,13 @@ impl CoreGame {
                     let ActionTarget::Character(target_id, movement) = &selected_target else {
                         unreachable!()
                     };
-                    let target = self.characters.get(*target_id);
+
+                    let target = mode.characters().get(*target_id);
                     assert!(caster.reaches_with_ability(
                         ability,
                         &enhancements,
                         target.position.get()
                     ));
-
-                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
-                        actor: caster_id,
-                        ability,
-                        target: Some(*target_id),
-                    })
-                    .await;
 
                     let ability_roll = maybe_ability_roll.unwrap();
                     let (ability_result, dice_roll_line) = ability_roll.unwrap_roll();
@@ -967,13 +983,23 @@ impl CoreGame {
                     if degree_of_success > 0 {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
-                    let outcome = self.perform_ability_ally_effect(
+                    if let Some(game) = real_game {
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: caster_id,
+                            ability,
+                            target: Some(*target_id),
+                        })
+                        .await;
+                    }
+
+                    let outcome = Self::perform_ability_ally_effect(
                         ability.name,
                         &enhancements,
                         effect,
                         target,
                         &mut detail_lines,
                         degree_of_success,
+                        mode,
                     );
 
                     target_outcome = Some((*target_id, outcome));
@@ -983,12 +1009,14 @@ impl CoreGame {
                     range: _,
                     area_effect,
                 } => {
-                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
-                        actor: caster_id,
-                        ability,
-                        target: None,
-                    })
-                    .await;
+                    if let Some(game) = real_game {
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: caster_id,
+                            ability,
+                            target: None,
+                        })
+                        .await;
+                    }
 
                     let target_pos = selected_target.unwrap_position();
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
@@ -997,7 +1025,7 @@ impl CoreGame {
                     let (_ability_result, dice_roll_line) = ability_roll.unwrap_roll();
                     detail_lines.push(dice_roll_line.to_string());
 
-                    let outcomes = self.perform_ability_area_effect(
+                    let outcomes = Self::perform_ability_area_effect(
                         ability.name,
                         ability_roll,
                         &enhancements,
@@ -1005,6 +1033,7 @@ impl CoreGame {
                         target_pos,
                         area_effect,
                         &mut detail_lines,
+                        mode,
                     );
 
                     area_outcomes = Some((target_pos, outcomes));
@@ -1014,12 +1043,14 @@ impl CoreGame {
                     self_area,
                     self_effect,
                 } => {
-                    self.ui_handle_event(GameEvent::AbilityWasInitiated {
-                        actor: caster_id,
-                        ability,
-                        target: None,
-                    })
-                    .await;
+                    if let Some(game) = real_game {
+                        game.ui_handle_event(GameEvent::AbilityWasInitiated {
+                            actor: caster_id,
+                            ability,
+                            target: None,
+                        })
+                        .await;
+                    }
 
                     if let Some(AbilityRoll::RolledWithSpellModifier { result: _, line }) =
                         &maybe_ability_roll
@@ -1039,13 +1070,14 @@ impl CoreGame {
                             detail_lines.push(format!("Fortune: {}", degree_of_success));
                         }
 
-                        let outcome = self.perform_ability_ally_effect(
+                        let outcome = Self::perform_ability_ally_effect(
                             ability.name,
                             &enhancements,
                             effect,
                             caster,
                             &mut detail_lines,
                             degree_of_success,
+                            mode,
                         );
                         target_outcome = Some((caster_id, outcome));
                     }
@@ -1055,7 +1087,7 @@ impl CoreGame {
 
                         let ability_roll = maybe_ability_roll.unwrap();
 
-                        let outcomes = self.perform_ability_area_effect(
+                        let outcomes = Self::perform_ability_area_effect(
                             ability.name,
                             ability_roll,
                             &enhancements,
@@ -1063,6 +1095,7 @@ impl CoreGame {
                             caster.position.get(),
                             area_effect,
                             &mut detail_lines,
+                            mode,
                         );
                         area_outcomes = Some((caster.position.get(), outcomes));
                     }
@@ -1070,7 +1103,7 @@ impl CoreGame {
             };
 
             if i < cast_n_times - 1 {
-                detail_lines.push(format!("{} cast again!", caster_ref.name))
+                detail_lines.push(format!("{} cast again!", caster.name))
             }
 
             if let Some((target_id, outcome)) = &target_outcome {
@@ -1086,23 +1119,29 @@ impl CoreGame {
                 }
             }
 
-            let caster_id = caster_ref.id();
-            // TODO also communicate if the caster healed from hitting the target (e.g. necrotic influence)
-            self.ui_handle_event(GameEvent::AbilityResolved {
+            let caster_id = caster.id();
+
+            let resolve_event = AbilityResolvedEvent {
                 actor: caster_id,
                 target_outcome,
                 area_outcomes,
                 ability,
                 detail_lines,
-            })
-            .await;
+            };
+
+            resolve_events.push(resolve_event.clone());
+
+            // TODO also communicate if the caster healed from hitting the target (e.g. necrotic influence)
+            if let Some(game) = real_game {
+                game.ui_handle_event(GameEvent::AbilityResolved(resolve_event))
+                    .await;
+            }
         }
 
-        enemies_hit
+        resolve_events
     }
 
     fn perform_ability_area_effect(
-        &self,
         name: &'static str,
         ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
@@ -1110,9 +1149,10 @@ impl CoreGame {
         area_center: Position,
         area_effect: AreaEffect,
         detail_lines: &mut Vec<String>,
+        mode: ActionPerformanceMode,
     ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         match area_effect.effect {
-            AbilityEffect::Negative(effect) => self.perform_ability_area_enemy_effect(
+            AbilityEffect::Negative(effect) => Self::perform_ability_area_enemy_effect(
                 area_effect.radius,
                 name,
                 ability_roll,
@@ -1122,12 +1162,13 @@ impl CoreGame {
                 detail_lines,
                 effect,
                 area_effect.acquisition,
+                mode,
             ),
 
             AbilityEffect::Positive(effect) => {
                 assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
 
-                self.perform_ability_area_ally_effect(
+                Self::perform_ability_area_ally_effect(
                     area_effect.radius,
                     name,
                     enhancements,
@@ -1136,13 +1177,13 @@ impl CoreGame {
                     detail_lines,
                     ability_roll,
                     effect,
+                    mode,
                 )
             }
         }
     }
 
     fn perform_ability_area_ally_effect(
-        &self,
         mut radius: Range,
         name: &'static str,
         enhancements: &[AbilityEnhancement],
@@ -1151,6 +1192,7 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
         ability_roll: AbilityRoll,
         effect: AbilityPositiveEffect,
+        mode: ActionPerformanceMode,
     ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         let mut target_outcomes = vec![];
 
@@ -1168,7 +1210,7 @@ impl CoreGame {
             detail_lines.push(format!("Fortune: {}", degree_of_success));
         }
 
-        for other_char in self.characters.iter() {
+        for other_char in mode.characters().iter() {
             if other_char.player_controlled() != caster.player_controlled() {
                 continue;
             }
@@ -1176,13 +1218,14 @@ impl CoreGame {
             if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
                 detail_lines.push(other_char.name.to_string());
 
-                let outcome = self.perform_ability_ally_effect(
+                let outcome = Self::perform_ability_ally_effect(
                     name,
                     enhancements,
                     effect,
                     other_char,
                     detail_lines,
                     degree_of_success,
+                    mode,
                 );
 
                 target_outcomes.push((other_char.id(), outcome));
@@ -1193,15 +1236,17 @@ impl CoreGame {
     }
 
     fn perform_ability_ally_effect(
-        &self,
         name: &'static str,
         enhancements: &[AbilityEnhancement],
         ally_effect: AbilityPositiveEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
         degree_of_success: u32,
+        mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         let mut maybe_healing = None;
+
+        let real_game = mode.real_game();
 
         if ally_effect.healing > 0 {
             let mut healing = ally_effect.healing;
@@ -1215,41 +1260,46 @@ impl CoreGame {
             line.push_str(&format!(" = {}", healing));
             detail_lines.push(line);
 
-            let health_gained = self.perform_gain_health(target, healing);
-            detail_lines.push(format!(
-                "  {} was healed for {}",
-                target.name, health_gained
-            ));
-            maybe_healing = Some(health_gained);
+            if let Some(game) = real_game {
+                let health_gained = game.perform_gain_health(target, healing);
+                detail_lines.push(format!(
+                    "  {} was healed for {}",
+                    target.name, health_gained
+                ));
+                maybe_healing = Some(health_gained);
+            } else {
+                // This might include over-heal, but hey.
+                maybe_healing = Some(healing);
+            }
         };
 
-        for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
-            match effect {
-                ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
-                ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
-                ApplyEffect::Condition(ref apply_condition) => {
-                    /*
-                    if let Some(stacks) = condition.stacks() {
-                        *stacks += degree_of_success;
+        if let Some(game) = real_game {
+            for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
+                match effect {
+                    ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::Condition(ref apply_condition) => {
+                        /*
+                        if let Some(stacks) = condition.stacks() {
+                            *stacks += degree_of_success;
+                        }
+                         */
                     }
-                     */
+                    ApplyEffect::PerBleeding { .. } => {}
+                    ApplyEffect::ConsumeCondition { .. } => {}
                 }
-                ApplyEffect::PerBleeding { .. } => {}
-                ApplyEffect::ConsumeCondition { .. } => {}
+
+                let (log_line, _damage) = game.perform_effect_application(effect, None, target);
+                detail_lines.push(log_line);
             }
 
-            dbg!(effect);
-
-            let (log_line, _damage) = self.perform_effect_application(effect, None, target);
-            detail_lines.push(log_line);
-        }
-
-        for enhancement in enhancements {
-            let effect = enhancement.spell_effect.unwrap();
-            for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-                let (log_line, _damage) =
-                    self.perform_effect_application(*apply_effect, None, target);
-                detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+            for enhancement in enhancements {
+                let effect = enhancement.spell_effect.unwrap();
+                for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
+                    let (log_line, _damage) =
+                        game.perform_effect_application(*apply_effect, None, target);
+                    detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                }
             }
         }
 
@@ -1259,7 +1309,6 @@ impl CoreGame {
     }
 
     fn perform_ability_area_enemy_effect(
-        &self,
         mut radius: Range,
         name: &'static str,
         ability_roll: AbilityRoll,
@@ -1269,6 +1318,7 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
         effect: AbilityNegativeEffect,
         acquisition: AreaTargetAcquisition,
+        mode: ActionPerformanceMode<'_>,
     ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         assert!(acquisition != AreaTargetAcquisition::Allies);
 
@@ -1282,7 +1332,7 @@ impl CoreGame {
             }
         }
 
-        for other_char in self.characters.iter() {
+        for other_char in mode.characters().iter() {
             let is_ally = other_char.player_controlled() == caster.player_controlled();
             let valid_target = match acquisition {
                 AreaTargetAcquisition::Enemies => !is_ally,
@@ -1318,7 +1368,7 @@ impl CoreGame {
 
                 detail_lines.push(line);
 
-                let outcome = self.perform_ability_enemy_effect(
+                let outcome = Self::perform_ability_enemy_effect(
                     caster,
                     name,
                     &ability_roll,
@@ -1327,6 +1377,7 @@ impl CoreGame {
                     other_char,
                     detail_lines,
                     false,
+                    mode,
                 );
 
                 target_outcomes.push((other_char.id(), outcome));
@@ -1337,7 +1388,6 @@ impl CoreGame {
     }
 
     fn perform_ability_enemy_effect(
-        &self,
         caster: &Rc<Character>,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
@@ -1346,9 +1396,10 @@ impl CoreGame {
         target: &Character,
         detail_lines: &mut Vec<String>,
         is_direct_target: bool,
+        mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         match enemy_effect {
-            AbilityNegativeEffect::Spell(spell_enemy_effect) => self.perform_spell_enemy_effect(
+            AbilityNegativeEffect::Spell(spell_enemy_effect) => Self::perform_spell_enemy_effect(
                 caster,
                 ability_name,
                 ability_roll,
@@ -1357,6 +1408,7 @@ impl CoreGame {
                 target,
                 detail_lines,
                 is_direct_target,
+                mode,
             ),
             AbilityNegativeEffect::PerformAttack => {
                 let attack_enhancement_effects: Vec<(&str, AttackEnhancementEffect)> = enhancements
@@ -1373,7 +1425,7 @@ impl CoreGame {
                     target,
                     reaction,
                     roll_modifier,
-                    AttackPerformanceMode::Real(self),
+                    mode,
                 );
 
                 AbilityTargetOutcome::AttackedEnemy(event)
@@ -1382,7 +1434,6 @@ impl CoreGame {
     }
 
     fn perform_spell_enemy_effect(
-        &self,
         caster: &Character,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
@@ -1391,7 +1442,10 @@ impl CoreGame {
         target: &Character,
         detail_lines: &mut Vec<String>,
         is_direct_target: bool,
+        mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
+        let real_game = mode.real_game();
+
         let success = match spell_enemy_effect.defense_type {
             Some(contest) => {
                 let ability_result = ability_roll.unwrap_roll().0;
@@ -1469,11 +1523,14 @@ impl CoreGame {
 
                 let damage = dmg_calculation.max(0) as u32;
 
-                if dmg_calculation > 0 {
-                    self.perform_losing_health(target, damage);
-                    dmg_str.push_str(&format!(" = {damage}"));
-                    detail_lines.push(dmg_str);
+                if let Some(game) = real_game {
+                    if dmg_calculation > 0 {
+                        game.perform_losing_health(target, damage);
+                        dmg_str.push_str(&format!(" = {damage}"));
+                        detail_lines.push(dmg_str);
+                    }
                 }
+
                 Some(damage)
             } else {
                 None
@@ -1492,52 +1549,55 @@ impl CoreGame {
 
             let mut damage_from_effects = 0;
 
-            for mut effect in spell_enemy_effect
-                .on_hit
-                .unwrap_or_default()
-                .iter()
-                .copied()
-                .flatten()
-            {
-                match effect {
-                    ApplyEffect::RemoveActionPoints(ref mut n) => {
-                        apply_degree_of_success(n, degree_of_success)
-                    }
-                    ApplyEffect::GainStamina(ref mut n) => {
-                        apply_degree_of_success(n, degree_of_success)
-                    }
-                    ApplyEffect::Condition(ref mut apply_condition) => {
-                        /*
-                        if let Some(stacks) = condition.stacks() {
-                            apply_degree_of_success(stacks, degree_of_success)
+            if let Some(game) = real_game {
+                for mut effect in spell_enemy_effect
+                    .on_hit
+                    .unwrap_or_default()
+                    .iter()
+                    .copied()
+                    .flatten()
+                {
+                    match effect {
+                        ApplyEffect::RemoveActionPoints(ref mut n) => {
+                            apply_degree_of_success(n, degree_of_success)
                         }
-                         */
+                        ApplyEffect::GainStamina(ref mut n) => {
+                            apply_degree_of_success(n, degree_of_success)
+                        }
+                        ApplyEffect::Condition(ref mut apply_condition) => {
+                            /*
+                            if let Some(stacks) = condition.stacks() {
+                                apply_degree_of_success(stacks, degree_of_success)
+                            }
+                             */
+                        }
+                        ApplyEffect::PerBleeding { .. } => {}
+                        ApplyEffect::ConsumeCondition { .. } => {}
                     }
-                    ApplyEffect::PerBleeding { .. } => {}
-                    ApplyEffect::ConsumeCondition { .. } => {}
+
+                    applied_effects.push(effect);
+
+                    let (log_line, damage) =
+                        game.perform_effect_application(effect, Some(caster), target);
+                    damage_from_effects += damage;
+                    detail_lines.push(log_line);
                 }
 
-                applied_effects.push(effect);
-                let (log_line, damage) =
-                    self.perform_effect_application(effect, Some(caster), target);
-                damage_from_effects += damage;
-                detail_lines.push(log_line);
-            }
-
-            for enhancement in enhancements {
-                // TODO: shouldn't these also be affected by degree of success?
-                let e = enhancement.spell_effect.unwrap();
-                let effects = if is_direct_target {
-                    e.target_on_hit
-                } else {
-                    e.area_on_hit
-                };
-                for effect in effects.iter().flatten().flatten() {
-                    applied_effects.push(*effect);
-                    let (log_line, damage) =
-                        self.perform_effect_application(*effect, Some(caster), target);
-                    damage_from_effects += damage;
-                    detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                for enhancement in enhancements {
+                    // TODO: shouldn't these also be affected by degree of success?
+                    let e = enhancement.spell_effect.unwrap();
+                    let effects = if is_direct_target {
+                        e.target_on_hit
+                    } else {
+                        e.area_on_hit
+                    };
+                    for effect in effects.iter().flatten().flatten() {
+                        applied_effects.push(*effect);
+                        let (log_line, damage) =
+                            game.perform_effect_application(*effect, Some(caster), target);
+                        damage_from_effects += damage;
+                        detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                    }
                 }
             }
 
@@ -1590,11 +1650,11 @@ impl CoreGame {
         defender: &Character,
         defender_reaction: Option<OnAttackedReaction>,
         ability_roll_modifier: i32,
-        mode: AttackPerformanceMode,
+        mode: ActionPerformanceMode,
     ) -> AttackedEvent {
         let game = match mode {
-            AttackPerformanceMode::Real(core_game) => Some(core_game),
-            AttackPerformanceMode::SimulatedRoll(_) => None,
+            ActionPerformanceMode::Real(core_game) => Some(core_game),
+            ActionPerformanceMode::SimulatedRoll(..) => None,
         };
 
         let mut attack_bonus = attack_roll_bonus(
@@ -1909,7 +1969,9 @@ impl CoreGame {
             if let Some(arrow) = used_arrow {
                 if let Some(area_effect) = arrow.area_effect {
                     detail_lines.push("".to_string());
-                    let area_target_outcomes = game.perform_ability_area_effect(
+                    // TODO: This AoE should also be performed (predicted) in attack-prediction mode (so that enemies' healthbar previews can be shown
+                    // also for the AoE targets)
+                    let area_target_outcomes = Self::perform_ability_area_effect(
                         arrow.name,
                         AbilityRoll::RolledWithSpellModifier {
                             result: roll_result,
@@ -1920,6 +1982,7 @@ impl CoreGame {
                         defender.pos(),
                         area_effect,
                         &mut detail_lines,
+                        mode,
                     );
                     area_outcomes = Some(area_target_outcomes);
                 }
@@ -2045,7 +2108,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
-                source: "Bleeding",
+                source: Condition::Bleeding,
             })
             .await;
             if conditions
@@ -2062,7 +2125,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
-                source: "Burning",
+                source: Condition::Burning,
             })
             .await;
             conditions.borrow_mut().remove(&Condition::Burning);
@@ -2164,16 +2227,31 @@ fn roll_description(advantage: i32) -> Option<String> {
     }
 }
 
-enum AttackPerformanceMode<'a> {
+#[derive(Copy, Clone)]
+enum ActionPerformanceMode<'a> {
     Real(&'a CoreGame),
-    SimulatedRoll(u32),
+    SimulatedRoll(u32, &'a Characters),
 }
 
-impl<'a> AttackPerformanceMode<'a> {
+impl<'a> ActionPerformanceMode<'a> {
+    fn characters(&self) -> &Characters {
+        match self {
+            ActionPerformanceMode::Real(core_game) => &core_game.characters,
+            ActionPerformanceMode::SimulatedRoll(_, characters) => *characters,
+        }
+    }
+
     fn simulated_roll(&self) -> Option<u32> {
         match self {
-            AttackPerformanceMode::Real(..) => None,
-            AttackPerformanceMode::SimulatedRoll(roll) => Some(*roll),
+            ActionPerformanceMode::Real(..) => None,
+            ActionPerformanceMode::SimulatedRoll(roll, _) => Some(*roll),
+        }
+    }
+
+    fn real_game(&self) -> Option<&CoreGame> {
+        match self {
+            ActionPerformanceMode::Real(core_game) => Some(*core_game),
+            ActionPerformanceMode::SimulatedRoll(..) => None,
         }
     }
 }
@@ -2186,7 +2264,61 @@ pub struct AttackPrediction {
     pub avg_damage: f32,
 }
 
+pub struct AbilityPrediction {
+    pub targets: HashMap<CharacterId, DamageInterval>,
+}
+
+pub struct DamageInterval {
+    pub min: u32,
+    pub max: u32,
+}
+
+pub fn predict_ability(
+    characters: &Characters,
+    caster: &Rc<Character>,
+    ability: Ability,
+    enhancements: &[AbilityEnhancement],
+    selected_target: &ActionTarget,
+) -> AbilityPrediction {
+    let mut targets: HashMap<CharacterId, DamageInterval> = Default::default();
+
+    // To predict the possible range, we first roll a 1 ...
+    let resolved_events = pollster::FutureExt::block_on(CoreGame::perform_ability(
+        caster,
+        ability,
+        enhancements,
+        selected_target,
+        ActionPerformanceMode::SimulatedRoll(1, characters),
+    ));
+    let event = &resolved_events[0];
+    for (target_id, damage) in event.damaged_targets() {
+        targets.insert(
+            target_id,
+            DamageInterval {
+                min: damage,
+                max: 0,
+            },
+        );
+    }
+
+    // ... and then roll a 20
+    let resolved_events = pollster::FutureExt::block_on(CoreGame::perform_ability(
+        caster,
+        ability,
+        enhancements,
+        selected_target,
+        ActionPerformanceMode::SimulatedRoll(20, characters),
+    ));
+    let event = &resolved_events[0];
+    for (target_id, damage) in event.damaged_targets() {
+        targets.get_mut(&target_id).unwrap().max = damage;
+    }
+
+    AbilityPrediction { targets }
+}
+
 pub fn predict_attack(
+    characters: &Characters,
     attacker: &Rc<Character>,
     hand_type: HandType,
     enhancements: &[(&'static str, AttackEnhancementEffect)],
@@ -2199,7 +2331,7 @@ pub fn predict_attack(
     let mut max_dmg = 0;
     let mut percentage_deal_damage = 0;
 
-    // TODO: This doesn't account for advantage! (?)
+    // TODO: The average doesn't account for advantage!
     for unmodified_roll in 1..=20 {
         let event = CoreGame::perform_attack(
             attacker,
@@ -2208,7 +2340,7 @@ pub fn predict_attack(
             defender,
             defender_reaction,
             ability_roll_modifier,
-            AttackPerformanceMode::SimulatedRoll(unmodified_roll),
+            ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
         );
 
         let damage = match event.outcome {
@@ -2264,7 +2396,7 @@ pub trait GameEventHandler {
     fn handle(&self, event: GameEvent);
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum GameEvent {
     LogLine(String),
     Moved {
@@ -2294,13 +2426,7 @@ pub enum GameEvent {
         ability: Ability,
         target: Option<CharacterId>,
     },
-    AbilityResolved {
-        actor: CharacterId,
-        target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
-        area_outcomes: Option<(Position, Vec<(CharacterId, AbilityTargetOutcome)>)>,
-        ability: Ability,
-        detail_lines: Vec<String>,
-    },
+    AbilityResolved(AbilityResolvedEvent),
     ConsumableWasUsed {
         user: CharacterId,
         consumable: Consumable,
@@ -2318,12 +2444,51 @@ pub enum GameEvent {
     CharacterTookDamage {
         character: CharacterId,
         amount: u32,
-        source: &'static str,
+        source: Condition,
     },
     CharacterReceivedCondition {
         character: CharacterId,
         condition: Condition,
     },
+}
+
+#[derive(Debug, Clone)]
+pub struct AbilityResolvedEvent {
+    pub actor: CharacterId,
+    pub target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
+    pub area_outcomes: Option<(Position, Vec<(CharacterId, AbilityTargetOutcome)>)>,
+    pub ability: Ability,
+    pub detail_lines: Vec<String>,
+}
+
+impl AbilityResolvedEvent {
+    fn enemies_hit(&self, result: &mut Vec<CharacterId>) {
+        if let Some((target_id, outcome)) = &self.target_outcome {
+            if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+                result.push(*target_id);
+            }
+        }
+        if let Some((_, outcomes)) = &self.area_outcomes {
+            for (target_id, outcome) in outcomes {
+                if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+                    result.push(*target_id);
+                }
+            }
+        }
+    }
+
+    fn damaged_targets(&self) -> HashMap<CharacterId, u32> {
+        let mut damaged_targets = HashMap::default();
+        if let Some((target_id, outcome)) = &self.target_outcome {
+            *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
+        }
+        if let Some((_pos, outcomes)) = &self.area_outcomes {
+            for (target_id, outcome) in outcomes {
+                *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
+            }
+        }
+        damaged_targets
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -2342,6 +2507,15 @@ pub enum AttackOutcome {
     Block,
     Parry,
     Miss,
+}
+
+impl AttackOutcome {
+    fn damage(&self) -> Option<u32> {
+        match self {
+            AttackOutcome::Hit(dmg, attack_hit_type) => Some(*dmg),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -2374,6 +2548,17 @@ pub enum AbilityTargetOutcome {
     AffectedAlly {
         healing: Option<u32>,
     },
+}
+
+impl AbilityTargetOutcome {
+    fn damage(&self) -> Option<u32> {
+        match self {
+            AbilityTargetOutcome::HitEnemy { damage, .. } => *damage,
+            AbilityTargetOutcome::AttackedEnemy(attacked_event) => attacked_event.outcome.damage(),
+            AbilityTargetOutcome::Resisted => None,
+            AbilityTargetOutcome::AffectedAlly { .. } => None,
+        }
+    }
 }
 
 pub fn as_percentage(probability: f32) -> String {
@@ -3033,6 +3218,13 @@ impl ActionTarget {
         match self {
             Self::Position(pos) => *pos,
             _ => panic!(),
+        }
+    }
+
+    pub fn target_id(&self) -> Option<CharacterId> {
+        match self {
+            Self::Character(target_id, ..) => Some(*target_id),
+            _ => None,
         }
     }
 }
@@ -3748,6 +3940,11 @@ impl Character {
             self.conditions.borrow_mut().remove(&Condition::NearDeath);
             self.conditions.borrow_mut().add(Condition::Dead);
         }
+    }
+
+    fn spend_mana(&self, amount: u32) {
+        self.mana.spend(amount);
+        self.on_mana_changed();
     }
 
     fn on_mana_changed(&self) {
@@ -5084,6 +5281,17 @@ fn are_flanking_target(attacker: Position, melee_engager: Position, target: Posi
             }
             // invalid
             else {
+                // TODO: Bug / crash:
+                // Invalid engagement direction: (0, -2). Engager=(9, 18), target=(9, 20)
+                // When using Sweeping attack while standing above 2 targets like so?
+                //
+                //   XXX
+                //   XXX
+                //   XXX
+                // 000 111
+                // 000 111
+                // 000 111
+                //
                 panic!(
                     "Invalid engagement direction: {:?}. Engager={:?}, target={:?}",
                     (eng_x, eng_y),
