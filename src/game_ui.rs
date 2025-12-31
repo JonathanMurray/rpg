@@ -792,7 +792,7 @@ impl UserInterface {
                         .collect();
 
                 let prediction = predict_attack(
-                    self.active_character(),
+                    self.characters.get_rc(self.active_character_id),
                     attack.hand,
                     &selected_enhancement_effects,
                     target_char,

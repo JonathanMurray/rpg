@@ -372,13 +372,14 @@ impl CoreGame {
 
                                 reactor.action_points.spend(1);
 
-                                let event = self.perform_attack(
-                                    reactor.id(),
+                                let event = Self::perform_attack(
+                                    reactor,
                                     HandType::MainHand,
-                                    vec![],
-                                    attacker.id(),
+                                    &[],
+                                    attacker,
                                     None,
                                     0,
+                                    AttackPerformanceMode::Real(self),
                                 );
 
                                 self.ui_handle_event(GameEvent::Attacked(event)).await;
@@ -416,7 +417,8 @@ impl CoreGame {
                         .await;
                     }
 
-                    let enhancements = enhancements.iter().map(|e| (e.name, e.effect)).collect();
+                    let enhancements: Vec<(&str, AttackEnhancementEffect)> =
+                        enhancements.iter().map(|e| (e.name, e.effect)).collect();
 
                     self.ui_handle_event(GameEvent::AttackWasInitiated {
                         actor: self.active_character_id,
@@ -424,13 +426,14 @@ impl CoreGame {
                     })
                     .await;
 
-                    let event = self.perform_attack(
-                        self.active_character_id,
+                    let event = Self::perform_attack(
+                        attacker,
                         hand,
-                        enhancements,
-                        target,
+                        &enhancements,
+                        defender,
                         reaction,
                         0,
+                        AttackPerformanceMode::Real(self),
                     );
                     self.ui_handle_event(GameEvent::Attacked(event.clone()))
                         .await;
@@ -588,13 +591,14 @@ impl CoreGame {
 
                             reactor.action_points.spend(1);
 
-                            let event = self.perform_attack(
-                                reactor.id(),
+                            let event = Self::perform_attack(
+                                reactor,
                                 HandType::MainHand,
-                                vec![],
-                                character.id(),
+                                &[],
+                                character,
                                 None,
                                 0,
+                                AttackPerformanceMode::Real(self),
                             );
                             self.ui_handle_event(GameEvent::Attacked(event)).await;
                         }
@@ -747,7 +751,7 @@ impl CoreGame {
         enhancements: Vec<AbilityEnhancement>,
         selected_target: ActionTarget,
     ) -> Vec<CharacterId> {
-        let caster = self.active_character();
+        let caster = self.characters.get_rc(self.active_character_id);
         let caster_id = caster.id();
 
         caster.action_points.spend(ability.action_point_cost);
@@ -1102,7 +1106,7 @@ impl CoreGame {
         name: &'static str,
         ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
-        caster: &Character,
+        caster: &Rc<Character>,
         area_center: Position,
         area_effect: AreaEffect,
         detail_lines: &mut Vec<String>,
@@ -1260,7 +1264,7 @@ impl CoreGame {
         name: &'static str,
         ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
-        caster: &Character,
+        caster: &Rc<Character>,
         area_center: Position,
         detail_lines: &mut Vec<String>,
         effect: AbilityNegativeEffect,
@@ -1334,7 +1338,7 @@ impl CoreGame {
 
     fn perform_ability_enemy_effect(
         &self,
-        caster: &Character,
+        caster: &Rc<Character>,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
@@ -1355,20 +1359,21 @@ impl CoreGame {
                 is_direct_target,
             ),
             AbilityNegativeEffect::PerformAttack => {
-                let attack_enhancement_effects = enhancements
+                let attack_enhancement_effects: Vec<(&str, AttackEnhancementEffect)> = enhancements
                     .iter()
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
                 let reaction = None;
                 let roll_modifier = ability_roll.unwrap_attack_bonus();
-                let event = self.perform_attack(
-                    caster.id(),
+                let event: AttackedEvent = Self::perform_attack(
+                    caster,
                     HandType::MainHand,
-                    attack_enhancement_effects,
-                    target.id(),
+                    &attack_enhancement_effects,
+                    target,
                     reaction,
                     roll_modifier,
+                    AttackPerformanceMode::Real(self),
                 );
 
                 AbilityTargetOutcome::AttackedEnemy(event)
@@ -1578,20 +1583,19 @@ impl CoreGame {
         self.ui_handle_event(GameEvent::LogLine(line.into())).await;
     }
 
-    /**
-     * Note: lots of duplication with predict_attack
-     */
     fn perform_attack(
-        &self,
-        attacker_id: CharacterId,
+        attacker: &Rc<Character>,
         hand_type: HandType,
-        enhancements: Vec<(&'static str, AttackEnhancementEffect)>,
-        defender_id: CharacterId,
+        enhancements: &[(&'static str, AttackEnhancementEffect)],
+        defender: &Character,
         defender_reaction: Option<OnAttackedReaction>,
         ability_roll_modifier: i32,
+        mode: AttackPerformanceMode,
     ) -> AttackedEvent {
-        let attacker = &self.characters.get_rc(attacker_id);
-        let defender = self.characters.get(defender_id);
+        let game = match mode {
+            AttackPerformanceMode::Real(core_game) => Some(core_game),
+            AttackPerformanceMode::SimulatedRoll(_) => None,
+        };
 
         let mut attack_bonus = attack_roll_bonus(
             attacker,
@@ -1616,34 +1620,41 @@ impl CoreGame {
         let mut armor_value = defender.protection_from_armor();
 
         if let Some(reaction) = defender_reaction {
-            defender.action_points.spend(reaction.action_point_cost);
-            defender.stamina.spend(reaction.stamina_cost);
-
-            detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
+            if game.is_some() {
+                defender.action_points.spend(reaction.action_point_cost);
+                defender.stamina.spend(reaction.stamina_cost);
+                detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
+            }
 
             let bonus_evasion = reaction.effect.bonus_evasion;
             if bonus_evasion > 0 {
-                detail_lines.push(format!(
-                    "  Evasion: {} +{} ({}) = {}",
-                    evasion,
-                    bonus_evasion,
-                    reaction.name,
-                    evasion + bonus_evasion
-                ));
                 evasion += bonus_evasion;
-                let p_hit = probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
-                detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
+
+                if game.is_some() {
+                    detail_lines.push(format!(
+                        "  Evasion: {} +{} ({}) = {}",
+                        evasion - bonus_evasion,
+                        bonus_evasion,
+                        reaction.name,
+                        evasion
+                    ));
+                    let p_hit =
+                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
+                    detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
+                }
             }
 
             let bonus_armor = reaction.effect.bonus_armor;
             if bonus_armor > 0 {
-                detail_lines.push(format!(
-                    "  Armor: {} +{} ({}) = {}",
-                    armor_value,
-                    bonus_armor,
-                    reaction.name,
-                    armor_value + bonus_armor
-                ));
+                if game.is_some() {
+                    detail_lines.push(format!(
+                        "  Armor: {} +{} ({}) = {}",
+                        armor_value,
+                        bonus_armor,
+                        reaction.name,
+                        armor_value + bonus_armor
+                    ));
+                }
                 armor_value += bonus_armor;
             }
 
@@ -1654,19 +1665,23 @@ impl CoreGame {
             }
         }
 
-        let unmodified_roll = roll_d20_with_advantage(attack_bonus.advantage);
+        let unmodified_roll = mode
+            .simulated_roll()
+            .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
         let roll_result =
             ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
 
-        if let Some(description) = roll_description(attack_bonus.advantage) {
-            detail_lines.push(description);
+        if game.is_some() {
+            if let Some(description) = roll_description(attack_bonus.advantage) {
+                detail_lines.push(description);
+            }
         }
 
         let mut armor_penetrators = vec![];
         let weapon = attacker.weapon(hand_type).unwrap();
         let mut used_arrow = None;
 
-        for (name, effect) in &enhancements {
+        for (name, effect) in enhancements {
             let penetration = effect.armor_penetration;
             if penetration > 0 {
                 armor_penetrators.push((penetration, *name));
@@ -1676,7 +1691,9 @@ impl CoreGame {
                 assert!(!weapon.is_melee());
                 let stack = attacker.arrows.get().unwrap();
                 used_arrow = Some(stack.arrow);
-                attacker.spend_one_arrow();
+                if game.is_some() {
+                    attacker.spend_one_arrow();
+                }
             }
         }
 
@@ -1700,20 +1717,22 @@ impl CoreGame {
             armor_str.push_str(&format!(" -{} ({})", penetration, label));
         }
 
-        detail_lines.push(format!(
-            "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}",
-            unmodified_roll,
-            attack_modifier,
-            if attack_bonus.flat_amount > 0 {
-                format!("(+{}) ", attack_bonus.flat_amount)
-            } else if attack_bonus.flat_amount < 0 {
-                format!("(-{}) ", -attack_bonus.flat_amount)
-            } else {
-                "".to_string()
-            },
-            roll_result,
-            evasion,
-        ));
+        if game.is_some() {
+            detail_lines.push(format!(
+                "Rolled: {} (+{} atk mod) {}= {}, vs evasion={}",
+                unmodified_roll,
+                attack_modifier,
+                if attack_bonus.flat_amount > 0 {
+                    format!("(+{}) ", attack_bonus.flat_amount)
+                } else if attack_bonus.flat_amount < 0 {
+                    format!("(-{}) ", -attack_bonus.flat_amount)
+                } else {
+                    "".to_string()
+                },
+                roll_result,
+                evasion,
+            ));
+        }
 
         let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = if roll_result >= evasion.saturating_sub(10) {
@@ -1729,7 +1748,7 @@ impl CoreGame {
                 dmg_calculation += bonus_dmg;
             }
 
-            for (name, effect) in &enhancements {
+            for (name, effect) in enhancements {
                 let bonus_dmg = effect.bonus_damage;
                 if bonus_dmg > 0 {
                     dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, name));
@@ -1782,69 +1801,74 @@ impl CoreGame {
 
             let damage = dmg_calculation.max(0) as u32;
 
-            dmg_str.push_str(&format!(" = {damage}"));
+            if let Some(game) = game {
+                dmg_str.push_str(&format!(" = {damage}"));
+                detail_lines.push(dmg_str);
+                game.perform_losing_health(defender, damage);
+            }
 
-            detail_lines.push(dmg_str);
-
-            self.perform_losing_health(defender, damage);
-
-            if let Some(effect) = on_true_hit_effect {
-                match effect {
-                    AttackHitEffect::Apply(effect) => {
-                        let (log_line, _damage) =
-                            self.perform_effect_application(effect, Some(attacker), defender);
-                        detail_lines.push(format!("{} (true hit)", log_line))
+            if let Some(game) = game {
+                if let Some(effect) = on_true_hit_effect {
+                    match effect {
+                        AttackHitEffect::Apply(effect) => {
+                            let (log_line, _damage) =
+                                game.perform_effect_application(effect, Some(attacker), defender);
+                            detail_lines.push(format!("{} (true hit)", log_line))
+                        }
+                        AttackHitEffect::SkipExertion => skip_attack_exertion = true,
                     }
-                    AttackHitEffect::SkipExertion => skip_attack_exertion = true,
+                }
+
+                if damage > 0 {
+                    for (name, effect) in enhancements {
+                        if let Some(effect) = effect.on_damage_effect {
+                            let log_line = match effect {
+                                AttackEnhancementOnHitEffect::RegainActionPoint => {
+                                    attacker.action_points.gain(1);
+                                    format!("{} regained 1 AP", attacker.name)
+                                }
+                                AttackEnhancementOnHitEffect::Target(apply_effect) => {
+                                    let (log_line, _damage) = game.perform_effect_application(
+                                        apply_effect,
+                                        Some(attacker),
+                                        defender,
+                                    );
+                                    log_line
+                                }
+                            };
+
+                            detail_lines.push(format!("{} ({})", log_line, name))
+                        }
+
+                        if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
+                            //*condition.stacks().unwrap() = damage;
+                            let stacks = (damage * x.num) / x.den;
+                            let line = game.perform_receive_condition(
+                                ApplyCondition {
+                                    condition,
+                                    stacks: Some(stacks),
+                                    duration_rounds: None,
+                                },
+                                defender,
+                            );
+                            detail_lines.push(format!("{} ({})", line, name))
+                        }
+                    }
+
+                    if let Some(arrow) = used_arrow {
+                        if let Some(apply_effect) = arrow.on_damage_apply {
+                            let (log_line, _damage) = game.perform_effect_application(
+                                apply_effect,
+                                Some(attacker),
+                                defender,
+                            );
+                            detail_lines.push(format!("{} ({})", log_line, arrow.name))
+                        }
+                    }
                 }
             }
 
-            if damage > 0 {
-                for (name, effect) in &enhancements {
-                    if let Some(effect) = effect.on_damage_effect {
-                        let log_line = match effect {
-                            AttackEnhancementOnHitEffect::RegainActionPoint => {
-                                attacker.action_points.gain(1);
-                                format!("{} regained 1 AP", attacker.name)
-                            }
-                            AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                                let (log_line, _damage) = self.perform_effect_application(
-                                    apply_effect,
-                                    Some(attacker),
-                                    defender,
-                                );
-                                log_line
-                            }
-                        };
-
-                        detail_lines.push(format!("{} ({})", log_line, name))
-                    }
-
-                    if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
-                        //*condition.stacks().unwrap() = damage;
-                        let stacks = (damage * x.num) / x.den;
-                        let line = self.perform_receive_condition(
-                            ApplyCondition {
-                                condition,
-                                stacks: Some(stacks),
-                                duration_rounds: None,
-                            },
-                            defender,
-                        );
-                        detail_lines.push(format!("{} ({})", line, name))
-                    }
-                }
-
-                if let Some(arrow) = used_arrow {
-                    if let Some(apply_effect) = arrow.on_damage_apply {
-                        let (log_line, _damage) =
-                            self.perform_effect_application(apply_effect, Some(attacker), defender);
-                        detail_lines.push(format!("{} ({})", log_line, arrow.name))
-                    }
-                }
-            }
-
-            if defender.lose_protected() {
+            if defender.lose_protected() && game.is_some() {
                 detail_lines.push(format!("{} lost Protected", defender.name));
             }
 
@@ -1868,51 +1892,53 @@ impl CoreGame {
             unreachable!("{roll_result}, {evasion}, {evasion_from_parry}, {evasion_from_sidestep}");
         };
 
-        if defender.lose_distracted() {
-            detail_lines.push(format!("{} lost Distracted", defender.name));
-        }
-
-        for (name, effect) in &enhancements {
-            if let Some(effect) = effect.on_target {
-                let (log_line, _damage) =
-                    self.perform_effect_application(effect, Some(attacker), defender);
-                detail_lines.push(format!("{} ({})", log_line, name));
-            }
-        }
-
         let mut area_outcomes = None;
-        if let Some(arrow) = used_arrow {
-            if let Some(area_effect) = arrow.area_effect {
-                detail_lines.push("".to_string());
-                let area_target_outcomes = self.perform_ability_area_effect(
-                    arrow.name,
-                    AbilityRoll::RolledWithSpellModifier {
-                        result: roll_result,
-                        line: "".to_string(),
-                    },
-                    &[],
-                    &attacker,
-                    defender.pos(),
-                    area_effect,
-                    &mut detail_lines,
-                );
-                area_outcomes = Some(area_target_outcomes);
+        if let Some(game) = game {
+            if defender.lose_distracted() {
+                detail_lines.push(format!("{} lost Distracted", defender.name));
             }
-        }
 
-        if weapon.is_melee() {
-            if let Some(previously_engaged) = attacker.engagement_target.take() {
-                self.characters
-                    .get(previously_engaged)
-                    .set_not_engaged_by(attacker.id());
+            for (name, effect) in enhancements {
+                if let Some(effect) = effect.on_target {
+                    let (log_line, _damage) =
+                        game.perform_effect_application(effect, Some(attacker), defender);
+                    detail_lines.push(format!("{} ({})", log_line, name));
+                }
             }
-            defender.set_engaged_by(Rc::clone(attacker));
-            attacker.engagement_target.set(Some(defender.id()));
+
+            if let Some(arrow) = used_arrow {
+                if let Some(area_effect) = arrow.area_effect {
+                    detail_lines.push("".to_string());
+                    let area_target_outcomes = game.perform_ability_area_effect(
+                        arrow.name,
+                        AbilityRoll::RolledWithSpellModifier {
+                            result: roll_result,
+                            line: "".to_string(),
+                        },
+                        &[],
+                        &attacker,
+                        defender.pos(),
+                        area_effect,
+                        &mut detail_lines,
+                    );
+                    area_outcomes = Some(area_target_outcomes);
+                }
+            }
+
+            if weapon.is_melee() {
+                if let Some(previously_engaged) = attacker.engagement_target.take() {
+                    game.characters
+                        .get(previously_engaged)
+                        .set_not_engaged_by(attacker.id());
+                }
+                defender.set_engaged_by(Rc::clone(attacker));
+                attacker.engagement_target.set(Some(defender.id()));
+            }
         }
 
         AttackedEvent {
-            attacker: attacker_id,
-            target: defender_id,
+            attacker: attacker.id(),
+            target: defender.id(),
             outcome,
             detail_lines,
             area_outcomes,
@@ -2138,6 +2164,20 @@ fn roll_description(advantage: i32) -> Option<String> {
     }
 }
 
+enum AttackPerformanceMode<'a> {
+    Real(&'a CoreGame),
+    SimulatedRoll(u32),
+}
+
+impl<'a> AttackPerformanceMode<'a> {
+    fn simulated_roll(&self) -> Option<u32> {
+        match self {
+            AttackPerformanceMode::Real(..) => None,
+            AttackPerformanceMode::SimulatedRoll(roll) => Some(*roll),
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone)]
 pub struct AttackPrediction {
     pub percentage_chance_deal_damage: u32,
@@ -2146,81 +2186,14 @@ pub struct AttackPrediction {
     pub avg_damage: f32,
 }
 
-/**
- * Note: lots of duplication with perform_attack
- */
 pub fn predict_attack(
-    attacker: &Character,
+    attacker: &Rc<Character>,
     hand_type: HandType,
     enhancements: &[(&'static str, AttackEnhancementEffect)],
     defender: &Character,
     defender_reaction: Option<OnAttackedReaction>,
     ability_roll_modifier: i32,
 ) -> AttackPrediction {
-    let mut attack_bonus = attack_roll_bonus(
-        attacker,
-        hand_type,
-        defender,
-        enhancements,
-        defender_reaction,
-    );
-    attack_bonus.flat_amount += ability_roll_modifier;
-
-    let mut evasion = defender.evasion();
-
-    let attack_modifier = attacker.attack_modifier(hand_type);
-
-    let mut armor_value = defender.protection_from_armor();
-
-    if let Some(reaction) = defender_reaction {
-        let bonus_evasion = reaction.effect.bonus_evasion;
-        if bonus_evasion > 0 {
-            evasion += bonus_evasion;
-        }
-
-        let bonus_armor = reaction.effect.bonus_armor;
-        if bonus_armor > 0 {
-            armor_value += bonus_armor;
-        }
-    }
-
-    let mut armor_penetrators = vec![];
-    let weapon = attacker.weapon(hand_type).unwrap();
-    let mut used_arrow = None;
-
-    for (name, effect) in enhancements {
-        let penetration = effect.armor_penetration;
-        if penetration > 0 {
-            armor_penetrators.push((penetration, *name));
-        }
-        if effect.consume_equipped_arrow {
-            assert!(used_arrow.is_none());
-            assert!(!weapon.is_melee());
-            let stack = attacker.arrows.get().unwrap();
-            used_arrow = Some(stack.arrow);
-        }
-    }
-
-    if let Some(arrow) = used_arrow {
-        let penetration = arrow.bonus_penetration;
-        if penetration > 0 {
-            armor_penetrators.push((penetration, arrow.name));
-        }
-    }
-
-    if attacker
-        .known_passive_skills
-        .contains(&PassiveSkill::WeaponProficiency)
-    {
-        armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
-    }
-
-    for (penetration, _label) in armor_penetrators {
-        armor_value = armor_value.saturating_sub(penetration);
-    }
-
-    let weapon = attacker.weapon(hand_type).unwrap();
-
     let mut damage_outcomes = vec![];
     let mut min_dmg = None;
     let mut max_dmg = 0;
@@ -2228,46 +2201,19 @@ pub fn predict_attack(
 
     // TODO: This doesn't account for advantage! (?)
     for unmodified_roll in 1..=20 {
-        let roll_result =
-            ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
-        let damage = if roll_result >= evasion.saturating_sub(10) {
-            let mut dmg_calculation = weapon.damage as i32;
+        let event = CoreGame::perform_attack(
+            attacker,
+            hand_type,
+            enhancements,
+            defender,
+            defender_reaction,
+            ability_roll_modifier,
+            AttackPerformanceMode::SimulatedRoll(unmodified_roll),
+        );
 
-            if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
-                let bonus_dmg = 1;
-                dmg_calculation += bonus_dmg;
-            }
-
-            for (_name, effect) in enhancements {
-                let bonus_dmg = effect.bonus_damage;
-                if bonus_dmg > 0 {
-                    dmg_calculation += bonus_dmg as i32;
-                }
-            }
-
-            if attacker
-                .known_passive_skills
-                .contains(&PassiveSkill::Honorless)
-            {
-                let bonus_dmg = 1;
-                if is_target_flanked(attacker.pos(), defender) {
-                    dmg_calculation += bonus_dmg as i32;
-                }
-            }
-
-            if roll_result < evasion {
-                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
-            } else if roll_result >= evasion + 10 {
-                dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
-            }
-
-            if armor_value > 0 {
-                dmg_calculation -= armor_value as i32;
-            }
-
-            dmg_calculation.max(0) as u32
-        } else {
-            0
+        let damage = match event.outcome {
+            AttackOutcome::Hit(dmg, ..) => dmg,
+            _ => 0,
         };
 
         if min_dmg.is_none() {

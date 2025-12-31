@@ -576,7 +576,7 @@ impl ActivityPopup {
 
         let reaction = *selected;
 
-        let attacker = self.characters.get(*attacker);
+        let attacker = self.characters.get_rc(*attacker);
         let defender = self.characters.get(*reactor);
 
         let attack_enhancements = &[];
