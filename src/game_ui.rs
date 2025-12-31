@@ -515,18 +515,19 @@ impl UserInterface {
             || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
 
-        let hovered_action = self
-            .hovered_button
-            .as_ref()
-            .map(|btn_hovered| match btn_hovered.action {
-                ButtonAction::Action(base_action)
-                    if btn_hovered.context != Some(ButtonContext::CharacterSheet) =>
-                {
-                    Some(base_action)
-                }
-                _ => None,
-            })
-            .flatten();
+        let mut hovered_action = None;
+
+        if let Some(btn) = self.hovered_button.as_ref() {
+            if let ButtonAction::Action(base_action) = btn.action {
+                hovered_action = Some((self.active_character_id, base_action));
+            }
+        }
+
+        if hovered_action.is_none() {
+            if let Some(ButtonAction::Action(base_action)) = self.target_ui.hovered_action() {
+                hovered_action = Some((self.target_ui.get_character_id().unwrap(), base_action));
+            }
+        }
 
         let grid_outcome = self.game_grid.draw(
             is_grid_receptive_to_dragging,

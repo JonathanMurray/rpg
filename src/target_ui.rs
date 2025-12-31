@@ -22,7 +22,7 @@ use crate::{
         TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{BaseAction, Character, Goodness, HandType},
+    core::{BaseAction, Character, CharacterId, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
     textures::{IconId, StatusId},
 };
@@ -63,6 +63,14 @@ impl TargetUi {
         }
     }
 
+    pub fn hovered_action(&self) -> Option<ButtonAction> {
+        let hovered_btn = *self.hovered_btn.borrow();
+        hovered_btn.map(|(btn_id, _)| {
+            let btn = self.buttons.get(&btn_id).unwrap();
+            btn.borrow().action
+        })
+    }
+
     pub fn rebuild_character_ui(&mut self) {
         if let Some(target) = self.target.take() {
             self.set_character(Some(&target));
@@ -75,6 +83,10 @@ impl TargetUi {
                 self.target = None;
             }
         }
+    }
+
+    pub fn get_character_id(&self) -> Option<CharacterId> {
+        self.target.as_ref().map(|ch| ch.id())
     }
 
     pub fn set_character(&mut self, character: Option<&Rc<Character>>) {

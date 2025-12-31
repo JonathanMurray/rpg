@@ -683,7 +683,7 @@ impl GameGrid {
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
         obstructed: bool,
-        hovered_base_action: Option<BaseAction>,
+        hovered_action: Option<(CharacterId, BaseAction)>,
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
         // TODO
@@ -778,12 +778,12 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        let range_indicator = self.determine_range_indicator(ui_state, hovered_base_action);
+        let range_indicator = self.determine_range_indicator(ui_state, hovered_action);
 
         self.draw_active_character_highlight();
 
         if matches!(ui_state, UiState::ChoosingAction) {
-            if let Some(BaseAction::Move) = hovered_base_action {
+            if let Some((char_id, BaseAction::Move)) = hovered_action {
                 self.draw_movement_path_background();
             }
         } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
@@ -835,11 +835,12 @@ impl GameGrid {
             }
         }
 
-        if let Some((range, indicator)) = range_indicator {
-            self.draw_range_indicator(active_char_pos, range, indicator);
+        if let Some((char_id, range, indicator)) = range_indicator {
+            let char_pos = self.characters.get(char_id).pos();
+            self.draw_range_indicator(char_pos, range, indicator);
 
             for character in self.characters.iter() {
-                if within_range_squared(range.squared(), active_char_pos, character.pos()) {
+                if within_range_squared(range.squared(), char_pos, character.pos()) {
                     labelled_char_ids.insert(character.id());
                 }
             }
@@ -1144,7 +1145,8 @@ impl GameGrid {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
                     if !player_has_action_char_target && hovered_character_id.is_none() {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((range, _indicator)) = range_indicator {
+                        if let Some((char_id, range, _indicator)) = range_indicator {
+                            // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -1170,7 +1172,8 @@ impl GameGrid {
                         ActionTarget::Position { .. }
                     ) {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((range, _indicator)) = range_indicator {
+                        if let Some((char_id, range, _indicator)) = range_indicator {
+                            // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -1599,8 +1602,32 @@ impl GameGrid {
     fn determine_range_indicator(
         &self,
         ui_state: &mut UiState,
-        hovered_base_action: Option<BaseAction>,
-    ) -> Option<(Range, RangeIndicator)> {
+        hovered_base_action: Option<(CharacterId, BaseAction)>,
+    ) -> Option<(CharacterId, Range, RangeIndicator)> {
+        let mut indicator = None;
+
+        match hovered_base_action {
+            Some((char_id, BaseAction::Attack(attack))) => {
+                let range = self
+                    .characters
+                    .get(char_id)
+                    .attack_range(attack.hand, iter::empty());
+                indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+            }
+            Some((char_id, BaseAction::UseAbility(ability))) => {
+                let radius = ability.target.radius(&[]);
+                let range = ability.target.range(&[]);
+                indicator = radius
+                    .or(range)
+                    .map(|range| (char_id, range, RangeIndicator::ActionTargetRange))
+            }
+            _ => {}
+        }
+
+        if indicator.is_some() {
+            return indicator;
+        }
+
         if let UiState::ConfiguringAction(configured_action) = ui_state {
             match configured_action {
                 ConfiguredAction::Attack {
@@ -1630,7 +1657,8 @@ impl GameGrid {
                             ActionReach::No => Some(RangeIndicator::CannotReach),
                         };
 
-                        maybe_indicator.map(|indicator| (range, indicator))
+                        maybe_indicator
+                            .map(|indicator| (self.active_character_id, range, indicator))
                     }
 
                     None => {
@@ -1638,7 +1666,11 @@ impl GameGrid {
                             attack.hand,
                             selected_enhancements.iter().map(|e| e.effect),
                         );
-                        Some((range, RangeIndicator::ActionTargetRange))
+                        Some((
+                            self.active_character_id,
+                            range,
+                            RangeIndicator::ActionTargetRange,
+                        ))
                     }
                 },
                 ConfiguredAction::UseAbility {
@@ -1661,6 +1693,7 @@ impl GameGrid {
                         };
                         maybe_indicator.map(|indicator| {
                             (
+                                self.active_character_id,
                                 ability.target.range(selected_enhancements).unwrap(),
                                 indicator,
                             )
@@ -1679,6 +1712,7 @@ impl GameGrid {
                         };
                         maybe_indicator.map(|indicator| {
                             (
+                                self.active_character_id,
                                 ability.target.range(selected_enhancements).unwrap(),
                                 indicator,
                             )
@@ -1688,29 +1722,15 @@ impl GameGrid {
                     ActionTarget::None => {
                         let radius = ability.target.radius(selected_enhancements);
                         let range = ability.target.range(selected_enhancements);
-                        radius
-                            .or(range)
-                            .map(|range| (range, RangeIndicator::ActionTargetRange))
+                        radius.or(range).map(|range| {
+                            (
+                                self.active_character_id,
+                                range,
+                                RangeIndicator::ActionTargetRange,
+                            )
+                        })
                     }
                 },
-                _ => None,
-            }
-        } else if let UiState::ChoosingAction = ui_state {
-            match hovered_base_action {
-                Some(BaseAction::Attack(attack)) => {
-                    let range = self
-                        .characters
-                        .get(self.active_character_id)
-                        .attack_range(attack.hand, iter::empty());
-                    Some((range, RangeIndicator::ActionTargetRange))
-                }
-                Some(BaseAction::UseAbility(ability)) => {
-                    let radius = ability.target.radius(&[]);
-                    let range = ability.target.range(&[]);
-                    radius
-                        .or(range)
-                        .map(|range| (range, RangeIndicator::ActionTargetRange))
-                }
                 _ => None,
             }
         } else {
