@@ -591,7 +591,7 @@ pub struct ActionButton {
     pub texture_draw_size: (f32, f32),
     style: Style,
     pub hover_border_color: Color,
-    points_row: Container,
+    bottom_row: Container,
     hovered: Cell<bool>,
     pub enabled: Cell<bool>,
     pub selected: Cell<ButtonSelected>,
@@ -613,6 +613,7 @@ impl ActionButton {
         id: u32,
         icons: &HashMap<IconId, Texture2D>,
         character: Option<Rc<Character>>,
+        font: &Font,
     ) -> Self {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
@@ -633,16 +634,15 @@ impl ActionButton {
         let hover_border_color = YELLOW;
 
         let r = 3.0;
-        let mut point_icons = vec![];
+        let mut bottom_row_elements = vec![];
 
         for _ in 0..action_points {
-            point_icons.push(Element::Circle(Circle { r, color: GOLD }))
+            bottom_row_elements.push(Element::Circle(Circle { r, color: GOLD }))
         }
 
         if mana_points > 0 {
-            let font = None; //TODO
-            let text =
-                TextLine::new(format!("{}", mana_points), 16, WHITE, font).with_depth(BLACK, 1.0);
+            let text = TextLine::new(format!("{}", mana_points), 16, WHITE, Some(font.clone()))
+                .with_depth(BLACK, 1.0);
 
             let element = Element::Container(Container {
                 children: vec![Element::Text(text)],
@@ -654,14 +654,13 @@ impl ActionButton {
                 ..Default::default()
             });
 
-            if !point_icons.is_empty() {
-                point_icons.push(Element::Empty(0.0, 0.0)); // For some extra margin
+            if !bottom_row_elements.is_empty() {
+                bottom_row_elements.push(Element::Empty(0.0, 0.0)); // For some extra margin
             }
-            point_icons.push(element);
+            bottom_row_elements.push(element);
         }
         if stamina_points > 0 {
-            let font = None; //TODO
-            let text = TextLine::new(format!("{}", stamina_points), 16, WHITE, font)
+            let text = TextLine::new(format!("{}", stamina_points), 16, WHITE, Some(font.clone()))
                 .with_depth(BLACK, 1.0);
 
             let element = Element::Container(Container {
@@ -674,15 +673,28 @@ impl ActionButton {
                 ..Default::default()
             });
 
-            if !point_icons.is_empty() {
-                point_icons.push(Element::Empty(0.0, 0.0)); // For some extra margin
+            if !bottom_row_elements.is_empty() {
+                bottom_row_elements.push(Element::Empty(0.0, 0.0)); // For some extra margin
             }
-            point_icons.push(element);
+            bottom_row_elements.push(element);
         }
 
-        let padding = if point_icons.is_empty() { 0.0 } else { 4.0 };
-        let points_row = Container {
-            children: point_icons,
+        if action.costs_arrow() {
+            bottom_row_elements.push(Element::Text(TextLine::new(
+                "Arrow",
+                16,
+                WHITE,
+                Some(font.clone()),
+            )));
+        }
+
+        let padding = if bottom_row_elements.is_empty() {
+            0.0
+        } else {
+            4.0
+        };
+        let bottom_row = Container {
+            children: bottom_row_elements,
             margin: 4.0,
             layout_dir: LayoutDirection::Horizontal,
             align: Align::Center,
@@ -712,7 +724,7 @@ impl ActionButton {
             texture_draw_size,
             style,
             hover_border_color,
-            points_row,
+            bottom_row,
             hovered: Cell::new(false),
             enabled: Cell::new(true),
             selected: Cell::new(ButtonSelected::No),
@@ -890,7 +902,7 @@ impl Drawable for ActionButton {
 
         self.style.draw(x, y, self.size);
 
-        let points_row_size = self.points_row.size();
+        let bottom_row_size = self.bottom_row.size();
 
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -989,23 +1001,23 @@ impl Drawable for ActionButton {
             ButtonSelected::No => {}
         }
 
-        // When viewed in the skill tree (editor), we can be so zoomed out that the points row doesn't fit well. In that case, don't show it.
+        // When viewed in the skill tree (editor), we can be so zoomed out that the bottom row doesn't fit well. In that case, don't show it.
         if self.size.0 > 45.0 {
-            let points_row_h_pad = 2.0;
+            let bottom_row_h_pad = 2.0;
 
-            if points_row_size.1 > 0.0 {
+            if bottom_row_size.1 > 0.0 {
                 draw_rectangle(
                     x + 1.0,
-                    y + h - points_row_size.1 - points_row_h_pad,
+                    y + h - bottom_row_size.1 - bottom_row_h_pad,
                     w - 2.0,
-                    points_row_size.1,
+                    bottom_row_size.1,
                     Color::new(0.1, 0.1, 0.1, 0.8),
                 );
             }
 
-            self.points_row.draw(
-                x + w - points_row_size.0 - 2.0,
-                y + h - points_row_h_pad - points_row_size.1,
+            self.bottom_row.draw(
+                x + w - bottom_row_size.0 - 2.0,
+                y + h - bottom_row_h_pad - bottom_row_size.1,
             );
         }
 
@@ -1135,6 +1147,15 @@ impl ButtonAction {
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 1,
             ButtonAction::Passive(..) => 0,
+        }
+    }
+
+    pub fn costs_arrow(&self) -> bool {
+        match self {
+            ButtonAction::AttackEnhancement(enhancement) => {
+                enhancement.effect.consume_equipped_arrow
+            }
+            _ => false,
         }
     }
 

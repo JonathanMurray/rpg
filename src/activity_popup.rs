@@ -77,6 +77,7 @@ impl ActivityPopup {
             next_button_id,
             &icons,
             None,
+            &font,
         );
         next_button_id += 1;
 
@@ -254,12 +255,14 @@ impl ActivityPopup {
                 character.remaining_movement.get() + (cost * MOVE_DISTANCE_PER_STAMINA) as f32;
             //let dim = draw_text_rounded(&format!("Move:"), x0, y0, base_text_params.clone());
             //y0 += dim.offset_y + line_margin;
+            /*
             draw_text_rounded(
                 &format!("{:.1}", movement),
                 x0 + 3.0,
                 y0,
                 base_text_params.clone(),
             );
+             */
         }
 
         if let Some(slider) = &mut self.movement_cost_slider {
@@ -620,6 +623,7 @@ impl ActivityPopup {
             self.next_button_id.get(),
             &self.icons,
             None,
+            &self.font,
         );
         self.next_button_id.set(self.next_button_id.get() + 1);
         btn
@@ -629,6 +633,7 @@ impl ActivityPopup {
         &self,
         btn_action: ButtonAction,
         character: Rc<Character>,
+        font: &Font,
     ) -> ActionButton {
         let btn = ActionButton::new(
             btn_action,
@@ -636,6 +641,7 @@ impl ActivityPopup {
             self.next_button_id.get(),
             &self.icons,
             Some(character),
+            font,
         );
         self.next_button_id.set(self.next_button_id.get() + 1);
         btn
@@ -777,6 +783,7 @@ impl ActivityPopup {
                 let btn = self.new_button_with_character_dependency(
                     ButtonAction::OpportunityAttack,
                     self.characters.get_rc(*reactor).clone(),
+                    &self.font,
                 );
                 popup_buttons.push(btn);
             }
@@ -792,6 +799,7 @@ impl ActivityPopup {
                 let btn = self.new_button_with_character_dependency(
                     ButtonAction::OpportunityAttack,
                     self.characters.get_rc(*reactor).clone(),
+                    &self.font,
                 );
                 popup_buttons.push(btn);
             }

@@ -115,6 +115,7 @@ impl RewardSelectionUi {
                         id,
                         &icons,
                         Some(Rc::clone(&character)),
+                        &font,
                     ),
                     context,
                 };

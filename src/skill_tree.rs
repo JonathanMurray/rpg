@@ -129,6 +129,7 @@ pub async fn run_editor() {
                 n.id,
                 &icons,
                 None,
+                &font,
             );
             btn.hover_border_color = LIGHTGRAY;
 
@@ -246,6 +247,7 @@ pub async fn run_editor() {
             btn_id,
             &icons,
             None,
+            &font,
         )))
     };
 
@@ -777,6 +779,7 @@ pub async fn run_skill_tree_scene() {
                         x,
                         y,
                         skill,
+                        &font,
                     );
 
                     if claimed_nodes.contains(&node.id) {
@@ -878,6 +881,7 @@ fn draw_skill_node(
     x: f32,
     y: f32,
     skill: Skill,
+    font: &Font,
 ) {
     let mut btn = ActionButton::new(
         skill_to_btn_action(skill),
@@ -885,6 +889,7 @@ fn draw_skill_node(
         0,
         icons,
         None,
+        font,
     );
     btn.change_scale(icon_w / 60.0);
     btn.hover_border_color = LIGHTGRAY;

@@ -2154,17 +2154,23 @@ fn build_character_ui(
     status_textures: HashMap<StatusId, Texture2D>,
     character_sheet_screen_pos: Rc<RefCell<(f32, f32)>>,
 ) -> CharacterUi {
-    let mut new_button = |btn_action,
-                          character: Option<Rc<Character>>,
-                          in_character_sheet: bool| {
-        let event_queue = Some(Rc::clone(event_queue));
-        let mut btn = ActionButton::new(btn_action, event_queue, *next_button_id, icons, character);
-        *next_button_id += 1;
-        if in_character_sheet {
-            btn.context = Some(ButtonContext::CharacterSheet);
-        }
-        btn
-    };
+    let mut new_button =
+        |btn_action, character: Option<Rc<Character>>, in_character_sheet: bool| {
+            let event_queue = Some(Rc::clone(event_queue));
+            let mut btn = ActionButton::new(
+                btn_action,
+                event_queue,
+                *next_button_id,
+                icons,
+                character,
+                simple_font,
+            );
+            *next_button_id += 1;
+            if in_character_sheet {
+                btn.context = Some(ButtonContext::CharacterSheet);
+            }
+            btn
+        };
 
     let mut tracked_action_buttons = IndexMap::new();
     let mut hoverable_buttons = vec![];

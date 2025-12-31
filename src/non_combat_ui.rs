@@ -183,6 +183,7 @@ impl NonCombatCharacterUi {
                 next_button_id,
                 icons,
                 character,
+                font,
             );
             btn.enabled.set(enabled);
             next_button_id += 1;

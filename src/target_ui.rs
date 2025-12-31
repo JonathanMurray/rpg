@@ -174,6 +174,7 @@ impl TargetUi {
                         next_btn_id,
                         &self.icons,
                         Some(Rc::clone(char)),
+                        &self.simple_font,
                     );
                     next_btn_id += 1;
                     btn

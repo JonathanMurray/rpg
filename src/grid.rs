@@ -15,6 +15,7 @@ use macroquad::{
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
     texture::draw_texture,
+    time::get_time,
     window::{screen_height, screen_width},
 };
 use rand::{random_range, rng, Rng};
@@ -611,28 +612,22 @@ impl GameGrid {
 
         let mut dying = false;
 
+        let game_time = get_time();
+
         for animation in self
             .character_animations
             .iter()
             .filter(|a| a.character_id == character.id())
         {
             let remaining = animation.remaining_duration;
-            let duration = animation.duration;
             match animation.kind {
                 AnimationKind::Motion { .. } => {
-                    // TODO: now that the cells are 3x smaller than before, this animation
-                    // is sadly also 3x faster than before, which looks a bit dumb. How to
-                    // animate the rotation across multiple cells of movement? Have to
-                    // remember (here in grid?) what the movement animation state of a char
-                    // was and then start from where it left off, when being instructed to
-                    // animate again?
-                    let remaining_part = remaining / duration;
-                    let quantized = (remaining_part * 4.0).floor() / 4.0;
-                    if quantized < 0.25 {
+                    let cycle_time = (game_time * 2.0) % (game_time * 2.0).floor();
+                    if cycle_time < 0.25 {
                         y += 1.0;
-                    } else if quantized < 0.5 {
+                    } else if cycle_time < 0.5 {
                         params.rotation = -0.05;
-                    } else if quantized < 0.75 {
+                    } else if cycle_time < 0.75 {
                         y += 1.0;
                     } else {
                         params.rotation = 0.05;
@@ -2183,13 +2178,12 @@ impl GameGrid {
             Color::new(0.0, 0.0, 0.0, 0.7)
         };
 
-        let ap = self
-            .movement_range
-            .cost(distance, self.active_char_remaining_movement());
-        if ap > 0 {
-            let text = format!("-{}", ap);
-            self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
-        }
+        let text = if distance.round() == distance {
+            distance.to_string()
+        } else {
+            format!("{distance:.1}")
+        };
+        self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
     }
 
     fn active_char_remaining_movement(&self) -> f32 {
