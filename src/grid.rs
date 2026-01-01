@@ -2285,11 +2285,6 @@ impl GameGrid {
     }
 
     fn draw_move_range_indicator(&self, character: &Character, range: f32) {
-        //TODO
-        println!(
-            "Draw move range indicator, char={}, range={}",
-            character.name, range
-        );
         let range_floor = range.floor() as i32;
         let origin = character.pos();
 

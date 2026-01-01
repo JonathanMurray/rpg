@@ -1851,8 +1851,7 @@ impl CoreGame {
                 AttackHitType::Critical => {
                     on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push(format!("  Critical hit"));
-                    let bonus_percentage = 50;
-                    dmg_str.push_str(&format!(" +{bonus_percentage}% (crit)"));
+                    dmg_str.push_str(&format!(" +50% (crit)"));
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                 }
             }
@@ -2144,30 +2143,35 @@ impl CoreGame {
                 })
                 .collect();
             if !adj_others.is_empty() {
-                let spread = burn_stacks / 2;
-                if spread > 0 {
+                let spread_amount = burn_stacks / 2;
+                dbg!(spread_amount);
+                if spread_amount > 0 {
                     adj_others.shuffle();
-                    let per_unit = spread / adj_others.len() as u32;
-                    let mut remainder = spread % adj_others.len() as u32;
+                    let per_receiver = spread_amount / adj_others.len() as u32;
+                    let mut remainder = spread_amount % adj_others.len() as u32;
+                    let mut num_receivers = 0;
                     for other in &adj_others {
                         let stacks = if remainder > 0 {
                             // Some unlucky ones get burned more than others...
                             remainder -= 1;
-                            per_unit + 1
+                            per_receiver + 1
                         } else {
-                            per_unit
+                            per_receiver
                         };
-                        let burning = Condition::Burning;
-                        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
-                            character: other.id(),
-                            condition: burning,
-                        })
-                        .await;
-                        other.receive_condition(burning, Some(stacks), None);
+                        if stacks > 0 {
+                            num_receivers += 1;
+                            let burning = Condition::Burning;
+                            self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+                                character: other.id(),
+                                condition: burning,
+                            })
+                            .await;
+                            other.receive_condition(burning, Some(stacks), None);
+                        }
                     }
+                    self.log(format!("The fire spread to {} other(s)", num_receivers))
+                        .await;
                 }
-                self.log(format!("The fire spread to {} other(s)", adj_others.len()))
-                    .await;
             }
         }
 
