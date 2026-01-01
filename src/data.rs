@@ -949,7 +949,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    description: "",
+    description: "Cause an enemy to bleed",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 1,

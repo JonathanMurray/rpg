@@ -142,7 +142,7 @@ async fn main() {
     clara.known_ability_enhancements.push(FIREBALL_REACH);
     clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
     clara.learn_ability(SHACKLED_MIND);
-    clara.learn_ability(HASTE);
+    clara.learn_ability(INFLICT_WOUNDS);
 
     /*
     clara
@@ -152,14 +152,11 @@ async fn main() {
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    // TODO
-    clara.receive_condition(Condition::Burning, Some(2), None);
-
-    let mut player_characters = vec![clara, bob, alice];
+    let mut player_characters = vec![clara];
 
     player_characters = run_fight_loop(
         player_characters,
-        FightId::VerticalSlice,
+        FightId::Test,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),

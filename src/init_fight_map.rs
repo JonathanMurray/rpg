@@ -281,7 +281,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
-                Attributes::new(1, 1, 1, 1),
+                Attributes::new(8, 1, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
             );
             e1.learn_ability(ENEMY_BRACE);

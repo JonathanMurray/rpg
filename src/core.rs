@@ -1541,12 +1541,21 @@ impl CoreGame {
 
             let mut applied_effects = vec![];
 
-            fn apply_degree_of_success(stacks: &mut u32, degree_of_success: i32) {
+            fn apply_degree_of_success(
+                stacks: &mut u32,
+                degree_of_success: i32,
+                reduced_to_nothing: &mut bool,
+            ) {
                 if degree_of_success == -1 {
-                    *stacks /= 2;
-                } else {
-                    assert!(degree_of_success >= 0);
-                    *stacks += degree_of_success as u32;
+                    // -25% Graze
+                    *stacks -= (*stacks as f32 * 0.25).ceil() as u32;
+                } else if degree_of_success > 0 {
+                    // +50% Crit
+                    *stacks += (*stacks as f32 * 0.5).ceil() as u32;
+                }
+
+                if *stacks <= 0 {
+                    *reduced_to_nothing = true;
                 }
             }
 
@@ -1560,30 +1569,43 @@ impl CoreGame {
                     .copied()
                     .flatten()
                 {
+                    let mut reduced_to_nothing = false;
                     match effect {
                         ApplyEffect::RemoveActionPoints(ref mut n) => {
-                            apply_degree_of_success(n, degree_of_success)
+                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing);
                         }
                         ApplyEffect::GainStamina(ref mut n) => {
-                            apply_degree_of_success(n, degree_of_success)
+                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
                         }
                         ApplyEffect::Condition(ref mut apply_condition) => {
-                            /*
-                            if let Some(stacks) = condition.stacks() {
-                                apply_degree_of_success(stacks, degree_of_success)
+                            if let Some(stacks) = &mut apply_condition.stacks {
+                                apply_degree_of_success(
+                                    stacks,
+                                    degree_of_success,
+                                    &mut reduced_to_nothing,
+                                );
                             }
-                             */
+                            if let Some(rounds) = &mut apply_condition.duration_rounds {
+                                apply_degree_of_success(
+                                    rounds,
+                                    degree_of_success,
+                                    &mut reduced_to_nothing,
+                                );
+                            }
                         }
                         ApplyEffect::PerBleeding { .. } => {}
                         ApplyEffect::ConsumeCondition { .. } => {}
                     }
 
-                    applied_effects.push(effect);
-
-                    let (log_line, damage) =
-                        game.perform_effect_application(effect, Some(caster), target);
-                    damage_from_effects += damage;
-                    detail_lines.push(log_line);
+                    if reduced_to_nothing {
+                        detail_lines.push(format!("'{}' was reduced to nothing (Graze)", effect));
+                    } else {
+                        applied_effects.push(effect);
+                        let (log_line, damage) =
+                            game.perform_effect_application(effect, Some(caster), target);
+                        damage_from_effects += damage;
+                        detail_lines.push(log_line);
+                    }
                 }
 
                 for enhancement in enhancements {
