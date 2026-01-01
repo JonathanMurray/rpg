@@ -1099,6 +1099,10 @@ impl UserInterface {
                 ConfiguredAction::ChangeEquipment { drag } => {
                     // Clear the drag; it's shared with the character sheet equipment UI
                     *drag.borrow_mut() = None;
+                    self.character_sheet_toggle.set_shown(false);
+                }
+                ConfiguredAction::UseConsumable(..) => {
+                    self.character_sheet_toggle.set_shown(false);
                 }
                 _ => {}
             },
@@ -1947,7 +1951,15 @@ impl UserInterface {
 
             if may_choose_action && self.active_character().can_use_action(base_action) {
                 if let Some(s) = ConfiguredAction::from_base_action(base_action) {
-                    self.set_state(UiState::ConfiguringAction(s));
+                    let already_configuring_it = match &*self.state.borrow() {
+                        UiState::ConfiguringAction(configured_action) => configured_action == &s,
+                        _ => false
+                    };
+                    if already_configuring_it {
+                        self.set_state(UiState::ChoosingAction);
+                    } else {
+                        self.set_state(UiState::ConfiguringAction(s));
+                    }
                 } else {
                     assert!(player_choice.is_none());
                     // The player ends their turn
