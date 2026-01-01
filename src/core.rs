@@ -626,7 +626,10 @@ impl CoreGame {
                 }
             }
 
-            // TODO don't perform movement if the actor died from opportunity attack!
+            if character.is_dead() {
+                println!("Breaking out of movement loop as the mover died");
+                break;
+            }
 
             let prev_position = character.position.get();
             let id = character.id();

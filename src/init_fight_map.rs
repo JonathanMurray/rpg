@@ -326,7 +326,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
              */
 
             for e in &enemies {
-                e.set_weapon(HandType::MainHand, BAD_SWORD);
+                e.set_weapon(HandType::MainHand, BAD_BOW);
             }
 
             characters.extend_from_slice(&enemies);
