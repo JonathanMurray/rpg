@@ -2470,7 +2470,10 @@ impl AbilityResolvedEvent {
         }
         if let Some((_, outcomes)) = &self.area_outcomes {
             for (target_id, outcome) in outcomes {
-                if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+                if matches!(
+                    outcome,
+                    AbilityTargetOutcome::HitEnemy { .. } | AbilityTargetOutcome::AttackedEnemy(..)
+                ) {
                     result.push(*target_id);
                 }
             }
