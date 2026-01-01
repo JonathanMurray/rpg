@@ -5100,8 +5100,7 @@ impl Character {
 
     fn incoming_attack_advantage(&self, reaction: Option<OnAttackedReaction>) -> i32 {
         let mut advantage = 0;
-        for (label, bonus) in self.incoming_attack_bonuses(reaction) {
-            dbg!(label, bonus);
+        for (_label, bonus) in self.incoming_attack_bonuses(reaction) {
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}

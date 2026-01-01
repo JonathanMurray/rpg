@@ -412,6 +412,7 @@ impl ActivityPopup {
 
         if changed_on_attacked_reaction {
             self.refresh_on_attacked_state();
+            return Some(ActivityPopupOutcome::ChangedReaction);
         }
         if changed_ability_enhancements {
             return Some(ActivityPopupOutcome::ChangedAbilityEnhancements);
@@ -726,7 +727,7 @@ impl ActivityPopup {
                 ..
             } => {
                 self.relevant_character_id = *reactor_id;
-                let attacker = self.characters.get(*attacker_id);
+                let attacker = self.characters.get_rc(*attacker_id);
                 let defender = self.characters.get(*reactor_id);
                 lines.push("React (on attacked)".to_string());
                 let attacks_str = format!(
@@ -843,6 +844,7 @@ pub enum ActivityPopupOutcome {
     ChangedAbilityEnhancements,
     ChangedAttackEnhancements,
     ChangedMovementSprint(u32),
+    ChangedReaction,
 }
 
 struct MovementStaminaSlider {

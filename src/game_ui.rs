@@ -1123,6 +1123,8 @@ impl UserInterface {
 
         self.activity_popup.additional_line = None;
 
+        self.game_grid.clear_target_damage_previews();
+
         let mut relevant_action_button = None;
 
         let mut is_reacting = None;
@@ -1163,7 +1165,13 @@ impl UserInterface {
                 }
             }
 
-            UiState::ReactingToAttack { reactor, .. } => {
+            UiState::ReactingToAttack {
+                reactor,
+                hand,
+                attacker,
+                is_within_melee,
+                selected,
+            } => {
                 is_reacting = Some(*reactor);
                 is_reacting_to_attack = true;
             }
@@ -1201,10 +1209,9 @@ impl UserInterface {
 
             if is_reacting_to_attack {
                 self.activity_popup.refresh_on_attacked_state();
+                self.refresh_reaction_state();
             }
         }
-
-        self.game_grid.clear_target_damage_previews();
 
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
@@ -1218,6 +1225,39 @@ impl UserInterface {
 
         self.refresh_selected_action_button();
         self.target_ui.rebuild_character_ui();
+    }
+
+    fn refresh_reaction_state(&mut self) {
+        let UiState::ReactingToAttack {
+            hand,
+            attacker,
+            reactor,
+            is_within_melee,
+            selected,
+        } = &*self.state.borrow()
+        else {
+            unreachable!()
+        };
+        let attacker = self.characters.get_rc(*attacker);
+        let defender = self.characters.get(*reactor);
+
+        dbg!(&selected);
+        let prediction = predict_attack(
+            &self.characters,
+            attacker,
+            *hand,
+            &[],
+            defender,
+            *selected,
+            0,
+        );
+        dbg!(prediction);
+        self.game_grid
+            .set_target_damage_preview(TargetDamagePreview {
+                character_id: defender.id(),
+                min: prediction.min_damage,
+                max: prediction.max_damage,
+            });
     }
 
     fn maybe_refresh_equipment_state(&mut self) {
@@ -1883,6 +1923,9 @@ impl UserInterface {
             Some(ActivityPopupOutcome::ChangedMovementSprint(_sprint_usage)) => {
                 self.game_grid.update_move_speed(self.active_character_id);
             }
+            Some(ActivityPopupOutcome::ChangedReaction) => {
+                self.refresh_reaction_state();
+            }
             None => {}
         }
 
@@ -1953,7 +1996,7 @@ impl UserInterface {
                 if let Some(s) = ConfiguredAction::from_base_action(base_action) {
                     let already_configuring_it = match &*self.state.borrow() {
                         UiState::ConfiguringAction(configured_action) => configured_action == &s,
-                        _ => false
+                        _ => false,
                     };
                     if already_configuring_it {
                         self.set_state(UiState::ChoosingAction);
