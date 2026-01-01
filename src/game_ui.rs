@@ -507,10 +507,12 @@ impl UserInterface {
     pub fn draw(&mut self) -> Option<PlayerChose> {
         let ui_y = screen_height() - 160.0;
 
-        let popup_rectangle = self.activity_popup.last_drawn_rectangle;
+        let popup_rect = self.activity_popup.last_drawn_rectangle;
+        let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
 
         let mouse_pos = mouse_position();
-        let is_grid_obstructed = popup_rectangle.contains(mouse_pos.into())
+        let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
+            || target_ui_rect.contains(mouse_pos.into())
             || self.character_sheet_toggle.is_shown()
             || mouse_pos.1 >= ui_y - 1.0;
         let is_grid_receptive_to_dragging = !is_grid_obstructed;

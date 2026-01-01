@@ -1,12 +1,14 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    hash::DefaultHasher,
     rc::Rc,
     vec,
 };
 
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
+    math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
     texture::Texture2D,
@@ -40,6 +42,7 @@ pub struct TargetUi {
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
     status_textures: HashMap<StatusId, Texture2D>,
+    pub last_drawn_rectangle: Cell<Rect>,
 }
 
 impl TargetUi {
@@ -60,6 +63,7 @@ impl TargetUi {
             hovered_btn: Default::default(),
             buttons: Default::default(),
             status_textures,
+            last_drawn_rectangle: Default::default(),
         }
     }
 
@@ -194,6 +198,12 @@ impl TargetUi {
 
                 let mut children: Vec<Element> = vec![];
                 let mut passive_children: Vec<Element> = vec![];
+
+                let btn = new_btn(ButtonAction::Action(BaseAction::Move));
+                let id = btn.id;
+                let btn = Rc::new(RefCell::new(btn));
+                children.push(Element::RcRefCell(btn.clone()));
+                self.buttons.insert(id, btn);
 
                 if let Some(attack) = char.attack_action() {
                     let btn = new_btn(ButtonAction::Action(BaseAction::Attack(attack)));
@@ -448,7 +458,16 @@ impl TargetUi {
 impl Drawable for TargetUi {
     fn draw(&self, x: f32, y: f32) {
         if self.target.is_some() {
-            self.container.draw(x, y);
+            let (w, h) = self.container.draw(x, y);
+
+            self.last_drawn_rectangle.set(Rect { x, y, w, h });
+        } else {
+            self.last_drawn_rectangle.set(Rect {
+                x,
+                y,
+                w: 0.0,
+                h: 0.0,
+            });
         }
 
         self.draw_action((screen_width() / 2.0, 60.0));

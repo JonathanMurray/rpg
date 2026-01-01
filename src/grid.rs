@@ -340,14 +340,11 @@ impl GameGrid {
         }
     }
 
-    fn routes(&self) -> Ref<IndexMap<(i32, i32), ChartNode>> {
-        let pos: (i32, i32) = self.characters.get(self.active_character_id).pos();
-        let routes = self.pathfind_grid.explore_outward(
-            self.active_character_id,
-            pos,
-            self.movement_range.max(),
-            None,
-        );
+    fn routes(&self, character_id: CharacterId) -> Ref<IndexMap<(i32, i32), ChartNode>> {
+        let pos: (i32, i32) = self.characters.get(character_id).pos();
+        let routes =
+            self.pathfind_grid
+                .explore_outward(character_id, pos, self.movement_range.max(), None);
 
         //dbg!(routes.len());
 
@@ -782,12 +779,10 @@ impl GameGrid {
 
         self.draw_active_character_highlight();
 
-        if matches!(ui_state, UiState::ChoosingAction) {
-            if let Some((char_id, BaseAction::Move)) = hovered_action {
-                self.draw_movement_path_background();
-            }
+        if let Some((char_id, BaseAction::Move)) = hovered_action {
+            self.draw_movement_path_background(char_id);
         } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
-            self.draw_movement_path_background();
+            self.draw_movement_path_background(self.active_character_id);
         }
 
         for character in self.characters.iter() {
@@ -1211,8 +1206,11 @@ impl GameGrid {
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
                     //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
-                    let path =
-                        build_path_from_chart(&self.routes(), active_char_pos, *hovered_route_dst);
+                    let path = build_path_from_chart(
+                        &self.routes(self.active_character_id),
+                        active_char_pos,
+                        *hovered_route_dst,
+                    );
                     self.draw_movement_path(&path.positions, true);
 
                     let remaining_movement = self.active_char_remaining_movement();
@@ -1494,7 +1492,7 @@ impl GameGrid {
         &self,
         mouse_grid_pos: (i32, i32),
     ) -> Option<((i32, i32), ChartNode)> {
-        match self.routes().get(&mouse_grid_pos) {
+        match self.routes(self.active_character_id).get(&mouse_grid_pos) {
             // distance_from_start == 0, means we're hovering the character's current position
             Some(node)
                 if node.distance_from_start > 0.0
@@ -1524,7 +1522,7 @@ impl GameGrid {
         for adjacent_cells in adjacency_lists {
             let mut result: Option<(Position, ChartNode)> = None;
             for adj in adjacent_cells {
-                if let Some(node) = self.routes().get(&adj) {
+                if let Some(node) = self.routes(self.active_character_id).get(&adj) {
                     if node.distance_from_start > 0.0
                         && node.distance_from_start <= self.movement_range.max()
                     {
@@ -1621,6 +1619,7 @@ impl GameGrid {
                     .or(range)
                     .map(|range| (char_id, range, RangeIndicator::ActionTargetRange))
             }
+
             _ => {}
         }
 
@@ -2134,18 +2133,21 @@ impl GameGrid {
         );
     }
 
-    fn draw_movement_path_background(&self) {
+    fn draw_movement_path_background(&self, character_id: CharacterId) {
         //let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        let active_char = self.characters.get(self.active_character_id);
+        let active_char = self.characters.get(character_id);
 
-        for (pos, chart_node) in self.routes().iter() {
-            if chart_node.distance_from_start <= active_char.remaining_movement.get() {
-                self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
-            } else if chart_node.distance_from_start <= self.movement_range.max() {
-                //if self.is_within_grid(*pos) && *pos != active_char_pos {
-                self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), self.cell_w / 20.0);
-                //}
+        if active_char.player_controlled() {
+            // This part only makes sense for player characters, that can choose to move further by paying stamina
+            for (pos, chart_node) in self.routes(character_id).iter() {
+                if chart_node.distance_from_start <= active_char.remaining_movement.get() {
+                    self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+                } else if chart_node.distance_from_start <= self.movement_range.max() {
+                    //if self.is_within_grid(*pos) && *pos != active_char_pos {
+                    self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), self.cell_w / 20.0);
+                    //}
+                }
             }
         }
 
@@ -2158,6 +2160,8 @@ impl GameGrid {
                 self.fill_cell(*pos, Color::new(0.9, 0.1, 0.2, 0.1), 0.0);
             }
         }
+
+        self.draw_move_range_indicator(active_char, active_char.remaining_movement.get());
     }
 
     fn is_within_grid(&self, pos: Position) -> bool {
@@ -2269,12 +2273,12 @@ impl GameGrid {
         );
     }
 
-    /*
-    fn draw_move_range_indicator(&self, origin: Position, range: f32) {
+    fn draw_move_range_indicator(&self, character: &Character, range: f32) {
         let range_floor = range.floor() as i32;
+        let origin = character.pos();
 
         let within = |x: i32, y: i32| {
-            self.routes
+            self.routes(character.id())
                 .get(&(x, y))
                 .map(|route| route.distance_from_start <= range)
                 .unwrap_or(false)
@@ -2304,7 +2308,6 @@ impl GameGrid {
             }
         }
     }
-     */
 
     fn draw_range_indicator(&self, origin: Position, range: Range, indicator: RangeIndicator) {
         let range_ceil = (f32::from(range)).ceil() as i32;
