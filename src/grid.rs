@@ -75,6 +75,7 @@ const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
 const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
+const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
 
@@ -341,10 +342,16 @@ impl GameGrid {
     }
 
     fn routes(&self, character_id: CharacterId) -> Ref<IndexMap<(i32, i32), ChartNode>> {
-        let pos: (i32, i32) = self.characters.get(character_id).pos();
-        let routes =
-            self.pathfind_grid
-                .explore_outward(character_id, pos, self.movement_range.max(), None);
+        let character = self.characters.get(character_id);
+        let pos: (i32, i32) = character.pos();
+        let exploration_range = if character.player_controlled() {
+            self.movement_range.max()
+        } else {
+            character.remaining_movement.get()
+        };
+        let routes = self
+            .pathfind_grid
+            .explore_outward(character_id, pos, exploration_range, None);
 
         //dbg!(routes.len());
 
@@ -777,8 +784,6 @@ impl GameGrid {
 
         let range_indicator = self.determine_range_indicator(ui_state, hovered_action);
 
-        self.draw_active_character_highlight();
-
         if let Some((char_id, BaseAction::Move)) = hovered_action {
             self.draw_movement_path_background(char_id);
         } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
@@ -823,6 +828,17 @@ impl GameGrid {
         let mut labelled_char_ids: HashSet<CharacterId> = Default::default();
 
         for character in self.characters.iter() {
+            if character.id() == self.active_character_id {
+                self.draw_character_highlight(character.id(), ACTIVE_CHARACTER_COLOR, 3.0);
+            }
+            if self.target_damage_previews.contains_key(&character.id()) {
+                self.draw_character_highlight(
+                    character.id(),
+                    CHARACTER_DAMAGE_PREVIEW_COLOR,
+                    self.cell_w * 0.5,
+                );
+            }
+
             self.draw_character(character);
 
             if is_key_down(KeyCode::LeftAlt) {
@@ -1921,15 +1937,14 @@ impl GameGrid {
          */
     }
 
-    fn draw_active_character_highlight(&self) {
-        let (x, y) = self.character_screen_pos(self.characters.get(self.active_character_id));
-        let margin = 3.0;
+    fn draw_character_highlight(&self, character_id: CharacterId, color: Color, margin: f32) {
+        let (x, y) = self.character_screen_pos(self.characters.get(character_id));
         draw_rectangle(
             x - self.cell_w + margin,
             y - self.cell_w + margin,
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
-            ACTIVE_CHARACTER_COLOR,
+            color,
         );
     }
 
@@ -2134,19 +2149,15 @@ impl GameGrid {
     }
 
     fn draw_movement_path_background(&self, character_id: CharacterId) {
-        //let active_char_pos = self.characters.get(self.active_character_id).pos();
+        let character = self.characters.get(character_id);
 
-        let active_char = self.characters.get(character_id);
-
-        if active_char.player_controlled() {
+        if character.player_controlled() {
             // This part only makes sense for player characters, that can choose to move further by paying stamina
             for (pos, chart_node) in self.routes(character_id).iter() {
-                if chart_node.distance_from_start <= active_char.remaining_movement.get() {
+                if chart_node.distance_from_start <= character.remaining_movement.get() {
                     self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
                 } else if chart_node.distance_from_start <= self.movement_range.max() {
-                    //if self.is_within_grid(*pos) && *pos != active_char_pos {
                     self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), self.cell_w / 20.0);
-                    //}
                 }
             }
         }
@@ -2161,7 +2172,7 @@ impl GameGrid {
             }
         }
 
-        self.draw_move_range_indicator(active_char, active_char.remaining_movement.get());
+        self.draw_move_range_indicator(character, character.remaining_movement.get());
     }
 
     fn is_within_grid(&self, pos: Position) -> bool {
@@ -2274,6 +2285,11 @@ impl GameGrid {
     }
 
     fn draw_move_range_indicator(&self, character: &Character, range: f32) {
+        //TODO
+        println!(
+            "Draw move range indicator, char={}, range={}",
+            character.name, range
+        );
         let range_floor = range.floor() as i32;
         let origin = character.pos();
 

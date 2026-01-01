@@ -895,67 +895,9 @@ impl UserInterface {
                 }
 
                 let action_text = match ability.target {
-                    AbilityTarget::Enemy { effect, .. } => {
-                        /*
-                        let ability_roll = ability.roll.unwrap();
-
-                        let chance = match effect {
-                            AbilityNegativeEffect::Spell(spell_enemy_effect) => {
-                                let prob = spell_enemy_effect
-                                    .defense_type
-                                    .map(|def| {
-                                        prob_ability_hit(
-                                            self.active_character(),
-                                            def,
-                                            target_char,
-                                            selected_enhancements,
-                                            ability_roll,
-                                        )
-                                    })
-                                    .unwrap_or(1.0);
-
-                                as_percentage(prob)
-                            }
-                            AbilityNegativeEffect::PerformAttack => {
-                                let enhancements: Vec<(&'static str, AttackEnhancementEffect)> =
-                                    selected_enhancements
-                                        .iter()
-                                        .filter_map(|e| e.attack_enhancement_effect())
-                                        .collect();
-
-                                let reaction = None;
-
-                                let hit_chance = prob_attack_hit(
-                                    self.active_character(),
-                                    HandType::MainHand,
-                                    target_char,
-                                    &enhancements,
-                                    reaction,
-                                );
-                                let full_penetration_chance = prob_attack_penetrating_hit(
-                                    self.active_character(),
-                                    HandType::MainHand,
-                                    target_char,
-                                    &enhancements,
-                                    reaction,
-                                );
-                                if hit_chance == full_penetration_chance {
-                                    as_percentage(hit_chance)
-                                } else {
-                                    format!(
-                                        "{} / {}",
-                                        as_percentage(hit_chance),
-                                        as_percentage(full_penetration_chance)
-                                    )
-                                }
-                            }
-                        };
-                         */
-
-                        // TODO: The above code should no longer be needed, since we instead use predict_ability further down in the code?
-                        format!("TODO: this should not be shown!")
+                    AbilityTarget::Enemy { .. } | AbilityTarget::Ally { .. } => {
+                        ability.name.to_string()
                     }
-                    AbilityTarget::Ally { .. } => ability.name.to_string(),
                     AbilityTarget::None { .. } | AbilityTarget::Area { .. } => {
                         unreachable!()
                     }
