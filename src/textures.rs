@@ -34,7 +34,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::PinkMan, "character.png"),
         (SpriteId::AlsoWeirdOrangeMan, "character2.png"),
         (SpriteId::WeirdOrangeMan, "character3.png"),
-        (SpriteId::Alice, "character4.png"),
+        (SpriteId::Alice, "alice.png"),
         (SpriteId::Bob, "character5.png"),
         (SpriteId::Clara, "clara.png"),
         (SpriteId::Skeleton, "skeleton.png"),

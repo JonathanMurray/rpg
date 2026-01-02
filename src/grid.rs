@@ -619,6 +619,8 @@ impl GameGrid {
 
         let game_time = get_time();
 
+        let mut weapon_rotation_modifier = 0.0;
+
         for animation in self
             .character_animations
             .iter()
@@ -652,6 +654,13 @@ impl GameGrid {
                 AnimationKind::Act { random_rotation } => {
                     y -= self.cell_w * 0.07;
                     params.rotation = random_rotation;
+                    weapon_rotation_modifier = PI * 0.2;
+                    if !character.is_facing_east.get() {
+                        weapon_rotation_modifier *= -1.0;
+                    }
+                    if character.has_equipped_ranged_weapon() {
+                        weapon_rotation_modifier *= -1.0;
+                    }
                 }
                 AnimationKind::HealthLost { .. } => {
                     // This affects how the healthbar is drawn
@@ -672,7 +681,11 @@ impl GameGrid {
 
         if let Some(weapon) = character.weapon(HandType::MainHand) {
             if let Some(texture) = weapon.sprite {
-                draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params.clone());
+                let weapon_params = DrawTextureParams {
+                    rotation: params.rotation + weapon_rotation_modifier,
+                    ..params
+                };
+                draw_texture_ex(&self.sprites[&texture], x, y, WHITE, weapon_params);
             }
         }
 
