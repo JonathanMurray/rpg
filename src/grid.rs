@@ -2018,7 +2018,8 @@ impl GameGrid {
                         Some(end_thickness) => thickness + (end_thickness - thickness) * t,
                         None => *thickness,
                     };
-                    draw_line(from.0, from.1, to.0, to.1, thickness, *color);
+                    draw_dashed_line(from, to, thickness, *color, 5.0, None);
+                    //draw_line(from.0, from.1, to.0, to.1, thickness, *color);
                 }
             }
         }
