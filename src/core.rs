@@ -59,6 +59,8 @@ impl CoreGame {
     }
 
     pub async fn run(mut self) -> Vec<Character> {
+        self.log("The battle begins").await;
+
         for character in self.characters.iter() {
             character.update_player_encumbrance();
             character.action_points.current.set(ACTION_POINTS_PER_TURN);

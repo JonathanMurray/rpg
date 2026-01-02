@@ -1622,11 +1622,11 @@ impl GameGrid {
 
         match hovered_base_action {
             Some((char_id, BaseAction::Attack(attack))) => {
-                let range = self
-                    .characters
-                    .get(char_id)
-                    .attack_range(attack.hand, iter::empty());
-                indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+                let character = self.characters.get(char_id);
+                if character.weapon(attack.hand).is_some() {
+                    let range = character.attack_range(attack.hand, iter::empty());
+                    indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+                }
             }
             Some((char_id, BaseAction::UseAbility(ability))) => {
                 let radius = ability.target.radius(&[]);
