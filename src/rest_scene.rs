@@ -16,6 +16,7 @@ use crate::{
     base_ui::draw_text_rounded,
     core::Character,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
+    sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
 };
 
@@ -33,6 +34,8 @@ pub async fn run_rest_loop(
 
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
+    let sound_player = SoundPlayer::new().await;
+
     {
         let (screen_w, screen_h) = screen_size();
 
@@ -42,6 +45,7 @@ pub async fn run_rest_loop(
             equipment_icons,
             icons.clone(),
             portrait_textures,
+            sound_player,
         );
 
         let transition_duration = 0.5;

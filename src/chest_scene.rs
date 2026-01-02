@@ -26,6 +26,7 @@ use crate::{
     },
     equipment_ui::equipment_tooltip,
     non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
+    sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
@@ -40,6 +41,8 @@ pub async fn run_chest_loop(
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
 
+    let sound_player = SoundPlayer::new().await;
+
     {
         let (screen_w, screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
@@ -50,6 +53,7 @@ pub async fn run_chest_loop(
             equipment_icons,
             icons.clone(),
             portrait_textures,
+            sound_player,
         );
 
         let transition_duration = 0.5;

@@ -21,6 +21,7 @@ use crate::core::EquipmentSlotRole;
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
 use crate::game_ui::{ConfiguredAction, UiState};
+use crate::sounds::SoundPlayer;
 use crate::stats_ui::build_character_stats_table;
 use crate::{
     action_button::ActionButton,
@@ -55,6 +56,7 @@ impl CharacterSheet {
         passive_skill_buttons: Vec<Rc<ActionButton>>,
         conditions_list: ConditionsList,
         screen_position: Rc<RefCell<(f32, f32)>>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let spell_book = build_spell_book(
             font,
@@ -85,6 +87,7 @@ impl CharacterSheet {
             &character,
             equipment_icons.clone(),
             false,
+            sound_player,
         )));
 
         let contents = Element::Container(Container {

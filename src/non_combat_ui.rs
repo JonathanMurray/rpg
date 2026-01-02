@@ -23,6 +23,7 @@ use crate::{
     core::{BaseAction, Character, HandType},
     equipment_ui::{EquipmentDrag, EquipmentSection},
     game_ui::ResourceBars,
+    sounds::SoundPlayer,
     stats_ui::build_character_stats_table,
     textures::{EquipmentIconId, IconId, PortraitId},
 };
@@ -94,6 +95,7 @@ impl NonCombatPartyUi {
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         icons: HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let portrait_row = PortraitRow::new(characters, portrait_textures);
         let bottom_panels: Vec<NonCombatCharacterUi> = characters
@@ -105,6 +107,7 @@ impl NonCombatPartyUi {
                     equipment_icons,
                     &icons,
                     portrait_textures,
+                    sound_player.clone(),
                 )
             })
             .collect();
@@ -167,6 +170,7 @@ impl NonCombatCharacterUi {
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         icons: &HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let (screen_w, _screen_h) = screen_size();
 
@@ -280,6 +284,7 @@ impl NonCombatCharacterUi {
             &character,
             equipment_icons.clone(),
             true,
+            sound_player,
         )));
 
         let bottom_panel = Element::Container(Container {

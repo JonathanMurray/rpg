@@ -423,6 +423,7 @@ impl UserInterface {
             &simple_font,
             characters.iter(),
             status_textures.clone(),
+            sound_player.clone(),
         );
 
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
@@ -2145,6 +2146,7 @@ fn build_character_uis<'a>(
     simple_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
     status_textures: HashMap<StatusId, Texture2D>,
+    sound_player: SoundPlayer,
 ) -> HashMap<u32, CharacterUi> {
     let mut next_button_id = 1;
 
@@ -2166,6 +2168,7 @@ fn build_character_uis<'a>(
             &mut next_button_id,
             status_textures.clone(),
             Rc::clone(&character_sheet_screen_pos),
+            sound_player.clone(),
         );
 
         character_uis.insert(character.id(), character_ui);
@@ -2182,6 +2185,7 @@ fn build_character_ui(
     next_button_id: &mut u32,
     status_textures: HashMap<StatusId, Texture2D>,
     character_sheet_screen_pos: Rc<RefCell<(f32, f32)>>,
+    sound_player: SoundPlayer,
 ) -> CharacterUi {
     let mut new_button =
         |btn_action, character: Option<Rc<Character>>, in_character_sheet: bool| {
@@ -2316,6 +2320,7 @@ fn build_character_ui(
         passive_buttons_for_character_sheet,
         ConditionsList::new(simple_font.clone(), vec![], status_textures.clone()),
         character_sheet_screen_pos,
+        sound_player,
     );
 
     let mut buttons = basic_buttons;

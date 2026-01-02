@@ -14,6 +14,8 @@ impl SoundPlayer {
         for (id, name) in &[
             (SoundId::HoverButton, "click_2"),
             (SoundId::ClickButton, "click_3"),
+            (SoundId::DragEquipment, "click_2"),
+            (SoundId::DropEquipment, "click_3"),
             (SoundId::Explosion, "explosion"),
             (SoundId::Powerup, "powerup"),
             (SoundId::MeleeAttack, "melee_attack"),
@@ -43,6 +45,8 @@ impl SoundPlayer {
 pub enum SoundId {
     HoverButton,
     ClickButton,
+    DragEquipment,
+    DropEquipment,
     Explosion,
     Powerup,
     MeleeAttack,

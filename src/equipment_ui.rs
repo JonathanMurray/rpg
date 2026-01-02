@@ -36,6 +36,7 @@ use crate::{
         WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
+    sounds::{SoundId, SoundPlayer},
     textures::EquipmentIconId,
 };
 
@@ -193,6 +194,7 @@ pub struct EquipmentSection {
     character: Rc<Character>,
     equipment_icons: HashMap<EquipmentIconId, Texture2D>,
     include_stash: bool,
+    sound_player: SoundPlayer,
 }
 
 impl EquipmentSection {
@@ -201,6 +203,7 @@ impl EquipmentSection {
         character: &Rc<Character>,
         equipment_icons: HashMap<EquipmentIconId, Texture2D>,
         include_stash: bool,
+        sound_player: SoundPlayer,
     ) -> Self {
         let (inventory_section, mut equipment_slots) = build_inventory_section(
             font,
@@ -308,6 +311,7 @@ impl EquipmentSection {
             character: Rc::clone(character),
             equipment_icons,
             include_stash,
+            sound_player,
         }
     }
 
@@ -452,6 +456,7 @@ impl EquipmentSection {
                     }
                 } else if is_mouse_button_pressed(MouseButton::Left) {
                     if slot.content.is_some() {
+                        self.sound_player.play(SoundId::DragEquipment);
                         drag = Some(EquipmentDrag {
                             from_idx: idx,
                             to_idx: None,
@@ -481,6 +486,7 @@ impl EquipmentSection {
 
                                         self.character.set_equipment(entry_a, role_b);
                                     }
+                                    self.sound_player.play(SoundId::DropEquipment);
                                     drag = None;
                                 }
                             }

@@ -570,7 +570,7 @@ impl PlayerCharacterPortrait {
             ..Default::default()
         });
 
-        let done_text = TextLine::new("Done", 18, WHITE, Some(font.clone()));
+        let done_text = TextLine::new("Done", 18, LIGHTGRAY, Some(font.clone()));
         let end_turn_text = TextLine::new("End turn", 18, WHITE, Some(font.clone()));
 
         Self {
@@ -653,7 +653,7 @@ impl Drawable for PlayerCharacterPortrait {
 
         let button_y = y + h + 5.0;
         if self.character.has_taken_a_turn_this_round.get() {
-            draw_rectangle_lines(x, button_y, w, button_h, 2.0, GOLD);
+            draw_rectangle_lines(x, button_y, w, button_h, 1.0, GRAY);
             self.done_text.draw(
                 x + w / 2.0 - self.done_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,

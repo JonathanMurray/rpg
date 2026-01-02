@@ -34,6 +34,7 @@ use crate::{
         SMITE, SWEEP_ATTACK,
     },
     non_combat_ui::{NonCombatCharacterUi, PortraitRow},
+    sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,
 };
@@ -92,6 +93,7 @@ impl RewardSelectionUi {
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         rewards: Vec<(ButtonAction, Option<&'static str>)>,
         next_button_id: &mut u32,
+        sound_player: SoundPlayer,
     ) -> Self {
         let bottom_panel = NonCombatCharacterUi::new(
             character.clone(),
@@ -99,6 +101,7 @@ impl RewardSelectionUi {
             equipment_icons,
             &icons,
             portrait_textures,
+            sound_player,
         );
 
         let event_queue = Rc::new(RefCell::new(vec![]));
@@ -390,6 +393,7 @@ pub async fn run_victory_loop(
 ) -> Vec<Character> {
     let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
     let mut selected_learnings: Vec<Option<Learning>> = vec![];
+    let sound_player = SoundPlayer::new().await;
     {
         let mut portrait_row = PortraitRow::new(&characters, portrait_textures);
 
@@ -496,6 +500,7 @@ pub async fn run_victory_loop(
                     portrait_textures,
                     rewards.clone(),
                     &mut next_button_id,
+                    sound_player.clone(),
                 )
             })
             .collect();
