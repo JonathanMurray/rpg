@@ -1683,12 +1683,13 @@ impl UserInterface {
             self.sound_player.play(SoundId::ShootArrow);
         }
 
-        self.game_grid.animate_character_acting(attacker, 0.2);
-
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
         let projectile_duration = 0.03 * distance_between(attacker_pos, target_pos);
+
+        self.game_grid
+            .animate_character_acting(attacker, projectile_duration.max(0.2));
 
         self.game_grid.add_effect(
             attacker_pos,
