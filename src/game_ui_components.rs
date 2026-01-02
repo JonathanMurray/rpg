@@ -383,7 +383,7 @@ pub struct PlayerPortraits {
 
 pub struct PlayerPortraitOutcome {
     pub changed_character: bool,
-    pub ended_turn: bool,
+    pub clicked_end_turn: bool,
 }
 
 impl PlayerPortraits {
@@ -499,7 +499,7 @@ impl PlayerPortraits {
 
         PlayerPortraitOutcome {
             changed_character,
-            ended_turn,
+            clicked_end_turn: ended_turn,
         }
     }
 
@@ -675,7 +675,6 @@ impl Drawable for PlayerCharacterPortrait {
             if Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
                 draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
                 if is_mouse_button_pressed(MouseButton::Left) {
-                    println!("CHARACTER DONE CLICKED");
                     self.has_clicked_end_turn.set(true);
                 }
             }

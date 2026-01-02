@@ -607,6 +607,7 @@ impl GameGrid {
                 )
                     .into(),
             ),
+            flip_x: character.is_facing_east.get(),
             ..Default::default()
         };
 

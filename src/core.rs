@@ -366,6 +366,8 @@ impl CoreGame {
                             dbg!(chooses_to_use_opportunity_attack);
 
                             if chooses_to_use_opportunity_attack {
+                                reactor.set_facing_toward(attacker.pos());
+
                                 self.ui_handle_event(
                                     GameEvent::CharacterReactedWithOpportunityAttack {
                                         reactor: reactor.id(),
@@ -422,6 +424,8 @@ impl CoreGame {
 
                     let enhancements: Vec<(&str, AttackEnhancementEffect)> =
                         enhancements.iter().map(|e| (e.name, e.effect)).collect();
+
+                    attacker.set_facing_toward(defender.pos());
 
                     self.ui_handle_event(GameEvent::AttackWasInitiated {
                         actor: self.active_character_id,
@@ -599,6 +603,8 @@ impl CoreGame {
                         dbg!(chooses_to_use_opportunity_attack);
 
                         if chooses_to_use_opportunity_attack {
+                            reactor.set_facing_toward(character.pos());
+
                             self.ui_handle_event(
                                 GameEvent::CharacterReactedWithOpportunityAttack {
                                     reactor: reactor.id(),
@@ -640,6 +646,8 @@ impl CoreGame {
             self.pathfind_grid
                 .set_occupied(new_position, Some(Occupation::Character(id)));
 
+            self.active_character().set_facing_toward(new_position);
+
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
                 from: prev_position,
@@ -647,7 +655,7 @@ impl CoreGame {
             })
             .await;
 
-            self.active_character().position.set(new_position);
+            self.active_character().set_position(new_position);
         }
 
         dbg!(self.active_character().pos());
@@ -905,6 +913,7 @@ impl CoreGame {
                     ));
 
                     if let Some(game) = real_game {
+                        caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
                             ability,
@@ -989,6 +998,7 @@ impl CoreGame {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
                     if let Some(game) = real_game {
+                        caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
                             ability,
@@ -1025,6 +1035,8 @@ impl CoreGame {
 
                     let target_pos = selected_target.unwrap_position();
                     assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
+
+                    caster.set_facing_toward(target_pos);
 
                     let ability_roll = maybe_ability_roll.unwrap();
                     let (_ability_result, dice_roll_line) = ability_roll.unwrap_roll();
@@ -1423,6 +1435,7 @@ impl CoreGame {
 
                 let reaction = None;
                 let roll_modifier = ability_roll.unwrap_attack_bonus();
+                caster.set_facing_toward(target.pos());
                 let event: AttackedEvent = Self::perform_attack(
                     caster,
                     HandType::MainHand,
@@ -3854,6 +3867,8 @@ pub struct Character {
     engagement_target: Cell<Option<CharacterId>>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
+
+    pub is_facing_east: Cell<bool>,
 }
 
 impl Character {
@@ -3922,7 +3937,21 @@ impl Character {
             is_engaged_by: Default::default(),
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
+            is_facing_east: Cell::new(false),
         }
+    }
+
+    fn set_facing_toward(&self, position: Position) {
+        let dx = position.0 - self.position.get().0;
+        if dx > 0 {
+            self.is_facing_east.set(true);
+        } else if dx < 0 {
+            self.is_facing_east.set(false);
+        }
+    }
+
+    fn set_position(&self, new_pos: Position) {
+        self.position.set(new_pos);
     }
 
     pub fn learn_ability(&self, ability: Ability) {

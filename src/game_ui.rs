@@ -588,14 +588,19 @@ impl UserInterface {
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
         }
-        if portrait_outcome.ended_turn {
-            if player_chose.is_some() {
-                println!(
-                    "Warning: overriding {:?} with new choice (end turn)",
-                    player_chose
-                );
+        if portrait_outcome.clicked_end_turn {
+            if matches!(
+                *self.state.borrow(),
+                UiState::ChoosingAction | UiState::ConfiguringAction(..)
+            ) {
+                if player_chose.is_some() {
+                    println!(
+                        "Warning: overriding {:?} with new choice (end turn)",
+                        player_chose
+                    );
+                }
+                player_chose = Some(PlayerChose::Action(None));
             }
-            player_chose = Some(PlayerChose::Action(None));
         }
 
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
