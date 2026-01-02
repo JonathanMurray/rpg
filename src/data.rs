@@ -262,7 +262,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
     range: WeaponRange::Ranged(15.5),
-    action_point_cost: 3,
+    action_point_cost: 4,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,

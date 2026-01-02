@@ -6,8 +6,9 @@ use std::{
 
 use macroquad::{
     audio::Sound,
-    color::SKYBLUE,
+    color::{MAGENTA, SKYBLUE},
     input::{is_key_pressed, KeyCode},
+    math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
     text::{measure_text, TextParams},
     texture::{draw_texture_ex, DrawTextureParams},
@@ -380,6 +381,11 @@ pub struct PlayerPortraits {
     sound_player: SoundPlayer,
 }
 
+pub struct PlayerPortraitOutcome {
+    pub changed_character: bool,
+    pub ended_turn: bool,
+}
+
 impl PlayerPortraits {
     pub fn new(
         characters: &Characters,
@@ -463,12 +469,13 @@ impl PlayerPortraits {
         self.set_active_character(game.active_character_id);
     }
 
-    pub fn draw(&self, x: f32, y: f32) -> bool {
+    pub fn draw(&self, x: f32, y: f32) -> PlayerPortraitOutcome {
         self.row.draw(x, y);
 
         let prev_selected = self.selected_i.get();
 
         let mut change_attempt = false;
+        let mut ended_turn = false;
 
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.take() {
@@ -478,6 +485,9 @@ impl PlayerPortraits {
                 change_attempt = true;
                 break;
             }
+            if portrait.borrow().has_clicked_end_turn.take() {
+                ended_turn = true;
+            }
         }
 
         if is_key_pressed(KeyCode::Tab) {
@@ -485,8 +495,12 @@ impl PlayerPortraits {
             change_attempt = true;
         }
 
-        // Return true if we did truly change
-        change_attempt && self.selected_i.get() != prev_selected
+        let changed_character = change_attempt && self.selected_i.get() != prev_selected;
+
+        PlayerPortraitOutcome {
+            changed_character,
+            ended_turn,
+        }
     }
 
     fn toggle_active_id(&self) {
@@ -514,6 +528,9 @@ struct PlayerCharacterPortrait {
     status_column: Element,
     status_rects: Vec<Rc<RefCell<Rectangle>>>,
     status_textures: HashMap<StatusId, Texture2D>,
+    done_text: TextLine,
+    end_turn_text: TextLine,
+    pub has_clicked_end_turn: Cell<bool>,
 }
 
 impl PlayerCharacterPortrait {
@@ -523,7 +540,7 @@ impl PlayerCharacterPortrait {
         texture: Texture2D,
         status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
-        let mut text = TextLine::new(character.name, 20, WHITE, Some(font));
+        let mut text = TextLine::new(character.name, 20, WHITE, Some(font.clone()));
         text.set_depth(BLACK, 2.0);
 
         let mut status_rects = vec![];
@@ -553,6 +570,9 @@ impl PlayerCharacterPortrait {
             ..Default::default()
         });
 
+        let done_text = TextLine::new("Done", 18, WHITE, Some(font.clone()));
+        let end_turn_text = TextLine::new("End turn", 18, WHITE, Some(font.clone()));
+
         Self {
             character: Rc::clone(character),
             text,
@@ -564,6 +584,9 @@ impl PlayerCharacterPortrait {
             status_column,
             status_rects,
             status_textures,
+            done_text,
+            end_turn_text,
+            has_clicked_end_turn: Cell::new(false),
         }
     }
 
@@ -625,6 +648,18 @@ impl Drawable for PlayerCharacterPortrait {
 
         //self.text.draw(self.padding + x, self.padding + y);
 
+        let button_h = 25.0;
+        let button_text_vert_pad = 6.0;
+
+        let button_y = y + h + 5.0;
+        if self.character.has_taken_a_turn_this_round.get() {
+            draw_rectangle_lines(x, button_y, w, button_h, 2.0, GOLD);
+            self.done_text.draw(
+                x + w / 2.0 - self.done_text.size().0 / 2.0,
+                button_y + button_text_vert_pad,
+            );
+        }
+
         if self.active_character.get() {
             let x_mid = x + w / 2.0;
             let arrow_w = 14.0;
@@ -635,6 +670,20 @@ impl Drawable for PlayerCharacterPortrait {
             let v3 = (x_mid, y - margin).into();
             draw_triangle(v1, v2, v3, GOLD);
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
+
+            draw_rectangle_lines(x, button_y, w, button_h, 1.0, LIGHTGRAY);
+            if Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
+                draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
+                if is_mouse_button_pressed(MouseButton::Left) {
+                    println!("CHARACTER DONE CLICKED");
+                    self.has_clicked_end_turn.set(true);
+                }
+            }
+
+            self.end_turn_text.draw(
+                x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
+                button_y + button_text_vert_pad,
+            );
         }
 
         let (mouse_x, mouse_y) = mouse_position();
@@ -674,7 +723,7 @@ pub struct Log {
 
 impl Log {
     pub fn new(font: Font) -> Self {
-        let h = 130.0;
+        let h = 200.0;
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
@@ -684,7 +733,7 @@ impl Log {
                 align: Align::End,
                 scroll: Some(ContainerScroll::default()),
                 //min_width: Some(450.0),
-                min_width: Some(300.0),
+                min_width: Some(430.0),
                 min_height: Some(h),
                 max_height: Some(h),
                 style: Style {
@@ -699,6 +748,10 @@ impl Log {
             font,
             padding: 10.0,
         }
+    }
+
+    pub fn width(&self) -> f32 {
+        self.container.size().0 + self.padding * 2.0
     }
 
     pub fn add(&mut self, text: impl Into<String>) {
@@ -958,8 +1011,8 @@ impl Drawable for ResourceBar {
         match self.layout {
             LayoutDirection::Horizontal => {
                 for i in 0..self.max {
-                    if i < self.current + self.reserved {
-                        if i >= self.current {
+                    if i < self.current {
+                        if i >= self.current.saturating_sub(self.reserved) {
                             draw_rectangle(x0, y0, cell_size.0, cell_size.1, WHITE);
                         } else {
                             draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
@@ -1048,20 +1101,23 @@ impl LabelledResourceBar {
     pub fn new(current: u32, max: u32, label: &'static str, color: Color, font: Font) -> Self {
         assert!(current <= max);
 
-        let cell_w = 15.0;
-        let max_h = 70.0;
-        let cell_h = if max <= 7 {
-            max_h / 7.0
+        let cell_h = 12.0;
+        let max_w = 70.0;
+        /*
+        let cell_w = if max <= 7 {
+            max_w / 7.0
         } else {
-            max_h / max as f32
+            max_w / max as f32
         };
+         */
+        let cell_w = max_w / max as f32;
         let bar = Rc::new(RefCell::new(ResourceBar {
             current,
             reserved: 0,
             max,
             color,
             cell_size: (cell_w, cell_h),
-            layout: LayoutDirection::Vertical,
+            layout: LayoutDirection::Horizontal,
         }));
         let cloned_bar = Rc::clone(&bar);
 
@@ -1075,8 +1131,8 @@ impl LabelledResourceBar {
         let label_text = TextLine::new(label, 16, WHITE, Some(font.clone()));
 
         let list = Container {
-            layout_dir: LayoutDirection::Vertical,
-            align: Align::Center,
+            layout_dir: LayoutDirection::Horizontal,
+            align: Align::Start,
             margin: 5.0,
             children: vec![
                 Element::RcRefCell(cloned_bar),

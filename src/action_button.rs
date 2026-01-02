@@ -326,11 +326,6 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
             description: Some("Use a consumable from your inventory (e.g. a potion)."),
             ..Default::default()
         },
-        BaseAction::EndTurn => Tooltip {
-            header: "End your turn".to_string(),
-            description: Some("Regain 3 AP and some of your stamina."),
-            ..Default::default()
-        },
     }
 }
 
@@ -606,6 +601,8 @@ pub struct ActionButton {
     pub context: Option<ButtonContext>,
 }
 
+pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
+
 impl ActionButton {
     pub fn new(
         action: ButtonAction,
@@ -622,8 +619,10 @@ impl ActionButton {
         let tooltip = button_action_tooltip(&action);
 
         let (size, texture_draw_size) = match action {
-            ButtonAction::Proceed | ButtonAction::Passive(..) => ((64.0, 52.0), (60.0, 48.0)),
-            _ => ((64.0, 64.0), (60.0, 48.0)),
+            ButtonAction::Proceed | ButtonAction::Passive(..) => {
+                ((REGULAR_ACTION_BUTTON_SIZE.0, 52.0), (60.0, 48.0))
+            }
+            _ => (REGULAR_ACTION_BUTTON_SIZE, (60.0, 48.0)),
         };
 
         let style = Style {
@@ -1089,7 +1088,6 @@ impl ButtonAction {
                 BaseAction::Move => "Move",
                 BaseAction::ChangeEquipment => "Change equipment",
                 BaseAction::UseConsumable => "Use consumable",
-                BaseAction::EndTurn => "End turn",
             },
             ButtonAction::OnAttackedReaction(reaction) => reaction.name,
             ButtonAction::OnHitReaction(reaction) => reaction.name,
@@ -1125,7 +1123,6 @@ impl ButtonAction {
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
                 BaseAction::UseConsumable => IconId::UseConsumable,
-                BaseAction::EndTurn => IconId::EndTurn,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::AbilityEnhancement(enhancement) => enhancement.icon,

@@ -3271,7 +3271,6 @@ pub enum BaseAction {
     Move,
     ChangeEquipment,
     UseConsumable,
-    EndTurn,
     // TODO add "DelayTurn" action that lets you put yourself one step later in the
     // turn order
 }
@@ -3290,7 +3289,6 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
             BaseAction::UseConsumable => 1,
-            BaseAction::EndTurn => -(ACTION_POINTS_PER_TURN as i32),
         }
     }
 
@@ -3301,7 +3299,6 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
-            BaseAction::EndTurn => 0,
         }
     }
 
@@ -3312,7 +3309,6 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
-            BaseAction::EndTurn => 0,
         }
     }
 }
@@ -3918,7 +3914,6 @@ impl Character {
                 }),
                 BaseAction::ChangeEquipment,
                 BaseAction::UseConsumable,
-                BaseAction::EndTurn,
             ]),
             known_attacked_reactions: Default::default(),
             known_on_hit_reactions: Default::default(),
@@ -4543,7 +4538,6 @@ impl Character {
                 self.has_any_consumable_in_inventory()
                     && ap as i32 >= BaseAction::UseConsumable.action_point_cost()
             }
-            BaseAction::EndTurn => true,
         }
     }
 

@@ -7,8 +7,10 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
+    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
     input::{get_keys_pressed, is_key_down, is_key_pressed, mouse_position, KeyCode},
+    math::Rect,
+    miniquad::gl::GL_RGB5_A1,
     shapes::{draw_line, draw_rectangle},
     text::{draw_text, Font},
     texture::Texture2D,
@@ -20,10 +22,10 @@ use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams}
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
-        ButtonSelected, InternalUiEvent,
+        ButtonSelected, InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
+    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
@@ -253,7 +255,6 @@ impl ConfiguredAction {
                 drag: Rc::new(RefCell::new(None)),
             }),
             BaseAction::UseConsumable => Some(Self::UseConsumable(None)),
-            BaseAction::EndTurn => None,
         }
     }
 
@@ -342,7 +343,6 @@ pub struct CharacterUi {
     action_points_row: ActionPointsRow,
     pub hoverable_buttons: Vec<Rc<ActionButton>>,
     actions_section: Container,
-    end_turn_button: Rc<ActionButton>,
     pub character_sheet: CharacterSheet,
     health_bar: Rc<RefCell<LabelledResourceBar>>,
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
@@ -350,14 +350,26 @@ pub struct CharacterUi {
     pub resource_bars: Container,
 }
 
+fn resources_mid_x() -> f32 {
+    screen_width() / 2.0 - 90.0
+}
+
 impl CharacterUi {
     pub fn draw(&self, y: f32) {
         let y0 = y + 5.0;
-        self.actions_section.draw(10.0, y0);
-        self.end_turn_button.draw(300.0, y0 + 32.0);
-        self.action_points_row.draw(410.0, y0);
-        self.resource_bars
-            .draw(460.0 - self.resource_bars.size().0 / 2.0, y0 + 35.0);
+        self.actions_section.draw(
+            screen_width() / 2.0 - self.actions_section.size().0 / 2.0,
+            y0,
+        );
+
+        self.action_points_row.draw(
+            resources_mid_x() - self.action_points_row.size().0 / 2.0,
+            screen_height() - 140.0,
+        );
+        self.resource_bars.draw(
+            resources_mid_x() - self.resource_bars.size().0 / 2.0,
+            screen_height() - 110.0,
+        );
     }
 }
 
@@ -441,7 +453,7 @@ impl UserInterface {
             &characters,
             first_player_character_id,
             active_character_id,
-            decorative_font.clone(),
+            simple_font.clone(),
             portrait_textures.clone(),
             status_textures.clone(),
             sound_player.clone(),
@@ -450,7 +462,7 @@ impl UserInterface {
         let character_sheet_toggle = CharacterSheetToggle {
             shown: Cell::new(false),
             text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
-            padding: 10.0,
+            padding: 7.0,
             sound_player: sound_player.clone(),
         };
 
@@ -505,7 +517,7 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) -> Option<PlayerChose> {
-        let ui_y = screen_height() - 160.0;
+        let ui_y = screen_height() - 230.0;
 
         let popup_rect = self.activity_popup.last_drawn_rectangle;
         let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
@@ -543,13 +555,18 @@ impl UserInterface {
         draw_rectangle(0.0, ui_y, screen_width(), screen_height() - ui_y, BLACK);
         draw_line(0.0, ui_y, screen_width(), ui_y, 1.0, ORANGE);
 
-        self.activity_popup.draw(20.0, ui_y + 1.0);
+        self.activity_popup.draw(570.0, ui_y + 1.0);
 
-        let did_change_selected_character = self.player_portraits.draw(570.0, ui_y + 25.0);
-        self.character_sheet_toggle.draw(570.0, ui_y + 110.0);
+        let portrait_outcome = self
+            .player_portraits
+            .draw(screen_width() / 2.0, screen_height() - 120.0);
+        self.character_sheet_toggle.draw(
+            resources_mid_x() - self.character_sheet_toggle.size().0 / 2.0,
+            screen_height() - 35.0,
+        );
 
         let selected_character_id = self.player_portraits.selected_id();
-        if did_change_selected_character {
+        if portrait_outcome.changed_character {
             self.on_new_selected_character();
             if matches!(*self.state.borrow(), UiState::ConfiguringAction(..)) {
                 self.set_state(UiState::ChoosingAction);
@@ -562,17 +579,29 @@ impl UserInterface {
                 && !new_selected_char.has_taken_a_turn_this_round.get()
             {
                 if player_chose.is_some() {
-                    println!("Warning: overriding {:?} with new choice", player_chose);
+                    println!(
+                        "Warning: overriding {:?} with new choice (switch char)",
+                        player_chose
+                    );
                 }
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
+        }
+        if portrait_outcome.ended_turn {
+            if player_chose.is_some() {
+                println!(
+                    "Warning: overriding {:?} with new choice (end turn)",
+                    player_chose
+                );
+            }
+            player_chose = Some(PlayerChose::Action(None));
         }
 
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
 
         character_ui.draw(ui_y + 5.0);
 
-        let log_x = 950.0;
+        let log_x = screen_width() - self.log.width();
         self.log.draw(log_x, ui_y);
 
         self.log.draw_tooltips(log_x, ui_y);
@@ -2176,7 +2205,6 @@ fn build_character_ui(
     let mut hoverable_buttons = vec![];
     let mut basic_buttons = vec![];
     let mut ability_buttons = vec![];
-    let mut end_turn_button = None;
 
     let mut attack_button_for_character_sheet = None;
     let mut ability_buttons_for_character_sheet = vec![];
@@ -2244,7 +2272,6 @@ fn build_character_ui(
                     .map(|key| (*key, simple_font.clone()));
                 basic_buttons.push(btn);
             }
-            BaseAction::EndTurn => end_turn_button = Some(btn),
         }
     }
 
@@ -2291,29 +2318,26 @@ fn build_character_ui(
         character_sheet_screen_pos,
     );
 
-    let mut upper_buttons = basic_buttons;
-    let mut lower_buttons = ability_buttons;
-    while lower_buttons.len() > upper_buttons.len() + 1 {
-        upper_buttons.push(lower_buttons.pop().unwrap());
+    let mut buttons = basic_buttons;
+    buttons.extend_from_slice(&ability_buttons);
+    let mut buttons: Vec<Element> = buttons.into_iter().map(|btn| Element::Rc(btn)).collect();
+    let button_placeholder = Rectangle {
+        size: REGULAR_ACTION_BUTTON_SIZE,
+        style: Style {
+            border_color: Some(GRAY),
+            ..Default::default()
+        },
+        texture: None,
+    };
+    while buttons.len() < 10 {
+        buttons.push(Element::Rect(button_placeholder.clone()));
     }
-
-    let upper_row = buttons_row(
-        upper_buttons
-            .into_iter()
-            .map(|btn| Element::Rc(btn))
-            .collect(),
-    );
-    let lower_row = buttons_row(
-        lower_buttons
-            .into_iter()
-            .map(|btn| Element::Rc(btn))
-            .collect(),
-    );
+    let button_row = buttons_row(buttons);
 
     let actions_section = Container {
         layout_dir: LayoutDirection::Vertical,
-        margin: 5.0,
-        children: vec![upper_row, lower_row],
+        margin: 0.0,
+        children: vec![button_row],
         ..Default::default()
     };
 
@@ -2333,7 +2357,6 @@ fn build_character_ui(
         action_points_row,
         hoverable_buttons,
         actions_section,
-        end_turn_button: end_turn_button.unwrap(),
         character_sheet,
         health_bar: resource_bars.health_bar,
         mana_bar: resource_bars.mana_bar,
@@ -2386,13 +2409,13 @@ impl ResourceBars {
         )));
 
         let container = Container {
-            layout_dir: LayoutDirection::Horizontal,
+            layout_dir: LayoutDirection::Vertical,
             margin: 9.0,
-            align: Align::End,
+            align: Align::Start,
             children: vec![
                 Element::RcRefCell(health_bar.clone()),
-                Element::RcRefCell(mana_bar.clone()),
                 Element::RcRefCell(stamina_bar.clone()),
+                Element::RcRefCell(mana_bar.clone()),
             ],
             style: Style {
                 border_color: Some(DARKGRAY),
@@ -2419,7 +2442,6 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::Move => "MOVE".to_string(),
             BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
             BaseAction::UseConsumable => "USING_CONSUMABLE".to_string(),
-            BaseAction::EndTurn => "END_TURN".to_string(),
         },
 
         _ => unreachable!(),
@@ -2429,7 +2451,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
 fn buttons_row(buttons: Vec<Element>) -> Element {
     Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
-        margin: 5.0,
+        margin: 3.0,
         children: buttons,
         ..Default::default()
     })

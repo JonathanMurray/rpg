@@ -376,6 +376,7 @@ impl Drawable for TextLine {
     }
 }
 
+#[derive(Clone)]
 pub struct Rectangle {
     pub size: (f32, f32),
     pub style: Style,
