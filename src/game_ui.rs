@@ -1485,7 +1485,7 @@ impl UserInterface {
                             }
                         }
                         AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
-                        AbilityTargetOutcome::AffectedAlly { healing } => {
+                        AbilityTargetOutcome::AffectedAlly { healing, condition } => {
                             if let Some(amount) = healing {
                                 line.push_str(&format!(" ({} healing)", amount))
                             }
@@ -1664,7 +1664,7 @@ impl UserInterface {
                             radius: 20.0,
                             stroke: Some((animation_color, 4.0)),
                             end_radius: Some(25.0),
-                            fill: None,
+                            fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
                         },
                     ),
                 },
@@ -1828,9 +1828,11 @@ impl UserInterface {
                 Some(effect)
             }
             AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), TextEffectStyle::Miss)),
-            AbilityTargetOutcome::AffectedAlly { healing } => {
+            AbilityTargetOutcome::AffectedAlly { healing, condition } => {
                 if let Some(heal_amount) = healing {
                     Some((format!("{}", heal_amount), TextEffectStyle::Friendly))
+                } else if let Some(condition) = condition {
+                    Some((format!("{}", condition.name()), TextEffectStyle::Friendly))
                 } else {
                     Some(("+".to_string(), TextEffectStyle::Friendly))
                 }

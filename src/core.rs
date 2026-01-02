@@ -1262,6 +1262,7 @@ impl CoreGame {
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         let mut maybe_healing = None;
+        let mut maybe_condition = None;
 
         let real_game = mode.real_game();
 
@@ -1296,6 +1297,7 @@ impl CoreGame {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref apply_condition) => {
+                        maybe_condition = Some(apply_condition.condition);
                         /*
                         if let Some(stacks) = condition.stacks() {
                             *stacks += degree_of_success;
@@ -1322,6 +1324,7 @@ impl CoreGame {
 
         AbilityTargetOutcome::AffectedAlly {
             healing: maybe_healing,
+            condition: maybe_condition,
         }
     }
 
@@ -2593,6 +2596,7 @@ pub enum AbilityTargetOutcome {
     AttackedEnemy(AttackedEvent),
     Resisted,
     AffectedAlly {
+        condition: Option<Condition>,
         healing: Option<u32>,
     },
 }
