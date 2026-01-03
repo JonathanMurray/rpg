@@ -5,6 +5,7 @@ use std::{
     f32::consts::PI,
     iter,
     rc::Rc,
+    str::CharIndices,
 };
 
 use indexmap::IndexMap;
@@ -1050,6 +1051,7 @@ impl GameGrid {
                     ACTIVE_CHARACTER_COLOR,
                     5.0,
                     2.0,
+                    true,
                 );
 
                 if *selected {
@@ -1082,6 +1084,7 @@ impl GameGrid {
                     ACTIVE_CHARACTER_COLOR,
                     5.0,
                     2.0,
+                    true,
                 );
 
                 self.draw_target_crosshair(attacker.pos(), victim.pos(), RED, 4.0);
@@ -1112,6 +1115,7 @@ impl GameGrid {
                     ACTIVE_CHARACTER_COLOR,
                     5.0,
                     2.0,
+                    true,
                 );
                 self.draw_target_crosshair(
                     attacker.pos(),
@@ -1132,6 +1136,7 @@ impl GameGrid {
                     ACTIVE_CHARACTER_COLOR,
                     5.0,
                     2.0,
+                    true,
                 );
 
                 labelled_char_ids.insert(reactor.id());
@@ -1204,6 +1209,7 @@ impl GameGrid {
                                 HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
                                 5.0,
                                 2.0,
+                                true,
                             );
                         }
                     }
@@ -1231,6 +1237,7 @@ impl GameGrid {
                                 HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
                                 5.0,
                                 2.0,
+                                true,
                             );
                             self.draw_target_crosshair(
                                 self.characters.get(self.active_character_id).pos(),
@@ -1289,6 +1296,7 @@ impl GameGrid {
                             HOVER_ALLY_COLOR,
                             5.0,
                             4.0,
+                            true,
                         );
                         self.draw_target_crosshair(
                             self.characters.get(self.active_character_id).pos(),
@@ -1358,6 +1366,7 @@ impl GameGrid {
                                 HOVER_ENEMY_COLOR,
                                 5.0,
                                 3.0,
+                                true,
                             );
                             self.draw_target_crosshair(
                                 active_char_pos,
@@ -1453,8 +1462,11 @@ impl GameGrid {
         }
 
         if let Some(id) = self.selected_player_character_id {
-            let pos = self.character_screen_pos(self.characters.get(id));
-            self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0);
+            if !matches!(ui_state, UiState::Idle) {
+                let pos = self.character_screen_pos(self.characters.get(id));
+                let animated = self.active_character_id == id && mouse_state == MouseState::None;
+                self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0, animated);
+            }
         }
 
         if let Some(target) = self.players_inspect_target {
@@ -1463,6 +1475,7 @@ impl GameGrid {
                 INSPECTING_TARGET_COLOR,
                 4.0,
                 2.0,
+                false,
             );
         }
 
@@ -1521,32 +1534,7 @@ impl GameGrid {
 
         for char_animation in &self.character_animations {
             if let AnimationKind::SpeechBubble { text } = char_animation.kind {
-                let font_size = 20;
-                let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
-                let padding = 5.0;
-                let bubble_h = text_dim.height + padding * 2.0;
-                let bubble_w = text_dim.width + padding * 2.0;
-                let (x, y) =
-                    self.character_screen_pos(self.characters.get(char_animation.character_id));
-                let x0 = x + self.cell_w * 2.0;
-                let y0 = y - self.cell_w;
-                let v1 = (x0 + 5.0, y0 - 5.0);
-                let v2 = (x0 + self.cell_w / 2.0, y0 - self.cell_w);
-                let v3 = (x0 + self.cell_w, y0 - self.cell_w);
-                let bg_color = Color::new(0.9, 0.9, 0.9, 1.0);
-                draw_triangle(v1.into(), v2.into(), v3.into(), bg_color);
-                draw_rectangle(x0, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
-                draw_text_rounded(
-                    text,
-                    x0 + padding,
-                    v2.1 - padding,
-                    TextParams {
-                        font: Some(&self.big_font),
-                        font_size: font_size,
-                        color: BLACK,
-                        ..Default::default()
-                    },
-                );
+                self.draw_speech_bubble(text, char_animation.character_id);
             }
         }
 
@@ -1627,6 +1615,34 @@ impl GameGrid {
         }
 
         None
+    }
+
+    fn draw_speech_bubble(&self, text: &str, character_id: CharacterId) {
+        let font_size = 20;
+        let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
+        let padding = 5.0;
+        let bubble_h = text_dim.height + padding * 2.0;
+        let bubble_w = (text_dim.width + padding * 2.0).max(self.cell_w * 1.5);
+        let (x, y) = self.character_screen_pos(self.characters.get(character_id));
+        let x0 = x + self.cell_w * 2.0;
+        let y0 = y - self.cell_w;
+        let v1 = (x0 + 5.0, y0 - 5.0);
+        let v2 = (x0 + self.cell_w / 2.0, y0 - self.cell_w);
+        let v3 = (x0 + self.cell_w, y0 - self.cell_w);
+        let bg_color = Color::new(0.9, 0.9, 0.9, 1.0);
+        draw_triangle(v1.into(), v2.into(), v3.into(), bg_color);
+        draw_rectangle(x0, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
+        draw_text_rounded(
+            text,
+            x0 + bubble_w / 2.0 - text_dim.width / 2.0,
+            v2.1 - padding,
+            TextParams {
+                font: Some(&self.big_font),
+                font_size: font_size,
+                color: BLACK,
+                ..Default::default()
+            },
+        );
     }
 
     fn draw_movement_to_target(
@@ -2016,13 +2032,23 @@ impl GameGrid {
         color: Color,
         margin: f32,
         thickness: f32,
+        animated: bool,
     ) {
         let len = self.cell_w * 0.7;
+
+        let game_time = get_time();
+
+        let pad = if animated && game_time - game_time.floor() < 0.5 {
+            2.0
+        } else {
+            0.0
+        };
+
         draw_cornered_rectangle_lines(
-            screen_pos.0 - self.cell_w,
-            screen_pos.1 - self.cell_w,
-            self.cell_w * CELLS_PER_ENTITY as f32,
-            self.cell_w * CELLS_PER_ENTITY as f32,
+            screen_pos.0 - self.cell_w - pad,
+            screen_pos.1 - self.cell_w - pad,
+            self.cell_w * CELLS_PER_ENTITY as f32 + pad * 2.0,
+            self.cell_w * CELLS_PER_ENTITY as f32 + pad * 2.0,
             thickness,
             color,
             margin,
@@ -2087,12 +2113,14 @@ impl GameGrid {
     }
 
     fn draw_overhead_question_mark(&self, reactor: &Character) {
+        self.draw_speech_bubble("?", reactor.id());
+        /*
         let text = "?";
-        let font_size = 20;
+        let font_size = 24;
         let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
         let (x, y) = self.character_screen_pos(reactor);
         let x0 = x + self.cell_w / 2.0 - text_dim.width / 2.0;
-        let y0 = y - 25.0;
+        let y0 = y - self.cell_w - 45.0;
         draw_text_rounded(
             text,
             x0,
@@ -2104,6 +2132,7 @@ impl GameGrid {
                 ..Default::default()
             },
         );
+         */
     }
 
     fn draw_engagement_arrow(
@@ -2265,7 +2294,7 @@ impl GameGrid {
             self.grid_y_to_screen(destination.1),
         );
 
-        self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0);
+        self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0, true);
 
         //self.draw_cell_outline(destination, MAGENTA, 5.0, 2.0);
 

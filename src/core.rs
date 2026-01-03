@@ -1968,10 +1968,10 @@ impl CoreGame {
                         }
                     }
                 }
-            }
 
-            if defender.lose_protected() && game.is_some() {
-                detail_lines.push(format!("{} lost Protected", defender.name));
+                if defender.lose_protected() {
+                    detail_lines.push(format!("{} lost Protected", defender.name));
+                }
             }
 
             AttackOutcome::Hit(damage, attack_hit_type)

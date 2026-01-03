@@ -29,6 +29,7 @@ impl SoundPlayer {
             (SoundId::SheetClose, "sheet_close"),
             (SoundId::Burning, "fire"),
             (SoundId::Invalid, "invalid"),
+            (SoundId::EndTurn, "end_turn"),
         ] {
             let sound = load_sound(&format!("sounds/{name}.wav")).await.unwrap();
             sounds.insert(*id, sound);
@@ -61,4 +62,5 @@ pub enum SoundId {
     SheetClose,
     Burning,
     Invalid,
+    EndTurn,
 }

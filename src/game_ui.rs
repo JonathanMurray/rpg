@@ -536,7 +536,7 @@ impl UserInterface {
 
         if let Some(btn) = self.hovered_button.as_ref() {
             if let ButtonAction::Action(base_action) = btn.action {
-                hovered_action = Some((self.active_character_id, base_action));
+                hovered_action = Some((self.player_portraits.selected_id(), base_action));
             }
         }
 
@@ -611,6 +611,7 @@ impl UserInterface {
                         player_chose
                     );
                 }
+                self.sound_player.play(SoundId::EndTurn);
                 player_chose = Some(PlayerChose::Action(None));
             }
         }
@@ -1877,6 +1878,10 @@ impl UserInterface {
         self.on_new_selected_character();
     }
 
+    fn selected_character(&self) -> &Character {
+        self.characters.get(self.player_portraits.selected_id())
+    }
+
     fn on_new_selected_character(&mut self) {
         // In case we're hovering a button that will no longer be shown due to the character switch,
         // we need to clear it, so that we don't panic trying to render its tooltip for example
@@ -1888,7 +1893,7 @@ impl UserInterface {
             self.player_portraits.selected_id() == self.active_character_id,
         );
 
-        let selected_char = self.characters.get(self.player_portraits.selected_id());
+        let selected_char = self.selected_character();
         let selected_in_grid = if selected_char.is_dead() {
             None
         } else {
@@ -1962,7 +1967,7 @@ impl UserInterface {
                     if context != Some(ButtonContext::CharacterSheet) {
                         self.sound_player.play(SoundId::Invalid);
                         self.game_grid.animate_character_speaking(
-                            self.active_character_id,
+                            self.player_portraits.selected_id(),
                             0.7,
                             "Can't do that!",
                         );
