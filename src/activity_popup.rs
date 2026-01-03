@@ -408,6 +408,8 @@ impl ActivityPopup {
                         }
                     }
                 }
+
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             };
         }
 

@@ -1026,26 +1026,32 @@ impl Drawable for ActionButton {
             );
         }
 
-        if self.enabled.get() && hovered {
+        if  hovered {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(event_sender) = &self.event_sender {
-                    event_sender.send(InternalUiEvent::ButtonClicked {
-                        id: self.id,
-                        action: self.action,
-                        context: self.context,
-                    });
+                    if self.enabled.get() {
+                        event_sender.send(InternalUiEvent::ButtonClicked {
+                            id: self.id,
+                            action: self.action,
+                            context: self.context,
+                        });
+                    } else {
+                        event_sender.send(InternalUiEvent::ButtonInvalidClicked{context:self.context});
+                    }
                 }
             }
-            let margin = -1.0;
-
-            draw_rectangle_lines(
-                x - margin,
-                y - margin,
-                w + margin * 2.0,
-                h + margin * 2.0,
-                2.0,
-                self.hover_border_color,
-            );
+            if self.enabled.get() {
+                let margin = -1.0;
+    
+                draw_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    2.0,
+                    self.hover_border_color,
+                );
+            }
         }
 
         draw_debug(x, y, w, h);
@@ -1251,6 +1257,9 @@ pub enum InternalUiEvent {
         action: ButtonAction,
         context: Option<ButtonContext>,
     },
+    ButtonInvalidClicked {
+        context: Option<ButtonContext>
+    }
 }
 
 #[derive(Debug)]

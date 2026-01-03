@@ -499,6 +499,7 @@ impl Drawable for TargetUi {
                     }
                 }
                 InternalUiEvent::ButtonClicked { .. } => {}
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             }
         }
 

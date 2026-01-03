@@ -543,6 +543,7 @@ pub async fn run_editor() {
                 InternalUiEvent::ButtonClicked { id, .. } => {
                     dbg!("grid button CLICKED", id);
                 }
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             }
         }
 
@@ -554,6 +555,7 @@ pub async fn run_editor() {
                 InternalUiEvent::ButtonClicked { action, .. } => {
                     state = State::PlacingSkill(btn_action_to_skill(action));
                 }
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             }
         }
 
@@ -816,6 +818,7 @@ pub async fn run_skill_tree_scene() {
                 InternalUiEvent::ButtonClicked { id, .. } => {
                     dbg!("grid button CLICKED", id);
                 }
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             }
         }
 

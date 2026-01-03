@@ -49,7 +49,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, DICE_SYMBOL},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, DICE_SYMBOL, UI_TEXTURE},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -555,10 +555,12 @@ impl UserInterface {
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
 
-        draw_rectangle(ui_x0, ui_y, ui_x1 - ui_x0, screen_height() - ui_y, BLACK);
-        draw_line(ui_x0, ui_y, ui_x1, ui_y, 1.0, ORANGE);
-        draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
-        draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
+        draw_rectangle(ui_x0, ui_y + 5.0, ui_x1 - ui_x0, screen_height() - ui_y, BLACK);
+        //draw_line(ui_x0, ui_y, ui_x1, ui_y, 1.0, ORANGE);
+        //draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
+        //draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
+
+        draw_texture(UI_TEXTURE.get().unwrap(), ui_x0 - 10.0, ui_y - 10.0, WHITE);
 
         self.activity_popup.draw(570.0, ui_y + 1.0);
 
@@ -1947,6 +1949,12 @@ impl UserInterface {
                             }
                             unexpected => panic!("{:?}", unexpected),
                         }
+                    }
+                }
+                
+                InternalUiEvent::ButtonInvalidClicked{context} => {
+                    if context != Some(ButtonContext::CharacterSheet) {
+                        self.sound_player.play(SoundId::Invalid);
                     }
                 }
             });

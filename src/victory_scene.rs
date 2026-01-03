@@ -366,6 +366,7 @@ impl RewardSelectionUi {
                         self.selected_btn = Some(Rc::clone(btn));
                     }
                 }
+                InternalUiEvent::ButtonInvalidClicked { .. } => {}
             }
         }
 
