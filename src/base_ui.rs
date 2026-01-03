@@ -1,10 +1,10 @@
 use macroquad::{
-    color::{BLUE, Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, PURPLE, SKYBLUE, WHITE},
-    input::{MouseButton, is_mouse_button_pressed, mouse_position, mouse_wheel},
+    color::{Color, BLUE, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, PURPLE, SKYBLUE, WHITE},
+    input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{Font, TextParams, draw_text_ex, measure_text},
-    texture::{self, DrawTextureParams, Texture2D, draw_texture, draw_texture_ex},
+    text::{draw_text_ex, measure_text, Font, TextParams},
+    texture::{self, draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},
@@ -305,13 +305,43 @@ impl TextLine {
 
     fn measure(&mut self) {
         let text_dimensions = measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
+
+        let parts = self.string.split("|");
+        let mut w = 0.0;
+        let mut h = 0.0;
+        let mut offset_y = 0.0;
+        for mut part in parts {
+            if part == "<dice>" {
+                w += 16.0;
+            } else if part == "<shield>" {
+                w += 16.0;
+            } else {
+                let mut font_size = self.font_size;
+                if part.starts_with("<value>") {
+                    part = &part["<value>".len()..];
+                    font_size = (self.font_size as f32 * 1.5).floor() as u16;
+                } else if part.starts_with("<keyword>") {
+                    part = &part["<keyword>".len()..];
+                }
+
+                let dim = measure_text(part, self.font.as_ref(), self.font_size, 1.0);
+                offset_y = dim.offset_y;
+
+                w += dim.width;
+                if dim.height > h {
+                    h = dim.height;
+                }
+                h = h.max(dim.height);
+            }
+        }
+
         self.size = (
-            text_dimensions.width.max(0.0) + self.hor_padding * 2.0,
-            text_dimensions.height.max(0.0) + self.vert_padding * 2.0,
+            w.max(0.0) + self.hor_padding * 2.0,
+            h.max(0.0) + self.vert_padding * 2.0,
         );
         self.size.1 = self.size.1.max(self.min_height);
         assert!(self.size.0.is_finite() && self.size.1.is_finite());
-        self.offset_y = text_dimensions.offset_y;
+        self.offset_y = offset_y;
     }
 }
 
@@ -324,21 +354,19 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
         } else if part == "<shield>" {
             draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             x += 16.0;
-        }  else {
-
+        } else {
             let mut params = params.clone();
             if part.starts_with("<value>") {
-                part  = &part["<value>".len()..];
+                part = &part["<value>".len()..];
                 params.color = Color::new(0.9, 0.7, 1.0, 1.0);
                 params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
             } else if part.starts_with("<keyword>") {
-                part  = &part["<keyword>".len()..];
+                part = &part["<keyword>".len()..];
                 params.color = ORANGE;
             }
 
             let part_dimensions = draw_text_rounded(part, x, y, params);
             x += part_dimensions.width;
-
         }
     }
 }
@@ -392,7 +420,8 @@ impl Drawable for TextLine {
             font: self.font.as_ref(),
             ..Default::default()
         };
-        draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
+        draw_text_with_font_icons(&self.string, x0, y0 + self.offset_y, params);
+        //draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
 
         draw_debug(x, y, self.size.0, self.size.1);
 

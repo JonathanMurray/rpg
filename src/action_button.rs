@@ -523,23 +523,25 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
-                Some(DefenseType::Will) => t.technical_description.push("  |<shield>| = will".to_string()),
-                Some(DefenseType::Evasion) => {
-                    t.technical_description.push("  |<shield>| = evasion".to_string())
-                }
-                Some(DefenseType::Toughness) => {
-                    t.technical_description.push("  |<shield>| = toughness".to_string())
-                }
+                Some(DefenseType::Will) => t
+                    .technical_description
+                    .push("  |<shield>| = will".to_string()),
+                Some(DefenseType::Evasion) => t
+                    .technical_description
+                    .push("  |<shield>| = evasion".to_string()),
+                Some(DefenseType::Toughness) => t
+                    .technical_description
+                    .push("  |<shield>| = toughness".to_string()),
                 None => {}
             };
 
             match effect.damage {
-                Some(AbilityDamage::Static(n)) => {
-                    t.technical_description.push(format!("  |<value>{}| damage", n))
-                }
-                Some(AbilityDamage::AtLeast(n)) => {
-                    t.technical_description.push(format!("  |<value>{}| damage", n))
-                }
+                Some(AbilityDamage::Static(n)) => t
+                    .technical_description
+                    .push(format!("  |<value>{}| damage", n)),
+                Some(AbilityDamage::AtLeast(n)) => t
+                    .technical_description
+                    .push(format!("  |<value>{}| damage", n)),
                 None => {}
             }
 
@@ -549,7 +551,8 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
         }
 
         AbilityNegativeEffect::PerformAttack => {
-            t.technical_description.push("  |<shield>| = evasion".to_string());
+            t.technical_description
+                .push("  |<shield>| = evasion".to_string());
             t.technical_description.push("  weapon damage".to_string());
         }
     }
@@ -604,6 +607,7 @@ pub struct ActionButton {
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
+pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
 
 impl ActionButton {
     pub fn new(
@@ -628,7 +632,7 @@ impl ActionButton {
         };
 
         let style = Style {
-            background_color: Some(Color::new(0.4, 0.32, 0.21, 1.0)),
+            background_color: Some(ACTION_BUTTON_BG_COLOR),
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         };

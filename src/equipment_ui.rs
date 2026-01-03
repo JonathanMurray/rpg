@@ -778,7 +778,7 @@ impl EquipmentStatsTable {
                 cells.push("Attack dmg".into());
                 cells.push(format!("{}", weapon.damage).into());
 
-                cells.push("Attack mod".into());
+                cells.push("|<dice>| Attack mod".into());
                 cells.push(format!("+{}", character.attack_modifier(hand)).into());
             }
         }
@@ -786,7 +786,7 @@ impl EquipmentStatsTable {
             cells.push("Attack dmg".into());
             cells.push("".into());
 
-            cells.push("Attack mod".into());
+            cells.push("|<dice>| Attack mod".into());
             cells.push("".into());
         }
 

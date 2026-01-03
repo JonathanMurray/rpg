@@ -737,6 +737,7 @@ impl Log {
                 max_height: Some(h),
                 style: Style {
                     border_color: Some(GRAY),
+                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.85)),
                     padding: 5.0,
                     ..Default::default()
                 },

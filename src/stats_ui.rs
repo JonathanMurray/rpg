@@ -43,13 +43,16 @@ impl CharacterStatsTable {
 pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> CharacterStatsTable {
     let element = build_stats_table(
         font,
-        20,
+        16,
         &[
             (
-                Some(("Str", character.base_attributes.strength.get())),
+                Some(("Strength", character.base_attributes.strength.get())),
                 &[
                     //("Health", StatValue::U32(character.health.max())),
-                    ("Toughness", StatValue::U32(character.toughness())),
+                    (
+                        "|<shield>| Toughness",
+                        StatValue::U32(character.toughness()),
+                    ),
                     //("Capacity", StatValue::U32(character.capacity.get())),
                 ],
             ),
@@ -60,23 +63,26 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
                 ],
             ),
             (
-                Some(("Agi", character.base_attributes.agility.get())),
+                Some(("Agility", character.base_attributes.agility.get())),
                 &[("Movement", StatValue::F32(character.base_move_speed.get()))],
             ),
-            (None, &[("Evasion", StatValue::U32(character.evasion()))]),
             (
-                Some(("Int", character.base_attributes.intellect.get())),
-                &[("Will", StatValue::U32(character.will()))],
+                None,
+                &[("|<shield>| Evasion", StatValue::U32(character.evasion()))],
+            ),
+            (
+                Some(("Intellect", character.base_attributes.intellect.get())),
+                &[("|<shield>| Will", StatValue::U32(character.will()))],
             ),
             (
                 None,
                 &[(
-                    "Spell mod",
+                    "|<dice>| Spell mod",
                     StatValue::String(format!("+{}", character.spell_modifier())),
                 )],
             ),
             (
-                Some(("Spi", character.base_attributes.spirit.get())),
+                Some(("Spirit", character.base_attributes.spirit.get())),
                 &[
                 //    ("Mana", StatValue::U32(character.mana.max()))
                 ],

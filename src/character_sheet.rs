@@ -76,6 +76,7 @@ impl CharacterSheet {
             layout_dir: LayoutDirection::Vertical,
             margin: 5.0,
             children: vec![
+                Element::Empty(0.0, 30.0),
                 Element::Box(Box::new(stats_table)),
                 Element::RcRefCell(conditions_list.clone()),
             ],
@@ -110,7 +111,7 @@ impl CharacterSheet {
                     },
                     children: vec![
                         Element::Text(
-                            TextLine::new("Skills", 22, WHITE, Some(font.clone()))
+                            TextLine::new("Skills", 24, WHITE, Some(font.clone()))
                                 .with_depth(BLACK, 2.0),
                         ),
                         Element::Container(spell_book),
@@ -403,7 +404,7 @@ pub fn build_spell_book(
         );
 
         spell_book.children.push(Element::Text(TextLine::new(
-            "Passive",
+            "Passives",
             16,
             WHITE,
             Some(font.clone()),

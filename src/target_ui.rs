@@ -250,7 +250,10 @@ impl TargetUi {
                     Some(self.simple_font.clone()),
                 );
                 let attack_text_line = TextLine::new(
-                    format!("Attack mod: +{}", char.attack_modifier(HandType::MainHand)),
+                    format!(
+                        "|<dice>| Attack mod: +{}",
+                        char.attack_modifier(HandType::MainHand)
+                    ),
                     16,
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),

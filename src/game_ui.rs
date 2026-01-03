@@ -7,7 +7,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, MAGENTA, ORANGE, RED, WHITE},
+    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE},
     input::{get_keys_pressed, is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     miniquad::gl::GL_RGB5_A1,
@@ -22,7 +22,7 @@ use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams}
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
-        ButtonSelected, InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE,
+        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
@@ -351,7 +351,7 @@ pub struct CharacterUi {
 }
 
 fn resources_mid_x() -> f32 {
-    screen_width() / 2.0 - 90.0
+    screen_width() / 2.0 - 260.0
 }
 
 impl CharacterUi {
@@ -519,6 +519,8 @@ impl UserInterface {
 
     pub fn draw(&mut self) -> Option<PlayerChose> {
         let ui_y = screen_height() - 230.0;
+        let ui_x0 = screen_width() / 2.0 - 350.0;
+        let ui_x1 = screen_width() / 2.0 + 350.0;
 
         let popup_rect = self.activity_popup.last_drawn_rectangle;
         let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
@@ -527,7 +529,7 @@ impl UserInterface {
         let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
             || target_ui_rect.contains(mouse_pos.into())
             || self.character_sheet_toggle.is_shown()
-            || mouse_pos.1 >= ui_y - 1.0;
+            || (mouse_pos.1 >= ui_y - 1.0 && mouse_pos.0 >= ui_x0 - 1.0);
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
 
         let mut hovered_action = None;
@@ -553,14 +555,16 @@ impl UserInterface {
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
 
-        draw_rectangle(0.0, ui_y, screen_width(), screen_height() - ui_y, BLACK);
-        draw_line(0.0, ui_y, screen_width(), ui_y, 1.0, ORANGE);
+        draw_rectangle(ui_x0, ui_y, ui_x1 - ui_x0, screen_height() - ui_y, BLACK);
+        draw_line(ui_x0, ui_y, ui_x1, ui_y, 1.0, ORANGE);
+        draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
+        draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
 
         self.activity_popup.draw(570.0, ui_y + 1.0);
 
         let portrait_outcome = self
             .player_portraits
-            .draw(screen_width() / 2.0, screen_height() - 120.0);
+            .draw(screen_width() / 2.0 - 120.0, screen_height() - 120.0);
         self.character_sheet_toggle.draw(
             resources_mid_x() - self.character_sheet_toggle.size().0 / 2.0,
             screen_height() - 35.0,
@@ -2338,6 +2342,7 @@ fn build_character_ui(
         size: REGULAR_ACTION_BUTTON_SIZE,
         style: Style {
             border_color: Some(GRAY),
+            background_color: Some(ACTION_BUTTON_BG_COLOR),
             ..Default::default()
         },
         texture: None,
@@ -2351,6 +2356,11 @@ fn build_character_ui(
         layout_dir: LayoutDirection::Vertical,
         margin: 0.0,
         children: vec![button_row],
+        style: Style {
+            background_color: Some(LIGHTGRAY),
+            padding: 2.0,
+            ..Default::default()
+        },
         ..Default::default()
     };
 
