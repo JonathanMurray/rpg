@@ -12,7 +12,7 @@ use macroquad::{
     color::{Color, BLACK, DARKBROWN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PURPLE},
     input::mouse_wheel,
     math::Vec2,
-    shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, DrawRectangleParams},
+    shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
     texture::draw_texture,
     time::get_time,
@@ -40,7 +40,7 @@ use crate::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
         BaseAction, Character, Condition, Goodness, Position, MOVE_DISTANCE_PER_STAMINA,
     },
-    data::BOW,
+    data::{BAD_BOW, BOW},
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
         draw_dashed_rectangle_sides,
@@ -121,6 +121,7 @@ enum AnimationKind {
     Death,
     Act { random_rotation: f32 },
     HealthLost { previous: u32 },
+    SpeechBubble { text: &'static str },
 }
 
 struct MovementRange {
@@ -320,6 +321,19 @@ impl GameGrid {
             character_id,
             duration,
             AnimationKind::Shake { random_time_offset },
+        ));
+    }
+
+    pub fn animate_character_speaking(
+        &mut self,
+        character_id: CharacterId,
+        duration: f32,
+        text: &'static str,
+    ) {
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationKind::SpeechBubble { text },
         ));
     }
 
@@ -664,6 +678,9 @@ impl GameGrid {
                 }
                 AnimationKind::HealthLost { .. } => {
                     // This affects how the healthbar is drawn
+                }
+                AnimationKind::SpeechBubble { .. } => {
+                    // This is drawn separately, after all the characters
                 }
             }
         }
@@ -1499,6 +1516,37 @@ impl GameGrid {
                 self.draw_character_label(char, false);
             } else {
                 self.draw_character_healthbar(char);
+            }
+        }
+
+        for char_animation in &self.character_animations {
+            if let AnimationKind::SpeechBubble { text } = char_animation.kind {
+                let font_size = 20;
+                let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
+                let padding = 5.0;
+                let bubble_h = text_dim.height + padding * 2.0;
+                let bubble_w = text_dim.width + padding * 2.0;
+                let (x, y) =
+                    self.character_screen_pos(self.characters.get(char_animation.character_id));
+                let x0 = x + self.cell_w * 2.0;
+                let y0 = y - self.cell_w;
+                let v1 = (x0 + 5.0, y0 - 5.0);
+                let v2 = (x0 + self.cell_w / 2.0, y0 - self.cell_w);
+                let v3 = (x0 + self.cell_w, y0 - self.cell_w);
+                let bg_color = Color::new(0.9, 0.9, 0.9, 1.0);
+                draw_triangle(v1.into(), v2.into(), v3.into(), bg_color);
+                draw_rectangle(x0, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
+                draw_text_rounded(
+                    text,
+                    x0 + padding,
+                    v2.1 - padding,
+                    TextParams {
+                        font: Some(&self.big_font),
+                        font_size: font_size,
+                        color: BLACK,
+                        ..Default::default()
+                    },
+                );
             }
         }
 

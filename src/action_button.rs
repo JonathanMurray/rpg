@@ -1026,7 +1026,7 @@ impl Drawable for ActionButton {
             );
         }
 
-        if  hovered {
+        if hovered {
             if is_mouse_button_pressed(MouseButton::Left) {
                 if let Some(event_sender) = &self.event_sender {
                     if self.enabled.get() {
@@ -1036,13 +1036,15 @@ impl Drawable for ActionButton {
                             context: self.context,
                         });
                     } else {
-                        event_sender.send(InternalUiEvent::ButtonInvalidClicked{context:self.context});
+                        event_sender.send(InternalUiEvent::ButtonInvalidClicked {
+                            context: self.context,
+                        });
                     }
                 }
             }
             if self.enabled.get() {
                 let margin = -1.0;
-    
+
                 draw_rectangle_lines(
                     x - margin,
                     y - margin,
@@ -1258,8 +1260,8 @@ pub enum InternalUiEvent {
         context: Option<ButtonContext>,
     },
     ButtonInvalidClicked {
-        context: Option<ButtonContext>
-    }
+        context: Option<ButtonContext>,
+    },
 }
 
 #[derive(Debug)]

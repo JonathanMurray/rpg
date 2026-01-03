@@ -555,7 +555,13 @@ impl UserInterface {
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
 
-        draw_rectangle(ui_x0, ui_y + 5.0, ui_x1 - ui_x0, screen_height() - ui_y, BLACK);
+        draw_rectangle(
+            ui_x0,
+            ui_y + 5.0,
+            ui_x1 - ui_x0,
+            screen_height() - ui_y,
+            BLACK,
+        );
         //draw_line(ui_x0, ui_y, ui_x1, ui_y, 1.0, ORANGE);
         //draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
         //draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
@@ -1951,10 +1957,15 @@ impl UserInterface {
                         }
                     }
                 }
-                
-                InternalUiEvent::ButtonInvalidClicked{context} => {
+
+                InternalUiEvent::ButtonInvalidClicked { context } => {
                     if context != Some(ButtonContext::CharacterSheet) {
                         self.sound_player.play(SoundId::Invalid);
+                        self.game_grid.animate_character_speaking(
+                            self.active_character_id,
+                            0.7,
+                            "Can't do that!",
+                        );
                     }
                 }
             });

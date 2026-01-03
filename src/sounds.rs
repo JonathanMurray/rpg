@@ -60,5 +60,5 @@ pub enum SoundId {
     SheetOpen,
     SheetClose,
     Burning,
-    Invalid
+    Invalid,
 }
