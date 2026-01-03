@@ -14,13 +14,13 @@ use macroquad::{
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, Align, Circle, Container, Drawable, Element,
-        LayoutDirection, Style, TextLine,
+        draw_debug, draw_text_rounded, draw_text_with_font_icons, Align, Circle, Container,
+        Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
@@ -32,7 +32,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
-    textures::IconId,
+    textures::{IconId, DICE_SYMBOL},
 };
 
 #[derive(Default, Debug)]
@@ -127,9 +127,9 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect == OnHitReactionEffect::ShieldBash {
-        technical_description.push("[ attack roll ]".to_string());
+        technical_description.push("|<dice>| = attack".to_string());
         technical_description.push("Targets the attacker".to_string());
-        technical_description.push("  [ toughness ]".to_string());
+        technical_description.push("  |<shield>| = toughness".to_string());
         technical_description.push("  Dazed (2+)".to_string());
     }
     Tooltip {
@@ -198,7 +198,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
     if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
         t.technical_description.push(format!(
-            "Inflicts {} {} per {}damage dealt",
+            "Inflicts {} |<keyword>{}| per {}damage dealt",
             x.num,
             condition.name(),
             if x.den == 1 {
@@ -312,7 +312,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
-                "Move a limited distance for free every turn. Spend AP and stamina to move further.",
+                "Move a limited distance for free every turn. Spend stamina to move further.",
             ),
             ..Default::default()
         },
@@ -336,14 +336,14 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         }
         ApplyEffect::GainStamina(n) => t
             .technical_description
-            .push(format!("  Gains {}+ stamina", n)),
+            .push(format!("  Gains |<value>{}| stamina", n)),
         ApplyEffect::Condition(apply_condition) => {
-            let mut line = format!("  {}", apply_condition.condition.name());
+            let mut line = format!("  |<keyword>{}|", apply_condition.condition.name());
             if let Some(stacks) = apply_condition.stacks {
-                line.push_str(&format!(" x {}", stacks));
+                line.push_str(&format!(" x |<value>{}|", stacks));
             }
             if let Some(rounds) = apply_condition.duration_rounds {
-                line.push_str(&format!(" for {} rounds", rounds));
+                line.push_str(&format!(" for |<value>{}| rounds", rounds));
             }
             t.technical_description.push(line);
             t.keywords.push(apply_condition.condition);
@@ -357,8 +357,8 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 damage, caster_healing_percentage
             ));
         }
-        ApplyEffect::ConsumeCondition { mut condition } => {
-            let line = format!("  Loses {}", condition.name());
+        ApplyEffect::ConsumeCondition { condition } => {
+            let line = format!("  Loses |<keyword>{}|", condition.name());
 
             t.technical_description.push(line);
             t.keywords.push(condition);
@@ -387,15 +387,15 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
-            AbilityRollType::Spell => "[ spell roll ]".to_string(),
-            AbilityRollType::RollAbilityWithAttackModifier => "[ attack roll ]".to_string(),
+            AbilityRollType::Spell => "|<dice>| = spell".to_string(),
+            AbilityRollType::RollAbilityWithAttackModifier => "|<dice>| = attack".to_string(),
             AbilityRollType::RollDuringAttack(bonus) => {
                 if bonus < 0 {
-                    format!("[ attack roll - {} ]", -bonus)
+                    format!("|<dice>| = attack - {}", -bonus)
                 } else if bonus > 0 {
-                    format!("[ attack roll + {} ]", bonus)
+                    format!("|<dice>| = attack + {}", bonus)
                 } else {
-                    "[ attack roll ]".to_string()
+                    "|<dice>| = attack".to_string()
                 }
             }
         };
@@ -408,6 +408,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             impact_area: area,
             reach,
         } => {
+            t.technical_description.push("".to_string());
             match reach {
                 AbilityReach::Range(range) => {
                     t.technical_description
@@ -426,6 +427,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                     AreaTargetAcquisition::Everyone => "EVERYONE",
                     AreaTargetAcquisition::Allies => unreachable!(),
                 };
+                t.technical_description.push("".to_string());
                 t.technical_description.push(format!(
                     "{} in impact area (radius {}) :",
                     targets_str, range
@@ -521,22 +523,22 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
-                Some(DefenseType::Will) => t.technical_description.push("  [ will ]".to_string()),
+                Some(DefenseType::Will) => t.technical_description.push("  |<shield>| = will".to_string()),
                 Some(DefenseType::Evasion) => {
-                    t.technical_description.push("  [ evasion ]".to_string())
+                    t.technical_description.push("  |<shield>| = evasion".to_string())
                 }
                 Some(DefenseType::Toughness) => {
-                    t.technical_description.push("  [ toughness ]".to_string())
+                    t.technical_description.push("  |<shield>| = toughness".to_string())
                 }
                 None => {}
             };
 
             match effect.damage {
                 Some(AbilityDamage::Static(n)) => {
-                    t.technical_description.push(format!("  {} damage", n))
+                    t.technical_description.push(format!("  |<value>{}| damage", n))
                 }
                 Some(AbilityDamage::AtLeast(n)) => {
-                    t.technical_description.push(format!("  {}+ damage", n))
+                    t.technical_description.push(format!("  |<value>{}| damage", n))
                 }
                 None => {}
             }
@@ -547,7 +549,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
         }
 
         AbilityNegativeEffect::PerformAttack => {
-            t.technical_description.push("  [ evasion ]".to_string());
+            t.technical_description.push("  |<shield>| = evasion".to_string());
             t.technical_description.push("  weapon damage".to_string());
         }
     }
@@ -556,7 +558,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
 fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut Tooltip) {
     if effect.healing > 0 {
         t.technical_description
-            .push(format!("  {}+ healing", effect.healing));
+            .push(format!("  |<value>{}| healing", effect.healing));
     }
 
     for apply in effect.apply.iter().flatten().flatten().copied() {
@@ -794,15 +796,15 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
-                    let mut technical_description = vec!["[ attack roll ]".to_string()];
+                    let mut technical_description = vec!["|<dice>| = attack".to_string()];
                     let range = if weapon.is_melee() {
                         "melee".to_string()
                     } else {
                         format!("range {}", weapon.range.into_range())
                     };
                     technical_description.push(format!("Target ({})", range));
-                    technical_description.push("  [ evasion ]".to_string());
-                    technical_description.push(format!("  {} damage", weapon.damage));
+                    technical_description.push("  |<shield>| = evasion".to_string());
+                    technical_description.push(format!("  |<value>{}| damage", weapon.damage));
                     Tooltip {
                         header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
 
@@ -1367,8 +1369,8 @@ pub fn draw_tooltip(
     let tooltip_w = max_line_w + text_margin * 2.0;
 
     let empty_line_h = 12.0;
-
     let line_h = 22.0;
+
     let num_real_lines = 1
         + physical_content_lines
             .iter()
@@ -1424,7 +1426,7 @@ pub fn draw_tooltip(
         tooltip_rect.y,
         tooltip_rect.w,
         tooltip_rect.h,
-        Color::new(0.0, 0.0, 0.0, 0.9),
+        Color::new(0.0, 0.0, 0.0, 0.8),
     );
     draw_rectangle_lines(
         tooltip_rect.x,
@@ -1444,7 +1446,8 @@ pub fn draw_tooltip(
 
     let mut line_y = tooltip_rect.y + text_margin * 2.0 + 5.0;
 
-    let mut draw_line = |line, color: Option<Color>, is_header: bool| {
+    let mut draw_line = |line: &str, color: Option<Color>, is_header: bool| {
+        let text_x = tooltip_rect.x + text_margin;
         let mut params = text_params.clone();
         if let Some(c) = color {
             params.color = c;
@@ -1452,10 +1455,10 @@ pub fn draw_tooltip(
         if is_header {
             params.font_size = header_font_size;
         }
-        draw_text_rounded(line, tooltip_rect.x + text_margin, line_y, params);
         if line.is_empty() {
             line_y += empty_line_h;
         } else {
+            draw_text_with_font_icons(line, text_x, line_y, params);
             line_y += line_h;
         }
     };

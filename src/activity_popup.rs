@@ -22,7 +22,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
         InternalUiEvent,
     },
-    base_ui::{draw_text_rounded, Drawable},
+    base_ui::{draw_text_rounded, draw_text_with_font_icons, Drawable},
     core::{
         as_percentage, predict_attack, prob_attack_hit, Character, CharacterId, Characters,
         MOVE_DISTANCE_PER_STAMINA,
@@ -154,19 +154,27 @@ impl ActivityPopup {
             measured_lines.push((line, dimensions));
         }
 
+        let empty_line_h = 12.0;
+        let line_h = 22.0;
+
         let line_margin = 8.0;
         let mut text_content_h = top_pad + header_dimensions.offset_y;
         let mut text_content_w = 0.0;
-        for (_line, dim) in &measured_lines {
+        for (line, dim) in &measured_lines {
             //text_content_h += dim.height;
-            text_content_h += dim.offset_y;
+            if line.is_empty() {
+                text_content_h += empty_line_h;
+            } else {
+                text_content_h += line_h;
+            }
+            //text_content_h += dim.offset_y;
             if dim.width > text_content_w {
                 text_content_w = dim.width;
             }
         }
-        text_content_h += (measured_lines.len() - 1) as f32 * line_margin;
+        //text_content_h += (measured_lines.len() - 1) as f32 * line_margin;
 
-        let height = text_content_h.max(74.0);
+        let height = (text_content_h + 10.0).max(74.0);
 
         let draw_proceed_button = !matches!(
             &*self.ui_state.borrow(),
@@ -239,10 +247,11 @@ impl ActivityPopup {
                 params.color = YELLOW;
                 draw_text_rounded(line, x0, y0, params.clone());
             } else {
-                draw_text_rounded(line, x0, y0, base_text_params.clone());
+                //draw_text_rounded(line, x0, y0, base_text_params.clone());
+                draw_text_with_font_icons(line, x0, y0, base_text_params.clone());
             }
 
-            y0 += dim.offset_y + line_margin;
+            y0 += 22.0;
         }
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;

@@ -13,7 +13,7 @@ use macroquad::{
     miniquad::gl::GL_RGB5_A1,
     shapes::{draw_line, draw_rectangle},
     text::{draw_text, Font},
-    texture::Texture2D,
+    texture::{draw_texture, Texture2D},
     window::{screen_height, screen_width},
 };
 
@@ -49,7 +49,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, DICE_SYMBOL},
 };
 
 #[derive(Debug, Clone, PartialEq)]

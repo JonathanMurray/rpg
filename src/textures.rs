@@ -1,4 +1,10 @@
-use std::{collections::HashMap, hash::Hash};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    hash::Hash,
+    rc::Rc,
+    sync::{Mutex, OnceLock},
+};
 
 use macroquad::{
     color::WHITE,
@@ -501,3 +507,23 @@ pub async fn load_and_init_texture(path: &str) -> Texture2D {
     texture.set_filter(FilterMode::Nearest);
     texture
 }
+
+pub async fn load_and_init_font_symbols() {
+    let font_atlas = load_and_init_texture("font.png").await;
+    let img = font_atlas.get_texture_data();
+
+    let symbol = |x, y| {
+        Texture2D::from_image(&img.sub_image(Rect::new(
+            x as f32 * 16.0,
+            y as f32 * 16.0,
+            16.0,
+            16.0,
+        )))
+    };
+
+    DICE_SYMBOL.get_or_init(|| symbol(0, 0));
+    SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
+}
+
+pub static DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();

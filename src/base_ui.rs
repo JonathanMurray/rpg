@@ -1,15 +1,17 @@
 use macroquad::{
-    color::{Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, WHITE},
-    input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
+    color::{BLUE, Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, PURPLE, SKYBLUE, WHITE},
+    input::{MouseButton, is_mouse_button_pressed, mouse_position, mouse_wheel},
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::{draw_text_ex, measure_text, Font, TextParams},
-    texture::{self, draw_texture_ex, DrawTextureParams, Texture2D},
+    text::{Font, TextParams, draw_text_ex, measure_text},
+    texture::{self, DrawTextureParams, Texture2D, draw_texture, draw_texture_ex},
 };
 use std::{
     cell::{Cell, RefCell},
     rc::{Rc, Weak},
 };
+
+use crate::textures::{DICE_SYMBOL, SHIELD_SYMBOL};
 
 pub trait Drawable {
     fn draw(&self, x: f32, y: f32);
@@ -310,6 +312,34 @@ impl TextLine {
         self.size.1 = self.size.1.max(self.min_height);
         assert!(self.size.0.is_finite() && self.size.1.is_finite());
         self.offset_y = text_dimensions.offset_y;
+    }
+}
+
+pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextParams<'_>) {
+    let parts = line.split("|");
+    for mut part in parts {
+        if part == "<dice>" {
+            draw_texture(DICE_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += 16.0;
+        } else if part == "<shield>" {
+            draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += 16.0;
+        }  else {
+
+            let mut params = params.clone();
+            if part.starts_with("<value>") {
+                part  = &part["<value>".len()..];
+                params.color = Color::new(0.9, 0.7, 1.0, 1.0);
+                params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
+            } else if part.starts_with("<keyword>") {
+                part  = &part["<keyword>".len()..];
+                params.color = ORANGE;
+            }
+
+            let part_dimensions = draw_text_rounded(part, x, y, params);
+            x += part_dimensions.width;
+
+        }
     }
 }
 

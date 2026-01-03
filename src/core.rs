@@ -5624,7 +5624,7 @@ impl Display for Range {
             Range::ExtendableRanged(range) => {
                 f.write_fmt(format_args!("{} ({})", range, range * 2))
             }
-            Range::Float(range) => f.write_fmt(format_args!("{:.2}", range)),
+            Range::Float(range) => f.write_fmt(format_args!("{:.1}", range)),
         }
     }
 }

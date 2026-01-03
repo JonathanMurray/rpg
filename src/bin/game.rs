@@ -6,6 +6,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use macroquad::audio::load_sound;
 use macroquad::color::{Color, LIGHTGRAY, MAGENTA, WHITE};
 use macroquad::input::{get_keys_pressed, mouse_position};
+use macroquad::math::Rect;
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
 use macroquad::miniquad::KeyCode;
 
@@ -47,7 +48,8 @@ use rpg::skill_tree::run_skill_tree_scene;
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-    load_all_status_textures, load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
+    load_all_status_textures, load_and_init_font_symbols, load_and_init_texture, EquipmentIconId,
+    IconId, PortraitId, SpriteId, DICE_SYMBOL,
 };
 use rpg::victory_scene::{run_victory_loop, Learning};
 
@@ -290,6 +292,8 @@ async fn init_fight_scene(
     let status_textures = load_all_status_textures().await;
 
     let sound_player = SoundPlayer::new().await;
+
+    load_and_init_font_symbols().await;
 
     let gfx_user_interface = UserInterface::new(
         &core_game,
