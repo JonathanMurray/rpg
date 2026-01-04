@@ -220,7 +220,15 @@ impl MapScene {
                     } else {
                         BLACK
                     };
-                    draw_dashed_line(from_pos, to_node.screen_pos, 2.0, line_color, 15.0, None);
+                    draw_dashed_line(
+                        from_pos,
+                        to_node.screen_pos,
+                        2.0,
+                        line_color,
+                        15.0,
+                        None,
+                        false,
+                    );
                 }
             }
 

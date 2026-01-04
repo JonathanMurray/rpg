@@ -853,7 +853,7 @@ impl GameGrid {
 
                 let is_player_engaging = engager.player_controlled();
 
-                self.draw_engagement_arrow(engager_pos, target_pos, is_player_engaging);
+                self.draw_engagement_line(engager_pos, target_pos, is_player_engaging);
             }
         }
 
@@ -2105,7 +2105,7 @@ impl GameGrid {
                         Some(end_thickness) => thickness + (end_thickness - thickness) * t,
                         None => *thickness,
                     };
-                    draw_dashed_line(from, to, thickness, *color, 5.0, None);
+                    draw_dashed_line(from, to, thickness, *color, 5.0, None, false);
                     //draw_line(from.0, from.1, to.0, to.1, thickness, *color);
                 }
             }
@@ -2114,28 +2114,9 @@ impl GameGrid {
 
     fn draw_overhead_question_mark(&self, reactor: &Character) {
         self.draw_speech_bubble("?", reactor.id());
-        /*
-        let text = "?";
-        let font_size = 24;
-        let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
-        let (x, y) = self.character_screen_pos(reactor);
-        let x0 = x + self.cell_w / 2.0 - text_dim.width / 2.0;
-        let y0 = y - self.cell_w - 45.0;
-        draw_text_rounded(
-            text,
-            x0,
-            y0,
-            TextParams {
-                font: Some(&self.big_font),
-                font_size,
-                color: YELLOW,
-                ..Default::default()
-            },
-        );
-         */
     }
 
-    fn draw_engagement_arrow(
+    fn draw_engagement_line(
         &self,
         engager: (f32, f32),
         target: (f32, f32),
@@ -2148,28 +2129,17 @@ impl GameGrid {
         };
         //let depth = None;
         let depth = Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0));
+
+        let segment_len = 5.0;
         draw_dashed_line(
             (engager.0 + self.cell_w / 2.0, engager.1 + self.cell_w / 2.0),
             (target.0 + self.cell_w / 2.0, target.1 + self.cell_w / 2.0),
             7.0,
             color,
-            5.0,
+            segment_len,
             depth,
+            true,
         );
-
-        let (mut dx, mut dy) = (0, 0);
-        if target.0 < engager.0 {
-            dx = -1;
-        } else if target.0 > engager.0 {
-            dx = 1;
-        }
-        if target.1 < engager.1 {
-            dy = -1;
-        } else if target.1 > engager.1 {
-            dy = 1;
-        }
-
-        //draw_arrow(target, self.cell_w, (dx, dy), color, 3.0);
     }
 
     fn draw_target_crosshair(
@@ -2193,6 +2163,7 @@ impl GameGrid {
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
             Some(self.cell_w * 0.4),
+            false,
         );
 
         let cross_hair_r = self.cell_w * 0.4;
@@ -2343,6 +2314,7 @@ impl GameGrid {
                 color,
                 5.0,
                 Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0)),
+                false,
             );
 
             if let Some(next) = path.next() {

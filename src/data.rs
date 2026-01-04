@@ -959,7 +959,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(10.0)),
+        reach: AbilityReach::Range(Range::Float(10.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: None,

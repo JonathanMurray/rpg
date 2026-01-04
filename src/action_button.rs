@@ -686,7 +686,7 @@ impl ActionButton {
 
         if action.costs_arrow() {
             bottom_row_elements.push(Element::Text(TextLine::new(
-                "Arrow",
+                "Item",
                 16,
                 WHITE,
                 Some(font.clone()),

@@ -501,7 +501,7 @@ pub async fn run_editor() {
                 let y1 = mid.1 + node.borrow().pos.1 as f32 * cell_w;
                 let x2 = mid.0 + mouse_grid_x as f32 * cell_w;
                 let y2 = mid.1 + mouse_grid_y as f32 * cell_w;
-                draw_dashed_line((x1, y1), (x2, y2), 1.0, LIGHTGRAY, 5.0, None);
+                draw_dashed_line((x1, y1), (x2, y2), 1.0, LIGHTGRAY, 5.0, None, false);
                 //draw_line(x1, y1, x2, y2, 1.0, GREEN);
             }
         }

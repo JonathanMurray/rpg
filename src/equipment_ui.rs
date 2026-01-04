@@ -529,7 +529,7 @@ impl EquipmentSection {
                         .screen_area()
                         .center();
 
-                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0, None);
+                    draw_dashed_line(from.into(), to.into(), 5.0, YELLOW, 5.0, None, false);
                 }
                 None => {
                     if is_mouse_button_down(MouseButton::Left) {

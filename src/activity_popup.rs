@@ -228,7 +228,7 @@ impl ActivityPopup {
             upper_border_color,
         );
 
-        draw_dashed_line((x, y), (x + width, y), 1.0, GRAY, 5.0, None);
+        draw_dashed_line((x, y), (x + width, y), 1.0, GRAY, 5.0, None, false);
 
         self.last_drawn_rectangle = Rect {
             x,

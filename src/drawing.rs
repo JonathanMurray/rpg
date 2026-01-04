@@ -1,6 +1,7 @@
 use macroquad::{
     color::Color,
     shapes::{draw_circle_lines, draw_line},
+    time::get_time,
 };
 
 pub fn draw_arrow(
@@ -64,8 +65,18 @@ pub fn draw_dashed_line(
     color: Color,
     segment_len: f32,
     depth: Option<(Color, f32)>,
+    animated: bool,
 ) {
-    draw_dashed_line_ex(from, to, thickness, color, segment_len, depth, None);
+    draw_dashed_line_ex(
+        from,
+        to,
+        thickness,
+        color,
+        segment_len,
+        depth,
+        None,
+        animated,
+    );
 }
 
 pub fn draw_dashed_line_ex(
@@ -76,6 +87,7 @@ pub fn draw_dashed_line_ex(
     segment_len: f32,
     depth: Option<(Color, f32)>,
     trim_start_and_end: Option<f32>,
+    animated: bool,
 ) {
     if let Some((color, offset)) = depth {
         draw_dashed_line_ex(
@@ -86,17 +98,32 @@ pub fn draw_dashed_line_ex(
             segment_len,
             None,
             trim_start_and_end,
+            animated,
         );
     }
 
-    let line_len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
+    let start_offset = if animated {
+        let game_time = get_time();
+        (game_time - game_time.floor()) as f32 * segment_len * 2.0
+    } else {
+        0.0
+    };
 
+    let line_len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
     // "Segments" alternate between "drawn" and "skipped over" to create the dash effect
     let num_segments = (line_len / segment_len) as u32;
+    let dx = (to.0 - from.0) / num_segments as f32;
+    let dy = (to.1 - from.1) / num_segments as f32;
+
+    let from = (
+        from.0 + (to.0 - from.0) * (start_offset / line_len),
+        from.1 + (to.1 - from.1) * (start_offset / line_len),
+    );
+
     let (mut prev_x, mut prev_y) = from;
     for i in 0..num_segments {
-        let x = from.0 + (to.0 - from.0) * i as f32 / num_segments as f32;
-        let y = from.1 + (to.1 - from.1) * i as f32 / num_segments as f32;
+        let x = from.0 + dx * i as f32;
+        let y = from.1 + dy * i as f32;
         if i % 2 == 0 {
             let mut skip = false;
             if let Some(trim) = trim_start_and_end {
@@ -127,7 +154,15 @@ pub fn draw_dashed_rectangle_lines(
     segment_len: f32,
 ) {
     // top
-    draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len, None);
+    draw_dashed_line(
+        (x, y),
+        (x + w, y),
+        thickness,
+        color,
+        segment_len,
+        None,
+        false,
+    );
 
     // right
     draw_dashed_line(
@@ -137,6 +172,7 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
+        false,
     );
 
     // bottom
@@ -147,10 +183,19 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
+        false,
     );
 
     // left
-    draw_dashed_line((x, y + h), (x, y), thickness, color, segment_len, None);
+    draw_dashed_line(
+        (x, y + h),
+        (x, y),
+        thickness,
+        color,
+        segment_len,
+        None,
+        false,
+    );
 }
 
 pub fn draw_cornered_rectangle_lines(
@@ -192,7 +237,15 @@ pub fn draw_dashed_rectangle_sides(
     bottom: bool,
 ) {
     if left {
-        draw_dashed_line((x, y), (x, y + h), thickness, color, segment_len, None);
+        draw_dashed_line(
+            (x, y),
+            (x, y + h),
+            thickness,
+            color,
+            segment_len,
+            None,
+            false,
+        );
     }
     if right {
         draw_dashed_line(
@@ -202,10 +255,19 @@ pub fn draw_dashed_rectangle_sides(
             color,
             segment_len,
             None,
+            false,
         );
     }
     if top {
-        draw_dashed_line((x, y), (x + w, y), thickness, color, segment_len, None);
+        draw_dashed_line(
+            (x, y),
+            (x + w, y),
+            thickness,
+            color,
+            segment_len,
+            None,
+            false,
+        );
     }
     if bottom {
         draw_dashed_line(
@@ -215,6 +277,7 @@ pub fn draw_dashed_rectangle_sides(
             color,
             segment_len,
             None,
+            false,
         );
     }
 }
