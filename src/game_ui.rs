@@ -1656,7 +1656,7 @@ impl UserInterface {
     fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
         let prev_health = self.characters.get(character_id).health.current() + dmg;
         self.game_grid
-            .animate_character_health_change(character_id, prev_health, 0.5);
+            .animate_character_health_change(character_id, prev_health, 0.6);
     }
 
     fn add_effects_for_area_outcomes(
@@ -1864,7 +1864,7 @@ impl UserInterface {
 
         if let Some((target_text, goodness)) = effect {
             self.game_grid
-                .add_text_effect(target_pos, start_time, 2.0, target_text, goodness);
+                .add_text_effect(target_pos, start_time, 3.0, target_text, goodness);
         }
     }
 

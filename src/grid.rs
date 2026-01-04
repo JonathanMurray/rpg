@@ -113,6 +113,10 @@ impl CharacterAnimation {
             kind,
         }
     }
+
+    fn remaining_duration_ratio(&self) -> f32 {
+        self.remaining_duration / self.duration
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -534,8 +538,7 @@ impl GameGrid {
                 if animation.character_id == character.id() {
                     let from = self.grid_pos_to_screen(from);
                     let to = self.grid_pos_to_screen(to);
-                    let remaining = animation.remaining_duration / animation.duration;
-                    //let remaining = (remaining * 4.0).floor() / 4.0;
+                    let remaining = animation.remaining_duration_ratio();
                     return (
                         to.0 - (to.0 - from.0) * remaining,
                         to.1 - (to.1 - from.1) * remaining,
@@ -1894,7 +1897,7 @@ impl GameGrid {
             );
         }
 
-        let status_y;
+        let mut status_y;
 
         if draw_name {
             draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
@@ -1913,6 +1916,10 @@ impl GameGrid {
             status_y = box_y - -1.0 - status_w;
         } else {
             status_y = health_y - 1.0 - status_w;
+
+            if draw_action_points {
+                status_y -= 10.0;
+            }
         }
 
         if !condition_infos.is_empty() {
@@ -1971,9 +1978,15 @@ impl GameGrid {
         for animation in &self.character_animations {
             if let AnimationKind::HealthLost { previous } = animation.kind {
                 if animation.character_id == character.id() {
-                    let lost_health_w = (health_w)
+                    let mut lost_health_w = (health_w)
                         * ((previous as f32 - character.health.current() as f32)
                             / character.health.max() as f32);
+
+                    let ratio = animation.remaining_duration_ratio();
+                    let animated_ratio = 0.2;
+                    if ratio < animated_ratio {
+                        lost_health_w *= ratio / animated_ratio;
+                    }
                     draw_rectangle(
                         health_x + current_health_w,
                         health_y,
@@ -2611,7 +2624,7 @@ impl EffectGraphics {
                 let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
-                let y0 = y - cell_w * 0.3 * t;
+                let y0 = y - t * cell_w * 2.0;
 
                 let remaining = effect.end_time - effect.age;
                 let fade_duration = 0.4;
