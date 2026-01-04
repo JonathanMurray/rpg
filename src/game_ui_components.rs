@@ -30,6 +30,7 @@ use crate::{
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::draw_cross,
+    game_ui::UiState,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId},
 };
@@ -469,7 +470,20 @@ impl PlayerPortraits {
         self.set_active_character(game.active_character_id);
     }
 
-    pub fn draw(&self, x: f32, y: f32) -> PlayerPortraitOutcome {
+    pub fn draw(&self, x: f32, y: f32, may_show_end_turn_button: bool) -> PlayerPortraitOutcome {
+        for (_, portrait) in &self.portraits {
+            let mut portrait = portrait.borrow_mut();
+            portrait
+                .may_show_end_turn_button
+                .set(may_show_end_turn_button);
+            let text_color = if may_show_end_turn_button {
+                WHITE
+            } else {
+                GRAY
+            };
+            portrait.end_turn_text.set_color(text_color);
+        }
+
         self.row.draw(x, y);
 
         let prev_selected = self.selected_i.get();
@@ -531,6 +545,7 @@ struct PlayerCharacterPortrait {
     done_text: TextLine,
     end_turn_text: TextLine,
     pub has_clicked_end_turn: Cell<bool>,
+    may_show_end_turn_button: Cell<bool>,
 }
 
 impl PlayerCharacterPortrait {
@@ -587,6 +602,7 @@ impl PlayerCharacterPortrait {
             done_text,
             end_turn_text,
             has_clicked_end_turn: Cell::new(false),
+            may_show_end_turn_button: Cell::new(false),
         }
     }
 
@@ -672,17 +688,25 @@ impl Drawable for PlayerCharacterPortrait {
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
 
             draw_rectangle_lines(x, button_y, w, button_h, 1.0, LIGHTGRAY);
-            if Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
-                draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
-                if is_mouse_button_pressed(MouseButton::Left) {
-                    self.has_clicked_end_turn.set(true);
-                }
-            }
-
             self.end_turn_text.draw(
                 x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,
             );
+            if self.may_show_end_turn_button.get() {
+                if Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
+                    draw_rectangle_lines(
+                        x + 2.0,
+                        button_y + 2.0,
+                        w - 4.0,
+                        button_h - 4.0,
+                        1.0,
+                        WHITE,
+                    );
+                    if is_mouse_button_pressed(MouseButton::Left) {
+                        self.has_clicked_end_turn.set(true);
+                    }
+                }
+            }
         }
 
         let (mouse_x, mouse_y) = mouse_position();

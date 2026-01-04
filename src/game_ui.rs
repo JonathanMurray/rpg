@@ -570,9 +570,15 @@ impl UserInterface {
 
         self.activity_popup.draw(570.0, ui_y + 1.0);
 
-        let portrait_outcome = self
-            .player_portraits
-            .draw(screen_width() / 2.0 - 120.0, screen_height() - 120.0);
+        let may_show_end_turn_button = matches!(
+            &*self.state.borrow(),
+            UiState::ChoosingAction | UiState::ConfiguringAction(..)
+        );
+        let portrait_outcome = self.player_portraits.draw(
+            screen_width() / 2.0 - 120.0,
+            screen_height() - 120.0,
+            may_show_end_turn_button,
+        );
         self.character_sheet_toggle.draw(
             resources_mid_x() - self.character_sheet_toggle.size().0 / 2.0,
             screen_height() - 35.0,
