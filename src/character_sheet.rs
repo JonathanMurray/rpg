@@ -15,7 +15,7 @@ use macroquad::{
     texture::Texture2D,
 };
 
-use crate::base_ui::{draw_text_rounded, Drawable, Rectangle};
+use crate::base_ui::{draw_text_rounded, Drawable};
 use crate::conditions_ui::ConditionsList;
 use crate::core::EquipmentSlotRole;
 use crate::drawing::draw_cross;

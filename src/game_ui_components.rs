@@ -24,11 +24,14 @@ use macroquad::{
 };
 
 use crate::{
+    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{
         draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
         Rectangle, Style, TextLine,
     },
-    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
+    core::{
+        Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
+    },
     drawing::draw_cross,
     game_ui::UiState,
     sounds::{SoundId, SoundPlayer},
@@ -380,6 +383,7 @@ pub struct PlayerPortraits {
     active_i: Cell<CharacterId>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
     sound_player: SoundPlayer,
+    font: Font,
 }
 
 pub struct PlayerPortraitOutcome {
@@ -434,6 +438,7 @@ impl PlayerPortraits {
             active_i: Cell::new(active_id),
             portraits,
             sound_player,
+            font,
         };
 
         this.set_selected_id(selected_id);
@@ -485,6 +490,24 @@ impl PlayerPortraits {
         }
 
         self.row.draw(x, y);
+
+        for (_, portrait) in &self.portraits {
+            if let Some((i, condition)) = portrait.borrow().hovered_status_rect.get() {
+                let rect = portrait.borrow().last_drawn_rect.get();
+                draw_tooltip(
+                    &self.font,
+                    TooltipPositionPreference::At((
+                        rect.right() + STATUS_ICON_W + 5.0,
+                        rect.y + 1.0,
+                    )),
+                    condition.name(),
+                    None,
+                    &[condition.description().to_string()],
+                    &[],
+                    true,
+                );
+            }
+        }
 
         let prev_selected = self.selected_i.get();
 
@@ -546,6 +569,9 @@ struct PlayerCharacterPortrait {
     end_turn_text: TextLine,
     pub has_clicked_end_turn: Cell<bool>,
     may_show_end_turn_button: Cell<bool>,
+    hovered_status_rect: Cell<Option<(usize, Condition)>>,
+    font: Font,
+    last_drawn_rect: Cell<Rect>,
 }
 
 impl PlayerCharacterPortrait {
@@ -567,7 +593,7 @@ impl PlayerCharacterPortrait {
                     background_color: Some(BLACK),
                     ..Default::default()
                 },
-                texture: None,
+                ..Default::default()
             }));
             status_rects.push(rect.clone());
             status_elements.push(Element::RcRefCell(rect));
@@ -603,17 +629,23 @@ impl PlayerCharacterPortrait {
             end_turn_text,
             has_clicked_end_turn: Cell::new(false),
             may_show_end_turn_button: Cell::new(false),
+            hovered_status_rect: Cell::new(None),
+            font,
+            last_drawn_rect: Cell::new(Rect::default()),
         }
     }
 
     fn set_statuses(&mut self, statuses: &[ConditionInfo]) {
+        self.hovered_status_rect.set(None);
         for (i, status_rect) in self.status_rects.iter().enumerate() {
             match statuses.get(i) {
                 Some(info) => {
                     status_rect.borrow_mut().style.background_color = Some(BLACK);
-
                     status_rect.borrow_mut().texture =
                         Some(self.status_textures[&info.condition.status_icon()].clone());
+                    if status_rect.borrow().has_been_hovered.take() {
+                        self.hovered_status_rect.set(Some((i, info.condition)));
+                    }
                 }
                 None => {
                     status_rect.borrow_mut().style.background_color = Some(BLACK);
@@ -629,6 +661,7 @@ impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = (64.0, 80.0);
         draw_rectangle(x, y, w, h, DARKGRAY);
+        self.last_drawn_rect.set(Rect::new(x, y, w, h));
 
         let params = DrawTextureParams {
             dest_size: Some((w, h).into()),

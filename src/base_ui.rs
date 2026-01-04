@@ -1,6 +1,7 @@
 use macroquad::{
     color::{Color, BLUE, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, PURPLE, SKYBLUE, WHITE},
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
+    math::Rect,
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
@@ -435,11 +436,12 @@ impl Drawable for TextLine {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct Rectangle {
     pub size: (f32, f32),
     pub style: Style,
     pub texture: Option<Texture2D>,
+    pub has_been_hovered: Cell<bool>,
 }
 
 impl Drawable for Rectangle {
@@ -456,6 +458,9 @@ impl Drawable for Rectangle {
                     ..Default::default()
                 },
             );
+        }
+        if Rect::new(x, y, self.size.0, self.size.1).contains(mouse_position().into()) {
+            self.has_been_hovered.set(true);
         }
     }
 

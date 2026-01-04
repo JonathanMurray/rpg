@@ -2375,7 +2375,7 @@ fn build_character_ui(
             background_color: Some(ACTION_BUTTON_BG_COLOR),
             ..Default::default()
         },
-        texture: None,
+        ..Default::default()
     };
     while buttons.len() < 10 {
         buttons.push(Element::Rect(button_placeholder.clone()));
