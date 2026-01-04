@@ -1933,6 +1933,7 @@ impl UserInterface {
         }
 
         let mut action_button_clicked = None;
+        let mut invalid_action = false;
 
         self.event_queue
             .take()
@@ -1971,12 +1972,7 @@ impl UserInterface {
 
                 InternalUiEvent::ButtonInvalidClicked { context } => {
                     if context != Some(ButtonContext::CharacterSheet) {
-                        self.sound_player.play(SoundId::Invalid);
-                        self.game_grid.animate_character_speaking(
-                            self.player_portraits.selected_id(),
-                            0.7,
-                            "Can't do that!",
-                        );
+                        invalid_action = true;
                     }
                 }
             });
@@ -1988,16 +1984,24 @@ impl UserInterface {
 
         for (_id, btn) in &character_ui.tracked_action_buttons {
             if let Some((keycode, _font)) = btn.hotkey.borrow().as_ref() {
-                if btn.enabled.get() && is_key_pressed(*keycode) {
-                    match btn.action {
-                        ButtonAction::Action(base_action) => {
-                            self.sound_player.play(SoundId::ClickButton);
-                            action_button_clicked = Some(base_action)
+                if is_key_pressed(*keycode) {
+                    if btn.enabled.get() {
+                        match btn.action {
+                            ButtonAction::Action(base_action) => {
+                                self.sound_player.play(SoundId::ClickButton);
+                                action_button_clicked = Some(base_action)
+                            }
+                            _ => unreachable!("button clicked via hotkey: {:?}", btn.action),
                         }
-                        _ => unreachable!("button clicked via hotkey: {:?}", btn.action),
+                    } else {
+                        invalid_action = true;
                     }
                 }
             }
+        }
+
+        if invalid_action {
+            self.on_invalid_action_clicked();
         }
 
         if let Some(base_action) = action_button_clicked {
@@ -2069,6 +2073,15 @@ impl UserInterface {
         self.animation_stopwatch.update(elapsed);
 
         player_choice
+    }
+
+    fn on_invalid_action_clicked(&mut self) {
+        self.sound_player.play(SoundId::Invalid);
+        self.game_grid.animate_character_speaking(
+            self.player_portraits.selected_id(),
+            0.7,
+            "Can't do that!",
+        );
     }
 
     fn handle_popup_proceed(&mut self) -> PlayerChose {
