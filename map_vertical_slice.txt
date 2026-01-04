@@ -1,16 +1,16 @@
 +----------------------------
 BBBBBBBBBBBBBBBBBBBB
-BRR   WWW          B
-BR     WW          B
+BRR  WWWW          B
+BR    WWW          B
 B      WW          B
-B      W    R     SB
-B  S        R3    SB
+B      WW   R     SB
+B  S   W    R3    SB
 B  PP      5    8 SB
-B  P   WW          B
-B           R4     B
-B            RR    B
-B                  B
-B   0 2         67 B
-BB   1   S        BB
+B  P     W         B
+B       WW  R4     B
+B       WWW   R    B
+B       WWW        B
+B   0 2  WWW    67 B
+BB   1            BB
  BBBBBBBBBBBBBBBBBB
 +----------------------------

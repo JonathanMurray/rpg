@@ -358,7 +358,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             ));
         }
         ApplyEffect::ConsumeCondition { condition } => {
-            let line = format!("  Loses |<keyword>{}|", condition.name());
+            let line = format!("  Removes |<keyword>{}|", condition.name());
 
             t.technical_description.push(line);
             t.keywords.push(condition);
