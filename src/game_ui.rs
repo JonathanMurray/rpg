@@ -35,7 +35,7 @@ use crate::{
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
         Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
-        OnAttackedReaction, OnHitReaction, Position,
+        MovementType, OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -1601,6 +1601,7 @@ impl UserInterface {
                 character,
                 from,
                 to,
+                movement_type,
             } => {
                 let mut duration = 0.15;
                 if from.0 != to.0 || from.1 != to.1 {
@@ -1610,8 +1611,9 @@ impl UserInterface {
 
                 self.game_grid
                     .set_character_motion(character, from, to, duration);
-                //TODO
-                self.sound_player.play(SoundId::Walk);
+                if movement_type != MovementType::KnockedBack {
+                    self.sound_player.play(SoundId::Walk);
+                }
                 self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharacterTookDamage {

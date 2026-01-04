@@ -363,6 +363,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             t.technical_description.push(line);
             t.keywords.push(condition);
         }
+        ApplyEffect::Knockback(amount) => {
+            t.technical_description
+                .push(format!("  Knocked back ({})", amount));
+        }
     }
 }
 

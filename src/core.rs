@@ -238,6 +238,8 @@ impl CoreGame {
             for ch in self.characters.iter() {
                 if ch.is_dead() {
                     self.pathfind_grid.set_occupied(ch.pos(), None);
+                } else if let Some((dx, dy)) = ch.is_being_pushed_in_direction.take() {
+                    self.perform_character_pushed(ch, dx, dy).await;
                 }
             }
             let dead_character_ids = self.characters.remove_dead();
@@ -269,6 +271,30 @@ impl CoreGame {
             if active_character_died {
                 self.notify_ui_of_new_active_char().await;
             }
+        }
+    }
+
+    async fn perform_character_pushed(&self, ch: &Rc<Character>, dx: i32, dy: i32) {
+        assert!((dx, dy) != (0, 0) && (dx == 0 || dy == 0));
+        let mut positions = vec![];
+        if dx != 0 {
+            for i in 0..=dx.abs() {
+                positions.push((ch.pos().0 + i * dx.signum(), ch.pos().1));
+            }
+        }
+        if dy != 0 {
+            for i in 0..=dy.abs() {
+                positions.push((ch.pos().0, ch.pos().1 + i * dy.signum()));
+            }
+        }
+        let positions: Vec<Position> = positions
+            .into_iter()
+            .take_while(|pos| self.pathfind_grid.is_free_for(ch.id(), *pos))
+            .collect();
+
+        if positions.len() > 1 {
+            self.perform_movement(ch.id(), positions, MovementType::KnockedBack)
+                .await;
         }
     }
 
@@ -503,7 +529,8 @@ impl CoreGame {
                     character.spend_movement(free_distance);
                 }
 
-                self.perform_movement(positions, true).await;
+                self.perform_movement(self.active_character_id, positions, MovementType::Regular)
+                    .await;
                 ActionOutcome::Default
             }
 
@@ -556,19 +583,20 @@ impl CoreGame {
 
     async fn perform_movement(
         &self,
+        character_id: CharacterId,
         mut positions: Vec<Position>,
-        can_trigger_opportunity_attack: bool,
+        movement_type: MovementType,
     ) {
+        let character = self.characters.get(character_id);
         //dbg!(("perform movement: {:?}", &positions));
         let start_position = positions.remove(0);
-        assert!(start_position == self.active_character().pos());
+        assert!(start_position == character.pos());
         assert!(
             !positions.is_empty(),
             "movement must consist of more than just the start position"
         );
 
         while !positions.is_empty() {
-            let character = self.active_character();
             let new_position = positions.remove(0);
             if new_position == character.pos() {
                 panic!(
@@ -585,7 +613,7 @@ impl CoreGame {
 
                 if unfriendly && leaving_melee {
                     // Movement opportunity attack
-                    if can_trigger_opportunity_attack
+                    if movement_type == MovementType::Regular
                         && other_char.can_use_opportunity_attack(character.id())
                     {
                         let reactor = other_char;
@@ -646,19 +674,22 @@ impl CoreGame {
             self.pathfind_grid
                 .set_occupied(new_position, Some(Occupation::Character(id)));
 
-            self.active_character().set_facing_toward(new_position);
+            if movement_type != MovementType::KnockedBack {
+                character.set_facing_toward(new_position);
+            }
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
                 from: prev_position,
                 to: new_position,
+                movement_type,
             })
             .await;
 
-            self.active_character().set_position(new_position);
+            character.set_position(new_position);
         }
 
-        dbg!(self.active_character().pos());
+        dbg!(character.pos());
 
         self.on_character_positions_changed();
     }
@@ -738,6 +769,18 @@ impl CoreGame {
                     line.push_str(&format!(" ({})", stacks_cleared));
                 }
                 line
+            }
+            ApplyEffect::Knockback(amount) => {
+                let giver = giver.unwrap();
+                let dx = receiver.pos().0 - giver.pos().0;
+                let dy = receiver.pos().1 - giver.pos().1;
+                let vector = if dx.abs() >= dy.abs() {
+                    (amount as i32 * dx.signum(), 0)
+                } else {
+                    (0, amount as i32 * dy.signum())
+                };
+                receiver.is_being_pushed_in_direction.set(Some(vector));
+                format!("  {} was knocked back (?)", receiver.name)
             }
         };
 
@@ -901,7 +944,12 @@ impl CoreGame {
 
                     if let Some(game) = real_game {
                         if let Some(positions) = movement {
-                            game.perform_movement(positions.clone(), false).await;
+                            game.perform_movement(
+                                caster.id(),
+                                positions.clone(),
+                                MovementType::AbilityEngage,
+                            )
+                            .await;
                         }
                     }
 
@@ -1306,6 +1354,7 @@ impl CoreGame {
                     }
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
+                    ApplyEffect::Knockback { .. } => {}
                 }
 
                 let (log_line, _damage) = game.perform_effect_application(effect, None, target);
@@ -1613,6 +1662,7 @@ impl CoreGame {
                         }
                         ApplyEffect::PerBleeding { .. } => {}
                         ApplyEffect::ConsumeCondition { .. } => {}
+                        ApplyEffect::Knockback { .. } => {}
                     }
 
                     if reduced_to_nothing {
@@ -2274,6 +2324,13 @@ fn roll_description(advantage: i32) -> Option<String> {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum MovementType {
+    Regular,
+    AbilityEngage,
+    KnockedBack,
+}
+
 #[derive(Copy, Clone)]
 enum ActionPerformanceMode<'a> {
     Real(&'a CoreGame),
@@ -2450,6 +2507,7 @@ pub enum GameEvent {
         character: CharacterId,
         from: Position,
         to: Position,
+        movement_type: MovementType,
     },
     CharacterReactedToAttacked {
         reactor: CharacterId,
@@ -2830,6 +2888,7 @@ pub enum ApplyEffect {
     ConsumeCondition {
         condition: Condition,
     },
+    Knockback(u32),
 }
 
 impl Display for ApplyEffect {
@@ -2852,6 +2911,7 @@ impl Display for ApplyEffect {
             ApplyEffect::ConsumeCondition { condition } => {
                 f.write_fmt(format_args!("-{}", condition.name()))
             }
+            ApplyEffect::Knockback(..) => f.write_str("KNOCKBACK (todo)"),
         }
     }
 }
@@ -3370,6 +3430,13 @@ impl Ability {
     pub fn targets_single_enemy(&self) -> bool {
         matches!(self.target, AbilityTarget::Enemy { .. })
     }
+
+    pub fn has_knockback(&self) -> bool {
+        match self.target {
+            AbilityTarget::Enemy { effect, .. } => effect.has_knockback(),
+            _ => false,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3442,6 +3509,17 @@ impl AbilityNegativeEffect {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => spell_enemy_effect,
             AbilityNegativeEffect::PerformAttack => panic!(),
         }
+    }
+
+    pub fn has_knockback(&self) -> bool {
+        if let AbilityNegativeEffect::Spell(sne) = self {
+            for effect in sne.on_hit.iter().flatten().flatten() {
+                if matches!(effect, ApplyEffect::Knockback { .. }) {
+                    return true;
+                }
+            }
+        }
+        false
     }
 }
 
@@ -3873,6 +3951,7 @@ pub struct Character {
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 
     pub is_facing_east: Cell<bool>,
+    is_being_pushed_in_direction: Cell<Option<(i32, i32)>>,
 }
 
 impl Character {
@@ -3942,6 +4021,7 @@ impl Character {
             engagement_target: Default::default(),
             changed_equipment_listeners: Default::default(),
             is_facing_east: Cell::new(false),
+            is_being_pushed_in_direction: Cell::new(None),
         }
     }
 

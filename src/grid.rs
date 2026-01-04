@@ -825,6 +825,12 @@ impl GameGrid {
             self.draw_movement_path_background(self.active_character_id);
         }
 
+        if let UiState::ConfiguringAction(ConfiguredAction::UseAbility { ability, .. }) = ui_state {
+            if ability.has_knockback() {
+                self.draw_filled_occupied_cells();
+            }
+        }
+
         for character in self.characters.iter() {
             for engager in character.is_engaged_by.borrow().values() {
                 let mut engager_pos = self.character_screen_pos(engager);
@@ -2230,6 +2236,11 @@ impl GameGrid {
             }
         }
 
+        self.draw_filled_occupied_cells();
+        self.draw_move_range_indicator(character, character.remaining_movement.get());
+    }
+
+    fn draw_filled_occupied_cells(&self) {
         for (pos, occupation) in self.pathfind_grid.occupied().iter() {
             let draw_occupation = match occupation {
                 Occupation::Character(id) => *id != self.active_character_id,
@@ -2239,8 +2250,6 @@ impl GameGrid {
                 self.fill_cell(*pos, Color::new(0.9, 0.1, 0.2, 0.1), 0.0);
             }
         }
-
-        self.draw_move_range_indicator(character, character.remaining_movement.get());
     }
 
     fn is_within_grid(&self, pos: Position) -> bool {
