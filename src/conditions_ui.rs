@@ -29,10 +29,12 @@ impl ConditionsList {
         infos: Vec<ConditionInfo>,
         status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
+        // We need to start out with an accurate height, to prevent the parent container from "flickering" the first time it renders
+        let approx_size = (1.0, infos.len() as f32 * CONDITIONS_LIST_LINE_H);
         Self {
             font,
             infos,
-            size: Cell::new((0.0, 0.0)),
+            size: Cell::new(approx_size),
             status_textures,
         }
     }
@@ -48,6 +50,8 @@ impl Drawable for ConditionsList {
         self.size.get()
     }
 }
+
+const CONDITIONS_LIST_LINE_H: f32 = 22.0;
 
 impl ConditionsList {
     fn draw_conditions(
@@ -69,14 +73,12 @@ impl ConditionsList {
 
         let mut max_w = 0.0;
 
-        let line_height = 22.0;
-
         let mut y_offset = 0.0;
 
         let status_w = 20.0;
 
         for info in condition_infos {
-            y_offset += line_height;
+            y_offset += CONDITIONS_LIST_LINE_H;
             let y0 = y + y_offset;
             let x0 = x + status_w + 2.0;
 
