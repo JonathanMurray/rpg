@@ -351,7 +351,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
         effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Static(2)),
-            on_hit: None,
+            on_hit: Some([Some(ApplyEffect::Knockback(2)), None]),
         })),
     }),
 };

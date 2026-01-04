@@ -1597,6 +1597,16 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
+            GameEvent::CharacterReceivedKnockback { character } => {
+                let char = self.characters.get(character);
+                self.game_grid.add_text_effect(
+                    char.pos(),
+                    0.0,
+                    1.5,
+                    "Knockback",
+                    TextEffectStyle::HostileHit,
+                );
+            }
             GameEvent::Moved {
                 character,
                 from,
@@ -1610,7 +1620,7 @@ impl UserInterface {
                 }
 
                 self.game_grid
-                    .set_character_motion(character, from, to, duration);
+                    .set_character_motion(character, from, to, duration, movement_type);
                 if movement_type != MovementType::KnockedBack {
                     self.sound_player.play(SoundId::Walk);
                 }

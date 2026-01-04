@@ -293,6 +293,8 @@ impl CoreGame {
             .collect();
 
         if positions.len() > 1 {
+            self.ui_handle_event(GameEvent::CharacterReceivedKnockback { character: ch.id() })
+                .await;
             self.perform_movement(ch.id(), positions, MovementType::KnockedBack)
                 .await;
         }
@@ -561,7 +563,7 @@ impl CoreGame {
                 }
                 if let Some(apply_effect) = consumable.effect {
                     // TODO: log it?
-                    self.perform_effect_application(apply_effect, None, character);
+                    self.perform_effect_application(apply_effect, None, None, character);
                 }
 
                 character.set_equipment(None, slot_role);
@@ -726,6 +728,7 @@ impl CoreGame {
         &self,
         effect: ApplyEffect,
         giver: Option<&Character>,
+        area_center: Option<Position>,
         receiver: &Character,
     ) -> (String, u32) {
         let mut damage_dealt = 0;
@@ -772,15 +775,24 @@ impl CoreGame {
             }
             ApplyEffect::Knockback(amount) => {
                 let giver = giver.unwrap();
-                let dx = receiver.pos().0 - giver.pos().0;
-                let dy = receiver.pos().1 - giver.pos().1;
+                let mut source_pos = giver.pos();
+
+                if let Some(center) = area_center {
+                    // The knockback originates from the area center, unless the area was centered directly on this target
+                    if center != receiver.pos() {
+                        source_pos = center;
+                    }
+                }
+
+                let dx = receiver.pos().0 - source_pos.0;
+                let dy = receiver.pos().1 - source_pos.1;
                 let vector = if dx.abs() >= dy.abs() {
                     (amount as i32 * dx.signum(), 0)
                 } else {
                     (0, amount as i32 * dy.signum())
                 };
                 receiver.is_being_pushed_in_direction.set(Some(vector));
-                format!("  {} was knocked back (?)", receiver.name)
+                format!("  {} was knocked back", receiver.name)
             }
         };
 
@@ -1000,7 +1012,7 @@ impl CoreGame {
                         effect,
                         target,
                         &mut detail_lines,
-                        true,
+                        None,
                         mode,
                     );
                     target_outcome = Some((*target_id, outcome));
@@ -1357,7 +1369,8 @@ impl CoreGame {
                     ApplyEffect::Knockback { .. } => {}
                 }
 
-                let (log_line, _damage) = game.perform_effect_application(effect, None, target);
+                let (log_line, _damage) =
+                    game.perform_effect_application(effect, None, None, target);
                 detail_lines.push(log_line);
             }
 
@@ -1365,7 +1378,7 @@ impl CoreGame {
                 let effect = enhancement.spell_effect.unwrap();
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
                     let (log_line, _damage) =
-                        game.perform_effect_application(*apply_effect, None, target);
+                        game.perform_effect_application(*apply_effect, None, None, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
             }
@@ -1445,7 +1458,7 @@ impl CoreGame {
                     effect,
                     other_char,
                     detail_lines,
-                    false,
+                    Some(area_center),
                     mode,
                 );
 
@@ -1464,7 +1477,7 @@ impl CoreGame {
         enemy_effect: AbilityNegativeEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
-        is_direct_target: bool,
+        area_center: Option<Position>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         match enemy_effect {
@@ -1476,7 +1489,7 @@ impl CoreGame {
                 spell_enemy_effect,
                 target,
                 detail_lines,
-                is_direct_target,
+                area_center,
                 mode,
             ),
             AbilityNegativeEffect::PerformAttack => {
@@ -1511,7 +1524,7 @@ impl CoreGame {
         spell_enemy_effect: SpellNegativeEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
-        is_direct_target: bool,
+        area_center: Option<Position>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         let real_game = mode.real_game();
@@ -1570,10 +1583,10 @@ impl CoreGame {
 
                 for enhancement in enhancements {
                     let e = enhancement.spell_effect.unwrap();
-                    let bonus_dmg = if is_direct_target {
-                        e.bonus_target_damage
-                    } else {
+                    let bonus_dmg = if area_center.is_some() {
                         e.bonus_area_damage
+                    } else {
+                        e.bonus_target_damage
                     };
                     if bonus_dmg > 0 {
                         dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, enhancement.name));
@@ -1669,8 +1682,12 @@ impl CoreGame {
                         detail_lines.push(format!("'{}' was reduced to nothing (Graze)", effect));
                     } else {
                         applied_effects.push(effect);
-                        let (log_line, damage) =
-                            game.perform_effect_application(effect, Some(caster), target);
+                        let (log_line, damage) = game.perform_effect_application(
+                            effect,
+                            Some(caster),
+                            area_center,
+                            target,
+                        );
                         damage_from_effects += damage;
                         detail_lines.push(log_line);
                     }
@@ -1679,15 +1696,19 @@ impl CoreGame {
                 for enhancement in enhancements {
                     // TODO: shouldn't these also be affected by degree of success?
                     let e = enhancement.spell_effect.unwrap();
-                    let effects = if is_direct_target {
-                        e.target_on_hit
-                    } else {
+                    let effects = if area_center.is_some() {
                         e.area_on_hit
+                    } else {
+                        e.target_on_hit
                     };
                     for effect in effects.iter().flatten().flatten() {
                         applied_effects.push(*effect);
-                        let (log_line, damage) =
-                            game.perform_effect_application(*effect, Some(caster), target);
+                        let (log_line, damage) = game.perform_effect_application(
+                            *effect,
+                            Some(caster),
+                            area_center,
+                            target,
+                        );
                         damage_from_effects += damage;
                         detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                     }
@@ -1963,8 +1984,12 @@ impl CoreGame {
                 if let Some(effect) = on_true_hit_effect {
                     match effect {
                         AttackHitEffect::Apply(effect) => {
-                            let (log_line, _damage) =
-                                game.perform_effect_application(effect, Some(attacker), defender);
+                            let (log_line, _damage) = game.perform_effect_application(
+                                effect,
+                                Some(attacker),
+                                None,
+                                defender,
+                            );
                             detail_lines.push(format!("{} (true hit)", log_line))
                         }
                         AttackHitEffect::SkipExertion => skip_attack_exertion = true,
@@ -1983,6 +2008,7 @@ impl CoreGame {
                                     let (log_line, _damage) = game.perform_effect_application(
                                         apply_effect,
                                         Some(attacker),
+                                        None,
                                         defender,
                                     );
                                     log_line
@@ -2012,6 +2038,7 @@ impl CoreGame {
                             let (log_line, _damage) = game.perform_effect_application(
                                 apply_effect,
                                 Some(attacker),
+                                None,
                                 defender,
                             );
                             detail_lines.push(format!("{} ({})", log_line, arrow.name))
@@ -2053,7 +2080,7 @@ impl CoreGame {
             for (name, effect) in enhancements {
                 if let Some(effect) = effect.on_target {
                     let (log_line, _damage) =
-                        game.perform_effect_application(effect, Some(attacker), defender);
+                        game.perform_effect_application(effect, Some(attacker), None, defender);
                     detail_lines.push(format!("{} ({})", log_line, name));
                 }
             }
@@ -2162,6 +2189,7 @@ impl CoreGame {
                                 duration_rounds: duration,
                             }),
                             Some(reactor),
+                            None,
                             attacker,
                         );
                         lines.push(format!("{} (Shield bash)", log_line));
@@ -2555,6 +2583,9 @@ pub enum GameEvent {
         character: CharacterId,
         condition: Condition,
     },
+    CharacterReceivedKnockback {
+        character: CharacterId,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -2620,7 +2651,7 @@ pub enum AttackOutcome {
 impl AttackOutcome {
     fn damage(&self) -> Option<u32> {
         match self {
-            AttackOutcome::Hit(dmg, attack_hit_type) => Some(*dmg),
+            AttackOutcome::Hit(dmg, _attack_hit_type) => Some(*dmg),
             _ => None,
         }
     }

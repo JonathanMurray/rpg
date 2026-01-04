@@ -39,7 +39,8 @@ use crate::{
     bot::convert_path_to_move_action,
     core::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
-        BaseAction, Character, Condition, Goodness, Position, MOVE_DISTANCE_PER_STAMINA,
+        BaseAction, Character, Condition, Goodness, MovementType, Position,
+        MOVE_DISTANCE_PER_STAMINA,
     },
     data::{BAD_BOW, BOW},
     drawing::{
@@ -121,12 +122,24 @@ impl CharacterAnimation {
 
 #[derive(Debug, Copy, Clone)]
 enum AnimationKind {
-    Motion { from: Position, to: Position },
-    Shake { random_time_offset: f32 },
+    Motion {
+        from: Position,
+        to: Position,
+        movement_type: MovementType,
+    },
+    Shake {
+        random_time_offset: f32,
+    },
     Death,
-    Act { random_rotation: f32 },
-    HealthLost { previous: u32 },
-    SpeechBubble { text: &'static str },
+    Act {
+        random_rotation: f32,
+    },
+    HealthLost {
+        previous: u32,
+    },
+    SpeechBubble {
+        text: &'static str,
+    },
 }
 
 struct MovementRange {
@@ -279,11 +292,16 @@ impl GameGrid {
         from: Position,
         to: Position,
         duration: f32,
+        movement_type: MovementType,
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::Motion { from, to },
+            AnimationKind::Motion {
+                from,
+                to,
+                movement_type,
+            },
         ));
     }
 
@@ -534,7 +552,7 @@ impl GameGrid {
 
     fn character_screen_pos(&self, character: &Character) -> (f32, f32) {
         for animation in &self.character_animations {
-            if let AnimationKind::Motion { from, to } = animation.kind {
+            if let AnimationKind::Motion { from, to, .. } = animation.kind {
                 if animation.character_id == character.id() {
                     let from = self.grid_pos_to_screen(from);
                     let to = self.grid_pos_to_screen(to);
@@ -646,16 +664,29 @@ impl GameGrid {
         {
             let remaining = animation.remaining_duration;
             match animation.kind {
-                AnimationKind::Motion { .. } => {
+                AnimationKind::Motion {
+                    movement_type,
+                    from,
+                    to,
+                } => {
                     let cycle_time = (game_time * 2.0) % (game_time * 2.0).floor();
-                    if cycle_time < 0.25 {
-                        y += 1.0;
-                    } else if cycle_time < 0.5 {
-                        params.rotation = -0.05;
-                    } else if cycle_time < 0.75 {
-                        y += 1.0;
+                    if movement_type == MovementType::KnockedBack {
+                        let amount = PI * 0.1;
+                        if from.0 < to.0 {
+                            params.rotation = amount;
+                        } else {
+                            params.rotation = -amount;
+                        }
                     } else {
-                        params.rotation = 0.05;
+                        if cycle_time < 0.25 {
+                            y += 1.0;
+                        } else if cycle_time < 0.5 {
+                            params.rotation = -0.05;
+                        } else if cycle_time < 0.75 {
+                            y += 1.0;
+                        } else {
+                            params.rotation = 0.05;
+                        }
                     }
                 }
                 AnimationKind::Shake { random_time_offset } => {
