@@ -1358,8 +1358,8 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     name: "Reach",
     description: "",
     icon: IconId::Extend,
-    action_point_cost: 0,
-    mana_cost: 1,
+    action_point_cost: 1,
+    mana_cost: 0,
     stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {

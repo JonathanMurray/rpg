@@ -3081,7 +3081,7 @@ impl Condition {
             Dazed => "-3 Evasion, Disadvantage on attacks.",
             Blinded => "Disadvantage, always Flanked when attacked.",
             Raging => "Advantage on melee attacks (until end of turn).",
-            Slowed => "-1 AP per turn, -25% movement",
+            Slowed => "-2 AP per turn, -25% movement",
             Hastened => "+1 AP per turn, +25% movement",
             Inspired => "+3 Will, +3 attack/spell modifier",
             Exposed => "-3 to all defenses.",
@@ -3184,7 +3184,7 @@ const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 3;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const INSPIRED_WILL_BONUS: u32 = 3;
-const SLOWED_AP_PENALTY: u32 = 1;
+const SLOWED_AP_PENALTY: u32 = 2;
 const HASTENED_AP_BONUS: u32 = 1;
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
