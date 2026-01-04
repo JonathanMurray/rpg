@@ -1525,11 +1525,11 @@ impl GameGrid {
         }
 
         for char in self.characters.iter() {
-            if labelled_char_ids.contains(&char.id()) {
-                self.draw_character_label(char, false);
-            } else {
-                self.draw_character_healthbar(char);
-            }
+            let draw_action_points =
+                char.player_controlled() && !char.has_taken_a_turn_this_round.get();
+            let draw_name = labelled_char_ids.contains(&char.id());
+            let discrete_healthbar = !draw_name;
+            self._draw_character_label(char, draw_action_points, draw_name, discrete_healthbar);
         }
 
         for char_animation in &self.character_animations {
@@ -1837,14 +1837,6 @@ impl GameGrid {
         draw_cross(x, y, self.cell_w, self.cell_w, RED, 2.0, self.cell_w * 0.15);
     }
 
-    fn draw_character_label(&self, character: &Character, draw_action_points: bool) {
-        self._draw_character_label(character, draw_action_points, true, false);
-    }
-
-    fn draw_character_healthbar(&self, character: &Character) {
-        self._draw_character_label(character, false, false, true);
-    }
-
     fn _draw_character_label(
         &self,
         character: &Character,
@@ -1881,7 +1873,26 @@ impl GameGrid {
         let condition_infos = character.condition_infos();
 
         let box_x = x - (box_w - self.cell_w) / 2.0;
-        let box_y = y - health_h - margin - box_h;
+        let mut box_y = y - health_h - margin - box_h;
+
+        if draw_action_points {
+            let ap_row_y = box_y + 6.0;
+            box_y -= 10.0;
+            let mut action_points_row = ActionPointsRow::new(
+                (10.0, 10.0),
+                0.2,
+                Style {
+                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+                    ..Default::default()
+                },
+            );
+            action_points_row.padding = 1.0;
+            action_points_row.current_ap = character.action_points.current();
+            action_points_row.draw(
+                x - (action_points_row.size().0 - self.cell_w) / 2.0,
+                ap_row_y,
+            );
+        }
 
         let status_y;
 
@@ -1994,25 +2005,6 @@ impl GameGrid {
                 },
             );
         }
-
-        // TODO: Maybe it's not necessary to see AP above enemies? It takes a lot of screen space, and blocks statuses.
-        /*
-        if draw_action_points {
-            let mut action_points_row = ActionPointsRow::new(
-                (10.0, 10.0),
-                0.2,
-                Style {
-                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
-                    ..Default::default()
-                },
-            );
-            action_points_row.current_ap = character.action_points.current();
-            action_points_row.draw(
-                x - (action_points_row.size().0 - self.cell_w) / 2.0,
-                box_y - action_points_row.size().1 - 3.0,
-            );
-        }
-         */
     }
 
     fn draw_character_highlight(&self, character_id: CharacterId, color: Color, margin: f32) {

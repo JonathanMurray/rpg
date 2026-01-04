@@ -835,7 +835,7 @@ pub struct ActionPointsRow {
     pub reserved_and_hovered_ap: (i32, i32),
     max_ap: u32,
     cell_size: (f32, f32),
-    padding: f32,
+    pub padding: f32,
     style: Style,
     radius_factor: f32,
 }
