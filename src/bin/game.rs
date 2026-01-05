@@ -6,19 +6,20 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use macroquad::audio::load_sound;
 use macroquad::color::{Color, LIGHTGRAY, MAGENTA, WHITE};
 use macroquad::input::{get_keys_pressed, mouse_position};
-use macroquad::math::Rect;
+use macroquad::math::{vec2, Rect};
 use macroquad::miniquad::window::{self, set_window_position, set_window_size};
 use macroquad::miniquad::KeyCode;
 
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{draw_text, load_ttf_font, Font};
 use macroquad::texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
+use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::BLACK,
     miniquad,
     rand::{self},
     time::get_frame_time,
-    window::{clear_background, Conf},
+    window::Conf,
 };
 
 use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
@@ -289,6 +290,8 @@ async fn init_fight_scene(
      */
 
     let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
+    // TODO
+    //terrain_atlas.set_filter(FilterMode::Linear);
 
     let status_textures = load_all_status_textures().await;
 

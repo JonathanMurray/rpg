@@ -9,6 +9,7 @@ use std::{
 use macroquad::{
     color::WHITE,
     math::Rect,
+    text,
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
 };
 
@@ -355,7 +356,22 @@ pub enum TerrainId {
     Grass2,
     Grass3,
     Grass4,
+    Dirt,
 
+    StoneWall,
+    StoneWallConcaveNorthWest,
+    StoneWallNorth,
+    StoneWallConcaveNorthEast,
+    StoneWallWest,
+    StoneWallEast,
+    StoneWallConcaveSouthWest,
+    StoneWallSouth,
+    StoneWallConcaveSouthEast,
+    StoneWallConvexNorthWest,
+    StoneWallConvexNorthEast,
+    StoneWallConvexSouthWest,
+    StoneWallConvexSouthEast,
+    StoneWallInner,
     Bush,
     Boulder2,
     TreeStump,
@@ -377,7 +393,7 @@ pub enum TerrainId {
 }
 
 pub fn draw_terrain(
-    texture: &Texture2D,
+    texture: &mut Texture2D,
     terrain_id: TerrainId,
     cell_w: f32,
     mut x: f32,
@@ -396,6 +412,23 @@ pub fn draw_terrain(
         TerrainId::Grass2 => (1, 8),
         TerrainId::Grass3 => (2, 8),
         TerrainId::Grass4 => (3, 8),
+
+        TerrainId::Dirt => (0, 10),
+
+        TerrainId::StoneWall => (1, 7),
+        TerrainId::StoneWallConcaveNorthWest => (0, 12),
+        TerrainId::StoneWallNorth => (1, 12),
+        TerrainId::StoneWallConcaveNorthEast => (2, 12),
+        TerrainId::StoneWallWest => (0, 13),
+        TerrainId::StoneWallEast => (2, 13),
+        TerrainId::StoneWallConcaveSouthWest => (0, 14),
+        TerrainId::StoneWallSouth => (1, 14),
+        TerrainId::StoneWallConcaveSouthEast => (2, 14),
+        TerrainId::StoneWallConvexNorthWest => (3, 12),
+        TerrainId::StoneWallConvexNorthEast => (5, 12),
+        TerrainId::StoneWallConvexSouthWest => (3, 14),
+        TerrainId::StoneWallConvexSouthEast => (5, 14),
+        TerrainId::StoneWallInner => (4, 13),
 
         TerrainId::Bush => (0, 7),
         TerrainId::Boulder2 => (0, 6),
@@ -480,7 +513,13 @@ pub fn draw_terrain(
         ..Default::default()
     };
 
-    draw_texture_ex(texture, x - cell_w, y - cell_w, WHITE, params);
+    draw_texture_ex(
+        texture,
+        (x - cell_w).floor(),
+        (y - cell_w).floor(),
+        WHITE,
+        params,
+    );
 }
 
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {

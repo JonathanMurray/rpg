@@ -920,9 +920,9 @@ impl Drawable for ActionPointsRow {
         //draw_rectangle(x, y, size.0, size.1, BLACK);
         self.style.draw_background(x, y, size);
 
-        let mut x0 = x + self.padding;
-        let y0 = y + self.padding;
-        let r = self.cell_size.1 * self.radius_factor;
+        let mut x0 = (x + self.padding).floor();
+        let y0 = (y + self.padding).floor();
+        let r = (self.cell_size.1 * self.radius_factor).round();
 
         let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
 
@@ -1007,6 +1007,7 @@ impl Drawable for ActionPointsRow {
                     SKYBLUE,
                 );
             } else {
+                /*
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
@@ -1014,6 +1015,7 @@ impl Drawable for ActionPointsRow {
                     1.0,
                     GRAY,
                 );
+                 */
             }
 
             x0 += self.cell_size.0;

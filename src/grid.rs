@@ -220,7 +220,14 @@ pub struct GameGrid {
     status_textures: HashMap<StatusId, Texture2D>,
 }
 
-const ZOOM_LEVELS: [f32; 6] = [16.0, 24.0, 32.0, 40.0, 48.0, 64.0];
+const ZOOM_LEVELS: [f32; 6] = [
+    32.0 / 3.0,
+    41.0 / 3.0,
+    50.0 / 3.0,
+    64.0 / 3.0,
+    85.0 / 3.0,
+    96.0 / 3.0,
+];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
@@ -245,7 +252,7 @@ impl GameGrid {
         terrain_objects: HashMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
-        let zoom_index = 1;
+        let zoom_index = 2;
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();
@@ -598,7 +605,7 @@ impl GameGrid {
         self.enemys_target = Some(target_character_id);
     }
 
-    fn draw_background(&self) {
+    fn draw_background(&mut self) {
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
 
@@ -606,8 +613,9 @@ impl GameGrid {
                 let y0 = self.grid_y_to_screen(row);
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
-                    let terrain_id = self.background.get(&(col, row)).unwrap();
-                    draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                    if let Some(terrain_id) = self.background.get(&(col, row)) {
+                        draw_terrain(&mut self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                    }
                 }
             }
         }
@@ -620,7 +628,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.terrain_objects.get(&(col, row)) {
-                        draw_terrain(&self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                        draw_terrain(&mut self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
                     }
                 }
             }

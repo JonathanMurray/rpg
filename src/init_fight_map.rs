@@ -54,6 +54,24 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let mut player_positions = vec![];
     let mut enemy_positions: HashMap<u32, Vec<Position>> = HashMap::new();
 
+    let terrain_object_chars: HashMap<char, TerrainId> = [
+        ('Y', TerrainId::StoneWallConcaveNorthWest),
+        ('U', TerrainId::StoneWallNorth),
+        ('I', TerrainId::StoneWallConcaveNorthEast),
+        ('H', TerrainId::StoneWallWest),
+        ('K', TerrainId::StoneWallEast),
+        ('N', TerrainId::StoneWallConcaveSouthWest),
+        ('M', TerrainId::StoneWallSouth),
+        (',', TerrainId::StoneWallConcaveSouthEast),
+        ('O', TerrainId::StoneWallConvexSouthWest),
+        ('L', TerrainId::StoneWallConvexSouthEast),
+        ('C', TerrainId::StoneWallConvexNorthWest),
+        ('V', TerrainId::StoneWallConvexNorthEast),
+        ('B', TerrainId::StoneWallInner),
+    ]
+    .into_iter()
+    .collect();
+
     let mut row = 0;
     for line in map_str.lines() {
         if line.starts_with('+') {
@@ -63,32 +81,41 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         let mut col = 0;
         for ch in line.chars() {
             let pos = (col, row);
-            match ch {
-                'W' => {
-                    water_grid.insert(pos);
-                    terrain_center_positions.insert(pos);
+            if let Some(terrain_id) = terrain_object_chars.get(&ch) {
+                terrain_objects.insert(pos, *terrain_id);
+                terrain_center_positions.insert(pos);
+            } else {
+                match ch {
+                    'W' => {
+                        water_grid.insert(pos);
+                        terrain_center_positions.insert(pos);
+                    }
+                    'X' => {
+                        terrain_objects.insert(pos, TerrainId::StoneWall);
+                        terrain_center_positions.insert(pos);
+                    }
+                    'B' => {
+                        terrain_objects.insert(pos, TerrainId::Bush);
+                        terrain_center_positions.insert(pos);
+                    }
+                    'R' => {
+                        terrain_objects.insert(pos, TerrainId::Boulder2);
+                        terrain_center_positions.insert(pos);
+                    }
+                    'S' => {
+                        terrain_objects.insert(pos, TerrainId::TreeStump);
+                        terrain_center_positions.insert(pos);
+                    }
+                    'P' => {
+                        player_positions.push(pos);
+                    }
+                    '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
+                        let digit = ch.to_digit(10).unwrap();
+                        enemy_positions.entry(digit).or_default().push(pos);
+                    }
+                    ' ' => {}
+                    _ => panic!("Unhandled map object: {}", ch),
                 }
-                'B' => {
-                    terrain_objects.insert(pos, TerrainId::Bush);
-                    terrain_center_positions.insert(pos);
-                }
-                'R' => {
-                    terrain_objects.insert(pos, TerrainId::Boulder2);
-                    terrain_center_positions.insert(pos);
-                }
-                'S' => {
-                    terrain_objects.insert(pos, TerrainId::TreeStump);
-                    terrain_center_positions.insert(pos);
-                }
-                'P' => {
-                    player_positions.push(pos);
-                }
-                '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' => {
-                    let digit = ch.to_digit(10).unwrap();
-                    enemy_positions.entry(digit).or_default().push(pos);
-                }
-                ' ' => {}
-                _ => panic!("Unhandled map object: {}", ch),
             }
 
             col += CELLS_PER_ENTITY as i32;
@@ -465,10 +492,13 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     ];
     let uniform_distr = Uniform::new(0, grass_variations.len()).unwrap();
     let mut grass_choices = uniform_distr.sample_iter(&mut rng);
-    for x in 0..grid_dimensions.0 {
-        for y in 0..grid_dimensions.1 {
+    for x in (0..grid_dimensions.0).step_by(CELLS_PER_ENTITY as usize) {
+        for y in (0..grid_dimensions.1).step_by(CELLS_PER_ENTITY as usize) {
             let i = grass_choices.next().unwrap();
-            background.insert((x as i32, y as i32), grass_variations[i]);
+            let pos = (x as i32, y as i32);
+            background.insert(pos, grass_variations[i]);
+            //TODO
+            background.insert(pos, TerrainId::Dirt);
         }
     }
 

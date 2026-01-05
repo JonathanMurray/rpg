@@ -1,16 +1,17 @@
 +----------------------------
 BBBBBBBBBBBBBBBBBBBB
-BRR  WWWW          B
-BR    WWW          B
-B      WW          B
-B      WW   R     SB
-B  S   W    R3    SB
-B  PP      5    8 SB
-B  P     W         B
-B       WW  R4     B
-B       WWW   R    B
-B       WWW        B
-B   0 2  WWW    67 B
-BB   1            BB
- BBBBBBBBBBBBBBBBBB
+YUUUUUUIBYUUUUUUUUUI
+HRR    KBH         K
+HR     KBH         K
+H      KBH         K
+H      OUL  R     SK
+H  S        R3    SK
+H  PP      5    8 SK
+H  P               K
+H       XX  R4     K
+H       XXX   R    K
+H       XXX        K
+H   0 2         67 K
+H    1  CV         K
+NMMMMMMM,NMMMMMMMMM,
 +----------------------------

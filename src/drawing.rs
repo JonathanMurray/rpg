@@ -208,10 +208,10 @@ pub fn draw_cornered_rectangle_lines(
     margin: f32,
     len: f32,
 ) {
-    let left = x + margin;
-    let top = y + margin;
-    let right = x + w - margin;
-    let bot = y + h - margin;
+    let left = (x + margin).floor();
+    let top = (y + margin).floor();
+    let right = (x + w - margin).floor();
+    let bot = (y + h - margin).floor();
 
     draw_line(left, top, left, top + len, thickness, color);
     draw_line(left, top, left + len, top, thickness, color);
