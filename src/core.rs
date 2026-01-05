@@ -3882,7 +3882,7 @@ impl Attributes {
     }
 
     fn max_health(&self) -> u32 {
-        10 + self.strength.get() * 2
+        13 + self.strength.get() * 2
     }
 
     fn max_mana(&self) -> u32 {
