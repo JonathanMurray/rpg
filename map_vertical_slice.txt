@@ -10,8 +10,8 @@ H  PP      5    8 SK
 H  P               K
 H       XX  R4     K
 H       XXX   R    K
-H       XXX        K
-H   0 2         67 K
-H    1  CV         K
+H                  K
+H   0 2 CV      67 K
+H    1  KH         K
 NMMMMMMM,NMMMMMMMMM,
 +----------------------------

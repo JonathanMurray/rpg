@@ -454,7 +454,7 @@ pub const MEDIUM_SHIELD: Shield = Shield {
     on_attacked_reaction: Some(OnAttackedReaction {
         id: OnAttackedReactionId::Block,
         name: "Block",
-        description: "Attempt to block an incoming ranged attack",
+        description: "Protect against an incoming ranged attack",
         icon: IconId::Block,
         action_point_cost: 0,
         stamina_cost: 1,
@@ -566,7 +566,7 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Parry,
     name: "Parry",
-    description: "Attempt to parry an incoming melee attack",
+    description: "Protect against an incoming melee attack",
     icon: IconId::Parry,
     action_point_cost: 0,
     stamina_cost: 1,
