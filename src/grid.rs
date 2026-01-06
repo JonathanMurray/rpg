@@ -735,25 +735,24 @@ impl GameGrid {
             y -= self.cell_w * 0.2;
             shadow_y -= self.cell_w * 0.2;
         }
-                  draw_texture_ex(
-                &self.sprites[&SpriteId::CharacterShadow],
-                shadow_x,
-                shadow_y,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(
-                        (
-                            self.cell_w * CELLS_PER_ENTITY as f32,
-                            self.cell_w * CELLS_PER_ENTITY as f32,
-                        )
-                            .into(),
-                    ),
-                    flip_x: character.is_facing_east.get(),
-                    ..Default::default()
-                },
-            );
+        draw_texture_ex(
+            &self.sprites[&SpriteId::CharacterShadow],
+            shadow_x,
+            shadow_y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(
+                    (
+                        self.cell_w * CELLS_PER_ENTITY as f32,
+                        self.cell_w * CELLS_PER_ENTITY as f32,
+                    )
+                        .into(),
+                ),
+                flip_x: character.is_facing_east.get(),
+                ..Default::default()
+            },
+        );
         if show_sprite {
-  
             draw_texture_ex(
                 &self.sprites[&character.sprite],
                 x,
@@ -2694,7 +2693,15 @@ impl EffectGraphics {
                 let font_size = 20;
                 let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
 
-                let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
+                let grow_duration = 0.15;
+
+                let font_scale = if effect.age < grow_duration {
+                    1.0 * effect.age / grow_duration
+                } else {
+                    1.0
+                };
+
+                let x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
                 let y0 = y - cell_w - t * cell_w * 2.0;
 
                 let remaining = effect.end_time - effect.age;
@@ -2708,6 +2715,7 @@ impl EffectGraphics {
                 let mut text_params = TextParams {
                     font: Some(font),
                     font_size,
+                    font_scale,
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
