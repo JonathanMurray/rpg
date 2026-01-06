@@ -480,7 +480,7 @@ impl GameGrid {
         pos = (pos.0 + dx, pos.1 + dy);
 
         let color = match style {
-            TextEffectStyle::Friendly => GREEN,
+            TextEffectStyle::Friendly => Color::new(0.8, 1.0, 0.8, 1.0),
             TextEffectStyle::Miss => WHITE,
             TextEffectStyle::ReactionExclamation => ORANGE,
             TextEffectStyle::HostileGraze => WHITE,

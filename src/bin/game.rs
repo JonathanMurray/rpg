@@ -50,8 +50,7 @@ use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
     load_all_status_textures, load_and_init_font_symbols, load_and_init_texture,
-    load_and_init_user_interface_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
-    DICE_SYMBOL,
+    load_and_init_ui_textures, EquipmentIconId, IconId, PortraitId, SpriteId, DICE_SYMBOL,
 };
 use rpg::victory_scene::{run_victory_loop, Learning};
 
@@ -298,7 +297,7 @@ async fn init_fight_scene(
     let sound_player = SoundPlayer::new().await;
 
     load_and_init_font_symbols().await;
-    load_and_init_user_interface_texture().await;
+    load_and_init_ui_textures().await;
 
     let gfx_user_interface = UserInterface::new(
         &core_game,

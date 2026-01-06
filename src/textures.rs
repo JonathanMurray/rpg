@@ -564,11 +564,19 @@ pub async fn load_and_init_font_symbols() {
     SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
 }
 
-pub async fn load_and_init_user_interface_texture() {
+pub async fn load_and_init_ui_textures() {
     let texture = load_and_init_texture("user_interface.png").await;
     UI_TEXTURE.get_or_init(|| texture);
+
+    let texture = load_and_init_texture("portrait_bg.png").await;
+    PORTRAIT_BG_TEXTURE.get_or_init(|| texture);
+
+    let texture = load_and_init_texture("portrait_enemy_bg.png").await;
+    PORTRAIT_ENEMY_BG_TEXTURE.get_or_init(|| texture);
 }
 
 pub static DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static PORTRAIT_ENEMY_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

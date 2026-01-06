@@ -9,9 +9,9 @@ use macroquad::{
     color::{MAGENTA, SKYBLUE},
     input::{is_key_pressed, KeyCode},
     math::Rect,
-    shapes::{draw_triangle, draw_triangle_lines},
+    shapes::{draw_rectangle_ex, draw_triangle, draw_triangle_lines, DrawRectangleParams},
     text::{measure_text, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
 
 use indexmap::IndexMap;
@@ -35,7 +35,7 @@ use crate::{
     drawing::draw_cross,
     game_ui::UiState,
     sounds::{SoundId, SoundPlayer},
-    textures::{PortraitId, StatusId},
+    textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
 };
 
 pub struct CharacterPortraits {
@@ -72,7 +72,7 @@ impl CharacterPortraits {
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            margin: 2.0,
+            //margin: 2.0,
             children: elements,
             /*
             style: Style {
@@ -219,7 +219,7 @@ impl TopCharacterPortrait {
 
         let container = Container {
             style: Style {
-                background_color: Some(DARKGRAY),
+                //background_color: Some(DARKGRAY),
                 ..Default::default()
             },
             children: vec![Element::ResizableTexture(texture, texture_size.clone())],
@@ -244,7 +244,23 @@ impl Drawable for TopCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = self.size();
         let (portrait_w, portrait_h) = self.container.children[0].size();
+        let bg_texture = if self.character.player_controlled() {
+            &PORTRAIT_BG_TEXTURE
+        } else {
+            &PORTRAIT_ENEMY_BG_TEXTURE
+        };
+        draw_texture_ex(
+            bg_texture.get().unwrap(),
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some((w, h).into()),
+                ..Default::default()
+            },
+        );
         self.container.draw(x + self.padding, y + self.padding);
+        draw_rectangle_lines(x, y, w, h, 2.0, LIGHTGRAY);
 
         let x0 = x + (w - portrait_w) / 2.0;
 
@@ -275,15 +291,15 @@ impl Drawable for TopCharacterPortrait {
 
         if !self.character.health.is_at_max() {
             let margin = 1.0;
-            let w = 64.0 - margin * 2.0;
-            let damage_h = (80.0 - margin * 2.0) * (1.0 - self.character.health.ratio());
+            let damage_w = w - margin * 2.0;
+            let damage_h = (h - margin * 2.0) * (1.0 - self.character.health.ratio());
             let x0 = x + margin;
             let y0 = y + margin;
-            draw_rectangle(x0, y0, w, damage_h, Color::new(0.3, 0.0, 0.0, 0.5));
+            draw_rectangle(x0, y0, damage_w, damage_h, Color::new(0.3, 0.0, 0.0, 0.5));
             draw_line(
                 x0,
                 y0 + damage_h,
-                x0 + w,
+                x0 + damage_w,
                 y0 + damage_h,
                 3.0,
                 Color::new(0.6, 0.0, 0.0, 0.6),
@@ -661,6 +677,7 @@ impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = (64.0, 80.0);
         draw_rectangle(x, y, w, h, DARKGRAY);
+        draw_texture(&PORTRAIT_BG_TEXTURE.get().unwrap(), x, y, WHITE);
         self.last_drawn_rect.set(Rect::new(x, y, w, h));
 
         let params = DrawTextureParams {
