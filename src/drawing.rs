@@ -1,6 +1,6 @@
 use macroquad::{
-    color::Color,
-    shapes::{draw_circle_lines, draw_line},
+    color::{Color, WHITE},
+    shapes::{draw_circle_lines, draw_line, draw_rectangle},
     time::get_time,
 };
 
@@ -120,28 +120,33 @@ pub fn draw_dashed_line_ex(
         from.1 + (to.1 - from.1) * (start_offset / line_len),
     );
 
+    let draw_dash = |start: (f32, f32), end: (f32, f32)| {
+        let mut skip = false;
+        if let Some(trim) = trim_start_and_end {
+            if (start.0 - from.0).abs() < trim && (start.1 - from.1).abs() < trim {
+                skip = true;
+            }
+            if (end.0 - to.0).abs() < trim && (end.1 - to.1).abs() < trim {
+                skip = true;
+            }
+        }
+        if !skip {
+            draw_line(start.0, start.1, end.0, end.1, thickness, color);
+        }
+    };
+
     let (mut prev_x, mut prev_y) = from;
     for i in 0..num_segments {
         let x = from.0 + dx * i as f32;
         let y = from.1 + dy * i as f32;
         if i % 2 == 0 {
-            let mut skip = false;
-            if let Some(trim) = trim_start_and_end {
-                if (prev_x - from.0).abs() < trim && (prev_y - from.1).abs() < trim {
-                    skip = true;
-                }
-                if (x - to.0).abs() < trim && (y - to.1).abs() < trim {
-                    skip = true;
-                }
-            }
-            if !skip {
-                draw_line(prev_x, prev_y, x, y, thickness, color);
-            }
+            draw_dash((prev_x, prev_y), (x, y));
         }
         prev_x = x;
         prev_y = y;
     }
-    draw_line(prev_x, prev_y, to.0, to.1, thickness, color);
+
+    draw_dash((prev_x, prev_y), to);
 }
 
 pub fn draw_dashed_rectangle_lines(
@@ -283,10 +288,18 @@ pub fn draw_dashed_rectangle_sides(
 }
 
 pub fn draw_crosshair((x, y): (f32, f32), r: f32, color: Color) {
+    let x = x.floor();
+    let y = y.floor();
     draw_circle_lines(x, y, r, 3.0, color);
     let len = r * 1.7;
-    draw_line(x - len, y, x + len, y, 2.0, color);
-    draw_line(x, y - len, x, y + len, 2.0, color);
+    let space = 4.0;
+    draw_line(x - len, y, x - space, y, 2.0, color);
+    draw_line(x + space, y, x + len, y, 2.0, color);
+
+    draw_line(x, y - len, x, y - space, 2.0, color);
+    draw_line(x, y + space, x, y + len, 2.0, color);
+
+    draw_rectangle(x - 1.0, y - 1.0, 3.0, 3.0, color);
 }
 
 pub fn draw_cross(x: f32, y: f32, w: f32, h: f32, color: Color, thickness: f32, margin: f32) {

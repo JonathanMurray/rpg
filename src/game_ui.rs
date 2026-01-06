@@ -1666,9 +1666,11 @@ impl UserInterface {
     }
 
     fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
-        let prev_health = self.characters.get(character_id).health.current() + dmg;
-        self.game_grid
-            .animate_character_health_change(character_id, prev_health, 0.6);
+        if dmg > 0 {
+            let prev_health = self.characters.get(character_id).health.current() + dmg;
+            self.game_grid
+                .animate_character_health_change(character_id, prev_health, 0.9);
+        }
     }
 
     fn add_effects_for_area_outcomes(
@@ -1784,9 +1786,11 @@ impl UserInterface {
             self.characters.get(target).name
         );
 
+        let mut damage_was_dealt = false;
         match outcome {
             AttackOutcome::Hit(dmg, _) => {
                 self.animate_character_damage(target, dmg);
+                damage_was_dealt = dmg > 0;
                 line.push_str(&format!(" ({} damage)", dmg))
             }
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
@@ -1818,13 +1822,15 @@ impl UserInterface {
         self.game_grid
             .add_text_effect(target_pos, 0.0, 1.5, impact_text, text_style);
 
-        self.game_grid.animate_character_shaking(target, 0.2);
+        if damage_was_dealt {
+            self.game_grid.animate_character_shaking(target, 0.2);
+        }
 
         if let Some(outcomes) = &event.area_outcomes {
             self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, outcomes);
         }
 
-        self.animation_stopwatch.set_to_at_least(0.2);
+        self.animation_stopwatch.set_to_at_least(0.3);
     }
 
     fn add_effect_for_ability_target_outcome(

@@ -665,6 +665,7 @@ impl GameGrid {
 
         let mut weapon_rotation_modifier = 0.0;
 
+        let mut show_sprite = true;
         for animation in self
             .character_animations
             .iter()
@@ -720,6 +721,7 @@ impl GameGrid {
                     }
                 }
                 AnimationKind::HealthLost { .. } => {
+                    show_sprite = ((remaining) / 0.1).floor() as i32 % 2 == 0;
                     // This affects how the healthbar is drawn
                 }
                 AnimationKind::SpeechBubble { .. } => {
@@ -731,27 +733,28 @@ impl GameGrid {
         if !dying {
             y -= self.cell_w * 0.2;
         }
-        draw_texture_ex(
-            &self.sprites[&character.sprite],
-            x,
-            y,
-            WHITE,
-            params.clone(),
-        );
-
-        if let Some(weapon) = character.weapon(HandType::MainHand) {
-            if let Some(texture) = weapon.sprite {
-                let weapon_params = DrawTextureParams {
-                    rotation: params.rotation + weapon_rotation_modifier,
-                    ..params
-                };
-                draw_texture_ex(&self.sprites[&texture], x, y, WHITE, weapon_params);
+        if show_sprite {
+            draw_texture_ex(
+                &self.sprites[&character.sprite],
+                x,
+                y,
+                WHITE,
+                params.clone(),
+            );
+            if let Some(weapon) = character.weapon(HandType::MainHand) {
+                if let Some(texture) = weapon.sprite {
+                    let weapon_params = DrawTextureParams {
+                        rotation: params.rotation + weapon_rotation_modifier,
+                        ..params
+                    };
+                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, weapon_params);
+                }
             }
-        }
 
-        if let Some(shield) = character.shield() {
-            if let Some(texture) = shield.sprite {
-                draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params);
+            if let Some(shield) = character.shield() {
+                if let Some(texture) = shield.sprite {
+                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params);
+                }
             }
         }
     }
@@ -2028,7 +2031,7 @@ impl GameGrid {
                             / character.health.max() as f32);
 
                     let ratio = animation.remaining_duration_ratio();
-                    let animated_ratio = 0.2;
+                    let animated_ratio = 0.3;
                     if ratio < animated_ratio {
                         lost_health_w *= ratio / animated_ratio;
                     }
@@ -2037,7 +2040,7 @@ impl GameGrid {
                         health_y,
                         lost_health_w,
                         health_h,
-                        YELLOW,
+                        ORANGE,
                     );
                 }
             }
@@ -2212,7 +2215,7 @@ impl GameGrid {
             crosshair_color,
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
-            Some(self.cell_w * 0.4),
+            Some(self.cell_w),
             false,
         );
 
@@ -2672,7 +2675,7 @@ impl EffectGraphics {
                 let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width / 2.0;
-                let y0 = y - t * cell_w * 2.0;
+                let y0 = y - cell_w - t * cell_w * 2.0;
 
                 let remaining = effect.end_time - effect.age;
                 let fade_duration = 0.4;
