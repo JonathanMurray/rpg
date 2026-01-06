@@ -1607,6 +1607,16 @@ impl UserInterface {
                     TextEffectStyle::HostileHit,
                 );
             }
+            GameEvent::CharacterGainedAP { character } => {
+                let char = self.characters.get(character);
+                self.game_grid.add_text_effect(
+                    char.pos(),
+                    0.0,
+                    1.5,
+                    "+AP",
+                    TextEffectStyle::Friendly,
+                );
+            }
             GameEvent::Moved {
                 character,
                 from,

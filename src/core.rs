@@ -168,6 +168,10 @@ impl CoreGame {
                                 (_, 0) => format!("{sta} stamina"),
                                 _ => format!("{sta} stamina, {ap} AP"),
                             };
+                            self.ui_handle_event(GameEvent::CharacterGainedAP {
+                                character: character.id(),
+                            })
+                            .await;
                             self.log(format!("{} gained {} (Reaper)", character.name, gain))
                                 .await;
                         }
@@ -2584,6 +2588,9 @@ pub enum GameEvent {
         condition: Condition,
     },
     CharacterReceivedKnockback {
+        character: CharacterId,
+    },
+    CharacterGainedAP {
         character: CharacterId,
     },
 }
