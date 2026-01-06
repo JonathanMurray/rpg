@@ -1,6 +1,6 @@
 use macroquad::{
     color::{Color, WHITE},
-    shapes::{draw_circle_lines, draw_line, draw_rectangle},
+    shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle},
     time::get_time,
 };
 
@@ -283,6 +283,51 @@ pub fn draw_dashed_rectangle_sides(
             segment_len,
             None,
             false,
+        );
+    }
+}
+
+pub fn draw_rounded_rectangle_lines(
+    x: f32,
+    y: f32,
+    w: f32,
+    h: f32,
+    thickness: f32,
+    color: Color,
+    inner_rounding: f32,
+    outer: Option<(Color, f32)>,
+) {
+    draw_rectangle_lines(x, y, w, h, thickness, color);
+
+    let mut passes = vec![(color, inner_rounding)];
+    if let Some((outer_color, outer_rounding)) = outer {
+        passes.push((outer_color, outer_rounding));
+    }
+
+    for (color, rounding) in passes {
+        draw_triangle(
+            (x, y).into(),
+            (x + rounding, y).into(),
+            (x, y + rounding).into(),
+            color,
+        );
+        draw_triangle(
+            (x + w, y).into(),
+            (x + w - rounding, y).into(),
+            (x + w, y + rounding).into(),
+            color,
+        );
+        draw_triangle(
+            (x, y + h).into(),
+            (x, y + h - rounding).into(),
+            (x + rounding, y + h).into(),
+            color,
+        );
+        draw_triangle(
+            (x + w, y + h).into(),
+            (x + w - rounding, y + h).into(),
+            (x + w, y + h - rounding).into(),
+            color,
         );
     }
 }

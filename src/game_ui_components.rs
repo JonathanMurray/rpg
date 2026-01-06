@@ -32,7 +32,7 @@ use crate::{
     core::{
         Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
     },
-    drawing::draw_cross,
+    drawing::{draw_cross, draw_rounded_rectangle_lines},
     game_ui::UiState,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
@@ -264,18 +264,18 @@ impl Drawable for TopCharacterPortrait {
 
         let x0 = x + (w - portrait_w) / 2.0;
 
-        draw_rectangle_lines(x0, y, portrait_w, portrait_h, 1.0, BLACK);
-
         if self.strong_highlight {
             let margin = 1.0;
 
-            draw_rectangle_lines(
+            draw_rounded_rectangle_lines(
                 x0 - margin,
                 y - margin,
                 portrait_w + 2.0 * margin,
                 portrait_h + 2.0 * margin,
                 5.0,
-                GOLD,
+                WHITE,
+                10.0,
+                None,
             );
         }
         if self.weak_highlight {
@@ -464,12 +464,12 @@ impl PlayerPortraits {
     pub fn set_selected_id(&self, character_id: CharacterId) {
         self.portraits[&self.selected_i.get()]
             .borrow()
-            .shown_character
+            .is_character_shown
             .set(false);
         self.selected_i.set(character_id);
         self.portraits[&self.selected_i.get()]
             .borrow()
-            .shown_character
+            .is_character_shown
             .set(true);
     }
 
@@ -479,11 +479,11 @@ impl PlayerPortraits {
 
     pub fn set_active_character(&self, character_id: CharacterId) {
         if let Some(portrait) = self.portraits.get(&self.active_i.get()) {
-            portrait.borrow().active_character.set(false);
+            portrait.borrow().is_character_active.set(false);
         }
         self.active_i.set(character_id);
         if let Some(portrait) = self.portraits.get(&character_id) {
-            portrait.borrow().active_character.set(true);
+            portrait.borrow().is_character_active.set(true);
         }
     }
 
@@ -573,8 +573,8 @@ impl PlayerPortraits {
 struct PlayerCharacterPortrait {
     text: TextLine,
     character: Rc<Character>,
-    shown_character: Cell<bool>,
-    active_character: Cell<bool>,
+    is_character_shown: Cell<bool>,
+    is_character_active: Cell<bool>,
     padding: f32,
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
@@ -633,8 +633,8 @@ impl PlayerCharacterPortrait {
         Self {
             character: Rc::clone(character),
             text,
-            shown_character: Cell::new(false),
-            active_character: Cell::new(false),
+            is_character_shown: Cell::new(false),
+            is_character_active: Cell::new(false),
             padding: 10.0,
             has_been_clicked: Cell::new(false),
             texture,
@@ -706,10 +706,10 @@ impl Drawable for PlayerCharacterPortrait {
             );
         }
 
-        if self.shown_character.get() {
-            draw_rectangle_lines(x, y, w, h, 3.0, WHITE);
+        if self.is_character_shown.get() {
+            draw_rounded_rectangle_lines(x, y, w, h, 3.0, WHITE, 8.0, Some((BLACK, 3.0)));
         } else {
-            draw_rectangle_lines(x, y, w, h, 1.0, GRAY);
+            draw_rounded_rectangle_lines(x, y, w, h, 1.0, GRAY, 4.0, Some((BLACK, 3.0)));
         }
 
         //self.text.draw(self.padding + x, self.padding + y);
@@ -726,7 +726,7 @@ impl Drawable for PlayerCharacterPortrait {
             );
         }
 
-        if self.active_character.get() {
+        if self.is_character_active.get() {
             let x_mid = x + w / 2.0;
             let arrow_w = 14.0;
             let arrow_h = 7.0;
@@ -762,7 +762,7 @@ impl Drawable for PlayerCharacterPortrait {
         let (mouse_x, mouse_y) = mouse_position();
         let hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
 
-        if hovered {
+        if hovered && !self.is_character_shown.get() {
             draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
             if is_mouse_button_pressed(MouseButton::Left) {
                 println!(

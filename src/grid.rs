@@ -45,7 +45,7 @@ use crate::{
     data::{BAD_BOW, BOW},
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
-        draw_dashed_rectangle_sides,
+        draw_dashed_rectangle_sides, draw_rounded_rectangle_lines,
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
