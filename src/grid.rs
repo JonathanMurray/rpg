@@ -2257,8 +2257,8 @@ impl GameGrid {
             crosshair_color,
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
-            Some(self.cell_w),
-            false,
+            Some(self.cell_w * 0.8),
+            true,
         );
 
         let cross_hair_r = self.cell_w * 0.4;
