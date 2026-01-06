@@ -19,7 +19,7 @@ use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
-use crate::util::are_entities_within_melee;
+use crate::util::{are_entities_within_melee, line_collision};
 
 pub type Position = (i32, i32);
 
@@ -1025,7 +1025,7 @@ impl CoreGame {
                         detail_lines.push("Area of effect:".to_string());
 
                         let area_target_outcomes = Self::perform_ability_area_enemy_effect(
-                            radius,
+                            AreaShape::Circle(radius),
                             "AoE",
                             ability_roll,
                             &enhancements,
@@ -1054,7 +1054,7 @@ impl CoreGame {
                     ));
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (ability_result, dice_roll_line) = ability_roll.unwrap_roll();
+                    let (ability_result, dice_roll_line) = ability_roll.unwrap_actual_roll();
                     detail_lines.push(dice_roll_line.to_string());
 
                     let degree_of_success = ability_result / 10;
@@ -1103,8 +1103,10 @@ impl CoreGame {
                     caster.set_facing_toward(target_pos);
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (_ability_result, dice_roll_line) = ability_roll.unwrap_roll();
-                    detail_lines.push(dice_roll_line.to_string());
+
+                    if let Some((_ability_result, dice_roll_line)) = ability_roll.actual_roll() {
+                        detail_lines.push(dice_roll_line.to_string());
+                    }
 
                     let outcomes = Self::perform_ability_area_effect(
                         ability.name,
@@ -1141,7 +1143,8 @@ impl CoreGame {
 
                     if let Some(effect) = self_effect {
                         let degree_of_success = if let Some(ability_roll) = &maybe_ability_roll {
-                            let (ability_result, _dice_roll_line) = ability_roll.unwrap_roll();
+                            let (ability_result, _dice_roll_line) =
+                                ability_roll.unwrap_actual_roll();
                             ability_result / 10
                         } else {
                             0
@@ -1164,9 +1167,10 @@ impl CoreGame {
                     }
 
                     if let Some(area_effect) = self_area {
-                        dbg!("SELF AREA ", area_effect.radius);
+                        dbg!("SELF AREA ", area_effect.shape);
 
                         let ability_roll = maybe_ability_roll.unwrap();
+                        dbg!(&ability_roll);
 
                         let outcomes = Self::perform_ability_area_effect(
                             ability.name,
@@ -1234,7 +1238,7 @@ impl CoreGame {
     ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
         match area_effect.effect {
             AbilityEffect::Negative(effect) => Self::perform_ability_area_enemy_effect(
-                area_effect.radius,
+                area_effect.shape,
                 name,
                 ability_roll,
                 enhancements,
@@ -1250,7 +1254,7 @@ impl CoreGame {
                 assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
 
                 Self::perform_ability_area_ally_effect(
-                    area_effect.radius,
+                    area_effect.shape,
                     name,
                     enhancements,
                     caster,
@@ -1265,11 +1269,11 @@ impl CoreGame {
     }
 
     fn perform_ability_area_ally_effect(
-        mut radius: Range,
+        mut shape: AreaShape,
         name: &'static str,
         enhancements: &[AbilityEnhancement],
         caster: &Character,
-        area_center: Position,
+        area_pos: Position,
         detail_lines: &mut Vec<String>,
         ability_roll: AbilityRoll,
         effect: AbilityPositiveEffect,
@@ -1280,11 +1284,14 @@ impl CoreGame {
         for enhancement in enhancements {
             let e = enhancement.spell_effect.unwrap();
             if e.increased_radius_tenths > 0 {
-                radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+                let AreaShape::Circle(radius) = &mut shape else {
+                    panic!()
+                };
+                *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
             }
         }
 
-        let roll_result = ability_roll.unwrap_roll().0;
+        let roll_result = ability_roll.unwrap_actual_roll().0;
 
         let degree_of_success = roll_result / 10;
         if degree_of_success > 0 {
@@ -1296,7 +1303,7 @@ impl CoreGame {
                 continue;
             }
 
-            if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
+            if is_target_within_shape(caster.pos(), area_pos, shape, other_char.pos()) {
                 detail_lines.push(other_char.name.to_string());
 
                 let outcome = Self::perform_ability_ally_effect(
@@ -1395,12 +1402,12 @@ impl CoreGame {
     }
 
     fn perform_ability_area_enemy_effect(
-        mut radius: Range,
+        mut shape: AreaShape,
         name: &'static str,
         ability_roll: AbilityRoll,
         enhancements: &[AbilityEnhancement],
         caster: &Rc<Character>,
-        area_center: Position,
+        area_pos: Position,
         detail_lines: &mut Vec<String>,
         effect: AbilityNegativeEffect,
         acquisition: AreaTargetAcquisition,
@@ -1413,7 +1420,10 @@ impl CoreGame {
         for enhancement in enhancements {
             if let Some(e) = enhancement.spell_effect {
                 if e.increased_radius_tenths > 0 {
-                    radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+                    let AreaShape::Circle(radius) = &mut shape else {
+                        panic!()
+                    };
+                    *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
                 }
             }
         }
@@ -1429,7 +1439,7 @@ impl CoreGame {
                 continue;
             }
 
-            if within_range_squared(radius.squared(), area_center, other_char.position.get()) {
+            if is_target_within_shape(caster.pos(), area_pos, shape, other_char.pos()) {
                 let mut line = other_char.name.to_string();
                 match effect {
                     AbilityNegativeEffect::Spell(spell_enemy_effect) => {
@@ -1462,7 +1472,7 @@ impl CoreGame {
                     effect,
                     other_char,
                     detail_lines,
-                    Some(area_center),
+                    Some(area_pos),
                     mode,
                 );
 
@@ -1535,7 +1545,7 @@ impl CoreGame {
 
         let success = match spell_enemy_effect.defense_type {
             Some(contest) => {
-                let ability_result = ability_roll.unwrap_roll().0;
+                let ability_result = ability_roll.unwrap_actual_roll().0;
                 let defense = match contest {
                     DefenseType::Will => target.will(),
                     DefenseType::Evasion => target.evasion(),
@@ -2513,12 +2523,16 @@ enum AbilityRoll {
 }
 
 impl AbilityRoll {
-    fn unwrap_roll(&self) -> (u32, &str) {
+    fn actual_roll(&self) -> Option<(u32, &str)> {
         match self {
-            AbilityRoll::RolledWithSpellModifier { result, line } => (*result, line),
-            AbilityRoll::RolledWithAttackModifier { result, line } => (*result, line),
-            unexpected => panic!("haven't rolled: {:?}", unexpected),
+            AbilityRoll::RolledWithSpellModifier { result, line } => Some((*result, line)),
+            AbilityRoll::RolledWithAttackModifier { result, line } => Some((*result, line)),
+            AbilityRoll::WillRollDuringAttack { .. } => None,
         }
+    }
+    fn unwrap_actual_roll(&self) -> (u32, &str) {
+        self.actual_roll()
+            .unwrap_or_else(|| panic!("haven't rolled"))
     }
     fn unwrap_attack_bonus(&self) -> i32 {
         match self {
@@ -3494,6 +3508,7 @@ pub enum AbilityId {
     ShackledMind,
     MindBlast,
     InflictWounds,
+    PiercingShot,
     Heal,
     HealingNova,
     SelfHeal,
@@ -3599,9 +3614,15 @@ pub enum AbilityTarget {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AreaEffect {
-    pub radius: Range,
+    pub shape: AreaShape,
     pub acquisition: AreaTargetAcquisition,
     pub effect: AbilityEffect,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AreaShape {
+    Circle(Range),
+    Line,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -3641,9 +3662,13 @@ impl AbilityTarget {
 
     fn base_radius(&self) -> Option<Range> {
         match self {
-            AbilityTarget::None { self_area, .. } => {
-                self_area.as_ref().map(|area_effect| area_effect.radius)
-            }
+            AbilityTarget::None { self_area, .. } => self_area
+                .as_ref()
+                .map(|area_effect| match area_effect.shape {
+                    AreaShape::Circle(range) => Some(range),
+                    AreaShape::Line => None,
+                })
+                .flatten(),
             _ => None,
         }
     }
@@ -5493,6 +5518,26 @@ pub enum ActionReach {
     Yes,
     YesButDisadvantage(&'static str),
     No,
+}
+
+pub fn is_target_within_shape(
+    caster_pos: Position,
+    area_pos: Position,
+    shape: AreaShape,
+    target_pos: Position,
+) -> bool {
+    match shape {
+        AreaShape::Circle(radius) => within_range_squared(radius.squared(), area_pos, target_pos),
+        AreaShape::Line => {
+            let mut is_hit = false;
+            line_collision(caster_pos, area_pos, |x, y| {
+                if target_pos == (x, y) {
+                    is_hit = true;
+                }
+            });
+            is_hit
+        }
+    }
 }
 
 pub fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {

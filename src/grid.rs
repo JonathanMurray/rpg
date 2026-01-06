@@ -38,8 +38,8 @@ use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
     bot::convert_path_to_move_action,
     core::{
-        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AttackAction,
-        BaseAction, Character, Condition, Goodness, MovementType, Position,
+        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
+        AttackAction, BaseAction, Character, Condition, Goodness, MovementType, Position,
         MOVE_DISTANCE_PER_STAMINA,
     },
     data::{BAD_BOW, BOW},
@@ -52,6 +52,7 @@ use crate::{
     game_ui_connection::DEBUG,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
+    util::line_collision,
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -1064,7 +1065,7 @@ impl GameGrid {
                     }
                     AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
                     AbilityTarget::Area { area_effect, .. } => {
-                        MouseState::RequiresPositionTarget(area_effect.radius)
+                        MouseState::RequiresPositionTarget(area_effect.shape)
                     }
                     AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                 },
@@ -1108,20 +1109,42 @@ impl GameGrid {
                 }
             }
 
-            MouseState::RequiresPositionTarget(range) => {
-                if let ActionTarget::Position(pos) = ui_state.players_action_target() {
-                    self.draw_range_indicator(
-                        (pos.0, pos.1),
-                        range,
-                        RangeIndicator::TargetAreaEffect,
-                    );
-                } else if is_mouse_within_grid && receptive_to_input {
-                    self.draw_range_indicator(
-                        mouse_grid_pos,
-                        range,
-                        RangeIndicator::TargetAreaEffect,
-                    );
-                }
+            MouseState::RequiresPositionTarget(shape) => {
+                match shape {
+                    AreaShape::Circle(radius) => {
+                        let center =
+                            if let ActionTarget::Position(pos) = ui_state.players_action_target() {
+                                Some(pos)
+                            } else if is_mouse_within_grid && receptive_to_input {
+                                Some(mouse_grid_pos)
+                            } else {
+                                None
+                            };
+                        if let Some(center) = center {
+                            self.draw_range_indicator(
+                                center,
+                                radius,
+                                RangeIndicator::TargetAreaEffect,
+                            );
+                        }
+                    }
+                    AreaShape::Line => {
+                        let point =
+                            if let ActionTarget::Position(pos) = ui_state.players_action_target() {
+                                Some(pos)
+                            } else if is_mouse_within_grid && receptive_to_input {
+                                Some(mouse_grid_pos)
+                            } else {
+                                None
+                            };
+                        if let Some(to) = point {
+                            let from = active_char_pos;
+                            line_collision(from, to, |x, y| {
+                                self.fill_cell((x, y), Color::new(1.0, 1.0, 1.0, 0.15), 0.0)
+                            });
+                        }
+                    }
+                };
             }
 
             _ => {}
@@ -2761,7 +2784,7 @@ enum MouseState {
         move_into_melee: Option<Range>,
     },
     RequiresAllyTarget,
-    RequiresPositionTarget(Range),
+    RequiresPositionTarget(AreaShape),
     ImplicitTarget,
     MayInputMovement,
     None,

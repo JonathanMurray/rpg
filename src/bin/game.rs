@@ -35,9 +35,10 @@ use rpg::data::{
     FIREBALL, FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HASTE, HEAL, HEALING_NOVA,
     HEALING_RAIN, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE,
     INSPIRE, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, OVERWHELMING, PENETRATING_ARROWS, RAGE, ROBE,
-    SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN, SHACKLED_MIND, SHIELD_BASH, SHIRT,
-    SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, OVERWHELMING, PENETRATING_ARROWS,
+    PIERCING_SHOT, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
+    SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK,
+    SWEEP_ATTACK_PRECISE, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -109,6 +110,7 @@ async fn main() {
     alice
         .known_passive_skills
         .push(PassiveSkill::WeaponProficiency);
+    alice.learn_ability(PIERCING_SHOT);
 
     let mut bob = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
@@ -147,6 +149,7 @@ async fn main() {
     clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
+    clara.learn_ability(HEALING_RAIN);
 
     /*
     clara
@@ -156,7 +159,7 @@ async fn main() {
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
 
-    let mut player_characters = vec![clara, bob, alice];
+    let mut player_characters = vec![alice, clara, bob];
 
     player_characters = run_fight_loop(
         player_characters,

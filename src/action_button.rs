@@ -25,7 +25,7 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
-        AreaEffect, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
+        AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
         AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType,
         EquipmentRequirement, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect,
         Range, Shield, Weapon, WeaponType,
@@ -456,7 +456,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             }
 
             if let Some(AreaEffect {
-                radius,
+                shape,
                 acquisition,
                 effect,
             }) = self_area
@@ -464,9 +464,12 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                 // There's no use-case for this yet (?)
                 assert!(acquisition != AreaTargetAcquisition::Everyone);
 
-                let radius_str = match radius {
-                    Range::Melee => "melee".to_string(),
-                    r => format!("radius {r}"),
+                let radius_str = match shape {
+                    AreaShape::Circle(r) => match r {
+                        Range::Melee => "melee".to_string(),
+                        r => format!("radius {r}"),
+                    },
+                    AreaShape::Line => "line".to_string(),
                 };
 
                 match effect {
@@ -500,12 +503,19 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
                 AreaTargetAcquisition::Allies => unreachable!(),
             };
             let line = if let Some(range) = range {
-                format!(
-                    "{} (range {}, radius {}) :",
-                    targets_str, range, area_effect.radius
-                )
+                match area_effect.shape {
+                    AreaShape::Circle(radius) => {
+                        format!("{} (range {}, radius {}) :", targets_str, range, radius)
+                    }
+                    AreaShape::Line => format!("{} (range {}, line) :", targets_str, range),
+                }
             } else {
-                format!("{} (radius {}) :", targets_str, area_effect.radius)
+                match area_effect.shape {
+                    AreaShape::Circle(radius) => {
+                        format!("{} (radius {}) :", targets_str, radius)
+                    }
+                    AreaShape::Line => format!("{} (line) :", targets_str),
+                }
             };
             t.technical_description.push(line);
             describe_ability_negative_effect(effect, t);
@@ -513,9 +523,19 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
         AbilityEffect::Positive(effect) => {
             assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
             let line = if let Some(range) = range {
-                format!("Allies (range {}, radius {}) :", range, area_effect.radius)
+                match area_effect.shape {
+                    AreaShape::Circle(radius) => {
+                        format!("Allies (range {}, radius {}) :", range, radius)
+                    }
+                    AreaShape::Line => format!("Allies (range {}, line) :", range),
+                }
             } else {
-                format!("Allies (radius {}) :", area_effect.radius)
+                match area_effect.shape {
+                    AreaShape::Circle(radius) => {
+                        format!("Allies (radius {}) :", radius)
+                    }
+                    AreaShape::Line => "Allies (line)".to_string(),
+                }
             };
             t.technical_description.push(line);
             describe_ability_ally_effect(effect, t);

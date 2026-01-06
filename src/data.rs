@@ -6,12 +6,13 @@ use crate::{
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
-        ApplyCondition, ApplyEffect, AreaEffect, AreaTargetAcquisition, ArmorPiece, Arrow,
-        AttackAttribute, AttackEnhancement, AttackEnhancementEffect, AttackEnhancementOnHitEffect,
-        AttackHitEffect, AttackType, Condition, Consumable, DefenseType, EquipEffect,
-        EquipmentRequirement, Fraction, OnAttackedReaction, OnAttackedReactionEffect,
-        OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
+        ApplyCondition, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition, ArmorPiece,
+        Arrow, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
+        AttackEnhancementOnHitEffect, AttackHitEffect, AttackType, Condition, Consumable,
+        DefenseType, EquipEffect, EquipmentRequirement, Fraction, OnAttackedReaction,
+        OnAttackedReactionEffect, OnAttackedReactionId, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange,
+        WeaponType,
     },
     sounds::SoundId,
     textures::{EquipmentIconId, IconId, SpriteId},
@@ -346,7 +347,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
     bonus_penetration: 0,
     on_damage_apply: None,
     area_effect: Some(AreaEffect {
-        radius: Range::Melee,
+        shape: AreaShape::Circle(Range::Melee),
         acquisition: AreaTargetAcquisition::Everyone,
         effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -629,7 +630,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Melee,
+            shape: AreaShape::Circle(Range::Melee),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
         }),
@@ -789,7 +790,7 @@ pub const SCREAM: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Ranged(7),
+            shape: AreaShape::Circle(Range::Ranged(7)),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
@@ -1179,7 +1180,7 @@ pub const INSPIRE: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Float(12.5),
+            shape: AreaShape::Circle(Range::Float(12.5)),
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
@@ -1214,7 +1215,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Float(12.5),
+            shape: AreaShape::Circle(Range::Float(12.5)),
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
@@ -1249,7 +1250,7 @@ pub const HEALING_NOVA: Ability = Ability {
     possible_enhancements: [None, None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            radius: Range::Ranged(12),
+            shape: AreaShape::Circle(Range::Ranged(12)),
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -1338,9 +1339,10 @@ pub const HEALING_RAIN: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Area {
-        range: Range::Ranged(15),
+        range: Range::Float(15.5),
         area_effect: AreaEffect {
-            radius: Range::Ranged(5),
+            //shape: AreaShape::Circle(Range::Float(5.5)),
+            shape: AreaShape::Line,
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -1351,6 +1353,31 @@ pub const HEALING_RAIN: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+};
+
+pub const PIERCING_SHOT: Ability = Ability {
+    id: AbilityId::PiercingShot,
+    name: "Piercing shot",
+    description: "Attack all enemies in a line",
+    icon: IconId::PiercingShot,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 2,
+    requirement: Some(EquipmentRequirement::Weapon(WeaponType::Ranged)),
+
+    roll: Some(AbilityRollType::RollDuringAttack(0)),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::Area {
+        range: Range::Float(15.5),
+        area_effect: AreaEffect {
+            shape: AreaShape::Line,
+            acquisition: AreaTargetAcquisition::Enemies,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
+        },
+    },
+    animation_color: RED,
+    initiate_sound: Some(SoundId::ShootArrow),
+    resolve_sound: Some(SoundId::HitArrow),
 };
 
 pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
