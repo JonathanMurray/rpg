@@ -34,6 +34,7 @@ pub enum SpriteId {
     Rapier,
     Dagger,
     Shield,
+    CharacterShadow,
 }
 
 pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
@@ -55,6 +56,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::Rapier, "rapier.png"),
         (SpriteId::Dagger, "dagger.png"),
         (SpriteId::Shield, "shield.png"),
+        (SpriteId::CharacterShadow, "character_shadow.png"),
     ])
     .await
 }
@@ -80,6 +82,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Rapier => panic!(),
         SpriteId::Dagger => panic!(),
         SpriteId::Shield => panic!(),
+        SpriteId::CharacterShadow => panic!(),
     }
 }
 

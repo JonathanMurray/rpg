@@ -658,6 +658,7 @@ impl GameGrid {
         let (mut x, mut y) = self.character_screen_pos(character);
         x -= self.cell_w;
         y -= self.cell_w;
+        let (shadow_x, mut shadow_y) = (x, y);
 
         let mut dying = false;
 
@@ -732,8 +733,27 @@ impl GameGrid {
 
         if !dying {
             y -= self.cell_w * 0.2;
+            shadow_y -= self.cell_w * 0.2;
         }
+                  draw_texture_ex(
+                &self.sprites[&SpriteId::CharacterShadow],
+                shadow_x,
+                shadow_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(
+                        (
+                            self.cell_w * CELLS_PER_ENTITY as f32,
+                            self.cell_w * CELLS_PER_ENTITY as f32,
+                        )
+                            .into(),
+                    ),
+                    flip_x: character.is_facing_east.get(),
+                    ..Default::default()
+                },
+            );
         if show_sprite {
+  
             draw_texture_ex(
                 &self.sprites[&character.sprite],
                 x,
