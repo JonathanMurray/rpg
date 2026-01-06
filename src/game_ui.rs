@@ -30,7 +30,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{
         as_percentage, distance_between, predict_ability, predict_attack, prob_ability_hit,
-        prob_attack_hit, prob_attack_penetrating_hit, Ability, AbilityEnhancement,
+        prob_attack_hit, prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
@@ -1392,7 +1392,9 @@ impl UserInterface {
                     self.sound_player.play(sound_id);
                 }
 
-                self.game_grid.animate_character_acting(actor, 0.2);
+                let with_shield = ability.id == AbilityId::ShieldBash;
+                self.game_grid
+                    .animate_character_acting(actor, with_shield, 0.2);
 
                 let duration;
 
@@ -1732,7 +1734,7 @@ impl UserInterface {
         let projectile_duration = 0.03 * distance_between(attacker_pos, target_pos);
 
         self.game_grid
-            .animate_character_acting(attacker, projectile_duration.max(0.2));
+            .animate_character_acting(attacker, false, projectile_duration.max(0.2));
 
         self.game_grid.add_effect(
             attacker_pos,

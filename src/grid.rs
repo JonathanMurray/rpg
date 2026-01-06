@@ -133,6 +133,7 @@ enum AnimationKind {
     Death,
     Act {
         random_rotation: f32,
+        with_shield: bool,
     },
     HealthLost {
         previous: u32,
@@ -320,12 +321,20 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_character_acting(&mut self, character_id: CharacterId, duration: f32) {
+    pub fn animate_character_acting(
+        &mut self,
+        character_id: CharacterId,
+        with_shield: bool,
+        duration: f32,
+    ) {
         let random_rotation = random_range(-0.05..0.05);
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::Act { random_rotation },
+            AnimationKind::Act {
+                random_rotation,
+                with_shield,
+            },
         ));
     }
 
@@ -665,6 +674,7 @@ impl GameGrid {
         let game_time = get_time();
 
         let mut weapon_rotation_modifier = 0.0;
+        let mut shield_offset = (0.0, 0.0);
 
         let mut show_sprite = true;
         for animation in self
@@ -710,15 +720,22 @@ impl GameGrid {
                     params.rotation = PI * 0.5;
                     dying = true;
                 }
-                AnimationKind::Act { random_rotation } => {
+                AnimationKind::Act {
+                    random_rotation,
+                    with_shield,
+                } => {
                     y -= self.cell_w * 0.07;
                     params.rotation = random_rotation;
-                    weapon_rotation_modifier = PI * 0.2;
-                    if !character.is_facing_east.get() {
-                        weapon_rotation_modifier *= -1.0;
-                    }
-                    if character.has_equipped_ranged_weapon() {
-                        weapon_rotation_modifier *= -1.0;
+                    if with_shield {
+                        shield_offset = (2.0, -4.0);
+                    } else {
+                        weapon_rotation_modifier = PI * 0.2;
+                        if !character.is_facing_east.get() {
+                            weapon_rotation_modifier *= -1.0;
+                        }
+                        if character.has_equipped_ranged_weapon() {
+                            weapon_rotation_modifier *= -1.0;
+                        }
                     }
                 }
                 AnimationKind::HealthLost { .. } => {
@@ -772,7 +789,13 @@ impl GameGrid {
 
             if let Some(shield) = character.shield() {
                 if let Some(texture) = shield.sprite {
-                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, params);
+                    draw_texture_ex(
+                        &self.sprites[&texture],
+                        x + shield_offset.0,
+                        y + shield_offset.1,
+                        WHITE,
+                        params,
+                    );
                 }
             }
         }
