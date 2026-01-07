@@ -607,14 +607,12 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
     name: "Precise",
     description: "Increase your precision",
     icon: IconId::Precision,
-    action_point_cost: 0,
-    mana_cost: 0,
     stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
         roll_modifier: 3,
         ..AttackEnhancementEffect::default()
     }),
-    spell_effect: None,
+    ..AbilityEnhancement::default()
 };
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
@@ -646,8 +644,6 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     name: "Heavy impact",
     description: "",
     icon: IconId::CrushingStrike,
-    action_point_cost: 0,
-    mana_cost: 0,
     stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
@@ -655,15 +651,13 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
         )),
         ..AttackEnhancementEffect::default()
     }),
-    spell_effect: None,
+    ..AbilityEnhancement::default()
 };
 pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::LungeAttack,
     name: "Reach",
     description: "",
     icon: IconId::Extend,
-    action_point_cost: 0,
-    mana_cost: 0,
     stamina_cost: 1,
     // TODO surely we don't need to increase the range both with SpellEnhancementEffect and AttackEnhancementEffect
     // One of them should be the correct way.
@@ -675,6 +669,7 @@ pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
         range_bonus: 1,
         ..AttackEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
@@ -768,14 +763,13 @@ pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
     name: "Shriek",
     description: "Increased range",
     icon: IconId::Banshee,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
     attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
         increased_radius_tenths: 45,
         ..SpellEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 pub const SCREAM: Ability = Ability {
     id: AbilityId::Scream,
@@ -851,28 +845,26 @@ pub const SHACKLED_MIND: Ability = Ability {
             name: "Reach",
             description: "",
             icon: IconId::Extend,
-            action_point_cost: 0,
             mana_cost: 1,
-            stamina_cost: 0,
             attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
                 increased_range_tenths: 30,
                 ..SpellEnhancementEffect::default()
             }),
+            ..AbilityEnhancement::default()
         }),
         Some(AbilityEnhancement {
             ability_id: AbilityId::ShackledMind,
             name: "Focus",
             description: "",
             icon: IconId::SpellAdvantage,
-            action_point_cost: 0,
             mana_cost: 1,
-            stamina_cost: 0,
             attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
                 bonus_advantage: 1,
                 ..SpellEnhancementEffect::default()
             }),
+            ..AbilityEnhancement::default()
         }),
         None,
     ],
@@ -901,12 +893,11 @@ pub const MIND_BLAST: Ability = Ability {
             icon: IconId::Dualcast,
             action_point_cost: 1,
             mana_cost: 1,
-            stamina_cost: 0,
-            attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
                 cast_twice: true,
                 ..SpellEnhancementEffect::default()
             }),
+            ..AbilityEnhancement::default()
         }),
         None,
         None,
@@ -930,27 +921,26 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
     name: "Necrotic influence",
     description: "Converts all bleeding to immediate damage and life-drain",
     icon: IconId::NecroticInfluence,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
-    spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([
-            Some(ApplyEffect::PerBleeding {
-                damage: 1,
-                caster_healing_percentage: 30,
-            }),
-            Some(ApplyEffect::ConsumeCondition {
-                condition: Condition::Bleeding,
-            }),
-        ]),
-        ..SpellEnhancementEffect::default()
-    }),
+    spell_effect: None,
     attack_effect: None,
+    // TODO: Per target hit: heal self 1 and gain 1x ArcaneSurge
+    /*
+    apply_on_self_per_area_target_hit: Some([
+        Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::ArcaneSurge,
+            stacks: Some(1),
+            duration_rounds: None,
+        })),
+        None,
+    ]),
+     */
+    ..AbilityEnhancement::default()
 };
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    description: "Cause an enemy to bleed",
+    description: "Cause enemies in a line to start bleeding",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 1,
@@ -959,21 +949,24 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
-    target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Float(10.5)),
-        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
-            defense_type: Some(DefenseType::Toughness),
-            damage: None,
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Bleeding,
-                    stacks: Some(10),
-                    duration_rounds: None,
-                })),
-                None,
-            ]),
-        }),
-        impact_area: None,
+    target: AbilityTarget::Area {
+        range: Range::Float(9.5),
+        area_effect: AreaEffect {
+            shape: AreaShape::Line,
+            acquisition: AreaTargetAcquisition::Enemies,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: Some(DefenseType::Toughness),
+                damage: None,
+                on_hit: Some([
+                    Some(ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Bleeding,
+                        stacks: Some(10),
+                        duration_rounds: None,
+                    })),
+                    None,
+                ]),
+            })),
+        },
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1075,14 +1068,12 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     name: "Energize",
     description: "",
     icon: IconId::Energize,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
-    attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
         target_on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
         ..SpellEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
@@ -1115,14 +1106,12 @@ pub const HEAL: Ability = Ability {
             name: "Reach",
             description: "",
             icon: IconId::Extend,
-            action_point_cost: 0,
             mana_cost: 1,
-            stamina_cost: 0,
-            attack_effect: None,
             spell_effect: Some(SpellEnhancementEffect {
                 increased_range_tenths: 60,
                 ..SpellEnhancementEffect::default()
             }),
+            ..AbilityEnhancement::default()
         }),
         // TODO add enhancement that heals over time (1 per round for 3 turns?)
         Some(HEAL_ENERGIZE),
@@ -1386,13 +1375,11 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     description: "",
     icon: IconId::Extend,
     action_point_cost: 1,
-    mana_cost: 0,
-    stamina_cost: 0,
-    attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
         increased_range_tenths: 80,
         ..SpellEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 
 pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
@@ -1400,24 +1387,19 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     name: "Massive",
     description: "",
     icon: IconId::Radius,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
-    attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
         increased_radius_tenths: 40,
         ..SpellEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::Fireball,
     name: "Inferno",
     description: "Targets hit by the impact start burning",
     icon: IconId::Inferno,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
-    attack_effect: None,
     spell_effect: Some(SpellEnhancementEffect {
         area_on_hit: Some([
             Some(ApplyEffect::Condition(ApplyCondition {
@@ -1429,6 +1411,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
         ]),
         ..SpellEnhancementEffect::default()
     }),
+    ..AbilityEnhancement::default()
 };
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireball,
@@ -1500,9 +1483,7 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
     name: "Burn",
     description: "",
     icon: IconId::Inferno,
-    action_point_cost: 0,
     mana_cost: 1,
-    stamina_cost: 0,
     spell_effect: Some(SpellEnhancementEffect {
         target_on_hit: Some([
             Some(ApplyEffect::Condition(ApplyCondition {
@@ -1514,7 +1495,7 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
         ]),
         ..SpellEnhancementEffect::default()
     }),
-    attack_effect: None,
+    ..AbilityEnhancement::default()
 };
 pub const SEARING_LIGHT: Ability = Ability {
     id: AbilityId::SearingLight,
@@ -1589,9 +1570,9 @@ pub const ARCANE_POTION: Consumable = Consumable {
     name: "Arcane potion",
     icon: EquipmentIconId::ArcanePotion,
     effect: Some(ApplyEffect::Condition(ApplyCondition {
-        condition: Condition::ArcaneProwess,
-        stacks: None,
-        duration_rounds: Some(2),
+        condition: Condition::ArcaneSurge,
+        stacks: Some(3),
+        duration_rounds: None,
     })),
     ..Consumable::default()
 };
@@ -1600,7 +1581,7 @@ pub const ARCANE_POTION: Consumable = Consumable {
 pub enum PassiveSkill {
     HardenedSkin,
     WeaponProficiency,
-    ArcaneSurge,
+    CriticalCharge,
     Reaper,
     BloodRage,
     ThrillOfBattle,
@@ -1614,7 +1595,7 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "Hardened skin",
             WeaponProficiency => "Weapon proficiency",
-            ArcaneSurge => "Arcane surge",
+            CriticalCharge => "Critical charge",
             Reaper => "Reaper",
             BloodRage => "Blood rage",
             ThrillOfBattle => "Thrill of battle",
@@ -1628,7 +1609,7 @@ impl PassiveSkill {
         match self {
             HardenedSkin => IconId::HardenedSkin,
             WeaponProficiency => IconId::WeaponProficiency,
-            ArcaneSurge => IconId::ArcaneSurge,
+            CriticalCharge => IconId::CriticalCharge,
             Reaper => IconId::Reaper,
             // TODO: unique icon
             BloodRage => IconId::Rage,
@@ -1646,7 +1627,7 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "+1 armor",
             WeaponProficiency => "Attacks gain +1 armor penetration",
-            ArcaneSurge => "+3 spell modifier while at/below 50% mana",
+            CriticalCharge => "+3 spell modifier while at/below 50% mana",
             Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
             BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
             ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",

@@ -87,7 +87,9 @@ impl GameUserInterfaceConnection {
     }
 
     async fn run_ui(&self, game: &CoreGame, message: MessageFromGame) -> UiOutcome {
+        println!("run_ui ...");
         let inner_ref = self.inner.borrow_mut();
+        println!("have inner ref.");
         inner_ref.as_ref().unwrap().run_ui(game, message).await
     }
 
@@ -213,6 +215,9 @@ struct _GameUserInterfaceConnection {
 
 impl _GameUserInterfaceConnection {
     async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
+
+        println!("inner run_ui ...");
+
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();
@@ -308,6 +313,7 @@ impl _GameUserInterfaceConnection {
 
             MessageFromGame::Event(event) => {
                 waiting_for_ui_animation_potentially = true;
+                println!("BEFORE CALLING handle_game_event({:?})", event);
                 user_interface.handle_game_event(event);
             }
         }

@@ -142,14 +142,15 @@ async fn main() {
     clara.set_weapon(HandType::MainHand, DAGGER);
     // TODO:
     clara.armor_piece.set(Some(CHAIN_MAIL));
-    clara.known_passive_skills.push(PassiveSkill::ArcaneSurge);
+    clara
+        .known_passive_skills
+        .push(PassiveSkill::CriticalCharge);
     clara.learn_ability(FIREBALL);
     clara.known_ability_enhancements.push(FIREBALL_INFERNO);
     clara.known_ability_enhancements.push(FIREBALL_REACH);
     clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
-    clara.learn_ability(HEALING_RAIN);
 
     /*
     clara
@@ -158,6 +159,7 @@ async fn main() {
      */
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
 
     let mut player_characters = vec![alice, clara, bob];
 

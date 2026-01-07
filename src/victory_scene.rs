@@ -457,7 +457,7 @@ pub async fn run_victory_loop(
         for passive in [
             PassiveSkill::HardenedSkin,
             PassiveSkill::WeaponProficiency,
-            PassiveSkill::ArcaneSurge,
+            PassiveSkill::CriticalCharge,
             PassiveSkill::Reaper,
             PassiveSkill::BloodRage,
             PassiveSkill::ThrillOfBattle,

@@ -299,6 +299,19 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         describe_attack_enhancement_effect(&effect, &mut t);
     }
 
+    /*
+    for apply_effect in enhancement
+        .apply_on_self_per_area_target_hit
+        .iter()
+        .flatten()
+        .flatten()
+    {
+        t.technical_description
+            .push("On self (per target hit):".to_string());
+        describe_apply_effect(*apply_effect, &mut t);
+    }
+     */
+
     t
 }
 

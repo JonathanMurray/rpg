@@ -65,7 +65,8 @@ use crate::rest_scene::run_rest_loop;
 use crate::shop_scene::{generate_shop_contents, run_shop_loop};
 use crate::textures::{
     load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-    load_and_init_texture, EquipmentIconId, IconId, PortraitId, SpriteId,
+    load_and_init_font_symbols, load_and_init_texture, EquipmentIconId, IconId, PortraitId,
+    SpriteId,
 };
 use crate::victory_scene::{run_victory_loop, Learning};
 use serde::{Deserialize, Serialize};
@@ -95,6 +96,8 @@ pub async fn run_editor() {
 
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
+
+    load_and_init_font_symbols().await;
 
     let portraits = load_all_portraits().await;
 
@@ -212,7 +215,7 @@ pub async fn run_editor() {
     let mut passives = vec![
         PassiveSkill::HardenedSkin,
         PassiveSkill::WeaponProficiency,
-        PassiveSkill::ArcaneSurge,
+        PassiveSkill::CriticalCharge,
         PassiveSkill::Reaper,
         PassiveSkill::BloodRage,
         PassiveSkill::ThrillOfBattle,
@@ -965,7 +968,7 @@ fn skills_mapping() -> Vec<(Skill, ButtonAction)> {
             (Skill::CripplingShot, atk_enhancement(CRIPPLING_SHOT)),
             (Skill::HardenedSkin, passive(HardenedSkin)),
             (Skill::WeaponProficiency, passive(WeaponProficiency)),
-            (Skill::ArcaneSurge, passive(ArcaneSurge)),
+            (Skill::ArcaneSurge, passive(CriticalCharge)),
             (Skill::Reaper, passive(Reaper)),
             (Skill::BloodRage, passive(BloodRage)),
             (Skill::ThrillOfBattle, passive(ThrillOfBattle)),

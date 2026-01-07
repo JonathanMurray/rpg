@@ -1302,7 +1302,10 @@ impl UserInterface {
     }
 
     pub fn handle_game_event(&mut self, event: GameEvent) {
-        //dbg!(&event);
+
+        println!("INSIDE handle_game_event({:?})", event);
+
+        dbg!(&event);
 
         self.target_ui.rebuild_character_ui();
 

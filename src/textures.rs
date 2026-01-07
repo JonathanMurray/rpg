@@ -101,7 +101,7 @@ pub enum StatusId {
     Slowed,
     Hastened,
     Inspired,
-    ArcaneSurge,
+    CriticalCharge,
     ReaperApCooldown,
     Rage,
     NearDeath,
@@ -128,7 +128,7 @@ pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
         (StatusId::Slowed, "status_slowed.png"),
         (StatusId::Hastened, "status_hastened.png"),
         (StatusId::Inspired, "status_inspired.png"),
-        (StatusId::ArcaneSurge, "status_arcane_surge.png"),
+        (StatusId::CriticalCharge, "status_arcane_surge.png"),
         (StatusId::ReaperApCooldown, "status_reaper_cooldown.png"),
         (StatusId::Rage, "status_rage.png"),
         (StatusId::NearDeath, "status_near_death.png"),
@@ -192,7 +192,7 @@ pub enum IconId {
 
     HardenedSkin,
     WeaponProficiency,
-    ArcaneSurge,
+    CriticalCharge,
     Reaper,
 }
 
@@ -248,7 +248,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
         (IconId::Energize, "energize_icon.png"),
         (IconId::HardenedSkin, "hardened_skin_icon.png"),
         (IconId::WeaponProficiency, "weapon_proficiency_icon.png"),
-        (IconId::ArcaneSurge, "arcane_surge_icon.png"),
+        (IconId::CriticalCharge, "critical_charge_icon.png"),
         (IconId::Reaper, "reaper_icon.png"),
         (IconId::Inspire, "inspire_icon.png"),
     ])

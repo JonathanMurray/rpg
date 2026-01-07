@@ -839,6 +839,9 @@ impl CoreGame {
         selected_target: &ActionTarget,
         mode: ActionPerformanceMode<'_>,
     ) -> Vec<AbilityResolvedEvent> {
+
+        println!("perform_ability {}, real={:?}", ability.name, matches!(mode, ActionPerformanceMode::Real(..)));
+
         let caster_id = caster.id();
 
         let real_game: Option<&CoreGame> = mode.real_game();
@@ -1226,6 +1229,7 @@ impl CoreGame {
         resolve_events
     }
 
+
     fn perform_ability_area_effect(
         name: &'static str,
         ability_roll: AbilityRoll,
@@ -1480,6 +1484,28 @@ impl CoreGame {
             }
         }
 
+        /*
+        if let Some(game) = mode.real_game() {
+            dbg!(&enhancements);
+            for enhancement in enhancements {
+                for apply_effect in enhancement
+                    .apply_on_self_per_area_target_hit
+                    .iter()
+                    .flatten()
+                    .flatten()
+                {
+                    // This should ideally be logged?
+
+                    // TODO: the effect should scale per target hit
+
+                    dbg!(apply_effect);
+
+                    let (_line, _damage) =
+                        game.perform_effect_application(*apply_effect, Some(caster), None, caster);
+                }
+            }
+        }
+         */
         target_outcomes
     }
 
@@ -2326,6 +2352,14 @@ impl CoreGame {
         if conditions.borrow_mut().remove(&Condition::Raging) {
             self.log(format!("{} stopped Raging", name)).await;
         }
+        if conditions.borrow().has(&Condition::ArcaneSurge) {
+            if conditions
+                .borrow_mut()
+                .lose_stacks(&Condition::ArcaneSurge, 1)
+            {
+                self.log(format!("{} lost Arcane surge", name)).await;
+            }
+        }
 
         //let mut new_ap = MAX_ACTION_POINTS;
         let mut gain_ap = ACTION_POINTS_PER_TURN;
@@ -3056,10 +3090,10 @@ pub enum Condition {
     Hindered,
     ReaperApCooldown,
     BloodRage,
-    ArcaneSurge,
+    CriticalCharge,
     ThrillOfBattle,
     Adrenalin,
-    ArcaneProwess,
+    ArcaneSurge,
     HealthPotionRecovering,
 }
 
@@ -3088,10 +3122,10 @@ impl Condition {
             Hindered => "Hindered",
             ReaperApCooldown => "Reaper",
             BloodRage => "Blood rage",
-            ArcaneSurge => "Arcane surge",
+            CriticalCharge => "Critical charge",
             ThrillOfBattle => "Thrill of battle",
             Adrenalin => "Adrenalin",
-            ArcaneProwess => "Arcane prowess",
+            ArcaneSurge => "Arcane surge",
             HealthPotionRecovering => "Recovering",
         }
     }
@@ -3120,10 +3154,10 @@ impl Condition {
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "+3 attack modifier (passive skill).",
-            ArcaneSurge => "+3 spell modifier (passive skill).",
+            CriticalCharge => "+3 spell modifier (passive skill).",
             ThrillOfBattle => "+3 attack/spell modifier (passive skill).",
             Adrenalin => "+1 AP per turn.",
-            ArcaneProwess => "+5 spell modifier.",
+            ArcaneSurge => "+x spell modifier. Decays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: heal 2.",
         }
     }
@@ -3152,10 +3186,10 @@ impl Condition {
             Hindered => false,
             ReaperApCooldown => false,
             BloodRage => true,
-            ArcaneSurge => true,
+            CriticalCharge => true,
             ThrillOfBattle => true,
             Adrenalin => true,
-            ArcaneProwess => true,
+            ArcaneSurge => true,
             HealthPotionRecovering => true,
         }
     }
@@ -3184,7 +3218,7 @@ impl Condition {
             Inspired => StatusId::Inspired,
             NearDeath => StatusId::NearDeath,
             Dead => StatusId::Dead,
-            ArcaneSurge => StatusId::ArcaneSurge,
+            CriticalCharge => StatusId::CriticalCharge,
             ReaperApCooldown => StatusId::ReaperApCooldown,
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
@@ -3743,12 +3777,30 @@ pub struct AbilityEnhancement {
 
     pub spell_effect: Option<SpellEnhancementEffect>,
     pub attack_effect: Option<AttackEnhancementEffect>,
+
+    // TODO: stack overflow?
+    //pub apply_on_self_per_area_target_hit: Option<[Option<ApplyEffect>; 2]>,
 }
 
 impl AbilityEnhancement {
     pub fn attack_enhancement_effect(&self) -> Option<(&'static str, AttackEnhancementEffect)> {
         self.attack_effect
             .map(|attack_effect| (self.name, attack_effect))
+    }
+
+    pub const fn default() -> Self {
+        Self {
+            ability_id: AbilityId::Kill,
+            name: "<placeholder>",
+            description: "",
+            icon: IconId::Equip,
+            action_point_cost: 0,
+            mana_cost: 0,
+            stamina_cost: 0,
+            spell_effect: None,
+            attack_effect: None,
+            //apply_on_self_per_area_target_hit: None,
+        }
     }
 }
 
@@ -3809,15 +3861,6 @@ impl AttackEnhancementEffect {
 pub enum AbilityEnhancementEffect {
     Spell(SpellEnhancementEffect),
     Attack(AttackEnhancementEffect),
-}
-
-impl AbilityEnhancementEffect {
-    fn unwrap_spell_enhancement_effect(&self) -> &SpellEnhancementEffect {
-        match self {
-            AbilityEnhancementEffect::Spell(e) => e,
-            AbilityEnhancementEffect::Attack(..) => panic!("{:?}", self),
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -4155,11 +4198,11 @@ impl Character {
     fn on_mana_changed(&self) {
         let add = self
             .known_passive_skills
-            .contains(&PassiveSkill::ArcaneSurge)
+            .contains(&PassiveSkill::CriticalCharge)
             && self.mana.ratio() <= 0.5;
         self.conditions
             .borrow_mut()
-            .add_or_remove(Condition::ArcaneSurge, add);
+            .add_or_remove(Condition::CriticalCharge, add);
     }
 
     fn regain_movement(&self) {
@@ -4969,15 +5012,13 @@ impl Character {
         if conditions.has(&Condition::Inspired) {
             res += 3;
         }
-        if conditions.has(&Condition::ArcaneSurge) {
+        if conditions.has(&Condition::CriticalCharge) {
             res += 3;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;
         }
-        if conditions.has(&Condition::ArcaneProwess) {
-            res += 5;
-        }
+        res += conditions.get_stacks(&Condition::ArcaneSurge);
 
         res
     }
@@ -5275,10 +5316,16 @@ impl Character {
             ));
         }
 
+        if is_spell && conditions.has(&Condition::CriticalCharge) {
+            // It's applied from spell_modifier()
+            bonuses.push(("Critical charge", RollBonusContributor::OtherPositive));
+        }
+
         if is_spell && conditions.has(&Condition::ArcaneSurge) {
             // It's applied from spell_modifier()
             bonuses.push(("Arcane surge", RollBonusContributor::OtherPositive));
         }
+
         if conditions.has(&Condition::ThrillOfBattle) {
             // It's applied from spell_modifier()
             bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
