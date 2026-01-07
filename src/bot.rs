@@ -2,7 +2,7 @@ use core::f32;
 use std::{cell::Cell, iter, rc::Rc};
 
 use macroquad::rand::ChooseRandom;
-use rand::{random_range, random_ratio, Rng};
+use rand::{random_range, Rng};
 
 use crate::{
     core::{
@@ -11,7 +11,6 @@ use crate::{
         Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
-    game_ui::PlayerChose,
     pathfind::Path,
     util::{adjacent_cells, are_entities_within_melee},
 };
@@ -93,10 +92,8 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     }
 
     if let Some(target_id) = behaviour.current_target.get() {
-        if player_chars
-            .iter()
-            .find(|ch| ch.id() == target_id)
-            .is_none()
+        if !player_chars
+            .iter().any(|ch| ch.id() == target_id)
         {
             // Player char must have died. Force a target switch.
             behaviour.current_target.set(None);
@@ -115,16 +112,14 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     dbg!(switch_target);
     if switch_target {
         behaviour.chance_of_switching_target.set(0.0);
+    } else if behaviour.chance_of_switching_target.get() == 0.0 {
+        // Make it very rare to switch target immediately after acquiring it
+        behaviour.chance_of_switching_target.set(0.01);
     } else {
-        if behaviour.chance_of_switching_target.get() == 0.0 {
-            // Make it very rare to switch target immediately after acquiring it
-            behaviour.chance_of_switching_target.set(0.01);
-        } else {
-            // After that, the chance increases steadily
-            behaviour
-                .chance_of_switching_target
-                .set(chance_switch_target + 0.1);
-        }
+        // After that, the chance increases steadily
+        behaviour
+            .chance_of_switching_target
+            .set(chance_switch_target + 0.1);
     }
 
     if switch_target {
@@ -183,7 +178,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
             BotAction::Attack => {
                 if attack_reaches(bot, target) {
                     println!("bot attacks target");
-                    return Some(simple_attack_action(&target));
+                    return Some(simple_attack_action(target));
                 }
             }
             BotAction::SingleTargetAbility(ability) => {
@@ -222,7 +217,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                         for player_char in &player_chars {
                             if attack_reaches(bot, player_char) {
                                 println!("bot attacks someone before moving to target");
-                                return Some(simple_attack_action(&player_char));
+                                return Some(simple_attack_action(player_char));
                             }
                         }
                     }
@@ -232,7 +227,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                                 println!("bot uses ability on someone before moving to target");
                                 return Some(simple_targetted_ability_action(
                                     ability,
-                                    &player_char,
+                                    player_char,
                                 ));
                             }
                         }
@@ -343,7 +338,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
                 != ActionReach::No
             {
                 if bot.can_attack(attack) {
-                    return Some(simple_attack_action(&player_char));
+                    return Some(simple_attack_action(player_char));
                 } else {
                     println!("bot reaches a player char but doesn't have enough AP to attack. Let it chill.");
                     return None;
@@ -506,10 +501,8 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
 }
 
 fn may_use(bot: &Character, ability: Ability) -> bool {
-    if ability.id == AbilityId::Brace {
-        if bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2 {
-            return false;
-        }
+    if ability.id == AbilityId::Brace && bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2 {
+        return false;
     }
     true
 }
@@ -526,11 +519,7 @@ pub fn bot_choose_attack_reaction(
         .characters
         .get(reactor_id)
         .usable_on_attacked_reactions(is_within_melee);
-    if let Some((reaction)) = reactions.first() {
-        Some(*reaction)
-    } else {
-        None
-    }
+    reactions.first().copied()
 }
 
 pub fn bot_choose_hit_reaction(

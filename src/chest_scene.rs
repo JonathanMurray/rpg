@@ -15,20 +15,18 @@ use rand::Rng;
 
 use crate::{
     action_button::{
-        draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference,
+        draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference,
     },
     base_ui::{draw_text_rounded, Drawable},
-    core::{ArrowStack, Character, EquipEffect, EquipmentEntry},
+    core::{ArrowStack, Character, EquipmentEntry},
     data::{
-        ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, CHAIN_MAIL, DAGGER,
-        ELUSIVE_BOW, ENERGY_POTION, HEALTH_POTION, LEATHER_ARMOR, LIGHT_CHAIN_MAIL, MANA_POTION,
-        MEDIUM_SHIELD, PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD,
+        ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, CHAIN_MAIL, ENERGY_POTION,
+        MEDIUM_SHIELD, PENETRATING_ARROWS,
     },
     equipment_ui::equipment_tooltip,
-    non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
+    non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
-    util::select_n_random,
 };
 
 pub async fn run_chest_loop(

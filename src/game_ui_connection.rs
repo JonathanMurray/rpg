@@ -2,11 +2,6 @@ use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
 use std::{cell::RefCell, sync::atomic::Ordering};
 
-use macroquad::camera::{set_camera, set_default_camera, Camera2D};
-use macroquad::color::{MAGENTA, WHITE};
-use macroquad::math::{vec2, Rect};
-use macroquad::shapes::draw_rectangle;
-use macroquad::texture::{draw_texture_ex, render_target, DrawTextureParams, FilterMode};
 use macroquad::{
     color::BLACK,
     input::{get_keys_pressed, KeyCode},

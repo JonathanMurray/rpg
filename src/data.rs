@@ -1,4 +1,3 @@
-use std::default;
 
 use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
 

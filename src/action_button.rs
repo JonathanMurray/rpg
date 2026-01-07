@@ -6,7 +6,7 @@ use std::{
 
 use macroquad::{
     color::{
-        Color, BLACK, BLUE, GOLD, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, SKYBLUE, WHITE,
+        Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE,
         YELLOW,
     },
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
@@ -14,7 +14,7 @@ use macroquad::{
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
@@ -26,13 +26,12 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType,
-        EquipmentRequirement, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect,
-        Range, Shield, Weapon, WeaponType,
+        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect,
+        Range, Shield, Weapon,
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
-    textures::{IconId, DICE_SYMBOL},
+    textures::IconId,
 };
 
 #[derive(Default, Debug)]
@@ -992,7 +991,7 @@ impl Drawable for ActionButton {
             let text = hotkey_string(keycode);
             let margin = 3.0;
             let font_size = 16;
-            let text_dim = measure_text(&text, Some(font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(font), font_size, 1.0);
             let x0 = x + margin;
             let y0 = y + margin;
             let padding = 2.0;
@@ -1004,7 +1003,7 @@ impl Drawable for ActionButton {
                 Color::new(0.0, 0.0, 0.0, 0.6),
             );
             draw_text_rounded(
-                &text,
+                text,
                 x0 + padding,
                 y0 + padding + text_dim.offset_y,
                 TextParams {
@@ -1102,7 +1101,8 @@ impl Drawable for ActionButton {
 }
 
 fn hotkey_string(keycode: &KeyCode) -> &str {
-    let text = match *keycode {
+    
+    (match *keycode {
         KeyCode::Key1 => "1",
         KeyCode::Key2 => "2",
         KeyCode::Key3 => "3",
@@ -1114,8 +1114,7 @@ fn hotkey_string(keycode: &KeyCode) -> &str {
         KeyCode::R => "R",
         KeyCode::T => "T",
         _ => "?",
-    };
-    text
+    }) as _
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

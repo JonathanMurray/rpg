@@ -15,7 +15,7 @@ use macroquad::{
 use crate::{
     base_ui::draw_text_rounded,
     core::Character,
-    non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
+    non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
 };

@@ -3,10 +3,9 @@ use std::collections::HashMap;
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    math::Rect,
     miniquad::window::screen_size,
     shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_ex,
+        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex,
         draw_rectangle_lines, DrawRectangleParams,
     },
     text::{measure_text, Font, TextParams},
@@ -14,7 +13,6 @@ use macroquad::{
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
-use rand::Rng;
 
 use crate::{
     base_ui::draw_text_rounded,
@@ -124,7 +122,7 @@ impl MapScene {
             EquipmentEntry::Weapon(RAPIER),
             EquipmentEntry::Shield(SMALL_SHIELD),
         ];
-        let mut rng = rand::rng();
+        let rng = rand::rng();
 
         let (screen_w, screen_h) = screen_size();
         let y_mid = screen_h / 2.0;
@@ -332,32 +330,30 @@ impl MapScene {
             if let Some(countdown) = &mut transition_countdown {
                 *countdown -= elapsed;
 
-                if *countdown < 0.0 {
-                    if *countdown < -TRANSITION_PAUSE_DURATION {
-                        let params = DrawRectangleParams {
-                            offset: Default::default(),
-                            rotation: 0.0,
-                            color: Color::new(
-                                0.0,
-                                0.0,
-                                0.0,
-                                1.0 * (-*countdown - TRANSITION_PAUSE_DURATION) / FADE_DURATION,
-                            ),
-                        };
-                        draw_rectangle_ex(0.0, 0.0, screen_w, screen_h, params);
+                if *countdown < 0.0 && *countdown < -TRANSITION_PAUSE_DURATION {
+                    let params = DrawRectangleParams {
+                        offset: Default::default(),
+                        rotation: 0.0,
+                        color: Color::new(
+                            0.0,
+                            0.0,
+                            0.0,
+                            1.0 * (-*countdown - TRANSITION_PAUSE_DURATION) / FADE_DURATION,
+                        ),
+                    };
+                    draw_rectangle_ex(0.0, 0.0, screen_w, screen_h, params);
 
-                        if *countdown < -TRANSITION_PAUSE_DURATION - FADE_DURATION {
-                            let node_i = selected_node_i.unwrap();
-                            self.player_node_i = node_i;
-                            self.visited_nodes.push(node_i);
+                    if *countdown < -TRANSITION_PAUSE_DURATION - FADE_DURATION {
+                        let node_i = selected_node_i.unwrap();
+                        self.player_node_i = node_i;
+                        self.visited_nodes.push(node_i);
 
-                            // Make sure to show the last drawn frame
-                            next_frame().await;
-                            return self.nodes[selected_node_i.unwrap()]
-                                .choice
-                                .as_mut()
-                                .unwrap();
-                        }
+                        // Make sure to show the last drawn frame
+                        next_frame().await;
+                        return self.nodes[selected_node_i.unwrap()]
+                            .choice
+                            .as_mut()
+                            .unwrap();
                     }
                 }
             }

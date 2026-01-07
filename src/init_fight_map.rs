@@ -11,15 +11,14 @@ use rand::{
 };
 
 use crate::{
-    bot::{BotBehaviour, FighterBehaviour, MagiBehaviour},
+    bot::BotBehaviour,
     core::{
-        Ability, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters,
+        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters,
         HandType, Position,
     },
     data::{
-        PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        BOW, BRACE, CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SELF_HEAL, ENEMY_TACKLE, INSPIRE,
-        LEATHER_ARMOR, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE,
+        LEATHER_ARMOR, MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
     },
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},

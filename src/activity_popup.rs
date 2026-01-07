@@ -6,10 +6,9 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{
-        is_key_down, is_mouse_button_down, is_mouse_button_pressed, mouse_position, KeyCode,
-        MouseButton,
+        is_key_down, KeyCode,
     },
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -24,7 +23,7 @@ use crate::{
     },
     base_ui::{draw_text_rounded, draw_text_with_font_icons, Drawable},
     core::{
-        as_percentage, predict_attack, prob_attack_hit, Character, CharacterId, Characters,
+        predict_attack, Character, CharacterId, Characters,
         MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{draw_cross, draw_dashed_line},

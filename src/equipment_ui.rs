@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, RED, SKYBLUE, YELLOW},
+    color::{Color, BLACK, RED, SKYBLUE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
@@ -31,8 +31,8 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ApplyEffect, ArmorPiece, Arrow, ArrowStack, AttackHitEffect, Character, Consumable,
-        EquipmentEntry, EquipmentSlotRole, HandType, Party, Shield, Weapon, WeaponGrip,
+        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Consumable,
+        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon, WeaponGrip,
         WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
@@ -220,7 +220,7 @@ impl EquipmentSection {
             let (stash_section, stash_slots) = build_inventory_section(
                 font,
                 &equipment_icons,
-                &character.party_stash(),
+                character.party_stash(),
                 InventoryType::PartyStash,
             );
             equipment_slots.extend_from_slice(&stash_slots);
@@ -247,7 +247,7 @@ impl EquipmentSection {
         };
 
         let money_text = MoneyText {
-            character: Rc::clone(&character),
+            character: Rc::clone(character),
             font: font.clone(),
         };
 

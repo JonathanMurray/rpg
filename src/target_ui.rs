@@ -1,13 +1,12 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
-    hash::DefaultHasher,
     rc::Rc,
     vec,
 };
 
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
@@ -17,7 +16,7 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, Tooltip,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,

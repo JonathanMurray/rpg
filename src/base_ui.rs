@@ -1,11 +1,11 @@
 use macroquad::{
-    color::{Color, BLUE, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, PURPLE, SKYBLUE, WHITE},
+    color::{Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, WHITE},
     input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
     math::Rect,
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
     text::{draw_text_ex, measure_text, Font, TextParams},
-    texture::{self, draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
 use std::{
     cell::{Cell, RefCell},

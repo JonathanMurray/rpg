@@ -1,11 +1,6 @@
-use macroquad::texture::{draw_texture, Texture2D};
 use rand::Rng;
 
-use crate::{
-    base_ui::draw_text_rounded,
-    core::{sq_distance_between, AreaShape, Position, MELEE_RANGE_SQUARED},
-    textures::DICE_SYMBOL,
-};
+use crate::core::{sq_distance_between, Position, MELEE_RANGE_SQUARED};
 
 pub fn are_entities_within_melee(a: Position, b: Position) -> bool {
     sq_distance_between(a, b) <= MELEE_RANGE_SQUARED

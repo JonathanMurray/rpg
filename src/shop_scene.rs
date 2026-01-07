@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
@@ -14,7 +14,7 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, TooltipPositionPreference,
+        draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference,
     },
     base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{ArrowStack, Character, EquipmentEntry, Party},
@@ -24,7 +24,7 @@ use crate::{
         PENETRATING_ARROWS, RAPIER, SMALL_SHIELD, SWORD, WAR_HAMMER,
     },
     equipment_ui::equipment_tooltip,
-    non_combat_ui::{NonCombatCharacterUi, NonCombatPartyUi, PortraitRow},
+    non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
     util::select_n_random,

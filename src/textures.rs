@@ -1,15 +1,12 @@
 use std::{
-    cell::{Cell, RefCell},
     collections::HashMap,
     hash::Hash,
-    rc::Rc,
-    sync::{Mutex, OnceLock},
+    sync::OnceLock,
 };
 
 use macroquad::{
     color::WHITE,
     math::Rect,
-    text,
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
 };
 

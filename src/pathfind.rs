@@ -377,7 +377,7 @@ impl PathfindGrid {
 
         *self.cached_unexplored.borrow_mut() = unexplored;
 
-        return self.cached_exploration_chart.borrow();
+        self.cached_exploration_chart.borrow()
     }
 
     pub fn is_free_for(&self, character_id: CharacterId, pos: Position) -> bool {
@@ -427,7 +427,7 @@ pub fn build_path_from_chart(
 ) -> Path {
     let dst_node = chart
         .get(&destination)
-        .expect(&format!("chart dest={:?}", destination));
+        .unwrap_or_else(|| panic!("chart dest={:?}", destination));
     let mut dist = dst_node.distance_from_start;
 
     let mut positions = vec![(dist, destination)];

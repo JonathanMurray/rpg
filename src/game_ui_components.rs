@@ -5,12 +5,10 @@ use std::{
 };
 
 use macroquad::{
-    audio::Sound,
-    color::{MAGENTA, SKYBLUE},
+    color::SKYBLUE,
     input::{is_key_pressed, KeyCode},
     math::Rect,
-    shapes::{draw_rectangle_ex, draw_triangle, draw_triangle_lines, DrawRectangleParams},
-    text::{measure_text, TextParams},
+    shapes::{draw_triangle, draw_triangle_lines},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
 
@@ -26,14 +24,13 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{
-        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
         Rectangle, Style, TextLine,
     },
     core::{
         Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
     },
     drawing::{draw_cross, draw_rounded_rectangle_lines},
-    game_ui::UiState,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
 };
@@ -677,7 +674,7 @@ impl Drawable for PlayerCharacterPortrait {
     fn draw(&self, x: f32, y: f32) {
         let (w, h) = (64.0, 80.0);
         draw_rectangle(x, y, w, h, DARKGRAY);
-        draw_texture(&PORTRAIT_BG_TEXTURE.get().unwrap(), x, y, WHITE);
+        draw_texture(PORTRAIT_BG_TEXTURE.get().unwrap(), x, y, WHITE);
         self.last_drawn_rect.set(Rect::new(x, y, w, h));
 
         let params = DrawTextureParams {
@@ -742,19 +739,17 @@ impl Drawable for PlayerCharacterPortrait {
                 x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,
             );
-            if self.may_show_end_turn_button.get() {
-                if Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
-                    draw_rectangle_lines(
-                        x + 2.0,
-                        button_y + 2.0,
-                        w - 4.0,
-                        button_h - 4.0,
-                        1.0,
-                        WHITE,
-                    );
-                    if is_mouse_button_pressed(MouseButton::Left) {
-                        self.has_clicked_end_turn.set(true);
-                    }
+            if self.may_show_end_turn_button.get() && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
+                draw_rectangle_lines(
+                    x + 2.0,
+                    button_y + 2.0,
+                    w - 4.0,
+                    button_h - 4.0,
+                    1.0,
+                    WHITE,
+                );
+                if is_mouse_button_pressed(MouseButton::Left) {
+                    self.has_clicked_end_turn.set(true);
                 }
             }
         }

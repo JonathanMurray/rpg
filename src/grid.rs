@@ -5,21 +5,19 @@ use std::{
     f32::consts::PI,
     iter,
     rc::Rc,
-    str::CharIndices,
 };
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKBROWN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PURPLE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams},
     text::{draw_text_ex, Font, TextParams},
-    texture::draw_texture,
     time::get_time,
     window::{screen_height, screen_width},
 };
-use rand::{random_range, rng, Rng};
+use rand::{random_range, Rng};
 
 use std::cell::Cell;
 
@@ -30,26 +28,23 @@ use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
     color::{GREEN, RED, WHITE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_circle, draw_circle_lines, draw_rectangle, draw_rectangle_lines},
     text::measure_text,
 };
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
-    bot::convert_path_to_move_action,
     core::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
-        AttackAction, BaseAction, Character, Condition, Goodness, MovementType, Position,
+        AttackAction, BaseAction, Character, MovementType, Position,
         MOVE_DISTANCE_PER_STAMINA,
     },
-    data::{BAD_BOW, BOW},
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
-        draw_dashed_rectangle_sides, draw_rounded_rectangle_lines,
+        draw_dashed_rectangle_sides,
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    game_ui_connection::DEBUG,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
     util::line_collision,
@@ -162,14 +157,14 @@ impl MovementRange {
 
     fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
         let additional_range = range - character_remaining_movement;
-        let result = if additional_range <= 0.0 {
+        
+
+        //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
+        if additional_range <= 0.0 {
             0
         } else {
             (additional_range / MOVE_DISTANCE_PER_STAMINA as f32).ceil() as u32
-        };
-
-        //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
-        result
+        }
     }
 }
 
@@ -698,16 +693,14 @@ impl GameGrid {
                         } else {
                             params.rotation = -amount;
                         }
+                    } else if cycle_time < 0.25 {
+                        y += 1.0;
+                    } else if cycle_time < 0.5 {
+                        params.rotation = -0.05;
+                    } else if cycle_time < 0.75 {
+                        y += 1.0;
                     } else {
-                        if cycle_time < 0.25 {
-                            y += 1.0;
-                        } else if cycle_time < 0.5 {
-                            params.rotation = -0.05;
-                        } else if cycle_time < 0.75 {
-                            y += 1.0;
-                        } else {
-                            params.rotation = 0.05;
-                        }
+                        params.rotation = 0.05;
                     }
                 }
                 AnimationKind::Shake { random_time_offset } => {
@@ -1440,14 +1433,11 @@ impl GameGrid {
                                 outcome.switched_state = Some(NewState::ChoosingAction);
                                 outcome.switched_players_action_target = true;
                             }
+                        } else if mouse_state == MouseState::RequiresAllyTarget {
+                            ui_state.set_target(ActionTarget::Character(hovered_id, None));
+                            outcome.switched_players_action_target = true;
                         } else {
-                            if mouse_state == MouseState::RequiresAllyTarget {
-                                ui_state.set_target(ActionTarget::Character(hovered_id, None));
-                                outcome.switched_players_action_target = true;
-                            } else {
-                                outcome.tried_switching_selected_player_char = Some(hovered_id);
-                            }
-                            //self.players_inspect_target = Some(hovered_id);
+                            outcome.tried_switching_selected_player_char = Some(hovered_id);
                         }
                     }
                 } else {
@@ -1754,7 +1744,7 @@ impl GameGrid {
             v2.1 - padding,
             TextParams {
                 font: Some(&self.big_font),
-                font_size: font_size,
+                font_size,
                 color: BLACK,
                 ..Default::default()
             },
@@ -1984,7 +1974,7 @@ impl GameGrid {
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
         let status_w = 20.0;
-        let box_h = (text_dimensions.height + text_pad * 2.0);
+        let box_h = text_dimensions.height + text_pad * 2.0;
 
         let condition_infos = character.condition_infos();
 

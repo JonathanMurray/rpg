@@ -1,22 +1,20 @@
 use std::cell::{Cell, RefCell};
 
 use std::collections::{HashMap, HashSet};
-use std::default;
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
-use macroquad::miniquad::window::blocking_event_loop;
 use macroquad::rand::ChooseRandom;
 
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
-use crate::data::{PassiveSkill, ADRENALIN_POTION, HASTE};
+use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY};
+use crate::pathfind::{Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::util::{are_entities_within_melee, line_collision};
@@ -713,10 +711,8 @@ impl CoreGame {
             {
                 let mut num_adjacent_enemies = 0;
                 for (pos, player_controlled) in &positions {
-                    if *player_controlled != character.player_controlled() {
-                        if are_entities_within_melee(*pos, character.pos()) {
-                            num_adjacent_enemies += 1;
-                        }
+                    if *player_controlled != character.player_controlled() && are_entities_within_melee(*pos, character.pos()) {
+                        num_adjacent_enemies += 1;
                     }
                 }
                 dbg!(num_adjacent_enemies);
@@ -975,7 +971,7 @@ impl CoreGame {
                     let target = mode.characters().get(*target_id);
                     assert!(caster.reaches_with_ability(
                         ability,
-                        &enhancements,
+                        enhancements,
                         target.position.get()
                     ));
 
@@ -1015,7 +1011,7 @@ impl CoreGame {
                         caster,
                         ability.name,
                         &ability_roll,
-                        &enhancements,
+                        enhancements,
                         effect,
                         target,
                         &mut detail_lines,
@@ -1031,7 +1027,7 @@ impl CoreGame {
                             AreaShape::Circle(radius),
                             "AoE",
                             ability_roll,
-                            &enhancements,
+                            enhancements,
                             caster,
                             target.position.get(),
                             &mut detail_lines,
@@ -1052,7 +1048,7 @@ impl CoreGame {
                     let target = mode.characters().get(*target_id);
                     assert!(caster.reaches_with_ability(
                         ability,
-                        &enhancements,
+                        enhancements,
                         target.position.get()
                     ));
 
@@ -1076,7 +1072,7 @@ impl CoreGame {
 
                     let outcome = Self::perform_ability_ally_effect(
                         ability.name,
-                        &enhancements,
+                        enhancements,
                         effect,
                         target,
                         &mut detail_lines,
@@ -1101,7 +1097,7 @@ impl CoreGame {
                     }
 
                     let target_pos = selected_target.unwrap_position();
-                    assert!(caster.reaches_with_ability(ability, &enhancements, target_pos));
+                    assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
 
                     caster.set_facing_toward(target_pos);
 
@@ -1114,7 +1110,7 @@ impl CoreGame {
                     let outcomes = Self::perform_ability_area_effect(
                         ability.name,
                         ability_roll,
-                        &enhancements,
+                        enhancements,
                         caster,
                         target_pos,
                         area_effect,
@@ -1159,7 +1155,7 @@ impl CoreGame {
 
                         let outcome = Self::perform_ability_ally_effect(
                             ability.name,
-                            &enhancements,
+                            enhancements,
                             effect,
                             caster,
                             &mut detail_lines,
@@ -1178,7 +1174,7 @@ impl CoreGame {
                         let outcomes = Self::perform_ability_area_effect(
                             ability.name,
                             ability_roll,
-                            &enhancements,
+                            enhancements,
                             caster,
                             caster.position.get(),
                             area_effect,
@@ -1815,7 +1811,7 @@ impl CoreGame {
             attacker,
             hand_type,
             defender,
-            &enhancements,
+            enhancements,
             defender_reaction,
         );
         attack_bonus.flat_amount += ability_roll_modifier;
@@ -1977,16 +1973,14 @@ impl CoreGame {
                 let bonus_dmg = 1;
                 if is_target_flanked(attacker.pos(), defender) {
                     dmg_str.push_str(&format!(" +{} (Honorless)", bonus_dmg));
-                    dmg_calculation += bonus_dmg as i32;
+                    dmg_calculation += bonus_dmg;
                 }
             }
 
             if roll_result < evasion {
                 attack_hit_type = AttackHitType::Graze;
-            } else {
-                if roll_result >= evasion + 10 {
-                    attack_hit_type = AttackHitType::Critical;
-                }
+            } else if roll_result >= evasion + 10 {
+                attack_hit_type = AttackHitType::Critical;
             }
 
             match attack_hit_type {
@@ -2001,8 +1995,8 @@ impl CoreGame {
                 }
                 AttackHitType::Critical => {
                     on_true_hit_effect = weapon.on_true_hit;
-                    detail_lines.push(format!("  Critical hit"));
-                    dmg_str.push_str(&format!(" +50% (crit)"));
+                    detail_lines.push("  Critical hit".to_string());
+                    dmg_str.push_str(" +50% (crit)");
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                 }
             }
@@ -2137,7 +2131,7 @@ impl CoreGame {
                             line: "".to_string(),
                         },
                         &[],
-                        &attacker,
+                        attacker,
                         defender.pos(),
                         area_effect,
                         &mut detail_lines,
@@ -2352,13 +2346,10 @@ impl CoreGame {
         if conditions.borrow_mut().remove(&Condition::Raging) {
             self.log(format!("{} stopped Raging", name)).await;
         }
-        if conditions.borrow().has(&Condition::ArcaneSurge) {
-            if conditions
+        if conditions.borrow().has(&Condition::ArcaneSurge) && conditions
                 .borrow_mut()
-                .lose_stacks(&Condition::ArcaneSurge, 1)
-            {
-                self.log(format!("{} lost Arcane surge", name)).await;
-            }
+                .lose_stacks(&Condition::ArcaneSurge, 1) {
+            self.log(format!("{} lost Arcane surge", name)).await;
         }
 
         //let mut new_ap = MAX_ACTION_POINTS;
@@ -2413,11 +2404,11 @@ enum ActionPerformanceMode<'a> {
     SimulatedRoll(u32, &'a Characters),
 }
 
-impl<'a> ActionPerformanceMode<'a> {
+impl ActionPerformanceMode<'_> {
     fn characters(&self) -> &Characters {
         match self {
             ActionPerformanceMode::Real(core_game) => &core_game.characters,
-            ActionPerformanceMode::SimulatedRoll(_, characters) => *characters,
+            ActionPerformanceMode::SimulatedRoll(_, characters) => characters,
         }
     }
 
@@ -2892,7 +2883,7 @@ impl Characters {
                 return ch.id();
             }
         }
-        return self.0[0].0;
+        self.0[0].0
 
         /*
         let mut i = 0;
@@ -3319,11 +3310,11 @@ impl Conditions {
 
     fn maybe_expire(&mut self, game_time: u32) {
         self.map.retain(|condition, state| {
-            let keep = state
+            
+            state
                 .ends_at
                 .map(|ends_at| ends_at > game_time)
-                .unwrap_or(true);
-            keep
+                .unwrap_or(true)
         });
     }
 
@@ -3698,11 +3689,10 @@ impl AbilityTarget {
         match self {
             AbilityTarget::None { self_area, .. } => self_area
                 .as_ref()
-                .map(|area_effect| match area_effect.shape {
+                .and_then(|area_effect| match area_effect.shape {
                     AreaShape::Circle(range) => Some(range),
                     AreaShape::Line => None,
-                })
-                .flatten(),
+                }),
             _ => None,
         }
     }
@@ -4360,7 +4350,7 @@ impl Character {
     }
 
     fn lose_distracted(&self) -> bool {
-        self.conditions.borrow_mut().remove(&&Condition::Distracted)
+        self.conditions.borrow_mut().remove(&Condition::Distracted)
     }
 
     pub fn equipment_weight(&self) -> u32 {
@@ -4487,7 +4477,7 @@ impl Character {
             let encumbrance = self.equipment_weight().saturating_sub(self.capacity.get());
             self.conditions
                 .borrow_mut()
-                .set_stacks(Condition::Encumbered, encumbrance as u32);
+                .set_stacks(Condition::Encumbered, encumbrance);
         }
     }
 
@@ -4571,23 +4561,20 @@ impl Character {
         let from_content = self.equipment(from);
         let to_content = self.equipment(to);
 
-        match (from_content, to_content) {
-            (Some(EquipmentEntry::Arrows(from_arrow)), Some(EquipmentEntry::Arrows(to_arrow))) => {
-                if from_arrow.arrow == to_arrow.arrow {
-                    // Merge the stacks
-                    let quantity = from_arrow.quantity + to_arrow.quantity;
-                    self.set_equipment(
-                        Some(EquipmentEntry::Arrows(ArrowStack::new(
-                            to_arrow.arrow,
-                            quantity,
-                        ))),
-                        to,
-                    );
-                    self.set_equipment(None, from);
-                    return;
-                }
+        if let (Some(EquipmentEntry::Arrows(from_arrow)), Some(EquipmentEntry::Arrows(to_arrow))) = (from_content, to_content) {
+            if from_arrow.arrow == to_arrow.arrow {
+                // Merge the stacks
+                let quantity = from_arrow.quantity + to_arrow.quantity;
+                self.set_equipment(
+                    Some(EquipmentEntry::Arrows(ArrowStack::new(
+                        to_arrow.arrow,
+                        quantity,
+                    ))),
+                    to,
+                );
+                self.set_equipment(None, from);
+                return;
             }
-            _ => {}
         }
         self.set_equipment(from_content, to);
         self.set_equipment(to_content, from);
@@ -4656,7 +4643,7 @@ impl Character {
                 }
 
                 if within_range_squared(
-                    (range as f32 + modifier as f32).powf(2.0),
+                    (range + modifier as f32).powf(2.0),
                     self.position.get(),
                     target_position,
                 ) {

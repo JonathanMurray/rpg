@@ -2,22 +2,18 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
-    slice::RChunksMut,
 };
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE},
-    input::{get_keys_pressed, is_key_down, is_key_pressed, mouse_position, KeyCode},
-    math::Rect,
-    miniquad::gl::GL_RGB5_A1,
-    shapes::{draw_line, draw_rectangle},
-    text::{draw_text, Font},
+    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, RED, WHITE},
+    input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
+    shapes::draw_rectangle,
+    text::Font,
     texture::{draw_texture, Texture2D},
     window::{screen_height, screen_width},
 };
 
-use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams};
 
 use crate::{
     action_button::{
@@ -29,9 +25,7 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        as_percentage, distance_between, predict_ability, predict_attack, prob_ability_hit,
-        prob_attack_hit, prob_attack_penetrating_hit, Ability, AbilityEnhancement, AbilityId,
-        AbilityNegativeEffect, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
+        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
         Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
@@ -49,7 +43,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, DICE_SYMBOL, UI_TEXTURE},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -606,20 +600,18 @@ impl UserInterface {
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
         }
-        if portrait_outcome.clicked_end_turn {
-            if matches!(
+        if portrait_outcome.clicked_end_turn && matches!(
                 *self.state.borrow(),
                 UiState::ChoosingAction | UiState::ConfiguringAction(..)
             ) {
-                if player_chose.is_some() {
-                    println!(
-                        "Warning: overriding {:?} with new choice (end turn)",
-                        player_chose
-                    );
-                }
-                self.sound_player.play(SoundId::EndTurn);
-                player_chose = Some(PlayerChose::Action(None));
+            if player_chose.is_some() {
+                println!(
+                    "Warning: overriding {:?} with new choice (end turn)",
+                    player_chose
+                );
             }
+            self.sound_player.play(SoundId::EndTurn);
+            player_chose = Some(PlayerChose::Action(None));
         }
 
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
@@ -1090,20 +1082,17 @@ impl UserInterface {
     }
 
     pub fn set_state(&mut self, state: UiState) {
-        match &*self.state.borrow() {
-            UiState::ConfiguringAction(configured_action) => match configured_action {
-                ConfiguredAction::ChangeEquipment { drag } => {
-                    // Clear the drag; it's shared with the character sheet equipment UI
-                    *drag.borrow_mut() = None;
-                    self.character_sheet_toggle.set_shown(false);
-                }
-                ConfiguredAction::UseConsumable(..) => {
-                    self.character_sheet_toggle.set_shown(false);
-                }
-                _ => {}
-            },
+        if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() { match configured_action {
+            ConfiguredAction::ChangeEquipment { drag } => {
+                // Clear the drag; it's shared with the character sheet equipment UI
+                *drag.borrow_mut() = None;
+                self.character_sheet_toggle.set_shown(false);
+            }
+            ConfiguredAction::UseConsumable(..) => {
+                self.character_sheet_toggle.set_shown(false);
+            }
             _ => {}
-        }
+        } }
 
         *self.state.borrow_mut() = state;
 
@@ -1156,7 +1145,7 @@ impl UserInterface {
                         remembered.retain(|e| usable.contains(e));
                         *selected_enhancements = remembered.clone();
                     }
-                } else if let ConfiguredAction::Move { cost, .. } = configured_action {
+                } else if let ConfiguredAction::Move {  .. } = configured_action {
                     //movement_cost = *cost;
                 }
             }
@@ -1884,7 +1873,7 @@ impl UserInterface {
                 if let Some(heal_amount) = healing {
                     Some((format!("{}", heal_amount), TextEffectStyle::Friendly))
                 } else if let Some(condition) = condition {
-                    Some((format!("{}", condition.name()), TextEffectStyle::Friendly))
+                    Some((condition.name().to_string(), TextEffectStyle::Friendly))
                 } else {
                     Some(("+".to_string(), TextEffectStyle::Friendly))
                 }

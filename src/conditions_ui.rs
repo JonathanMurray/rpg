@@ -6,11 +6,11 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::{Font, TextParams},
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
-    action_button::{draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference},
+    action_button::{draw_regular_tooltip, Side, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
     textures::StatusId,

@@ -212,11 +212,8 @@ impl CharacterSheet {
         );
 
         let mut requested_consumption = None;
-        match ui_state {
-            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
-                requested_consumption = *consumption
-            }
-            _ => {}
+        if let UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) = ui_state {
+            requested_consumption = *consumption
         };
 
         let outcome = self

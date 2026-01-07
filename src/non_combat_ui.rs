@@ -19,7 +19,7 @@ use crate::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
-    character_sheet::{build_spell_book, MoneyText},
+    character_sheet::build_spell_book,
     core::{BaseAction, Character, HandType},
     equipment_ui::{EquipmentDrag, EquipmentSection},
     game_ui::ResourceBars,

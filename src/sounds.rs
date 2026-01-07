@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use macroquad::audio::{load_sound, play_sound, play_sound_once, PlaySoundParams, Sound};
+use macroquad::audio::{load_sound, play_sound_once, Sound};
 
 #[derive(Clone)]
 pub struct SoundPlayer {
