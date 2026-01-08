@@ -556,16 +556,21 @@ impl CoreGame {
                     unexpected => unreachable!("Not consumable: {:?}", unexpected),
                 };
 
+                let mut detail_lines = vec![];
+
                 if consumable.health_gain > 0 {
-                    self.perform_gain_health(character, consumable.health_gain);
+                    let amount = self.perform_gain_health(character, consumable.health_gain);
+                    detail_lines.push(format!("gained {} health", amount));
                 }
                 if consumable.mana_gain > 0 {
-                    character.mana.gain(consumable.mana_gain);
+                    let amount = character.mana.gain(consumable.mana_gain);
                     character.on_mana_changed();
+                    detail_lines.push(format!("gained {} mana", amount));
                 }
                 if let Some(apply_effect) = consumable.effect {
-                    // TODO: log it?
-                    self.perform_effect_application(apply_effect, None, None, character);
+                    let (line, _damage) =
+                        self.perform_effect_application(apply_effect, None, None, character);
+                    detail_lines.push(line);
                 }
 
                 character.set_equipment(None, slot_role);
@@ -573,6 +578,7 @@ impl CoreGame {
                 self.ui_handle_event(GameEvent::ConsumableWasUsed {
                     user: character.id(),
                     consumable,
+                    detail_lines,
                 })
                 .await;
 
@@ -1344,8 +1350,7 @@ impl CoreGame {
         degree_of_success: u32,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
-        let mut maybe_healing = None;
-        let mut maybe_condition = None;
+        let mut applied_effects = vec![];
 
         let real_game = mode.real_game();
 
@@ -1367,10 +1372,10 @@ impl CoreGame {
                     "  {} was healed for {}",
                     target.name, health_gained
                 ));
-                maybe_healing = Some(health_gained);
+                applied_effects.push(ApplyEffect::GainHealth(health_gained));
             } else {
                 // This might include over-heal, but hey.
-                maybe_healing = Some(healing);
+                applied_effects.push(ApplyEffect::GainHealth(healing));
             }
         };
 
@@ -1381,7 +1386,6 @@ impl CoreGame {
                     ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref apply_condition) => {
-                        maybe_condition = Some(apply_condition.condition);
                         /*
                         if let Some(stacks) = condition.stacks() {
                             *stacks += degree_of_success;
@@ -1392,6 +1396,8 @@ impl CoreGame {
                     ApplyEffect::ConsumeCondition { .. } => {}
                     ApplyEffect::Knockback { .. } => {}
                 }
+
+                applied_effects.push(effect);
 
                 let (log_line, _damage) =
                     game.perform_effect_application(effect, None, None, target);
@@ -1408,11 +1414,7 @@ impl CoreGame {
             }
         }
 
-        AbilityTargetOutcome::AffectedAlly {
-            healing: maybe_healing,
-            condition: maybe_condition,
-            apply_effect: None,
-        }
+        AbilityTargetOutcome::AffectedAlly { applied_effects }
     }
 
     fn perform_ability_area_enemy_effect(
@@ -1520,9 +1522,7 @@ impl CoreGame {
                         target_outcomes.push((
                             caster.id(),
                             AbilityTargetOutcome::AffectedAlly {
-                                condition: None,
-                                healing: None,
-                                apply_effect: Some(apply_effect),
+                                applied_effects: vec![apply_effect],
                             },
                         ));
                     }
@@ -2639,6 +2639,7 @@ pub enum GameEvent {
     ConsumableWasUsed {
         user: CharacterId,
         consumable: Consumable,
+        detail_lines: Vec<String>,
     },
     CharacterDying {
         character: CharacterId,
@@ -2764,9 +2765,7 @@ pub enum AbilityTargetOutcome {
     AttackedEnemy(AttackedEvent),
     Resisted,
     AffectedAlly {
-        condition: Option<Condition>,
-        healing: Option<u32>,
-        apply_effect: Option<ApplyEffect>,
+        applied_effects: Vec<ApplyEffect>,
     },
 }
 
@@ -3183,7 +3182,7 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "-3 Evasion, Disadvantage on attacks.",
+            Dazed => "-5 Evasion, Disadvantage on attacks.",
             Blinded => "Disadvantage, always Flanked when attacked.",
             Raging => "Advantage on melee attacks (until end of turn).",
             Slowed => "-2 AP per turn, -25% movement",
@@ -3247,7 +3246,7 @@ impl Condition {
     pub const fn has_cumulative_stacking(&self) -> bool {
         use Condition::*;
         match self {
-            Bleeding | Burning => true,
+            Bleeding | Burning | ArcaneSurge => true,
             _ => false,
         }
     }
@@ -3286,7 +3285,7 @@ impl Condition {
 const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
-const DAZED_EVASION_PENALTY: u32 = 3;
+const DAZED_EVASION_PENALTY: u32 = 5;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const INSPIRED_WILL_BONUS: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 2;

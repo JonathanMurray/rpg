@@ -1488,13 +1488,9 @@ impl UserInterface {
                             }
                         }
                         AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
-                        AbilityTargetOutcome::AffectedAlly {
-                            healing,
-                            condition,
-                            apply_effect,
-                        } => {
-                            if let Some(amount) = healing {
-                                line.push_str(&format!(" ({} healing)", amount))
+                        AbilityTargetOutcome::AffectedAlly { applied_effects } => {
+                            if applied_effects.len() == 1 {
+                                line.push_str(&format!("  ({})", applied_effects[0]));
                             }
                         }
                         AbilityTargetOutcome::AttackedEnemy(event) => {
@@ -1546,13 +1542,20 @@ impl UserInterface {
                     self.handle_attacked_event(event);
                 }
             }
-            GameEvent::ConsumableWasUsed { user, consumable } => {
+            GameEvent::ConsumableWasUsed {
+                user,
+                consumable,
+                detail_lines,
+            } => {
                 self.sound_player.play(SoundId::Powerup);
-                self.log.add(format!(
-                    "{} used {}",
-                    self.characters.get(user).name,
-                    consumable.name
-                ));
+                self.log.add_with_details(
+                    format!(
+                        "{} used {}",
+                        self.characters.get(user).name,
+                        consumable.name
+                    ),
+                    &detail_lines,
+                );
             }
             GameEvent::CharacterDying { character } => {
                 let duration = 0.5;
@@ -1928,20 +1931,12 @@ impl UserInterface {
                 Some(effect)
             }
             AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), TextEffectStyle::Miss)),
-            AbilityTargetOutcome::AffectedAlly {
-                healing,
-                condition,
-                apply_effect,
-            } => {
-                let s = if let Some(heal_amount) = healing {
-                    format!("{}", heal_amount)
-                } else if let Some(condition) = condition {
-                    condition.name().to_string()
-                } else if let Some(applied_effect) = apply_effect {
-                    applied_effect.to_string()
-                } else {
-                    "+".to_string()
-                };
+            AbilityTargetOutcome::AffectedAlly { applied_effects } => {
+                let mut s = String::new();
+                for apply_effect in applied_effects {
+                    s.push_str(&format!("{} ", apply_effect));
+                }
+
                 Some((s, TextEffectStyle::Friendly))
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
