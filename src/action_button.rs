@@ -5,10 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{
-        Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE,
-        YELLOW,
-    },
+    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -26,8 +23,8 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect,
-        Range, Shield, Weapon,
+        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
+        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
@@ -298,18 +295,18 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         describe_attack_enhancement_effect(&effect, &mut t);
     }
 
-    /*
-    for apply_effect in enhancement
-        .apply_on_self_per_area_target_hit
-        .iter()
-        .flatten()
-        .flatten()
-    {
+    if enhancement.apply_on_self_per_area_target_hit.is_some() {
         t.technical_description
             .push("On self (per target hit):".to_string());
-        describe_apply_effect(*apply_effect, &mut t);
+        for apply_effect in enhancement
+            .apply_on_self_per_area_target_hit
+            .iter()
+            .flatten()
+            .flatten()
+        {
+            describe_apply_effect(*apply_effect, &mut t);
+        }
     }
-     */
 
     t
 }
@@ -349,6 +346,9 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         ApplyEffect::GainStamina(n) => t
             .technical_description
             .push(format!("  Gains |<value>{}| stamina", n)),
+        ApplyEffect::GainHealth(n) => t
+            .technical_description
+            .push(format!("  Gains |<value>{}| health", n)),
         ApplyEffect::Condition(apply_condition) => {
             let mut line = format!("  |<keyword>{}|", apply_condition.condition.name());
             if let Some(stacks) = apply_condition.stacks {
@@ -1101,7 +1101,6 @@ impl Drawable for ActionButton {
 }
 
 fn hotkey_string(keycode: &KeyCode) -> &str {
-    
     (match *keycode {
         KeyCode::Key1 => "1",
         KeyCode::Key2 => "2",

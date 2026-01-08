@@ -24,8 +24,8 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, TextLine,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style,
+        TextLine,
     },
     core::{
         Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
@@ -739,15 +739,10 @@ impl Drawable for PlayerCharacterPortrait {
                 x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,
             );
-            if self.may_show_end_turn_button.get() && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into()) {
-                draw_rectangle_lines(
-                    x + 2.0,
-                    button_y + 2.0,
-                    w - 4.0,
-                    button_h - 4.0,
-                    1.0,
-                    WHITE,
-                );
+            if self.may_show_end_turn_button.get()
+                && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into())
+            {
+                draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     self.has_clicked_end_turn.set(true);
                 }

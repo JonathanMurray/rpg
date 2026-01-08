@@ -13,9 +13,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference,
-    },
+    action_button::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable, TextLine},
     core::{ArrowStack, Character, EquipmentEntry, Party},
     data::{

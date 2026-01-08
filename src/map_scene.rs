@@ -5,8 +5,8 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     miniquad::window::screen_size,
     shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex,
-        draw_rectangle_lines, DrawRectangleParams,
+        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, draw_rectangle_lines,
+        DrawRectangleParams,
     },
     text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},

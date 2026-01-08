@@ -30,6 +30,7 @@ impl SoundPlayer {
             (SoundId::Burning, "fire"),
             (SoundId::Invalid, "invalid"),
             (SoundId::EndTurn, "end_turn"),
+            (SoundId::YourTurn, "your_turn3"),
         ] {
             let sound = load_sound(&format!("sounds/{name}.wav")).await.unwrap();
             sounds.insert(*id, sound);
@@ -63,4 +64,5 @@ pub enum SoundId {
     Burning,
     Invalid,
     EndTurn,
+    YourTurn,
 }

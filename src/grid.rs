@@ -36,8 +36,7 @@ use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
     core::{
         within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
-        AttackAction, BaseAction, Character, MovementType, Position,
-        MOVE_DISTANCE_PER_STAMINA,
+        AttackAction, BaseAction, Character, MovementType, Position, MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -157,7 +156,6 @@ impl MovementRange {
 
     fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
         let additional_range = range - character_remaining_movement;
-        
 
         //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
         if additional_range <= 0.0 {
@@ -477,6 +475,8 @@ impl GameGrid {
         text: impl Into<String>,
         style: TextEffectStyle,
     ) {
+        let text = text.into();
+        dbg!(&text);
         let mut pos = (position.0 as f32, position.1 as f32);
 
         let mut rng = rand::rng();
@@ -499,7 +499,7 @@ impl GameGrid {
             end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(text.into(), self.big_font.clone(), color),
+                EffectGraphics::Text(text, self.big_font.clone(), color),
             ),
             source_pos: pos,
             destination_pos: pos,
@@ -1057,8 +1057,11 @@ impl GameGrid {
                         }
                     }
                     AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                    AbilityTarget::Area { area_effect, .. } => {
-                        MouseState::RequiresPositionTarget(area_effect.shape)
+                    AbilityTarget::Area { area_effect, range } => {
+                        MouseState::RequiresPositionTarget {
+                            shape: area_effect.shape,
+                            range,
+                        }
                     }
                     AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                 },
@@ -1070,6 +1073,8 @@ impl GameGrid {
             },
             _ => MouseState::None,
         };
+
+        let mut snapped_position_target: Option<Position> = None;
 
         match mouse_state {
             MouseState::RequiresEnemyTarget {
@@ -1102,7 +1107,7 @@ impl GameGrid {
                 }
             }
 
-            MouseState::RequiresPositionTarget(shape) => {
+            MouseState::RequiresPositionTarget { shape, range } => {
                 match shape {
                     AreaShape::Circle(radius) => {
                         let center =
@@ -1130,8 +1135,17 @@ impl GameGrid {
                             } else {
                                 None
                             };
-                        if let Some(to) = point {
+                        if let Some(mut to) = point {
                             let from = active_char_pos;
+                            let mut dx = to.0 - from.0;
+                            let mut dy = to.1 - from.1;
+                            let dist = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+                            let multiplier: f32 = f32::from(range) / dist;
+                            dx = (dx as f32 * multiplier) as i32;
+                            dy = (dy as f32 * multiplier) as i32;
+                            to = (from.0 + dx, from.1 + dy);
+                            snapped_position_target = Some(to);
+
                             line_collision(from, to, |x, y| {
                                 self.fill_cell((x, y), Color::new(1.0, 1.0, 1.0, 0.15), 0.0)
                             });
@@ -1284,7 +1298,8 @@ impl GameGrid {
                 && matches!(mouse_state, MouseState::RequiresPositionTarget { .. })
             {
                 if ui_state.players_action_target() == ActionTarget::None {
-                    ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
+                    let target_pos = snapped_position_target.unwrap_or(mouse_grid_pos);
+                    ui_state.set_target(ActionTarget::Position(target_pos));
                     outcome.switched_players_action_target = true;
                 } else {
                     *ui_state = UiState::ChoosingAction;
@@ -1338,11 +1353,13 @@ impl GameGrid {
                                 > range.squared();
                         }
 
-                        if is_mouse_pos_out_of_range {
+                        if is_mouse_pos_out_of_range && snapped_position_target.is_none() {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
+                            let position_target = snapped_position_target.unwrap_or(mouse_grid_pos);
+
                             self.draw_cornered_outline(
-                                self.grid_pos_to_screen(mouse_grid_pos),
+                                self.grid_pos_to_screen(position_target),
                                 HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
                                 5.0,
                                 2.0,
@@ -1350,7 +1367,7 @@ impl GameGrid {
                             );
                             self.draw_target_crosshair(
                                 self.characters.get(self.active_character_id).pos(),
-                                mouse_grid_pos,
+                                position_target,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                                 4.0,
                             );
@@ -1419,7 +1436,7 @@ impl GameGrid {
 
                     if pressed_left_mouse {
                         if self.active_character_id == hovered_id {
-                            if matches!(mouse_state, MouseState::RequiresPositionTarget(..)) {
+                            if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;
                                 self.players_inspect_target = Some(hovered_id);
@@ -2774,7 +2791,10 @@ enum MouseState {
         move_into_melee: Option<Range>,
     },
     RequiresAllyTarget,
-    RequiresPositionTarget(AreaShape),
+    RequiresPositionTarget {
+        shape: AreaShape,
+        range: Range,
+    },
     ImplicitTarget,
     MayInputMovement,
     None,

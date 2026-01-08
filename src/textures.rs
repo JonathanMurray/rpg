@@ -1,8 +1,4 @@
-use std::{
-    collections::HashMap,
-    hash::Hash,
-    sync::OnceLock,
-};
+use std::{collections::HashMap, hash::Hash, sync::OnceLock};
 
 use macroquad::{
     color::WHITE,

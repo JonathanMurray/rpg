@@ -7,9 +7,7 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
-    input::{
-        is_key_down, KeyCode,
-    },
+    input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
@@ -22,10 +20,7 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_icons, Drawable},
-    core::{
-        predict_attack, Character, CharacterId, Characters,
-        MOVE_DISTANCE_PER_STAMINA,
-    },
+    core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
     textures::IconId,

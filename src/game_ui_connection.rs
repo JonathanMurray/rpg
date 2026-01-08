@@ -55,7 +55,9 @@ enum MessageFromGame {
         attacker: CharacterId,
         victim: CharacterId,
     },
-    Event(GameEvent),
+    // Box since GameEvent was significantly larger than other variants, and we started getting a stackoverflow
+    // when handling the event
+    Event(Box<GameEvent>),
 }
 
 pub enum ActionOrSwitchTo {
@@ -82,9 +84,7 @@ impl GameUserInterfaceConnection {
     }
 
     async fn run_ui(&self, game: &CoreGame, message: MessageFromGame) -> UiOutcome {
-        println!("run_ui ...");
         let inner_ref = self.inner.borrow_mut();
-        println!("have inner ref.");
         inner_ref.as_ref().unwrap().run_ui(game, message).await
     }
 
@@ -196,7 +196,7 @@ impl GameUserInterfaceConnection {
     }
 
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
-        let msg = MessageFromGame::Event(event);
+        let msg = MessageFromGame::Event(Box::new(event));
         match self.run_ui(game, msg).await {
             UiOutcome::None => {}
             _ => unreachable!(),
@@ -210,9 +210,6 @@ struct _GameUserInterfaceConnection {
 
 impl _GameUserInterfaceConnection {
     async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
-
-        println!("inner run_ui ...");
-
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();
@@ -308,7 +305,6 @@ impl _GameUserInterfaceConnection {
 
             MessageFromGame::Event(event) => {
                 waiting_for_ui_animation_potentially = true;
-                println!("BEFORE CALLING handle_game_event({:?})", event);
                 user_interface.handle_game_event(event);
             }
         }

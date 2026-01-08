@@ -14,7 +14,6 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
-
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
@@ -25,8 +24,9 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AttackAction, AttackEnhancement,
+        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId,
+        AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action,
+        ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
         Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
         MovementType, OnAttackedReaction, OnHitReaction, Position,
@@ -600,10 +600,12 @@ impl UserInterface {
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
         }
-        if portrait_outcome.clicked_end_turn && matches!(
+        if portrait_outcome.clicked_end_turn
+            && matches!(
                 *self.state.borrow(),
                 UiState::ChoosingAction | UiState::ConfiguringAction(..)
-            ) {
+            )
+        {
             if player_chose.is_some() {
                 println!(
                     "Warning: overriding {:?} with new choice (end turn)",
@@ -1082,17 +1084,19 @@ impl UserInterface {
     }
 
     pub fn set_state(&mut self, state: UiState) {
-        if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() { match configured_action {
-            ConfiguredAction::ChangeEquipment { drag } => {
-                // Clear the drag; it's shared with the character sheet equipment UI
-                *drag.borrow_mut() = None;
-                self.character_sheet_toggle.set_shown(false);
+        if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
+            match configured_action {
+                ConfiguredAction::ChangeEquipment { drag } => {
+                    // Clear the drag; it's shared with the character sheet equipment UI
+                    *drag.borrow_mut() = None;
+                    self.character_sheet_toggle.set_shown(false);
+                }
+                ConfiguredAction::UseConsumable(..) => {
+                    self.character_sheet_toggle.set_shown(false);
+                }
+                _ => {}
             }
-            ConfiguredAction::UseConsumable(..) => {
-                self.character_sheet_toggle.set_shown(false);
-            }
-            _ => {}
-        } }
+        }
 
         *self.state.borrow_mut() = state;
 
@@ -1145,7 +1149,7 @@ impl UserInterface {
                         remembered.retain(|e| usable.contains(e));
                         *selected_enhancements = remembered.clone();
                     }
-                } else if let ConfiguredAction::Move {  .. } = configured_action {
+                } else if let ConfiguredAction::Move { .. } = configured_action {
                     //movement_cost = *cost;
                 }
             }
@@ -1290,15 +1294,10 @@ impl UserInterface {
         self.animation_stopwatch.remaining.is_some()
     }
 
-    pub fn handle_game_event(&mut self, event: GameEvent) {
-
-        println!("INSIDE handle_game_event({:?})", event);
-
-        dbg!(&event);
-
+    pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        match event {
+        match *event {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
@@ -1379,6 +1378,7 @@ impl UserInterface {
                 actor,
                 ability,
                 target,
+                area_at,
             } => {
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.play(sound_id);
@@ -1391,63 +1391,46 @@ impl UserInterface {
                 let duration;
 
                 let animation_color = ability.animation_color;
+                let caster_pos = self.characters.get(actor).pos();
                 if let Some(target) = &target {
-                    let caster_pos = self.characters.get(actor).pos();
                     let target_pos = self.characters.get(*target).pos();
 
                     duration = 0.05 * distance_between(caster_pos, target_pos);
 
-                    self.game_grid.add_effect(
+                    self.add_circle_projectile_effect(
+                        duration,
+                        animation_color,
                         caster_pos,
                         target_pos,
-                        Effect {
-                            start_time: 0.0,
-                            end_time: duration,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 10.0,
-                                    end_radius: Some(15.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
-                                },
-                            ),
-                        },
                     );
-                    self.game_grid.add_effect(
-                        caster_pos,
-                        target_pos,
-                        Effect {
-                            start_time: 0.025,
-                            end_time: duration + 0.025,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 8.0,
-                                    end_radius: Some(13.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
+                } else if let Some((shape, area_pos)) = area_at {
+                    duration = 0.05 * distance_between(caster_pos, area_pos);
+                    match shape {
+                        AreaShape::Circle(range) => {
+                            self.add_circle_projectile_effect(
+                                duration,
+                                animation_color,
+                                caster_pos,
+                                area_pos,
+                            );
+                        }
+                        AreaShape::Line => {
+                            self.game_grid.add_effect(
+                                caster_pos,
+                                area_pos,
+                                Effect {
+                                    start_time: 0.0,
+                                    end_time: duration,
+                                    variant: EffectVariant::Line {
+                                        color: animation_color,
+                                        thickness: 10.0,
+                                        end_thickness: None,
+                                        extend_gradually: true,
+                                    },
                                 },
-                            ),
-                        },
-                    );
-                    self.game_grid.add_effect(
-                        caster_pos,
-                        target_pos,
-                        Effect {
-                            start_time: 0.05,
-                            end_time: duration + 0.05,
-                            variant: EffectVariant::At(
-                                EffectPosition::Projectile,
-                                EffectGraphics::Circle {
-                                    radius: 6.0,
-                                    end_radius: Some(11.0),
-                                    fill: Some(animation_color),
-                                    stroke: None,
-                                },
-                            ),
-                        },
-                    );
+                            );
+                        }
+                    }
                 } else {
                     duration = 0.2;
                 }
@@ -1461,7 +1444,14 @@ impl UserInterface {
                 mut detail_lines,
             }) => {
                 if let Some(sound_id) = ability.resolve_sound {
-                    self.sound_player.play(sound_id);
+                    let mut skip_sound = false;
+                    if let Some((_pos, targets)) = &area_outcomes {
+                        skip_sound = targets.is_empty();
+                    }
+
+                    if !skip_sound {
+                        self.sound_player.play(sound_id);
+                    }
                 }
 
                 let actor_name = self.characters.get(actor).name;
@@ -1498,7 +1488,11 @@ impl UserInterface {
                             }
                         }
                         AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
-                        AbilityTargetOutcome::AffectedAlly { healing, condition } => {
+                        AbilityTargetOutcome::AffectedAlly {
+                            healing,
+                            condition,
+                            apply_effect,
+                        } => {
                             if let Some(amount) = healing {
                                 line.push_str(&format!(" ({} healing)", amount))
                             }
@@ -1586,8 +1580,13 @@ impl UserInterface {
                 }
             }
             GameEvent::NewActiveCharacter { new_active } => {
+                let was_players_turn = self.active_character().player_controlled();
                 self.set_new_active_character_id(new_active);
-                if !self.active_character().player_controlled() {
+                if self.active_character().player_controlled() {
+                    if !was_players_turn {
+                        self.sound_player.play(SoundId::YourTurn);
+                    }
+                } else {
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
@@ -1667,6 +1666,66 @@ impl UserInterface {
                 );
             }
         }
+    }
+
+    fn add_circle_projectile_effect(
+        &mut self,
+        duration: f32,
+        animation_color: Color,
+        caster_pos: (i32, i32),
+        target_pos: (i32, i32),
+    ) {
+        self.game_grid.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time: 0.0,
+                end_time: duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 10.0,
+                        end_radius: Some(15.0),
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
+            },
+        );
+        self.game_grid.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time: 0.025,
+                end_time: duration + 0.025,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 8.0,
+                        end_radius: Some(13.0),
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
+            },
+        );
+        self.game_grid.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time: 0.05,
+                end_time: duration + 0.05,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 6.0,
+                        end_radius: Some(11.0),
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
+            },
+        );
     }
 
     fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
@@ -1869,14 +1928,21 @@ impl UserInterface {
                 Some(effect)
             }
             AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), TextEffectStyle::Miss)),
-            AbilityTargetOutcome::AffectedAlly { healing, condition } => {
-                if let Some(heal_amount) = healing {
-                    Some((format!("{}", heal_amount), TextEffectStyle::Friendly))
+            AbilityTargetOutcome::AffectedAlly {
+                healing,
+                condition,
+                apply_effect,
+            } => {
+                let s = if let Some(heal_amount) = healing {
+                    format!("{}", heal_amount)
                 } else if let Some(condition) = condition {
-                    Some((condition.name().to_string(), TextEffectStyle::Friendly))
+                    condition.name().to_string()
+                } else if let Some(applied_effect) = apply_effect {
+                    applied_effect.to_string()
                 } else {
-                    Some(("+".to_string(), TextEffectStyle::Friendly))
-                }
+                    "+".to_string()
+                };
+                Some((s, TextEffectStyle::Friendly))
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
                 // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.

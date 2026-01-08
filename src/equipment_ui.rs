@@ -32,8 +32,7 @@ use crate::{
     character_sheet::MoneyText,
     core::{
         ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Consumable,
-        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon, WeaponGrip,
-        WeaponRange,
+        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     sounds::{SoundId, SoundPlayer},

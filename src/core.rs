@@ -711,7 +711,9 @@ impl CoreGame {
             {
                 let mut num_adjacent_enemies = 0;
                 for (pos, player_controlled) in &positions {
-                    if *player_controlled != character.player_controlled() && are_entities_within_melee(*pos, character.pos()) {
+                    if *player_controlled != character.player_controlled()
+                        && are_entities_within_melee(*pos, character.pos())
+                    {
                         num_adjacent_enemies += 1;
                     }
                 }
@@ -740,6 +742,10 @@ impl CoreGame {
             ApplyEffect::GainStamina(n) => {
                 let amount_gained = receiver.stamina.gain(n);
                 format!("  {} gained {} stamina", receiver.name, amount_gained)
+            }
+            ApplyEffect::GainHealth(n) => {
+                let amount_gained = receiver.health.gain(n);
+                format!("  {} gained {} health", receiver.name, amount_gained)
             }
             ApplyEffect::Condition(apply_condition) => {
                 self.perform_receive_condition(apply_condition, receiver)
@@ -835,8 +841,11 @@ impl CoreGame {
         selected_target: &ActionTarget,
         mode: ActionPerformanceMode<'_>,
     ) -> Vec<AbilityResolvedEvent> {
-
-        println!("perform_ability {}, real={:?}", ability.name, matches!(mode, ActionPerformanceMode::Real(..)));
+        println!(
+            "perform_ability {}, real={:?}",
+            ability.name,
+            matches!(mode, ActionPerformanceMode::Real(..))
+        );
 
         let caster_id = caster.id();
 
@@ -981,6 +990,7 @@ impl CoreGame {
                             actor: caster_id,
                             ability,
                             target: Some(*target_id),
+                            area_at: None,
                         })
                         .await;
                     }
@@ -1066,6 +1076,7 @@ impl CoreGame {
                             actor: caster_id,
                             ability,
                             target: Some(*target_id),
+                            area_at: None,
                         })
                         .await;
                     }
@@ -1087,19 +1098,20 @@ impl CoreGame {
                     range: _,
                     area_effect,
                 } => {
+                    let target_pos = selected_target.unwrap_position();
+                    assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
+
+                    caster.set_facing_toward(target_pos);
+
                     if let Some(game) = real_game {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
                             ability,
                             target: None,
+                            area_at: Some((area_effect.shape, target_pos)),
                         })
                         .await;
                     }
-
-                    let target_pos = selected_target.unwrap_position();
-                    assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
-
-                    caster.set_facing_toward(target_pos);
 
                     let ability_roll = maybe_ability_roll.unwrap();
 
@@ -1130,6 +1142,7 @@ impl CoreGame {
                             actor: caster_id,
                             ability,
                             target: None,
+                            area_at: None,
                         })
                         .await;
                     }
@@ -1224,7 +1237,6 @@ impl CoreGame {
 
         resolve_events
     }
-
 
     fn perform_ability_area_effect(
         name: &'static str,
@@ -1366,6 +1378,7 @@ impl CoreGame {
             for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref apply_condition) => {
                         maybe_condition = Some(apply_condition.condition);
@@ -1398,6 +1411,7 @@ impl CoreGame {
         AbilityTargetOutcome::AffectedAlly {
             healing: maybe_healing,
             condition: maybe_condition,
+            apply_effect: None,
         }
     }
 
@@ -1480,28 +1494,41 @@ impl CoreGame {
             }
         }
 
-        /*
         if let Some(game) = mode.real_game() {
             dbg!(&enhancements);
             for enhancement in enhancements {
-                for apply_effect in enhancement
+                for mut apply_effect in enhancement
                     .apply_on_self_per_area_target_hit
                     .iter()
+                    .copied()
                     .flatten()
                     .flatten()
                 {
-                    // This should ideally be logged?
+                    let num_targets_hit = target_outcomes.len() as u32;
 
-                    // TODO: the effect should scale per target hit
+                    if num_targets_hit > 0 {
+                        apply_effect.multiply(num_targets_hit);
+                        dbg!(apply_effect);
 
-                    dbg!(apply_effect);
+                        let (_line, _damage) = game.perform_effect_application(
+                            apply_effect,
+                            Some(caster),
+                            None,
+                            caster,
+                        );
 
-                    let (_line, _damage) =
-                        game.perform_effect_application(*apply_effect, Some(caster), None, caster);
+                        target_outcomes.push((
+                            caster.id(),
+                            AbilityTargetOutcome::AffectedAlly {
+                                condition: None,
+                                healing: None,
+                                apply_effect: Some(apply_effect),
+                            },
+                        ));
+                    }
                 }
             }
         }
-         */
         target_outcomes
     }
 
@@ -1691,6 +1718,9 @@ impl CoreGame {
                             apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing);
                         }
                         ApplyEffect::GainStamina(ref mut n) => {
+                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
+                        }
+                        ApplyEffect::GainHealth(ref mut n) => {
                             apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
                         }
                         ApplyEffect::Condition(ref mut apply_condition) => {
@@ -2346,9 +2376,11 @@ impl CoreGame {
         if conditions.borrow_mut().remove(&Condition::Raging) {
             self.log(format!("{} stopped Raging", name)).await;
         }
-        if conditions.borrow().has(&Condition::ArcaneSurge) && conditions
+        if conditions.borrow().has(&Condition::ArcaneSurge)
+            && conditions
                 .borrow_mut()
-                .lose_stacks(&Condition::ArcaneSurge, 1) {
+                .lose_stacks(&Condition::ArcaneSurge, 1)
+        {
             self.log(format!("{} lost Arcane surge", name)).await;
         }
 
@@ -2601,6 +2633,7 @@ pub enum GameEvent {
         actor: CharacterId,
         ability: Ability,
         target: Option<CharacterId>,
+        area_at: Option<(AreaShape, Position)>,
     },
     AbilityResolved(AbilityResolvedEvent),
     ConsumableWasUsed {
@@ -2733,6 +2766,7 @@ pub enum AbilityTargetOutcome {
     AffectedAlly {
         condition: Option<Condition>,
         healing: Option<u32>,
+        apply_effect: Option<ApplyEffect>,
     },
 }
 
@@ -2957,6 +2991,7 @@ impl Characters {
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(ApplyCondition),
+    GainHealth(u32),
     GainStamina(u32),
     PerBleeding {
         damage: u32,
@@ -2968,11 +3003,36 @@ pub enum ApplyEffect {
     Knockback(u32),
 }
 
+impl ApplyEffect {
+    fn multiply(&mut self, factor: u32) {
+        match self {
+            ApplyEffect::RemoveActionPoints(n) => *n *= factor,
+            ApplyEffect::Condition(apply_condition) => {
+                if let Some(rounds) = &mut apply_condition.duration_rounds {
+                    *rounds *= factor;
+                }
+                if let Some(stacks) = &mut apply_condition.stacks {
+                    *stacks *= factor;
+                }
+            }
+            ApplyEffect::GainHealth(n) => *n *= factor,
+            ApplyEffect::GainStamina(n) => *n *= factor,
+            ApplyEffect::PerBleeding {
+                damage,
+                caster_healing_percentage,
+            } => todo!(),
+            ApplyEffect::ConsumeCondition { condition } => todo!(),
+            ApplyEffect::Knockback(n) => *n *= factor,
+        }
+    }
+}
+
 impl Display for ApplyEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("+{n} stamina")),
+            ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
             }
@@ -2982,7 +3042,6 @@ impl Display for ApplyEffect {
             } => {
                 f.write_fmt(format_args!("{} damage per Bleeding", damage))?;
 
-                // TODO mention healing? (where is this shown?)
                 Ok(())
             }
             ApplyEffect::ConsumeCondition { condition } => {
@@ -3310,7 +3369,6 @@ impl Conditions {
 
     fn maybe_expire(&mut self, game_time: u32) {
         self.map.retain(|condition, state| {
-            
             state
                 .ends_at
                 .map(|ends_at| ends_at > game_time)
@@ -3687,12 +3745,14 @@ impl AbilityTarget {
 
     fn base_radius(&self) -> Option<Range> {
         match self {
-            AbilityTarget::None { self_area, .. } => self_area
-                .as_ref()
-                .and_then(|area_effect| match area_effect.shape {
-                    AreaShape::Circle(range) => Some(range),
-                    AreaShape::Line => None,
-                }),
+            AbilityTarget::None { self_area, .. } => {
+                self_area
+                    .as_ref()
+                    .and_then(|area_effect| match area_effect.shape {
+                        AreaShape::Circle(range) => Some(range),
+                        AreaShape::Line => None,
+                    })
+            }
             _ => None,
         }
     }
@@ -3768,8 +3828,7 @@ pub struct AbilityEnhancement {
     pub spell_effect: Option<SpellEnhancementEffect>,
     pub attack_effect: Option<AttackEnhancementEffect>,
 
-    // TODO: stack overflow?
-    //pub apply_on_self_per_area_target_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub apply_on_self_per_area_target_hit: Option<[Option<ApplyEffect>; 2]>,
 }
 
 impl AbilityEnhancement {
@@ -3789,7 +3848,7 @@ impl AbilityEnhancement {
             stamina_cost: 0,
             spell_effect: None,
             attack_effect: None,
-            //apply_on_self_per_area_target_hit: None,
+            apply_on_self_per_area_target_hit: None,
         }
     }
 }
@@ -4561,7 +4620,9 @@ impl Character {
         let from_content = self.equipment(from);
         let to_content = self.equipment(to);
 
-        if let (Some(EquipmentEntry::Arrows(from_arrow)), Some(EquipmentEntry::Arrows(to_arrow))) = (from_content, to_content) {
+        if let (Some(EquipmentEntry::Arrows(from_arrow)), Some(EquipmentEntry::Arrows(to_arrow))) =
+            (from_content, to_content)
+        {
             if from_arrow.arrow == to_arrow.arrow {
                 // Merge the stacks
                 let quantity = from_arrow.quantity + to_arrow.quantity;

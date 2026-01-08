@@ -1,4 +1,3 @@
-
 use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
 
 use crate::{
@@ -918,22 +917,18 @@ pub const MIND_BLAST: Ability = Ability {
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::InflictWounds,
     name: "Necrotic influence",
-    description: "Converts all bleeding to immediate damage and life-drain",
+    description: "Heal and grow stronger for each affected target",
     icon: IconId::NecroticInfluence,
     mana_cost: 1,
-    spell_effect: None,
-    attack_effect: None,
-    // TODO: Per target hit: heal self 1 and gain 1x ArcaneSurge
-    /*
+    spell_effect: Some(SpellEnhancementEffect::default()),
     apply_on_self_per_area_target_hit: Some([
+        Some(ApplyEffect::GainHealth(1)),
         Some(ApplyEffect::Condition(ApplyCondition {
             condition: Condition::ArcaneSurge,
             stacks: Some(1),
             duration_rounds: None,
         })),
-        None,
     ]),
-     */
     ..AbilityEnhancement::default()
 };
 pub const INFLICT_WOUNDS: Ability = Ability {

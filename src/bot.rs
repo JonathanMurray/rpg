@@ -92,9 +92,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     }
 
     if let Some(target_id) = behaviour.current_target.get() {
-        if !player_chars
-            .iter().any(|ch| ch.id() == target_id)
-        {
+        if !player_chars.iter().any(|ch| ch.id() == target_id) {
             // Player char must have died. Force a target switch.
             behaviour.current_target.set(None);
         }
@@ -225,10 +223,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                         for player_char in &player_chars {
                             if bot.reaches_with_ability(ability, &[], player_char.pos()) {
                                 println!("bot uses ability on someone before moving to target");
-                                return Some(simple_targetted_ability_action(
-                                    ability,
-                                    player_char,
-                                ));
+                                return Some(simple_targetted_ability_action(ability, player_char));
                             }
                         }
                     }
@@ -501,7 +496,9 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
 }
 
 fn may_use(bot: &Character, ability: Ability) -> bool {
-    if ability.id == AbilityId::Brace && bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2 {
+    if ability.id == AbilityId::Brace
+        && bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2
+    {
         return false;
     }
     true

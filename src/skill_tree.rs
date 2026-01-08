@@ -1,14 +1,12 @@
-use std::cell::{RefCell};
+use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::rc::Rc;
 
-use macroquad::color::{
-    Color, DARKGRAY, GOLD, GRAY, LIGHTGRAY, WHITE,
-};
+use macroquad::color::{Color, DARKGRAY, GOLD, GRAY, LIGHTGRAY, WHITE};
 use macroquad::input::{
-    is_key_down, is_key_pressed, is_mouse_button_down,
-    is_mouse_button_pressed, is_mouse_button_released, mouse_position, mouse_wheel,
+    is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed,
+    is_mouse_button_released, mouse_position, mouse_wheel,
 };
 use macroquad::math::Rect;
 use macroquad::miniquad::window::{screen_size, set_window_position};
@@ -17,9 +15,7 @@ use macroquad::miniquad::{KeyCode, MouseButton};
 use macroquad::shapes::{
     draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines,
 };
-use macroquad::text::{
-    draw_text_ex, load_ttf_font, measure_text, Font, TextParams,
-};
+use macroquad::text::{draw_text_ex, load_ttf_font, measure_text, Font, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
 use macroquad::window::next_frame;
 use macroquad::{
@@ -37,12 +33,12 @@ use crate::base_ui::{Container, Drawable, Element, LayoutDirection, Style};
 use crate::core::BaseAction;
 
 use crate::data::{
-    PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, INFLICT_WOUNDS, LUNGE_ATTACK, MIND_BLAST, QUICK, RAGE, SCREAM, SEARING_LIGHT, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
+    PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, INFLICT_WOUNDS, LUNGE_ATTACK, MIND_BLAST,
+    QUICK, RAGE, SCREAM, SEARING_LIGHT, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::textures::{
-    load_all_icons, load_all_portraits,
-    load_and_init_font_symbols, IconId, PortraitId,
+    load_all_icons, load_all_portraits, load_and_init_font_symbols, IconId, PortraitId,
 };
 use serde::{Deserialize, Serialize};
 

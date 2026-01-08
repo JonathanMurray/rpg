@@ -141,7 +141,7 @@ async fn main() {
     );
     clara.set_weapon(HandType::MainHand, DAGGER);
     // TODO:
-    clara.armor_piece.set(Some(CHAIN_MAIL));
+    clara.armor_piece.set(Some(LEATHER_ARMOR));
     clara
         .known_passive_skills
         .push(PassiveSkill::CriticalCharge);
@@ -151,12 +151,9 @@ async fn main() {
     clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
-
-    /*
     clara
         .known_ability_enhancements
         .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
-     */
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
