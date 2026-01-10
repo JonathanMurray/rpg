@@ -97,7 +97,7 @@ async fn main() {
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
-        Attributes::new(2, 4, 4, 3),
+        Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
     alice.set_weapon(HandType::MainHand, BOW);
@@ -117,7 +117,7 @@ async fn main() {
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(4, 3, 3, 3),
+        Attributes::new(5, 3, 3, 3),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, SWORD);
@@ -136,12 +136,12 @@ async fn main() {
         "Clara",
         PortraitId::Portrait3,
         SpriteId::Clara,
-        Attributes::new(2, 2, 4, 5),
+        Attributes::new(2, 2, 3, 7),
         (3, 10),
     );
     clara.set_weapon(HandType::MainHand, DAGGER);
     // TODO:
-    clara.armor_piece.set(Some(LEATHER_ARMOR));
+    clara.armor_piece.set(Some(SHIRT));
     clara
         .known_passive_skills
         .push(PassiveSkill::CriticalCharge);

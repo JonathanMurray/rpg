@@ -55,6 +55,15 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
     equip: EquipEffect::default(),
 };
 
+pub const GOOD_CHAIN_MAIL: ArmorPiece = ArmorPiece {
+    name: "Good chain mail",
+    protection: 4,
+    limit_evasion_from_agi: Some(4),
+    icon: EquipmentIconId::ChainMail,
+    weight: 3,
+    equip: EquipEffect::default(),
+};
+
 pub const LIGHT_CHAIN_MAIL: ArmorPiece = ArmorPiece {
     name: "Light chain mail",
     protection: 3,
@@ -952,7 +961,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     target: AbilityTarget::Area {
         range: Range::Float(7.5),
         area_effect: AreaEffect {
-            shape: AreaShape::Circle(Range::Float(2.5)),
+            shape: AreaShape::Circle(Range::Float(3.5)),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -1389,7 +1398,7 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Radius,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_radius_tenths: 40,
+        increased_radius_tenths: 30,
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -1432,7 +1441,7 @@ pub const FIREBALL: Ability = Ability {
             on_hit: None,
         }),
         impact_area: Some((
-            Range::Float(6.5),
+            Range::Float(5.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),

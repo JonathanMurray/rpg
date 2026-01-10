@@ -158,16 +158,18 @@ impl CoreGame {
                         character.maybe_gain_resources_from_reaper(killed_by_action.len() as u32)
                     {
                         if sta + ap > 0 {
-                            let gain = match (sta, ap) {
+                            if ap > 0 {
+                                self.ui_handle_event(GameEvent::CharacterGainedAP {
+                                    character: character.id(),
+                                })
+                                .await;
+                            }
+                            let gain_str = match (sta, ap) {
                                 (0, _) => format!("{ap} AP"),
                                 (_, 0) => format!("{sta} stamina"),
                                 _ => format!("{sta} stamina, {ap} AP"),
                             };
-                            self.ui_handle_event(GameEvent::CharacterGainedAP {
-                                character: character.id(),
-                            })
-                            .await;
-                            self.log(format!("{} gained {} (Reaper)", character.name, gain))
+                            self.log(format!("{} gained {} (Reaper)", character.name, gain_str))
                                 .await;
                         }
                     }
@@ -441,7 +443,7 @@ impl CoreGame {
                             )
                             .await;
 
-                        maybe_self_reaction.map(|r| (self.active_character_id, r))
+                        maybe_self_reaction.map(|r| (target, r))
                     } else {
                         let mut maybe_ally_reaction: Option<(u32, OnAttackedReaction)> = None;
                         for ch in self.characters.iter() {

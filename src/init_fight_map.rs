@@ -18,8 +18,8 @@ use crate::{
     },
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, LEATHER_ARMOR, MAGI_HEAL,
-        MAGI_INFLICT_WOUNDS, SHIRT,
+        CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR,
+        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
     },
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
@@ -366,14 +366,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     "Ghoul",
                     PortraitId::Ghoul,
                     SpriteId::Ghoul,
-                    Attributes::new(1, 2, 1, 1),
+                    Attributes::new(2, 3, 1, 1),
                     pos,
                 );
 
                 if i == 2 {
                     ghoul.position.set((pos.0 - 2, pos.1));
                 }
-                ghoul.health.change_max_value_to(14 + i);
+                ghoul.health.change_max_value_to(15 + i);
                 ghoul.armor_piece.set(Some(SHIRT));
                 ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
                 if i % 2 == 0 {
@@ -390,10 +390,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     "Ghoul",
                     PortraitId::Ghoul,
                     SpriteId::Ghoul,
-                    Attributes::new(1, 2, 2, 1),
+                    Attributes::new(1, 3, 2, 1),
                     pos,
                 );
-                archer.health.change_max_value_to(12);
+                archer.health.change_max_value_to(9);
                 archer.set_weapon(HandType::MainHand, BAD_BOW);
                 characters.push(archer);
             }
@@ -404,10 +404,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     "Skeleton",
                     PortraitId::Skeleton,
                     SpriteId::Skeleton,
-                    Attributes::new(3, 3, 3, 1),
+                    Attributes::new(4, 4, 3, 1),
                     pos,
                 );
-                skeleton.health.change_max_value_to(18 + i - 5);
+                skeleton.health.change_max_value_to(35 + i - 5);
                 skeleton.armor_piece.set(Some(LEATHER_ARMOR));
                 skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
                 skeleton.set_shield(BAD_SMALL_SHIELD);
@@ -422,10 +422,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     "Ghoul",
                     PortraitId::Ghoul,
                     SpriteId::Ghoul,
-                    Attributes::new(1, 2, 1, 1),
+                    Attributes::new(2, 2, 1, 1),
                     pos,
                 );
-                ghoul.health.change_max_value_to(14 + i - 6);
+                ghoul.health.change_max_value_to(12 + i - 6);
                 ghoul.armor_piece.set(Some(SHIRT));
                 ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
                 if i % 2 == 0 {
@@ -440,11 +440,11 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                     "Ogre",
                     PortraitId::Ogre,
                     SpriteId::Ogre,
-                    Attributes::new(4, 2, 1, 1),
+                    Attributes::new(12, 4, 3, 1),
                     pos,
                 );
-                ogre.health.change_max_value_to(25);
-                ogre.armor_piece.set(Some(CHAIN_MAIL));
+                ogre.health.change_max_value_to(56);
+                ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
                 ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
                 ogre.learn_ability(ENEMY_TACKLE);
                 ogre.known_passive_skills.push(PassiveSkill::BloodRage);
