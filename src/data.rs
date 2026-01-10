@@ -944,9 +944,9 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [Some(INFLICT_WOUNDS_NECROTIC_INFLUENCE), None, None],
     target: AbilityTarget::Area {
-        range: Range::Float(9.5),
+        range: Range::Float(7.5),
         area_effect: AreaEffect {
-            shape: AreaShape::Line,
+            shape: AreaShape::Circle(Range::Float(2.5)),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
