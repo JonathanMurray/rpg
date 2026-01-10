@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
+use std::ops::RemAssign;
 use std::rc::{Rc, Weak};
 
 use indexmap::IndexMap;
@@ -62,7 +63,7 @@ impl CoreGame {
         for character in self.characters.iter() {
             character.update_player_encumbrance();
             character.action_points.current.set(ACTION_POINTS_PER_TURN);
-            character.regain_movement();
+            character.regain_full_movement();
             character.on_health_changed();
             character.has_taken_a_turn_this_round.set(false);
         }
@@ -529,8 +530,9 @@ impl CoreGame {
                 character.stamina.spend(extra_cost);
                 let paid_distance = (extra_cost * MOVE_DISTANCE_PER_STAMINA) as f32;
                 if total_distance > paid_distance {
-                    let free_distance = total_distance - paid_distance;
-                    character.spend_movement(free_distance);
+                    character.spend_movement(total_distance - paid_distance);
+                } else if total_distance < paid_distance {
+                    character.gain_movement(paid_distance - total_distance);
                 }
 
                 self.perform_movement(self.active_character_id, positions, MovementType::Regular)
@@ -2406,7 +2408,7 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
         let stamina_gain = (character.stamina.max() as f32 / 4.0).ceil() as u32;
         character.stamina.gain(stamina_gain);
-        character.regain_movement();
+        character.regain_full_movement();
     }
 }
 
@@ -4253,7 +4255,7 @@ impl Character {
             .add_or_remove(Condition::CriticalCharge, add);
     }
 
-    fn regain_movement(&self) {
+    fn regain_full_movement(&self) {
         self.remaining_movement.set(self.move_speed());
     }
 
@@ -4266,6 +4268,17 @@ impl Character {
             remaining
         );
         self.remaining_movement.set(remaining - distance);
+    }
+
+    fn gain_movement(&self, distance: f32) {
+        let remaining = self.remaining_movement.get();
+        assert!(
+            distance > 0.0 && remaining >= 0.0,
+            "{} {}",
+            distance,
+            remaining
+        );
+        self.remaining_movement.set(remaining + distance);
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
