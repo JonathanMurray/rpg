@@ -814,8 +814,6 @@ impl UserInterface {
             unreachable!()
         };
 
-        dbg!(target);
-
         self.remembered_attack_enhancements
             .insert(self.active_character_id, selected_enhancements.clone());
 

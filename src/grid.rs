@@ -210,7 +210,8 @@ pub struct GameGrid {
 
     movement_range: MovementRange,
 
-    players_inspect_target: Option<CharacterId>,
+    locked_inspection_target: Option<CharacterId>,
+    hovered_character: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
     status_textures: HashMap<StatusId, Texture2D>,
 }
@@ -262,7 +263,8 @@ impl GameGrid {
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
             movement_range: MovementRange::default(),
-            players_inspect_target: None,
+            locked_inspection_target: None,
+            hovered_character: None,
             enemys_target: None,
             zoom_index,
             cell_w,
@@ -373,8 +375,8 @@ impl GameGrid {
     pub fn remove_dead(&mut self) {
         let removed = self.characters.remove_dead();
         for id in removed {
-            if self.players_inspect_target == Some(id) {
-                self.players_inspect_target = None;
+            if self.locked_inspection_target == Some(id) {
+                self.locked_inspection_target = None;
             }
 
             if self.selected_player_character_id == Some(id) {
@@ -806,7 +808,7 @@ impl GameGrid {
         // TODO
         let receptive_to_input = !obstructed;
 
-        let previous_inspect_target = self.players_inspect_target;
+        let prev_inspect_target = self.hovered_character.or(self.locked_inspection_target);
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 
@@ -992,14 +994,16 @@ impl GameGrid {
             outcome.hovered_move_path_cost = Some(0);
         }
 
-        let mut hovered_character_id = None;
-
         if is_mouse_within_grid && receptive_to_input {
+            // Only clear hovered_character if mouse is over grid; This is to avoid a flickering that could occur if you hover
+            // a character which then brings up a target UI on top of the mouse which causes the character to no longer be hovered, thereby
+            // removing the target UI, etc.
+            self.hovered_character = None;
             for character in self.characters.iter() {
                 if character.occupies_cell(mouse_grid_pos) {
                     let id = character.id();
                     outcome.hovered_character_id = Some(id);
-                    hovered_character_id = Some(id);
+                    self.hovered_character = Some(id);
                 }
             }
         }
@@ -1091,7 +1095,7 @@ impl GameGrid {
                         RangeIndicator::TargetAreaEffect,
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
-                    if let Some(hovered_id) = hovered_character_id {
+                    if let Some(hovered_id) = self.hovered_character {
                         self.draw_range_indicator(
                             self.characters.get(hovered_id).pos(),
                             aoe_radius,
@@ -1282,7 +1286,7 @@ impl GameGrid {
         }
 
         if is_mouse_within_grid && receptive_to_input {
-            let pressed_terrain = pressed_left_mouse && hovered_character_id.is_none();
+            let pressed_terrain = pressed_left_mouse && self.hovered_character.is_none();
 
             if pressed_terrain {
                 match mouse_state {
@@ -1296,7 +1300,7 @@ impl GameGrid {
                     _ => {}
                 }
 
-                self.players_inspect_target = None;
+                self.locked_inspection_target = None;
             }
 
             if pressed_left_mouse
@@ -1319,7 +1323,7 @@ impl GameGrid {
 
             match mouse_state {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
-                    if !player_has_action_char_target && hovered_character_id.is_none() {
+                    if !player_has_action_char_target && self.hovered_character.is_none() {
                         let mut is_mouse_pos_out_of_range = false;
                         if let Some((char_id, range, _indicator)) = range_indicator {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
@@ -1418,7 +1422,7 @@ impl GameGrid {
                         outcome.hovered_move_path_cost = Some(cost);
                     }
                 }
-            } else if let Some(hovered_id) = hovered_character_id {
+            } else if let Some(hovered_id) = self.hovered_character {
                 let hovered_char = self.characters.get(hovered_id);
                 if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
@@ -1444,11 +1448,11 @@ impl GameGrid {
                             if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;
-                                self.players_inspect_target = Some(hovered_id);
+                                self.locked_inspection_target = Some(hovered_id);
                             } else if mouse_state == MouseState::RequiresAllyTarget {
                                 ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                 outcome.switched_players_action_target = true;
-                                self.players_inspect_target = Some(hovered_id);
+                                self.locked_inspection_target = Some(hovered_id);
                             } else {
                                 // Click self => abort the action
                                 *ui_state = UiState::ChoosingAction;
@@ -1557,7 +1561,7 @@ impl GameGrid {
                             }
 
                             outcome.switched_players_action_target = true;
-                            self.players_inspect_target = Some(hovered_id);
+                            self.locked_inspection_target = Some(hovered_id);
                         } else if let MouseState::RequiresEnemyTarget {
                             move_into_melee, ..
                         } = mouse_state
@@ -1578,9 +1582,9 @@ impl GameGrid {
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
 
-                            self.players_inspect_target = Some(hovered_id);
+                            self.locked_inspection_target = Some(hovered_id);
                         } else if !matches!(mouse_state, MouseState::RequiresAllyTarget) {
-                            self.players_inspect_target = Some(hovered_id);
+                            self.locked_inspection_target = Some(hovered_id);
                         }
                     }
                 }
@@ -1597,7 +1601,7 @@ impl GameGrid {
             }
         }
 
-        if let Some(target) = self.players_inspect_target {
+        if let Some(target) = self.locked_inspection_target {
             self.draw_cornered_outline(
                 self.character_screen_pos(self.characters.get(target)),
                 INSPECTING_TARGET_COLOR,
@@ -1645,7 +1649,7 @@ impl GameGrid {
             );
         }
 
-        if let Some(id) = hovered_character_id {
+        if let Some(id) = self.hovered_character {
             if id != self.active_character_id {
                 let char = self.characters.get(id);
                 labelled_char_ids.insert(char.id());
@@ -1668,16 +1672,10 @@ impl GameGrid {
 
         self.draw_effects();
 
-        if self.players_inspect_target != previous_inspect_target {
-            outcome.switched_inspect_target = Some(self.players_inspect_target);
+        let inspect_target = self.hovered_character.or(self.locked_inspection_target);
+        if inspect_target != prev_inspect_target {
+            outcome.switched_inspect_target = Some(inspect_target);
         }
-
-        /*
-        This should not be needed, since we immediately commit the movement action anyway?
-        if has_non_empty_movement_path(ui_state) != had_non_empty_movement_path {
-            outcome.switched_movement_path = true;
-        }
-         */
 
         outcome
     }
@@ -2613,8 +2611,6 @@ pub struct GridOutcome {
     pub tried_switching_selected_player_char: Option<CharacterId>,
 
     pub hovered_move_path_cost: Option<u32>,
-    // TODO: is this relevant still?
-    //pub switched_movement_path: bool,
 }
 
 #[derive(Debug, Copy, Clone)]

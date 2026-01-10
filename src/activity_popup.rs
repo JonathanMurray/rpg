@@ -668,7 +668,8 @@ impl ActivityPopup {
         let mut stamina_slider = None;
         self.selected_choice_button_ids.clear();
 
-        dbg!("ON NEW STATE", self.ui_state.borrow());
+        println!("on_new_state");
+        dbg!(self.ui_state.borrow());
 
         match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {

@@ -310,6 +310,7 @@ impl TargetUi {
             }
         } else {
             self.target = None;
+            *self.hovered_btn.borrow_mut() = None;
         }
     }
 
