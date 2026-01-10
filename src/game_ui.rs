@@ -53,6 +53,7 @@ pub enum UiState {
     ReactingToAttack {
         hand: HandType,
         attacker: CharacterId,
+        defender: CharacterId,
         reactor: CharacterId,
         is_within_melee: bool,
         selected: Option<OnAttackedReaction>,
@@ -834,9 +835,6 @@ impl UserInterface {
                     details.push(("Can not reach!".to_string(), Goodness::Bad));
                 }
 
-                // We cannot know yet if the defender will react
-                let defender_reaction = None;
-
                 let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
                     selected_enhancements
                         .iter()
@@ -849,7 +847,7 @@ impl UserInterface {
                     attack.hand,
                     &selected_enhancement_effects,
                     target_char,
-                    defender_reaction,
+                    None,
                     0,
                 );
 
@@ -860,7 +858,7 @@ impl UserInterface {
                 ) {
                     details.push((term.to_string(), bonus.goodness()));
                 }
-                for (term, bonus) in target_char.incoming_attack_bonuses(defender_reaction) {
+                for (term, bonus) in target_char.incoming_attack_bonuses(None) {
                     details.push((term.to_string(), bonus.goodness()));
                 }
 
@@ -1155,9 +1153,10 @@ impl UserInterface {
             }
 
             UiState::ReactingToAttack {
-                reactor,
                 hand,
                 attacker,
+                defender,
+                reactor,
                 is_within_melee,
                 selected,
             } => {
@@ -1220,6 +1219,7 @@ impl UserInterface {
         let UiState::ReactingToAttack {
             hand,
             attacker,
+            defender,
             reactor,
             is_within_melee,
             selected,
@@ -1228,7 +1228,7 @@ impl UserInterface {
             unreachable!()
         };
         let attacker = self.characters.get_rc(*attacker);
-        let defender = self.characters.get(*reactor);
+        let defender = self.characters.get(*defender);
 
         dbg!(&selected);
         let prediction = predict_attack(
@@ -1237,7 +1237,7 @@ impl UserInterface {
             *hand,
             &[],
             defender,
-            *selected,
+            selected.map(|r| (*reactor, r)),
             0,
         );
         dbg!(prediction);

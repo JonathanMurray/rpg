@@ -33,8 +33,9 @@ enum UiOutcome {
 enum MessageFromGame {
     AwaitingChooseAction,
     AwaitingChooseOnAttackedReaction {
-        attacker: CharacterId,
         hand: HandType,
+        attacker: CharacterId,
+        defender: CharacterId,
         reactor: CharacterId,
         is_within_melee: bool,
     },
@@ -103,6 +104,7 @@ impl GameUserInterfaceConnection {
         &self,
         game: &CoreGame,
         attacker: CharacterId,
+        defender: CharacterId,
         hand: HandType,
         reactor: CharacterId,
         within_melee: bool,
@@ -111,8 +113,9 @@ impl GameUserInterfaceConnection {
             .run_ui(
                 game,
                 MessageFromGame::AwaitingChooseOnAttackedReaction {
-                    attacker,
                     hand,
+                    attacker,
+                    defender,
                     reactor,
                     is_within_melee: within_melee,
                 },
@@ -226,8 +229,9 @@ impl _GameUserInterfaceConnection {
                 }
             }
             MessageFromGame::AwaitingChooseOnAttackedReaction {
-                attacker,
                 hand,
+                attacker,
+                defender,
                 reactor,
                 is_within_melee,
             } => {
@@ -237,8 +241,9 @@ impl _GameUserInterfaceConnection {
                 } else {
                     println!("awaiting player attack reaction");
                     user_interface.set_state(UiState::ReactingToAttack {
-                        attacker,
                         hand,
+                        attacker,
+                        defender,
                         reactor,
                         is_within_melee,
                         selected: None,

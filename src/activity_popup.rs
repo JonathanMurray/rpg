@@ -575,6 +575,7 @@ impl ActivityPopup {
         let UiState::ReactingToAttack {
             hand,
             attacker,
+            defender,
             reactor,
             is_within_melee: _,
             selected,
@@ -586,7 +587,8 @@ impl ActivityPopup {
         let reaction = *selected;
 
         let attacker = self.characters.get_rc(*attacker);
-        let defender = self.characters.get(*reactor);
+        let defender = self.characters.get(*defender);
+        let reactor = self.characters.get(*reactor);
 
         let attack_enhancements = &[];
 
@@ -608,7 +610,7 @@ impl ActivityPopup {
             *hand,
             attack_enhancements,
             defender,
-            reaction,
+            reaction.map(|r| (reactor.id(), r)),
             0,
         );
 
@@ -725,15 +727,16 @@ impl ActivityPopup {
             }
 
             UiState::ReactingToAttack {
-                attacker: attacker_id,
                 hand,
+                attacker: attacker_id,
+                defender: defender_id,
                 reactor: reactor_id,
                 is_within_melee,
                 ..
             } => {
                 self.relevant_character_id = *reactor_id;
                 let attacker = self.characters.get_rc(*attacker_id);
-                let defender = self.characters.get(*reactor_id);
+                let defender = self.characters.get(*defender_id);
                 lines.push("React (on attacked)".to_string());
                 let attacks_str = format!(
                     "{} attacks {} (d20+{} vs {})",
@@ -744,9 +747,11 @@ impl ActivityPopup {
                 );
                 lines.push(attacks_str);
 
-                let defender = self.characters.get(*reactor_id);
+                let reactor = self.characters.get(*reactor_id);
 
-                for reaction in defender.usable_on_attacked_reactions(*is_within_melee) {
+                for reaction in reactor
+                    .usable_on_attacked_reactions(*is_within_melee, defender_id == reactor_id)
+                {
                     let btn_action = ButtonAction::OnAttackedReaction(reaction);
                     let btn = self.new_button(btn_action);
                     popup_buttons.push(btn);

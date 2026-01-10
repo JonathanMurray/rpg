@@ -61,11 +61,7 @@ impl CoreGame {
         self.log("The battle begins").await;
 
         for character in self.characters.iter() {
-            character.update_player_encumbrance();
-            character.action_points.current.set(ACTION_POINTS_PER_TURN);
-            character.regain_full_movement();
-            character.on_health_changed();
-            character.has_taken_a_turn_this_round.set(false);
+            character.on_battle_start();
         }
         for player_char in self.player_characters() {
             player_char.is_part_of_active_group.set(true);
@@ -205,7 +201,7 @@ impl CoreGame {
                 if new_round {
                     println!("NEW ROUND STARTED!");
                     for character in self.characters.iter() {
-                        character.has_taken_a_turn_this_round.set(false);
+                        character.on_new_round();
                     }
 
                     if self.active_character().player_controlled() {
@@ -429,28 +425,57 @@ impl CoreGame {
                 } else {
                     // TODO: Should not be able to react when flanked?
                     let defender_can_react_to_attack = !defender
-                        .usable_on_attacked_reactions(is_within_melee)
+                        .usable_on_attacked_reactions(is_within_melee, true)
                         .is_empty();
 
                     let reaction = if defender_can_react_to_attack {
-                        self.user_interface
+                        let maybe_self_reaction = self
+                            .user_interface
                             .choose_attack_reaction(
                                 self,
                                 self.active_character_id,
+                                target,
                                 hand,
                                 target,
                                 is_within_melee,
                             )
-                            .await
+                            .await;
+
+                        maybe_self_reaction.map(|r| (self.active_character_id, r))
                     } else {
-                        None
+                        let mut maybe_ally_reaction: Option<(u32, OnAttackedReaction)> = None;
+                        for ch in self.characters.iter() {
+                            let is_ally = ch.player_controlled() == defender.player_controlled();
+                            if is_ally && are_entities_within_melee(defender.pos(), ch.pos()) {
+                                if !ch
+                                    .usable_on_attacked_reactions(is_within_melee, false)
+                                    .is_empty()
+                                {
+                                    let r = self
+                                        .user_interface
+                                        .choose_attack_reaction(
+                                            self,
+                                            self.active_character_id,
+                                            target,
+                                            hand,
+                                            ch.id(),
+                                            is_within_melee,
+                                        )
+                                        .await;
+                                    if let Some(r) = r {
+                                        maybe_ally_reaction = Some((ch.id(), r));
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+
+                        maybe_ally_reaction
                     };
 
-                    if reaction.is_some() {
-                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
-                            reactor: defender.id(),
-                        })
-                        .await;
+                    if let Some((reactor, _reaction)) = reaction {
+                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked { reactor })
+                            .await;
                     }
 
                     let enhancements: Vec<(&str, AttackEnhancementEffect)> =
@@ -1563,7 +1588,6 @@ impl CoreGame {
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
-                let reaction = None;
                 let roll_modifier = ability_roll.unwrap_attack_bonus();
                 caster.set_facing_toward(target.pos());
                 let event: AttackedEvent = Self::perform_attack(
@@ -1571,7 +1595,7 @@ impl CoreGame {
                     HandType::MainHand,
                     &attack_enhancement_effects,
                     target,
-                    reaction,
+                    None,
                     roll_modifier,
                     mode,
                 );
@@ -1830,7 +1854,7 @@ impl CoreGame {
         hand_type: HandType,
         enhancements: &[(&'static str, AttackEnhancementEffect)],
         defender: &Character,
-        defender_reaction: Option<OnAttackedReaction>,
+        maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
         ability_roll_modifier: i32,
         mode: ActionPerformanceMode,
     ) -> AttackedEvent {
@@ -1844,7 +1868,7 @@ impl CoreGame {
             hand_type,
             defender,
             enhancements,
-            defender_reaction,
+            maybe_reaction.map(|(_reactor, reaction)| reaction),
         );
         attack_bonus.flat_amount += ability_roll_modifier;
 
@@ -1861,11 +1885,11 @@ impl CoreGame {
 
         let mut armor_value = defender.protection_from_armor();
 
-        if let Some(reaction) = defender_reaction {
-            if game.is_some() {
-                defender.action_points.spend(reaction.action_point_cost);
-                defender.stamina.spend(reaction.stamina_cost);
-                detail_lines.push(format!("{} reacted with {}", defender.name, reaction.name));
+        if let Some((reactor, reaction)) = maybe_reaction {
+            if let Some(game) = game {
+                let reactor = game.characters.get(reactor);
+                reactor.on_use_on_attacked_reaction(reaction);
+                detail_lines.push(format!("{} reacted with {}", reactor.name, reaction.name));
             }
 
             let bonus_evasion = reaction.effect.bonus_evasion;
@@ -2320,7 +2344,7 @@ impl CoreGame {
                 .characters
                 .iter()
                 .filter(|other| {
-                    // TODO: if "melee" doesn't encompass diagonally adjancent, the spreading feels
+                    // TODO: if "melee" doesn't encompass diagonally adjacent, the spreading feels
                     // a bit too unlikely
                     other.id != character.id
                         && are_entities_within_melee(other.pos(), character.pos())
@@ -2528,7 +2552,7 @@ pub fn predict_attack(
     hand_type: HandType,
     enhancements: &[(&'static str, AttackEnhancementEffect)],
     defender: &Character,
-    defender_reaction: Option<OnAttackedReaction>,
+    reaction: Option<(CharacterId, OnAttackedReaction)>,
     ability_roll_modifier: i32,
 ) -> AttackPrediction {
     let mut damage_outcomes = vec![];
@@ -2543,7 +2567,7 @@ pub fn predict_attack(
             hand_type,
             enhancements,
             defender,
-            defender_reaction,
+            reaction,
             ability_roll_modifier,
             ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
         );
@@ -3063,6 +3087,8 @@ pub struct OnAttackedReaction {
     pub stamina_cost: u32,
     pub effect: OnAttackedReactionEffect,
     pub required_attack_type: Option<AttackType>,
+    pub used_hand: Option<HandType>,
+    pub target: OnAttackedReactionTarget,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3076,6 +3102,12 @@ pub enum OnAttackedReactionId {
 pub struct OnAttackedReactionEffect {
     pub bonus_evasion: u32,
     pub bonus_armor: u32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum OnAttackedReactionTarget {
+    OnlySelf,
+    SelfOrAdjacentAlly,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -4069,6 +4101,8 @@ pub struct Character {
     round_length: Option<u32>,
     pub is_part_of_active_group: Cell<bool>,
     pub has_taken_a_turn_this_round: Cell<bool>,
+    pub has_used_main_hand_reaction_this_round: Cell<bool>,
+    pub has_used_off_hand_reaction_this_round: Cell<bool>,
 
     pub name: &'static str,
     pub portrait: PortraitId,
@@ -4137,6 +4171,8 @@ impl Character {
             index_in_round: None,
             round_length: None,
             has_taken_a_turn_this_round: Cell::new(false),
+            has_used_main_hand_reaction_this_round: Cell::new(false),
+            has_used_off_hand_reaction_this_round: Cell::new(false),
             is_part_of_active_group: Cell::new(false),
             portrait,
             sprite,
@@ -4541,6 +4577,22 @@ impl Character {
             EquipmentSlotRole::Inventory(idx) => self.inventory[idx].get(),
             EquipmentSlotRole::PartyStash(idx) => self.party_stash()[idx].get(),
         }
+    }
+
+    fn on_battle_start(&self) {
+        self.update_player_encumbrance();
+        self.action_points.current.set(ACTION_POINTS_PER_TURN);
+        self.regain_full_movement();
+        self.on_health_changed();
+        self.has_taken_a_turn_this_round.set(false);
+        self.has_used_main_hand_reaction_this_round.set(false);
+        self.has_used_off_hand_reaction_this_round.set(false);
+    }
+
+    fn on_new_round(&self) {
+        self.has_taken_a_turn_this_round.set(false);
+        self.has_used_main_hand_reaction_this_round.set(false);
+        self.has_used_off_hand_reaction_this_round.set(false);
     }
 
     fn update_player_encumbrance(&self) {
@@ -4951,26 +5003,56 @@ impl Character {
         known
     }
 
-    pub fn usable_on_attacked_reactions(&self, is_within_melee: bool) -> Vec<OnAttackedReaction> {
+    pub fn usable_on_attacked_reactions(
+        &self,
+        is_within_melee: bool,
+        self_defense: bool,
+    ) -> Vec<OnAttackedReaction> {
         let mut usable = self.known_on_attacked_reactions();
-        usable.retain(|reaction| self.can_use_on_attacked_reaction(*reaction, is_within_melee));
+        usable.retain(|reaction| {
+            self.can_use_on_attacked_reaction(*reaction, is_within_melee, self_defense)
+        });
         usable
     }
 
-    pub fn can_use_on_attacked_reaction(
+    fn can_use_on_attacked_reaction(
         &self,
         reaction: OnAttackedReaction,
         is_within_melee: bool,
+        self_defense: bool,
     ) -> bool {
-        let allowed = match reaction.required_attack_type {
-            None => true,
-            Some(AttackType::Melee) => is_within_melee,
-            Some(AttackType::Ranged) => !is_within_melee,
-        };
+        if match reaction.required_attack_type {
+            Some(AttackType::Melee) => !is_within_melee,
+            Some(AttackType::Ranged) => is_within_melee,
+            None => false,
+        } {
+            return false;
+        }
+
+        if match reaction.used_hand {
+            Some(HandType::MainHand) => self.has_used_main_hand_reaction_this_round.get(),
+            Some(HandType::OffHand) => self.has_used_off_hand_reaction_this_round.get(),
+            None => false,
+        } {
+            return false;
+        }
+
+        if !self_defense && reaction.target == OnAttackedReactionTarget::OnlySelf {
+            return false;
+        }
+
         let ap = self.action_points.current();
-        ap >= reaction.action_point_cost
-            && self.stamina.current() >= reaction.stamina_cost
-            && allowed
+        ap >= reaction.action_point_cost && self.stamina.current() >= reaction.stamina_cost
+    }
+
+    fn on_use_on_attacked_reaction(&self, reaction: OnAttackedReaction) {
+        self.action_points.spend(reaction.action_point_cost);
+        self.stamina.spend(reaction.stamina_cost);
+        match reaction.used_hand {
+            Some(HandType::MainHand) => self.has_used_main_hand_reaction_this_round.set(true),
+            Some(HandType::OffHand) => self.has_used_off_hand_reaction_this_round.set(true),
+            None => {}
+        }
     }
 
     pub fn known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {

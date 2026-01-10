@@ -511,12 +511,6 @@ pub fn bot_choose_attack_reaction(
 ) -> Option<OnAttackedReaction> {
     // TODO: it needs to be more intuitive/clear for player how/when/why bot reacts
     return None;
-
-    let reactions = game
-        .characters
-        .get(reactor_id)
-        .usable_on_attacked_reactions(is_within_melee);
-    reactions.first().copied()
 }
 
 pub fn bot_choose_hit_reaction(

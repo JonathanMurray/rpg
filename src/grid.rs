@@ -1228,9 +1228,13 @@ impl GameGrid {
             }
 
             UiState::ReactingToAttack {
-                attacker, reactor, ..
+                attacker,
+                defender,
+                reactor,
+                ..
             } => {
                 let attacker = self.characters.get(*attacker);
+                let defender = self.characters.get(*defender);
                 let reactor = self.characters.get(*reactor);
 
                 self.draw_cornered_outline(
@@ -1242,11 +1246,12 @@ impl GameGrid {
                 );
                 self.draw_target_crosshair(
                     attacker.pos(),
-                    reactor.pos(),
+                    defender.pos(),
                     Color::new(0.90, 0.16, 0.22, 0.8),
                     4.0,
                 );
                 labelled_char_ids.insert(attacker.id());
+                labelled_char_ids.insert(defender.id());
                 labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
