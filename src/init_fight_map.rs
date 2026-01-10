@@ -63,6 +63,15 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         ('N', TerrainId::StoneWallConcaveSouthWest),
         ('M', TerrainId::StoneWallSouth),
         (',', TerrainId::StoneWallConcaveSouthEast),
+        ('y', TerrainId::NewWaterNorthWest),
+        ('u', TerrainId::NewWaterNorth),
+        ('i', TerrainId::NewWaterNorthEast),
+        ('j', TerrainId::NewWaterWest),
+        ('k', TerrainId::NewWater),
+        ('l', TerrainId::NewWaterEast),
+        ('n', TerrainId::NewWaterSouthWest),
+        ('m', TerrainId::NewWaterSouth),
+        (';', TerrainId::NewWaterSouthEast),
         ('O', TerrainId::StoneWallConvexSouthWest),
         ('L', TerrainId::StoneWallConvexSouthEast),
         ('C', TerrainId::StoneWallConvexNorthWest),
@@ -103,7 +112,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                         terrain_center_positions.insert(pos);
                     }
                     'S' => {
-                        terrain_objects.insert(pos, TerrainId::TreeStump);
+                        terrain_objects.insert(pos, TerrainId::Table);
                         terrain_center_positions.insert(pos);
                     }
                     'P' => {

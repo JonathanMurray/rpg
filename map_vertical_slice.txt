@@ -4,14 +4,14 @@ YUUUUUUIBYUUUUUUUUUI
 HRR    KBH         K
 HR     KBH         K
 H      KBH         K
-H      OUL  R     SK
-H  S        R3    SK
-H  PP      5    8 SK
+H  S   OUL  R   S  K
+H           R3     K
+H  PP      5    8  K
 H  P               K
-H       XX  R4     K
-H       XXX   R    K
+H       yui  R4    K
+H       nm;    R   K
 H                  K
-H   0 2 CV      67 K
-H    1  KH         K
-NMMMMMMM,NMMMMMMMMM,
+H   0 2CMV      67 K
+H    1 KBH         K
+NMMMMMM,BNMMMMMMMMM,
 +----------------------------

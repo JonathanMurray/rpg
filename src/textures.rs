@@ -1,9 +1,10 @@
-use std::{collections::HashMap, hash::Hash, sync::OnceLock};
+use std::{collections::HashMap, f32::consts::PI, hash::Hash, sync::OnceLock};
 
 use macroquad::{
     color::WHITE,
     math::Rect,
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
+    time::{get_frame_time, get_time},
 };
 
 use crate::pathfind::CELLS_PER_ENTITY;
@@ -373,6 +374,18 @@ pub enum TerrainId {
     Bush,
     Boulder2,
     TreeStump,
+    Table,
+
+    NewWaterNorthWest,
+    NewWaterNorth,
+    NewWaterNorthEast,
+    NewWaterWest,
+    NewWater,
+    NewWaterEast,
+    NewWaterSouthWest,
+    NewWaterSouth,
+    NewWaterSouthEast,
+
     Water,
     WaterBeachNorth,
     WaterBeachEast,
@@ -405,13 +418,42 @@ pub fn draw_terrain(
     let mut right_margin = false;
     let mut bot_margin = false;
     let mut left_margin = false;
-    let (col, row) = match terrain_id {
+    let mut rotation = 0.0;
+    let (mut col, mut row) = match terrain_id {
         TerrainId::Grass => (0, 8),
         TerrainId::Grass2 => (1, 8),
         TerrainId::Grass3 => (2, 8),
         TerrainId::Grass4 => (3, 8),
 
         TerrainId::Dirt => (0, 10),
+
+        TerrainId::NewWaterNorthWest => (1, 9),
+        TerrainId::NewWaterNorth => {
+            rotation = 0.5 * PI;
+            (1, 10)
+        }
+        TerrainId::NewWaterNorthEast => {
+            rotation = 0.5 * PI;
+            (1, 9)
+        }
+        TerrainId::NewWaterWest => (1, 10),
+        TerrainId::NewWater => (2, 10),
+        TerrainId::NewWaterEast => {
+            rotation = PI;
+            (1, 10)
+        }
+        TerrainId::NewWaterSouthWest => {
+            rotation = 1.5 * PI;
+            (1, 9)
+        }
+        TerrainId::NewWaterSouth => {
+            rotation = 1.5 * PI;
+            (1, 10)
+        }
+        TerrainId::NewWaterSouthEast => {
+            rotation = PI;
+            (1, 9)
+        }
 
         TerrainId::StoneWall => (1, 7),
         TerrainId::StoneWallConcaveNorthWest => (0, 12),
@@ -431,6 +473,7 @@ pub fn draw_terrain(
         TerrainId::Bush => (0, 7),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
+        TerrainId::Table => (2, 7),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {
@@ -472,6 +515,23 @@ pub fn draw_terrain(
         }
     };
 
+    let t = get_time();
+    // animate water
+    if ((t * 0.5) % (t * 0.5).floor()) < 0.5 {
+        if (col, row) == (1, 10) {
+            (col, row) = (1, 11);
+        } else if (col, row) == (1, 9) {
+            (col, row) = (2, 9);
+        }
+    }
+
+    // animate table candle
+    if (t * 0.7) % (t * 0.7).floor() < 0.5 {
+        if (col, row) == (2, 7) {
+            (col, row) = (3, 7);
+        }
+    }
+
     let mut src_sides = [
         col as f32 * w,
         row as f32 * h,
@@ -508,6 +568,7 @@ pub fn draw_terrain(
     let params = DrawTextureParams {
         source: Some(src_rect),
         dest_size: Some(dst_size.into()),
+        rotation,
         ..Default::default()
     };
 

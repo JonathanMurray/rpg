@@ -696,13 +696,13 @@ impl GameGrid {
                             params.rotation = -amount;
                         }
                     } else if cycle_time < 0.25 {
-                        y += 1.0;
+                        y += 3.0;
                     } else if cycle_time < 0.5 {
-                        params.rotation = -0.05;
+                        params.rotation = -0.07;
                     } else if cycle_time < 0.75 {
-                        y += 1.0;
+                        y += 3.0;
                     } else {
-                        params.rotation = 0.05;
+                        params.rotation = 0.07;
                     }
                 }
                 AnimationKind::Shake { random_time_offset } => {
@@ -1172,7 +1172,7 @@ impl GameGrid {
                 let reactor = self.characters.get(*reactor);
 
                 let path = [movement.0, movement.1];
-                self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0);
+                self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0, true);
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,
@@ -1779,7 +1779,7 @@ impl GameGrid {
     ) {
         if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
-            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0);
+            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0, false);
         } else {
             self.draw_target_crosshair(
                 *movement_to_target.last().unwrap(),
@@ -1791,6 +1791,7 @@ impl GameGrid {
                 movement_to_target.iter().copied(),
                 MOVEMENT_ARROW_COLOR,
                 7.0,
+                false,
             );
         }
     }
@@ -2380,12 +2381,14 @@ impl GameGrid {
                 path.iter().map(|(_dist, pos)| *pos),
                 HOVER_MOVEMENT_ARROW_COLOR,
                 3.0,
+                false,
             );
         } else {
             self.draw_movement_path_arrow(
                 path.iter().map(|(_dist, pos)| *pos),
                 MOVEMENT_ARROW_COLOR,
                 7.0,
+                false,
             );
         };
 
@@ -2427,6 +2430,7 @@ impl GameGrid {
         mut path: impl ExactSizeIterator<Item = Position>,
         color: Color,
         thickness: f32,
+        animated: bool,
     ) {
         let mut a = path.next().expect("First cell in path");
         let mut b = path.next().expect("Second cell in path");
@@ -2445,7 +2449,7 @@ impl GameGrid {
                 color,
                 5.0,
                 Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0)),
-                false,
+                animated,
             );
 
             if let Some(next) = path.next() {
