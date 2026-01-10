@@ -1525,6 +1525,8 @@ impl CoreGame {
             }
         }
 
+        let num_targets_hit = target_outcomes.len() as u32;
+
         if let Some(game) = mode.real_game() {
             dbg!(&enhancements);
             for enhancement in enhancements {
@@ -1535,11 +1537,8 @@ impl CoreGame {
                     .flatten()
                     .flatten()
                 {
-                    let num_targets_hit = target_outcomes.len() as u32;
-
                     if num_targets_hit > 0 {
                         apply_effect.multiply(num_targets_hit);
-                        dbg!(apply_effect);
 
                         let (_line, _damage) = game.perform_effect_application(
                             apply_effect,
