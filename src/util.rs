@@ -1,3 +1,4 @@
+use macroquad::color::Color;
 use rand::Rng;
 
 use crate::core::{sq_distance_between, Position, MELEE_RANGE_SQUARED};
@@ -53,3 +54,13 @@ pub fn line_collision(from: (i32, i32), to: (i32, i32), mut visitor: impl FnMut(
         }
     }
 }
+
+pub const fn rgb(r: u8, g: u8, b: u8) -> Color {
+    Color::new(r as f32 / 256.0, g as f32 / 256.0, b as f32 / 256.0, 1.0)
+}
+
+pub const COL_RED: Color = rgb(223, 53, 81);
+pub const COL_GREEN_0: Color = rgb(93 , 146,38);
+pub const COL_GREEN_1: Color = rgb(144 , 181,58);
+pub const COL_GREEN_2: Color = rgb(201 , 226,118);
+pub const COL_BLUE: Color = rgb(58, 139, 194);

@@ -33,10 +33,9 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_rounded, Drawable, Style},
+    base_ui::{Drawable, Style, draw_text_rounded},
     core::{
-        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
-        AttackAction, BaseAction, Character, MovementType, Position, MOVE_DISTANCE_PER_STAMINA,
+        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MOVE_DISTANCE_PER_STAMINA, MovementType, Position, within_range_squared
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -44,9 +43,9 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
-    textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
-    util::line_collision,
+    pathfind::{CELLS_PER_ENTITY, ChartNode, Occupation, PathfindGrid, build_path_from_chart},
+    textures::{SpriteId, StatusId, TerrainId, character_sprite_height, draw_terrain},
+    util::{COL_RED, line_collision, rgb},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -2074,7 +2073,13 @@ impl GameGrid {
 
         let current_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
-        draw_rectangle(health_x, health_y, current_health_w, health_h, RED);
+        draw_rectangle(
+            health_x,
+            health_y,
+            current_health_w,
+            health_h,
+            COL_RED,
+        );
 
         if let Some(damage_preview) = self.target_damage_previews.get(&character.id()) {
             let effective_min = damage_preview.min.min(character.health.current());
@@ -2346,10 +2351,11 @@ impl GameGrid {
         if character.player_controlled() {
             // This part only makes sense for player characters, that can choose to move further by paying stamina
             for (pos, chart_node) in self.routes(character_id).iter() {
+                let margin = 0.0; //self.cell_w / 20.0;
                 if chart_node.distance_from_start <= character.remaining_movement.get() {
-                    self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+                    self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, margin);
                 } else if chart_node.distance_from_start <= self.movement_range.max() {
-                    self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), self.cell_w / 20.0);
+                    self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), margin);
                 }
             }
         }
@@ -2503,7 +2509,8 @@ impl GameGrid {
                 let thickness = 2.0;
 
                 if within(x, y) {
-                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, self.cell_w / 20.0);
+                    let margin = 0.0; //self.cell_w / 20.0;
+                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, margin);
                     self.draw_dashed_borders(
                         x,
                         y,

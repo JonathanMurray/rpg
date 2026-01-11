@@ -16,16 +16,15 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
+        ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, draw_button_tooltip
     },
     base_ui::{
-        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
-        TableStyle, TextLine,
+        Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine, draw_text_rounded, table
     },
     conditions_ui::ConditionsList,
     core::{BaseAction, Character, CharacterId, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{IconId, StatusId},
+    textures::{IconId, StatusId}, util::COL_RED,
 };
 
 pub struct TargetUi {
@@ -144,7 +143,7 @@ impl TargetUi {
                 },
             );
             action_points_row.current_ap = char.action_points.current();
-            let mut health_bar = ResourceBar::horizontal(char.health.max(), RED, (80.0, 10.0));
+            let mut health_bar = ResourceBar::horizontal(char.health.max(), COL_RED, (80.0, 10.0));
             health_bar.current = char.health.current();
 
             let health_text_line = TextLine::new(

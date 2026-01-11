@@ -134,7 +134,7 @@ async fn main() {
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Clara",
-        PortraitId::Portrait3,
+        PortraitId::Clara,
         SpriteId::Clara,
         Attributes::new(2, 2, 3, 7),
         (3, 10),

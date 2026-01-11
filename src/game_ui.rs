@@ -16,20 +16,14 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
-        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
+        ACTION_BUTTON_BG_COLOR, ActionButton, ButtonAction, ButtonContext, ButtonHovered, ButtonSelected, InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE, draw_button_tooltip
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId,
-        AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action,
-        ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement,
-        AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
-        Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
-        MovementType, OnAttackedReaction, OnHitReaction, Position,
+        Ability, AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction, OnHitReaction, Position, distance_between, predict_ability, predict_attack
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -43,7 +37,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE}, util::{COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_RED},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -2535,7 +2529,7 @@ impl ResourceBars {
             character.health.current(),
             character.health.max(),
             "Health",
-            RED,
+            COL_RED,
             font.clone(),
         )));
 
@@ -2543,7 +2537,7 @@ impl ResourceBars {
             character.mana.current(),
             character.mana.max(),
             "Mana",
-            BLUE,
+            COL_BLUE,
             font.clone(),
         )));
 
@@ -2551,7 +2545,7 @@ impl ResourceBars {
             character.stamina.current(),
             character.stamina.max(),
             "Stamina",
-            GREEN,
+            COL_GREEN_0,
             font.clone(),
         )));
 

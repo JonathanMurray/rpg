@@ -253,7 +253,7 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
 pub enum PortraitId {
     Alice,
     Bob,
-    Portrait3,
+    Clara,
     Skeleton,
     Magi,
     Ghoul,
@@ -262,9 +262,9 @@ pub enum PortraitId {
 
 pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
     load_and_init_textures(vec![
-        (PortraitId::Alice, "portrait_1.png"),
-        (PortraitId::Bob, "portrait_2.png"),
-        (PortraitId::Portrait3, "portrait_3.png"),
+        (PortraitId::Alice, "portrait_alice.png"),
+        (PortraitId::Bob, "portrait_bob.png"),
+        (PortraitId::Clara, "portrait_clara.png"),
         (PortraitId::Skeleton, "portrait_skeleton.png"),
         (PortraitId::Magi, "portrait_magi.png"),
         (PortraitId::Ghoul, "portrait_ghoul.png"),
