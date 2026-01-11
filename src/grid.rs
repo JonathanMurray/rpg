@@ -57,6 +57,7 @@ use crate::{
 const BACKGROUND_COLOR: Color = COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
+const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.1);
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
 const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
@@ -914,6 +915,79 @@ impl GameGrid {
             }
         }
 
+        let mut is_aiming_area = false;
+
+        let mouse_state = match ui_state {
+            UiState::ChoosingAction => MouseState::None,
+
+            UiState::ConfiguringAction(base_action) => match base_action {
+                ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
+                    area_radius: None,
+                    move_into_melee: None,
+                },
+
+                ConfiguredAction::UseAbility {
+                    ability,
+                    selected_enhancements,
+                    target,
+                } => match ability.target {
+                    AbilityTarget::Enemy {
+                        impact_area, reach, ..
+                    } => {
+                        let mut area_radius = None;
+                        if let Some((mut radius, _acquisition, _effect)) = impact_area {
+                            for effect in
+                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
+                            {
+                                if effect.increased_radius_tenths > 0 {
+                                    radius =
+                                        radius.plusf(effect.increased_radius_tenths as f32 * 0.1);
+                                }
+                            }
+                            area_radius = Some(radius);
+                            if *target == ActionTarget::None {
+                                is_aiming_area = true;
+                            }
+                        }
+                        let mut move_into_melee = None;
+                        if let AbilityReach::MoveIntoMelee(mut range) = reach {
+                            for effect in
+                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
+                            {
+                                if effect.increased_range_tenths > 0 {
+                                    range = range.plusf(effect.increased_range_tenths as f32 * 0.1);
+                                }
+                            }
+                            move_into_melee = Some(range);
+                        }
+
+                        MouseState::RequiresEnemyTarget {
+                            area_radius,
+                            move_into_melee,
+                        }
+                    }
+                    AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
+                    AbilityTarget::Area { area_effect, range } => {
+                        if *target == ActionTarget::None {
+                            is_aiming_area = true;
+                        }
+
+                        MouseState::RequiresPositionTarget {
+                            shape: area_effect.shape,
+                            range,
+                        }
+                    }
+                    AbilityTarget::None { .. } => MouseState::ImplicitTarget,
+                },
+
+                ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
+
+                ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
+                ConfiguredAction::UseConsumable { .. } => MouseState::None,
+            },
+            _ => MouseState::None,
+        };
+
         for character in self.characters.iter() {
             for engager in character.is_engaged_by.borrow().values() {
                 let mut engager_pos = self.character_screen_pos(engager);
@@ -954,12 +1028,19 @@ impl GameGrid {
         for character in self.characters.iter() {
             if character.id() == self.active_character_id {
                 self.draw_character_highlight(character.id(), ACTIVE_CHARACTER_COLOR, 3.0);
-            }
-            if self.target_damage_previews.contains_key(&character.id()) {
+            } else if is_aiming_area {
                 self.draw_character_highlight(
                     character.id(),
+                    CELL_OCCUPIED_COLOR,
+                    self.cell_w * 0.1,
+                );
+            }
+
+            if self.target_damage_previews.contains_key(&character.id()) {
+                self.draw_circular_character_highlight(
+                    character.id(),
                     CHARACTER_DAMAGE_PREVIEW_COLOR,
-                    self.cell_w * 0.5,
+                    self.cell_w * 0.25,
                 );
             }
 
@@ -981,18 +1062,7 @@ impl GameGrid {
             }
         }
 
-        if let UiState::ConfiguringAction(ConfiguredAction::Move {
-            selected_movement_path,
-            ..
-        }) = ui_state
-        {
-            if !selected_movement_path.is_empty() {
-                todo!("can this ever happen?");
-                // TODO This never occurs anymore? (since you immediately commit the movement path when clicking on ground?)
-                println!("Draw movement selected");
-                self.draw_movement_path(selected_movement_path, false);
-            }
-
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
             // If we're hovering an actual movement path, this cost will be updated further down in the code
             outcome.hovered_move_path_cost = Some(0);
         }
@@ -1016,70 +1086,6 @@ impl GameGrid {
         }
 
         let pressed_left_mouse = is_mouse_button_pressed(MouseButton::Left);
-
-        let mouse_state = match ui_state {
-            UiState::ChoosingAction => MouseState::None,
-
-            UiState::ConfiguringAction(base_action) => match base_action {
-                ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
-                    area_radius: None,
-                    move_into_melee: None,
-                },
-
-                ConfiguredAction::UseAbility {
-                    ability,
-                    selected_enhancements,
-                    target: _,
-                } => match ability.target {
-                    AbilityTarget::Enemy {
-                        impact_area, reach, ..
-                    } => {
-                        let mut area_radius = None;
-                        if let Some((mut radius, _acquisition, _effect)) = impact_area {
-                            for effect in
-                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
-                            {
-                                if effect.increased_radius_tenths > 0 {
-                                    radius =
-                                        radius.plusf(effect.increased_radius_tenths as f32 * 0.1);
-                                }
-                            }
-                            area_radius = Some(radius);
-                        }
-                        let mut move_into_melee = None;
-                        if let AbilityReach::MoveIntoMelee(mut range) = reach {
-                            for effect in
-                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
-                            {
-                                if effect.increased_range_tenths > 0 {
-                                    range = range.plusf(effect.increased_range_tenths as f32 * 0.1);
-                                }
-                            }
-                            move_into_melee = Some(range);
-                        }
-
-                        MouseState::RequiresEnemyTarget {
-                            area_radius,
-                            move_into_melee,
-                        }
-                    }
-                    AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                    AbilityTarget::Area { area_effect, range } => {
-                        MouseState::RequiresPositionTarget {
-                            shape: area_effect.shape,
-                            range,
-                        }
-                    }
-                    AbilityTarget::None { .. } => MouseState::ImplicitTarget,
-                },
-
-                ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
-
-                ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
-                ConfiguredAction::UseConsumable { .. } => MouseState::None,
-            },
-            _ => MouseState::None,
-        };
 
         let mut snapped_position_target: Option<Position> = None;
 
@@ -1370,6 +1376,7 @@ impl GameGrid {
                         } else {
                             let position_target = snapped_position_target.unwrap_or(mouse_grid_pos);
 
+                            /*
                             self.draw_cornered_outline(
                                 self.grid_pos_to_screen(position_target),
                                 HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
@@ -1377,6 +1384,7 @@ impl GameGrid {
                                 2.0,
                                 true,
                             );
+                             */
                             self.draw_target_crosshair(
                                 self.characters.get(self.active_character_id).pos(),
                                 position_target,
@@ -2160,6 +2168,21 @@ impl GameGrid {
         );
     }
 
+    fn draw_circular_character_highlight(
+        &self,
+        character_id: CharacterId,
+        color: Color,
+        margin: f32,
+    ) {
+        let (x, y) = self.character_screen_pos(self.characters.get(character_id));
+        draw_circle(
+            x + self.cell_w / 2.0,
+            y + self.cell_w / 2.0,
+            self.cell_w * 1.5 - margin,
+            color,
+        );
+    }
+
     fn draw_cornered_outline(
         &self,
         screen_pos: (f32, f32),
@@ -2371,7 +2394,7 @@ impl GameGrid {
                 Occupation::Terrain => true,
             };
             if draw_occupation {
-                self.fill_cell(*pos, Color::new(0.9, 0.1, 0.2, 0.1), 0.0);
+                self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 0.0);
             }
         }
     }

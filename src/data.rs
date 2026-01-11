@@ -641,7 +641,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
-            shape: AreaShape::Circle(Range::Melee),
+            shape: AreaShape::Circle(Range::Float(2.5)),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
         }),
@@ -961,7 +961,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     target: AbilityTarget::Area {
         range: Range::Float(7.5),
         area_effect: AreaEffect {
-            shape: AreaShape::Circle(Range::Float(3.5)),
+            shape: AreaShape::Circle(Range::Float(2.5)),
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -1441,7 +1441,7 @@ pub const FIREBALL: Ability = Ability {
             on_hit: None,
         }),
         impact_area: Some((
-            Range::Float(4.5),
+            Range::Float(3.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),

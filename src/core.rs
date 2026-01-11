@@ -5745,7 +5745,14 @@ pub fn is_target_within_shape(
     target: &Character,
 ) -> bool {
     match shape {
-        AreaShape::Circle(radius) => within_range_squared(radius.squared(), area_pos, target.pos()),
+        AreaShape::Circle(radius) => {
+            let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
+            within_range_squared(
+                (f32::from(radius) + margin).powf(2.0),
+                area_pos,
+                target.pos(),
+            )
+        }
         AreaShape::Line => {
             let mut is_hit = false;
             line_collision(caster_pos, area_pos, |x, y| {
