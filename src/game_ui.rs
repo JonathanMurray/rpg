@@ -1787,8 +1787,8 @@ impl UserInterface {
                         EffectGraphics::Circle {
                             radius: f32::from(radius) * self.game_grid.cell_w,
                             end_radius: None,
-                            fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
-                            stroke: Some((animation_color, 4.0)),
+                            fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
+                            stroke: None,
                         },
                     ),
                 },

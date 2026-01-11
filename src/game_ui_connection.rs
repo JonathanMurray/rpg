@@ -20,7 +20,7 @@ use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, O
 
 use super::game_ui::{PlayerChose, UiState, UserInterface};
 
-pub static DEBUG: AtomicBool = AtomicBool::new(true);
+pub static DEBUG: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -343,8 +343,10 @@ impl _GameUserInterfaceConnection {
                 dbg!(DEBUG.load(Ordering::SeqCst));
             }
 
-            let fps = get_fps();
-            draw_text(&format!("FPS: {}", fps), 10.0, 200.0, 30.0, MAGENTA);
+            if DEBUG.load(Ordering::Relaxed) {
+                let fps = get_fps();
+                draw_text(&format!("FPS: {}", fps), 10.0, 200.0, 30.0, MAGENTA);
+            }
 
             if let Some(player_choice) = player_choice {
                 user_interface.set_state(UiState::Idle);

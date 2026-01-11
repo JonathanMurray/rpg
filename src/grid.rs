@@ -2078,6 +2078,19 @@ impl GameGrid {
                     },
                 );
                 draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, YELLOW);
+                if let Some(stacks) = info.stacks {
+                    draw_text_rounded(
+                        &stacks.to_string(),
+                        status_x + 1.0,
+                        status_y + status_w - 1.0,
+                        TextParams {
+                            font: Some(&self.simple_font),
+                            font_size: 12,
+                            color: WHITE,
+                            ..Default::default()
+                        },
+                    );
+                }
                 status_x += status_w;
             }
         }
