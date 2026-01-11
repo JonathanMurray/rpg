@@ -340,9 +340,9 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
 
 pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     match effect {
-        ApplyEffect::RemoveActionPoints(n) => {
-            t.technical_description.push(format!("  Loses {}+ AP", n))
-        }
+        ApplyEffect::RemoveActionPoints(n) => t
+            .technical_description
+            .push(format!("  Loses |<value>{}| AP", n)),
         ApplyEffect::GainStamina(n) => t
             .technical_description
             .push(format!("  Gains |<value>{}| stamina", n)),

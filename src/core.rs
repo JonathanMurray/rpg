@@ -59,6 +59,7 @@ impl CoreGame {
 
     pub async fn run(mut self) -> Vec<Character> {
         self.log("The battle begins").await;
+        self.log("Round 1").await;
 
         for character in self.characters.iter() {
             character.on_battle_start();
@@ -202,6 +203,7 @@ impl CoreGame {
 
                 if new_round {
                     println!("NEW ROUND STARTED!");
+
                     for character in self.characters.iter() {
                         character.on_new_round();
                     }
@@ -214,6 +216,8 @@ impl CoreGame {
                     }
 
                     self.round_index += 1;
+
+                    self.log(format!("Round {}", self.round_index + 1)).await;
                 }
 
                 let game_time = self.current_time();
@@ -1364,7 +1368,7 @@ impl CoreGame {
                 continue;
             }
 
-            if is_target_within_shape(caster.pos(), area_pos, shape, other_char.pos()) {
+            if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
                 detail_lines.push(other_char.name.to_string());
 
                 let outcome = Self::perform_ability_ally_effect(
@@ -1498,7 +1502,7 @@ impl CoreGame {
                 continue;
             }
 
-            if is_target_within_shape(caster.pos(), area_pos, shape, other_char.pos()) {
+            if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
                 let mut line = other_char.name.to_string();
                 match effect {
                     AbilityNegativeEffect::Spell(spell_enemy_effect) => {
@@ -5738,14 +5742,14 @@ pub fn is_target_within_shape(
     caster_pos: Position,
     area_pos: Position,
     shape: AreaShape,
-    target_pos: Position,
+    target: &Character,
 ) -> bool {
     match shape {
-        AreaShape::Circle(radius) => within_range_squared(radius.squared(), area_pos, target_pos),
+        AreaShape::Circle(radius) => within_range_squared(radius.squared(), area_pos, target.pos()),
         AreaShape::Line => {
             let mut is_hit = false;
             line_collision(caster_pos, area_pos, |x, y| {
-                if target_pos == (x, y) {
+                if target.occupies_cell((x, y)) {
                     is_hit = true;
                 }
             });

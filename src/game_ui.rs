@@ -537,7 +537,6 @@ impl UserInterface {
                 // Don't allow "hovering" action of dead character as there may be assumptions in rendering code
                 // that the character exists physically on the grid
                 if self.characters.contains_alive(selected_char_id) {
-                    dbg!(selected_char_id, base_action);
                     hovered_action = Some((selected_char_id, base_action));
                 }
             }
@@ -546,7 +545,6 @@ impl UserInterface {
         if hovered_action.is_none() {
             if let Some(ButtonAction::Action(base_action)) = self.target_ui.hovered_action() {
                 let target_char_id = self.target_ui.get_character_id().unwrap();
-                dbg!(target_char_id, base_action);
                 hovered_action = Some((target_char_id, base_action));
             }
         }

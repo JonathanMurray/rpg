@@ -916,7 +916,7 @@ pub const MIND_BLAST: Ability = Ability {
         None,
     ],
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Ranged(15)),
+        reach: AbilityReach::Range(Range::Float(13.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Static(1)),
@@ -949,7 +949,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    description: "Cause enemies in a line to start bleeding",
+    description: "Cause enemies to start bleeding",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 1,
@@ -1398,7 +1398,7 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Radius,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_radius_tenths: 30,
+        increased_radius_tenths: 40,
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -1441,7 +1441,7 @@ pub const FIREBALL: Ability = Ability {
             on_hit: None,
         }),
         impact_area: Some((
-            Range::Float(5.5),
+            Range::Float(4.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),

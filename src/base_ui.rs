@@ -1,6 +1,8 @@
 use macroquad::{
-    color::{Color, DARKGRAY, DARKGREEN, GRAY, MAGENTA, ORANGE, WHITE},
-    input::{is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton},
+    color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
+    input::{
+        is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
+    },
     math::Rect,
     prelude::TextDimensions,
     shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
@@ -562,6 +564,7 @@ impl Default for Align {
 pub struct ContainerScroll {
     offset: Cell<f32>,
     pub scroll_speed: f32,
+    is_dragging: Cell<bool>,
 }
 
 impl ContainerScroll {
@@ -578,6 +581,7 @@ impl Default for ContainerScroll {
         Self {
             offset: Default::default(),
             scroll_speed: 15.0,
+            is_dragging: Cell::new(false),
         }
     }
 }
@@ -585,7 +589,7 @@ impl Default for ContainerScroll {
 #[derive(Default)]
 pub struct Container {
     pub layout_dir: LayoutDirection,
-    pub reverse_vertical: bool,
+    //pub reverse_vertical: bool,
     pub align: Align,
     pub margin: f32,
     pub style: Style,
@@ -612,6 +616,37 @@ impl Container {
         }
 
         (w, h)
+    }
+
+    fn content_size_larger_than_container(&self) -> bool {
+        let (mut w, mut h) = self.content_size();
+
+        if let Some(max_h) = self.max_height {
+            if h > max_h {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    pub fn push_child(&mut self, element: Element) {
+        let mut was_scrolled_to_end = false;
+        if let Some(scroll) = &self.scroll {
+            let content_size = self.content_size();
+            let size = self.size();
+            if scroll.offset.get() == content_size.1 - size.1 || content_size.1 < size.1 {
+                was_scrolled_to_end = true;
+            }
+        }
+
+        self.children.push(element);
+
+        if let Some(scroll) = &self.scroll {
+            if was_scrolled_to_end {
+                scroll.offset.set(self.content_size().1 - self.size().1);
+            }
+        }
     }
 
     pub fn content_size(&self) -> (f32, f32) {
@@ -673,9 +708,11 @@ impl Container {
 
         let mut x0 = x + self.style.padding;
         let mut y0 = y + self.style.padding;
+        /*
         if self.reverse_vertical {
             y0 = y + size.1 - self.style.padding;
         }
+         */
 
         let scroll_offset = self
             .scroll
@@ -711,9 +748,11 @@ impl Container {
 
             let mut y_element = y0 + offset.1;
 
+            /*
             if self.reverse_vertical {
                 y_element -= element_h;
             }
+             */
 
             if (y_element >= y) && (y_element + element.size().1 <= y + size.1 + 5.0) {
                 if only_tooltips {
@@ -726,11 +765,15 @@ impl Container {
             match self.layout_dir {
                 LayoutDirection::Horizontal => x0 += element_w + self.margin,
                 LayoutDirection::Vertical => {
+                    /*
                     if self.reverse_vertical {
                         y0 -= element_h + self.margin;
                     } else {
                         y0 += element_h + self.margin
                     }
+                     */
+
+                    y0 += element_h + self.margin
                 }
             }
 
@@ -764,34 +807,62 @@ impl Container {
 
         if !only_tooltips {
             if let Some(scroll) = &self.scroll {
-                let content_size = self.content_size();
-                let mut bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+                // Only draw scrollbar if the content actually fills the container
+                if self.content_size_larger_than_container() {
+                    let content_size = self.content_size();
 
-                let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
+                    let mut bar_y = y + scroll.offset.get() / content_size.1 * size.1;
 
-                if self.reverse_vertical {
-                    // bar_y += content_size.1 - bar_h;
-                    bar_y = y + size.1 - bar_h + scroll.offset.get() / content_size.1 * size.1;
-                }
+                    let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
 
-                let bar_w = 7.0;
-                draw_rectangle(x + size.0, bar_y, bar_w, bar_h, GRAY);
+                    /*
+                    if self.reverse_vertical {
+                        // bar_y += content_size.1 - bar_h;
+                        bar_y = y + size.1 - bar_h + scroll.offset.get() / content_size.1 * size.1;
+                    }
+                     */
 
-                let (mouse_x, mouse_y) = mouse_position();
-                if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
-                    let (_dx, dy) = mouse_wheel();
-                    if dy != 0.0 && content_size.1 > size.1 {
-                        let mut new_offset = (scroll.offset.get()
-                            - dy.signum() * scroll.scroll_speed)
-                            .min(content_size.1 - size.1)
-                            .max(0.0);
+                    let bar_w = 7.0;
+                    draw_rectangle(x + size.0, y, bar_w, size.1, DARKGRAY);
+                    draw_rectangle(x + size.0 + 1.0, bar_y, bar_w - 2.0, bar_h, GRAY);
 
-                        if self.reverse_vertical {
-                            new_offset = (scroll.offset.get() - dy.signum() * scroll.scroll_speed)
-                                .min(0.0)
-                                .max(size.1 - content_size.1);
+                    let (mouse_x, mouse_y) = mouse_position();
+                    let mut new_scroll_offset = None;
+                    // Scrolling with mousewheel
+                    if (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) {
+                        let (_dx, dy) = mouse_wheel();
+                        if dy != 0.0 && content_size.1 > size.1 {
+                            new_scroll_offset =
+                                Some(scroll.offset.get() - dy.signum() * scroll.scroll_speed)
                         }
+                    }
 
+                    if !is_mouse_button_down(MouseButton::Left) {
+                        scroll.is_dragging.set(false);
+                    }
+
+                    // Scrolling by dragging with mouse
+                    if (x + size.0..x + size.0 + bar_w).contains(&mouse_x)
+                        && (y..y + size.1).contains(&mouse_y)
+                    {
+                        if is_mouse_button_pressed(MouseButton::Left) {
+                            scroll.is_dragging.set(true);
+                        }
+                    }
+
+                    if scroll.is_dragging.get() {
+                        let offset = (mouse_y - bar_h / 2.0 - y) / size.1 * content_size.1;
+                        new_scroll_offset = Some(offset);
+                    }
+
+                    if let Some(mut new_offset) = new_scroll_offset {
+                        /*
+                        if self.reverse_vertical {
+                            new_offset = new_offset.min(0.0).max(size.1 - content_size.1)
+                        } else {
+                          */
+                        new_offset = new_offset.min(content_size.1 - size.1).max(0.0);
+                        //};
                         scroll.offset.set(new_offset);
                     }
                 }

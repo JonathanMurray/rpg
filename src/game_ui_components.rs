@@ -792,7 +792,7 @@ impl Log {
         Self {
             container: Container {
                 layout_dir: LayoutDirection::Vertical,
-                reverse_vertical: true,
+                //reverse_vertical: false,
                 children: vec![],
                 margin: 4.0,
                 align: Align::End,
@@ -827,11 +827,10 @@ impl Log {
     pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
         const MAX_LINES: usize = 50;
         let text = text.into();
-        dbg!(&text);
         if self.container.children.len() == MAX_LINES {
-            self.container.children.pop();
-            self.text_lines.pop();
-            self.line_details.pop();
+            self.container.children.remove(0);
+            self.text_lines.remove(0);
+            self.line_details.remove(0);
         }
         // TODO Support setting max width for TextLine, and having it line-wrap to fit inside the given width
         let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
@@ -839,8 +838,8 @@ impl Log {
         text_line.set_max_width(self.container.min_width.unwrap());
         let text_line = Rc::new(text_line);
 
-        self.text_lines.insert(0, text_line.clone());
-        self.container.children.insert(0, Element::Rc(text_line));
+        self.text_lines.push(text_line.clone());
+        self.container.push_child(Element::Rc(text_line));
 
         if !details.is_empty() {
             let details_container = Container {
@@ -858,9 +857,9 @@ impl Log {
                     .collect(),
                 ..Default::default()
             };
-            self.line_details.insert(0, Some(details_container));
+            self.line_details.push(Some(details_container));
         } else {
-            self.line_details.insert(0, None);
+            self.line_details.push(None);
         }
     }
 
