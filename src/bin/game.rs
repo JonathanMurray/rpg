@@ -159,7 +159,9 @@ async fn main() {
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
 
-    let mut player_characters = vec![alice, clara, bob];
+    bob.receive_condition(Condition::Bleeding, Some(10), None);
+
+    let mut player_characters = vec![bob, alice, clara];
 
     player_characters = run_fight_loop(
         player_characters,

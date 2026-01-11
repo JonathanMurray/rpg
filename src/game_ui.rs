@@ -1662,6 +1662,7 @@ impl UserInterface {
                 if source == Condition::Burning {
                     self.sound_player.play(SoundId::Burning);
                 }
+
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
@@ -1669,6 +1670,7 @@ impl UserInterface {
                     format!("{}", amount),
                     TextEffectStyle::HostileHit,
                 );
+                self.animate_character_damage(character.id(), amount);
             }
             GameEvent::CharacterReceivedCondition {
                 character,
