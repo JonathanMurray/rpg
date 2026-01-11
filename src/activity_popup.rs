@@ -669,7 +669,7 @@ impl ActivityPopup {
         self.selected_choice_button_ids.clear();
 
         println!("on_new_state");
-        dbg!(self.ui_state.borrow());
+        //dbg!(self.ui_state.borrow());
 
         match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {

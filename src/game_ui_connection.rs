@@ -2,6 +2,9 @@ use std::rc::Rc;
 use std::sync::atomic::AtomicBool;
 use std::{cell::RefCell, sync::atomic::Ordering};
 
+use macroquad::color::MAGENTA;
+use macroquad::text::draw_text;
+use macroquad::time::get_fps;
 use macroquad::{
     color::BLACK,
     input::{get_keys_pressed, KeyCode},
@@ -317,6 +320,10 @@ impl _GameUserInterfaceConnection {
         loop {
             let elapsed = get_frame_time();
 
+            if elapsed > 0.05 {
+                println!("Frame took {elapsed}");
+            }
+
             let mut player_choice = user_interface.update(game, elapsed);
 
             clear_background(BLACK);
@@ -335,6 +342,9 @@ impl _GameUserInterfaceConnection {
                 DEBUG.fetch_not(Ordering::SeqCst);
                 dbg!(DEBUG.load(Ordering::SeqCst));
             }
+
+            let fps = get_fps();
+            draw_text(&format!("FPS: {}", fps), 10.0, 200.0, 30.0, MAGENTA);
 
             if let Some(player_choice) = player_choice {
                 user_interface.set_state(UiState::Idle);

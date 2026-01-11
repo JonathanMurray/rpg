@@ -24,12 +24,12 @@ use crate::{
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId,
-        AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action,
-        ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement,
-        AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
-        Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
-        MovementType, OnAttackedReaction, OnHitReaction, Position,
+        distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
+        AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction,
+        AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent,
+        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness,
+        HandType, MovementType, OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -1303,7 +1303,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        dbg!(&event);
+        //dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {
@@ -1446,20 +1446,20 @@ impl UserInterface {
                         }
                     }
                 } else {
-                    duration = 0.2;
+                    duration = 0.3;
                 }
-                self.animation_stopwatch.set_to_at_least(duration);
+                self.animation_stopwatch.set_to_at_least(duration - 0.1);
             }
             GameEvent::AbilityResolved(AbilityResolvedEvent {
                 actor,
                 target_outcome,
-                area_outcomes,
+                area_outcome,
                 ability,
                 mut detail_lines,
             }) => {
                 if let Some(sound_id) = ability.resolve_sound {
                     let mut skip_sound = false;
-                    if let Some((_pos, targets)) = &area_outcomes {
+                    if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
                         skip_sound = targets.is_empty();
                     }
 
@@ -1513,8 +1513,8 @@ impl UserInterface {
                     }
                 }
 
-                if let Some((_, outcomes)) = &area_outcomes {
-                    for (_, outcome) in outcomes {
+                if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
+                    for (_, outcome) in targets {
                         if let AbilityTargetOutcome::AttackedEnemy(attacked_event) = &outcome {
                             attacks.push(attacked_event);
                         }
@@ -1543,12 +1543,18 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.3);
                 }
 
-                if let Some((area_center_pos, outcomes)) = &area_outcomes {
+                if let Some(AbilityAreaOutcome {
+                    center,
+                    targets,
+                    shape,
+                }) = &area_outcome
+                {
                     self.add_effects_for_area_outcomes(
                         0.0,
                         animation_color,
-                        area_center_pos,
-                        outcomes,
+                        &center,
+                        Some(*shape),
+                        targets,
                     );
                 }
 
@@ -1705,24 +1711,25 @@ impl UserInterface {
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
                         radius: 10.0,
-                        end_radius: Some(15.0),
+                        end_radius: None,
                         fill: Some(animation_color),
                         stroke: None,
                     },
                 ),
             },
         );
+
         self.game_grid.add_effect(
             caster_pos,
             target_pos,
             Effect {
                 start_time: 0.025,
-                end_time: duration + 0.025,
+                end_time: duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
                         radius: 8.0,
-                        end_radius: Some(13.0),
+                        end_radius: None,
                         fill: Some(animation_color),
                         stroke: None,
                     },
@@ -1734,12 +1741,12 @@ impl UserInterface {
             target_pos,
             Effect {
                 start_time: 0.05,
-                end_time: duration + 0.05,
+                end_time: duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
                         radius: 6.0,
-                        end_radius: Some(11.0),
+                        end_radius: None,
                         fill: Some(animation_color),
                         stroke: None,
                     },
@@ -1761,26 +1768,53 @@ impl UserInterface {
         start_time: f32,
         animation_color: Color,
         area_center_pos: &(i32, i32),
+        shape: Option<AreaShape>,
         outcomes: &[(CharacterId, AbilityTargetOutcome)],
     ) {
         let area_duration = 0.2;
 
-        for (target_id, outcome) in outcomes {
-            let target_pos = self.characters.get(*target_id).pos();
+        dbg!(shape);
 
+        if let Some(AreaShape::Circle(radius)) = shape {
             self.game_grid.add_effect(
-                (area_center_pos.0, area_center_pos.1),
-                target_pos,
+                *area_center_pos,
+                *area_center_pos,
                 Effect {
                     start_time,
                     end_time: start_time + area_duration,
                     variant: EffectVariant::At(
                         EffectPosition::Destination,
                         EffectGraphics::Circle {
-                            radius: 20.0,
+                            radius: f32::from(radius) * self.game_grid.cell_w,
+                            end_radius: None,
+                            fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
                             stroke: Some((animation_color, 4.0)),
+                        },
+                    ),
+                },
+            );
+        }
+
+        let mut delay = 0.1;
+        for (target_id, outcome) in outcomes {
+            let target_pos = self.characters.get(*target_id).pos();
+
+            let start = start_time + delay;
+            let end = start + 0.2;
+
+            self.game_grid.add_effect(
+                (area_center_pos.0, area_center_pos.1),
+                target_pos,
+                Effect {
+                    start_time: start,
+                    end_time: end,
+                    variant: EffectVariant::At(
+                        EffectPosition::Destination,
+                        EffectGraphics::Circle {
+                            radius: 20.0,
                             end_radius: Some(25.0),
                             fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
+                            stroke: Some((animation_color, 4.0)),
                         },
                     ),
                 },
@@ -1788,9 +1822,11 @@ impl UserInterface {
 
             self.game_grid.animate_character_shaking(*target_id, 0.2);
 
-            self.add_effect_for_ability_target_outcome(outcome, start_time, *target_id, target_pos);
+            self.add_effect_for_ability_target_outcome(outcome, start, *target_id, target_pos);
 
             self.animation_stopwatch.set_to_at_least(start_time + 0.3);
+
+            delay += 0.1;
         }
     }
 
@@ -1910,7 +1946,7 @@ impl UserInterface {
         }
 
         if let Some(outcomes) = &event.area_outcomes {
-            self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, outcomes);
+            self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, None, outcomes);
         }
 
         self.animation_stopwatch.set_to_at_least(0.3);

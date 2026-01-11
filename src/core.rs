@@ -4,6 +4,7 @@ use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::RemAssign;
 use std::rc::{Rc, Weak};
+use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
@@ -1007,12 +1008,12 @@ impl CoreGame {
             }
 
             let mut target_outcome = None;
-            let mut area_outcomes = None;
+            let mut area_outcome = None;
 
             match ability.target {
                 AbilityTarget::Enemy {
                     effect,
-                    impact_area,
+                    impact_circle,
                     ..
                 } => {
                     let ActionTarget::Character(target_id, movement) = &selected_target else {
@@ -1070,6 +1071,7 @@ impl CoreGame {
                         detail_lines.push(line.to_string());
                     }
 
+                    let before = SystemTime::now();
                     let outcome = Self::perform_ability_enemy_effect(
                         caster,
                         ability.name,
@@ -1083,7 +1085,7 @@ impl CoreGame {
                     );
                     target_outcome = Some((*target_id, outcome));
 
-                    if let Some((radius, acquisition, area_effect)) = impact_area {
+                    if let Some((radius, acquisition, area_effect)) = impact_circle {
                         detail_lines.push("Area of effect:".to_string());
 
                         let area_target_outcomes = Self::perform_ability_area_enemy_effect(
@@ -1099,8 +1101,14 @@ impl CoreGame {
                             mode,
                         );
 
-                        area_outcomes = Some((target.position.get(), area_target_outcomes));
+                        area_outcome = Some(AbilityAreaOutcome {
+                            center: target.position.get(),
+                            targets: area_target_outcomes,
+                            shape: AreaShape::Circle(radius),
+                        });
                     }
+
+                    dbg!(before.elapsed());
                 }
 
                 AbilityTarget::Ally { range: _, effect } => {
@@ -1183,7 +1191,11 @@ impl CoreGame {
                         mode,
                     );
 
-                    area_outcomes = Some((target_pos, outcomes));
+                    area_outcome = Some(AbilityAreaOutcome {
+                        center: target_pos,
+                        targets: outcomes,
+                        shape: area_effect.shape,
+                    });
                 }
 
                 AbilityTarget::None {
@@ -1247,7 +1259,11 @@ impl CoreGame {
                             &mut detail_lines,
                             mode,
                         );
-                        area_outcomes = Some((caster.position.get(), outcomes));
+                        area_outcome = Some(AbilityAreaOutcome {
+                            center: caster.position.get(),
+                            targets: outcomes,
+                            shape: area_effect.shape,
+                        });
                     }
                 }
             };
@@ -1261,8 +1277,8 @@ impl CoreGame {
                     enemies_hit.push(*target_id);
                 }
             }
-            if let Some((_, outcomes)) = &area_outcomes {
-                for (target_id, outcome) in outcomes {
+            if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
+                for (target_id, outcome) in targets {
                     if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
                         enemies_hit.push(*target_id);
                     }
@@ -1274,7 +1290,7 @@ impl CoreGame {
             let resolve_event = AbilityResolvedEvent {
                 actor: caster_id,
                 target_outcome,
-                area_outcomes,
+                area_outcome,
                 ability,
                 detail_lines,
             };
@@ -2719,9 +2735,16 @@ pub enum GameEvent {
 pub struct AbilityResolvedEvent {
     pub actor: CharacterId,
     pub target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
-    pub area_outcomes: Option<(Position, Vec<(CharacterId, AbilityTargetOutcome)>)>,
+    pub area_outcome: Option<AbilityAreaOutcome>,
     pub ability: Ability,
     pub detail_lines: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct AbilityAreaOutcome {
+    pub center: Position,
+    pub targets: Vec<(CharacterId, AbilityTargetOutcome)>,
+    pub shape: AreaShape,
 }
 
 impl AbilityResolvedEvent {
@@ -2731,8 +2754,8 @@ impl AbilityResolvedEvent {
                 result.push(*target_id);
             }
         }
-        if let Some((_, outcomes)) = &self.area_outcomes {
-            for (target_id, outcome) in outcomes {
+        if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
+            for (target_id, outcome) in targets {
                 if matches!(
                     outcome,
                     AbilityTargetOutcome::HitEnemy { .. } | AbilityTargetOutcome::AttackedEnemy(..)
@@ -2748,8 +2771,8 @@ impl AbilityResolvedEvent {
         if let Some((target_id, outcome)) = &self.target_outcome {
             *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
         }
-        if let Some((_pos, outcomes)) = &self.area_outcomes {
-            for (target_id, outcome) in outcomes {
+        if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
+            for (target_id, outcome) in targets {
                 *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
             }
         }
@@ -3738,7 +3761,7 @@ pub enum AbilityTarget {
     Enemy {
         reach: AbilityReach,
         effect: AbilityNegativeEffect,
-        impact_area: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
+        impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
     },
 
     Ally {

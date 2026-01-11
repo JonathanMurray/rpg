@@ -190,7 +190,7 @@ pub enum RangeIndicator {
 pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
-    cell_w: f32,
+    pub cell_w: f32,
     terrain_atlas: Texture2D,
     background: HashMap<Position, TerrainId>,
     terrain_objects: HashMap<Position, TerrainId>,
@@ -932,7 +932,9 @@ impl GameGrid {
                     target,
                 } => match ability.target {
                     AbilityTarget::Enemy {
-                        impact_area, reach, ..
+                        impact_circle: impact_area,
+                        reach,
+                        ..
                     } => {
                         let mut area_radius = None;
                         if let Some((mut radius, _acquisition, _effect)) = impact_area {

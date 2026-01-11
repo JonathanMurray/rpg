@@ -421,7 +421,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
     match ability.target {
         AbilityTarget::Enemy {
             effect,
-            impact_area: area,
+            impact_circle: area,
             reach,
         } => {
             t.technical_description.push("".to_string());
