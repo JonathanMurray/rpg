@@ -183,7 +183,7 @@ impl CoreGame {
                  */
             } else {
                 let name = self.active_character().name;
-                self.log(format!("{} ended their turn", name)).await;
+                self.log(format!("|{}| ended their turn", name)).await;
                 ending_turn = true;
             }
 
@@ -475,9 +475,12 @@ impl CoreGame {
                         maybe_ally_reaction
                     };
 
-                    if let Some((reactor, _reaction)) = reaction {
-                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked { reactor })
-                            .await;
+                    if let Some((reactor, reaction)) = reaction {
+                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
+                            reactor,
+                            with_shield: reaction.used_hand == Some(HandType::OffHand),
+                        })
+                        .await;
                     }
 
                     let enhancements: Vec<(&str, AttackEnhancementEffect)> =
@@ -635,6 +638,8 @@ impl CoreGame {
             "movement must consist of more than just the start position"
         );
 
+        let mut step_idx = 0;
+
         while !positions.is_empty() {
             let new_position = positions.remove(0);
             if new_position == character.pos() {
@@ -681,6 +686,12 @@ impl CoreGame {
 
                             reactor.action_points.spend(1);
 
+                            self.ui_handle_event(GameEvent::AttackWasInitiated {
+                                actor: reactor.id(),
+                                target: character.id(),
+                            })
+                            .await;
+
                             let event = Self::perform_attack(
                                 reactor,
                                 HandType::MainHand,
@@ -722,10 +733,13 @@ impl CoreGame {
                 from: prev_position,
                 to: new_position,
                 movement_type,
+                step_idx,
             })
             .await;
 
             character.set_position(new_position);
+
+            step_idx += 1;
         }
 
         dbg!(character.pos());
@@ -2638,9 +2652,11 @@ pub enum GameEvent {
         from: Position,
         to: Position,
         movement_type: MovementType,
+        step_idx: u32,
     },
     CharacterReactedToAttacked {
         reactor: CharacterId,
+        with_shield: bool,
     },
     CharacterReactedToHit {
         main_line: String,
@@ -2967,12 +2983,19 @@ impl Characters {
          */
     }
 
-    pub fn contains(&self, character_id: CharacterId) -> bool {
-        self.0.iter().any(|(id, _ch)| *id == character_id)
+    pub fn contains_alive(&self, character_id: CharacterId) -> bool {
+        self.0
+            .iter()
+            .any(|(id, ch)| *id == character_id && !ch.is_dead())
     }
 
     pub fn get(&self, character_id: CharacterId) -> &Character {
         self.get_rc(character_id)
+    }
+
+    pub fn safe_get(&self, character_id: CharacterId) -> Option<&Character> {
+        let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
+        entry.map(|(_id, ch)| &**ch)
     }
 
     pub fn get_rc(&self, character_id: CharacterId) -> &Rc<Character> {
@@ -3295,6 +3318,7 @@ impl Condition {
             Bleeding => StatusId::Bleeding,
             Burning => StatusId::Burning,
             HealthPotionRecovering => StatusId::Healing,
+            Hindered => StatusId::Hindered,
             Blinded => StatusId::Blinded,
             Exposed => StatusId::Exposed,
             Slowed => StatusId::Slowed,

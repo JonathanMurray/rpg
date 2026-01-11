@@ -16,15 +16,17 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, draw_button_tooltip
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{
-        Align, Container, Drawable, Element, LayoutDirection, Style, TableStyle, TextLine, draw_text_rounded, table
+        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
+        TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{BaseAction, Character, CharacterId, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{IconId, StatusId}, util::COL_RED,
+    textures::{IconId, StatusId},
+    util::COL_RED,
 };
 
 pub struct TargetUi {
@@ -472,7 +474,7 @@ impl Drawable for TargetUi {
             });
         }
 
-        self.draw_action((screen_width() / 2.0, 60.0));
+        self.draw_action((screen_width() / 2.0, 200.0));
 
         for event in self.button_events.borrow_mut().drain(..) {
             match event {

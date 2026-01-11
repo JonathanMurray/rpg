@@ -33,9 +33,10 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{Drawable, Style, draw_text_rounded},
+    base_ui::{draw_text_rounded, Drawable, Style},
     core::{
-        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MOVE_DISTANCE_PER_STAMINA, MovementType, Position, within_range_squared
+        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
+        AttackAction, BaseAction, Character, MovementType, Position, MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -43,9 +44,10 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{CELLS_PER_ENTITY, ChartNode, Occupation, PathfindGrid, build_path_from_chart},
-    textures::{SpriteId, StatusId, TerrainId, character_sprite_height, draw_terrain},
-    util::{COL_GRAY, COL_RED, line_collision, rgb},
+    pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
+    sounds::SoundPlayer,
+    textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
+    util::{line_collision, rgb, COL_GRAY, COL_RED},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
@@ -91,12 +93,13 @@ pub struct TargetDamagePreview {
     pub max: u32,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug)]
 struct CharacterAnimation {
     character_id: CharacterId,
     duration: f32,
     remaining_duration: f32,
     kind: AnimationKind,
+    custom_toggle: Cell<bool>,
 }
 
 impl CharacterAnimation {
@@ -106,6 +109,7 @@ impl CharacterAnimation {
             duration,
             remaining_duration: duration,
             kind,
+            custom_toggle: Cell::new(false),
         }
     }
 
@@ -213,14 +217,11 @@ pub struct GameGrid {
     hovered_character: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
     status_textures: HashMap<StatusId, Texture2D>,
+
+    sound_player: SoundPlayer,
 }
 
-const ZOOM_LEVELS: [f32; 4] = [
-    50.0 / 3.0,
-    64.0 / 3.0,
-    85.0 / 3.0,
-    96.0 / 3.0,
-];
+const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
@@ -244,6 +245,7 @@ impl GameGrid {
         background: HashMap<Position, TerrainId>,
         terrain_objects: HashMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let zoom_index = 1;
         let cell_w = ZOOM_LEVELS[zoom_index];
@@ -275,6 +277,7 @@ impl GameGrid {
             background,
             terrain_objects,
             status_textures,
+            sound_player,
         }
     }
 
@@ -695,6 +698,9 @@ impl GameGrid {
                     } else if cycle_time < 0.25 {
                         y += 3.0;
                     } else if cycle_time < 0.5 {
+                        if animation.custom_toggle.get() {
+                            animation.custom_toggle.set(false);
+                        }
                         params.rotation = -0.07;
                     } else if cycle_time < 0.75 {
                         y += 3.0;
@@ -720,7 +726,7 @@ impl GameGrid {
                     y -= self.cell_w * 0.07;
                     params.rotation = random_rotation;
                     if with_shield {
-                        shield_offset = (2.0, -4.0);
+                        shield_offset = (2.0, -5.0);
                     } else {
                         weapon_rotation_modifier = PI * 0.2;
                         if !character.is_facing_east.get() {
@@ -1822,23 +1828,25 @@ impl GameGrid {
     ) -> Option<(CharacterId, Range, RangeIndicator)> {
         let mut indicator = None;
 
-        match hovered_base_action {
-            Some((char_id, BaseAction::Attack(attack))) => {
-                let character = self.characters.get(char_id);
-                if character.weapon(attack.hand).is_some() {
-                    let range = character.attack_range(attack.hand, iter::empty());
-                    indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+        if let Some((char_id, base_action)) = hovered_base_action {
+            if let Some(character) = self.characters.safe_get(char_id) {
+                match base_action {
+                    BaseAction::Attack(attack) => {
+                        if character.weapon(attack.hand).is_some() {
+                            let range = character.attack_range(attack.hand, iter::empty());
+                            indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+                        }
+                    }
+                    BaseAction::UseAbility(ability) => {
+                        let radius = ability.target.radius(&[]);
+                        let range = ability.target.range(&[]);
+                        indicator = radius
+                            .or(range)
+                            .map(|range| (char_id, range, RangeIndicator::ActionTargetRange))
+                    }
+                    _ => {}
                 }
             }
-            Some((char_id, BaseAction::UseAbility(ability))) => {
-                let radius = ability.target.radius(&[]);
-                let range = ability.target.range(&[]);
-                indicator = radius
-                    .or(range)
-                    .map(|range| (char_id, range, RangeIndicator::ActionTargetRange))
-            }
-
-            _ => {}
         }
 
         if indicator.is_some() {
@@ -2071,13 +2079,7 @@ impl GameGrid {
 
         let current_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
-        draw_rectangle(
-            health_x,
-            health_y,
-            current_health_w,
-            health_h,
-            COL_RED,
-        );
+        draw_rectangle(health_x, health_y, current_health_w, health_h, COL_RED);
 
         if let Some(damage_preview) = self.target_damage_previews.get(&character.id()) {
             let effective_min = damage_preview.min.min(character.health.current());

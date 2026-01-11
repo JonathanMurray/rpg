@@ -21,7 +21,7 @@ impl SoundPlayer {
             (SoundId::MeleeAttack, "melee_attack"),
             (SoundId::ShootArrow, "shoot_arrow_2"),
             (SoundId::HitArrow, "hit_arrow"),
-            (SoundId::Walk, "walk"),
+            (SoundId::Walk, "walk3"),
             (SoundId::Debuff, "debuff"),
             (SoundId::ShootSpell, "shoot_spell"),
             (SoundId::Death, "death"),

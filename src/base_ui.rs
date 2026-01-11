@@ -12,7 +12,10 @@ use std::{
     rc::{Rc, Weak},
 };
 
-use crate::textures::{DICE_SYMBOL, SHIELD_SYMBOL};
+use crate::{
+    textures::{DICE_SYMBOL, SHIELD_SYMBOL},
+    util::{COL_ALICE, COL_BOB, COL_CLARA},
+};
 
 pub trait Drawable {
     fn draw(&self, x: f32, y: f32);
@@ -325,14 +328,16 @@ impl TextLine {
                     part = &part["<keyword>".len()..];
                 }
 
-                let dim = measure_text(part, self.font.as_ref(), self.font_size, 1.0);
-                offset_y = dim.offset_y;
+                if part.len() > 0 {
+                    let dim = measure_text(part, self.font.as_ref(), self.font_size, 1.0);
+                    offset_y = dim.offset_y;
 
-                w += dim.width;
-                if dim.height > h {
-                    h = dim.height;
+                    w += dim.width;
+                    if dim.height > h {
+                        h = dim.height;
+                    }
+                    h = h.max(dim.height);
                 }
-                h = h.max(dim.height);
             }
         }
 
@@ -355,6 +360,16 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
         } else if part == "<shield>" {
             draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             x += 16.0;
+        } else if ["Bob", "Alice", "Clara"].contains(&part) {
+            let mut params = params.clone();
+            params.color = match &part {
+                &"Bob" => COL_BOB,
+                &"Alice" => COL_ALICE,
+                &"Clara" => COL_CLARA,
+                _ => unreachable!(),
+            };
+            let part_dimensions = draw_text_rounded(part, x, y, params);
+            x += part_dimensions.width;
         } else {
             let mut params = params.clone();
             if part.starts_with("<value>") {

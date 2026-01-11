@@ -91,6 +91,7 @@ pub enum StatusId {
     Bleeding,
     Healing,
     Blinded,
+    Hindered,
     Exposed,
     Slowed,
     Hastened,
@@ -118,6 +119,7 @@ pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
         (StatusId::Bleeding, "status_bleeding.png"),
         (StatusId::Healing, "status_healing.png"),
         (StatusId::Blinded, "status_blinded.png"),
+        (StatusId::Hindered, "status_hindered.png"),
         (StatusId::Exposed, "status_exposed.png"),
         (StatusId::Slowed, "status_slowed.png"),
         (StatusId::Hastened, "status_hastened.png"),
@@ -427,7 +429,6 @@ pub fn draw_terrain(
 
         TerrainId::Floor => (0, 9),
         //TerrainId::Floor => (0, 10),
-
         TerrainId::NewWaterNorthWest => (1, 9),
         TerrainId::NewWaterNorth => {
             rotation = 0.5 * PI;

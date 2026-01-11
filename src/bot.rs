@@ -386,7 +386,7 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
     let bot = game.active_character();
 
     if let Some((_, target_id)) = behaviour.current_goal.get() {
-        if !game.characters.contains(target_id) {
+        if !game.characters.contains_alive(target_id) {
             dbg!("MAGI, TARGET HAS DIED?", target_id);
             behaviour.current_goal.set(None);
         }

@@ -16,14 +16,20 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        ACTION_BUTTON_BG_COLOR, ActionButton, ButtonAction, ButtonContext, ButtonHovered, ButtonSelected, InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE, draw_button_tooltip
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
+        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
     core::{
-        Ability, AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction, OnHitReaction, Position, distance_between, predict_ability, predict_attack
+        distance_between, predict_ability, predict_attack, Ability, AbilityEnhancement, AbilityId,
+        AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome, Action,
+        ActionReach, ActionTarget, AreaShape, AttackAction, AttackEnhancement,
+        AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent, BaseAction,
+        Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness, HandType,
+        MovementType, OnAttackedReaction, OnHitReaction, Position,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -37,7 +43,8 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE}, util::{COL_BLACK_BLUE, COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_RED},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE},
+    util::{COL_BLACK_BLUE, COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -437,6 +444,7 @@ impl UserInterface {
             background,
             terrain_objects,
             status_textures.clone(),
+            sound_player.clone(),
         );
 
         let player_portraits = PlayerPortraits::new(
@@ -525,13 +533,21 @@ impl UserInterface {
 
         if let Some(btn) = self.hovered_button.as_ref() {
             if let ButtonAction::Action(base_action) = btn.action {
-                hovered_action = Some((self.player_portraits.selected_id(), base_action));
+                let selected_char_id = self.player_portraits.selected_id();
+                // Don't allow "hovering" action of dead character as there may be assumptions in rendering code
+                // that the character exists physically on the grid
+                if self.characters.contains_alive(selected_char_id) {
+                    dbg!(selected_char_id, base_action);
+                    hovered_action = Some((selected_char_id, base_action));
+                }
             }
         }
 
         if hovered_action.is_none() {
             if let Some(ButtonAction::Action(base_action)) = self.target_ui.hovered_action() {
-                hovered_action = Some((self.target_ui.get_character_id().unwrap(), base_action));
+                let target_char_id = self.target_ui.get_character_id().unwrap();
+                dbg!(target_char_id, base_action);
+                hovered_action = Some((target_char_id, base_action));
             }
         }
 
@@ -1289,11 +1305,16 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
+        dbg!(&event);
+
         match *event {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
-            GameEvent::CharacterReactedToAttacked { reactor } => {
+            GameEvent::CharacterReactedToAttacked {
+                reactor,
+                with_shield,
+            } => {
                 let reactor_pos = self.characters.get(reactor).pos();
                 self.game_grid.add_text_effect(
                     reactor_pos,
@@ -1302,6 +1323,9 @@ impl UserInterface {
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
+
+                self.game_grid
+                    .animate_character_acting(reactor, with_shield, 0.8);
 
                 self.animation_stopwatch.set_to_at_least(0.4);
             }
@@ -1452,10 +1476,10 @@ impl UserInterface {
                 } else {
                     "used"
                 };
-                let mut line = format!("{} {} {}", actor_name, verb, ability.name);
+                let mut line = format!("|{}| {} {}", actor_name, verb, ability.name);
                 if let Some((target_id, _outcome)) = &target_outcome {
                     let target_name = self.characters.get(*target_id).name;
-                    line.push_str(&format!(" on {}", target_name));
+                    line.push_str(&format!(" on |{}|", target_name));
                 }
 
                 let mut attacks = vec![];
@@ -1542,7 +1566,7 @@ impl UserInterface {
                 self.sound_player.play(SoundId::Powerup);
                 self.log.add_with_details(
                     format!(
-                        "{} used {}",
+                        "|{}| used {}",
                         self.characters.get(user).name,
                         consumable.name
                     ),
@@ -1560,7 +1584,7 @@ impl UserInterface {
             } => {
                 self.sound_player.play(SoundId::Death);
                 self.log
-                    .add(format!("{} died", self.characters.get(character).name));
+                    .add(format!("|{}| died", self.characters.get(character).name));
 
                 self.target_ui.clear_character_if_dead();
 
@@ -1610,8 +1634,9 @@ impl UserInterface {
                 from,
                 to,
                 movement_type,
+                step_idx,
             } => {
-                let mut duration = 0.15;
+                let mut duration = 0.11; //0.15;
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;
@@ -1619,7 +1644,7 @@ impl UserInterface {
 
                 self.game_grid
                     .set_character_motion(character, from, to, duration, movement_type);
-                if movement_type != MovementType::KnockedBack {
+                if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
                     self.sound_player.play(SoundId::Walk);
                 }
                 self.animation_stopwatch.set_to_at_least(duration);
@@ -1631,7 +1656,7 @@ impl UserInterface {
             } => {
                 let character = self.characters.get(character);
                 self.log.add(format!(
-                    "{} took {} damage from {}",
+                    "|{}| took {} damage from {}",
                     character.name,
                     amount,
                     source.name()
@@ -1838,7 +1863,7 @@ impl UserInterface {
         };
 
         let mut line = format!(
-            "{} {} {}",
+            "|{}| {} |{}|",
             self.characters.get(attacker).name,
             verb,
             self.characters.get(target).name

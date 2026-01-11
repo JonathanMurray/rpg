@@ -6,10 +6,10 @@ use std::{
 
 use macroquad::{
     color::SKYBLUE,
-    input::{KeyCode, is_key_pressed},
+    input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
-    texture::{DrawTextureParams, FilterMode, draw_texture, draw_texture_ex},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode},
 };
 
 use indexmap::IndexMap;
@@ -826,6 +826,8 @@ impl Log {
 
     pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
         const MAX_LINES: usize = 50;
+        let text = text.into();
+        dbg!(&text);
         if self.container.children.len() == MAX_LINES {
             self.container.children.pop();
             self.text_lines.pop();
