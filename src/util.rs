@@ -60,7 +60,12 @@ pub const fn rgb(r: u8, g: u8, b: u8) -> Color {
 }
 
 pub const COL_RED: Color = rgb(223, 53, 81);
-pub const COL_GREEN_0: Color = rgb(93 , 146,38);
-pub const COL_GREEN_1: Color = rgb(144 , 181,58);
-pub const COL_GREEN_2: Color = rgb(201 , 226,118);
+pub const COL_GREEN_0: Color = rgb(15 , 106,46);
+pub const COL_GREEN_1: Color = rgb(93 , 146,38);
+pub const COL_GREEN_2: Color = rgb(144 , 181,58);
+pub const COL_GREEN_3: Color = rgb(201 , 226,118);
 pub const COL_BLUE: Color = rgb(58, 139, 194);
+
+pub const COL_BLACK_BLUE: Color = rgb(34, 39, 52);
+
+pub const COL_GRAY: Color = rgb(96, 120, 132);

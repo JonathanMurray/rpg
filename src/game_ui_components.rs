@@ -6,10 +6,10 @@ use std::{
 
 use macroquad::{
     color::SKYBLUE,
-    input::{is_key_pressed, KeyCode},
+    input::{KeyCode, is_key_pressed},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
+    texture::{DrawTextureParams, FilterMode, draw_texture, draw_texture_ex},
 };
 
 use indexmap::IndexMap;
@@ -214,6 +214,8 @@ impl TopCharacterPortrait {
            };
         */
 
+        //texture.set_filter(FilterMode::Linear);
+
         let container = Container {
             style: Style {
                 //background_color: Some(DARKGRAY),
@@ -326,10 +328,10 @@ impl Drawable for TopCharacterPortrait {
     }
 
     fn size(&self) -> (f32, f32) {
-        *self.texture_size.borrow_mut() = if !self.character.is_part_of_active_group.get() {
-            (48.0, 60.0)
-        } else {
+        *self.texture_size.borrow_mut() = if self.character.is_part_of_active_group.get() {
             (64.0, 80.0)
+        } else {
+            (56.0, 70.0)
         };
 
         let (w, h) = self.container.size();

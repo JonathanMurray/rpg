@@ -507,7 +507,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let pos = (x as i32, y as i32);
             background.insert(pos, grass_variations[i]);
             //TODO
-            background.insert(pos, TerrainId::Dirt);
+            background.insert(pos, TerrainId::Floor);
         }
     }
 

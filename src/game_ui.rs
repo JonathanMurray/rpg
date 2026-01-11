@@ -37,7 +37,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE}, util::{COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_RED},
+    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE}, util::{COL_BLACK_BLUE, COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
 
 #[derive(Debug, Clone, PartialEq)]

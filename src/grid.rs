@@ -45,14 +45,14 @@ use crate::{
     game_ui_components::ActionPointsRow,
     pathfind::{CELLS_PER_ENTITY, ChartNode, Occupation, PathfindGrid, build_path_from_chart},
     textures::{SpriteId, StatusId, TerrainId, character_sprite_height, draw_terrain},
-    util::{COL_RED, line_collision, rgb},
+    util::{COL_GRAY, COL_RED, line_collision, rgb},
 };
 use crate::{
     core::{CharacterId, Characters, HandType, Range},
     drawing::{draw_arrow, draw_dashed_line},
 };
 
-const BACKGROUND_COLOR: Color = Color::new(0.2, 0.2, 0.2, 1.0);
+const BACKGROUND_COLOR: Color = COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
@@ -215,9 +215,7 @@ pub struct GameGrid {
     status_textures: HashMap<StatusId, Texture2D>,
 }
 
-const ZOOM_LEVELS: [f32; 6] = [
-    32.0 / 3.0,
-    41.0 / 3.0,
+const ZOOM_LEVELS: [f32; 4] = [
     50.0 / 3.0,
     64.0 / 3.0,
     85.0 / 3.0,
@@ -247,7 +245,7 @@ impl GameGrid {
         terrain_objects: HashMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
     ) -> Self {
-        let zoom_index = 2;
+        let zoom_index = 1;
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();

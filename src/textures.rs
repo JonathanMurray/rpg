@@ -355,7 +355,7 @@ pub enum TerrainId {
     Grass2,
     Grass3,
     Grass4,
-    Dirt,
+    Floor,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -425,7 +425,8 @@ pub fn draw_terrain(
         TerrainId::Grass3 => (2, 8),
         TerrainId::Grass4 => (3, 8),
 
-        TerrainId::Dirt => (0, 10),
+        TerrainId::Floor => (0, 9),
+        //TerrainId::Floor => (0, 10),
 
         TerrainId::NewWaterNorthWest => (1, 9),
         TerrainId::NewWaterNorth => {
