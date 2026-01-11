@@ -53,16 +53,24 @@ impl Tooltip {
 
     pub fn content_lines(&self, detailed: bool) -> Vec<String> {
         let mut lines = vec![];
+        let mut has_description = false;
+        let show_details = detailed || self.technical_description.len() < 2;
         if let Some(description) = self.description {
             if !description.is_empty() {
+                has_description = true;
                 lines.push(description.to_string());
-                if detailed && !self.technical_description.is_empty() {
+                if show_details && !self.technical_description.is_empty() {
                     lines.push("".to_string());
                 }
             }
         }
-        if detailed {
+        if show_details {
             lines.extend_from_slice(&self.technical_description);
+        } else if !self.technical_description.is_empty() {
+            if has_description {
+                lines.push("".to_string());
+            }
+            lines.push("|<alt_key>| |<faded>details|".to_string());
         }
         lines
     }
@@ -503,6 +511,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             describe_area_effect(Some(range), area_effect, &mut t)
         }
     };
+
     t
 }
 

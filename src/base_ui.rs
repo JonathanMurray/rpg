@@ -15,7 +15,7 @@ use std::{
 };
 
 use crate::{
-    textures::{DICE_SYMBOL, SHIELD_SYMBOL},
+    textures::{ALT_KEY_SYMBOL, DICE_SYMBOL, SHIELD_SYMBOL},
     util::{COL_ALICE, COL_BOB, COL_CLARA},
 };
 
@@ -362,6 +362,9 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
         } else if part == "<shield>" {
             draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             x += 16.0;
+        } else if part == "<alt_key>" {
+            draw_texture(ALT_KEY_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += 16.0;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
             params.color = match &part {
@@ -381,6 +384,9 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
             } else if part.starts_with("<keyword>") {
                 part = &part["<keyword>".len()..];
                 params.color = ORANGE;
+            } else if part.starts_with("<faded>") {
+                part = &part["<faded>".len()..];
+                params.color = GRAY;
             }
 
             let part_dimensions = draw_text_rounded(part, x, y, params);
