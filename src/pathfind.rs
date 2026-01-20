@@ -9,7 +9,7 @@ use indexmap::IndexMap;
 
 use crate::core::{
     distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
-    MELEE_RANGE_SQUARED,
+    CENTER_MELEE_RANGE_SQUARED,
 };
 
 pub const CELLS_PER_ENTITY: u32 = 3;
@@ -124,7 +124,7 @@ impl PathfindGrid {
             character_id,
             start,
             target,
-            MELEE_RANGE_SQUARED,
+            CENTER_MELEE_RANGE_SQUARED,
             exploration_range,
         )
     }

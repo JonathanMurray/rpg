@@ -4803,7 +4803,7 @@ impl Character {
 
         match weapon_range {
             WeaponRange::Melee => {
-                if within_range_squared(
+                if target_within_range_squared(
                     weapon_range.squared(),
                     self.position.get(),
                     target_position,
@@ -4819,12 +4819,12 @@ impl Character {
                     modifier += enhancement.range_bonus;
                 }
 
-                if within_range_squared(
+                if target_within_range_squared(
                     (range + modifier as f32).powf(2.0),
                     self.position.get(),
                     target_position,
                 ) {
-                    if within_range_squared(
+                    if target_within_range_squared(
                         Range::Melee.squared(),
                         self.position.get(),
                         target_position,
@@ -4847,7 +4847,7 @@ impl Character {
         target_position: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
-        within_range_squared(range.squared(), self.position.get(), target_position)
+        target_within_range_squared(range.squared(), self.position.get(), target_position)
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
@@ -5769,12 +5769,8 @@ pub fn is_target_within_shape(
 ) -> bool {
     match shape {
         AreaShape::Circle(radius) => {
-            let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
-            within_range_squared(
-                (f32::from(radius) + margin).powf(2.0),
-                area_pos,
-                target.pos(),
-            )
+            //let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
+            target_within_range_squared((f32::from(radius)).powf(2.0), area_pos, target.pos())
         }
         AreaShape::Line => {
             let mut is_hit = false;
@@ -5790,14 +5786,38 @@ pub fn is_target_within_shape(
 
 pub fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
     let distance_squared = (destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2);
-    //dbg!(("within range squared", range_squared, source, destination, distance_squared));
     distance_squared as f32 <= range_squared
 }
 
-pub const MELEE_RANGE_SQUARED: f32 = 13.0;
+pub fn target_within_range_squared(range_squared: f32, source: Position, target: Position) -> bool {
+    for x in target.0 - 1..=target.0 + 1 {
+        for y in target.1 - 1..=target.1 + 1 {
+            let distance_squared = (x - source.0).pow(2) + (y - source.1).pow(2);
+            if distance_squared as f32 <= range_squared {
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/*
+This is the max distance to be considered melee:
+
+AAA
+AAA
+AAABBB
+BBB
+BBB
+
+I.e. two sides must be touching. The distance from A center to B edge
+is therefore sqrt(1^2 + 2^2)
+*/
+pub const TOUCHING_MELEE_RANGE_SQUARED: f32 = 5.0;
+pub const CENTER_MELEE_RANGE_SQUARED: f32 = 13.0;
 
 fn within_meele(source: Position, destination: Position) -> bool {
-    within_range_squared(MELEE_RANGE_SQUARED, source, destination)
+    within_range_squared(CENTER_MELEE_RANGE_SQUARED, source, destination)
 }
 
 pub fn sq_distance_between(source: Position, destination: Position) -> f32 {
@@ -6003,10 +6023,10 @@ impl WeaponRange {
                BBB
                BBB
 
-            I.e. two sides must be touching. The distance between the center point
-            is therefore sqrt(3^2 + 2^2)
+            I.e. two sides must be touching. The distance from A center to B edge
+            is therefore sqrt(1^2 + 2^2)
              */
-            Self::Melee => ((3u32).pow(2) + (2u32).pow(2)) as f32,
+            Self::Melee => 5 as f32,
             Self::Ranged(range) => range.powf(2.0),
         }
     }
@@ -6043,7 +6063,7 @@ impl Display for Range {
 impl Range {
     pub fn squared(&self) -> f32 {
         match self {
-            Range::Melee => MELEE_RANGE_SQUARED,
+            Range::Melee => TOUCHING_MELEE_RANGE_SQUARED,
             Range::Ranged(range) => range.pow(2) as f32,
             Range::ExtendableRanged(range) => range.pow(2) as f32,
             Range::Float(range) => range.powf(2.0),
@@ -6052,7 +6072,7 @@ impl Range {
 
     pub fn plus(&self, n: u32) -> Range {
         match self {
-            Range::Melee => Range::Float(MELEE_RANGE_SQUARED.sqrt() + n as f32),
+            Range::Melee => Range::Float(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n as f32),
             Range::Ranged(range) => Range::Ranged(range + n),
             Range::ExtendableRanged(range) => Range::Ranged(range + n),
             Range::Float(range) => Range::Float(range + n as f32),
@@ -6061,7 +6081,7 @@ impl Range {
 
     pub fn plusf(&self, n: f32) -> Range {
         match self {
-            Range::Melee => Range::Float(MELEE_RANGE_SQUARED.sqrt() + n),
+            Range::Melee => Range::Float(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n),
             Range::Ranged(range) => Range::Float(*range as f32 + n),
             Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
             Range::Float(range) => Range::Float(range + n),
@@ -6072,7 +6092,7 @@ impl Range {
 impl From<Range> for f32 {
     fn from(range: Range) -> Self {
         match range {
-            Range::Melee => MELEE_RANGE_SQUARED.sqrt(),
+            Range::Melee => TOUCHING_MELEE_RANGE_SQUARED.sqrt(),
             Range::Ranged(r) => r as f32,
             Range::ExtendableRanged(r) => r as f32,
             Range::Float(f) => f,

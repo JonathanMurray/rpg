@@ -1,10 +1,10 @@
 use macroquad::color::Color;
 use rand::Rng;
 
-use crate::core::{sq_distance_between, Position, MELEE_RANGE_SQUARED};
+use crate::core::{sq_distance_between, Position, CENTER_MELEE_RANGE_SQUARED};
 
 pub fn are_entities_within_melee(a: Position, b: Position) -> bool {
-    sq_distance_between(a, b) <= MELEE_RANGE_SQUARED
+    sq_distance_between(a, b) <= CENTER_MELEE_RANGE_SQUARED
 }
 
 pub fn adjacent_cells((x, y): Position) -> Vec<Position> {

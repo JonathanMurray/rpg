@@ -35,8 +35,9 @@ use macroquad::{
 use crate::{
     base_ui::{draw_text_rounded, Drawable, Style},
     core::{
-        within_range_squared, AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaShape,
-        AttackAction, BaseAction, Character, MovementType, Position, MOVE_DISTANCE_PER_STAMINA,
+        target_within_range_squared, within_range_squared, AbilityReach, AbilityTarget,
+        ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MovementType,
+        Position, MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -1058,7 +1059,7 @@ impl GameGrid {
             self.draw_range_indicator(char_pos, range, indicator);
 
             for character in self.characters.iter() {
-                if within_range_squared(range.squared(), char_pos, character.pos()) {
+                if target_within_range_squared(range.squared(), char_pos, character.pos()) {
                     labelled_char_ids.insert(character.id());
                 }
             }
