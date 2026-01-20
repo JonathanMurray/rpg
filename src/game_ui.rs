@@ -82,16 +82,17 @@ pub enum UiState {
 }
 
 impl UiState {
-    pub fn has_required_player_input(
+    pub fn action_usability_problem(
         &self,
         relevant_character: &Character,
         characters: &Characters,
-    ) -> bool {
+    ) -> Option<&'static str> {
         match self {
             UiState::ConfiguringAction(configured_action) => {
-                configured_action.has_required_player_input(relevant_character, characters)
+                configured_action.usability_problem(relevant_character, characters)
             }
-            _ => true,
+
+            _ => None,
         }
     }
 
@@ -151,11 +152,11 @@ pub enum ConfiguredAction {
 }
 
 impl ConfiguredAction {
-    fn has_required_player_input(
+    fn usability_problem(
         &self,
         relevant_character: &Character,
         characters: &Characters,
-    ) -> bool {
+    ) -> Option<&'static str> {
         match self {
             ConfiguredAction::Attack {
                 target,
@@ -170,12 +171,16 @@ impl ConfiguredAction {
                         target_char.position.get(),
                         selected_enhancements.iter().map(|e| e.effect),
                     );
-                    matches!(
+                    if matches!(
                         reach,
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..)
-                    )
+                    ) {
+                        None
+                    } else {
+                        Some("Out of reach")
+                    }
                 }
-                None => false,
+                None => Some("Select an enemy"),
             },
 
             ConfiguredAction::UseAbility {
@@ -187,47 +192,75 @@ impl ConfiguredAction {
                 ActionTarget::Character(target_id, movement) => {
                     if let Some(positions) = movement {
                         if positions.is_empty() {
-                            return false;
+                            return Some("Select movement");
                         }
                     }
                     let target_char = characters.get(*target_id);
 
-                    relevant_character.reaches_with_ability(
+                    if relevant_character.reaches_with_ability(
                         *ability,
                         selected_enhancements,
                         target_char.position.get(),
-                    )
+                    ) {
+                        None
+                    } else {
+                        Some("Out of reach")
+                    }
                 }
 
                 ActionTarget::Position(target_pos) => {
                     assert!(matches!(ability.target, AbilityTarget::Area { .. }));
-                    relevant_character.reaches_with_ability(
+                    if relevant_character.reaches_with_ability(
                         *ability,
                         selected_enhancements,
                         *target_pos,
-                    )
+                    ) {
+                        None
+                    } else {
+                        Some("Out of reach")
+                    }
                 }
 
                 ActionTarget::None => match ability.target {
-                    AbilityTarget::None { .. } => true,
-                    _ => false,
+                    AbilityTarget::None { .. } => None,
+                    AbilityTarget::Enemy { .. } => Some("Select an enemy"),
+                    AbilityTarget::Ally { .. } => Some("Select an ally"),
+                    AbilityTarget::Area { .. } => Some("Select an area"),
                 },
             },
 
             ConfiguredAction::Move {
                 selected_movement_path,
                 ..
-            } => !selected_movement_path.is_empty(),
+            } => {
+                if selected_movement_path.is_empty() {
+                    Some("Select movement")
+                } else {
+                    None
+                }
+            }
 
-            ConfiguredAction::ChangeEquipment { drag } => matches!(
-                *drag.borrow(),
-                Some(EquipmentDrag {
-                    to_idx: Some(_),
-                    ..
-                })
-            ),
+            ConfiguredAction::ChangeEquipment { drag } => {
+                if matches!(
+                    *drag.borrow(),
+                    Some(EquipmentDrag {
+                        to_idx: Some(_),
+                        ..
+                    })
+                ) {
+                    None
+                } else {
+                    Some("Drag an item")
+                }
+            }
 
-            ConfiguredAction::UseConsumable(consumable) => consumable.is_some(),
+            ConfiguredAction::UseConsumable(consumable) => {
+                if consumable.is_some() {
+                    None
+                } else {
+                    Some("Select a consumable")
+                }
+            }
         }
     }
 
@@ -990,7 +1023,10 @@ impl UserInterface {
         }
 
         self.game_grid.clear_target_damage_previews();
-        if configured_action.has_required_player_input(self.active_character(), &self.characters) {
+        if configured_action
+            .usability_problem(self.active_character(), &self.characters)
+            .is_none()
+        {
             let prediction = predict_ability(
                 &self.characters,
                 self.characters.get_rc(self.active_character_id),
@@ -1051,7 +1087,8 @@ impl UserInterface {
     fn refresh_selected_action_button(&mut self) {
         if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
             let fully_selected = configured_action
-                .has_required_player_input(self.active_character(), &self.characters);
+                .usability_problem(self.active_character(), &self.characters)
+                .is_none();
             self.set_selected_action(Some((
                 ButtonAction::Action(configured_action.base_action()),
                 fully_selected,

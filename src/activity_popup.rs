@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
+    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -19,7 +19,9 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
         InternalUiEvent,
     },
-    base_ui::{draw_text_rounded, draw_text_with_font_icons, Drawable},
+    base_ui::{
+        draw_text_rounded, draw_text_with_font_icons, measure_text_with_font_icons, Drawable,
+    },
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
@@ -43,6 +45,7 @@ pub struct ActivityPopup {
     next_button_id: Cell<u32>,
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
+    proceed_button_error: Option<String>,
 
     movement_cost_slider: Option<MovementStaminaSlider>,
 
@@ -86,6 +89,7 @@ impl ActivityPopup {
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
+            proceed_button_error: None,
             next_button_id: Cell::new(next_button_id),
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
@@ -111,7 +115,7 @@ impl ActivityPopup {
 
         let bg_color = BLACK;
 
-        let top_pad = 5.0;
+        let top_pad = 10.0;
 
         let base_text_params = TextParams {
             font: Some(&self.font),
@@ -178,7 +182,7 @@ impl ActivityPopup {
         let hor_pad = 10.0;
         let margin_between_text_and_buttons = 20.0;
         let button_margin = 10.0;
-        let margin_between_choices_and_proceed = 10.0;
+        let margin_between_choices_and_proceed = 15.0;
 
         let mut width = text_content_w + margin_between_text_and_buttons;
 
@@ -282,14 +286,10 @@ impl ActivityPopup {
 
         let y_btn = y - height / 2.0 - 32.0;
 
+        let first_btn_x = x_btn;
+
         for btn in self.choice_buttons.values() {
             btn.draw(x_btn, y_btn);
-
-            if self.hovered_choice_button_id == Some(btn.id) {
-                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip(), detailed_tooltip);
-            }
-
             x_btn += btn.size.0 + button_margin;
         }
 
@@ -298,7 +298,33 @@ impl ActivityPopup {
                 x_btn += margin_between_choices_and_proceed;
             }
 
-            self.proceed_button.draw(x_btn, y_btn + 6.0);
+            if let Some(error) = &self.proceed_button_error {
+                let font_size = 22;
+                let text_dim = measure_text_with_font_icons(&error, Some(&self.font), font_size);
+                draw_text_with_font_icons(
+                    &error,
+                    x + width - text_dim.width - 10.0,
+                    y - height + top_pad + 15.0,
+                    TextParams {
+                        font: Some(&self.font),
+                        font_size: font_size,
+                        color: RED,
+                        ..Default::default()
+                    },
+                );
+            } else {
+                self.proceed_button.draw(x_btn, y_btn + 6.0);
+            }
+        }
+
+        x_btn = first_btn_x; // step back to render tooltips in the right positions
+        for btn in self.choice_buttons.values() {
+            if self.hovered_choice_button_id == Some(btn.id) {
+                let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
+                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip(), detailed_tooltip);
+            }
+
+            x_btn += btn.size.0 + button_margin;
         }
     }
 
@@ -675,6 +701,7 @@ impl ActivityPopup {
             UiState::ConfiguringAction(configured_action) => {
                 let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
+                lines.push("".to_string());
                 lines.extend_from_slice(&tooltip.technical_description);
 
                 match configured_action {
@@ -827,6 +854,8 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
+        self.refresh_enabled_state();
+
         self.movement_cost_slider = stamina_slider;
 
         self.base_lines = lines;
@@ -840,12 +869,27 @@ impl ActivityPopup {
         let enough_mana = char.mana.current() >= self.mana_points();
         let enough_stamina = char.stamina.current() >= self.stamina_points();
 
-        let has_required_input = self.ui_state.borrow().has_required_player_input(
+        let usability_problem = self.ui_state.borrow().action_usability_problem(
             self.characters.get(self.relevant_character_id),
             &self.characters,
         );
 
-        let enabled = enough_ap && enough_mana && enough_stamina && has_required_input;
+        let mut enabled = false;
+        let mut error = None;
+        if !enough_ap {
+            error = Some("Not enough AP".to_string());
+        } else if !enough_mana {
+            error = Some("Not enough mana".to_string());
+        } else if !enough_stamina {
+            error = Some("Not enough stamina".to_string());
+        } else if let Some(e) = usability_problem {
+            error = Some(e.to_string());
+        } else {
+            enabled = true;
+        }
+
+        self.proceed_button_error = error.map(|e| (format!("|<warning>| {e}")));
+
         self.proceed_button.enabled.set(enabled);
     }
 }
