@@ -637,7 +637,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     stamina_cost: 2,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
-    roll: Some(AbilityRollType::RollDuringAttack(-3)),
+    roll: Some(AbilityRollType::RollDuringAttack(0)),
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {

@@ -331,7 +331,7 @@ impl TextLine {
                 }
 
                 if part.len() > 0 {
-                    let dim = measure_text(part, self.font.as_ref(), self.font_size, 1.0);
+                    let dim = measure_text(part, self.font.as_ref(), font_size, 1.0);
                     offset_y = dim.offset_y;
 
                     w += dim.width;
@@ -386,7 +386,7 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
                 params.color = ORANGE;
             } else if part.starts_with("<faded>") {
                 part = &part["<faded>".len()..];
-                params.color = GRAY;
+                params.color = LIGHTGRAY;
             }
 
             let part_dimensions = draw_text_rounded(part, x, y, params);
