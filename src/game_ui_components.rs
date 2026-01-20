@@ -508,17 +508,22 @@ impl PlayerPortraits {
         self.row.draw(x, y);
 
         for (_, portrait) in &self.portraits {
-            if let Some((i, condition)) = portrait.borrow().hovered_status_rect.get() {
+            if let Some((i, info)) = portrait.borrow().hovered_status_rect.get() {
                 let rect = portrait.borrow().last_drawn_rect.get();
+                let name = if let Some(stacks) = info.stacks {
+                    format!("{} ({})", info.condition.name(), stacks)
+                } else {
+                    info.condition.name().to_string()
+                };
                 draw_tooltip(
                     &self.font,
                     TooltipPositionPreference::At((
                         rect.right() + STATUS_ICON_W + 5.0,
                         rect.y + 1.0,
                     )),
-                    condition.name(),
+                    &name,
                     None,
-                    &[condition.description().to_string()],
+                    &[info.populated_description()],
                     &[],
                     true,
                 );
@@ -585,7 +590,7 @@ struct PlayerCharacterPortrait {
     end_turn_text: TextLine,
     pub has_clicked_end_turn: Cell<bool>,
     may_show_end_turn_button: Cell<bool>,
-    hovered_status_rect: Cell<Option<(usize, Condition)>>,
+    hovered_status_rect: Cell<Option<(usize, ConditionInfo)>>,
     font: Font,
     last_drawn_rect: Cell<Rect>,
 }
@@ -660,7 +665,7 @@ impl PlayerCharacterPortrait {
                     status_rect.borrow_mut().texture =
                         Some(self.status_textures[&info.condition.status_icon()].clone());
                     if status_rect.borrow().has_been_hovered.take() {
-                        self.hovered_status_rect.set(Some((i, info.condition)));
+                        self.hovered_status_rect.set(Some((i, *info)));
                     }
                 }
                 None => {

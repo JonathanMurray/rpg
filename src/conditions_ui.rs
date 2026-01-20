@@ -119,13 +119,13 @@ impl ConditionsList {
             }
         }
 
-        if let Some((rect, condition)) = tooltip {
+        if let Some((rect, condition_info)) = tooltip {
             draw_regular_tooltip(
                 font,
                 TooltipPositionPreference::RelativeToRect(rect, Side::Right),
-                condition.name,
+                condition_info.name,
                 None,
-                &[condition.description.to_string()],
+                &[condition_info.populated_description()],
             );
         }
 

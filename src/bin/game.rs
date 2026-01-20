@@ -131,6 +131,13 @@ async fn main() {
     bob.known_attack_enhancements.push(EMPOWER);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
+    // TODO:
+    alice.receive_condition(Condition::ArcaneSurge, Some(5), None);
+    alice.receive_condition(Condition::Burning, Some(2), None);
+    alice.receive_condition(Condition::Bleeding, Some(13), None);
+    alice.try_gain_equipment(EquipmentEntry::Armor(CHAIN_MAIL));
+    alice.try_gain_equipment(EquipmentEntry::Armor(CHAIN_MAIL));
+
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Clara",

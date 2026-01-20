@@ -3276,8 +3276,8 @@ impl Condition {
             Exposed => "-3 to all defenses.",
             Hindered => "-50% movement.",
             Protected => "+x armor against the next attack.",
-            Bleeding => "End of turn: 50% converts to damage.",
-            Burning => "End of turn: converts to damage, 50% spreads to adjacent.",
+            Bleeding => "Deals x damage over time. (50% of remaining at the end of each turn)",
+            Burning => "End of turn: deals x damage. 50% spreads to adjacent.",
             Braced => "+3 Evasion against the next attack.",
             Distracted => "-6 Evasion against the next attack.",
             Weakened => "-x to all defenses and actions.",
@@ -3385,6 +3385,20 @@ pub struct ConditionInfo {
     pub is_positive: bool,
     pub stacks: Option<u32>,
     pub remaining_rounds: Option<u32>,
+}
+
+impl ConditionInfo {
+    pub fn populated_description(&self) -> String {
+        if let Some(stacks) = self.stacks {
+            self.condition
+                .description()
+                .replace("-x ", &format!("-{stacks} "))
+                .replace("+x ", &format!("+{stacks} "))
+                .replace(" x ", &format!(" {stacks} "))
+        } else {
+            self.condition.description().to_string()
+        }
+    }
 }
 
 impl Display for ConditionInfo {
