@@ -1,6 +1,10 @@
-use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW};
+use macroquad::{
+    color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW},
+    input::KeyCode,
+};
 
 use crate::{
+    action_button::Keyword,
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
@@ -1645,10 +1649,10 @@ impl PassiveSkill {
         }
     }
 
-    pub fn keywords(&self) -> &'static [Condition] {
+    pub fn keywords(&self) -> &'static [Keyword] {
         use PassiveSkill::*;
         match self {
-            BloodRage => &[Condition::NearDeath],
+            BloodRage => &[Keyword::Cond(Condition::NearDeath)],
             _ => &[],
         }
     }

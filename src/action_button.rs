@@ -41,7 +41,29 @@ pub struct Tooltip {
     pub description: Option<&'static str>,
     pub error: Option<&'static str>,
     pub technical_description: Vec<String>,
-    pub keywords: Vec<Condition>,
+    pub keywords: Vec<Keyword>,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum Keyword {
+    Cond(Condition),
+    Advantage,
+}
+
+impl Keyword {
+    fn name(&self) -> &str {
+        match self {
+            Keyword::Cond(condition) => condition.name(),
+            Keyword::Advantage => "Advantage",
+        }
+    }
+
+    fn description(&self) -> &str {
+        match self {
+            Keyword::Cond(condition) => condition.description(),
+            Keyword::Advantage => "Roll extra dice and take the highest result",
+        }
+    }
 }
 
 impl Tooltip {
@@ -199,10 +221,12 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
     if effect.roll_advantage > 0 {
         t.technical_description
-            .push(format!("+ {} advantage", effect.roll_advantage));
+            .push(format!("+ {} |<keyword>Advantage|", effect.roll_advantage));
+        t.keywords.push(Keyword::Advantage);
     } else if effect.roll_advantage < 0 {
         t.technical_description
-            .push(format!("- {} advantage", -effect.roll_advantage));
+            .push(format!("- {} |<keyword>Advantage|", -effect.roll_advantage));
+        t.keywords.push(Keyword::Advantage);
     }
     if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
         t.technical_description.push(format!(
@@ -215,7 +239,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
                 format!("{} ", x.den)
             }
         ));
-        t.keywords.push(condition);
+        t.keywords.push(Keyword::Cond(condition));
     }
 
     if effect.armor_penetration > 0 {
@@ -370,7 +394,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 line.push_str(&format!(" for |<value>{}| rounds", rounds));
             }
             t.technical_description.push(line);
-            t.keywords.push(apply_condition.condition);
+            t.keywords.push(Keyword::Cond(apply_condition.condition));
         }
         ApplyEffect::PerBleeding {
             damage,
@@ -385,7 +409,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             let line = format!("  Removes |<keyword>{}|", condition.name());
 
             t.technical_description.push(line);
-            t.keywords.push(condition);
+            t.keywords.push(Keyword::Cond(condition));
         }
         ApplyEffect::Knockback(amount) => {
             t.technical_description
@@ -1388,7 +1412,7 @@ pub fn draw_tooltip(
     header: &str,
     error: Option<&'static str>,
     content_lines: &[String],
-    keywords: &[Condition],
+    keywords: &[Keyword],
     is_keyword_tooltip: bool,
 ) -> Rect {
     let header_font_size = if is_keyword_tooltip { 16 } else { 24 };
@@ -1542,7 +1566,7 @@ pub fn draw_tooltip(
     tooltip_rect
 }
 
-pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Condition], mut rect: Rect) {
+pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword], mut rect: Rect) {
     for (i, keyword) in keywords.iter().enumerate() {
         let pos_preference = if i == 0 {
             TooltipPositionPreference::RelativeToRect(rect, Side::Right)
@@ -1562,7 +1586,7 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Condition
     }
 }
 
-pub fn draw_keyword_tooltips(font: &Font, keywords: &[Condition], x: f32, mut y: f32) {
+pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f32) {
     for keyword in keywords {
         let rect = draw_tooltip(
             font,

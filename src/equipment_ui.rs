@@ -22,8 +22,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        describe_apply_effect, describe_area_effect, draw_regular_tooltip, draw_tooltip, Side,
-        Tooltip, TooltipPositionPreference,
+        describe_apply_effect, describe_area_effect, draw_regular_tooltip, draw_tooltip, Keyword,
+        Side, Tooltip, TooltipPositionPreference,
     },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
@@ -113,9 +113,11 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         if let AttackHitEffect::Apply(apply_effect) = effect {
             match apply_effect {
                 ApplyEffect::Condition(apply_condition) => {
-                    t.keywords.push(apply_condition.condition)
+                    t.keywords.push(Keyword::Cond(apply_condition.condition))
                 }
-                ApplyEffect::ConsumeCondition { condition } => t.keywords.push(condition),
+                ApplyEffect::ConsumeCondition { condition } => {
+                    t.keywords.push(Keyword::Cond(condition))
+                }
                 _ => {}
             }
         }
