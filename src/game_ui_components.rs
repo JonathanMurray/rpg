@@ -10,6 +10,7 @@ use macroquad::{
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode},
+    time::{get_frame_time, get_time},
 };
 
 use indexmap::IndexMap;
@@ -983,7 +984,19 @@ impl Drawable for ActionPointsRow {
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    WHITE,
+                    GOLD,
+                );
+
+                let game_time = get_time();
+                let t = (game_time * 0.7).fract() as f32;
+                let alpha = 0.2 + if t < 0.5 { t } else { 1.0 - t };
+
+                draw_circle_lines(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    2.0,
+                    Color::new(1.0, 1.0, 1.0, alpha),
                 );
             } else if missing {
                 draw_circle(
@@ -1081,10 +1094,15 @@ impl Drawable for ResourceBar {
             LayoutDirection::Horizontal => {
                 for i in 0..self.max {
                     if i < self.current {
+                        draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
                         if i >= self.current.saturating_sub(self.reserved) {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, WHITE);
-                        } else {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
+                            draw_rectangle(
+                                x0,
+                                y0,
+                                cell_size.0,
+                                cell_size.1,
+                                Color::new(1.0, 1.0, 1.0, 0.5),
+                            );
                         }
                     }
 
@@ -1114,10 +1132,15 @@ impl Drawable for ResourceBar {
             LayoutDirection::Vertical => {
                 for i in 0..self.max {
                     if i >= self.max - self.current {
+                        draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
                         if i < self.max - self.current + self.reserved {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, WHITE);
-                        } else {
-                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
+                            draw_rectangle(
+                                x0,
+                                y0,
+                                cell_size.0,
+                                cell_size.1,
+                                Color::new(1.0, 1.0, 1.0, 0.5),
+                            );
                         }
                     }
 
