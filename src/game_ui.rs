@@ -1025,14 +1025,19 @@ impl UserInterface {
             .tracked_action_buttons
             .values()
         {
+            let base_action = match btn.action {
+                ButtonAction::Action(base_action) => base_action,
+                _ => unreachable!(),
+            };
+
+            btn.set_has_enough_ap(
+                self.active_character()
+                    .has_enough_ap_for_action(base_action),
+            );
+
             if allowed {
-                let enabled = match btn.action {
-                    ButtonAction::Action(base_action) => {
-                        self.active_character().can_use_action(base_action)
-                    }
-                    _ => unreachable!(),
-                };
-                btn.enabled.set(enabled);
+                btn.enabled
+                    .set(self.active_character().can_use_action(base_action));
             } else {
                 btn.enabled.set(false);
             }

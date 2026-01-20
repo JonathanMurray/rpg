@@ -529,12 +529,12 @@ impl Style {
 
 pub struct Circle {
     pub r: f32,
-    pub color: Color,
+    pub color: Rc<Cell<Color>>,
 }
 
 impl Circle {
     pub fn draw(&self, x: f32, y: f32) {
-        draw_circle(x + self.r, y + self.r, self.r, self.color);
+        draw_circle(x + self.r, y + self.r, self.r, self.color.get());
         draw_circle_lines(x + self.r, y + self.r, self.r, 1.0, DARKGRAY);
     }
 

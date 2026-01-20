@@ -4924,6 +4924,21 @@ impl Character {
         }
     }
 
+    pub fn has_enough_ap_for_action(&self, action: BaseAction) -> bool {
+        let ap = self.action_points.current();
+        match action {
+            BaseAction::Attack(attack) => {
+                matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
+            }
+            BaseAction::UseAbility(ability) => ap >= ability.action_point_cost,
+            BaseAction::Move => true,
+            BaseAction::ChangeEquipment => {
+                ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
+            }
+            BaseAction::UseConsumable => ap as i32 >= BaseAction::UseConsumable.action_point_cost(),
+        }
+    }
+
     pub fn usable_abilities(&self) -> Vec<Ability> {
         return self
             .known_actions

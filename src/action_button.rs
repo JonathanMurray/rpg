@@ -29,6 +29,7 @@ use crate::{
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
     textures::IconId,
+    util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
 const EVASION_STR: &str = "  |<shield>| Evasion";
@@ -678,6 +679,7 @@ pub struct ActionButton {
     tooltip_is_based_on_equipped_shield: Cell<Option<Shield>>,
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
     pub context: Option<ButtonContext>,
+    ap_color: Rc<Cell<Color>>,
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
@@ -715,19 +717,24 @@ impl ActionButton {
         let r = 3.0;
         let mut bottom_row_elements = vec![];
 
+        let ap_color = Rc::new(Cell::new(GOLD));
+
         for _ in 0..action_points {
-            bottom_row_elements.push(Element::Circle(Circle { r, color: GOLD }))
+            bottom_row_elements.push(Element::Circle(Circle {
+                r,
+                color: Rc::clone(&ap_color),
+            }))
         }
 
         if mana_points > 0 {
             let text = TextLine::new(format!("{}", mana_points), 16, WHITE, Some(font.clone()))
+                .with_padding(3.0, 0.0)
                 .with_depth(BLACK, 1.0);
 
             let element = Element::Container(Container {
                 children: vec![Element::Text(text)],
                 style: Style {
-                    background_color: Some(Color::new(0.0, 0.4, 0.8, 1.00)),
-                    padding: 1.0,
+                    background_color: Some(COL_BLUE), // Some(Color::new(0.0, 0.4, 0.8, 1.00)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -740,13 +747,13 @@ impl ActionButton {
         }
         if stamina_points > 0 {
             let text = TextLine::new(format!("{}", stamina_points), 16, WHITE, Some(font.clone()))
+                .with_padding(3.0, 0.0)
                 .with_depth(BLACK, 1.0);
 
             let element = Element::Container(Container {
                 children: vec![Element::Text(text)],
                 style: Style {
-                    background_color: Some(Color::new(0.00, 0.5, 0.05, 1.00)),
-                    padding: 1.0,
+                    background_color: Some(COL_GREEN_0), // Some(Color::new(0.00, 0.5, 0.05, 1.00)),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -816,7 +823,13 @@ impl ActionButton {
             tooltip_is_based_on_equipped_shield: Default::default(),
             hotkey: RefCell::new(None),
             context: None,
+            ap_color,
         }
+    }
+
+    pub fn set_has_enough_ap(&self, has_enough_ap: bool) {
+        let color = if has_enough_ap { GOLD } else { COL_RED };
+        self.ap_color.set(color);
     }
 
     pub fn change_scale(&mut self, scale_factor: f32) {
