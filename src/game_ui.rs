@@ -8,6 +8,7 @@ use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, RED, WHITE},
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
+    math::Rect,
     shapes::draw_rectangle,
     text::Font,
     texture::{draw_texture, Texture2D},
@@ -16,8 +17,9 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
-        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
+        draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction, ButtonContext,
+        ButtonHovered, ButtonSelected, InternalUiEvent, Side, TooltipPositionPreference,
+        ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
@@ -377,6 +379,7 @@ pub struct CharacterUi {
     mana_bar: Rc<RefCell<LabelledResourceBar>>,
     stamina_bar: Rc<RefCell<LabelledResourceBar>>,
     pub resource_bars: Container,
+    font: Font,
 }
 
 fn resources_mid_x() -> f32 {
@@ -395,10 +398,52 @@ impl CharacterUi {
             resources_mid_x() - self.action_points_row.size().0 / 2.0,
             screen_height() - 140.0,
         );
-        self.resource_bars.draw(
-            resources_mid_x() - self.resource_bars.size().0 / 2.0,
-            screen_height() - 110.0,
-        );
+        let resource_bars_y = screen_height() - 110.0;
+        let resource_bars_x = resources_mid_x() - self.resource_bars.size().0 / 2.0;
+        self.resource_bars.draw(resource_bars_x, resource_bars_y);
+
+        let tooltip = if self.health_bar.borrow().bar.borrow().hovered.get() {
+            Some((
+                "Health",
+                "Does not regenerate on its own. (Increased from Strength.)",
+            ))
+        } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
+            Some((
+                "Mana",
+                "Used for spells. Regenerates a small amount after every encounter. (Increased from Spirit.)",
+            ))
+        } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
+            Some((
+                "Stamina",
+                "Used for movement and certain actions. Regenerates a small amount after every turn. (Increased from Strength and Agility.)",
+            ))
+        } else {
+            None
+        };
+
+        if let Some((header, content)) = tooltip {
+            let pos = (
+                resources_mid_x() + self.resource_bars.size().0 / 2.0 + 5.0,
+                resource_bars_y,
+            );
+            draw_tooltip(
+                &self.font,
+                TooltipPositionPreference::RelativeToRect(
+                    Rect::new(
+                        resource_bars_x,
+                        resource_bars_y,
+                        self.resource_bars.size().0,
+                        self.resource_bars.size().1,
+                    ),
+                    Side::Left,
+                ),
+                header,
+                None,
+                &[content.to_string()],
+                &[],
+                false,
+            );
+        }
     }
 }
 
@@ -2614,14 +2659,15 @@ fn build_character_ui(
         mana_bar: resource_bars.mana_bar,
         stamina_bar: resource_bars.stamina_bar,
         resource_bars: resource_bars.container,
+        font: simple_font.clone(),
     }
 }
 
 pub struct ResourceBars {
     pub container: Container,
-    health_bar: Rc<RefCell<LabelledResourceBar>>,
-    mana_bar: Rc<RefCell<LabelledResourceBar>>,
-    stamina_bar: Rc<RefCell<LabelledResourceBar>>,
+    pub health_bar: Rc<RefCell<LabelledResourceBar>>,
+    pub mana_bar: Rc<RefCell<LabelledResourceBar>>,
+    pub stamina_bar: Rc<RefCell<LabelledResourceBar>>,
 }
 
 impl Drawable for ResourceBars {

@@ -1004,6 +1004,7 @@ pub struct ResourceBar {
     pub color: Color,
     pub cell_size: (f32, f32),
     pub layout: LayoutDirection,
+    pub hovered: Cell<bool>,
 }
 
 impl ResourceBar {
@@ -1015,6 +1016,7 @@ impl ResourceBar {
             color,
             cell_size: (size.0 / max as f32, size.1),
             layout: LayoutDirection::Horizontal,
+            hovered: Cell::new(false),
         }
     }
 }
@@ -1027,7 +1029,7 @@ impl Drawable for ResourceBar {
         let mut x0 = x;
         let mut y0 = y;
 
-        match self.layout {
+        let rect = match self.layout {
             LayoutDirection::Horizontal => {
                 for i in 0..self.max {
                     if i < self.current {
@@ -1064,7 +1066,7 @@ impl Drawable for ResourceBar {
                     x0 += cell_size.0;
                 }
 
-                draw_rectangle_lines(x, y, self.max as f32 * cell_size.0, cell_size.1, 1.0, WHITE);
+                Rect::new(x, y, self.max as f32 * cell_size.0, cell_size.1)
             }
             LayoutDirection::Vertical => {
                 for i in 0..self.max {
@@ -1106,9 +1108,13 @@ impl Drawable for ResourceBar {
                     y0 += cell_size.1;
                 }
 
-                draw_rectangle_lines(x, y, cell_size.0, self.max as f32 * cell_size.1, 1.0, WHITE);
+                Rect::new(x, y, cell_size.0, self.max as f32 * cell_size.1)
             }
-        }
+        };
+
+        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+
+        self.hovered.set(rect.contains(mouse_position().into()));
     }
 
     fn size(&self) -> (f32, f32) {
@@ -1121,7 +1127,7 @@ impl Drawable for ResourceBar {
 
 pub struct LabelledResourceBar {
     list: Container,
-    bar: Rc<RefCell<ResourceBar>>,
+    pub bar: Rc<RefCell<ResourceBar>>,
     value_text: Rc<RefCell<TextLine>>,
     max_value: u32,
 }
@@ -1132,22 +1138,11 @@ impl LabelledResourceBar {
 
         let cell_h = 12.0;
         let max_w = 70.0;
-        /*
-        let cell_w = if max <= 7 {
-            max_w / 7.0
-        } else {
-            max_w / max as f32
-        };
-         */
-        let cell_w = max_w / max as f32;
-        let bar = Rc::new(RefCell::new(ResourceBar {
-            current,
-            reserved: 0,
+        let bar = Rc::new(RefCell::new(ResourceBar::horizontal(
             max,
             color,
-            cell_size: (cell_w, cell_h),
-            layout: LayoutDirection::Horizontal,
-        }));
+            (max_w, cell_h),
+        )));
         let cloned_bar = Rc::clone(&bar);
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
