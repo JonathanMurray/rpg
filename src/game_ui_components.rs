@@ -39,7 +39,8 @@ use crate::{
 pub struct CharacterPortraits {
     row: Container,
     active_id: CharacterId,
-    hovered_id: Option<CharacterId>,
+    selected_id: CharacterId,
+    grid_hovered_id: Option<CharacterId>,
     portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
 }
 
@@ -87,17 +88,19 @@ impl CharacterPortraits {
         let mut this = Self {
             row,
             active_id,
-            hovered_id: None,
+            selected_id: active_id,
+            grid_hovered_id: None,
             portraits,
         };
 
         this.set_active_character(active_id);
+        this.set_selected_character(active_id);
         this
     }
 
     fn set_active_character(&mut self, id: CharacterId) {
+        // The entry may have been removed if the active character died during its turn
         if let Some(portrait) = self.portraits.get(&self.active_id) {
-            // The entry may have been removed if the active character died during its turn
             portrait.borrow_mut().strong_highlight = false;
         }
         self.active_id = id;
@@ -106,34 +109,41 @@ impl CharacterPortraits {
             .strong_highlight = true;
     }
 
-    pub fn update(&mut self, game: &CoreGame) {
-        self.set_active_character(game.active_character_id);
-        for (id, character) in game.characters.iter_with_ids() {
-            /*
-            let portrait = self.portraits[id].borrow_mut();
-            portrait.action_points_row.borrow_mut().current_ap = character.action_points.current();
-            portrait.action_points_row.borrow_mut().is_characters_turn =
-                *id == game.active_character_id;
-                 */
-            //portrait.health_bar.borrow_mut().current = character.health.current();
+    pub fn set_selected_character(&mut self, id: CharacterId) {
+        if let Some(portrait) = self.portraits.get(&self.selected_id) {
+            portrait.borrow_mut().strong_highlight = false;
         }
+        self.selected_id = id;
+        self.portraits[&self.selected_id]
+            .borrow_mut()
+            .strong_highlight = true;
     }
 
-    pub fn set_hovered_character_id(&mut self, id: Option<CharacterId>) {
-        if let Some(previous_id) = self.hovered_id {
+    pub fn set_grid_hovered_character_id(&mut self, id: Option<CharacterId>) {
+        if let Some(previous_id) = self.grid_hovered_id {
             if let Some(portrait) = self.portraits.get(&previous_id) {
                 // The entry may have been removed if the character died recently
                 portrait.borrow_mut().weak_highlight = false;
             }
         }
-        self.hovered_id = id;
-        if let Some(id) = self.hovered_id {
+        self.grid_hovered_id = id;
+        if let Some(id) = self.grid_hovered_id {
             self.portraits[&id].borrow_mut().weak_highlight = true;
         }
     }
 
-    pub fn draw(&self, x: f32, y: f32) {
+    pub fn draw(&self, x: f32, y: f32) -> Option<CharacterId> {
         self.row.draw(x, y);
+
+        let mut clicked_character_id = None;
+
+        for (ch_id, portrait) in &self.portraits {
+            if portrait.borrow().has_been_clicked.take() {
+                clicked_character_id = Some(ch_id);
+            }
+        }
+
+        clicked_character_id.copied()
     }
 
     pub fn remove_dead(&mut self) {
@@ -146,82 +156,18 @@ impl CharacterPortraits {
 struct TopCharacterPortrait {
     strong_highlight: bool,
     weak_highlight: bool,
-    //action_points_row: Rc<RefCell<ActionPointsRow>>,
-    //health_bar: Rc<RefCell<ResourceBar>>,
     padding: f32,
     container: Container,
     character: Rc<Character>,
-    font: Font,
     texture_size: Rc<RefCell<(f32, f32)>>,
+    has_been_clicked: Cell<bool>,
 }
 
 impl TopCharacterPortrait {
     fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
-        /*
-        let action_points_row = Rc::new(RefCell::new(ActionPointsRow::new(
-            (10.0, 10.0),
-            0.2,
-            Style {
-                background_color: Some(BLACK),
-                ..Default::default()
-            },
-        )));
-        let cloned_ap_row = Rc::clone(&action_points_row);
-         */
-
-        let name_color = if character.player_controlled() {
-            WHITE
-        } else {
-            Color::new(1.0, 0.7, 0.7, 1.0)
-        };
-
-        let mut name_text_line = TextLine::new(character.name, 16, name_color, Some(font.clone()));
-        name_text_line.set_min_height(13.0);
-
-        /*
-        let health_bar = Rc::new(RefCell::new(ResourceBar::horizontal(
-            character.health.max(),
-            RED,
-            (action_points_row.borrow().size().0, 8.0),
-        )));
-         */
-
-        //let texture_size = (48.0, 60.0);
         let texture_size = Rc::new(RefCell::new((64.0, 80.0)));
-        /*
-           let container = Container {
-               layout_dir: LayoutDirection::Vertical,
-               align: Align::Center,
-               children: vec![
-                   //Element::Text(name_text_line),
-                   Element::Container(Container {
-                       style: Style {
-                           background_color: Some(DARKGRAY),
-                           ..Default::default()
-                       },
-                       children: vec![Element::ResizableTexture(texture, texture_size.clone())],
-                       ..Default::default()
-                   }),
-                   //Element::RcRefCell(cloned_ap_row),
-                   //Element::RcRefCell(health_bar.clone()),
-               ],
-               margin: 1.0,
-               style: Style {
-                   padding: 0.0,
-
-                   ..Default::default()
-               },
-               ..Default::default()
-           };
-        */
-
-        //texture.set_filter(FilterMode::Linear);
 
         let container = Container {
-            style: Style {
-                //background_color: Some(DARKGRAY),
-                ..Default::default()
-            },
             children: vec![Element::ResizableTexture(texture, texture_size.clone())],
             ..Default::default()
         };
@@ -229,13 +175,11 @@ impl TopCharacterPortrait {
         Self {
             strong_highlight: false,
             weak_highlight: false,
-            //action_points_row,
-            //health_bar,
             padding: 0.0,
             container,
             character: character.clone(),
-            font,
             texture_size,
+            has_been_clicked: Cell::new(false),
         }
     }
 }
@@ -306,26 +250,14 @@ impl Drawable for TopCharacterPortrait {
             );
         }
 
-        /*
-        if self.character.has_taken_a_turn_this_round.get() {
-            // TODO: draw some kind of hourglass instead?
-            let text = "DONE";
-            let font_size = 16;
-            let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
-            draw_rectangle(x, y, w, h, Color::new(0.0, 0.0, 0.0, 0.3));
-            draw_text_rounded(
-                text,
-                x + w / 2.0 - text_dim.width / 2.0,
-                y + 30.0,
-                TextParams {
-                    font: Some(&self.font),
-                    font_size,
-                    color: WHITE,
-                    ..Default::default()
-                },
-            );
+        let (mouse_x, mouse_y) = mouse_position();
+
+        if is_mouse_button_pressed(MouseButton::Left)
+            && (x..x + w).contains(&mouse_x)
+            && (y..y + h).contains(&mouse_y)
+        {
+            self.has_been_clicked.set(true);
         }
-         */
     }
 
     fn size(&self) -> (f32, f32) {

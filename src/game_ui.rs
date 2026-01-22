@@ -416,7 +416,7 @@ pub struct UserInterface {
 
     game_grid: GameGrid,
     activity_popup: ActivityPopup,
-    character_portraits: CharacterPortraits,
+    top_character_portraits: CharacterPortraits,
     player_portraits: PlayerPortraits,
     character_sheet_toggle: CharacterSheetToggle,
     character_uis: HashMap<CharacterId, CharacterUi>,
@@ -523,7 +523,7 @@ impl UserInterface {
         Self {
             game_grid,
             characters,
-            character_portraits,
+            top_character_portraits: character_portraits,
             player_portraits,
             character_sheet_toggle,
             active_character_id,
@@ -610,18 +610,27 @@ impl UserInterface {
             &*self.state.borrow(),
             UiState::ChoosingAction | UiState::ConfiguringAction(..)
         );
-        let portrait_outcome = self.player_portraits.draw(
+        let player_portraits_outcome = self.player_portraits.draw(
             screen_width() / 2.0 - 120.0,
             screen_height() - 120.0,
             may_show_end_turn_button,
         );
+        let mut changed_character = player_portraits_outcome.changed_character;
         self.character_sheet_toggle.draw(
             resources_mid_x() - self.character_sheet_toggle.size().0 / 2.0,
             screen_height() - 35.0,
         );
 
+        let clicked_character_id = self.top_character_portraits.draw(0.0, 0.0);
+        if let Some(id) = clicked_character_id {
+            if self.characters.get(id).player_controlled() {
+                self.player_portraits.set_selected_id(id);
+                changed_character = true;
+            }
+        }
+
         let selected_character_id = self.player_portraits.selected_id();
-        if portrait_outcome.changed_character {
+        if changed_character {
             self.on_new_selected_character();
             if matches!(*self.state.borrow(), UiState::ConfiguringAction(..)) {
                 self.set_state(UiState::ChoosingAction);
@@ -642,7 +651,7 @@ impl UserInterface {
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
         }
-        if portrait_outcome.clicked_end_turn
+        if player_portraits_outcome.clicked_end_turn
             && matches!(
                 *self.state.borrow(),
                 UiState::ChoosingAction | UiState::ConfiguringAction(..)
@@ -666,8 +675,6 @@ impl UserInterface {
         self.log.draw(log_x, ui_y);
 
         self.log.draw_tooltips(log_x, ui_y);
-
-        self.character_portraits.draw(0.0, 0.0);
 
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
@@ -732,8 +739,8 @@ impl UserInterface {
 
     fn handle_grid_outcome(&mut self, outcome: GridOutcome) -> Option<PlayerChose> {
         let mut player_chose = None;
-        self.character_portraits
-            .set_hovered_character_id(outcome.hovered_character_id);
+        self.top_character_portraits
+            .set_grid_hovered_character_id(outcome.hovered_character_id);
 
         if let Some(new_inspect_target) = outcome.switched_inspect_target {
             let target = new_inspect_target.map(|id| self.characters.get_rc(id));
@@ -1635,7 +1642,7 @@ impl UserInterface {
                 self.target_ui.clear_character_if_dead();
 
                 self.game_grid.remove_dead();
-                self.character_portraits.remove_dead();
+                self.top_character_portraits.remove_dead();
 
                 // TODO: Ideally the UI shouldn't show a new active character until the death "animation" is complete.
                 self.animation_stopwatch.set_to_at_least(0.5);
@@ -2211,7 +2218,8 @@ impl UserInterface {
             }
         }
 
-        self.character_portraits.update(game);
+        self.top_character_portraits
+            .set_selected_character(self.player_portraits.selected_id());
         self.player_portraits.update(game);
 
         self.update_character_status(&game.characters);
