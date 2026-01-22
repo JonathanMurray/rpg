@@ -828,7 +828,7 @@ pub const SCREAM: Ability = Ability {
 pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
-    description: "Shackle an enemy's mind, slowing them and lowering their defenses",
+    description: "Slow an enemy and lower their defenses",
     icon: IconId::ShackledMind,
     action_point_cost: 2,
     mana_cost: 2,
@@ -894,7 +894,7 @@ pub const SHACKLED_MIND: Ability = Ability {
 pub const MIND_BLAST: Ability = Ability {
     id: AbilityId::MindBlast,
     name: "Mind blast",
-    description: "Assault an enemy's mind, damaging and disrupting them",
+    description: "Damage an enemy and make them lose AP",
     icon: IconId::Mindblast,
     action_point_cost: 2,
     mana_cost: 1,
