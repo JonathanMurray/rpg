@@ -404,18 +404,18 @@ impl CharacterUi {
 
         let tooltip = if self.health_bar.borrow().bar.borrow().hovered.get() {
             Some((
-                "Health",
-                "Does not regenerate on its own. (Increased from Strength.)",
-            ))
-        } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
-            Some((
-                "Mana",
-                "Used for spells. Regenerates a small amount after every encounter. (Increased from Spirit.)",
+                "Health |<heart>|",
+                "Does not regenerate on its own. (Increase with Strength.)",
             ))
         } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
             Some((
-                "Stamina",
-                "Used for movement and certain actions. Regenerates a small amount after every turn. (Increased from Strength and Agility.)",
+                "Stamina |<stamina>|",
+                "Used for movement and certain actions. Regenerates 25% after every turn. (Increase with Strength and Agility.)"
+            ))
+        } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
+            Some((
+                "Mana |<mana>|",
+                "Used for spells. Regenerates a small amount after every encounter. (Increase with Spirit.)",
             ))
         } else {
             None

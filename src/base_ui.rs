@@ -15,7 +15,10 @@ use std::{
 };
 
 use crate::{
-    textures::{ALT_KEY_SYMBOL, DICE_SYMBOL, SHIELD_SYMBOL, WARNING_SYMBOL},
+    textures::{
+        ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
+        WARNING_SYMBOL,
+    },
     util::{COL_ALICE, COL_BOB, COL_CLARA},
 };
 
@@ -332,7 +335,17 @@ pub fn measure_text_with_font_icons(
     let mut offset_y = 0.0;
     for mut part in parts {
         let symbol_w = 16.0;
-        if ["<dice>", "<shield>", "<alt_key>", "<warning>"].contains(&part) {
+        if [
+            "<dice>",
+            "<shield>",
+            "<alt_key>",
+            "<warning>",
+            "<heart>",
+            "<stamina>",
+            "<mana>",
+        ]
+        .contains(&part)
+        {
             w += symbol_w;
         } else {
             let mut font_size = font_size;
@@ -378,6 +391,15 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
             x += symbol_w;
         } else if part == "<warning>" {
             draw_texture(WARNING_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += symbol_w;
+        } else if part == "<heart>" {
+            draw_texture(HEART_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += symbol_w;
+        } else if part == "<stamina>" {
+            draw_texture(STAMINA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            x += symbol_w;
+        } else if part == "<mana>" {
+            draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             x += symbol_w;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
@@ -433,7 +455,7 @@ impl Drawable for TextLine {
                 font: self.font.as_ref(),
                 ..Default::default()
             };
-            draw_text_rounded(
+            draw_text_with_font_icons(
                 &self.string,
                 x0 + offset,
                 y0 + self.offset_y + offset,

@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -28,7 +28,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::draw_dashed_rectangle_lines,
-    textures::IconId,
+    textures::{IconId, MANA_SYMBOL},
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
