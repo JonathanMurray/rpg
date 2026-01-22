@@ -114,9 +114,11 @@ impl CharacterPortraits {
             portrait.borrow_mut().strong_highlight = false;
         }
         self.selected_id = id;
-        self.portraits[&self.selected_id]
-            .borrow_mut()
-            .strong_highlight = true;
+        // A dead player character can be selected in the player portraits, but the corresponding top portrait
+        // will have been removed.
+        if let Some(portrait) = self.portraits.get(&self.selected_id) {
+            portrait.borrow_mut().strong_highlight = true;
+        }
     }
 
     pub fn set_grid_hovered_character_id(&mut self, id: Option<CharacterId>) {

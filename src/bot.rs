@@ -77,7 +77,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                     bot.id(),
                     bot_pos,
                     ch.pos(),
-                    weapon_range.squared(),
+                    weapon_range.center_to_center_squared(),
                     EXPLORATION_RANGE,
                 )
                 .map(|p| p.total_distance)
@@ -129,7 +129,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                 bot.id(),
                 bot_pos,
                 new_target.pos(),
-                weapon_range.squared(),
+                weapon_range.center_to_center_squared(),
                 EXPLORATION_RANGE,
             );
 
@@ -199,7 +199,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         bot.id(),
         bot_pos,
         target.pos(),
-        weapon_range.squared(),
+        weapon_range.center_to_center_squared(),
         EXPLORATION_RANGE,
     );
 
@@ -350,7 +350,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
                 bot.id(),
                 bot_pos,
                 *player_pos,
-                range.squared(),
+                range.center_to_center_squared(),
                 EXPLORATION_RANGE,
             )
         } else {
@@ -448,7 +448,11 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
     let target = game.characters.get(target_id);
 
     if !bot.reaches_with_ability(ability, &enhancements, target.pos()) {
-        let ability_range_sq = ability.target.range(&enhancements).unwrap().squared();
+        let ability_range_sq = ability
+            .target
+            .range(&enhancements)
+            .unwrap()
+            .center_to_center_squared();
         let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
             bot.id(),
             bot.pos(),

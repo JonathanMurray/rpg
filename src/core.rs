@@ -6043,20 +6043,17 @@ impl Display for WeaponRange {
 impl WeaponRange {
     pub fn squared(&self) -> f32 {
         match self {
-            /*
-            This is the max distance to be considered melee:
-
-            AAA
-            AAA
-            AAABBB
-               BBB
-               BBB
-
-            I.e. two sides must be touching. The distance from A center to B edge
-            is therefore sqrt(1^2 + 2^2)
-             */
-            Self::Melee => 5 as f32,
+            Self::Melee => TOUCHING_MELEE_RANGE_SQUARED as f32,
             Self::Ranged(range) => range.powf(2.0),
+        }
+    }
+
+    pub fn center_to_center_squared(&self) -> f32 {
+        match self {
+            // 2^ + 3^2
+            WeaponRange::Melee => CENTER_MELEE_RANGE_SQUARED,
+            // Add sqrt(2.0) to reach one extra diagonal cell, i.e. to the center cell of the target (?)
+            WeaponRange::Ranged(range) => (range + f32::sqrt(2.0)).powf(2.0),
         }
     }
 
@@ -6097,6 +6094,18 @@ impl Range {
             Range::ExtendableRanged(range) => range.pow(2) as f32,
             Range::Float(range) => range.powf(2.0),
         }
+    }
+
+    pub fn center_to_center_squared(&self) -> f32 {
+        let range = match self {
+            Range::Melee => return CENTER_MELEE_RANGE_SQUARED,
+            Range::Ranged(range) => *range as f32,
+            Range::ExtendableRanged(range) => *range as f32,
+            Range::Float(range) => *range,
+        };
+
+        // Add sqrt(2.0) to reach one extra diagonal cell, i.e. to the center cell of the target (?)
+        (range + f32::sqrt(2.0)).powf(2.0)
     }
 
     pub fn plus(&self, n: u32) -> Range {
