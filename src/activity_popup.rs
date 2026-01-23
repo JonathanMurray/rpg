@@ -473,6 +473,7 @@ impl ActivityPopup {
     fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
+            // TODO: panicked when clicking an attack enhancement and then clicking 'attack' to close the action
             .map(|id| &self.choice_buttons[id].action)
     }
 

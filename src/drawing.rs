@@ -1,5 +1,5 @@
 use macroquad::{
-    color::Color,
+    color::{Color, MAGENTA},
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle},
     time::get_time,
 };
@@ -102,12 +102,12 @@ pub fn draw_dashed_line_ex(
         );
     }
 
-    let start_offset = if animated {
-        let game_time = get_time();
-        (game_time - game_time.floor()) as f32 * segment_len * 2.0
-    } else {
-        0.0
-    };
+    let mut start_offset = 0.0;
+
+    if animated {
+        let t = get_time() / 2.0;
+        start_offset = -segment_len + (t - t.floor()) as f32 * segment_len * 2.0;
+    }
 
     let line_len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
     // "Segments" alternate between "drawn" and "skipped over" to create the dash effect
@@ -115,38 +115,59 @@ pub fn draw_dashed_line_ex(
     let dx = (to.0 - from.0) / num_segments as f32;
     let dy = (to.1 - from.1) / num_segments as f32;
 
-    let from = (
-        from.0 + (to.0 - from.0) * (start_offset / line_len),
-        from.1 + (to.1 - from.1) * (start_offset / line_len),
-    );
+    let offset_x = (to.0 - from.0) * (start_offset / line_len);
+    let offset_y = (to.1 - from.1) * (start_offset / line_len);
 
-    let draw_dash = |start: (f32, f32), end: (f32, f32)| {
+    let draw_dash = |(mut x0, mut y0): (f32, f32), (mut x1, mut y1): (f32, f32)| {
         let mut skip = false;
         if let Some(trim) = trim_start_and_end {
-            if (start.0 - from.0).abs() < trim && (start.1 - from.1).abs() < trim {
+            if (x0 - from.0).abs() < trim && (y0 - from.1).abs() < trim {
                 skip = true;
             }
-            if (end.0 - to.0).abs() < trim && (end.1 - to.1).abs() < trim {
+            if (x1 - to.0).abs() < trim && (y1 - to.1).abs() < trim {
                 skip = true;
             }
         }
+
+        // Don't show the part of the dash that goes outside of the (from, to) line
+        if from.0 < to.0 {
+            x0 = x0.min(to.0).max(from.0);
+            x1 = x1.min(to.0).max(from.0);
+        } else {
+            x0 = x0.min(from.0).max(to.0);
+            x1 = x1.min(from.0).max(to.0);
+        }
+        if from.1 < to.1 {
+            y0 = y0.min(to.1).max(from.1);
+            y1 = y1.min(to.1).max(from.1);
+        } else {
+            y0 = y0.min(from.1).max(to.1);
+            y1 = y1.min(from.1).max(to.1);
+        }
+
         if !skip {
-            draw_line(start.0, start.1, end.0, end.1, thickness, color);
+            draw_line(x0, y0, x1, y1, thickness, color);
         }
     };
 
-    let (mut prev_x, mut prev_y) = from;
-    for i in 0..num_segments {
-        let x = from.0 + dx * i as f32;
-        let y = from.1 + dy * i as f32;
-        if i % 2 == 0 {
+    let (mut prev_x, mut prev_y) = (from.0 + offset_x, from.1 + offset_y);
+    for i in 1..=num_segments {
+        let x = prev_x + dx;
+        let y = prev_y + dy;
+        if i % 2 == 1 {
             draw_dash((prev_x, prev_y), (x, y));
+        } else {
+            // TODO
+            //draw_line(prev_x    ,prev_y, x, y, 4.0, MAGENTA);
         }
         prev_x = x;
         prev_y = y;
     }
 
-    draw_dash((prev_x, prev_y), to);
+    draw_dash(
+        (prev_x, prev_y),
+        (to.0 + offset_x + dx, to.1 + offset_y + dy),
+    );
 }
 
 pub fn draw_dashed_rectangle_lines(
@@ -158,6 +179,8 @@ pub fn draw_dashed_rectangle_lines(
     color: Color,
     segment_len: f32,
 ) {
+    let animated = true;
+
     // top
     draw_dashed_line(
         (x, y),
@@ -166,7 +189,7 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
-        false,
+        animated,
     );
 
     // right
@@ -177,7 +200,7 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
-        false,
+        animated,
     );
 
     // bottom
@@ -188,7 +211,7 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
-        false,
+        animated,
     );
 
     // left
@@ -199,7 +222,7 @@ pub fn draw_dashed_rectangle_lines(
         color,
         segment_len,
         None,
-        false,
+        animated,
     );
 }
 
