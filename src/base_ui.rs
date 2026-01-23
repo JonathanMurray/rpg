@@ -324,6 +324,65 @@ impl TextLine {
     }
 }
 
+impl Drawable for TextLine {
+    fn draw(&self, x: f32, y: f32) {
+        let y0 = y + self.vert_padding;
+
+        let x0 = if self.right_align {
+            let text_dimensions =
+                measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
+            x + self.size.0 - text_dimensions.width - self.hor_padding
+        } else {
+            x + self.hor_padding
+        };
+
+        if let Some((color, offset)) = self.depth {
+            let params = TextParams {
+                font_size: self.font_size,
+                color,
+                font: self.font.as_ref(),
+                ..Default::default()
+            };
+            draw_text_with_font_icons(
+                &self.string,
+                x0 + offset,
+                y0 + self.offset_y + offset,
+                params,
+            );
+        }
+
+        let (mouse_x, mouse_y) = mouse_position();
+        let hovered =
+            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
+
+        let mut color = self.color;
+        if let Some(hover_color) = self.hover_color {
+            if hovered {
+                color = hover_color;
+            }
+        }
+
+        let params = TextParams {
+            font_size: self.font_size,
+            color,
+            font: self.font.as_ref(),
+            ..Default::default()
+        };
+        draw_text_with_font_icons(&self.string, x0, y0 + self.offset_y, params);
+        //draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
+
+        draw_debug(x, y, self.size.0, self.size.1);
+
+        if hovered {
+            self.has_been_hovered.set(Some((x, y)));
+        }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.size
+    }
+}
+
 pub fn measure_text_with_font_icons(
     line: &str,
     font: Option<&Font>,
@@ -400,7 +459,7 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
             x += symbol_w;
         } else if part == "<mana>" {
             draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            x += symbol_w;
+            x += symbol_w * 0.6;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
             params.color = match &part {
@@ -434,65 +493,6 @@ pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextPar
 pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> TextDimensions {
     draw_text_ex(text, x.floor(), y.floor(), params)
     //draw_text_ex(text, x, y, params)
-}
-
-impl Drawable for TextLine {
-    fn draw(&self, x: f32, y: f32) {
-        let y0 = y + self.vert_padding;
-
-        let x0 = if self.right_align {
-            let text_dimensions =
-                measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
-            x + self.size.0 - text_dimensions.width - self.hor_padding
-        } else {
-            x + self.hor_padding
-        };
-
-        if let Some((color, offset)) = self.depth {
-            let params = TextParams {
-                font_size: self.font_size,
-                color,
-                font: self.font.as_ref(),
-                ..Default::default()
-            };
-            draw_text_with_font_icons(
-                &self.string,
-                x0 + offset,
-                y0 + self.offset_y + offset,
-                params,
-            );
-        }
-
-        let (mouse_x, mouse_y) = mouse_position();
-        let hovered =
-            (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
-
-        let mut color = self.color;
-        if let Some(hover_color) = self.hover_color {
-            if hovered {
-                color = hover_color;
-            }
-        }
-
-        let params = TextParams {
-            font_size: self.font_size,
-            color,
-            font: self.font.as_ref(),
-            ..Default::default()
-        };
-        draw_text_with_font_icons(&self.string, x0, y0 + self.offset_y, params);
-        //draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
-
-        draw_debug(x, y, self.size.0, self.size.1);
-
-        if hovered {
-            self.has_been_hovered.set(Some((x, y)));
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        self.size
-    }
 }
 
 #[derive(Clone, Default)]

@@ -1132,10 +1132,18 @@ pub struct LabelledResourceBar {
     pub bar: Rc<RefCell<ResourceBar>>,
     value_text: Rc<RefCell<TextLine>>,
     max_value: u32,
+    symbol: &'static str,
 }
 
 impl LabelledResourceBar {
-    pub fn new(current: u32, max: u32, label: &'static str, color: Color, font: Font) -> Self {
+    pub fn new(
+        current: u32,
+        max: u32,
+        label: &'static str,
+        color: Color,
+        font: Font,
+        symbol: &'static str,
+    ) -> Self {
         assert!(current <= max);
 
         let cell_h = 12.0;
@@ -1148,13 +1156,13 @@ impl LabelledResourceBar {
         let cloned_bar = Rc::clone(&bar);
 
         let value_text = Rc::new(RefCell::new(TextLine::new(
-            format!("{}/{}", current, max),
-            20,
+            "".to_string(),
+            16,
             WHITE,
             Some(font.clone()),
         )));
         let cloned_value_text = Rc::clone(&value_text);
-        let label_text = TextLine::new(label, 16, WHITE, Some(font.clone()));
+        //let label_text = TextLine::new("|<heart>|", 16, WHITE, Some(font.clone()));
 
         let list = Container {
             layout_dir: LayoutDirection::Horizontal,
@@ -1174,6 +1182,7 @@ impl LabelledResourceBar {
             bar,
             value_text,
             max_value: max,
+            symbol,
         }
     }
 
@@ -1182,7 +1191,7 @@ impl LabelledResourceBar {
         self.bar.borrow_mut().current = value;
         self.value_text
             .borrow_mut()
-            .set_string(format!("{}/{}", value, self.max_value));
+            .set_string(format!("|{}| {}/{}", self.symbol, value, self.max_value,));
     }
 
     pub fn set_reserved(&mut self, value: u32) {

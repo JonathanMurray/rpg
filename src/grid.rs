@@ -58,7 +58,7 @@ use crate::{
 const BACKGROUND_COLOR: Color = COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
-const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.1);
+const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.2);
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
 const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);

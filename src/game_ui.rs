@@ -2688,6 +2688,7 @@ impl ResourceBars {
             "Health",
             COL_RED,
             font.clone(),
+            "<heart>",
         )));
 
         let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
@@ -2696,6 +2697,7 @@ impl ResourceBars {
             "Mana",
             COL_BLUE,
             font.clone(),
+            "<mana>",
         )));
 
         let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
@@ -2704,6 +2706,7 @@ impl ResourceBars {
             "Stamina",
             COL_GREEN_0,
             font.clone(),
+            "<stamina>",
         )));
 
         let container = Container {
