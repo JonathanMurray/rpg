@@ -25,6 +25,7 @@ use crate::{
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
+    sounds::{SoundId, SoundPlayer},
     textures::IconId,
 };
 
@@ -55,6 +56,7 @@ pub struct ActivityPopup {
     hovered_choice_button_id: Option<u32>,
 
     pub last_drawn_rectangle: Rect,
+    sound_player: SoundPlayer,
 }
 
 impl ActivityPopup {
@@ -64,6 +66,7 @@ impl ActivityPopup {
         icons: HashMap<IconId, Texture2D>,
         characters: Characters,
         active_character_id: CharacterId,
+        sound_player: SoundPlayer,
     ) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
 
@@ -96,6 +99,7 @@ impl ActivityPopup {
             movement_cost_slider: None,
             hovered_choice_button_id: None,
             last_drawn_rectangle: Default::default(),
+            sound_player,
         }
     }
 
@@ -348,6 +352,9 @@ impl ActivityPopup {
                     id, hovered_pos, ..
                 }) => {
                     if hovered_pos.is_some() {
+                        if self.hovered_choice_button_id.is_none() {
+                            self.sound_player.play(SoundId::HoverButton);
+                        }
                         self.hovered_choice_button_id = Some(id);
                     } else if self.hovered_choice_button_id == Some(id) {
                         self.hovered_choice_button_id = None;
@@ -355,6 +362,7 @@ impl ActivityPopup {
                 }
 
                 InternalUiEvent::ButtonClicked { id, .. } => {
+                    self.sound_player.play(SoundId::ClickButton);
                     let clicked_btn = &self.choice_buttons[&id];
                     clicked_btn.toggle_selected();
 

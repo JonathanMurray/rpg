@@ -563,6 +563,7 @@ impl UserInterface {
             icons,
             characters.clone(),
             active_character_id,
+            sound_player.clone(),
         );
 
         Self {
