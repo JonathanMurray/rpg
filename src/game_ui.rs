@@ -35,8 +35,8 @@ use crate::{
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
-        ActionPointsRow, CharacterPortraits, CharacterSheetToggle, LabelledResourceBar, Log,
-        PlayerPortraits,
+        ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, PlayerPortraits,
+        TopCharacterPortraits,
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
@@ -461,7 +461,7 @@ pub struct UserInterface {
 
     game_grid: GameGrid,
     activity_popup: ActivityPopup,
-    top_character_portraits: CharacterPortraits,
+    top_character_portraits: TopCharacterPortraits,
     player_portraits: PlayerPortraits,
     character_sheet_toggle: CharacterSheetToggle,
     character_uis: HashMap<CharacterId, CharacterUi>,
@@ -542,7 +542,7 @@ impl UserInterface {
             sound_player: sound_player.clone(),
         };
 
-        let character_portraits = CharacterPortraits::new(
+        let character_portraits = TopCharacterPortraits::new(
             &game.characters,
             game.active_character_id,
             simple_font.clone(),
@@ -669,6 +669,7 @@ impl UserInterface {
         let clicked_character_id = self.top_character_portraits.draw(0.0, 0.0);
         if let Some(id) = clicked_character_id {
             if self.characters.get(id).player_controlled() {
+                self.sound_player.play(SoundId::ClickButton);
                 self.player_portraits.set_selected_id(id);
                 changed_character = true;
             }

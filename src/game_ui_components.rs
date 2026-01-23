@@ -36,7 +36,7 @@ use crate::{
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
 };
 
-pub struct CharacterPortraits {
+pub struct TopCharacterPortraits {
     row: Container,
     active_id: CharacterId,
     selected_id: CharacterId,
@@ -44,7 +44,7 @@ pub struct CharacterPortraits {
     portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
 }
 
-impl CharacterPortraits {
+impl TopCharacterPortraits {
     pub fn new(
         characters: &Characters,
         active_id: CharacterId,
