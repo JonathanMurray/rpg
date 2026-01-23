@@ -1303,6 +1303,8 @@ impl UserInterface {
             }
         }
 
+        self.player_portraits.set_reacting_character(is_reacting);
+
         self.activity_popup
             .on_new_state(self.active_character_id, relevant_action_button);
 

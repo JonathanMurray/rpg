@@ -2,13 +2,15 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
+    str::CharIndices,
 };
 
 use macroquad::{
-    color::SKYBLUE,
+    color::{PURPLE, SKYBLUE},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
+    text::{draw_text, measure_text, TextParams},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode},
     time::{get_frame_time, get_time},
 };
@@ -25,8 +27,8 @@ use macroquad::{
 use crate::{
     action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style,
-        TextLine,
+        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Rectangle, Style, TextLine,
     },
     core::{
         Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
@@ -329,8 +331,9 @@ impl Drawable for CharacterSheetToggle {
 
 pub struct PlayerPortraits {
     row: Container,
-    selected_i: Cell<CharacterId>,
-    active_i: Cell<CharacterId>,
+    selected_id: Cell<CharacterId>,
+    active_id: Cell<CharacterId>,
+    reacting_id: Cell<Option<CharacterId>>,
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
     sound_player: SoundPlayer,
     font: Font,
@@ -384,8 +387,9 @@ impl PlayerPortraits {
 
         let this = Self {
             row,
-            selected_i: Cell::new(selected_id),
-            active_i: Cell::new(active_id),
+            selected_id: Cell::new(selected_id),
+            active_id: Cell::new(active_id),
+            reacting_id: Cell::new(None),
             portraits,
             sound_player,
             font,
@@ -396,26 +400,40 @@ impl PlayerPortraits {
     }
 
     pub fn set_selected_id(&self, character_id: CharacterId) {
-        self.portraits[&self.selected_i.get()]
+        self.portraits[&self.selected_id.get()]
             .borrow()
             .is_character_shown
             .set(false);
-        self.selected_i.set(character_id);
-        self.portraits[&self.selected_i.get()]
+        self.selected_id.set(character_id);
+        self.portraits[&self.selected_id.get()]
             .borrow()
             .is_character_shown
             .set(true);
     }
 
     pub fn selected_id(&self) -> CharacterId {
-        self.selected_i.get()
+        self.selected_id.get()
+    }
+
+    pub fn set_reacting_character(&self, reactor: Option<CharacterId>) {
+        if let Some(i) = self.reacting_id.get() {
+            if let Some(portrait) = self.portraits.get(&i) {
+                portrait.borrow().is_character_reacting.set(false);
+            }
+        }
+        self.reacting_id.set(reactor);
+        if let Some(i) = self.reacting_id.get() {
+            if let Some(portrait) = self.portraits.get(&i) {
+                portrait.borrow().is_character_reacting.set(true);
+            }
+        }
     }
 
     pub fn set_active_character(&self, character_id: CharacterId) {
-        if let Some(portrait) = self.portraits.get(&self.active_i.get()) {
+        if let Some(portrait) = self.portraits.get(&self.active_id.get()) {
             portrait.borrow().is_character_active.set(false);
         }
-        self.active_i.set(character_id);
+        self.active_id.set(character_id);
         if let Some(portrait) = self.portraits.get(&character_id) {
             portrait.borrow().is_character_active.set(true);
         }
@@ -464,7 +482,7 @@ impl PlayerPortraits {
             }
         }
 
-        let prev_selected = self.selected_i.get();
+        let prev_selected = self.selected_id.get();
 
         let mut change_attempt = false;
         let mut ended_turn = false;
@@ -487,7 +505,7 @@ impl PlayerPortraits {
             change_attempt = true;
         }
 
-        let changed_character = change_attempt && self.selected_i.get() != prev_selected;
+        let changed_character = change_attempt && self.selected_id.get() != prev_selected;
 
         PlayerPortraitOutcome {
             changed_character,
@@ -496,7 +514,10 @@ impl PlayerPortraits {
     }
 
     fn toggle_active_id(&self) {
-        let idx = self.portraits.get_index_of(&self.selected_i.get()).unwrap();
+        let idx = self
+            .portraits
+            .get_index_of(&self.selected_id.get())
+            .unwrap();
         let new_idx = (idx + 1) % self.portraits.len();
         let (new_character_id, _) = self.portraits.get_index(new_idx).unwrap();
         self.set_selected_id(*new_character_id);
@@ -514,6 +535,7 @@ struct PlayerCharacterPortrait {
     character: Rc<Character>,
     is_character_shown: Cell<bool>,
     is_character_active: Cell<bool>,
+    is_character_reacting: Cell<bool>,
     padding: f32,
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
@@ -574,6 +596,7 @@ impl PlayerCharacterPortrait {
             text,
             is_character_shown: Cell::new(false),
             is_character_active: Cell::new(false),
+            is_character_reacting: Cell::new(false),
             padding: 10.0,
             has_been_clicked: Cell::new(false),
             texture,
@@ -689,6 +712,23 @@ impl Drawable for PlayerCharacterPortrait {
                     self.has_clicked_end_turn.set(true);
                 }
             }
+        }
+
+        if self.is_character_reacting.get() {
+            let text = "?";
+            let font_size = 24;
+            let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
+            draw_text_rounded(
+                text,
+                x + w / 2.0 - text_dim.width / 2.0,
+                y - 7.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size,
+                    color: GOLD,
+                    ..Default::default()
+                },
+            );
         }
 
         let (mouse_x, mouse_y) = mouse_position();
