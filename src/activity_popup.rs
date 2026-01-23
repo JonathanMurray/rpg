@@ -473,7 +473,6 @@ impl ActivityPopup {
     fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
-            // TODO: panicked when clicking an attack enhancement and then clicking 'attack' to close the action
             .map(|id| &self.choice_buttons[id].action)
     }
 
@@ -863,12 +862,14 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
-        self.refresh_enabled_state();
-
         self.movement_cost_slider = stamina_slider;
 
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
+
+        // We must have assigned choice_buttons before calling this, since we may have selected enhancements that we assume
+        // correspond to choice buttons
+        self.refresh_enabled_state();
     }
 
     fn refresh_enabled_state(&mut self) {
