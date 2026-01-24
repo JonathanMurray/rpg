@@ -251,14 +251,18 @@ impl CharacterSheet {
                 // Since we modified the drag that's shared (through Rc) with the UiState
                 changed_state = true;
             }
-        } else if outcome.requested_consumption.is_some()
-            && outcome.requested_consumption != requested_consumption
-            && is_allowed_to_use_consumable
-        {
-            *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
-                outcome.requested_consumption,
-            ));
-            changed_state = true;
+        }
+        if outcome.requested_consumption != requested_consumption {
+            dbg!(outcome.requested_consumption, requested_consumption);
+            *self.drag.borrow_mut() = None;
+            if outcome.requested_consumption.is_some() && is_allowed_to_use_consumable
+                || outcome.requested_consumption.is_none()
+            {
+                *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
+                    outcome.requested_consumption,
+                ));
+                changed_state = true;
+            }
         }
 
         self.container.draw_tooltips(x, y);

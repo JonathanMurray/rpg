@@ -456,6 +456,7 @@ impl EquipmentSection {
                         }
                     }
                 } else if is_mouse_button_pressed(MouseButton::Left) {
+                    requested_consumption = None;
                     if slot.content.is_some() {
                         self.sound_player.play(SoundId::DragEquipment);
                         drag = Some(EquipmentDrag {
@@ -464,6 +465,7 @@ impl EquipmentSection {
                         });
                     }
                 } else if is_mouse_button_released(MouseButton::Left) {
+                    requested_consumption = None;
                     if let Some(EquipmentDrag { from_idx, to_idx }) = &mut drag {
                         if to_idx.is_none() && *from_idx != idx {
                             let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
