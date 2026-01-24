@@ -512,7 +512,7 @@ impl CoreGame {
                         .await;
 
                     let maybe_damage = match event.outcome {
-                        AttackOutcome::Hit(dmg, _type) => Some(dmg),
+                        AttackOutcome::Hit { damage, .. } => Some(damage),
                         _ => None,
                     };
                     if let Some(damage) = maybe_damage {
@@ -2060,7 +2060,7 @@ impl CoreGame {
             let mut dmg_calculation = weapon.damage as i32;
 
             let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, weapon.name);
-            let mut attack_hit_type = AttackHitType::Regular;
+            let mut hit_type = AttackHitType::Regular;
 
             if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
                 let bonus_dmg = 1;
@@ -2088,12 +2088,12 @@ impl CoreGame {
             }
 
             if roll_result < evasion {
-                attack_hit_type = AttackHitType::Graze;
+                hit_type = AttackHitType::Graze;
             } else if roll_result >= evasion + 10 {
-                attack_hit_type = AttackHitType::Critical;
+                hit_type = AttackHitType::Critical;
             }
 
-            match attack_hit_type {
+            match hit_type {
                 AttackHitType::Graze => {
                     dmg_str.push_str(" -25% (graze)");
                     dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
@@ -2120,10 +2120,12 @@ impl CoreGame {
 
             let damage = dmg_calculation.max(0) as u32;
 
+            let mut actual_health_lost = 0;
+
             if let Some(game) = game {
                 dmg_str.push_str(&format!(" = {damage}"));
                 detail_lines.push(dmg_str);
-                game.perform_losing_health(defender, damage);
+                actual_health_lost = game.perform_losing_health(defender, damage);
             }
 
             if let Some(game) = game {
@@ -2198,7 +2200,11 @@ impl CoreGame {
                 }
             }
 
-            AttackOutcome::Hit(damage, attack_hit_type)
+            AttackOutcome::Hit {
+                damage,
+                actual_health_lost,
+                hit_type,
+            }
         } else if roll_result
             < evasion
                 .saturating_sub(evasion_from_parry + evasion_from_sidestep + evasion_from_block + 5)
@@ -2630,7 +2636,7 @@ pub fn predict_attack(
         );
 
         let damage = match event.outcome {
-            AttackOutcome::Hit(dmg, ..) => dmg,
+            AttackOutcome::Hit { damage, .. } => damage,
             _ => 0,
         };
 
@@ -2813,7 +2819,11 @@ pub struct AttackedEvent {
 
 #[derive(Debug, Copy, Clone)]
 pub enum AttackOutcome {
-    Hit(u32, AttackHitType),
+    Hit {
+        damage: u32,
+        actual_health_lost: u32,
+        hit_type: AttackHitType,
+    },
     Dodge,
     Block,
     Parry,
@@ -2823,7 +2833,7 @@ pub enum AttackOutcome {
 impl AttackOutcome {
     fn damage(&self) -> Option<u32> {
         match self {
-            AttackOutcome::Hit(dmg, _attack_hit_type) => Some(*dmg),
+            AttackOutcome::Hit { damage, .. } => Some(*damage),
             _ => None,
         }
     }
@@ -3470,7 +3480,7 @@ impl Conditions {
         self.map.shift_remove(condition).is_some()
     }
 
-    pub fn get(&self, condition: &Condition) -> Option<&ConditionState> {
+    fn get(&self, condition: &Condition) -> Option<&ConditionState> {
         self.map.get(condition)
     }
 
@@ -5727,6 +5737,12 @@ impl Character {
 }
 
 fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
+    println!(
+        "Check if target {} (pos={:?}) is flanked, from attacker pos {:?} ...",
+        target.name,
+        target.pos(),
+        attacker_pos
+    );
     let target_is_immune_to_flanking = target
         .known_passive_skills
         .contains(&PassiveSkill::ThrillOfBattle);
@@ -5749,7 +5765,15 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
 fn are_flanking_target(attacker: Position, melee_engager: Position, target: Position) -> bool {
     let engaged_from = (melee_engager.0 - target.0, melee_engager.1 - target.1);
     let (dx, dy) = (attacker.0 - target.0, attacker.1 - target.1);
-    assert!((dx, dy) != (0, 0));
+    // TODO: this panicked, when using Sweeping attack, after moving to a cell where an enemy had just died (?).
+    if (dx, dy) == (0, 0) {
+        panic!(
+            "Invalid dx,dy: {:?}. Engager={:?}, target={:?}",
+            (dx, dy),
+            melee_engager,
+            target
+        );
+    }
 
     match engaged_from {
         // from east

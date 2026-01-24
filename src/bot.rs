@@ -99,6 +99,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     }
 
     if behaviour.current_target.get().is_none() {
+        // TODO: this panics if all player chars have died
         behaviour.current_target.set(Some(player_chars[0].id()));
     }
 
@@ -156,7 +157,9 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         candidates.push(BotAction::Attack);
     }
     for a in bot.usable_single_target_abilities() {
-        candidates.push(BotAction::SingleTargetAbility(a));
+        if may_use(bot, a) {
+            candidates.push(BotAction::SingleTargetAbility(a));
+        }
     }
     for a in bot.usable_abilities() {
         if may_use(bot, a) {
@@ -503,6 +506,9 @@ fn may_use(bot: &Character, ability: Ability) -> bool {
     if ability.id == AbilityId::Brace
         && bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2
     {
+        return false;
+    }
+    if ability.id == AbilityId::Inspire && bot.conditions.borrow().has(&Condition::Inspired) {
         return false;
     }
     true

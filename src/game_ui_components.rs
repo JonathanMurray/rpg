@@ -805,7 +805,6 @@ impl Log {
     }
 
     pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
-        dbg!(details); //TODO
         const MAX_LINES: usize = 50;
         let text = text.into();
         if self.container.children.len() == MAX_LINES {

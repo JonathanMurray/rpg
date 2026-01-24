@@ -19,7 +19,7 @@ use crate::{
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
         CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR,
-        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
+        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
@@ -313,20 +313,20 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let mut enemies = vec![];
 
             let mut e1 = Character::new(
-                bot(BotBehaviour::Normal, 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
                 Attributes::new(8, 1, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
             );
-            e1.learn_ability(ENEMY_BRACE);
+            e1.learn_ability(ENEMY_TACKLE);
             e1.known_passive_skills.push(PassiveSkill::BloodRage);
             e1.health.change_max_value_to(3);
             enemies.push(e1);
 
             enemies.push(Character::new(
-                bot(BotBehaviour::Normal, 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enemy 2",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton2,
@@ -362,7 +362,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
              */
 
             for e in &enemies {
-                e.set_weapon(HandType::MainHand, BAD_BOW);
+                e.set_weapon(HandType::MainHand, SWORD);
             }
 
             characters.extend_from_slice(&enemies);

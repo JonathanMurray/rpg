@@ -1855,9 +1855,11 @@ impl UserInterface {
         );
     }
 
-    fn animate_character_damage(&mut self, character_id: CharacterId, dmg: u32) {
-        if dmg > 0 {
-            let prev_health = self.characters.get(character_id).health.current() + dmg;
+    fn animate_character_damage(&mut self, character_id: CharacterId, actual_health_lost: u32) {
+        if actual_health_lost > 0 {
+            let prev_health =
+                self.characters.get(character_id).health.current() + actual_health_lost;
+            dbg!(prev_health);
             self.game_grid
                 .animate_character_health_change(character_id, prev_health, 0.9);
         }
@@ -1992,9 +1994,18 @@ impl UserInterface {
         }
 
         let verb = match outcome {
-            AttackOutcome::Hit(_, AttackHitType::Regular) => "hit",
-            AttackOutcome::Hit(_, AttackHitType::Graze) => "grazed",
-            AttackOutcome::Hit(_, AttackHitType::Critical) => "crit",
+            AttackOutcome::Hit {
+                hit_type: AttackHitType::Regular,
+                ..
+            } => "hit",
+            AttackOutcome::Hit {
+                hit_type: AttackHitType::Graze,
+                ..
+            } => "grazed",
+            AttackOutcome::Hit {
+                hit_type: AttackHitType::Critical,
+                ..
+            } => "crit",
             _ => "missed",
         };
 
@@ -2007,10 +2018,14 @@ impl UserInterface {
 
         let mut damage_was_dealt = false;
         match outcome {
-            AttackOutcome::Hit(dmg, _) => {
-                self.animate_character_damage(target, dmg);
-                damage_was_dealt = dmg > 0;
-                line.push_str(&format!(" ({} damage)", dmg))
+            AttackOutcome::Hit {
+                damage,
+                actual_health_lost,
+                ..
+            } => {
+                self.animate_character_damage(target, actual_health_lost);
+                damage_was_dealt = damage > 0;
+                line.push_str(&format!(" ({} damage)", damage))
             }
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
             AttackOutcome::Parry => line.push_str(" (parry)"),
@@ -2023,15 +2038,21 @@ impl UserInterface {
         let target_pos = self.characters.get(target).pos();
 
         let (impact_text, text_style) = match outcome {
-            AttackOutcome::Hit(damage, AttackHitType::Regular) => {
-                (format!("{}", damage), TextEffectStyle::HostileHit)
-            }
-            AttackOutcome::Hit(damage, AttackHitType::Graze) => {
-                (format!("{}", damage), TextEffectStyle::HostileGraze)
-            }
-            AttackOutcome::Hit(damage, AttackHitType::Critical) => {
-                (format!("{}!", damage), TextEffectStyle::HostileCrit)
-            }
+            AttackOutcome::Hit {
+                damage,
+                hit_type: AttackHitType::Regular,
+                ..
+            } => (format!("{}", damage), TextEffectStyle::HostileHit),
+            AttackOutcome::Hit {
+                damage,
+                hit_type: AttackHitType::Graze,
+                ..
+            } => (format!("{}", damage), TextEffectStyle::HostileGraze),
+            AttackOutcome::Hit {
+                damage,
+                hit_type: AttackHitType::Critical,
+                ..
+            } => (format!("{}!", damage), TextEffectStyle::HostileCrit),
             AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
