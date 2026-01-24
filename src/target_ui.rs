@@ -302,6 +302,7 @@ impl TargetUi {
                 style: Style {
                     background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
                     border_color: Some(LIGHTGRAY),
+                    border_inner_rounding: Some(6.0),
                     padding: 10.0,
                     ..Default::default()
                 },

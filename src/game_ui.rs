@@ -1625,9 +1625,9 @@ impl UserInterface {
                     // its own dice roll)
                     detail_lines.clear();
                     if attacks.len() == 1 {
-                        detail_lines.push("resulting in an attack".to_string());
+                        line.push_str(" (1 target)");
                     } else {
-                        detail_lines.push(format!("resulting in {} attacks", attacks.len()));
+                        line.push_str(&format!(" ({} targets)", attacks.len()));
                     }
                 }
 

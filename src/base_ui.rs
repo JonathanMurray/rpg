@@ -15,6 +15,7 @@ use std::{
 };
 
 use crate::{
+    drawing::draw_rounded_rectangle_lines,
     textures::{
         ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
         WARNING_SYMBOL,
@@ -582,6 +583,7 @@ impl Rectangle {
 pub struct Style {
     pub background_color: Option<Color>,
     pub border_color: Option<Color>,
+    pub border_inner_rounding: Option<f32>,
     pub border_width: Option<f32>,
     pub padding: f32,
 }
@@ -601,7 +603,13 @@ impl Style {
     pub fn draw_foreground(&self, x: f32, y: f32, size: (f32, f32)) {
         if let Some(color) = self.border_color {
             let thickness = self.border_width.unwrap_or(1.0);
-            draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
+            if let Some(rounding) = self.border_inner_rounding {
+                draw_rounded_rectangle_lines(
+                    x, y, size.0, size.1, thickness, color, rounding, None,
+                );
+            } else {
+                draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
+            }
         }
     }
 }
