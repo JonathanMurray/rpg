@@ -833,10 +833,13 @@ impl CoreGame {
             }
             e @ ApplyEffect::ConsumeCondition { condition } => {
                 let stacks_cleared = receiver.clear_condition(condition);
-                let mut line = format!("  {} lost {}", receiver.name, condition.name());
-                if stacks_cleared > 0 {
-                    line.push_str(&format!(" ({})", stacks_cleared));
-                    actual_effect = Some(e);
+                let mut line = "".to_string();
+                if let Some(stacks) = stacks_cleared {
+                    line.push_str(&format!("  {} lost {}", receiver.name, condition.name()));
+                    if stacks > 0 {
+                        line.push_str(&format!(" ({})", stacks));
+                        actual_effect = Some(e);
+                    }
                 }
                 line
             }
@@ -3138,7 +3141,7 @@ impl Display for ApplyEffect {
                 Ok(())
             }
             ApplyEffect::ConsumeCondition { condition } => {
-                f.write_fmt(format_args!("-{}", condition.name()))
+                f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
             ApplyEffect::Knockback(..) => f.write_str("KNOCKBACK (todo)"),
         }
@@ -5706,14 +5709,18 @@ impl Character {
         }
     }
 
-    fn clear_condition(&self, condition: Condition) -> u32 {
+    fn clear_condition(&self, condition: Condition) -> Option<u32> {
         let mut conditions = self.conditions.borrow_mut();
+
+        if !conditions.has(&condition) {
+            return None;
+        }
 
         let prev_stacks = conditions.get_stacks(&condition);
 
         conditions.remove(&condition);
 
-        prev_stacks
+        Some(prev_stacks)
     }
 }
 

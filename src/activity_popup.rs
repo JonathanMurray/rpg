@@ -20,7 +20,7 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{
-        draw_text_rounded, draw_text_with_font_icons, measure_text_with_font_icons, Drawable,
+        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons, Drawable,
     },
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::{draw_cross, draw_dashed_line},
@@ -250,7 +250,7 @@ impl ActivityPopup {
                 draw_text_rounded(line, x0, y0, params.clone());
             } else {
                 //draw_text_rounded(line, x0, y0, base_text_params.clone());
-                draw_text_with_font_icons(line, x0, y0, base_text_params.clone());
+                draw_text_with_font_tags(line, x0, y0, base_text_params.clone(), true);
             }
 
             y0 += 22.0;
@@ -305,7 +305,7 @@ impl ActivityPopup {
             if let Some(error) = &self.proceed_button_error {
                 let font_size = 22;
                 let text_dim = measure_text_with_font_icons(&error, Some(&self.font), font_size);
-                draw_text_with_font_icons(
+                draw_text_with_font_tags(
                     &error,
                     x + width - text_dim.width - 10.0,
                     y - height + top_pad + 15.0,
@@ -315,6 +315,7 @@ impl ActivityPopup {
                         color: RED,
                         ..Default::default()
                     },
+                    true,
                 );
             } else {
                 self.proceed_button.draw(x_btn, y_btn + 6.0);

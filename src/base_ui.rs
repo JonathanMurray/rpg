@@ -343,11 +343,12 @@ impl Drawable for TextLine {
                 font: self.font.as_ref(),
                 ..Default::default()
             };
-            draw_text_with_font_icons(
+            draw_text_with_font_tags(
                 &self.string,
                 x0 + offset,
                 y0 + self.offset_y + offset,
                 params,
+                false,
             );
         }
 
@@ -368,7 +369,7 @@ impl Drawable for TextLine {
             font: self.font.as_ref(),
             ..Default::default()
         };
-        draw_text_with_font_icons(&self.string, x0, y0 + self.offset_y, params);
+        draw_text_with_font_tags(&self.string, x0, y0 + self.offset_y, params, true);
         //draw_text_rounded(&self.string, x0, y0 + self.offset_y, params);
 
         draw_debug(x, y, self.size.0, self.size.1);
@@ -415,6 +416,8 @@ pub fn measure_text_with_font_icons(
                 part = &part["<keyword>".len()..];
             } else if part.starts_with("<faded>") {
                 part = &part["<faded>".len()..];
+            } else if part.starts_with("<strikethrough>") {
+                part = &part["<strikethrough>".len()..];
             }
 
             if part.len() > 0 {
@@ -437,56 +440,94 @@ pub fn measure_text_with_font_icons(
     }
 }
 
-pub fn draw_text_with_font_icons(line: &str, mut x: f32, y: f32, params: TextParams<'_>) {
+pub fn draw_text_with_font_tags(
+    line: &str,
+    mut x: f32,
+    y: f32,
+    params: TextParams<'_>,
+    render_tags: bool,
+) {
     let parts = line.split("|");
     for mut part in parts {
         let symbol_w = 16.0;
         if part == "<dice>" {
-            draw_texture(DICE_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(DICE_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<shield>" {
-            draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<alt_key>" {
-            draw_texture(ALT_KEY_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(ALT_KEY_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<warning>" {
-            draw_texture(WARNING_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(WARNING_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<heart>" {
-            draw_texture(HEART_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(HEART_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<stamina>" {
-            draw_texture(STAMINA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(STAMINA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w;
         } else if part == "<mana>" {
-            draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            if render_tags {
+                draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
             x += symbol_w * 0.6;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
-            params.color = match &part {
-                &"Bob" => COL_BOB,
-                &"Alice" => COL_ALICE,
-                &"Clara" => COL_CLARA,
-                _ => unreachable!(),
-            };
+            if render_tags {
+                params.color = match &part {
+                    &"Bob" => COL_BOB,
+                    &"Alice" => COL_ALICE,
+                    &"Clara" => COL_CLARA,
+                    _ => unreachable!(),
+                };
+            }
             let part_dimensions = draw_text_rounded(part, x, y, params);
             x += part_dimensions.width;
         } else {
             let mut params = params.clone();
+            let mut strikethrough = false;
             if part.starts_with("<value>") {
                 part = &part["<value>".len()..];
-                params.color = Color::new(0.9, 0.7, 1.0, 1.0);
-                params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
+                if render_tags {
+                    params.color = Color::new(0.9, 0.7, 1.0, 1.0);
+                    params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
+                }
             } else if part.starts_with("<keyword>") {
                 part = &part["<keyword>".len()..];
-                params.color = ORANGE;
+                if render_tags {
+                    params.color = ORANGE;
+                }
             } else if part.starts_with("<faded>") {
                 part = &part["<faded>".len()..];
-                params.color = LIGHTGRAY;
+                if render_tags {
+                    params.color = LIGHTGRAY;
+                }
+            } else if part.starts_with("<strikethrough>") {
+                part = &part["<strikethrough>".len()..];
+                strikethrough = true;
             }
 
             let part_dimensions = draw_text_rounded(part, x, y, params);
+
+            if strikethrough && render_tags {
+                let y0 = y - part_dimensions.offset_y + part_dimensions.height / 2.0;
+                draw_line(x, y0, x + part_dimensions.width, y0, 2.0, WHITE);
+            }
+
             x += part_dimensions.width;
         }
     }

@@ -16,7 +16,7 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, draw_text_with_font_icons, measure_text_with_font_icons,
+        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons,
         Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
@@ -1560,7 +1560,7 @@ pub fn draw_tooltip(
         if line.is_empty() {
             line_y += empty_line_h;
         } else {
-            draw_text_with_font_icons(line, text_x, line_y, params);
+            draw_text_with_font_tags(line, text_x, line_y, params, true);
             line_y += line_h;
         }
     };

@@ -33,7 +33,9 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_rounded, Drawable, Style},
+    base_ui::{
+        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons, Drawable, Style,
+    },
     core::{
         target_within_range_squared, within_range_squared, AbilityReach, AbilityTarget,
         ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MovementType,
@@ -2795,7 +2797,8 @@ impl EffectGraphics {
             }
             EffectGraphics::Text(text, font, color) => {
                 let font_size = 20;
-                let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
+                //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
+                let text_dimensions = measure_text_with_font_icons(text, Some(font), font_size);
 
                 let grow_duration = 0.15;
 
@@ -2824,12 +2827,14 @@ impl EffectGraphics {
                     ..Default::default()
                 };
                 // First draw shadow
-                draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
+                //draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
+                draw_text_with_font_tags(text, x0 + 2.0, y0 + 2.0, text_params.clone(), false);
                 text_params.color = *color;
                 text_params.color.a = alpha;
 
                 // Then the regular text
-                draw_text_ex(text, x0, y0, text_params);
+                //draw_text_ex(text, x0, y0, text_params);
+                draw_text_with_font_tags(text, x0, y0, text_params, true);
             }
         }
     }
