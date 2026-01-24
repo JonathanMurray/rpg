@@ -822,7 +822,7 @@ impl Container {
     fn _draw(&self, x: f32, y: f32, only_tooltips: bool) -> (f32, f32) {
         let size = self.size();
         if !only_tooltips {
-            self.style.draw(x, y, size);
+            self.style.draw_background(x, y, size);
         }
 
         let mut x0 = x + self.style.padding;
@@ -988,6 +988,10 @@ impl Container {
             }
         }
 
+        if !only_tooltips {
+            self.style.draw_foreground(x, y, size);
+        }
+
         size
     }
 }
@@ -1040,9 +1044,9 @@ pub struct TableCell {
 }
 
 impl TableCell {
-    pub fn new(text: String, color: Option<Color>, depth: Option<Color>) -> Self {
+    pub fn new(text: impl Into<String>, color: Option<Color>, depth: Option<Color>) -> Self {
         Self {
-            text,
+            text: text.into(),
             color_override: color,
             depth,
         }

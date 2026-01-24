@@ -6,7 +6,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
@@ -20,12 +20,12 @@ use crate::{
     },
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
-        TableStyle, TextLine,
+        TableCell, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{BaseAction, Character, CharacterId, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{IconId, StatusId},
+    textures::{IconId, PortraitId, StatusId},
     util::COL_RED,
 };
 
@@ -42,6 +42,7 @@ pub struct TargetUi {
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
     status_textures: HashMap<StatusId, Texture2D>,
+    portrait_textures: HashMap<PortraitId, Texture2D>,
     pub last_drawn_rectangle: Cell<Rect>,
 }
 
@@ -51,6 +52,7 @@ impl TargetUi {
         simple_font: Font,
         icons: HashMap<IconId, Texture2D>,
         status_textures: HashMap<StatusId, Texture2D>,
+        portrait_textures: HashMap<PortraitId, Texture2D>,
     ) -> Self {
         Self {
             target: Default::default(),
@@ -63,6 +65,7 @@ impl TargetUi {
             hovered_btn: Default::default(),
             buttons: Default::default(),
             status_textures,
+            portrait_textures,
             last_drawn_rectangle: Default::default(),
         }
     }
@@ -101,12 +104,6 @@ impl TargetUi {
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
-            let conditions_list = ConditionsList::new(
-                self.simple_font.clone(),
-                char.condition_infos(),
-                self.status_textures.clone(),
-            );
-
             let armor_text_line = TextLine::new(
                 format!("Armor: {}", char.protection_from_armor()),
                 22,
@@ -116,12 +113,12 @@ impl TargetUi {
 
             let def_table = table(
                 vec![
-                    "Toughness".into(),
-                    "Evasion".into(),
-                    "Will".into(),
-                    char.toughness().to_string().into(),
-                    char.evasion().to_string().into(),
-                    char.will().to_string().into(),
+                    TableCell::new("Toughness", Some(LIGHTGRAY), None),
+                    TableCell::new("Evasion", Some(LIGHTGRAY), None),
+                    TableCell::new("Will", Some(LIGHTGRAY), None),
+                    TableCell::new(char.toughness().to_string(), Some(WHITE), Some(BLACK)),
+                    TableCell::new(char.evasion().to_string(), Some(WHITE), Some(BLACK)),
+                    TableCell::new(char.will().to_string(), Some(WHITE), Some(BLACK)),
                 ],
                 vec![Align::Center, Align::Center, Align::Center],
                 self.simple_font.clone(),
@@ -157,11 +154,25 @@ impl TargetUi {
             //health_text_line.set_depth(BLACK, 2.0);
             //health_text_line.set_min_height(20.0);
 
+            let portrait = Element::Container(Container {
+                style: Style {
+                    background_color: Some(Color::new(0.5, 0.5, 0.5, 0.3)),
+                    border_color: Some(LIGHTGRAY),
+                    ..Default::default()
+                },
+                children: vec![Element::Texture(
+                    self.portrait_textures[&char.portrait].clone(),
+                    None,
+                )],
+                ..Default::default()
+            });
+
             let centered_list = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Center,
                 children: vec![
                     Element::Text(name_text_line),
+                    portrait,
                     Element::Box(Box::new(health_bar)),
                     Element::Text(health_text_line),
                     Element::Box(Box::new(action_points_row)),
@@ -233,11 +244,13 @@ impl TargetUi {
                     children,
                     ..Default::default()
                 }));
-                passives_row = Some(Element::Container(Container {
-                    layout_dir: LayoutDirection::Horizontal,
-                    children: passive_children,
-                    ..Default::default()
-                }));
+                if !passive_children.is_empty() {
+                    passives_row = Some(Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        children: passive_children,
+                        ..Default::default()
+                    }));
+                }
             }
 
             let mut rows = vec![Element::Container(centered_list)];
@@ -264,7 +277,7 @@ impl TargetUi {
                 ];
                 if bot_using_spells {
                     detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!("Spell roll: +{}", char.spell_modifier()),
+                        format!("|<dice>| Spell roll: +{}", char.spell_modifier()),
                         16,
                         LIGHTGRAY,
                         Some(self.simple_font.clone()),
@@ -274,7 +287,7 @@ impl TargetUi {
                 let detailed_stats = Container {
                     layout_dir: LayoutDirection::Vertical,
                     children: detailed_stats_lines,
-                    margin: 7.0,
+                    margin: 9.0,
                     style: Style {
                         padding: 5.0,
                         ..Default::default()
@@ -292,13 +305,21 @@ impl TargetUi {
                 rows.push(row);
             }
 
-            rows.push(Element::Box(Box::new(conditions_list)));
+            if !char.condition_infos().is_empty() {
+                let conditions_list = ConditionsList::new(
+                    self.simple_font.clone(),
+                    char.condition_infos(),
+                    self.status_textures.clone(),
+                );
+
+                rows.push(Element::Box(Box::new(conditions_list)));
+            }
 
             self.container = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Start,
                 children: rows,
-                margin: 10.0,
+                margin: 15.0,
                 style: Style {
                     background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
                     border_color: Some(LIGHTGRAY),

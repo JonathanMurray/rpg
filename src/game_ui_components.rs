@@ -1102,20 +1102,24 @@ impl Drawable for ResourceBar {
                     if i > 0 {
                         let thick = if self.max < 8 { true } else { i % 5 == 0 };
 
-                        let (thickness, color, space) = if thick {
-                            (2.0, BLACK, self.cell_size.1 * 0.14)
-                        } else {
-                            (1.0, DARKGRAY, self.cell_size.1 * 0.3)
-                        };
+                        let show_line = self.max <= 17 || thick;
 
-                        draw_line(
-                            x0,
-                            y0 + space,
-                            x0,
-                            y0 + cell_size.1 - space,
-                            thickness,
-                            color,
-                        );
+                        if show_line {
+                            let (thickness, color, space) = if thick {
+                                (2.0, Color::new(0.0, 0.0, 0.0, 0.6), self.cell_size.1 * 0.14)
+                            } else {
+                                (1.0, Color::new(0.0, 0.0, 0.0, 0.4), self.cell_size.1 * 0.3)
+                            };
+
+                            draw_line(
+                                x0,
+                                y0 + space,
+                                x0,
+                                y0 + cell_size.1 - space,
+                                thickness,
+                                color,
+                            );
+                        }
                     }
                     x0 += cell_size.0;
                 }

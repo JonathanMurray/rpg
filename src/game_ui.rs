@@ -537,8 +537,7 @@ impl UserInterface {
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
-            // TODO
-            shown: Cell::new(true),
+            shown: Cell::new(false),
             text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
             padding: 7.0,
             sound_player: sound_player.clone(),
@@ -549,7 +548,7 @@ impl UserInterface {
             game.active_character_id,
             simple_font.clone(),
             //decorative_font.clone(),
-            portrait_textures,
+            portrait_textures.clone(),
         );
 
         let target_ui = TargetUi::new(
@@ -557,6 +556,7 @@ impl UserInterface {
             simple_font.clone(),
             icons.clone(),
             status_textures.clone(),
+            portrait_textures.clone(),
         );
 
         let activity_popup = ActivityPopup::new(
