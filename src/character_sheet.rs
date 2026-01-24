@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
+use macroquad::color::{DARKBLUE, DARKGRAY, MAGENTA, SKYBLUE};
 
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
@@ -97,6 +97,8 @@ impl CharacterSheet {
             style: Style {
                 background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
                 padding: 10.0,
+                border_color: Some(BLACK),
+                border_inner_rounding: Some(5.0),
                 ..Default::default()
             },
             children: vec![
@@ -128,6 +130,7 @@ impl CharacterSheet {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
             border_between_children: Some(LIGHTGRAY),
+            margin: 8.0,
             style: Style {
                 padding: 3.0,
                 background_color: Some(BLACK),

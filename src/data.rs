@@ -1104,7 +1104,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
-    description: "Restore an ally's health",
+    description: "Restore an ally's health. Removes Bleeding and Burning.",
     icon: IconId::Heal,
     action_point_cost: 2,
     mana_cost: 1,

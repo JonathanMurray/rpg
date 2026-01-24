@@ -1562,9 +1562,9 @@ impl UserInterface {
                         skip_sound = targets.is_empty();
                     }
 
-                    if !skip_sound {
-                        self.sound_player.play(sound_id);
-                    }
+                    //if !skip_sound {
+                    self.sound_player.play(sound_id);
+                    //}
                 }
 
                 let actor_name = self.characters.get(actor).name;
