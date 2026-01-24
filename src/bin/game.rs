@@ -111,6 +111,7 @@ async fn main() {
         .known_passive_skills
         .push(PassiveSkill::WeaponProficiency);
     alice.learn_ability(PIERCING_SHOT);
+    alice.receive_condition(Condition::Burning, Some(3), None);
 
     let mut bob = Character::new(
         CharacterKind::Player(Rc::clone(&party)),

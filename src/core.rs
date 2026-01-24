@@ -605,7 +605,7 @@ impl CoreGame {
                     detail_lines.push(format!("gained {} mana", amount));
                 }
                 if let Some(apply_effect) = consumable.effect {
-                    let (line, _damage) =
+                    let (applied, line, _damage) =
                         self.perform_effect_application(apply_effect, None, None, character);
                     detail_lines.push(line);
                 }
@@ -786,28 +786,34 @@ impl CoreGame {
         giver: Option<&Character>,
         area_center: Option<Position>,
         receiver: &Character,
-    ) -> (String, u32) {
+    ) -> (Option<ApplyEffect>, String, u32) {
         let mut damage_dealt = 0;
+        let mut actual_effect = None;
         let line = match effect {
             ApplyEffect::RemoveActionPoints(n) => {
-                receiver.action_points.lose(n);
+                let lost = receiver.action_points.lose(n);
+                actual_effect = Some(ApplyEffect::RemoveActionPoints(lost));
                 format!("  {} lost {} AP", receiver.name, n)
             }
             ApplyEffect::GainStamina(n) => {
-                let amount_gained = receiver.stamina.gain(n);
-                format!("  {} gained {} stamina", receiver.name, amount_gained)
+                let gained = receiver.stamina.gain(n);
+                actual_effect = Some(ApplyEffect::GainStamina(gained));
+                format!("  {} gained {} stamina", receiver.name, gained)
             }
             ApplyEffect::GainHealth(n) => {
-                let amount_gained = receiver.health.gain(n);
-                format!("  {} gained {} health", receiver.name, amount_gained)
+                let gained = receiver.health.gain(n);
+                actual_effect = Some(ApplyEffect::GainHealth(gained));
+                format!("  {} gained {} health", receiver.name, gained)
             }
-            ApplyEffect::Condition(apply_condition) => {
+            e @ ApplyEffect::Condition(apply_condition) => {
+                actual_effect = Some(e);
                 self.perform_receive_condition(apply_condition, receiver)
             }
-            ApplyEffect::PerBleeding {
+            e @ ApplyEffect::PerBleeding {
                 damage,
                 caster_healing_percentage,
             } => {
+                actual_effect = Some(e);
                 let stacks = receiver
                     .conditions
                     .borrow()
@@ -825,15 +831,16 @@ impl CoreGame {
                     healing_amount
                 )
             }
-            ApplyEffect::ConsumeCondition { condition } => {
+            e @ ApplyEffect::ConsumeCondition { condition } => {
                 let stacks_cleared = receiver.clear_condition(condition);
                 let mut line = format!("  {} lost {}", receiver.name, condition.name());
                 if stacks_cleared > 0 {
                     line.push_str(&format!(" ({})", stacks_cleared));
+                    actual_effect = Some(e);
                 }
                 line
             }
-            ApplyEffect::Knockback(amount) => {
+            e @ ApplyEffect::Knockback(amount) => {
                 let giver = giver.unwrap();
                 let mut source_pos = giver.pos();
 
@@ -852,11 +859,12 @@ impl CoreGame {
                     (0, amount as i32 * dy.signum())
                 };
                 receiver.is_being_pushed_in_direction.set(Some(vector));
+                actual_effect = Some(e);
                 format!("  {} was knocked back", receiver.name)
             }
         };
 
-        (line, damage_dealt)
+        (actual_effect, line, damage_dealt)
     }
 
     fn current_time(&self) -> u32 {
@@ -1460,17 +1468,18 @@ impl CoreGame {
                     ApplyEffect::Knockback { .. } => {}
                 }
 
-                applied_effects.push(effect);
-
-                let (log_line, _damage) =
+                let (applied, log_line, _damage) =
                     game.perform_effect_application(effect, None, None, target);
+                if let Some(applied) = applied {
+                    applied_effects.push(applied);
+                }
                 detail_lines.push(log_line);
             }
 
             for enhancement in enhancements {
                 let effect = enhancement.spell_effect.unwrap();
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-                    let (log_line, _damage) =
+                    let (applied, log_line, _damage) =
                         game.perform_effect_application(*apply_effect, None, None, target);
                     detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                 }
@@ -1574,18 +1583,21 @@ impl CoreGame {
                     if num_targets_hit > 0 {
                         apply_effect.multiply(num_targets_hit);
 
-                        let (_line, _damage) = game.perform_effect_application(
+                        let (applied, _line, _damage) = game.perform_effect_application(
                             apply_effect,
                             Some(caster),
                             None,
                             caster,
                         );
 
+                        let mut applied_effects = vec![];
+                        if let Some(applied) = applied {
+                            applied_effects.push(applied);
+                        }
+
                         target_outcomes.push((
                             caster.id(),
-                            AbilityTargetOutcome::AffectedAlly {
-                                applied_effects: vec![apply_effect],
-                            },
+                            AbilityTargetOutcome::AffectedAlly { applied_effects },
                         ));
                     }
                 }
@@ -1808,13 +1820,15 @@ impl CoreGame {
                     if reduced_to_nothing {
                         detail_lines.push(format!("'{}' was reduced to nothing (Graze)", effect));
                     } else {
-                        applied_effects.push(effect);
-                        let (log_line, damage) = game.perform_effect_application(
+                        let (applied, log_line, damage) = game.perform_effect_application(
                             effect,
                             Some(caster),
                             area_center,
                             target,
                         );
+                        if let Some(applied) = applied {
+                            applied_effects.push(applied);
+                        }
                         damage_from_effects += damage;
                         detail_lines.push(log_line);
                     }
@@ -1829,13 +1843,15 @@ impl CoreGame {
                         e.target_on_hit
                     };
                     for effect in effects.iter().flatten().flatten() {
-                        applied_effects.push(*effect);
-                        let (log_line, damage) = game.perform_effect_application(
+                        let (applied, log_line, damage) = game.perform_effect_application(
                             *effect,
                             Some(caster),
                             area_center,
                             target,
                         );
+                        if let Some(applied) = applied {
+                            applied_effects.push(applied);
+                        }
                         damage_from_effects += damage;
                         detail_lines.push(format!("{} ({})", log_line, enhancement.name));
                     }
@@ -2109,7 +2125,7 @@ impl CoreGame {
                 if let Some(effect) = on_true_hit_effect {
                     match effect {
                         AttackHitEffect::Apply(effect) => {
-                            let (log_line, _damage) = game.perform_effect_application(
+                            let (applied, log_line, _damage) = game.perform_effect_application(
                                 effect,
                                 Some(attacker),
                                 None,
@@ -2130,12 +2146,13 @@ impl CoreGame {
                                     format!("{} regained 1 AP", attacker.name)
                                 }
                                 AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                                    let (log_line, _damage) = game.perform_effect_application(
-                                        apply_effect,
-                                        Some(attacker),
-                                        None,
-                                        defender,
-                                    );
+                                    let (applied, log_line, _damage) = game
+                                        .perform_effect_application(
+                                            apply_effect,
+                                            Some(attacker),
+                                            None,
+                                            defender,
+                                        );
                                     log_line
                                 }
                             };
@@ -2160,7 +2177,7 @@ impl CoreGame {
 
                     if let Some(arrow) = used_arrow {
                         if let Some(apply_effect) = arrow.on_damage_apply {
-                            let (log_line, _damage) = game.perform_effect_application(
+                            let (applied, log_line, _damage) = game.perform_effect_application(
                                 apply_effect,
                                 Some(attacker),
                                 None,
@@ -2204,7 +2221,7 @@ impl CoreGame {
 
             for (name, effect) in enhancements {
                 if let Some(effect) = effect.on_target {
-                    let (log_line, _damage) =
+                    let (_applied, log_line, _damage) =
                         game.perform_effect_application(effect, Some(attacker), None, defender);
                     detail_lines.push(format!("{} ({})", log_line, name));
                 }
@@ -2307,7 +2324,7 @@ impl CoreGame {
                     };
 
                     if let Some((condition, duration)) = condition {
-                        let (log_line, _damage) = self.perform_effect_application(
+                        let (_applied, log_line, _damage) = self.perform_effect_application(
                             ApplyEffect::Condition(ApplyCondition {
                                 condition,
                                 stacks: None,

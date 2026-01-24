@@ -16,7 +16,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine, draw_debug, draw_text_rounded, draw_text_with_font_icons, measure_text_with_font_icons
+        draw_debug, draw_text_rounded, draw_text_with_font_icons, measure_text_with_font_icons,
+        Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
