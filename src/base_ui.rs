@@ -219,6 +219,7 @@ pub struct TextLine {
     color: Color,
     hover_color: Option<Color>,
     min_height: f32,
+    max_height: f32,
     min_width: f32,
     max_width: f32,
     right_align: bool,
@@ -240,11 +241,12 @@ impl TextLine {
         let mut this = Self {
             size: (0.0, 0.0),
             string: string.into(),
-            offset_y: 0.0,
+            offset_y: font_size as f32 * 0.6,
             font_size,
             color,
             hover_color: None,
             min_height: 0.0,
+            max_height: f32::MAX,
             min_width: 0.0,
             max_width: f32::MAX,
             right_align: false,
@@ -261,6 +263,11 @@ impl TextLine {
     pub fn set_min_height(&mut self, min_height: f32) {
         self.min_height = min_height;
         self.size.1 = self.size.1.max(min_height);
+    }
+
+    pub fn set_max_height(&mut self, max_height: f32) {
+        self.max_height = max_height;
+        self.size.1 = self.size.1.min(max_height);
     }
 
     pub fn set_min_width(&mut self, min_width: f32, right_align: bool) {
@@ -317,11 +324,12 @@ impl TextLine {
         let dim = measure_text_with_font_icons(&self.string, self.font.as_ref(), self.font_size);
         self.size = (
             dim.width.max(0.0) + self.hor_padding * 2.0,
-            dim.height.max(0.0) + self.vert_padding * 2.0,
+            //dim.height.max(0.0) + self.vert_padding * 2.0,
+            dim.offset_y.max(0.0) + self.vert_padding * 2.0,
         );
-        self.size.1 = self.size.1.max(self.min_height);
+        self.size.1 = self.size.1.max(self.min_height).min(self.max_height);
         assert!(self.size.0.is_finite() && self.size.1.is_finite());
-        self.offset_y = dim.offset_y;
+        //self.offset_y = dim.offset_y;
     }
 }
 
@@ -337,7 +345,7 @@ impl Drawable for TextLine {
             x + self.hor_padding
         };
 
-        if let Some((color, offset)) = self.depth {
+        if let Some((color, depth_offset)) = self.depth {
             let params = TextParams {
                 font_size: self.font_size,
                 color,
@@ -346,8 +354,8 @@ impl Drawable for TextLine {
             };
             draw_text_with_font_tags(
                 &self.string,
-                x0 + offset,
-                y0 + self.offset_y + offset,
+                x0 + depth_offset,
+                y0 + self.offset_y + depth_offset,
                 params,
                 false,
             );

@@ -2032,8 +2032,8 @@ impl CoreGame {
         }
 
         let mut armor_str = armor_value.to_string();
-        for (penetration, label) in armor_penetrators {
-            armor_value = armor_value.saturating_sub(penetration);
+        for (penetration, label) in &armor_penetrators {
+            armor_value = armor_value.saturating_sub(*penetration);
             armor_str.push_str(&format!(" -{} ({})", penetration, label));
         }
 
@@ -2114,6 +2114,8 @@ impl CoreGame {
             if armor_value > 0 {
                 dmg_str.push_str(&format!(" -{armor_value} (armor)"));
                 dmg_calculation -= armor_value as i32;
+            } else if !armor_penetrators.is_empty() {
+                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
             }
 
             let damage = dmg_calculation.max(0) as u32;

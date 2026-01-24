@@ -677,7 +677,7 @@ impl Drawable for PlayerCharacterPortrait {
         //self.text.draw(self.padding + x, self.padding + y);
 
         let button_h = 25.0;
-        let button_text_vert_pad = 6.0;
+        let button_text_vert_pad = 8.0;
 
         let button_y = y + h + 5.0;
         if self.character.has_taken_a_turn_this_round.get() {
@@ -805,6 +805,7 @@ impl Log {
     }
 
     pub fn add_with_details(&mut self, text: impl Into<String>, details: &[String]) {
+        dbg!(details); //TODO
         const MAX_LINES: usize = 50;
         let text = text.into();
         if self.container.children.len() == MAX_LINES {
@@ -816,6 +817,7 @@ impl Log {
         let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
         text_line.set_padding(3.0, 3.0);
         text_line.set_max_width(self.container.min_width.unwrap());
+        text_line.set_min_height(20.0);
         let text_line = Rc::new(text_line);
 
         self.text_lines.push(text_line.clone());
@@ -824,7 +826,7 @@ impl Log {
         if !details.is_empty() {
             let details_container = Container {
                 layout_dir: LayoutDirection::Vertical,
-                margin: 5.0,
+                margin: 0.0,
                 style: Style {
                     background_color: Some(BLACK),
                     padding: 5.0,
@@ -833,7 +835,12 @@ impl Log {
                 },
                 children: details
                     .iter()
-                    .map(|s| Element::Text(TextLine::new(s, 18, WHITE, Some(self.font.clone()))))
+                    .map(|s| {
+                        let mut text = TextLine::new(s, 18, WHITE, Some(self.font.clone()));
+                        text.set_min_height(20.0);
+                        text.set_max_height(20.0);
+                        Element::Text(text)
+                    })
                     .collect(),
                 ..Default::default()
             };
