@@ -27,6 +27,7 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     sounds::{SoundId, SoundPlayer},
     textures::IconId,
+    util::COL_GREEN_0,
 };
 
 use crate::action_button::ActionButton;
@@ -754,7 +755,10 @@ impl ActivityPopup {
                         let stamina = &active_char.stamina;
                         if stamina.max() > 0 {
                             let max_stamina_spend = stamina.current();
-                            stamina_slider = Some(MovementStaminaSlider::new(max_stamina_spend));
+                            stamina_slider = Some(MovementStaminaSlider::new(
+                                max_stamina_spend,
+                                self.font.clone(),
+                            ));
                         }
                     }
 
@@ -921,10 +925,11 @@ struct MovementStaminaSlider {
     cell_w: f32,
     cell_h: f32,
     has_changed: Cell<bool>,
+    font: Font,
 }
 
 impl MovementStaminaSlider {
-    fn new(max: u32) -> Self {
+    fn new(max: u32, font: Font) -> Self {
         Self {
             max,
             max_allowed: 0,
@@ -933,6 +938,7 @@ impl MovementStaminaSlider {
             cell_w: 30.0,
             cell_h: 20.0,
             has_changed: Cell::new(false),
+            font,
         }
     }
 
@@ -956,7 +962,7 @@ impl MovementStaminaSlider {
         let pad = 2.0;
         for i in 0..self.selected_i + 1 {
             let x0 = x + w * i as f32;
-            let color = if i == 0 { DARKGRAY } else { GREEN };
+            let color = if i == 0 { DARKGRAY } else { COL_GREEN_0 };
             draw_rectangle(x0 + pad, y + pad, w - pad * 2.0, h - pad * 2.0, color);
         }
         for i in 0..self.max_allowed + 1 {
@@ -967,6 +973,22 @@ impl MovementStaminaSlider {
             let x0 = x + w * i as f32;
             draw_rectangle_lines(x0, y, w, h, 1.0, DARKGRAY);
         }
+
+        let text = format!("{}", self.selected_i);
+        let font_size = 16;
+        let text_dim = measure_text(&text, Some(&self.font), font_size, 1.0);
+
+        draw_text_rounded(
+            &text,
+            x + w * self.selected_i as f32 + w / 2.0 - text_dim.width / 2.0,
+            y + w / 2.0,
+            TextParams {
+                font: Some(&self.font),
+                font_size,
+                color: WHITE,
+                ..Default::default()
+            },
+        );
 
         let x0 = x + w * self.selected_i as f32;
         let margin = 1.0;
@@ -979,35 +1001,6 @@ impl MovementStaminaSlider {
             YELLOW,
         );
 
-        /*
-        let (mouse_x, mouse_y) = mouse_position();
-        if !is_mouse_button_down(MouseButton::Left) {
-            self.is_sliding = false;
-        }
-
-        if (y..y + h).contains(&mouse_y) && (x..x + w * (self.max + 1) as f32).contains(&mouse_x) {
-            let i = ((mouse_x - x) / w) as u32;
-
-            let x0 = x + w * i as f32;
-
-            if i < self.max_allowed + 1 {
-                draw_rectangle_lines(x0, y, w, h, 2.0, WHITE);
-            } else {
-                draw_rectangle_lines(x0, y, w, h, 1.0, RED);
-            }
-
-            if is_mouse_button_pressed(MouseButton::Left) {
-                self.is_sliding = true;
-            }
-
-            if self.is_sliding {
-                let new_value = (i).min(self.max_allowed);
-                self.has_changed.set(self.selected_i != new_value);
-                self.selected_i = new_value;
-            }
-        }
-         */
-
-        draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
+        //draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
     }
 }
