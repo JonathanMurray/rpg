@@ -929,8 +929,8 @@ impl MovementStaminaSlider {
             max_allowed: 0,
             selected_i: 0,
             //is_sliding: false,
-            cell_w: 35.0,
-            cell_h: 28.0,
+            cell_w: 30.0,
+            cell_h: 20.0,
             has_changed: Cell::new(false),
         }
     }

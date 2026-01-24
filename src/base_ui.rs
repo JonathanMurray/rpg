@@ -413,6 +413,8 @@ pub fn measure_text_with_font_icons(
                 font_size = (font_size as f32 * 1.5).floor() as u16;
             } else if part.starts_with("<keyword>") {
                 part = &part["<keyword>".len()..];
+            } else if part.starts_with("<faded>") {
+                part = &part["<faded>".len()..];
             }
 
             if part.len() > 0 {
