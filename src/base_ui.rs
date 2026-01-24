@@ -15,6 +15,7 @@ use std::{
 };
 
 use crate::{
+    action_button::{draw_tooltip, Side, TooltipPositionPreference},
     drawing::draw_rounded_rectangle_lines,
     textures::{
         ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
@@ -700,6 +701,7 @@ pub struct Container {
     pub children: Vec<Element>,
     pub border_between_children: Option<Color>,
     pub scroll: Option<ContainerScroll>,
+    pub tooltip: Option<(Font, String, Vec<String>)>,
 }
 
 impl Container {
@@ -799,6 +801,22 @@ impl Container {
 
     pub fn draw_tooltips(&self, x: f32, y: f32) {
         self._draw(x, y, true);
+
+        if let Some((font, header, lines)) = self.tooltip.as_ref() {
+            let (w, h) = self.size();
+            let rect = Rect::new(x, y, w, h);
+            if rect.contains(mouse_position().into()) {
+                draw_tooltip(
+                    font,
+                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    &header,
+                    None,
+                    &lines,
+                    &[],
+                    false,
+                );
+            }
+        }
     }
 
     fn _draw(&self, x: f32, y: f32, only_tooltips: bool) -> (f32, f32) {
@@ -1056,7 +1074,7 @@ pub fn table(
         columns.push(vec![]);
     }
 
-    let mut font_size = 18;
+    let mut font_size = 16;
 
     let mut col_i = 0;
     let mut row_i = 0;

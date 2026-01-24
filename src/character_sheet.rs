@@ -78,6 +78,7 @@ impl CharacterSheet {
             children: vec![
                 Element::Empty(0.0, 30.0),
                 Element::Box(Box::new(stats_table)),
+                Element::Empty(0.0, 10.0),
                 Element::RcRefCell(conditions_list.clone()),
             ],
             ..Default::default()
@@ -93,7 +94,7 @@ impl CharacterSheet {
 
         let contents = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
-            margin: 5.0,
+            margin: 15.0,
             style: Style {
                 background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
                 padding: 10.0,
@@ -336,7 +337,8 @@ pub fn build_spell_book(
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         },
-        min_width: Some(300.0),
+        // To maintain alignment when switching between different characters' character sheet, and their spellbook contents differ in width
+        min_width: Some(360.0),
         ..Default::default()
     };
 

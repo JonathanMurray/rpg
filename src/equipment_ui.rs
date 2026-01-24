@@ -776,18 +776,18 @@ impl EquipmentStatsTable {
         for hand in [HandType::MainHand, HandType::OffHand] {
             if let Some(weapon) = character.weapon(hand) {
                 has_weapon = true;
-                cells.push("Attack dmg".into());
+                cells.push("Attack damage".into());
                 cells.push(format!("{}", weapon.damage).into());
 
-                cells.push("|<dice>| Attack mod".into());
+                cells.push("|<dice>| Attack roll".into());
                 cells.push(format!("+{}", character.attack_modifier(hand)).into());
             }
         }
         if !has_weapon {
-            cells.push("Attack dmg".into());
+            cells.push("Attack damage".into());
             cells.push("".into());
 
-            cells.push("|<dice>| Attack mod".into());
+            cells.push("|<dice>| Attack roll".into());
             cells.push("".into());
         }
 

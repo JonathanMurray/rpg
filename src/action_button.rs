@@ -158,7 +158,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect == OnHitReactionEffect::ShieldBash {
-        technical_description.push("|<dice>| Attack modifier".to_string());
+        technical_description.push("|<dice>| Attack roll".to_string());
         technical_description.push("Targets the attacker".to_string());
         technical_description.push("  |<shield>| = toughness".to_string());
         technical_description.push("  Dazed (2+)".to_string());
@@ -440,17 +440,15 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
-            AbilityRollType::Spell => "|<dice>| Spell modifier".to_string(),
-            AbilityRollType::RollAbilityWithAttackModifier => {
-                "|<dice>| Attack modifier".to_string()
-            }
+            AbilityRollType::Spell => "|<dice>| Spell roll".to_string(),
+            AbilityRollType::RollAbilityWithAttackModifier => "|<dice>| Attack roll".to_string(),
             AbilityRollType::RollDuringAttack(bonus) => {
                 if bonus < 0 {
-                    format!("|<dice>| Attack modifier (-{})", -bonus)
+                    format!("|<dice>| Attack roll (-{})", -bonus)
                 } else if bonus > 0 {
-                    format!("|<dice>| Attack modifier (+{})", bonus)
+                    format!("|<dice>| Attack roll (+{})", bonus)
                 } else {
-                    "|<dice>| Attack modifier".to_string()
+                    "|<dice>| Attack roll".to_string()
                 }
             }
         };
@@ -887,7 +885,7 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
-                    let mut technical_description = vec!["|<dice>| Attack modifier".to_string()];
+                    let mut technical_description = vec!["|<dice>| Attack roll".to_string()];
                     let range = if weapon.is_melee() {
                         "melee".to_string()
                     } else {

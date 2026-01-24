@@ -405,7 +405,7 @@ impl CharacterUi {
         let tooltip = if self.action_points_row.hovered.get() {
             Some((
                 "Action Points (AP)",
-                "Used for actions. 4 AP is restored after every turn.",
+                "Used for actions. 4 AP is restored after ending your turn.",
             ))
         } else if self.health_bar.borrow().bar.borrow().hovered.get() {
             Some((
@@ -415,7 +415,7 @@ impl CharacterUi {
         } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                "Used for movement and certain actions. 25% is restored after every turn. (Max stamina is affected by Strength and Agility.)"
+                "Used for movement and certain actions. 25% is restored after ending your turn. (Max stamina is affected by Strength and Agility.)"
             ))
         } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
             Some((
@@ -537,7 +537,8 @@ impl UserInterface {
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
-            shown: Cell::new(false),
+            // TODO
+            shown: Cell::new(true),
             text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
             padding: 7.0,
             sound_player: sound_player.clone(),

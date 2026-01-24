@@ -251,7 +251,7 @@ impl TargetUi {
                 );
                 let attack_text_line = TextLine::new(
                     format!(
-                        "|<dice>| Attack mod: +{}",
+                        "|<dice>| Attack roll: +{}",
                         char.attack_modifier(HandType::MainHand)
                     ),
                     16,
@@ -264,7 +264,7 @@ impl TargetUi {
                 ];
                 if bot_using_spells {
                     detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!("Spell mod: +{}", char.spell_modifier()),
+                        format!("Spell roll: +{}", char.spell_modifier()),
                         16,
                         LIGHTGRAY,
                         Some(self.simple_font.clone()),

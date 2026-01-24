@@ -1,13 +1,14 @@
-use std::{fmt, rc::Rc};
+use std::{default, fmt, rc::Rc};
 
 use macroquad::{
-    color::{GRAY, WHITE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, SKYBLUE, WHITE, YELLOW},
     text::Font,
 };
 
 use crate::{
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::Character,
+    util::COL_BLUE,
 };
 
 type AttributeCell = (&'static str, u32);
@@ -41,6 +42,178 @@ impl CharacterStatsTable {
 }
 
 pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> CharacterStatsTable {
+    let mut stat_cells = vec![];
+    for (label, value, name, lines) in [
+        (
+            "STR",
+            character.base_attributes.strength.get(),
+            "Strength",
+            &[
+                "Each point grants:",
+                "|<heart>| 2 health",
+                "|<stamina>| 1 stamina",
+                "|<dice>| +1 on melee attacks",
+                "|<shield>| 2 Toughness",
+            ][..],
+        ),
+        (
+            "AGI",
+            character.base_attributes.agility.get(),
+            "Agility",
+            &[
+                "Each point grants:",
+                "|<stamina>| 1 stamina",
+                "+ 0.5 movement",
+                "|<dice>| +1 on ranged attacks",
+                "|<shield>| 1 Evasion",
+            ],
+        ),
+        (
+            "INT",
+            character.base_attributes.intellect.get(),
+            "Intellect",
+            &[
+                "Each point grants:",
+                "|<dice>| +1 on spells & attacks",
+                "|<shield>| 2 Will, 0.5 Evasion",
+            ],
+        ),
+        (
+            "SPI",
+            character.base_attributes.spirit.get(),
+            "Spirit",
+            &[
+                "Each point grants:",
+                "|<mana>| 2 mana",
+                "|<dice>| +1 on spells",
+            ],
+        ),
+    ] {
+        let label_line =
+            TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
+        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(font.clone()))
+            .with_depth(BLACK, 2.0);
+        let cell = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            align: Align::Center,
+            margin: 10.0,
+            children: vec![Element::Text(label_line), Element::Text(value_line)],
+            tooltip: Some((
+                font.clone(),
+                name.to_string(),
+                lines.iter().map(|s| s.to_string()).collect(),
+                /*
+                vec![
+                    "|<keyword>Strength|: max health, stamina, Toughness, attack modifier for melee attacks"
+                        .to_string(),
+                        /*
+                    "".to_string(),
+                    "|<keyword>Agility|: stamina, Evasion, movement, attack modifier for ranged attacks"
+                        .to_string(),
+                    "".to_string(),
+                    "|<keyword>Intellect|: Will, Evasion, spell modifier".to_string(),
+                    "".to_string(),
+                    "|<keyword>Spirit|: mana, spell modifier".to_string(),
+                     */
+                ],
+                 */
+            )),
+            ..Default::default()
+        });
+        stat_cells.push(cell);
+    }
+
+    let stat_row = Element::Container(Container {
+        layout_dir: LayoutDirection::Horizontal,
+        margin: 20.0,
+        children: stat_cells,
+
+        ..Default::default()
+    });
+
+    let movement_row = Element::Text(TextLine::new(
+        format!("Movement: {}", character.base_move_speed.get()),
+        16,
+        WHITE,
+        Some(font.clone()),
+    ));
+
+    let spell_mod_row: Element = Element::Text(TextLine::new(
+        format!("|<dice>| Spell roll: +{}", character.spell_modifier()),
+        16,
+        WHITE,
+        Some(font.clone()),
+    ));
+
+    let defense_header: Element = Element::Text(TextLine::new(
+        "|<shield>| Defenses",
+        16,
+        WHITE,
+        Some(font.clone()),
+    ));
+
+    let defense_header_row = Element::Container(Container {
+        layout_dir: LayoutDirection::Vertical,
+        align: Align::Center,
+        style: Style {
+            background_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
+            padding: 2.0,
+            ..Default::default()
+        },
+        min_width: Some(150.0),
+        children: vec![defense_header],
+        ..Default::default()
+    });
+
+    let mut defense_cells = vec![];
+    for (label, value) in [
+        ("Toughness", character.toughness()),
+        ("Evasion", character.evasion()),
+        ("Will", character.will()),
+    ] {
+        let label_line =
+            TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
+        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(font.clone()))
+            .with_depth(BLACK, 2.0);
+        let cell = Element::Container(Container {
+            layout_dir: LayoutDirection::Vertical,
+            align: Align::Center,
+            margin: 10.0,
+            children: vec![Element::Text(label_line), Element::Text(value_line)],
+            ..Default::default()
+        });
+        defense_cells.push(cell);
+    }
+
+    let defense_row = Element::Container(Container {
+        layout_dir: LayoutDirection::Horizontal,
+        margin: 20.0,
+        children: defense_cells,
+        ..Default::default()
+    });
+
+    let element = Element::Container(Container {
+        layout_dir: LayoutDirection::Vertical,
+        align: Align::Center,
+        margin: 13.0,
+        style: Style {
+            border_color: Some(GRAY),
+            padding: 10.0,
+            ..Default::default()
+        },
+        children: vec![
+            stat_row,
+            Element::Empty(0.0, 0.0),
+            movement_row,
+            spell_mod_row,
+            Element::Empty(0.0, 0.0),
+            defense_header_row,
+            defense_row,
+        ],
+        ..Default::default()
+    });
+
+    /*
     let element = build_stats_table(
         font,
         16,
@@ -89,6 +262,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             ),
         ],
     );
+     */
 
     CharacterStatsTable {
         element,
