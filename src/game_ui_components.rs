@@ -885,6 +885,7 @@ pub struct ActionPointsRow {
     pub padding: f32,
     style: Style,
     radius_factor: f32,
+    pub hovered: Cell<bool>,
 }
 
 impl ActionPointsRow {
@@ -898,6 +899,7 @@ impl ActionPointsRow {
             radius_factor,
             padding: 3.0,
             style,
+            hovered: Cell::new(false),
         }
     }
 }
@@ -909,6 +911,9 @@ impl Drawable for ActionPointsRow {
         let size = self.size();
         //draw_rectangle(x, y, size.0, size.1, BLACK);
         self.style.draw_background(x, y, size);
+
+        self.hovered
+            .set(Rect::new(x, y, size.0, size.1).contains(mouse_position().into()));
 
         let mut x0 = (x + self.padding).floor();
         let y0 = (y + self.padding).floor();

@@ -402,30 +402,31 @@ impl CharacterUi {
         let resource_bars_x = resources_mid_x() - self.resource_bars.size().0 / 2.0;
         self.resource_bars.draw(resource_bars_x, resource_bars_y);
 
-        let tooltip = if self.health_bar.borrow().bar.borrow().hovered.get() {
+        let tooltip = if self.action_points_row.hovered.get() {
+            Some((
+                "Action Points (AP)",
+                "Used for actions. 4 AP is restored after every turn.",
+            ))
+        } else if self.health_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                "Does not regenerate on its own. (Increase with Strength.)",
+                "Does not regenerate on its own. (Max health is affected by Strength)",
             ))
         } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                "Used for movement and certain actions. Regenerates 25% after every turn. (Increase with Strength and Agility.)"
+                "Used for movement and certain actions. 25% is restored after every turn. (Max stamina is affected by Strength and Agility.)"
             ))
         } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                "Used for spells. Regenerates a small amount after every encounter. (Increase with Spirit.)",
+                "Used for spells. Regenerates a small amount after every encounter. (Max mana is affected by Spirit.)",
             ))
         } else {
             None
         };
 
         if let Some((header, content)) = tooltip {
-            let pos = (
-                resources_mid_x() + self.resource_bars.size().0 / 2.0 + 5.0,
-                resource_bars_y,
-            );
             draw_tooltip(
                 &self.font,
                 TooltipPositionPreference::RelativeToRect(
