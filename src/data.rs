@@ -379,16 +379,29 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
+pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::ShieldBash,
+    name: "Knockback",
+    description: "Push the target away in a straight line",
+    // TODO: unique icon
+    icon: IconId::Extend,
+    stamina_cost: 1,
+    spell_effect: Some(SpellEnhancementEffect {
+        target_on_hit: Some([Some(ApplyEffect::Knockback(3)), None]),
+        ..SpellEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
+};
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
-    description: "Strike at the enemy with your shield, dazing and knocking them back",
+    description: "Deal a small amount of damage and daze the enemy",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
     stamina_cost: 1,
     mana_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: [Some(SHIELD_BASH_KNOCKBACK), None, None],
 
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
@@ -401,7 +414,7 @@ pub const SHIELD_BASH: Ability = Ability {
                     duration_rounds: Some(1),
                     stacks: None,
                 })),
-                Some(ApplyEffect::Knockback(2)),
+                None,
             ]),
         }),
         impact_circle: None,

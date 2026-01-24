@@ -37,8 +37,8 @@ use rpg::data::{
     INSPIRE, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
     LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, MIND_BLAST, OVERWHELMING, PENETRATING_ARROWS,
     PIERCING_SHOT, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
-    SHACKLED_MIND, SHIELD_BASH, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE, SWEEP_ATTACK,
-    SWEEP_ATTACK_PRECISE, SWORD,
+    SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE,
+    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
@@ -127,6 +127,7 @@ async fn main() {
     bob.known_passive_skills.push(PassiveSkill::Reaper);
     bob.learn_ability(SWEEP_ATTACK);
     bob.learn_ability(SHIELD_BASH);
+    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
     bob.learn_ability(INSPIRE);
     bob.known_attack_enhancements.push(SMITE);
     bob.known_attack_enhancements.push(EMPOWER);
