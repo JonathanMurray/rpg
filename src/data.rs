@@ -909,7 +909,7 @@ pub const MIND_BLAST: Ability = Ability {
     name: "Mind blast",
     description: "Damage an enemy and make them lose AP",
     icon: IconId::Mindblast,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
@@ -936,7 +936,7 @@ pub const MIND_BLAST: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(13.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
-            damage: Some(AbilityDamage::Static(1)),
+            damage: Some(AbilityDamage::Static(4)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         }),
         impact_circle: None,

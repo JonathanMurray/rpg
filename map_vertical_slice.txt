@@ -7,11 +7,11 @@ H      KBH         K
 H  S   OUL  R   S  K
 H           R3     K
 H  PP      5    8  K
-H  P               K
-H       yui  R4    K
-H       nm;    R   K
-H                  K
-H   0 2CMV      67 K
-H    1 KBH         K
-NMMMMMM,BNMMMMMMMMM,
+H  P              7K
+H       yui  R4  6 K
+H       nm; CMMMMMM,
+H           KBBBBBBB
+H   0 2CMMMM,BBBBBBB
+H    1 KBBBBBBBBBBBB
+NMMMMMM,BBBBBBBBBBBB    
 +----------------------------
