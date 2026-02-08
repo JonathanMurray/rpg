@@ -1,8 +1,9 @@
 use std::collections::HashMap;
 
-use macroquad::{audio::{
-    PlaySoundParams, Sound, load_sound, play_sound, play_sound_once, stop_sound
-}, rand::ChooseRandom};
+use macroquad::{
+    audio::{load_sound, play_sound, play_sound_once, stop_sound, PlaySoundParams, Sound},
+    rand::ChooseRandom,
+};
 
 #[derive(Clone)]
 pub struct SoundPlayer {
@@ -15,7 +16,16 @@ impl SoundPlayer {
 
         for (id, names) in &[
             //(SoundId::HoverButton, vec!["click_2"]),
-            (SoundId::HoverButton, vec!["fl_click_1.ogg", "fl_click_2.ogg", "fl_click_3.ogg", "fl_click_4.ogg", "fl_click_5.ogg"]),
+            (
+                SoundId::HoverButton,
+                vec![
+                    "fl_click_1.ogg",
+                    "fl_click_2.ogg",
+                    "fl_click_3.ogg",
+                    "fl_click_4.ogg",
+                    "fl_click_5.ogg",
+                ],
+            ),
             (SoundId::ClickButton, vec!["fl_low_click.ogg"]),
             (SoundId::DragEquipment, vec!["click_2"]),
             (SoundId::DropEquipment, vec!["click_3"]),
@@ -41,7 +51,6 @@ impl SoundPlayer {
         ] {
             let mut sounds = vec![];
             for name in names {
-
                 let name = if name.ends_with(".ogg") {
                     name.to_string()
                 } else {
@@ -53,7 +62,9 @@ impl SoundPlayer {
             sounds_by_id.insert(*id, sounds);
         }
 
-        Self { sounds: sounds_by_id }
+        Self {
+            sounds: sounds_by_id,
+        }
     }
 
     pub fn play(&self, sound_id: SoundId) {

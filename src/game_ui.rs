@@ -1567,7 +1567,6 @@ impl UserInterface {
                 ability,
                 mut detail_lines,
             }) => {
-
                 if let Some(sound_id) = ability.initiate_sound {
                     self.sound_player.stop(sound_id);
                 }
@@ -1692,18 +1691,22 @@ impl UserInterface {
                     &detail_lines,
                 );
             }
-            GameEvent::CharacterDying { character } => {
+            GameEvent::CharactersDying { characters } => {
                 let duration = 0.5;
                 self.sound_player.play(SoundId::Death);
-                self.game_grid.animate_death(character, duration);
-                self.animation_stopwatch.set_to_at_least(duration);
+                for char_id in characters {
+                    self.game_grid.animate_death(char_id, duration);
+                    self.animation_stopwatch.set_to_at_least(duration);
+                }
             }
-            GameEvent::CharacterDied {
-                character,
+            GameEvent::CharactersDied {
+                characters,
                 new_active,
             } => {
-                self.log
-                    .add(format!("|{}| died", self.characters.get(character).name));
+                for char_id in characters {
+                    self.log
+                        .add(format!("|{}| died", self.characters.get(char_id).name));
+                }
 
                 self.target_ui.clear_character_if_dead();
 

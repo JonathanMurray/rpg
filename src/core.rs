@@ -250,24 +250,26 @@ impl CoreGame {
                 }
             }
             let dead_character_ids = self.characters.remove_dead();
+
             for dead_id in &dead_character_ids {
                 for ch in self.characters.iter() {
                     ch.set_not_engaged_by(*dead_id);
                     ch.set_not_engaging(*dead_id);
                 }
+            }
 
-                self.ui_handle_event(GameEvent::CharacterDying {
-                    character: *dead_id,
-                })
-                .await;
-
+            if !dead_character_ids.is_empty() {
                 let new_active = if active_character_died {
                     Some(self.active_character_id)
                 } else {
                     None
                 };
-                self.ui_handle_event(GameEvent::CharacterDied {
-                    character: *dead_id,
+                self.ui_handle_event(GameEvent::CharactersDying {
+                    characters: dead_character_ids.clone(),
+                })
+                .await;
+                self.ui_handle_event(GameEvent::CharactersDied {
+                    characters: dead_character_ids.clone(),
                     new_active,
                 })
                 .await;
@@ -2733,11 +2735,11 @@ pub enum GameEvent {
         consumable: Consumable,
         detail_lines: Vec<String>,
     },
-    CharacterDying {
-        character: CharacterId,
+    CharactersDying {
+        characters: Vec<CharacterId>,
     },
-    CharacterDied {
-        character: CharacterId,
+    CharactersDied {
+        characters: Vec<CharacterId>,
         new_active: Option<CharacterId>,
     },
     NewActiveCharacter {
