@@ -6,7 +6,7 @@ use macroquad::{
 use crate::{
     action_button::Keyword,
     core::{
-        Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
+        Ability, AbilityChargeFx, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
         AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
         ApplyCondition, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition, ArmorPiece,
         Arrow, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
@@ -16,6 +16,7 @@ use crate::{
         OnHitReactionEffect, Range, Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon,
         WeaponGrip, WeaponRange, WeaponType,
     },
+    grid::ParticleShape,
     sounds::SoundId,
     textures::{EquipmentIconId, IconId, SpriteId},
 };
@@ -423,6 +424,7 @@ pub const SHIELD_BASH: Ability = Ability {
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: None,
 };
 
 pub const ENEMY_TACKLE: Ability = Ability {
@@ -452,10 +454,11 @@ pub const ENEMY_TACKLE: Ability = Ability {
         }),
         impact_circle: None,
     },
-    animation_color: RED,
+    animation_color: GRAY,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: None,
 };
 
 pub const SMALL_SHIELD: Shield = Shield {
@@ -664,9 +667,13 @@ pub const SWEEP_ATTACK: Ability = Ability {
         }),
         self_effect: None,
     },
-    animation_color: MAGENTA,
+    animation_color: BLACK,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
@@ -722,9 +729,13 @@ pub const LUNGE_ATTACK: Ability = Ability {
         effect: AbilityNegativeEffect::PerformAttack,
         impact_circle: None,
     },
-    animation_color: MAGENTA,
+    animation_color: GRAY,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 // TODO Should not be possible to use Brace if you already have that number of Protected stacks
@@ -753,9 +764,10 @@ pub const ENEMY_BRACE: Ability = Ability {
             ]),
         }),
     },
-    animation_color: MAGENTA,
+    animation_color: GRAY,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: None,
 };
 
 pub const BRACE: Ability = Ability {
@@ -783,9 +795,13 @@ pub const BRACE: Ability = Ability {
             ]),
         }),
     },
-    animation_color: MAGENTA,
+    animation_color: GRAY,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
@@ -836,6 +852,10 @@ pub const SCREAM: Ability = Ability {
     animation_color: BLUE,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const SHACKLED_MIND: Ability = Ability {
@@ -902,6 +922,10 @@ pub const SHACKLED_MIND: Ability = Ability {
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Rect,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const MIND_BLAST: Ability = Ability {
@@ -944,6 +968,10 @@ pub const MIND_BLAST: Ability = Ability {
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhancement {
@@ -994,9 +1022,13 @@ pub const INFLICT_WOUNDS: Ability = Ability {
             })),
         },
     },
-    animation_color: PURPLE,
+    animation_color: BROWN,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
@@ -1030,6 +1062,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     animation_color: BROWN,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
+    charge_fx: None,
 };
 
 pub const MAGI_INFLICT_HORRORS: Ability = Ability {
@@ -1063,6 +1096,7 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
+    charge_fx: None,
 };
 
 pub const MAGI_HEAL: Ability = Ability {
@@ -1087,6 +1121,7 @@ pub const MAGI_HEAL: Ability = Ability {
     animation_color: LIME,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: None,
 };
 
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
@@ -1147,6 +1182,10 @@ pub const HEAL: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const HASTE: Ability = Ability {
@@ -1179,6 +1218,10 @@ pub const HASTE: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const INSPIRE: Ability = Ability {
@@ -1214,6 +1257,10 @@ pub const INSPIRE: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const ENEMY_INSPIRE: Ability = Ability {
@@ -1249,6 +1296,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: None,
 };
 
 pub const HEALING_NOVA: Ability = Ability {
@@ -1277,6 +1325,10 @@ pub const HEALING_NOVA: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const ENEMY_SELF_HEAL: Ability = Ability {
@@ -1308,6 +1360,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: None,
 };
 
 pub const SELF_HEAL: Ability = Ability {
@@ -1339,6 +1392,10 @@ pub const SELF_HEAL: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const HEALING_RAIN: Ability = Ability {
@@ -1368,6 +1425,10 @@ pub const HEALING_RAIN: Ability = Ability {
     animation_color: GREEN,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const PIERCING_SHOT: Ability = Ability {
@@ -1393,6 +1454,10 @@ pub const PIERCING_SHOT: Ability = Ability {
     animation_color: RED,
     initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: Some(SoundId::HitArrow),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
@@ -1444,8 +1509,10 @@ pub const FIREBALL: Ability = Ability {
     name: "Fireball",
     description: "Hurl fire at an enemy, dealing area damage",
     icon: IconId::Fireball,
-    action_point_cost: 3,
-    mana_cost: 2,
+    // TODO
+    action_point_cost: 0,
+    // TODO
+    mana_cost: 0,
     stamina_cost: 0,
     requirement: None,
 
@@ -1475,7 +1542,11 @@ pub const FIREBALL: Ability = Ability {
 
     animation_color: RED,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Explosion),
+    resolve_sound: Some(SoundId::FireballHit),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::FireCrackle,
+    }),
 };
 
 pub const KILL: Ability = Ability {
@@ -1502,6 +1573,10 @@ pub const KILL: Ability = Ability {
     animation_color: BLACK,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
@@ -1554,6 +1629,10 @@ pub const SEARING_LIGHT: Ability = Ability {
     animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
 };
 
 pub const HEALTH_POTION: Consumable = Consumable {

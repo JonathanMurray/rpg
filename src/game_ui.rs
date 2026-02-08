@@ -1206,9 +1206,6 @@ impl UserInterface {
     }
 
     fn on_new_state(&mut self) {
-        // TODO
-        //self.sound_player.click();
-
         //dbg!(&self.state.borrow());
         //println!("^^^ on_new_state() ^^^");
 
@@ -1221,9 +1218,20 @@ impl UserInterface {
         let mut is_reacting = None;
         let mut is_reacting_to_attack = false;
 
+        self.sound_player.stop(SoundId::FireCrackle);
+        self.sound_player.stop(SoundId::MechanicNoise);
+
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
                 self.set_allowed_to_use_action_buttons(true);
+
+                if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
+                    if ability.id == AbilityId::Fireball {
+                        self.sound_player.play_looping(SoundId::FireCrackle);
+                    } else {
+                        self.sound_player.play_looping(SoundId::MechanicNoise);
+                    }
+                }
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
                     .tracked_action_buttons
@@ -1500,7 +1508,7 @@ impl UserInterface {
 
                 let with_shield = ability.id == AbilityId::ShieldBash;
                 self.game_grid
-                    .animate_character_acting(actor, with_shield, 0.2);
+                    .animate_character_acting(actor, with_shield, 0.3);
 
                 let duration;
 
@@ -1509,9 +1517,10 @@ impl UserInterface {
                 if let Some(target) = &target {
                     let target_pos = self.characters.get(*target).pos();
 
-                    duration = 0.05 * distance_between(caster_pos, target_pos);
+                    duration = 0.04 * distance_between(caster_pos, target_pos);
 
                     self.add_circle_projectile_effect(
+                        0.1,
                         duration,
                         animation_color,
                         caster_pos,
@@ -1522,6 +1531,7 @@ impl UserInterface {
                     match shape {
                         AreaShape::Circle(range) => {
                             self.add_circle_projectile_effect(
+                                0.0,
                                 duration,
                                 animation_color,
                                 caster_pos,
@@ -1548,7 +1558,7 @@ impl UserInterface {
                 } else {
                     duration = 0.3;
                 }
-                self.animation_stopwatch.set_to_at_least(duration - 0.1);
+                self.animation_stopwatch.set_to_at_least(duration + 0.1);
             }
             GameEvent::AbilityResolved(AbilityResolvedEvent {
                 actor,
@@ -1557,6 +1567,11 @@ impl UserInterface {
                 ability,
                 mut detail_lines,
             }) => {
+
+                if let Some(sound_id) = ability.initiate_sound {
+                    self.sound_player.stop(sound_id);
+                }
+
                 if let Some(sound_id) = ability.resolve_sound {
                     let mut skip_sound = false;
                     if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
@@ -1679,6 +1694,7 @@ impl UserInterface {
             }
             GameEvent::CharacterDying { character } => {
                 let duration = 0.5;
+                self.sound_player.play(SoundId::Death);
                 self.game_grid.animate_death(character, duration);
                 self.animation_stopwatch.set_to_at_least(duration);
             }
@@ -1686,7 +1702,6 @@ impl UserInterface {
                 character,
                 new_active,
             } => {
-                self.sound_player.play(SoundId::Death);
                 self.log
                     .add(format!("|{}| died", self.characters.get(character).name));
 
@@ -1796,6 +1811,7 @@ impl UserInterface {
 
     fn add_circle_projectile_effect(
         &mut self,
+        start_time: f32,
         duration: f32,
         animation_color: Color,
         caster_pos: (i32, i32),
@@ -1805,8 +1821,8 @@ impl UserInterface {
             caster_pos,
             target_pos,
             Effect {
-                start_time: 0.0,
-                end_time: duration,
+                start_time: start_time,
+                end_time: start_time + duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
@@ -1823,8 +1839,8 @@ impl UserInterface {
             caster_pos,
             target_pos,
             Effect {
-                start_time: 0.025,
-                end_time: duration,
+                start_time: start_time + 0.025,
+                end_time: start_time + duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
@@ -1840,8 +1856,8 @@ impl UserInterface {
             caster_pos,
             target_pos,
             Effect {
-                start_time: 0.05,
-                end_time: duration,
+                start_time: start_time + 0.05,
+                end_time: start_time + duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
                     EffectGraphics::Circle {
@@ -1940,7 +1956,7 @@ impl UserInterface {
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
-        let projectile_duration = 0.03 * distance_between(attacker_pos, target_pos);
+        let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.3);
 
         self.game_grid
             .animate_character_acting(attacker, false, projectile_duration.max(0.2));

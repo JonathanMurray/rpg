@@ -5,11 +5,12 @@ use std::{
     f32::consts::PI,
     iter,
     rc::Rc,
+    str::CharIndices,
 };
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, BLUE, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams},
@@ -37,7 +38,7 @@ use crate::{
         draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons, Drawable, Style,
     },
     core::{
-        target_within_range_squared, within_range_squared, AbilityReach, AbilityTarget,
+        target_within_range_squared, within_range_squared, AbilityId, AbilityReach, AbilityTarget,
         ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MovementType,
         Position, MOVE_DISTANCE_PER_STAMINA,
     },
@@ -190,6 +191,39 @@ pub enum RangeIndicator {
     CannotReach,
 }
 
+const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
+
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum TextEffectStyle {
+    Friendly,
+    Miss,
+    ReactionExclamation,
+    HostileGraze,
+    HostileHit,
+    HostileCrit,
+}
+
+struct ParticleGroup {
+    character_id: CharacterId,
+    ability_id: AbilityId,
+    particles: Vec<Particle>,
+    color: Color,
+    shape: ParticleShape,
+}
+
+struct Particle {
+    x: f32,
+    y: f32,
+    radius: f32,
+    alpha: f32,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum ParticleShape {
+    Circle,
+    Rect,
+}
+
 pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
@@ -202,6 +236,7 @@ pub struct GameGrid {
     //routes: IndexMap<Position, ChartNode>,
     characters: Characters,
 
+    ability_character_animation: Option<ParticleGroup>,
     target_damage_previews: HashMap<CharacterId, TargetDamagePreview>,
     character_animations: Vec<CharacterAnimation>,
     pub grid_dimensions: (u32, u32),
@@ -223,18 +258,6 @@ pub struct GameGrid {
     status_textures: HashMap<StatusId, Texture2D>,
 
     sound_player: SoundPlayer,
-}
-
-const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
-
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum TextEffectStyle {
-    Friendly,
-    Miss,
-    ReactionExclamation,
-    HostileGraze,
-    HostileHit,
-    HostileCrit,
 }
 
 impl GameGrid {
@@ -273,6 +296,7 @@ impl GameGrid {
             cell_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
+            ability_character_animation: Default::default(),
             target_damage_previews: Default::default(),
             character_animations: Default::default(),
             big_font,
@@ -327,7 +351,7 @@ impl GameGrid {
         with_shield: bool,
         duration: f32,
     ) {
-        let random_rotation = random_range(-0.05..0.05);
+        let random_rotation = random_range(-0.1..0.1);
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
@@ -436,6 +460,34 @@ impl GameGrid {
         }
         self.character_animations
             .retain(|a| a.remaining_duration > 0.0);
+
+        if let Some(particle_group) = &mut self.ability_character_animation {
+            let mut rng = rand::rng();
+            let mut fresh_count = 0;
+            for particle in &mut particle_group.particles {
+                particle.y -= elapsed * 1.5;
+                particle.alpha -= elapsed * (0.1 + rng.random_range(0.0..0.2));
+                if particle.alpha > 0.2 {
+                    fresh_count += 1;
+                }
+            }
+            particle_group.particles.retain(|p| p.alpha > 0.0);
+            for _ in 0..(3 - fresh_count) {
+                let char_pos = self.characters.get(particle_group.character_id).pos();
+                let px = char_pos.0 as f32 + 0.5 + rng.random_range(-1.3..=1.3);
+                let py = char_pos.1 as f32 + 0.2 + rng.random_range(-1.0..=0.0);
+                let radius = 2.0 + rng.random_range(0.0..5.0);
+
+                let p = Particle {
+                    x: px,
+                    y: py,
+                    radius,
+                    alpha: 0.15 + rng.random_range(0.0..0.2),
+                };
+
+                particle_group.particles.push(p);
+            }
+        }
 
         let camera_speed = 5.0;
         if is_key_down(KeyCode::Left) {
@@ -727,12 +779,12 @@ impl GameGrid {
                     random_rotation,
                     with_shield,
                 } => {
-                    y -= self.cell_w * 0.07;
+                    y -= self.cell_w * 0.2;
                     params.rotation = random_rotation;
                     if with_shield {
                         shield_offset = (2.0, -5.0);
                     } else {
-                        weapon_rotation_modifier = PI * 0.2;
+                        weapon_rotation_modifier = PI * 0.3;
                         if !character.is_facing_east.get() {
                             weapon_rotation_modifier *= -1.0;
                         }
@@ -912,14 +964,44 @@ impl GameGrid {
             self.draw_movement_path_background(self.active_character_id);
         }
 
+        let mut is_casting = None;
         if let UiState::ConfiguringAction(ConfiguredAction::UseAbility { ability, .. }) = ui_state {
             if ability.has_knockback() {
                 self.draw_filled_occupied_cells();
             }
+            // TODO: different graphics for different abilities
+            /*
+            if ability.id == AbilityId::Fireball {
+                is_casting = Some(ability.animation_color);
+            } else if ability.id == AbilityId::ShackledMind {
+                is_casting = Some(ability.animation_color);
+            }
+             */
+            if ability.charge_fx.is_some() {
+                is_casting = Some(ability);
+            }
+        }
+
+        if let Some(ability) = is_casting {
+            if self
+                .ability_character_animation
+                .as_ref()
+                .map(|group| group.ability_id != ability.id)
+                .unwrap_or(true)
+            {
+                self.ability_character_animation = Some(ParticleGroup {
+                    ability_id: ability.id,
+                    character_id: self.active_character_id,
+                    particles: vec![],
+                    color: ability.animation_color,
+                    shape: ability.charge_fx.unwrap().particle_shape,
+                });
+            }
+        } else {
+            self.ability_character_animation = None;
         }
 
         let mut is_aiming_area = false;
-
         let mouse_state = match ui_state {
             UiState::ChoosingAction => MouseState::None,
 
@@ -1050,6 +1132,20 @@ impl GameGrid {
             }
 
             self.draw_character(character);
+
+            if let Some(group) = &self.ability_character_animation {
+                for particle in &group.particles {
+                    let x = self.grid_x_f32_to_screen(particle.x);
+                    let y = self.grid_y_f32_to_screen(particle.y);
+                    let mut color = group.color;
+                    color.a = particle.alpha;
+                    let r = particle.radius;
+                    match group.shape {
+                        ParticleShape::Circle => draw_circle(x, y, r, color),
+                        ParticleShape::Rect => draw_rectangle(x - r, y - r, r, r, color),
+                    }
+                }
+            }
 
             if is_key_down(KeyCode::LeftAlt) {
                 labelled_char_ids.insert(character.id());

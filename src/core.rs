@@ -15,6 +15,7 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
+use crate::grid::ParticleShape;
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid};
 use crate::sounds::SoundId;
@@ -3663,6 +3664,12 @@ pub enum HandType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub struct AbilityChargeFx {
+    pub(crate) particle_shape: ParticleShape,
+    pub(crate) sound: SoundId,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Ability {
     pub id: AbilityId,
     pub name: &'static str,
@@ -3679,6 +3686,7 @@ pub struct Ability {
     pub animation_color: Color,
     pub initiate_sound: Option<SoundId>,
     pub resolve_sound: Option<SoundId>,
+    pub charge_fx: Option<AbilityChargeFx>,
 }
 
 impl Ability {

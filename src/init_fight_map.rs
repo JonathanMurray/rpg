@@ -322,7 +322,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             );
             e1.learn_ability(ENEMY_TACKLE);
             e1.known_passive_skills.push(PassiveSkill::BloodRage);
-            e1.health.change_max_value_to(3);
+            e1.health.change_max_value_to(300);
             enemies.push(e1);
 
             enemies.push(Character::new(
