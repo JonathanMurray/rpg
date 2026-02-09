@@ -5747,12 +5747,14 @@ impl Character {
 }
 
 fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
+    /*
     println!(
         "Check if target {} (pos={:?}) is flanked, from attacker pos {:?} ...",
         target.name,
         target.pos(),
         attacker_pos
     );
+     */
     let target_is_immune_to_flanking = target
         .known_passive_skills
         .contains(&PassiveSkill::ThrillOfBattle);

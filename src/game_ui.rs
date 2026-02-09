@@ -7,6 +7,7 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, RED, WHITE},
+    conf,
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     shapes::draw_rectangle,
@@ -154,6 +155,16 @@ pub enum ConfiguredAction {
 }
 
 impl ConfiguredAction {
+    fn has_target(&self) -> bool {
+        match self {
+            ConfiguredAction::Attack { target, .. } => target.is_some(),
+            ConfiguredAction::UseAbility { target, .. } => !matches!(target, ActionTarget::None),
+            ConfiguredAction::Move { .. } => false,
+            ConfiguredAction::ChangeEquipment { .. } => false,
+            ConfiguredAction::UseConsumable(..) => false,
+        }
+    }
+
     fn usability_problem(
         &self,
         relevant_character: &Character,
@@ -839,6 +850,12 @@ impl UserInterface {
         }
 
         if outcome.switched_players_action_target {
+            if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
+                if configured_action.has_target() {
+                    self.sound_player.play(SoundId::SelectTarget);
+                }
+            }
+
             self.refresh_target_state();
         }
 

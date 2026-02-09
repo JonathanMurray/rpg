@@ -31,14 +31,14 @@ impl SoundPlayer {
             (SoundId::DropEquipment, vec!["click_3"]),
             (SoundId::Explosion, vec!["explosion"]),
             (SoundId::FireballHit, vec!["fl_fireball_hit.ogg"]),
-            (SoundId::Powerup, vec!["powerup"]),
+            (SoundId::Powerup, vec!["fl_spell_buff.ogg"]),
             (SoundId::MeleeAttack, vec!["melee_attack"]),
             (SoundId::ShootArrow, vec!["shoot_arrow_2"]),
             (SoundId::HitArrow, vec!["hit_arrow"]),
             (SoundId::Walk, vec!["walk3"]),
-            (SoundId::Debuff, vec!["debuff"]),
+            (SoundId::Debuff, vec!["fl_spell_debuff.ogg"]),
             (SoundId::ShootSpell, vec!["fl_spell_projectile_2.ogg"]),
-            (SoundId::Death, vec!["death"]),
+            (SoundId::Death, vec!["fl_death.ogg"]),
             (SoundId::SheetOpen, vec!["sheet_open"]),
             (SoundId::SheetClose, vec!["sheet_close"]),
             (SoundId::Burning, vec!["fire"]),
@@ -48,6 +48,7 @@ impl SoundPlayer {
             //(SoundId::FireCrackle, vec!["looping_effect.ogg"]),
             (SoundId::FireCrackle, vec!["fl_crackling_noise_2.ogg"]),
             (SoundId::MechanicNoise, vec!["fl_wobble.ogg"]),
+            (SoundId::SelectTarget, vec!["fl_blip_3.ogg"]),
         ] {
             let mut sounds = vec![];
             for name in names {
@@ -118,4 +119,5 @@ pub enum SoundId {
     YourTurn,
     FireCrackle,
     MechanicNoise,
+    SelectTarget,
 }
