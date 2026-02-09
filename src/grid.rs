@@ -862,6 +862,7 @@ impl GameGrid {
         ui_state: &mut UiState,
         obstructed: bool,
         hovered_action: Option<(CharacterId, BaseAction)>,
+        active_char_reserved_and_hovered_ap: (i32, i32),
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
         // TODO
@@ -1769,11 +1770,14 @@ impl GameGrid {
         }
 
         for char in self.characters.iter() {
-            let draw_action_points =
-                char.player_controlled() && !char.has_taken_a_turn_this_round.get();
             let draw_name = labelled_char_ids.contains(&char.id());
             let discrete_healthbar = !draw_name;
-            self._draw_character_label(char, draw_action_points, draw_name, discrete_healthbar);
+            self._draw_character_label(
+                char,
+                draw_name,
+                discrete_healthbar,
+                active_char_reserved_and_hovered_ap,
+            );
         }
 
         for char_animation in &self.character_animations {
@@ -2081,10 +2085,13 @@ impl GameGrid {
     fn _draw_character_label(
         &self,
         character: &Character,
-        draw_action_points: bool,
         draw_name: bool,
         discrete_healthbar: bool,
+        active_char_reserved_and_hovered_ap: (i32, i32),
     ) {
+        let draw_action_points =
+            character.player_controlled() && !character.has_taken_a_turn_this_round.get();
+
         let (x, y) = self.character_screen_pos(character);
         let sprite_h = character_sprite_height(character.sprite);
         let texture_h = 32.0;
@@ -2127,6 +2134,9 @@ impl GameGrid {
                     ..Default::default()
                 },
             );
+            if character.id() == self.active_character_id {
+                action_points_row.reserved_and_hovered_ap = active_char_reserved_and_hovered_ap;
+            }
             action_points_row.padding = 1.0;
             action_points_row.current_ap = character.action_points.current();
             action_points_row.draw(

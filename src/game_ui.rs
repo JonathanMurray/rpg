@@ -641,11 +641,17 @@ impl UserInterface {
             }
         }
 
+        let character_ui = self
+            .character_uis
+            .get_mut(&self.player_portraits.selected_id())
+            .unwrap();
+
         let grid_outcome = self.game_grid.draw(
             is_grid_receptive_to_dragging,
             &mut self.state.borrow_mut(),
             is_grid_obstructed,
             hovered_action,
+            character_ui.action_points_row.reserved_and_hovered_ap,
         );
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
