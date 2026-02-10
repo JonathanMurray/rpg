@@ -49,7 +49,7 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
-    sounds::SoundPlayer,
+    sounds::{SoundId, SoundPlayer},
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
     util::{line_collision, rgb, COL_GRAY, COL_RED},
 };
@@ -868,6 +868,8 @@ impl GameGrid {
         // TODO
         let receptive_to_input = !obstructed;
 
+        let prev_hovered = self.hovered_character;
+
         let prev_inspect_target = self.hovered_character.or(self.locked_inspection_target);
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
@@ -1539,6 +1541,9 @@ impl GameGrid {
                 let hovered_char = self.characters.get(hovered_id);
                 if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
+                        if prev_hovered != Some(hovered_id) {
+                            self.sound_player.play(SoundId::HoverTarget);
+                        }
                         self.draw_cornered_outline(
                             self.grid_pos_to_screen(hovered_char.pos()),
                             HOVER_ALLY_COLOR,
@@ -1606,6 +1611,9 @@ impl GameGrid {
                                 positions,
                             );
                         } else {
+                            if prev_hovered != Some(hovered_id) {
+                                self.sound_player.play(SoundId::HoverTarget);
+                            }
                             self.draw_cornered_outline(
                                 self.grid_pos_to_screen(hovered_char.pos()),
                                 HOVER_ENEMY_COLOR,

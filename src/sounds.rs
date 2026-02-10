@@ -49,6 +49,7 @@ impl SoundPlayer {
             (SoundId::FireCrackle, vec!["fl_crackling_noise_2.ogg"]),
             (SoundId::MechanicNoise, vec!["fl_wobble.ogg"]),
             (SoundId::SelectTarget, vec!["fl_blip_3.ogg"]),
+            (SoundId::HoverTarget, vec!["fl_blip_short_3.ogg"]),
         ] {
             let mut sounds = vec![];
             for name in names {
@@ -121,4 +122,5 @@ pub enum SoundId {
     FireCrackle,
     MechanicNoise,
     SelectTarget,
+    HoverTarget,
 }
