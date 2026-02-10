@@ -1,5 +1,6 @@
 pub mod action_button;
 mod activity_popup;
+mod banner;
 pub mod base_ui;
 pub mod bot;
 mod character_sheet;

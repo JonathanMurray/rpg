@@ -23,6 +23,7 @@ use crate::{
         ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
+    banner::Banner,
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
     character_sheet::CharacterSheet,
     conditions_ui::ConditionsList,
@@ -465,7 +466,10 @@ pub struct UserInterface {
     state: Rc<RefCell<UiState>>,
     animation_stopwatch: StopWatch,
 
-    font: Font,
+    banner: Banner,
+
+    simple_font: Font,
+    big_font: Font,
 
     hovered_button: Option<ButtonHovered>,
     active_character_id: CharacterId,
@@ -579,6 +583,9 @@ impl UserInterface {
             sound_player.clone(),
         );
 
+        let mut banner = Banner::new();
+        banner.set("Battle!", 3.0);
+
         Self {
             game_grid,
             characters,
@@ -589,7 +596,10 @@ impl UserInterface {
             remembered_attack_enhancements: Default::default(),
             animation_stopwatch: StopWatch::default(),
 
-            font: simple_font.clone(),
+            banner,
+
+            simple_font: simple_font.clone(),
+            big_font: big_font.clone(),
 
             hovered_button: None,
             log: Log::new(simple_font.clone()),
@@ -793,13 +803,15 @@ impl UserInterface {
             {
                 let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
                 draw_button_tooltip(
-                    &self.font,
+                    &self.simple_font,
                     btn_hovered.hovered_pos.unwrap(),
                     &btn.tooltip(),
                     detailed_tooltip,
                 );
             }
         }
+
+        self.banner.draw(&self.big_font);
 
         player_chose
     }
@@ -1750,9 +1762,13 @@ impl UserInterface {
                 self.set_new_active_character_id(new_active);
                 if self.active_character().player_controlled() {
                     if !was_players_turn {
+                        self.banner.set("Your turn", 1.5);
                         self.sound_player.play(SoundId::YourTurn);
                     }
                 } else {
+                    if was_players_turn {
+                        self.banner.set("Enemy turn", 1.5);
+                    }
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
