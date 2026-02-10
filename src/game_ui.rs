@@ -714,6 +714,7 @@ impl UserInterface {
                         player_chose
                     );
                 }
+
                 player_chose = Some(PlayerChose::SwitchTo(selected_character_id));
             }
         }
@@ -821,6 +822,7 @@ impl UserInterface {
                     .has_taken_a_turn_this_round
                     .get()
             {
+                self.sound_player.play(SoundId::ClickButton);
                 return Some(PlayerChose::SwitchTo(new_selected_player_char));
             } else {
                 self.set_selected_character(new_selected_player_char);

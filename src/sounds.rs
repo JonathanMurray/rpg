@@ -69,6 +69,7 @@ impl SoundPlayer {
     }
 
     pub fn play(&self, sound_id: SoundId) {
+        dbg!(sound_id);
         let sounds = &self.sounds[&sound_id];
         let sound = if sounds.len() == 1 {
             &sounds[0]

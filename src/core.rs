@@ -27,7 +27,7 @@ pub type Position = (i32, i32);
 pub const MAX_ACTION_POINTS: u32 = 6;
 pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
-pub const MOVE_DISTANCE_PER_STAMINA: u32 = 3;
+pub const MOVE_DISTANCE_PER_STAMINA: u32 = 4;
 
 #[derive(Debug)]
 enum ActionOutcome {

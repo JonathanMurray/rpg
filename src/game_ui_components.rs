@@ -502,6 +502,7 @@ impl PlayerPortraits {
 
         if is_key_pressed(KeyCode::Tab) {
             self.toggle_active_id();
+            self.sound_player.play(SoundId::ClickButton);
             change_attempt = true;
         }
 
