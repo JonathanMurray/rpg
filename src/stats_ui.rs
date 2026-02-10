@@ -43,7 +43,7 @@ impl CharacterStatsTable {
 
 pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> CharacterStatsTable {
     let mut stat_cells = vec![];
-    for (label, value, name, lines) in [
+    for (label, value, name, tooltip_lines) in [
         (
             "STR",
             character.base_attributes.strength.get(),
@@ -101,22 +101,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             tooltip: Some((
                 font.clone(),
                 name.to_string(),
-                lines.iter().map(|s| s.to_string()).collect(),
-                /*
-                vec![
-                    "|<keyword>Strength|: max health, stamina, Toughness, attack modifier for melee attacks"
-                        .to_string(),
-                        /*
-                    "".to_string(),
-                    "|<keyword>Agility|: stamina, Evasion, movement, attack modifier for ranged attacks"
-                        .to_string(),
-                    "".to_string(),
-                    "|<keyword>Intellect|: Will, Evasion, spell modifier".to_string(),
-                    "".to_string(),
-                    "|<keyword>Spirit|: mana, spell modifier".to_string(),
-                     */
-                ],
-                 */
+                tooltip_lines.iter().map(|s| s.to_string()).collect(),
             )),
             ..Default::default()
         });
@@ -166,10 +151,22 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
     });
 
     let mut defense_cells = vec![];
-    for (label, value) in [
-        ("Toughness", character.toughness()),
-        ("Evasion", character.evasion()),
-        ("Will", character.will()),
+    for (label, value, tooltip_lines) in [
+        (
+            "Toughness",
+            character.toughness(),
+            &["Protection against physical harm that can't be dodged"][..],
+        ),
+        (
+            "Evasion",
+            character.evasion(),
+            &["Protection against melee attacks and projectiles"][..],
+        ),
+        (
+            "Will",
+            character.will(),
+            &["Protection against non-physical harm"][..],
+        ),
     ] {
         let label_line =
             TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
@@ -180,6 +177,11 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             align: Align::Center,
             margin: 10.0,
             children: vec![Element::Text(label_line), Element::Text(value_line)],
+            tooltip: Some((
+                font.clone(),
+                label.to_string(),
+                tooltip_lines.iter().map(|s| s.to_string()).collect(),
+            )),
             ..Default::default()
         });
         defense_cells.push(cell);
