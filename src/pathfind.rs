@@ -384,6 +384,13 @@ impl PathfindGrid {
         // A character takes up 9 cells in a square. Check that each cell is free
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
+                if !(0..self.dimensions.0 as i32).contains(&x)
+                    || !(0..self.dimensions.1 as i32).contains(&y)
+                {
+                    // This cell is outside of the grid
+                    return false;
+                }
+
                 match self.occupied.borrow().get(&(x, y)) {
                     Some(Occupation::Character(id)) => {
                         if *id != character_id {

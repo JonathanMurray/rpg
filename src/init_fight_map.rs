@@ -317,7 +317,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
-                Attributes::new(8, 1, 1, 1),
+                Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
             );
             e1.learn_ability(ENEMY_TACKLE);
@@ -490,6 +490,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         terrain_objects.insert((x, y), id);
     }
 
+    // TODO: This should be dynamic based on map file
     let grid_dimensions: (u32, u32) = (20 * CELLS_PER_ENTITY, 15 * CELLS_PER_ENTITY);
 
     let mut background: HashMap<Position, TerrainId> = Default::default();

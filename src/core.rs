@@ -658,6 +658,17 @@ impl CoreGame {
                 );
             }
 
+            if !(0..self.pathfind_grid.dimensions().0 as i32).contains(&new_position.0)
+                || !(0..self.pathfind_grid.dimensions().1 as i32).contains(&new_position.1)
+            {
+                panic!(
+                    "Character {} tried to move out of the map, from {:?} to {:?}",
+                    character.id(),
+                    character.pos(),
+                    new_position
+                )
+            }
+
             for other_char in self.characters.iter() {
                 let unfriendly = other_char.player_controlled() != character.player_controlled();
                 let leaving_melee = within_meele(character.pos(), other_char.pos())
