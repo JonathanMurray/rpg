@@ -19,9 +19,7 @@ use crate::{
         draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
         InternalUiEvent,
     },
-    base_ui::{
-        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons, Drawable,
-    },
+    base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::{draw_cross, draw_dashed_line},
     game_ui::{ConfiguredAction, UiState},
@@ -305,7 +303,7 @@ impl ActivityPopup {
 
             if let Some(error) = &self.proceed_button_error {
                 let font_size = 22;
-                let text_dim = measure_text_with_font_icons(&error, Some(&self.font), font_size);
+                let text_dim = measure_text_with_font_tags(&error, Some(&self.font), font_size);
                 draw_text_with_font_tags(
                     &error,
                     x + width - text_dim.width - 10.0,

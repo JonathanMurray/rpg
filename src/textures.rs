@@ -628,6 +628,7 @@ pub async fn load_and_init_font_symbols() {
     HEART_SYMBOL.get_or_init(|| symbol(0, 1));
     STAMINA_SYMBOL.get_or_init(|| symbol(1, 1));
     MANA_SYMBOL.get_or_init(|| symbol(2, 1));
+    SWORD_SYMBOL.get_or_init(|| symbol(0, 2));
 }
 
 pub async fn load_and_init_ui_textures() {
@@ -648,6 +649,7 @@ pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HEART_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MANA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

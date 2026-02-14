@@ -32,8 +32,9 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction,
         AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent,
-        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, GameEvent, Goodness,
-        HandType, MovementType, OnAttackedReaction, OnHitReaction, Position,
+        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageInterval,
+        GameEvent, Goodness, HandType, MovementType, OnAttackedReaction, OnHitReaction, Position,
+        TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -42,7 +43,7 @@ use crate::{
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
-        TargetDamagePreview, TextEffectStyle,
+        TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
     sounds::{SoundId, SoundPlayer},
@@ -155,6 +156,8 @@ pub enum ConfiguredAction {
     UseConsumable(Option<EquipmentConsumption>),
 }
 
+const OUT_OF_REACH: &'static str = "Out of reach";
+
 impl ConfiguredAction {
     fn has_target(&self) -> bool {
         match self {
@@ -191,7 +194,7 @@ impl ConfiguredAction {
                     ) {
                         None
                     } else {
-                        Some("Out of reach")
+                        Some(OUT_OF_REACH)
                     }
                 }
                 None => Some("Select an enemy"),
@@ -218,7 +221,7 @@ impl ConfiguredAction {
                     ) {
                         None
                     } else {
-                        Some("Out of reach")
+                        Some(OUT_OF_REACH)
                     }
                 }
 
@@ -231,7 +234,7 @@ impl ConfiguredAction {
                     ) {
                         None
                     } else {
-                        Some("Out of reach")
+                        Some(OUT_OF_REACH)
                     }
                 }
 
@@ -908,12 +911,14 @@ impl UserInterface {
         {
             self.activity_popup.on_new_movement_ap_cost();
 
+            /*
             if !selected_movement_path.is_empty() {
                 self.target_ui.clear_action();
             } else {
                 self.target_ui
                     .set_action("Select a destination".to_string(), vec![], false);
             }
+             */
 
             //self.activity_popup.refresh_enabled_state();
         }
@@ -961,10 +966,10 @@ impl UserInterface {
                     selected_enhancements.iter().map(|e| e.effect),
                 );
 
-                let mut details = vec![];
+                let mut details: Vec<(&'static str, Goodness)> = vec![];
 
                 if matches!(reach, ActionReach::No) {
-                    details.push(("Can not reach!".to_string(), Goodness::Bad));
+                    details.push(("Out of reach!", Goodness::Bad));
                 }
 
                 let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
@@ -988,32 +993,31 @@ impl UserInterface {
                     &selected_enhancement_effects,
                     target_char,
                 ) {
-                    details.push((term.to_string(), bonus.goodness()));
+                    details.push((term, bonus.goodness()));
                 }
                 for (term, bonus) in target_char.incoming_attack_bonuses(None) {
-                    details.push((term.to_string(), bonus.goodness()));
+                    details.push((term, bonus.goodness()));
                 }
 
                 let header = format!(
-                    "Damage: {}-{}",
+                    "|<sword>| {}-{}",
                     prediction.min_damage, prediction.max_damage,
                 );
 
                 self.game_grid.clear_target_damage_previews();
                 self.game_grid
-                    .set_target_damage_preview(TargetDamagePreview {
+                    .set_target_effect_preview(TargetEffectPreview {
                         character_id: *target_id,
-                        min: prediction.min_damage,
-                        max: prediction.max_damage,
+                        prediction: TargetPrediction::from(prediction),
                     });
 
-                self.target_ui.set_action(header, details, true);
+                //self.target_ui.set_action(header, details, true);
             }
 
             None => {
                 self.game_grid.clear_target_damage_previews();
-                self.target_ui
-                    .set_action("Select an enemy".to_string(), vec![], false);
+                //self.target_ui
+                //.set_action("Select an enemy".to_string(), vec![], false);
             }
         }
 
@@ -1038,18 +1042,18 @@ impl UserInterface {
 
         println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
 
+        /*
+        let mut details = vec![];
         match target {
             ActionTarget::Character(target_id, movement, ..) => {
                 let target_char = self.characters.get(*target_id);
-
-                let mut details = vec![];
 
                 if !self.active_character().reaches_with_ability(
                     ability,
                     selected_enhancements,
                     target_char.pos(),
                 ) {
-                    details.push(("Can not reach!".to_string(), Goodness::Bad));
+                    details.push(("Out of reach!".to_string(), Goodness::Bad));
                 }
 
                 if let Some(movement) = movement {
@@ -1081,45 +1085,18 @@ impl UserInterface {
                     }
                 };
 
-                self.target_ui.set_action(action_text, details, true);
+                self.target_ui.set_action(action_text, details.clone(), true);
             }
 
-            ActionTarget::Position(..) => {
-                assert!(matches!(ability.target, AbilityTarget::Area { .. }));
-                self.target_ui
-                    .set_action(format!("{} (AoE)", ability.name), vec![], false);
-            }
-
-            ActionTarget::None => {
-                match ability.target {
-                    AbilityTarget::Enemy { .. } => {
-                        self.target_ui
-                            .set_action("Select an enemy".to_string(), vec![], false);
-                    }
-
-                    AbilityTarget::Ally { .. } => {
-                        self.target_ui
-                            .set_action("Select an ally".to_string(), vec![], false);
-                    }
-
-                    AbilityTarget::None { .. } => {
-                        let header = ability.name.to_string();
-                        self.target_ui.set_action(header, vec![], false);
-                    }
-
-                    AbilityTarget::Area { .. } => {
-                        self.target_ui
-                            .set_action("Select an area".to_string(), vec![], false);
-                    }
-                };
-            }
         }
+         */
 
         self.game_grid.clear_target_damage_previews();
-        if configured_action
-            .usability_problem(self.active_character(), &self.characters)
-            .is_none()
-        {
+
+        let usability_problem =
+            configured_action.usability_problem(self.active_character(), &self.characters);
+
+        if matches!(usability_problem, None | Some(OUT_OF_REACH)) {
             let prediction = predict_ability(
                 &self.characters,
                 self.characters.get_rc(self.active_character_id),
@@ -1128,22 +1105,11 @@ impl UserInterface {
                 target,
             );
 
-            if let Some(target_id) = target.target_id() {
-                if let Some(dmg) = prediction.targets.get(&target_id) {
-                    self.target_ui.set_action(
-                        format!("Damage: {}-{}", dmg.min, dmg.max),
-                        vec![],
-                        false,
-                    );
-                }
-            }
-
-            for (target_id, dmg) in prediction.targets {
+            for (target_id, prediction) in prediction.targets {
                 self.game_grid
-                    .set_target_damage_preview(TargetDamagePreview {
+                    .set_target_effect_preview(TargetEffectPreview {
                         character_id: target_id,
-                        min: dmg.min,
-                        max: dmg.max,
+                        prediction,
                     });
             }
         }
@@ -1326,21 +1292,23 @@ impl UserInterface {
             }
 
             UiState::ChoosingAction => {
+                /*
                 self.target_ui
                     .set_action("Select an action".to_string(), vec![], false);
+                */
 
                 self.set_allowed_to_use_action_buttons(true);
             }
 
             UiState::Idle => {
-                self.target_ui.clear_action();
+                //self.target_ui.clear_action();
                 self.set_allowed_to_use_action_buttons(false);
             }
         }
 
         if let Some(reactor) = is_reacting {
-            self.target_ui
-                .set_action("Reaction!".to_string(), vec![], false);
+            //self.target_ui
+            //    .set_action("Reaction!".to_string(), vec![], false);
             self.set_allowed_to_use_action_buttons(false);
             self.player_portraits.set_selected_id(reactor);
 
@@ -1391,20 +1359,19 @@ impl UserInterface {
             selected.map(|r| (*reactor, r)),
             0,
         );
-        dbg!(prediction);
+        dbg!(&prediction);
         self.game_grid
-            .set_target_damage_preview(TargetDamagePreview {
+            .set_target_effect_preview(TargetEffectPreview {
                 character_id: defender.id(),
-                min: prediction.min_damage,
-                max: prediction.max_damage,
+                prediction: TargetPrediction::from(prediction),
             });
     }
 
     fn maybe_refresh_equipment_state(&mut self) {
         match &*self.state.borrow() {
             UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) => {
-                self.target_ui
-                    .set_action("Change equipment".to_string(), vec![], false);
+                //self.target_ui
+                //.set_action("Change equipment".to_string(), vec![], false);
 
                 if let Some(
                     drag @ EquipmentDrag {
@@ -1418,21 +1385,22 @@ impl UserInterface {
                     self.activity_popup.additional_line = Some(description);
                 } else {
                     self.activity_popup.additional_line =
-                        Some("Drag something to equip/unequip it".to_string());
+                        Some("Drag something in your inventory to equip/unequip it".to_string());
                     self.set_character_sheet_shown(true);
                 }
             }
 
             UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
-                self.target_ui
-                    .set_action("Use consumable".to_string(), vec![], false);
+                //self.target_ui
+                //  .set_action("Use consumable".to_string(), vec![], false);
 
                 if let Some(consumption) = consumption {
                     self.activity_popup.additional_line =
                         Some(format!("Use {}", consumption.consumable.name));
                 } else {
-                    self.activity_popup.additional_line =
-                        Some("Right click a consumable in your inventory to use it".to_string());
+                    self.activity_popup.additional_line = Some(
+                        "Select a consumable in your inventory by right-clicking it".to_string(),
+                    );
                     self.set_character_sheet_shown(true);
                 }
             }

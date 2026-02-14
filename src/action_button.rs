@@ -16,7 +16,7 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons,
+        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags,
         Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
@@ -1432,7 +1432,7 @@ pub fn draw_tooltip(
     let text_margin = 8.0;
 
     let mut measure_width = |line, size| {
-        let dimensions = measure_text_with_font_icons(line, Some(font), size);
+        let dimensions = measure_text_with_font_tags(line, Some(font), size);
         if dimensions.width > max_line_w {
             max_line_w = dimensions.width;
         }

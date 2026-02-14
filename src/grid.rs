@@ -14,7 +14,7 @@ use macroquad::{
     input::mouse_wheel,
     math::Vec2,
     shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams},
-    text::{draw_text_ex, Font, TextParams},
+    text::{draw_text, draw_text_ex, Font, TextParams},
     time::get_time,
     window::{screen_height, screen_width},
 };
@@ -35,12 +35,12 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_icons, Drawable, Style,
+        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable, Style,
     },
     core::{
         target_within_range_squared, within_range_squared, AbilityId, AbilityReach, AbilityTarget,
-        ActionReach, ActionTarget, AreaShape, AttackAction, BaseAction, Character, MovementType,
-        Position, MOVE_DISTANCE_PER_STAMINA,
+        ActionReach, ActionTarget, AreaEffect, AreaShape, AttackAction, BaseAction, Character,
+        Goodness, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -50,6 +50,7 @@ use crate::{
     game_ui_components::ActionPointsRow,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     sounds::{SoundId, SoundPlayer},
+    target_ui::draw_action,
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
     util::{line_collision, rgb, COL_GRAY, COL_RED},
 };
@@ -91,11 +92,10 @@ const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
-#[derive(Debug, Copy, Clone)]
-pub struct TargetDamagePreview {
+#[derive(Debug, Clone)]
+pub struct TargetEffectPreview {
     pub character_id: CharacterId,
-    pub min: u32,
-    pub max: u32,
+    pub prediction: TargetPrediction,
 }
 
 #[derive(Debug)]
@@ -237,7 +237,7 @@ pub struct GameGrid {
     characters: Characters,
 
     ability_character_animation: Option<ParticleGroup>,
-    target_damage_previews: HashMap<CharacterId, TargetDamagePreview>,
+    target_damage_previews: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
@@ -309,7 +309,7 @@ impl GameGrid {
         }
     }
 
-    pub fn set_target_damage_preview(&mut self, preview: TargetDamagePreview) {
+    pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
         self.target_damage_previews
             .insert(preview.character_id, preview);
     }
@@ -959,7 +959,22 @@ impl GameGrid {
 
         let active_char_pos = self.characters.get(self.active_character_id).pos();
 
-        let range_indicator = self.determine_range_indicator(ui_state, hovered_action);
+        if is_mouse_within_grid && receptive_to_input {
+            // Only clear hovered_character if mouse is over grid; This is to avoid a flickering that could occur if you hover
+            // a character which then brings up a target UI on top of the mouse which causes the character to no longer be hovered, thereby
+            // removing the target UI, etc.
+            self.hovered_character = None;
+            for character in self.characters.iter() {
+                if character.occupies_cell(mouse_grid_pos) {
+                    let id = character.id();
+                    outcome.hovered_character_id = Some(id);
+                    self.hovered_character = Some(id);
+                }
+            }
+        }
+
+        let range_indicator =
+            self.determine_range_indicator(ui_state, hovered_action, mouse_grid_pos);
 
         if let Some((char_id, BaseAction::Move)) = hovered_action {
             self.draw_movement_path_background(char_id);
@@ -1171,20 +1186,6 @@ impl GameGrid {
             outcome.hovered_move_path_cost = Some(0);
         }
 
-        if is_mouse_within_grid && receptive_to_input {
-            // Only clear hovered_character if mouse is over grid; This is to avoid a flickering that could occur if you hover
-            // a character which then brings up a target UI on top of the mouse which causes the character to no longer be hovered, thereby
-            // removing the target UI, etc.
-            self.hovered_character = None;
-            for character in self.characters.iter() {
-                if character.occupies_cell(mouse_grid_pos) {
-                    let id = character.id();
-                    outcome.hovered_character_id = Some(id);
-                    self.hovered_character = Some(id);
-                }
-            }
-        }
-
         if !(matches!(ui_state, UiState::ReactingToAttack { .. })) {
             self.enemys_target = None;
         }
@@ -1300,6 +1301,7 @@ impl GameGrid {
                         target.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         4.0,
+                        true,
                     );
                 }
 
@@ -1327,7 +1329,7 @@ impl GameGrid {
                     true,
                 );
 
-                self.draw_target_crosshair(attacker.pos(), victim.pos(), RED, 4.0);
+                self.draw_target_crosshair(attacker.pos(), victim.pos(), RED, 4.0, true);
 
                 if *selected {
                     self.draw_target_crosshair(
@@ -1335,6 +1337,7 @@ impl GameGrid {
                         attacker.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         4.0,
+                        true,
                     );
                 }
 
@@ -1366,6 +1369,7 @@ impl GameGrid {
                     defender.pos(),
                     Color::new(0.90, 0.16, 0.22, 0.8),
                     4.0,
+                    true,
                 );
                 labelled_char_ids.insert(attacker.id());
                 labelled_char_ids.insert(defender.id());
@@ -1434,18 +1438,35 @@ impl GameGrid {
                 ActionTarget::Character { .. }
             );
 
+            let mut hovered_move_route = None;
+
             match mouse_state {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
                     if !player_has_action_char_target && self.hovered_character.is_none() {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((char_id, range, _indicator)) = range_indicator {
+                        if let Some((char_id, range, indicator)) = range_indicator {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
+                            is_mouse_pos_out_of_range =
+                                matches!(indicator, RangeIndicator::CannotReach);
+                            /*
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
                                 as f32)
                                 > range.squared();
+                                 */
                         }
+
+                        let text = if is_mouse_pos_out_of_range {
+                            "Out of reach"
+                        } else {
+                            if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
+                                "Select enemy"
+                            } else {
+                                "Select ally"
+                            }
+                        };
+                        self.draw_cursor_text(text, mouse_grid_pos);
 
                         if is_mouse_pos_out_of_range {
                             self.draw_invalid_target_marker(mouse_grid_pos);
@@ -1460,7 +1481,7 @@ impl GameGrid {
                         }
                     }
                 }
-                MouseState::RequiresPositionTarget { .. } => {
+                MouseState::RequiresPositionTarget { shape, .. } => {
                     if !matches!(
                         ui_state.players_action_target(),
                         ActionTarget::Position { .. }
@@ -1475,37 +1496,44 @@ impl GameGrid {
                                 > range.squared();
                         }
 
+                        match shape {
+                            AreaShape::Circle(..) => {
+                                let text = if is_mouse_pos_out_of_range {
+                                    "Out of reach"
+                                } else {
+                                    "Select area"
+                                };
+                                self.draw_cursor_text(text, mouse_grid_pos);
+                            }
+                            // The line graphics should be self-explanatory
+                            AreaShape::Line => {}
+                        };
+
                         if is_mouse_pos_out_of_range && snapped_position_target.is_none() {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
                             let position_target = snapped_position_target.unwrap_or(mouse_grid_pos);
 
-                            /*
-                            self.draw_cornered_outline(
-                                self.grid_pos_to_screen(position_target),
-                                HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR,
-                                5.0,
-                                2.0,
-                                true,
-                            );
-                             */
                             self.draw_target_crosshair(
                                 self.characters.get(self.active_character_id).pos(),
                                 position_target,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                                 4.0,
+                                true,
                             );
                         }
                     }
                 }
+                MouseState::MayInputMovement => {
+                    hovered_move_route = self.determine_hovered_route_position(mouse_grid_pos);
+
+                    if hovered_move_route.is_none() {
+                        self.draw_invalid_target_marker(mouse_grid_pos);
+                        self.draw_cursor_text("Out of reach", mouse_grid_pos);
+                    }
+                }
                 _ => {}
             }
-
-            let hovered_move_route = if matches!(mouse_state, MouseState::MayInputMovement) {
-                self.determine_hovered_route_position(mouse_grid_pos)
-            } else {
-                None
-            };
 
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
@@ -1551,11 +1579,14 @@ impl GameGrid {
                             4.0,
                             true,
                         );
+                        let cannot_reach =
+                            matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
                         self.draw_target_crosshair(
                             self.characters.get(self.active_character_id).pos(),
                             hovered_char.pos(),
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                             4.0,
+                            !cannot_reach,
                         );
                     } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
@@ -1621,11 +1652,16 @@ impl GameGrid {
                                 3.0,
                                 true,
                             );
+                            let cannot_reach = matches!(
+                                range_indicator,
+                                Some((_, _, RangeIndicator::CannotReach))
+                            );
                             self.draw_target_crosshair(
                                 active_char_pos,
                                 hovered_char.pos(),
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
                                 4.0,
+                                !cannot_reach,
                             );
                         }
                     } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
@@ -1739,22 +1775,28 @@ impl GameGrid {
                 if let Some(positions) = movement {
                     self.draw_movement_to_target(active_char_pos, target_pos, positions);
                 } else {
+                    let cannot_reach =
+                        matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
                     self.draw_target_crosshair(
                         active_char_pos,
                         target_pos,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         5.0,
+                        !cannot_reach,
                     );
                 }
 
                 labelled_char_ids.insert(target.id());
             }
             ActionTarget::Position(target_pos) => {
+                let cannot_reach =
+                    matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
                 self.draw_target_crosshair(
                     active_char_pos,
                     target_pos,
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
                     7.0,
+                    !cannot_reach,
                 );
             }
             ActionTarget::None => {}
@@ -1767,6 +1809,7 @@ impl GameGrid {
                 target_pos,
                 ENEMYS_TARGET_CROSSHAIR_COLOR,
                 7.0,
+                true,
             );
         }
 
@@ -1802,6 +1845,23 @@ impl GameGrid {
         }
 
         outcome
+    }
+
+    fn draw_cursor_text(&self, text: &str, mouse_grid_pos: (i32, i32)) {
+        let snapped_mouse_pos = self.grid_pos_to_screen(mouse_grid_pos);
+
+        let text_dim = measure_text(text, Some(&self.simple_font), 16, 1.0);
+        draw_text_ex(
+            text,
+            snapped_mouse_pos.0 + self.cell_w / 2.0 - text_dim.width / 2.0,
+            snapped_mouse_pos.1,
+            TextParams {
+                font: Some(&self.simple_font),
+                font_size: 16,
+                color: WHITE,
+                ..Default::default()
+            },
+        );
     }
 
     fn determine_hovered_route_position(
@@ -1895,6 +1955,36 @@ impl GameGrid {
         );
     }
 
+    fn draw_small_info_speech_bubble(&self, text: &str, character_id: CharacterId) {
+        let font_size = 16;
+        let text_dim = measure_text(text, Some(&self.simple_font), font_size, 1.0);
+        let padding = 2.0;
+        let bubble_h = text_dim.height + padding * 2.0;
+        let bubble_w = (text_dim.width + padding * 2.0).max(self.cell_w * 1.5);
+        let (x, y) = self.character_screen_pos(self.characters.get(character_id));
+        let x0 = x + self.cell_w * 2.0;
+        let y0 = y - self.cell_w;
+        let bg_color = Color::new(0.0, 0.0, 0.0, 0.7);
+        draw_rectangle(
+            x0,
+            y0 - self.cell_w - bubble_h,
+            bubble_w,
+            bubble_h,
+            bg_color,
+        );
+        draw_text_rounded(
+            text,
+            x0 + bubble_w / 2.0 - text_dim.width / 2.0,
+            y0 - self.cell_w - padding,
+            TextParams {
+                font: Some(&self.simple_font),
+                font_size,
+                color: WHITE,
+                ..Default::default()
+            },
+        );
+    }
+
     fn draw_movement_to_target(
         &self,
         actor_pos: (i32, i32),
@@ -1910,6 +2000,7 @@ impl GameGrid {
                 target_pos,
                 PLAYERS_TARGET_CROSSHAIR_COLOR,
                 7.0,
+                true,
             );
             self.draw_movement_path_arrow(
                 movement_to_target.iter().copied(),
@@ -1946,6 +2037,7 @@ impl GameGrid {
         &self,
         ui_state: &mut UiState,
         hovered_base_action: Option<(CharacterId, BaseAction)>,
+        mouse_grid_pos: (i32, i32),
     ) -> Option<(CharacterId, Range, RangeIndicator)> {
         let mut indicator = None;
 
@@ -1981,105 +2073,139 @@ impl GameGrid {
                     target,
                     selected_enhancements,
                     ..
-                } => match target {
-                    Some(target) => {
-                        let (range, reach) = self
-                            .characters
-                            .get(self.active_character_id)
-                            .reaches_with_attack(
+                } => {
+                    let active_char = self.characters.get(self.active_character_id);
+
+                    let (range, reach) = match target.or(self.hovered_character) {
+                        Some(target) => {
+                            let target_pos = self.characters.get(target).position.get();
+
+                            let (range, reach) = active_char.reaches_with_attack(
                                 attack.hand,
-                                self.characters.get(*target).position.get(),
+                                target_pos,
                                 selected_enhancements.iter().map(|e| e.effect),
                             );
 
-                        let maybe_indicator = match reach {
-                            ActionReach::Yes | ActionReach::YesButDisadvantage(..) => {
-                                if let ActionReach::YesButDisadvantage(..) = reach {
-                                    Some(RangeIndicator::CanReachButDisadvantage)
-                                } else {
-                                    None
-                                }
-                            }
-                            ActionReach::No => Some(RangeIndicator::CannotReach),
-                        };
+                            (range, reach)
+                        }
+                        None => {
+                            let range = active_char.weapon(attack.hand).unwrap().range.into_range();
 
-                        maybe_indicator
-                            .map(|indicator| (self.active_character_id, range, indicator))
-                    }
+                            let hovered_pos = mouse_grid_pos;
 
-                    None => {
-                        let range = self.characters.get(self.active_character_id).attack_range(
-                            attack.hand,
-                            selected_enhancements.iter().map(|e| e.effect),
-                        );
-                        Some((
-                            self.active_character_id,
-                            range,
-                            RangeIndicator::ActionTargetRange,
-                        ))
-                    }
-                },
+                            let reach = if within_range_squared(
+                                range.squared(),
+                                active_char.pos(),
+                                hovered_pos,
+                            ) {
+                                ActionReach::Yes
+                            } else {
+                                ActionReach::No
+                            };
+                            (range, reach)
+                        }
+                    };
+
+                    let indicator = match reach {
+                        ActionReach::Yes => RangeIndicator::ActionTargetRange,
+                        ActionReach::YesButDisadvantage(..) => {
+                            RangeIndicator::CanReachButDisadvantage
+                        }
+                        ActionReach::No => RangeIndicator::CannotReach,
+                    };
+
+                    Some((self.active_character_id, range, indicator))
+                }
                 ConfiguredAction::UseAbility {
                     ability,
                     selected_enhancements,
                     target,
-                } => match target {
-                    ActionTarget::Character(target_char_id, ..) => {
-                        let maybe_indicator = if self
-                            .characters
-                            .get(self.active_character_id)
-                            .reaches_with_ability(
-                                *ability,
-                                selected_enhancements,
-                                self.characters.get(*target_char_id).position.get(),
-                            ) {
-                            None
+                } => {
+                    let target_pos = match target {
+                        ActionTarget::Character(target_char_id, _) => {
+                            Some(self.characters.get(*target_char_id).pos())
+                        }
+                        ActionTarget::Position(pos) => Some(*pos),
+                        ActionTarget::None => {
+                            let mut pos = None;
+                            if let Some(hovered_id) = self.hovered_character {
+                                if ability.targets_single_character() {
+                                    pos = Some(self.characters.get(hovered_id).pos())
+                                }
+                            }
+                            pos
+                        }
+                    };
+
+                    let active_char = self.characters.get(self.active_character_id);
+
+                    if let Some(target_pos) = target_pos {
+                        let indicator = if active_char.reaches_with_ability(
+                            *ability,
+                            selected_enhancements,
+                            target_pos,
+                        ) {
+                            RangeIndicator::ActionTargetRange
                         } else {
-                            Some(RangeIndicator::CannotReach)
+                            RangeIndicator::CannotReach
                         };
-                        maybe_indicator.map(|indicator| {
-                            (
+                        Some((
+                            self.active_character_id,
+                            ability.target.range(selected_enhancements).unwrap(),
+                            indicator,
+                        ))
+                    } else {
+                        let is_line_target = matches!(
+                            ability.target,
+                            AbilityTarget::Area {
+                                area_effect: AreaEffect {
+                                    shape: AreaShape::Line,
+                                    ..
+                                },
+                                ..
+                            }
+                        );
+
+                        if is_line_target {
+                            // When aiming a line, there's no concept of "selecting a destination that is out of range", since the line clamps to the max range
+                            Some((
                                 self.active_character_id,
                                 ability.target.range(selected_enhancements).unwrap(),
-                                indicator,
-                            )
-                        })
-                    }
-
-                    ActionTarget::Position(target_pos) => {
-                        let maybe_indicator = if self
-                            .characters
-                            .get(self.active_character_id)
-                            .reaches_with_ability(*ability, selected_enhancements, *target_pos)
-                        {
-                            None
-                        } else {
-                            Some(RangeIndicator::CannotReach)
-                        };
-                        maybe_indicator.map(|indicator| {
-                            (
-                                self.active_character_id,
-                                ability.target.range(selected_enhancements).unwrap(),
-                                indicator,
-                            )
-                        })
-                    }
-
-                    ActionTarget::None => {
-                        let radius = ability.target.radius(selected_enhancements);
-                        let range = ability.target.range(selected_enhancements);
-                        radius.or(range).map(|range| {
-                            (
-                                self.active_character_id,
-                                range,
                                 RangeIndicator::ActionTargetRange,
-                            )
-                        })
+                            ))
+                        } else if ability.requires_target() {
+                            let range = ability.target.range(selected_enhancements).unwrap();
+                            let indicator = if within_range_squared(
+                                range.squared(),
+                                active_char.pos(),
+                                mouse_grid_pos,
+                            ) {
+                                RangeIndicator::ActionTargetRange
+                            } else {
+                                RangeIndicator::CannotReach
+                            };
+                            Some((
+                                self.active_character_id,
+                                ability.target.range(selected_enhancements).unwrap(),
+                                indicator,
+                            ))
+                        } else {
+                            let radius = ability.target.radius(selected_enhancements);
+                            let range = ability.target.range(selected_enhancements);
+                            radius.or(range).map(|range| {
+                                (
+                                    self.active_character_id,
+                                    range,
+                                    RangeIndicator::ActionTargetRange,
+                                )
+                            })
+                        }
                     }
-                },
+                }
                 _ => None,
             }
         } else {
+            // Not configuring action
             None
         }
     }
@@ -2123,7 +2249,8 @@ impl GameGrid {
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
-        let status_w = 20.0;
+        // TODO:
+        let status_w = 10.0;
         let box_h = text_dimensions.height + text_pad * 2.0;
 
         let condition_infos = character.condition_infos();
@@ -2194,7 +2321,8 @@ impl GameGrid {
                         ..Default::default()
                     },
                 );
-                draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, YELLOW);
+                draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
+                /*
                 if let Some(stacks) = info.stacks {
                     draw_text_rounded(
                         &stacks.to_string(),
@@ -2208,6 +2336,7 @@ impl GameGrid {
                         },
                     );
                 }
+                 */
                 status_x += status_w;
             }
         }
@@ -2221,9 +2350,10 @@ impl GameGrid {
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, current_health_w, health_h, COL_RED);
 
-        if let Some(damage_preview) = self.target_damage_previews.get(&character.id()) {
-            let effective_min = damage_preview.min.min(character.health.current());
-            let effective_max = damage_preview.max.min(character.health.current());
+        if let Some(preview) = self.target_damage_previews.get(&character.id()) {
+            let damage = preview.prediction.damage;
+            let effective_min = damage.min.min(character.health.current());
+            let effective_max = damage.max.min(character.health.current());
             let guaranteed_damage_w =
                 (health_w) * (effective_min as f32 / character.health.max() as f32);
             draw_rectangle(
@@ -2241,6 +2371,33 @@ impl GameGrid {
                 potential_damage_w,
                 health_h,
                 ORANGE,
+            );
+
+            let mut text = if damage.max > 0 {
+                format!("|<sword>|{}-{}", damage.min, damage.max)
+            } else if preview.prediction.is_buff {
+                "|<heart>|".to_string()
+            } else {
+                // This is an optimistic guess. If not damage and not buff, it is (probably?) a debuff.
+                "|<sword>|".to_string()
+            };
+
+            // TODO: Render the details with red/green backgrounds, like in target ui
+            /*
+            for (detail_str, _goodness) in &preview.details {
+                text.push_str(&format!(" {}", detail_str));
+            }
+             */
+
+            let x0 = health_x + health_w / 2.0;
+            let y0 = health_y + health_h + 2.0;
+
+            draw_action(
+                (x0, y0),
+                &self.simple_font,
+                &text,
+                &self.simple_font,
+                &preview.prediction.details,
             );
         }
 
@@ -2437,6 +2594,7 @@ impl GameGrid {
         target_pos: Position,
         crosshair_color: Color,
         thickness: f32,
+        within_range: bool,
     ) {
         let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
         let actor_y = self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0;
@@ -2452,7 +2610,7 @@ impl GameGrid {
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
             Some(self.cell_w * 0.8),
-            true,
+            within_range,
         );
 
         let cross_hair_r = self.cell_w * 0.4;
@@ -2912,7 +3070,7 @@ impl EffectGraphics {
             EffectGraphics::Text(text, font, color) => {
                 let font_size = 20;
                 //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
-                let text_dimensions = measure_text_with_font_icons(text, Some(font), font_size);
+                let text_dimensions = measure_text_with_font_tags(text, Some(font), font_size);
 
                 let grow_duration = 0.15;
 

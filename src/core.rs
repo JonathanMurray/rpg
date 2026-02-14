@@ -1057,13 +1057,13 @@ impl CoreGame {
                     }
 
                     let target = mode.characters().get(*target_id);
-                    assert!(caster.reaches_with_ability(
-                        ability,
-                        enhancements,
-                        target.position.get()
-                    ));
 
                     if let Some(game) = real_game {
+                        assert!(caster.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            target.position.get()
+                        ));
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
@@ -1142,11 +1142,6 @@ impl CoreGame {
                     };
 
                     let target = mode.characters().get(*target_id);
-                    assert!(caster.reaches_with_ability(
-                        ability,
-                        enhancements,
-                        target.position.get()
-                    ));
 
                     let ability_roll = maybe_ability_roll.unwrap();
                     let (ability_result, dice_roll_line) = ability_roll.unwrap_actual_roll();
@@ -1157,6 +1152,11 @@ impl CoreGame {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
                     if let Some(game) = real_game {
+                        assert!(caster.reaches_with_ability(
+                            ability,
+                            enhancements,
+                            target.position.get()
+                        ));
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
@@ -1185,11 +1185,10 @@ impl CoreGame {
                     area_effect,
                 } => {
                     let target_pos = selected_target.unwrap_position();
-                    assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
-
-                    caster.set_facing_toward(target_pos);
 
                     if let Some(game) = real_game {
+                        assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
+                        caster.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
                             ability,
@@ -2562,18 +2561,40 @@ impl ActionPerformanceMode<'_> {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct AttackPrediction {
     pub percentage_chance_deal_damage: u32,
     pub min_damage: u32,
     pub max_damage: u32,
     pub avg_damage: f32,
+    pub details: Vec<(&'static str, Goodness)>,
 }
 
 pub struct AbilityPrediction {
-    pub targets: HashMap<CharacterId, DamageInterval>,
+    pub targets: HashMap<CharacterId, TargetPrediction>,
 }
 
+#[derive(Debug, Clone)]
+pub struct TargetPrediction {
+    pub damage: DamageInterval,
+    pub is_buff: bool,
+    pub details: Vec<(&'static str, Goodness)>,
+}
+
+impl From<AttackPrediction> for TargetPrediction {
+    fn from(value: AttackPrediction) -> Self {
+        Self {
+            damage: DamageInterval {
+                min: value.min_damage,
+                max: value.max_damage,
+            },
+            is_buff: false,
+            details: value.details,
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
 pub struct DamageInterval {
     pub min: u32,
     pub max: u32,
@@ -2586,7 +2607,7 @@ pub fn predict_ability(
     enhancements: &[AbilityEnhancement],
     selected_target: &ActionTarget,
 ) -> AbilityPrediction {
-    let mut targets: HashMap<CharacterId, DamageInterval> = Default::default();
+    let mut targets: HashMap<CharacterId, TargetPrediction> = Default::default();
 
     // To predict the possible range, we first roll a 1 ...
     let resolved_events = pollster::FutureExt::block_on(CoreGame::perform_ability(
@@ -2597,12 +2618,27 @@ pub fn predict_ability(
         ActionPerformanceMode::SimulatedRoll(1, characters),
     ));
     let event = &resolved_events[0];
-    for (target_id, damage) in event.damaged_targets() {
+    for (target_id, result) in event.affected_targets() {
+        let mut details: Vec<(&'static str, Goodness)> = vec![];
+
+        if let Some(roll) = ability.roll {
+            for (label, contributor) in caster.outgoing_ability_roll_bonuses(enhancements, roll) {
+                details.push((label, contributor.goodness()));
+            }
+            for (label, contributor) in characters.get(target_id).incoming_ability_bonuses() {
+                details.push((label, contributor.goodness()));
+            }
+        }
+
         targets.insert(
             target_id,
-            DamageInterval {
-                min: damage,
-                max: 0,
+            TargetPrediction {
+                damage: DamageInterval {
+                    min: result.damage,
+                    max: 0,
+                },
+                is_buff: result.is_buff,
+                details,
             },
         );
     }
@@ -2616,8 +2652,8 @@ pub fn predict_ability(
         ActionPerformanceMode::SimulatedRoll(20, characters),
     ));
     let event = &resolved_events[0];
-    for (target_id, damage) in event.damaged_targets() {
-        targets.get_mut(&target_id).unwrap().max = damage;
+    for (target_id, result) in event.affected_targets() {
+        targets.get_mut(&target_id).unwrap().damage.max = result.damage;
     }
 
     AbilityPrediction { targets }
@@ -2636,6 +2672,15 @@ pub fn predict_attack(
     let mut min_dmg = None;
     let mut max_dmg = 0;
     let mut percentage_deal_damage = 0;
+
+    let mut details = vec![];
+    for (label, contributor) in attacker.outgoing_attack_bonuses(hand_type, enhancements, defender)
+    {
+        details.push((label, contributor.goodness()));
+    }
+    for (label, contributor) in defender.incoming_attack_bonuses(reaction.map(|(_id, r)| r)) {
+        details.push((label, contributor.goodness()));
+    }
 
     // TODO: The average doesn't account for advantage!
     for unmodified_roll in 1..=20 {
@@ -2672,6 +2717,7 @@ pub fn predict_attack(
         min_damage: min_dmg.unwrap(),
         max_damage: max_dmg,
         avg_damage,
+        details,
     }
 }
 
@@ -2808,18 +2854,36 @@ impl AbilityResolvedEvent {
         }
     }
 
-    fn damaged_targets(&self) -> HashMap<CharacterId, u32> {
-        let mut damaged_targets = HashMap::default();
+    fn affected_targets(&self) -> HashMap<CharacterId, TargetResult> {
+        let mut affected_targets = HashMap::default();
         if let Some((target_id, outcome)) = &self.target_outcome {
-            *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
+            affected_targets.insert(
+                *target_id,
+                TargetResult {
+                    damage: outcome.damage().unwrap_or(0),
+                    is_buff: outcome.is_buff(),
+                },
+            );
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
             for (target_id, outcome) in targets {
-                *damaged_targets.entry(*target_id).or_insert(0) += outcome.damage().unwrap_or(0);
+                let entry = affected_targets.entry(*target_id).or_insert(TargetResult {
+                    damage: 0,
+                    is_buff: false,
+                });
+                entry.damage += outcome.damage().unwrap_or(0);
+                if outcome.is_buff() {
+                    entry.is_buff = true;
+                }
             }
         }
-        damaged_targets
+        affected_targets
     }
+}
+
+struct TargetResult {
+    damage: u32,
+    is_buff: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -2894,6 +2958,22 @@ impl AbilityTargetOutcome {
             AbilityTargetOutcome::AffectedAlly { .. } => None,
         }
     }
+
+    fn is_buff(&self) -> bool {
+        matches!(self, AbilityTargetOutcome::AffectedAlly { .. })
+    }
+
+    /*
+    // TODO: This doesn't work. Ability prediction doesn't run the code that applies effects, so applied_effects would always be empty
+    fn is_debuff(&self) -> bool {
+        match self {
+            AbilityTargetOutcome::HitEnemy {
+                applied_effects, ..
+            } => !applied_effects.is_empty(),
+            _ => false,
+        }
+    }
+     */
 }
 
 pub fn as_percentage(probability: f32) -> String {
@@ -3716,6 +3796,22 @@ impl Ability {
 
     pub fn targets_single_enemy(&self) -> bool {
         matches!(self.target, AbilityTarget::Enemy { .. })
+    }
+
+    pub fn targets_single_character(&self) -> bool {
+        matches!(
+            self.target,
+            AbilityTarget::Ally { .. } | AbilityTarget::Enemy { .. }
+        )
+    }
+
+    pub fn requires_target(&self) -> bool {
+        match self.target {
+            AbilityTarget::Enemy { .. } => true,
+            AbilityTarget::Ally { .. } => true,
+            AbilityTarget::Area { .. } => true,
+            AbilityTarget::None { .. } => false,
+        }
     }
 
     pub fn has_knockback(&self) -> bool {
@@ -4911,10 +5007,20 @@ impl Character {
         &self,
         ability: Ability,
         enhancements: &[AbilityEnhancement],
-        target_position: Position,
+        target_pos: Position,
     ) -> bool {
         let range = ability.target.range(enhancements).unwrap();
-        target_within_range_squared(range.squared(), self.position.get(), target_position)
+        match ability.target {
+            AbilityTarget::Enemy { .. } | AbilityTarget::Ally { .. } => {
+                target_within_range_squared(range.squared(), self.position.get(), target_pos)
+            }
+            AbilityTarget::Area { .. } => {
+                within_range_squared(range.squared(), self.position.get(), target_pos)
+            }
+            AbilityTarget::None { .. } => {
+                panic!("Ability that has no target always reaches. Shouldn't be checked")
+            }
+        }
     }
 
     pub fn known_actions(&self) -> Vec<BaseAction> {
@@ -5494,7 +5600,7 @@ impl Character {
         let mut bonuses = vec![];
 
         if is_target_flanked(self.pos(), target) {
-            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(3)));
+            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(5)));
         }
 
         let (_range, reach) = self.reaches_with_attack(

@@ -19,8 +19,8 @@ use crate::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{
-        draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
-        TableCell, TableStyle, TextLine,
+        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, table, Align,
+        Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
     core::{BaseAction, Character, CharacterId, Goodness, HandType},
@@ -36,7 +36,7 @@ pub struct TargetUi {
 
     container: Container,
 
-    action: Option<(String, Vec<(String, Goodness)>, bool)>,
+    //action: Option<(String, Vec<(&'static str, Goodness)>, bool)>,
     icons: HashMap<IconId, Texture2D>,
     button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
@@ -59,7 +59,7 @@ impl TargetUi {
             big_font,
             simple_font,
             container: Container::default(),
-            action: None,
+            //action: None,
             icons,
             button_events: Default::default(),
             hovered_btn: Default::default(),
@@ -337,6 +337,7 @@ impl TargetUi {
         }
     }
 
+    /*
     pub fn clear_action(&mut self) {
         self.action = None;
     }
@@ -344,141 +345,29 @@ impl TargetUi {
     pub fn set_action(
         &mut self,
         header: String,
-        details: Vec<(String, Goodness)>,
+        details: Vec<(&'static str, Goodness)>,
         only_show_with_target: bool,
     ) {
         self.action = Some((header, details, only_show_with_target));
     }
 
+
     fn draw_action(&self, container_pos: (f32, f32)) {
-        let Some((header, details, only_show_with_target)) = &self.action else {
-            return;
-        };
-
-        if *only_show_with_target && self.target.is_none() {
-            return;
-        }
-
-        let (mut x, y) = container_pos;
-
-        let header_font_size = 20;
-        let detail_font_size = 20;
-        let params = TextParams {
-            font: Some(&self.big_font),
-            font_size: header_font_size,
-            color: WHITE,
-            ..Default::default()
-        };
-
-        let vert_margin = 3.0;
-        let detail_hor_margin = 5.0;
-        let header_pad = 8.0;
-        let detail_pad = 5.0;
-
-        let header_dimensions = measure_text(header, Some(&self.big_font), header_font_size, 1.0);
-        let header_w = header_dimensions.width + header_pad * 2.0;
-        let mut header_h = 0.0;
-        if header_dimensions.height.is_finite() {
-            header_h = header_dimensions.height + header_pad * 2.0;
-        }
-
-        let mut details_w = 0.0;
-        let mut details_h = 0.0;
-        let mut details_max_offset = 0.0;
-        if !details.is_empty() {
-            let mut details_relative_y_interval = [f32::MAX, f32::MIN];
-
-            for (line, _goodness) in details.iter() {
-                let dim = measure_text(line, Some(&self.simple_font), detail_font_size, 1.0);
-                details_w += dim.width;
-                if dim.height.is_finite() {
-                    if dim.offset_y > details_max_offset {
-                        details_max_offset = dim.offset_y;
-                    }
-                    let top = -dim.offset_y;
-                    let bot = -dim.offset_y + dim.height;
-                    if top < details_relative_y_interval[0] {
-                        details_relative_y_interval[0] = top;
-                    }
-                    if bot > details_relative_y_interval[1] {
-                        details_relative_y_interval[1] = bot;
-                    }
-                }
+        if let Some((header, details, only_show_with_target)) = &self.action {
+            if *only_show_with_target && self.target.is_none() {
+                return;
             }
-            details_w += details.len() as f32 * detail_pad * 2.0
-                + (details.len() - 1) as f32 * detail_hor_margin;
-            details_h =
-                details_relative_y_interval[1] - details_relative_y_interval[0] + detail_pad * 2.0;
-        }
 
-        let h = if details.is_empty() {
-            header_h
-        } else {
-            header_h + vert_margin + details_h
+            draw_action(
+                container_pos,
+                &self.big_font,
+                header,
+                &self.simple_font,
+                &details,
+            );
         };
-
-        x -= header_w / 2.0;
-
-        let mut x0 = x;
-        let mut y0 = y - h;
-        draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
-
-        let dim = draw_text_rounded(
-            header,
-            x0 + header_pad,
-            y0 + header_pad + header_dimensions.offset_y,
-            params.clone(),
-        );
-        y0 += dim.height + header_pad * 2.0 + vert_margin;
-
-        x0 += (header_w - details_w) / 2.0;
-
-        for (line, goodness) in details {
-            let mut params = params.clone();
-            params.font = Some(&self.simple_font);
-            params.font_size = detail_font_size;
-
-            let dim = measure_text(line, Some(&self.simple_font), params.font_size, 1.0);
-
-            let bg_color = match goodness {
-                Goodness::Good => Color::new(0.0, 0.4, 0.0, 1.0),
-                Goodness::Neutral => BLACK,
-                Goodness::Bad => Color::new(0.5, 0.0, 0.0, 1.0),
-            };
-            draw_rectangle(
-                x0,
-                y0,
-                dim.width + 2.0 * detail_pad,
-                dim.height + 2.0 * detail_pad,
-                bg_color,
-            );
-            draw_rectangle_lines(
-                x0,
-                y0,
-                dim.width + 2.0 * detail_pad,
-                dim.height + 2.0 * detail_pad,
-                1.0,
-                BLACK,
-            );
-
-            params.color = BLACK;
-            draw_text_rounded(
-                line,
-                x0 + detail_pad,
-                y0 + detail_pad + details_max_offset,
-                params.clone(),
-            );
-            params.color = WHITE;
-            draw_text_rounded(
-                line,
-                x0 + detail_pad - 1.0,
-                y0 + detail_pad + details_max_offset - 1.0,
-                params,
-            );
-
-            x0 += dim.width + detail_pad * 2.0 + detail_hor_margin;
-        }
     }
+    */
 }
 
 impl Drawable for TargetUi {
@@ -496,7 +385,7 @@ impl Drawable for TargetUi {
             });
         }
 
-        self.draw_action((screen_width() / 2.0, 200.0));
+        //self.draw_action((screen_width() / 2.0, 200.0));
 
         for event in self.button_events.borrow_mut().drain(..) {
             match event {
@@ -535,5 +424,129 @@ impl Drawable for TargetUi {
 
     fn size(&self) -> (f32, f32) {
         self.container.size()
+    }
+}
+
+pub fn draw_action(
+    pos: (f32, f32),
+    header_font: &Font,
+    header: &str,
+    details_font: &Font,
+    details: &[(&'static str, Goodness)],
+) {
+    let (mut x, y) = pos;
+
+    let header_font_size = 16;
+    let detail_font_size = 13;
+    let params = TextParams {
+        font: Some(header_font),
+        font_size: header_font_size,
+        color: WHITE,
+        ..Default::default()
+    };
+
+    let vert_margin = 2.0;
+    let detail_hor_margin = 2.0;
+    let header_pad = 2.0;
+    let detail_pad = 2.0;
+
+    let header_dimensions =
+        measure_text_with_font_tags(header, Some(header_font), header_font_size);
+    let header_w = header_dimensions.width + header_pad * 2.0;
+    let mut header_h = 0.0;
+    if header_dimensions.height.is_finite() {
+        header_h = header_dimensions.offset_y + header_pad * 2.0;
+    }
+
+    let mut details_w = 0.0;
+    let mut details_h = 0.0;
+    let mut details_max_offset = 0.0;
+    if !details.is_empty() {
+        let mut details_relative_y_interval = [f32::MAX, f32::MIN];
+
+        for (line, _goodness) in details.iter() {
+            let dim = measure_text(line, Some(details_font), detail_font_size, 1.0);
+            details_w += dim.width;
+            if dim.height.is_finite() {
+                if dim.offset_y > details_max_offset {
+                    details_max_offset = dim.offset_y;
+                }
+                let top = -dim.offset_y;
+                let bot = -dim.offset_y + dim.height;
+                if top < details_relative_y_interval[0] {
+                    details_relative_y_interval[0] = top;
+                }
+                if bot > details_relative_y_interval[1] {
+                    details_relative_y_interval[1] = bot;
+                }
+            }
+        }
+        details_w += details.len() as f32 * detail_pad * 2.0
+            + (details.len() - 1) as f32 * detail_hor_margin;
+        details_h =
+            details_relative_y_interval[1] - details_relative_y_interval[0] + detail_pad * 2.0;
+    }
+
+    x -= header_w / 2.0;
+
+    let mut x0 = x;
+    let mut y0 = y; // - h;
+    draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
+
+    draw_text_with_font_tags(
+        header,
+        x0 + header_pad,
+        y0 + header_pad + header_dimensions.offset_y,
+        params.clone(),
+        true,
+    );
+    y0 += header_dimensions.offset_y + header_pad * 2.0 + vert_margin;
+
+    x0 += (header_w - details_w) / 2.0;
+
+    for (line, goodness) in details {
+        let mut params = params.clone();
+        params.font = Some(details_font);
+        params.font_size = detail_font_size;
+
+        let dim = measure_text(line, Some(details_font), params.font_size, 1.0);
+
+        let bg_color = match goodness {
+            Goodness::Good => Color::new(0.0, 0.4, 0.0, 1.0),
+            Goodness::Neutral => BLACK,
+            Goodness::Bad => Color::new(0.5, 0.0, 0.0, 1.0),
+        };
+        draw_rectangle(
+            x0,
+            y0,
+            dim.width + 2.0 * detail_pad,
+            dim.height + 2.0 * detail_pad,
+            bg_color,
+        );
+        draw_rectangle_lines(
+            x0,
+            y0,
+            dim.width + 2.0 * detail_pad,
+            dim.height + 2.0 * detail_pad,
+            1.0,
+            BLACK,
+        );
+
+        params.color = BLACK;
+        draw_text_rounded(
+            line,
+            x0 + detail_pad,
+            y0 + detail_pad + details_max_offset,
+            params.clone(),
+        );
+        params.color = WHITE;
+        draw_text_rounded(
+            line,
+            x0 + detail_pad - 1.0,
+            y0 + detail_pad + details_max_offset - 1.0,
+            params,
+        );
+
+        x0 += dim.width + detail_pad * 2.0 + detail_hor_margin;
     }
 }

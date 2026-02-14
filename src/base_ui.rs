@@ -19,7 +19,7 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     textures::{
         ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
-        WARNING_SYMBOL,
+        SWORD_SYMBOL, WARNING_SYMBOL,
     },
     util::{COL_ALICE, COL_BOB, COL_CLARA},
 };
@@ -322,7 +322,7 @@ impl TextLine {
     }
 
     fn measure(&mut self) {
-        let dim = measure_text_with_font_icons(&self.string, self.font.as_ref(), self.font_size);
+        let dim = measure_text_with_font_tags(&self.string, self.font.as_ref(), self.font_size);
         self.size = (
             dim.width.max(0.0) + self.hor_padding * 2.0,
             //dim.height.max(0.0) + self.vert_padding * 2.0,
@@ -394,15 +394,15 @@ impl Drawable for TextLine {
     }
 }
 
-pub fn measure_text_with_font_icons(
+pub fn measure_text_with_font_tags(
     line: &str,
     font: Option<&Font>,
     font_size: u16,
 ) -> TextDimensions {
     let parts = line.split("|");
     let mut w = 0.0;
-    let mut h = 0.0;
-    let mut offset_y = 0.0;
+    let mut h: f32 = 0.0;
+    let mut offset_y = None;
     for mut part in parts {
         let symbol_w = 16.0;
         if [
@@ -412,11 +412,20 @@ pub fn measure_text_with_font_icons(
             "<warning>",
             "<heart>",
             "<stamina>",
-            "<mana>",
         ]
         .contains(&part)
         {
             w += symbol_w;
+            h = h.max(symbol_w);
+            if offset_y.is_none() {
+                offset_y = Some(13.0);
+            }
+        } else if ["<mana>", "<sword>"].contains(&part) {
+            w += symbol_w * 0.6;
+            h = h.max(symbol_w);
+            if offset_y.is_none() {
+                offset_y = Some(13.0);
+            }
         } else {
             let mut font_size = font_size;
             if part.starts_with("<value>") {
@@ -432,7 +441,7 @@ pub fn measure_text_with_font_icons(
 
             if part.len() > 0 {
                 let dim = measure_text(part, font, font_size, 1.0);
-                offset_y = dim.offset_y;
+                offset_y = Some(dim.offset_y);
 
                 w += dim.width;
                 if dim.height > h {
@@ -446,7 +455,7 @@ pub fn measure_text_with_font_icons(
     TextDimensions {
         width: w,
         height: h,
-        offset_y,
+        offset_y: offset_y.unwrap_or(0.0),
     }
 }
 
@@ -493,6 +502,11 @@ pub fn draw_text_with_font_tags(
         } else if part == "<mana>" {
             if render_tags {
                 draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
+            x += symbol_w * 0.6;
+        } else if part == "<sword>" {
+            if render_tags {
+                draw_texture(SWORD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             }
             x += symbol_w * 0.6;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
