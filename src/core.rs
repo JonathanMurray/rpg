@@ -2124,6 +2124,11 @@ impl CoreGame {
                 }
             }
 
+            if defender.conditions.borrow().has(&Condition::Protected) {
+                dmg_str.push_str(" -30% (Protected)");
+                dmg_calculation -= (dmg_calculation as f32 * 0.3).ceil() as i32;
+            }
+
             if armor_value > 0 {
                 dmg_str.push_str(&format!(" -{armor_value} (armor)"));
                 dmg_calculation -= armor_value as i32;
@@ -3401,7 +3406,7 @@ impl Condition {
             Inspired => "+3 Will, +3 attack/spell modifier",
             Exposed => "-5 to all defenses.",
             Hindered => "-50% movement.",
-            Protected => "+x armor against the next attack.",
+            Protected => "Takes 30% less damage from the next attack.",
             Bleeding => "Deals x damage over time. (50% of remaining at the end of each turn)",
             Burning => "End of turn: deals x damage. 50% spreads to adjacent.",
             Braced => "+3 Evasion against the next attack.",
@@ -5490,9 +5495,11 @@ impl Character {
             protection += shield.armor;
         }
 
+        /*
         if let Some(state) = self.conditions.borrow().get(&Condition::Protected) {
             protection += state.stacks.unwrap();
         }
+         */
 
         if self
             .known_passive_skills

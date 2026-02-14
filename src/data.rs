@@ -744,7 +744,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     name: "Brace",
     description: "",
     icon: IconId::Brace,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
@@ -757,8 +757,8 @@ pub const ENEMY_BRACE: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: None,
+                    stacks: None, //Some(2),
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),
@@ -788,8 +788,8 @@ pub const BRACE: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: Some(2),
-                    duration_rounds: None,
+                    stacks: None, //Some(2),
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),
@@ -1350,8 +1350,8 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: Some(1),
-                    duration_rounds: None,
+                    stacks: None, //Some(2),
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),
@@ -1382,8 +1382,8 @@ pub const SELF_HEAL: Ability = Ability {
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,
-                    stacks: Some(1),
-                    duration_rounds: None,
+                    stacks: None, //Some(2),
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),

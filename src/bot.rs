@@ -504,9 +504,7 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
 }
 
 fn may_use(bot: &Character, ability: Ability) -> bool {
-    if ability.id == AbilityId::Brace
-        && bot.conditions.borrow().get_stacks(&Condition::Protected) > 0
-    {
+    if ability.id == AbilityId::Brace && bot.conditions.borrow().has(&Condition::Protected) {
         return false;
     }
     if ability.id == AbilityId::Inspire && bot.conditions.borrow().has(&Condition::Inspired) {
