@@ -587,7 +587,7 @@ impl UserInterface {
         );
 
         let mut banner = Banner::new();
-        banner.set("Battle!", 3.0);
+        banner.set("Battle!", 2.0);
 
         Self {
             game_grid,
@@ -1888,7 +1888,6 @@ impl UserInterface {
         if actual_health_lost > 0 {
             let prev_health =
                 self.characters.get(character_id).health.current() + actual_health_lost;
-            dbg!(prev_health);
             self.game_grid
                 .animate_character_health_change(character_id, prev_health, 0.9);
         }
@@ -1903,8 +1902,6 @@ impl UserInterface {
         outcomes: &[(CharacterId, AbilityTargetOutcome)],
     ) {
         let area_duration = 0.2;
-
-        dbg!(shape);
 
         if let Some(AreaShape::Circle(radius)) = shape {
             self.game_grid.add_effect(

@@ -534,7 +534,6 @@ impl GameGrid {
         style: TextEffectStyle,
     ) {
         let text = text.into();
-        dbg!(&text);
         let mut pos = (position.0 as f32, position.1 as f32);
 
         let mut rng = rand::rng();

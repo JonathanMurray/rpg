@@ -4,7 +4,7 @@ use std::{cell::RefCell, sync::atomic::Ordering};
 
 use macroquad::color::MAGENTA;
 use macroquad::text::draw_text;
-use macroquad::time::get_fps;
+use macroquad::time::{get_fps, get_time};
 use macroquad::{
     color::BLACK,
     input::{get_keys_pressed, KeyCode},
@@ -321,7 +321,10 @@ impl _GameUserInterfaceConnection {
             let elapsed = get_frame_time();
 
             if elapsed > 0.05 {
+                println!("-----");
+                dbg!(get_time());
                 println!("Frame took {elapsed}");
+                println!("-----");
             }
 
             let mut player_choice = user_interface.update(game, elapsed);

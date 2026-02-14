@@ -13,7 +13,8 @@ use macroquad::miniquad::KeyCode;
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{draw_text, load_ttf_font, Font};
 use macroquad::texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
-use macroquad::window::{screen_height, screen_width};
+use macroquad::time::get_time;
+use macroquad::window::{clear_background, next_frame, screen_height, screen_width};
 use macroquad::{
     color::BLACK,
     miniquad,
@@ -70,11 +71,23 @@ async fn main() {
     // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
     set_window_position(100, 100);
 
+    dbg!(get_time());
     dbg!(
         window::screen_size(),
         window::dpi_scale(),
         window::high_dpi()
     );
+
+    clear_background(BLACK);
+    draw_text(
+        "Loading...",
+        screen_width() / 2.0,
+        screen_height() / 2.0,
+        32.0,
+        LIGHTGRAY,
+    );
+    next_frame().await;
+    dbg!(get_time());
 
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
@@ -86,6 +99,11 @@ async fn main() {
     let portrait_textures = load_all_portraits().await;
 
     let mut map_scene = MapScene::new(portrait_textures.clone()).await;
+
+    load_and_init_font_symbols().await;
+    load_and_init_ui_textures().await;
+
+    let sound_player = SoundPlayer::new().await;
 
     let party = Rc::new(Party {
         money: Cell::new(8),
@@ -162,12 +180,15 @@ async fn main() {
 
     let mut player_characters = vec![clara, bob, alice];
 
+    dbg!(get_time());
+
     player_characters = run_fight_loop(
         player_characters,
         FightId::VerticalSlice,
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
+        sound_player.clone(),
     )
     .await;
 
@@ -205,6 +226,7 @@ async fn main() {
                     &equipment_icons,
                     icons.clone(),
                     portrait_textures.clone(),
+                    sound_player.clone(),
                 )
                 .await;
 
@@ -239,6 +261,7 @@ async fn run_fight_loop(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: HashMap<PortraitId, Texture2D>,
+    sound_player: SoundPlayer,
 ) -> Vec<Character> {
     let core_game = init_fight_scene(
         player_characters,
@@ -246,8 +269,13 @@ async fn run_fight_loop(
         &equipment_icons,
         icons.clone(),
         portrait_textures.clone(),
+        sound_player,
     )
     .await;
+    // Run one quick frame, so that the core game doesn't think that much time has elapsed on the very first frame
+    next_frame().await;
+    next_frame().await;
+    dbg!(get_time());
     core_game.run().await
 }
 
@@ -257,6 +285,7 @@ async fn init_fight_scene(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: HashMap<PortraitId, Texture2D>,
+    sound_player: SoundPlayer,
 ) -> CoreGame {
     let init_state = init_fight_map(player_characters, fight_id);
 
@@ -297,11 +326,6 @@ async fn init_fight_scene(
     //terrain_atlas.set_filter(FilterMode::Linear);
 
     let status_textures = load_all_status_textures().await;
-
-    let sound_player = SoundPlayer::new().await;
-
-    load_and_init_font_symbols().await;
-    load_and_init_ui_textures().await;
 
     let gfx_user_interface = UserInterface::new(
         &core_game,

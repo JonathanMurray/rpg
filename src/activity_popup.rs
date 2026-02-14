@@ -215,6 +215,9 @@ impl ActivityPopup {
 
         width += hor_pad * 2.0;
 
+        // Prevent warning text (drawn in top-right corner) from colliding with header, when no enhancements
+        width = width.max(340.0);
+
         draw_rectangle(x, y - height, width, height, bg_color);
 
         let upper_border_color = ORANGE;
