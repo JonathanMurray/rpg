@@ -20,7 +20,7 @@ use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
-use crate::util::{are_entities_within_melee, line_collision};
+use crate::util::{are_entities_within_melee, line_collision, CustomShuffle};
 
 pub type Position = (i32, i32);
 
@@ -2430,7 +2430,7 @@ impl CoreGame {
                 let spread_amount = burn_stacks / 2;
                 dbg!(spread_amount);
                 if spread_amount > 0 {
-                    adj_others.shuffle();
+                    CustomShuffle::shuffle(&mut adj_others);
                     let per_receiver = spread_amount / adj_others.len() as u32;
                     let mut remainder = spread_amount % adj_others.len() as u32;
                     let mut num_receivers = 0;
@@ -3413,9 +3413,9 @@ impl Condition {
             NearDeath => "-1 AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 25% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
-            BloodRage => "+3 attack modifier (passive skill).",
+            BloodRage => "+5 attack modifier (passive skill).",
             CriticalCharge => "+5 spell modifier (passive skill).",
-            ThrillOfBattle => "+3 attack/spell modifier (passive skill).",
+            ThrillOfBattle => "+5 attack/spell modifier (passive skill).",
             Adrenalin => "+1 AP per turn.",
             ArcaneSurge => "+x spell modifier. Decays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: heal 2.",
@@ -5398,7 +5398,7 @@ impl Character {
             res += 5;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
-            res += 3;
+            res += 5;
         }
         res += conditions.get_stacks(&Condition::ArcaneSurge);
 
@@ -5525,10 +5525,10 @@ impl Character {
             res += 3;
         }
         if conditions.has(&Condition::BloodRage) {
-            res += 3;
+            res += 5;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
-            res += 3;
+            res += 5;
         }
 
         res

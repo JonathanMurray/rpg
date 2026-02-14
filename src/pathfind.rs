@@ -149,7 +149,7 @@ impl PathfindGrid {
     ) -> Option<Path> {
         let before = Instant::now();
 
-        println!("find shortest path to proxy ...");
+        //println!("find shortest path to proxy ...");
         let chart = self.explore_outward(
             character_id,
             start,
@@ -163,7 +163,7 @@ impl PathfindGrid {
         for (pos, chart_node) in chart.iter() {
             if within_range_squared(proximity_squared, *pos, target) {
                 //if distance_between(*pos, target) <= proximity {
-                println!("Build path from chart... start={:?}, pos={:?}", start, pos);
+                //println!("Build path from chart... start={:?}, pos={:?}", start, pos);
                 let path = build_path_from_chart(&chart, start, *pos);
 
                 //dbg!(&path);
@@ -178,7 +178,7 @@ impl PathfindGrid {
             }
         }
 
-        println!("find shortest path to proxy ... DONE");
+        //println!("find shortest path to proxy ... DONE");
 
         shortest_path
     }

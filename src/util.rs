@@ -1,4 +1,4 @@
-use macroquad::color::Color;
+use macroquad::{color::Color, rand::gen_range};
 use rand::Rng;
 
 use crate::core::{sq_distance_between, Position, CENTER_MELEE_RANGE_SQUARED};
@@ -28,6 +28,20 @@ pub fn select_n_random<T: Copy>(mut from: Vec<T>, n: usize) -> Vec<T> {
         selected.push(from.remove(i));
     }
     selected
+}
+
+pub trait CustomShuffle<T> {
+    // Custom shuffle implementation. See https://github.com/not-fl3/quad-rand/issues/6
+    fn shuffle(&mut self);
+}
+
+impl<T> CustomShuffle<T> for Vec<T> {
+    fn shuffle(&mut self) {
+        for i in (1..self.len()).rev() {
+            let j = gen_range(0, i + 1);
+            self.swap(i, j);
+        }
+    }
 }
 
 pub fn line_collision(from: (i32, i32), to: (i32, i32), mut visitor: impl FnMut(i32, i32)) {

@@ -12,7 +12,7 @@ use crate::{
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     pathfind::Path,
-    util::{adjacent_cells, are_entities_within_melee},
+    util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -46,8 +46,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
         BotBehaviour::Magi(magi) => run_magi_behaviour(game, magi),
         BotBehaviour::Fighter(fighter) => run_fighter_behaviour(game, fighter),
     };
-
-    dbg!("BOT CHOSE.");
+    println!("Bot chose: {:?}", result);
 
     result
 }
@@ -88,7 +87,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         });
     } else {
         println!("Shuffle player chars");
-        player_chars.shuffle();
+        CustomShuffle::shuffle(&mut player_chars);
     }
 
     if let Some(target_id) = behaviour.current_target.get() {
@@ -171,10 +170,12 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
             candidates.push(candidate);
         }
     }
-    candidates.shuffle();
+    CustomShuffle::shuffle(&mut candidates);
+
+    //dbg!(&candidates);
 
     if let Some(preferred_action) = candidates.first().copied() {
-        dbg!(("bot preferred action", preferred_action));
+        //dbg!(("bot preferred action", preferred_action));
         match preferred_action {
             BotAction::Attack => {
                 if attack_reaches(bot, target) {
@@ -328,7 +329,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
 
     if let Some(attack) = bot.attack_action() {
         attack_range = Some(bot.weapon(attack.hand).unwrap().range);
-        ChooseRandom::shuffle(&mut player_chars[..]);
+        CustomShuffle::shuffle(&mut player_chars);
         for player_char in player_chars {
             if bot
                 .reaches_with_attack(attack.hand, player_char.position.get(), iter::empty())
@@ -504,7 +505,7 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
 
 fn may_use(bot: &Character, ability: Ability) -> bool {
     if ability.id == AbilityId::Brace
-        && bot.conditions.borrow().get_stacks(&Condition::Protected) >= 2
+        && bot.conditions.borrow().get_stacks(&Condition::Protected) > 0
     {
         return false;
     }

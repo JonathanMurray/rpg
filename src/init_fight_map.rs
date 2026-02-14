@@ -313,7 +313,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let mut enemies = vec![];
 
             let mut e1 = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 10.0),
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,

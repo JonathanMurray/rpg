@@ -744,7 +744,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     name: "Brace",
     description: "",
     icon: IconId::Brace,
-    action_point_cost: 1,
+    action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
@@ -1732,8 +1732,8 @@ impl PassiveSkill {
             WeaponProficiency => "Attacks gain +1 armor penetration",
             CriticalCharge => "+5 spell modifier while at/below 50% mana",
             Reaper => "On kill: gain 1 stamina, 2 AP (max 2 AP per turn)",
-            BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
-            ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
+            BloodRage => "+5 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
+            ThrillOfBattle => "+5 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal +1 damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
         }
