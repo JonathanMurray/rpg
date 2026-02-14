@@ -317,9 +317,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 "Enemy 1",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton,
-                Attributes::new(1, 1, 1, 1),
+                Attributes::new(1, 10, 1, 1),
                 *enemy_positions[&0].choose().unwrap(),
             );
+            e1.armor_piece.set(Some(GOOD_CHAIN_MAIL));
             e1.learn_ability(ENEMY_TACKLE);
             e1.known_passive_skills.push(PassiveSkill::BloodRage);
             e1.health.change_max_value_to(300);
@@ -362,7 +363,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
              */
 
             for e in &enemies {
-                e.set_weapon(HandType::MainHand, SWORD);
+                e.set_weapon(HandType::MainHand, BAD_DAGGER);
             }
 
             characters.extend_from_slice(&enemies);

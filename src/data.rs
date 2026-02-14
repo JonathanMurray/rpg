@@ -766,7 +766,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     },
     animation_color: GRAY,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
+    resolve_sound: Some(SoundId::BuffBrace),
     charge_fx: None,
 };
 
@@ -797,7 +797,7 @@ pub const BRACE: Ability = Ability {
     },
     animation_color: GRAY,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Powerup),
+    resolve_sound: Some(SoundId::BuffBrace),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
@@ -1181,7 +1181,7 @@ pub const HEAL: Ability = Ability {
 
     animation_color: GREEN,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::Powerup),
+    resolve_sound: Some(SoundId::Heal),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,

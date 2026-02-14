@@ -1576,17 +1576,6 @@ impl UserInterface {
                     self.sound_player.stop(sound_id);
                 }
 
-                if let Some(sound_id) = ability.resolve_sound {
-                    let mut skip_sound = false;
-                    if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
-                        skip_sound = targets.is_empty();
-                    }
-
-                    //if !skip_sound {
-                    self.sound_player.play(sound_id);
-                    //}
-                }
-
                 let actor_name = self.characters.get(actor).name;
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
@@ -1601,6 +1590,7 @@ impl UserInterface {
 
                 let mut attacks = vec![];
 
+                let mut resist = false;
                 if let Some((target, outcome)) = &target_outcome {
                     match outcome {
                         AbilityTargetOutcome::HitEnemy {
@@ -1620,7 +1610,10 @@ impl UserInterface {
                                 line.push_str(&format!("  ({})", applied_effects[0]));
                             }
                         }
-                        AbilityTargetOutcome::Resisted => line.push_str(" (miss)"),
+                        AbilityTargetOutcome::Resisted => {
+                            resist = true;
+                            line.push_str(" (miss)");
+                        }
                         AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                             if applied_effects.len() == 1 {
                                 line.push_str(&format!("  ({})", applied_effects[0]));
@@ -1629,6 +1622,14 @@ impl UserInterface {
                         AbilityTargetOutcome::AttackedEnemy(event) => {
                             attacks.push(event);
                         }
+                    }
+                }
+
+                if let Some(sound_id) = ability.resolve_sound {
+                    if resist {
+                        self.sound_player.play(SoundId::Resist);
+                    } else {
+                        self.sound_player.play(sound_id);
                     }
                 }
 
@@ -2015,26 +2016,28 @@ impl UserInterface {
         let outcome = event.outcome;
         let detail_lines = &event.detail_lines;
 
-        if self.characters.get(attacker).has_equipped_ranged_weapon() {
-            self.sound_player.play(SoundId::HitArrow);
-        } else {
-            self.sound_player.play(SoundId::MeleeAttack);
-        }
-
-        let verb = match outcome {
+        let verb;
+        match outcome {
             AttackOutcome::Hit {
-                hit_type: AttackHitType::Regular,
-                ..
-            } => "hit",
-            AttackOutcome::Hit {
-                hit_type: AttackHitType::Graze,
-                ..
-            } => "grazed",
-            AttackOutcome::Hit {
-                hit_type: AttackHitType::Critical,
-                ..
-            } => "crit",
-            _ => "missed",
+                hit_type, damage, ..
+            } => {
+                if damage == 0 {
+                    self.sound_player.play(SoundId::ArmorAbsorbed);
+                } else if self.characters.get(attacker).has_equipped_ranged_weapon() {
+                    self.sound_player.play(SoundId::HitArrow);
+                } else {
+                    self.sound_player.play(SoundId::MeleeAttack);
+                }
+                verb = match hit_type {
+                    AttackHitType::Regular => "hit",
+                    AttackHitType::Graze => "grazed",
+                    AttackHitType::Critical => "crit",
+                };
+            }
+            _ => {
+                self.sound_player.play(SoundId::AttackMiss);
+                verb = "missed";
+            }
         };
 
         let mut line = format!(

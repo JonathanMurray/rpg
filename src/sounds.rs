@@ -15,7 +15,6 @@ impl SoundPlayer {
         let mut sounds_by_id = HashMap::new();
 
         for (id, names) in &[
-            //(SoundId::HoverButton, vec!["click_2"]),
             (
                 SoundId::HoverButton,
                 vec![
@@ -32,7 +31,12 @@ impl SoundPlayer {
             (SoundId::Explosion, vec!["explosion"]),
             (SoundId::FireballHit, vec!["fl_fireball_hit.ogg"]),
             (SoundId::Powerup, vec!["fl_spell_buff.ogg"]),
+            (SoundId::BuffBrace, vec!["fl_buff_brace.ogg"]),
+            (SoundId::Heal, vec!["fl_heal.ogg"]),
             (SoundId::MeleeAttack, vec!["melee_attack"]),
+            (SoundId::AttackMiss, vec!["fl_miss.ogg"]),
+            (SoundId::Resist, vec!["fl_resist.ogg"]),
+            (SoundId::ArmorAbsorbed, vec!["fl_armor_absorbed.ogg"]),
             (SoundId::ShootArrow, vec!["shoot_arrow_2"]),
             (SoundId::HitArrow, vec!["hit_arrow"]),
             (SoundId::Walk, vec!["walk3"]),
@@ -106,7 +110,12 @@ pub enum SoundId {
     Explosion,
     FireballHit,
     Powerup,
+    BuffBrace,
+    Heal,
     MeleeAttack,
+    AttackMiss,
+    Resist,
+    ArmorAbsorbed,
     ShootArrow,
     HitArrow,
     Walk,
