@@ -173,7 +173,7 @@ async fn main() {
     clara
         .known_ability_enhancements
         .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
-    clara.learn_ability(MIND_BLAST);
+    //clara.learn_ability(MIND_BLAST);
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));

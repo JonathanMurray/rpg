@@ -3414,7 +3414,7 @@ impl Condition {
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "+3 attack modifier (passive skill).",
-            CriticalCharge => "+3 spell modifier (passive skill).",
+            CriticalCharge => "+5 spell modifier (passive skill).",
             ThrillOfBattle => "+3 attack/spell modifier (passive skill).",
             Adrenalin => "+1 AP per turn.",
             ArcaneSurge => "+x spell modifier. Decays 1 at end of turn.",
@@ -4538,7 +4538,7 @@ impl Character {
             let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 0
             } else {
-                self.action_points.gain(1)
+                self.action_points.gain(2)
             };
             self.receive_condition(Condition::ReaperApCooldown, None, None);
             Some((sta, ap))
@@ -5395,7 +5395,7 @@ impl Character {
             res += 3;
         }
         if conditions.has(&Condition::CriticalCharge) {
-            res += 3;
+            res += 5;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;

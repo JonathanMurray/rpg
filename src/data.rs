@@ -1467,7 +1467,7 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Extend,
     action_point_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_range_tenths: 80,
+        increased_range_tenths: 100,
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -1730,8 +1730,8 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "+1 armor",
             WeaponProficiency => "Attacks gain +1 armor penetration",
-            CriticalCharge => "+3 spell modifier while at/below 50% mana",
-            Reaper => "On kill: gain 1 stamina, 1 AP (max 1 AP per turn)",
+            CriticalCharge => "+5 spell modifier while at/below 50% mana",
+            Reaper => "On kill: gain 1 stamina, 2 AP (max 2 AP per turn)",
             BloodRage => "+3 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
             ThrillOfBattle => "+3 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal +1 damage against Flanked targets",

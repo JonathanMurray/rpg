@@ -2549,6 +2549,8 @@ fn build_character_ui(
     let mut tracked_action_buttons = IndexMap::new();
     let mut hoverable_buttons = vec![];
     let mut basic_buttons = vec![];
+    let mut change_eq_btn = None;
+    let mut use_consumable_btn = None;
     let mut ability_buttons = vec![];
 
     let mut attack_button_for_character_sheet = None;
@@ -2611,11 +2613,17 @@ fn build_character_ui(
 
                 hoverable_buttons.push(btn);
             }
-            BaseAction::Move | BaseAction::ChangeEquipment | BaseAction::UseConsumable => {
+            BaseAction::Move => {
                 *btn.hotkey.borrow_mut() = basic_hotkeys
                     .get(basic_buttons.len())
                     .map(|key| (*key, simple_font.clone()));
                 basic_buttons.push(btn);
+            }
+            BaseAction::ChangeEquipment => {
+                change_eq_btn = Some(btn);
+            }
+            BaseAction::UseConsumable => {
+                use_consumable_btn = Some(btn);
             }
         }
     }
@@ -2676,9 +2684,11 @@ fn build_character_ui(
         },
         ..Default::default()
     };
-    while buttons.len() < 10 {
+    while buttons.len() < 8 {
         buttons.push(Element::Rect(button_placeholder.clone()));
     }
+    buttons.push(Element::Rc(change_eq_btn.unwrap()));
+    buttons.push(Element::Rc(use_consumable_btn.unwrap()));
     let button_row = buttons_row(buttons);
 
     let actions_section = Container {
