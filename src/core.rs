@@ -1865,7 +1865,13 @@ impl CoreGame {
                         }
                         ApplyEffect::PerBleeding { .. } => {}
                         ApplyEffect::ConsumeCondition { .. } => {}
-                        ApplyEffect::Knockback { .. } => {}
+                        ApplyEffect::Knockback(ref mut distance) => {
+                            apply_degree_of_success(
+                                distance,
+                                degree_of_success,
+                                &mut reduced_to_nothing,
+                            );
+                        }
                     }
 
                     if reduced_to_nothing {
@@ -2192,6 +2198,8 @@ impl CoreGame {
                 actual_health_lost = game.perform_losing_health(defender, damage);
             }
 
+            let mut applied_effects = vec![];
+
             if let Some(game) = game {
                 if let Some(effect) = on_true_hit_effect {
                     match effect {
@@ -2236,13 +2244,16 @@ impl CoreGame {
                                     if resist {
                                         "Resist".to_string()
                                     } else {
-                                        let (_applied, log_line, _damage) = game
+                                        let (applied, log_line, _damage) = game
                                             .perform_effect_application(
                                                 apply_effect,
                                                 Some(attacker),
                                                 None,
                                                 defender,
                                             );
+                                        if let Some(apply_effect) = applied {
+                                            applied_effects.push(apply_effect);
+                                        }
                                         log_line
                                     }
                                 }
@@ -2288,6 +2299,7 @@ impl CoreGame {
                 damage,
                 actual_health_lost,
                 hit_type,
+                applied_effects,
             }
         } else if roll_result
             < evasion
@@ -2993,12 +3005,13 @@ pub struct AttackedEvent {
     pub area_outcomes: Option<Vec<(CharacterId, AbilityTargetOutcome)>>,
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum AttackOutcome {
     Hit {
         damage: u32,
         actual_health_lost: u32,
         hit_type: AttackHitType,
+        applied_effects: Vec<ApplyEffect>,
     },
     Dodge,
     Block,
@@ -3343,7 +3356,7 @@ impl Display for ApplyEffect {
             ApplyEffect::ConsumeCondition { condition } => {
                 f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
-            ApplyEffect::Knockback(..) => f.write_str("KNOCKBACK (todo)"),
+            ApplyEffect::Knockback(..) => f.write_str("Knockback"),
         }
     }
 }

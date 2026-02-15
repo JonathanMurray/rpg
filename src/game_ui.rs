@@ -11,7 +11,7 @@ use macroquad::{
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     shapes::draw_rectangle,
-    text::Font,
+    text::{self, Font},
     texture::{draw_texture, Texture2D},
     window::{screen_height, screen_width},
 };
@@ -30,11 +30,11 @@ use crate::{
     core::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction,
-        AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent,
-        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageInterval,
-        DamageSource, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction,
-        OnHitReaction, Position, TargetPrediction,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
+        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
+        DamageInterval, DamageSource, GameEvent, Goodness, HandType, MovementType,
+        OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -487,6 +487,7 @@ pub struct UserInterface {
     target_ui: TargetUi,
     log: Log,
     sound_player: SoundPlayer,
+    status_textures: HashMap<StatusId, Texture2D>,
 }
 
 impl UserInterface {
@@ -612,6 +613,7 @@ impl UserInterface {
             target_ui,
             state: ui_state,
             sound_player,
+            status_textures,
         }
     }
 
@@ -1431,6 +1433,7 @@ impl UserInterface {
                     reactor_pos,
                     0.0,
                     0.5,
+                    None,
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
@@ -1447,6 +1450,7 @@ impl UserInterface {
                     reactor.pos(),
                     0.0,
                     0.5,
+                    None,
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
@@ -1468,6 +1472,7 @@ impl UserInterface {
                         reactor_pos,
                         0.0,
                         1.0,
+                        None,
                         condition.name().to_string(),
                         TextEffectStyle::HostileHit,
                     );
@@ -1480,6 +1485,7 @@ impl UserInterface {
                             attacker_pos,
                             0.0,
                             1.0,
+                            None,
                             condition.name().to_string(),
                             TextEffectStyle::HostileHit,
                         );
@@ -1488,6 +1494,7 @@ impl UserInterface {
                             attacker_pos,
                             0.0,
                             1.0,
+                            None,
                             "Miss".to_string(),
                             TextEffectStyle::Miss,
                         );
@@ -1741,8 +1748,7 @@ impl UserInterface {
 
                 character_ui.stamina_bar.borrow_mut().animate_gain(duration);
 
-                println!("TODO: animate ap/stamina gain ....");
-                self.animation_stopwatch.set_to_at_least(duration + 0.5);
+                self.animation_stopwatch.set_to_at_least(duration + 0.2);
             }
             GameEvent::NewActiveCharacter { new_active } => {
                 let was_players_turn = self.active_character().player_controlled();
@@ -1760,14 +1766,17 @@ impl UserInterface {
                 }
             }
             GameEvent::CharacterReceivedKnockback { character } => {
+                /*
                 let char = self.characters.get(character);
                 self.game_grid.add_text_effect(
                     char.pos(),
                     0.0,
                     1.5,
+                    None,
                     "Knockback",
                     TextEffectStyle::HostileHit,
                 );
+                 */
             }
             GameEvent::CharacterGainedAP { character } => {
                 let char = self.characters.get(character);
@@ -1775,8 +1784,9 @@ impl UserInterface {
                     char.pos(),
                     0.0,
                     1.5,
+                    None,
                     "+AP",
-                    TextEffectStyle::Friendly,
+                    TextEffectStyle::FriendlyEffect,
                 );
             }
             GameEvent::Moved {
@@ -1822,6 +1832,7 @@ impl UserInterface {
                     character.pos(),
                     0.0,
                     1.5,
+                    None,
                     format!("{}", amount),
                     TextEffectStyle::HostileHit,
                 );
@@ -1832,12 +1843,18 @@ impl UserInterface {
                 condition,
             } => {
                 let character = self.characters.get(character);
+                let texture = self
+                    .status_textures
+                    .get(&condition.status_icon())
+                    .unwrap()
+                    .clone();
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    1.5,
+                    2.0,
+                    Some(texture),
                     condition.name().to_string(),
-                    TextEffectStyle::HostileHit,
+                    TextEffectStyle::HostileEffect,
                 );
             }
         }
@@ -2031,15 +2048,19 @@ impl UserInterface {
     fn handle_attacked_event(&mut self, event: &AttackedEvent) {
         let attacker = event.attacker;
         let target = event.target;
-        let outcome = event.outcome;
         let detail_lines = &event.detail_lines;
 
+        let mut applied_effects = vec![];
+
         let verb;
-        match outcome {
+        match &event.outcome {
             AttackOutcome::Hit {
-                hit_type, damage, ..
+                hit_type,
+                damage,
+                actual_health_lost,
+                applied_effects: effects,
             } => {
-                if damage == 0 {
+                if *damage == 0 {
                     self.sound_player.play(SoundId::ArmorAbsorbed);
                 } else if self.characters.get(attacker).has_equipped_ranged_weapon() {
                     self.sound_player.play(SoundId::HitArrow);
@@ -2051,6 +2072,7 @@ impl UserInterface {
                     AttackHitType::Graze => "grazed",
                     AttackHitType::Critical => "crit",
                 };
+                applied_effects = effects.clone();
             }
             _ => {
                 self.sound_player.play(SoundId::AttackMiss);
@@ -2066,7 +2088,7 @@ impl UserInterface {
         );
 
         let mut damage_was_dealt = false;
-        match outcome {
+        match event.outcome {
             AttackOutcome::Hit {
                 damage,
                 actual_health_lost,
@@ -2086,7 +2108,7 @@ impl UserInterface {
 
         let target_pos = self.characters.get(target).pos();
 
-        let (impact_text, text_style) = match outcome {
+        let (impact_text, text_style) = match event.outcome {
             AttackOutcome::Hit {
                 damage,
                 hit_type: AttackHitType::Regular,
@@ -2109,7 +2131,31 @@ impl UserInterface {
         };
 
         self.game_grid
-            .add_text_effect(target_pos, 0.0, 1.5, impact_text, text_style);
+            .add_text_effect(target_pos, 0.0, 1.0, None, impact_text, text_style);
+
+        if !applied_effects.is_empty() {
+            let mut s = String::new();
+            let mut texture = None;
+            for apply_effect in applied_effects {
+                if let ApplyEffect::Condition(condition) = apply_effect {
+                    texture = Some(
+                        self.status_textures
+                            .get(&condition.condition.status_icon())
+                            .unwrap()
+                            .clone(),
+                    );
+                }
+                s.push_str(&format!("{} ", apply_effect));
+            }
+            self.game_grid.add_text_effect(
+                target_pos,
+                0.0,
+                2.0,
+                texture,
+                s,
+                TextEffectStyle::HostileEffect,
+            );
+        };
 
         if damage_was_dealt {
             self.game_grid.animate_character_shaking(target, 0.2);
@@ -2129,48 +2175,81 @@ impl UserInterface {
         target: CharacterId,
         target_pos: (i32, i32),
     ) {
-        let effect = match &outcome {
+        let mut effects = vec![];
+
+        match &outcome {
             AbilityTargetOutcome::HitEnemy {
                 damage,
                 graze,
                 applied_effects,
             } => {
-                let effect = if let Some(dmg) = damage {
+                if let Some(dmg) = damage {
                     self.animate_character_damage(target, *dmg);
-                    (format!("{}", dmg), TextEffectStyle::HostileHit)
+                    effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
                     if *graze {
-                        ("Graze".to_string(), TextEffectStyle::HostileGraze)
+                        effects.push((
+                            None,
+                            "Graze".to_string(),
+                            TextEffectStyle::HostileGraze,
+                            1.0,
+                        ));
                     } else {
-                        ("Hit".to_string(), TextEffectStyle::HostileHit)
+                        effects.push((None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0));
                     }
-                } else {
+                }
+
+                if !applied_effects.is_empty() {
                     let mut s = String::new();
+                    let mut texture = None;
                     for apply_effect in applied_effects {
+                        if let ApplyEffect::Condition(condition) = *apply_effect {
+                            texture = Some(
+                                self.status_textures
+                                    .get(&condition.condition.status_icon())
+                                    .unwrap()
+                                    .clone(),
+                            );
+                        }
                         s.push_str(&format!("{} ", apply_effect));
                     }
-                    (s, TextEffectStyle::HostileHit)
+                    effects.push((texture, s, TextEffectStyle::HostileEffect, 2.0));
                 };
-                Some(effect)
             }
-            AbilityTargetOutcome::Resisted => Some(("Resist".to_string(), TextEffectStyle::Miss)),
+            AbilityTargetOutcome::Resisted => {
+                effects.push((None, "Resist".to_string(), TextEffectStyle::Miss, 1.0))
+            }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                 let mut s = String::new();
+                let mut texture = None;
                 for apply_effect in applied_effects {
+                    if let ApplyEffect::Condition(condition) = *apply_effect {
+                        texture = Some(
+                            self.status_textures
+                                .get(&condition.condition.status_icon())
+                                .unwrap()
+                                .clone(),
+                        );
+                    }
                     s.push_str(&format!("{} ", apply_effect));
                 }
 
-                Some((s, TextEffectStyle::Friendly))
+                effects.push((texture, s, TextEffectStyle::FriendlyEffect, 2.0))
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
                 // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.
-                None
             }
         };
 
-        if let Some((target_text, goodness)) = effect {
-            self.game_grid
-                .add_text_effect(target_pos, start_time, 3.0, target_text, goodness);
+        for (texture, target_text, goodness, duration) in effects {
+            self.game_grid.add_text_effect(
+                target_pos,
+                start_time,
+                duration,
+                texture,
+                target_text,
+                goodness,
+            );
         }
     }
 

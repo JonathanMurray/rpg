@@ -681,7 +681,8 @@ impl Drawable for PlayerCharacterPortrait {
         let button_text_vert_pad = 8.0;
 
         let button_y = y + h + 5.0;
-        if self.character.has_taken_a_turn_this_round.get() {
+        let has_taken_a_turn = self.character.has_taken_a_turn_this_round.get();
+        if has_taken_a_turn {
             draw_rectangle_lines(x, button_y, w, button_h, 1.0, GRAY);
             self.done_text.draw(
                 x + w / 2.0 - self.done_text.size().0 / 2.0,
@@ -701,10 +702,14 @@ impl Drawable for PlayerCharacterPortrait {
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
 
             draw_rectangle_lines(x, button_y, w, button_h, 1.0, LIGHTGRAY);
-            self.end_turn_text.draw(
-                x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
-                button_y + button_text_vert_pad,
-            );
+            if !has_taken_a_turn {
+                // Just after the char has ended their turn, and AP/stamina is being animated, the character is "active"
+                // even though we've already pressed "End turn".
+                self.end_turn_text.draw(
+                    x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
+                    button_y + button_text_vert_pad,
+                );
+            }
             if self.may_show_end_turn_button.get()
                 && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into())
             {

@@ -195,9 +195,10 @@ const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
-    Friendly,
+    FriendlyEffect,
     Miss,
     ReactionExclamation,
+    HostileEffect,
     HostileGraze,
     HostileHit,
     HostileCrit,
@@ -530,6 +531,7 @@ impl GameGrid {
         position: Position,
         start_time: f32,
         duration: f32,
+        status_texture: Option<Texture2D>,
         text: impl Into<String>,
         style: TextEffectStyle,
     ) {
@@ -541,11 +543,22 @@ impl GameGrid {
         let dy = rng.random_range(-0.3..=0.3);
         pos = (pos.0 + dx, pos.1 + dy);
 
+        let mut font = &self.big_font;
+        let mut font_size = 20;
         let color = match style {
-            TextEffectStyle::Friendly => Color::new(0.8, 1.0, 0.8, 1.0),
+            TextEffectStyle::FriendlyEffect => {
+                font = &self.simple_font;
+                font_size = 16;
+                Color::new(0.8, 1.0, 0.8, 1.0)
+            }
+            TextEffectStyle::HostileEffect => {
+                font = &self.simple_font;
+                font_size = 16;
+                ORANGE
+            }
             TextEffectStyle::Miss => WHITE,
             TextEffectStyle::ReactionExclamation => ORANGE,
-            TextEffectStyle::HostileGraze => WHITE,
+            TextEffectStyle::HostileGraze => LIGHTGRAY,
             TextEffectStyle::HostileHit => ORANGE,
             TextEffectStyle::HostileCrit => RED,
         };
@@ -556,7 +569,7 @@ impl GameGrid {
             end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(text, self.big_font.clone(), color),
+                EffectGraphics::Text(status_texture, text, font.clone(), font_size, color),
             ),
             source_pos: pos,
             destination_pos: pos,
@@ -2248,7 +2261,6 @@ impl GameGrid {
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
-        // TODO:
         let status_w = 10.0;
         let box_h = text_dimensions.height + text_pad * 2.0;
 
@@ -2992,7 +3004,7 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(String, Font, Color),
+    Text(Option<Texture2D>, String, Font, u16, Color),
 }
 
 impl EffectGraphics {
@@ -3066,10 +3078,10 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(text, font, color) => {
-                let font_size = 20;
+            EffectGraphics::Text(status_texture, text, font, font_size, color) => {
+                //let font_size = 20;
                 //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
-                let text_dimensions = measure_text_with_font_tags(text, Some(font), font_size);
+                let text_dimensions = measure_text_with_font_tags(text, Some(font), *font_size);
 
                 let grow_duration = 0.15;
 
@@ -3090,9 +3102,26 @@ impl EffectGraphics {
                     1.0
                 };
 
+                let status_w = 20.0;
+                if let Some(texture) = status_texture {
+                    let status_x = x0 - status_w - 3.0;
+                    let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
+                    draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
+                    draw_texture_ex(
+                        texture,
+                        status_x,
+                        status_y,
+                        WHITE,
+                        DrawTextureParams {
+                            dest_size: Some((status_w, status_w).into()),
+                            ..Default::default()
+                        },
+                    );
+                }
+
                 let mut text_params = TextParams {
                     font: Some(font),
-                    font_size,
+                    font_size: *font_size,
                     font_scale,
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
