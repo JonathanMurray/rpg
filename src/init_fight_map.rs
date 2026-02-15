@@ -446,7 +446,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             for i in 8..=8 {
                 let pos = *enemy_positions[&i].choose().unwrap();
                 let mut ogre = Character::new(
-                    bot(BotBehaviour::Normal, 10.0),
+                    bot(BotBehaviour::Fighter(Default::default()), 10.0),
                     "Ogre",
                     PortraitId::Ogre,
                     SpriteId::Ogre,

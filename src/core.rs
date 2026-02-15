@@ -877,7 +877,7 @@ impl CoreGame {
                 };
                 receiver.is_being_pushed_in_direction.set(Some(vector));
                 actual_effect = Some(e);
-                format!("  {} was knocked back", receiver.name)
+                format!("  {} was knocked back ({})", receiver.name, amount)
             }
         };
 
@@ -1076,24 +1076,44 @@ impl CoreGame {
 
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
-                    if let AbilityRoll::RolledWithSpellModifier { result: _, line } =
-                        &mut ability_roll
-                    {
-                        let spell_enemy_effect = effect.unwrap_spell();
-                        if let Some(contest) = spell_enemy_effect.defense_type {
-                            match contest {
-                                DefenseType::Will => {
-                                    line.push_str(&format!(", vs will={}", target.will()))
-                                }
-                                DefenseType::Evasion => {
-                                    line.push_str(&format!(", vs evasion={}", target.evasion()))
-                                }
-                                DefenseType::Toughness => {
-                                    line.push_str(&format!(", vs toughness={}", target.toughness()))
+                    match &mut ability_roll {
+                        AbilityRoll::RolledWithSpellModifier { line, .. } => {
+                            let spell_enemy_effect = effect.unwrap_spell();
+                            if let Some(contest) = spell_enemy_effect.defense_type {
+                                match contest {
+                                    DefenseType::Will => {
+                                        line.push_str(&format!(", vs will={}", target.will()))
+                                    }
+                                    DefenseType::Evasion => {
+                                        line.push_str(&format!(", vs evasion={}", target.evasion()))
+                                    }
+                                    DefenseType::Toughness => line.push_str(&format!(
+                                        ", vs toughness={}",
+                                        target.toughness()
+                                    )),
                                 }
                             }
+                            detail_lines.push(line.to_string());
                         }
-                        detail_lines.push(line.to_string());
+                        AbilityRoll::RolledWithAttackModifier { line, .. } => {
+                            let spell_enemy_effect = effect.unwrap_spell();
+                            if let Some(contest) = spell_enemy_effect.defense_type {
+                                match contest {
+                                    DefenseType::Will => {
+                                        line.push_str(&format!(", vs will={}", target.will()))
+                                    }
+                                    DefenseType::Evasion => {
+                                        line.push_str(&format!(", vs evasion={}", target.evasion()))
+                                    }
+                                    DefenseType::Toughness => line.push_str(&format!(
+                                        ", vs toughness={}",
+                                        target.toughness()
+                                    )),
+                                }
+                            }
+                            detail_lines.push(line.to_string());
+                        }
+                        AbilityRoll::WillRollDuringAttack { .. } => {}
                     }
 
                     let before = SystemTime::now();

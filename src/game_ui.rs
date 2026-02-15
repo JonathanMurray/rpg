@@ -1768,7 +1768,10 @@ impl UserInterface {
                 movement_type,
                 step_idx,
             } => {
-                let mut duration = 0.11; //0.15;
+                // TODO
+                let mut duration = 0.07;
+                //let mut duration = 0.11;
+
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;

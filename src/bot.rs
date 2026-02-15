@@ -172,7 +172,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     }
     CustomShuffle::shuffle(&mut candidates);
 
-    //dbg!(&candidates);
+    dbg!(&candidates);
 
     if let Some(preferred_action) = candidates.first().copied() {
         //dbg!(("bot preferred action", preferred_action));
@@ -246,7 +246,12 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         println!("BOT MOVING PATH: {:?}", path);
         return convert_path_to_move_action(bot, path);
     } else {
-        println!("bot finds no path to target");
+        println!(
+            "bot finds no path to target (from {:?} to {:?})",
+            bot_pos,
+            target.pos()
+        );
+        //dbg!(&game.pathfind_grid.occupied());
     }
 
     println!("No bot action");

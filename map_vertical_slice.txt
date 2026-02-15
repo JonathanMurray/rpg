@@ -6,7 +6,7 @@ HR     KBH         K
 H      KBH         K
 H  S   OUL  R   S  K
 H           R3     K
-H  PP      5    8  K
+H  PP 8    5       K
 H  P              7K
 H       yui  R4  6 K
 H       nm; CMMMMMM,
