@@ -124,7 +124,6 @@ async fn main() {
     alice.learn_ability(HEAL);
     alice.known_ability_enhancements.push(HEAL_ENERGIZE);
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
-    alice.known_attack_enhancements.push(EMPOWER);
     alice
         .known_passive_skills
         .push(PassiveSkill::WeaponProficiency);

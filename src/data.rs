@@ -63,7 +63,7 @@ pub const CHAIN_MAIL: ArmorPiece = ArmorPiece {
 pub const GOOD_CHAIN_MAIL: ArmorPiece = ArmorPiece {
     name: "Good chain mail",
     protection: 4,
-    limit_evasion_from_agi: Some(4),
+    limit_evasion_from_agi: None,
     icon: EquipmentIconId::ChainMail,
     weight: 3,
     equip: EquipEffect::default(),
@@ -124,7 +124,15 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
     icon: IconId::Slashing,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
-        inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            None,
+            ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Bleeding,
+                stacks: Some(5),
+                duration_rounds: None,
+            }),
+        )),
+        //inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -531,6 +539,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     weapon_requirement: Some(WeaponType::Melee),
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            Some(DefenseType::Toughness),
             ApplyEffect::RemoveActionPoints(2),
         )),
         ..AttackEnhancementEffect::default()
@@ -545,6 +554,7 @@ pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
         roll_advantage: 1,
+        improved_graze: true,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -577,10 +587,12 @@ pub const EMPOWER: AttackEnhancement = AttackEnhancement {
 
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
+    description: "Attempt to cripple the target",
     icon: IconId::CripplingShot,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            Some(DefenseType::Toughness),
             ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Hindered,
                 stacks: None,
@@ -684,6 +696,7 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     stamina_cost: 1,
     attack_effect: Some(AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            Some(DefenseType::Toughness),
             ApplyEffect::RemoveActionPoints(1),
         )),
         ..AttackEnhancementEffect::default()
@@ -1010,11 +1023,11 @@ pub const INFLICT_WOUNDS: Ability = Ability {
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: None,
+                damage: Some(AbilityDamage::AtLeast(4)),
                 on_hit: Some([
                     Some(ApplyEffect::Condition(ApplyCondition {
                         condition: Condition::Bleeding,
-                        stacks: Some(10),
+                        stacks: Some(8),
                         duration_rounds: None,
                     })),
                     None,

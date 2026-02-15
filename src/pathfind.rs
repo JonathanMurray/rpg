@@ -194,12 +194,11 @@ impl PathfindGrid {
             && self.cache_key.get().range >= range
             && self.cache_key.get().target == target
         {
-            /*
             println!(
-                "explore_outward(char={}, start={:?}, range={} CACHED",
-                character_id, start, exploration_range
+                "explore_outward(char={}, start={:?}, range={}, target={:?}) CACHED",
+                character_id, start, range, target
             );
-             */
+
             return self.cached_exploration_chart.borrow();
         }
 

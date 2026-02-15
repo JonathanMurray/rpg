@@ -2116,11 +2116,16 @@ impl CoreGame {
                 dmg_calculation += bonus_dmg;
             }
 
+            let mut graze_improvement = None;
+
             for (name, effect) in enhancements {
                 let bonus_dmg = effect.bonus_damage;
                 if bonus_dmg > 0 {
                     dmg_str.push_str(&format!(" +{} ({})", bonus_dmg, name));
                     dmg_calculation += bonus_dmg as i32;
+                }
+                if effect.improved_graze {
+                    graze_improvement = Some(name);
                 }
             }
 
@@ -2143,8 +2148,13 @@ impl CoreGame {
 
             match hit_type {
                 AttackHitType::Graze => {
-                    dmg_str.push_str(" -25% (graze)");
-                    dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                    if let Some(source) = graze_improvement {
+                        dmg_str.push_str(&format!(" -25% (graze, {})", source));
+                        dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                    } else {
+                        dmg_str.push_str(" -50% (graze)");
+                        dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
+                    }
                     detail_lines.push("  Graze!".to_string());
                 }
                 AttackHitType::Regular => {
@@ -2206,15 +2216,35 @@ impl CoreGame {
                                     attacker.action_points.gain(1);
                                     format!("{} regained 1 AP", attacker.name)
                                 }
-                                AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                                    let (applied, log_line, _damage) = game
-                                        .perform_effect_application(
-                                            apply_effect,
-                                            Some(attacker),
-                                            None,
-                                            defender,
-                                        );
-                                    log_line
+                                AttackEnhancementOnHitEffect::Target(
+                                    defense_type,
+                                    apply_effect,
+                                ) => {
+                                    let mut resist = false;
+                                    if let Some(defense_type) = defense_type {
+                                        let defense = defender.defense(defense_type);
+                                        detail_lines.push(format!(
+                                            "{} vs {}={}",
+                                            roll_result,
+                                            defense_type.name(),
+                                            defense
+                                        ));
+                                        if roll_result < defense {
+                                            resist = true;
+                                        }
+                                    }
+                                    if resist {
+                                        "Resist".to_string()
+                                    } else {
+                                        let (_applied, log_line, _damage) = game
+                                            .perform_effect_application(
+                                                apply_effect,
+                                                Some(attacker),
+                                                None,
+                                                defender,
+                                            );
+                                        log_line
+                                    }
                                 }
                             };
 
@@ -3120,11 +3150,7 @@ pub fn prob_ability_hit(
 ) -> f32 {
     let bonus = ability_roll_bonus(caster, defender, enhancements, modifier);
 
-    let def = match defense_type {
-        DefenseType::Will => defender.will(),
-        DefenseType::Evasion => defender.evasion(),
-        DefenseType::Toughness => defender.toughness(),
-    };
+    let def = defender.defense(defense_type);
 
     let modifier_value = match modifier {
         AbilityRollType::Spell => caster.spell_modifier() as i32,
@@ -4189,6 +4215,8 @@ pub struct AttackEnhancementEffect {
     pub on_target: Option<ApplyEffect>,
 
     pub consume_equipped_arrow: bool,
+
+    pub improved_graze: bool,
 }
 
 impl AttackEnhancementEffect {
@@ -4206,6 +4234,7 @@ impl AttackEnhancementEffect {
             on_self: None,
             on_target: None,
             consume_equipped_arrow: false,
+            improved_graze: false,
         }
     }
 }
@@ -4249,7 +4278,7 @@ impl SpellEnhancementEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AttackEnhancementOnHitEffect {
     RegainActionPoint,
-    Target(ApplyEffect),
+    Target(Option<DefenseType>, ApplyEffect),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -4257,6 +4286,16 @@ pub enum DefenseType {
     Will,
     Evasion,
     Toughness,
+}
+
+impl DefenseType {
+    fn name(&self) -> &'static str {
+        match self {
+            DefenseType::Will => "will",
+            DefenseType::Evasion => "evasion",
+            DefenseType::Toughness => "toughness",
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, Default, PartialEq)]
@@ -5511,6 +5550,14 @@ impl Character {
 
     fn evasion_from_intellect(&self) -> u32 {
         self.intellect() / 2
+    }
+
+    pub fn defense(&self, defense_type: DefenseType) -> u32 {
+        match defense_type {
+            DefenseType::Will => self.will(),
+            DefenseType::Evasion => self.evasion(),
+            DefenseType::Toughness => self.toughness(),
+        }
     }
 
     pub fn will(&self) -> u32 {

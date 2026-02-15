@@ -36,6 +36,14 @@ const EVASION_STR: &str = "  |<shield>| Evasion";
 const WILL_STR: &str = "  |<shield>| Will";
 const TOUGHNESS_STR: &str = "  |<shield>| Toughness";
 
+fn defense_str(defense_type: DefenseType) -> &'static str {
+    match defense_type {
+        DefenseType::Will => WILL_STR,
+        DefenseType::Evasion => EVASION_STR,
+        DefenseType::Toughness => TOUGHNESS_STR,
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct Tooltip {
     pub header: String,
@@ -220,6 +228,11 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         t.technical_description
             .push(format!("+ {} range", effect.range_bonus));
     }
+
+    if effect.improved_graze {
+        t.technical_description
+            .push("-25% damage on Graze (instead of -50%)".to_string());
+    }
     if effect.roll_advantage > 0 {
         t.technical_description
             .push(format!("+ {} |<keyword>Advantage|", effect.roll_advantage));
@@ -254,12 +267,18 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if let Some(effect) = effect.on_damage_effect {
+        t.technical_description
+            .push("(If attack deals damage)".to_string());
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
                 t.technical_description.push("Regain AP".to_string())
             }
-            AttackEnhancementOnHitEffect::Target(apply_effect) => {
-                t.technical_description.push("Target (on hit):".to_string());
+            AttackEnhancementOnHitEffect::Target(defense_type, apply_effect) => {
+                t.technical_description.push("Target:".to_string());
+                if let Some(defense_type) = defense_type {
+                    t.technical_description
+                        .push(defense_str(defense_type).to_string());
+                }
                 describe_apply_effect(apply_effect, t);
             }
         }
@@ -601,11 +620,9 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
             match effect.defense_type {
-                Some(DefenseType::Will) => t.technical_description.push(WILL_STR.to_string()),
-                Some(DefenseType::Evasion) => t.technical_description.push(EVASION_STR.to_string()),
-                Some(DefenseType::Toughness) => {
-                    t.technical_description.push(TOUGHNESS_STR.to_string())
-                }
+                Some(defense_type) => t
+                    .technical_description
+                    .push(defense_str(defense_type).to_string()),
                 None => {}
             };
 
