@@ -296,16 +296,31 @@ impl CoreGame {
                 positions.push((ch.pos().0, ch.pos().1 + i * dy.signum()));
             }
         }
+
+        let original_distance = positions.len();
+
         let positions: Vec<Position> = positions
             .into_iter()
             .take_while(|pos| self.pathfind_grid.is_free_for(ch.id(), *pos))
             .collect();
+
+        let reduction_from_collision = original_distance - positions.len();
 
         if positions.len() > 1 {
             self.ui_handle_event(GameEvent::CharacterReceivedKnockback { character: ch.id() })
                 .await;
             self.perform_movement(ch.id(), positions, MovementType::KnockedBack)
                 .await;
+        }
+        if reduction_from_collision > 0 {
+            let collision_damage = reduction_from_collision as u32;
+            self.perform_losing_health(ch, collision_damage);
+            self.ui_handle_event(GameEvent::CharacterTookDamage {
+                character: ch.id(),
+                amount: collision_damage,
+                source: DamageSource::KnockbackCollision,
+            })
+            .await;
         }
     }
 
@@ -2419,7 +2434,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
-                source: Condition::Bleeding,
+                source: DamageSource::Condition(Condition::Bleeding),
             })
             .await;
             if conditions
@@ -2436,7 +2451,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
-                source: Condition::Burning,
+                source: DamageSource::Condition(Condition::Burning),
             })
             .await;
             conditions.borrow_mut().remove(&Condition::Burning);
@@ -2830,7 +2845,7 @@ pub enum GameEvent {
     CharacterTookDamage {
         character: CharacterId,
         amount: u32,
-        source: Condition,
+        source: DamageSource,
     },
     CharacterReceivedCondition {
         character: CharacterId,
@@ -2842,6 +2857,21 @@ pub enum GameEvent {
     CharacterGainedAP {
         character: CharacterId,
     },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum DamageSource {
+    Condition(Condition),
+    KnockbackCollision,
+}
+
+impl DamageSource {
+    pub fn name(&self) -> &'static str {
+        match self {
+            DamageSource::Condition(condition) => condition.name(),
+            DamageSource::KnockbackCollision => "Collision",
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

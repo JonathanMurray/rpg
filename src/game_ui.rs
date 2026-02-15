@@ -33,8 +33,8 @@ use crate::{
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, AreaShape, AttackAction,
         AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome, AttackedEvent,
         BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageInterval,
-        GameEvent, Goodness, HandType, MovementType, OnAttackedReaction, OnHitReaction, Position,
-        TargetPrediction,
+        DamageSource, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction,
+        OnHitReaction, Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -1796,7 +1796,7 @@ impl UserInterface {
                     amount,
                     source.name()
                 ));
-                if source == Condition::Burning {
+                if source == DamageSource::Condition(Condition::Burning) {
                     self.sound_player.play(SoundId::Burning);
                 }
 

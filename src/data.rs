@@ -432,7 +432,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
     name: "Tackle",
     description: "",
     icon: IconId::Tackle,
-    action_point_cost: 2,
+    action_point_cost: 3,
     stamina_cost: 0,
     mana_cost: 0,
     requirement: None,

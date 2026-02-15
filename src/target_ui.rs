@@ -23,7 +23,7 @@ use crate::{
         Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle, TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{BaseAction, Character, CharacterId, Goodness, HandType},
+    core::{AbilityRollType, BaseAction, Character, CharacterId, Goodness, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
     textures::{IconId, PortraitId, StatusId},
     util::COL_RED,
@@ -224,7 +224,9 @@ impl TargetUi {
                     self.buttons.insert(id, btn);
                 }
                 for ability in char.known_abilities() {
-                    bot_using_spells = true;
+                    if matches!(ability.roll, Some(AbilityRollType::Spell)) {
+                        bot_using_spells = true;
+                    }
                     let btn = new_btn(ButtonAction::Action(BaseAction::UseAbility(ability)));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
@@ -271,8 +273,18 @@ impl TargetUi {
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),
                 );
+                let damage_text_line = TextLine::new(
+                    format!(
+                        "Attack damage: {}",
+                        char.weapon(HandType::MainHand).unwrap().damage
+                    ),
+                    16,
+                    LIGHTGRAY,
+                    Some(self.simple_font.clone()),
+                );
                 let mut detailed_stats_lines = vec![
                     Element::Text(movement_text_line),
+                    Element::Text(damage_text_line),
                     Element::Text(attack_text_line),
                 ];
                 if bot_using_spells {
@@ -336,38 +348,6 @@ impl TargetUi {
             *self.hovered_btn.borrow_mut() = None;
         }
     }
-
-    /*
-    pub fn clear_action(&mut self) {
-        self.action = None;
-    }
-
-    pub fn set_action(
-        &mut self,
-        header: String,
-        details: Vec<(&'static str, Goodness)>,
-        only_show_with_target: bool,
-    ) {
-        self.action = Some((header, details, only_show_with_target));
-    }
-
-
-    fn draw_action(&self, container_pos: (f32, f32)) {
-        if let Some((header, details, only_show_with_target)) = &self.action {
-            if *only_show_with_target && self.target.is_none() {
-                return;
-            }
-
-            draw_action(
-                container_pos,
-                &self.big_font,
-                header,
-                &self.simple_font,
-                &details,
-            );
-        };
-    }
-    */
 }
 
 impl Drawable for TargetUi {
@@ -384,8 +364,6 @@ impl Drawable for TargetUi {
                 h: 0.0,
             });
         }
-
-        //self.draw_action((screen_width() / 2.0, 200.0));
 
         for event in self.button_events.borrow_mut().drain(..) {
             match event {
