@@ -6,7 +6,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{PURPLE, SKYBLUE},
+    color::{MAGENTA, PURPLE, SKYBLUE},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
@@ -882,6 +882,13 @@ impl Log {
     }
 }
 
+struct ApGainAnimation {
+    total_gain: u32,
+    gained_so_far: u32,
+    duration_per_ap: f32,
+    age: f32,
+}
+
 #[derive(Default)]
 pub struct ActionPointsRow {
     pub is_characters_turn: bool,
@@ -893,6 +900,7 @@ pub struct ActionPointsRow {
     style: Style,
     radius_factor: f32,
     pub hovered: Cell<bool>,
+    gain_animation: Option<ApGainAnimation>,
 }
 
 impl ActionPointsRow {
@@ -907,6 +915,40 @@ impl ActionPointsRow {
             padding: 3.0,
             style,
             hovered: Cell::new(false),
+            gain_animation: None,
+        }
+    }
+
+    pub fn animate_gain(&mut self, total_gain: u32, duration: f32) {
+        self.gain_animation = Some(ApGainAnimation {
+            total_gain,
+            gained_so_far: 0,
+            duration_per_ap: duration / total_gain as f32,
+            age: 0.0,
+        });
+    }
+
+    pub fn update(&mut self, elapsed: f32, sound_player: &SoundPlayer) {
+        if let Some(animation) = &mut self.gain_animation {
+            let prev = animation.gained_so_far;
+            animation.age += elapsed;
+            animation.gained_so_far =
+                1 + (animation.age / animation.duration_per_ap).floor() as u32;
+            if prev < animation.total_gain && animation.gained_so_far > prev {
+                dbg!(animation.gained_so_far);
+                let sound = match animation.gained_so_far {
+                    1 => SoundId::Scale1,
+                    2 => SoundId::Scale2,
+                    3 => SoundId::Scale3,
+                    4 => SoundId::Scale4,
+                    _ => SoundId::Scale5,
+                };
+                sound_player.play(sound);
+            }
+
+            if animation.age > animation.duration_per_ap * animation.total_gain as f32 {
+                self.gain_animation = None;
+            }
         }
     }
 }
@@ -941,6 +983,12 @@ impl Drawable for ActionPointsRow {
             let mut available = false;
             let mut missing = false;
 
+            let mut currently_animated = None;
+            if let Some(animation) = &self.gain_animation {
+                currently_animated =
+                    Some(self.current_ap - animation.total_gain + animation.gained_so_far - 1);
+            }
+
             if reserved_ap >= 0 {
                 if i < self.current_ap as i32 - reserved_ap {
                     available = true;
@@ -964,12 +1012,18 @@ impl Drawable for ActionPointsRow {
             }
 
             if available {
-                draw_circle(
-                    x0 + self.cell_size.0 / 2.0,
-                    y0 + self.cell_size.1 / 2.0,
-                    r,
-                    GOLD,
-                );
+                let mut show = true;
+                if let Some(currently_animated) = currently_animated {
+                    show = (i as u32) <= currently_animated;
+                }
+                if show {
+                    draw_circle(
+                        x0 + self.cell_size.0 / 2.0,
+                        y0 + self.cell_size.1 / 2.0,
+                        r,
+                        GOLD,
+                    );
+                }
             } else if reserved {
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
@@ -1020,16 +1074,16 @@ impl Drawable for ActionPointsRow {
                     2.0,
                     SKYBLUE,
                 );
-            } else {
-                /*
+            }
+
+            if currently_animated == Some(i as u32) {
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    1.0,
-                    GRAY,
+                    4.0,
+                    WHITE,
                 );
-                 */
             }
 
             x0 += self.cell_size.0;
@@ -1059,6 +1113,7 @@ pub struct ResourceBar {
     pub cell_size: (f32, f32),
     pub layout: LayoutDirection,
     pub hovered: Cell<bool>,
+    gain_animation: Option<f32>,
 }
 
 impl ResourceBar {
@@ -1071,6 +1126,16 @@ impl ResourceBar {
             cell_size: (size.0 / max as f32, size.1),
             layout: LayoutDirection::Horizontal,
             hovered: Cell::new(false),
+            gain_animation: None,
+        }
+    }
+
+    pub fn update(&mut self, elapsed: f32) {
+        if let Some(animation) = &mut self.gain_animation {
+            *animation -= elapsed;
+            if *animation <= 0.0 {
+                self.gain_animation = None;
+            }
         }
     }
 }
@@ -1172,6 +1237,10 @@ impl Drawable for ResourceBar {
 
         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
 
+        if self.gain_animation.is_some() {
+            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
+        }
+
         self.hovered.set(rect.contains(mouse_position().into()));
     }
 
@@ -1240,6 +1309,14 @@ impl LabelledResourceBar {
             max_value: max,
             symbol,
         }
+    }
+
+    pub fn update(&mut self, elapsed: f32) {
+        self.bar.borrow_mut().update(elapsed);
+    }
+
+    pub fn animate_gain(&mut self, duration: f32) {
+        self.bar.borrow_mut().gain_animation = Some(duration);
     }
 
     pub fn set_current(&mut self, value: u32) {

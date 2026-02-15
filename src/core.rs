@@ -2571,15 +2571,23 @@ impl CoreGame {
         if conditions.borrow().has(&Condition::Hastened) {
             gain_ap += HASTENED_AP_BONUS;
         }
-        character.action_points.gain(gain_ap);
+        let gained_ap = character.action_points.gain(gain_ap);
         //character.action_points.current.set(new_ap);
 
         conditions.borrow_mut().remove(&Condition::MainHandExertion);
         conditions.borrow_mut().remove(&Condition::OffHandExertion);
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
-        let stamina_gain = (character.stamina.max() as f32 / 4.0).ceil() as u32;
-        character.stamina.gain(stamina_gain);
+        let gain_stamina = (character.stamina.max() as f32 / 4.0).ceil() as u32;
+        let gained_stamina = character.stamina.gain(gain_stamina);
         character.regain_full_movement();
+
+        if character.player_controlled() {
+            self.ui_handle_event(GameEvent::PlayerCharacterEndedTheirTurn {
+                gained_ap,
+                gained_stamina,
+            })
+            .await;
+        }
     }
 }
 
@@ -2869,6 +2877,10 @@ pub enum GameEvent {
     CharactersDied {
         characters: Vec<CharacterId>,
         new_active: Option<CharacterId>,
+    },
+    PlayerCharacterEndedTheirTurn {
+        gained_ap: u32,
+        gained_stamina: u32,
     },
     NewActiveCharacter {
         new_active: CharacterId,

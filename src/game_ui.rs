@@ -743,7 +743,7 @@ impl UserInterface {
                     player_chose
                 );
             }
-            self.sound_player.play(SoundId::EndTurn);
+            self.sound_player.play(SoundId::ClickButton);
             player_chose = Some(PlayerChose::Action(None));
         }
 
@@ -1209,8 +1209,8 @@ impl UserInterface {
     }
 
     fn on_new_state(&mut self) {
-        //dbg!(&self.state.borrow());
-        //println!("^^^ on_new_state() ^^^");
+        dbg!(&self.state.borrow());
+        println!("^^^ on_new_state() ^^^");
 
         self.activity_popup.additional_line = None;
 
@@ -1416,7 +1416,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        //dbg!(&event);
+        dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {
@@ -1725,6 +1725,24 @@ impl UserInterface {
                 if let Some(new_active) = new_active {
                     self.set_new_active_character_id(new_active);
                 }
+            }
+            GameEvent::PlayerCharacterEndedTheirTurn {
+                gained_ap,
+                gained_stamina: _,
+            } => {
+                let character_ui = self
+                    .character_uis
+                    .get_mut(&self.active_character_id)
+                    .unwrap();
+                let duration = gained_ap as f32 * 0.07;
+                character_ui
+                    .action_points_row
+                    .animate_gain(gained_ap, duration);
+
+                character_ui.stamina_bar.borrow_mut().animate_gain(duration);
+
+                println!("TODO: animate ap/stamina gain ....");
+                self.animation_stopwatch.set_to_at_least(duration + 0.5);
             }
             GameEvent::NewActiveCharacter { new_active } => {
                 let was_players_turn = self.active_character().player_controlled();
@@ -2187,6 +2205,13 @@ impl UserInterface {
             self.player_portraits.selected_id() == self.active_character_id,
         );
 
+        for (_id, character_ui) in &mut self.character_uis {
+            character_ui
+                .action_points_row
+                .update(elapsed, &self.sound_player);
+            character_ui.stamina_bar.borrow_mut().update(elapsed);
+        }
+
         let selected_char = self.selected_character();
         let selected_in_grid = if selected_char.is_dead() {
             None
@@ -2267,7 +2292,7 @@ impl UserInterface {
 
         let character_ui = self
             .character_uis
-            .get(&self.player_portraits.selected_id())
+            .get_mut(&self.player_portraits.selected_id())
             .unwrap();
 
         for (_id, btn) in &character_ui.tracked_action_buttons {
