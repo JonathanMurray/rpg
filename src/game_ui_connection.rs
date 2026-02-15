@@ -318,13 +318,15 @@ impl _GameUserInterfaceConnection {
         }
 
         loop {
-            let elapsed = get_frame_time();
+            let mut elapsed = get_frame_time();
 
-            if elapsed > 0.05 {
+            const MAX_FRAME_TIME: f32 = 0.05;
+            if elapsed > MAX_FRAME_TIME {
                 println!("-----");
                 dbg!(get_time());
                 println!("Frame took {elapsed}");
                 println!("-----");
+                elapsed = MAX_FRAME_TIME;
             }
 
             let mut player_choice = user_interface.update(game, elapsed);
