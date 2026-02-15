@@ -2164,11 +2164,12 @@ impl CoreGame {
                 dmg_calculation -= (dmg_calculation as f32 * 0.3).ceil() as i32;
             }
 
+            if !armor_penetrators.is_empty() {
+                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
+            }
             if armor_value > 0 {
                 dmg_str.push_str(&format!(" -{armor_value} (armor)"));
                 dmg_calculation -= armor_value as i32;
-            } else if !armor_penetrators.is_empty() {
-                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
             }
 
             let damage = dmg_calculation.max(0) as u32;
@@ -3454,7 +3455,7 @@ impl Condition {
             Slowed => "-2 AP per turn, -25% movement",
             Hastened => "+1 AP per turn, +25% movement",
             Inspired => "+3 Will, +3 attack/spell modifier",
-            Exposed => "-5 to all defenses.",
+            Exposed => "-5 to all defenses, -50% armor.",
             Hindered => "-50% movement.",
             Protected => "Takes 30% less damage from the next attack.",
             Bleeding => "Deals x damage over time. (50% of remaining at the end of each turn)",
@@ -5558,6 +5559,10 @@ impl Character {
             protection += 1;
         }
 
+        if self.has_condition(&Condition::Exposed) {
+            protection /= 2;
+        }
+
         protection
     }
 
@@ -5917,6 +5922,10 @@ impl Character {
         conditions.remove(&condition);
 
         Some(prev_stacks)
+    }
+
+    fn has_condition(&self, condition: &Condition) -> bool {
+        self.conditions.borrow().has(condition)
     }
 }
 
