@@ -2057,8 +2057,8 @@ impl UserInterface {
             AttackOutcome::Hit {
                 hit_type,
                 damage,
-                actual_health_lost,
                 applied_effects: effects,
+                ..
             } => {
                 if *damage == 0 {
                     self.sound_player.play(SoundId::ArmorAbsorbed);
@@ -2074,7 +2074,11 @@ impl UserInterface {
                 };
                 applied_effects = effects.clone();
             }
-            _ => {
+            AttackOutcome::Block | AttackOutcome::Parry => {
+                self.sound_player.play(SoundId::ArmorAbsorbed);
+                verb = "missed";
+            }
+            AttackOutcome::Dodge | AttackOutcome::Miss => {
                 self.sound_player.play(SoundId::AttackMiss);
                 verb = "missed";
             }

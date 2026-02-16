@@ -416,7 +416,7 @@ pub const SHIELD_BASH: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(2)),
+            damage: Some(AbilityDamage::AtLeast(3)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,

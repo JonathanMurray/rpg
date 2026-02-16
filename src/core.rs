@@ -1784,8 +1784,8 @@ impl CoreGame {
                 let graze = degree_of_success == -1;
 
                 if graze {
-                    dmg_str.push_str(" -25% (Graze)");
-                    dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                    dmg_str.push_str(" -50% (Graze)");
+                    dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
                 } else if increased_by_good_roll && degree_of_success > 0 {
                     dmg_str.push_str(&format!(" +50% ({success_label})"));
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
@@ -2302,8 +2302,9 @@ impl CoreGame {
                 applied_effects,
             }
         } else if roll_result
-            < evasion
-                .saturating_sub(evasion_from_parry + evasion_from_sidestep + evasion_from_block + 5)
+            < evasion.saturating_sub(
+                evasion_from_parry + evasion_from_sidestep + evasion_from_block + 10,
+            )
         {
             detail_lines.push("  Missed!".to_string());
             AttackOutcome::Miss
