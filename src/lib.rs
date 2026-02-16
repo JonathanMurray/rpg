@@ -20,6 +20,7 @@ pub mod map_scene;
 mod non_combat_ui;
 pub mod pathfind;
 pub mod rest_scene;
+mod settings;
 pub mod shop_scene;
 pub mod skill_tree;
 pub mod sounds;

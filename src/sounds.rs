@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use macroquad::{
     audio::{load_sound, play_sound, play_sound_once, stop_sound, PlaySoundParams, Sound},
@@ -7,7 +7,8 @@ use macroquad::{
 
 #[derive(Clone)]
 pub struct SoundPlayer {
-    sounds: HashMap<SoundId, Vec<Sound>>,
+    sounds: Rc<HashMap<SoundId, Vec<Sound>>>,
+    pub enabled: Rc<Cell<bool>>,
 }
 
 impl SoundPlayer {
@@ -74,11 +75,15 @@ impl SoundPlayer {
         }
 
         Self {
-            sounds: sounds_by_id,
+            sounds: Rc::new(sounds_by_id),
+            enabled: Rc::new(Cell::new(true)),
         }
     }
 
     pub fn play(&self, sound_id: SoundId) {
+        if !self.enabled.get() {
+            return;
+        }
         dbg!(sound_id);
         let sounds = &self.sounds[&sound_id];
         let sound = if sounds.len() == 1 {
@@ -90,6 +95,9 @@ impl SoundPlayer {
     }
 
     pub fn play_looping(&self, sound_id: SoundId) {
+        if !self.enabled.get() {
+            return;
+        }
         let sound = &self.sounds[&sound_id][0];
         play_sound(
             sound,

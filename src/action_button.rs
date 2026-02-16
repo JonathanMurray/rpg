@@ -262,7 +262,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if let Some(effect) = effect.on_target {
-        t.technical_description.push("Target:".to_string());
+        t.technical_description.push("|<faded>Target:|".to_string());
         describe_apply_effect(effect, t);
     }
 
@@ -274,7 +274,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
                 t.technical_description.push("Regain AP".to_string())
             }
             AttackEnhancementOnHitEffect::Target(defense_type, apply_effect) => {
-                t.technical_description.push("Target:".to_string());
+                t.technical_description.push("|<faded>Target:|".to_string());
                 if let Some(defense_type) = defense_type {
                     t.technical_description
                         .push(defense_str(defense_type).to_string());
@@ -324,11 +324,11 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         }
 
         for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-            t.technical_description.push("Target:".to_string());
+            t.technical_description.push("|<faded>Target:|".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
         for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
-            t.technical_description.push("Area:".to_string());
+            t.technical_description.push("|<faded>Area:|".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
 

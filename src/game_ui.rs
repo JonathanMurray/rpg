@@ -46,6 +46,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
+    settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
     textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE},
@@ -488,6 +489,9 @@ pub struct UserInterface {
     log: Log,
     sound_player: SoundPlayer,
     status_textures: HashMap<StatusId, Texture2D>,
+
+    faster_movement: Rc<Cell<bool>>,
+    settings: Container,
 }
 
 impl UserInterface {
@@ -590,6 +594,15 @@ impl UserInterface {
         let mut banner = Banner::new();
         banner.set("Battle!", 2.0);
 
+        let faster_movement = Rc::new(Cell::new(false));
+
+        let settings = build_settings(
+            &big_font,
+            &simple_font,
+            sound_player.clone(),
+            faster_movement.clone(),
+        );
+
         Self {
             game_grid,
             characters,
@@ -614,6 +627,8 @@ impl UserInterface {
             state: ui_state,
             sound_player,
             status_textures,
+            faster_movement,
+            settings,
         }
     }
 
@@ -628,10 +643,12 @@ impl UserInterface {
 
         let popup_rect = self.activity_popup.last_drawn_rectangle;
         let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
+        let settings_rect = self.settings.last_drawn_rectangle.get();
 
         let mouse_pos = mouse_position();
         let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
             || target_ui_rect.contains(mouse_pos.into())
+            || settings_rect.contains(mouse_pos.into())
             || self.character_sheet_toggle.is_shown()
             || (mouse_pos.1 >= ui_y - 1.0 && mouse_pos.0 >= ui_x0 - 1.0);
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
@@ -817,6 +834,9 @@ impl UserInterface {
         }
 
         self.banner.draw(&self.big_font);
+
+        let h = self.settings.size().1;
+        self.settings.draw(0.0, screen_height() - h);
 
         player_chose
     }
@@ -1796,9 +1816,11 @@ impl UserInterface {
                 movement_type,
                 step_idx,
             } => {
-                // TODO
-                let mut duration = 0.07;
-                //let mut duration = 0.11;
+                let mut duration = if self.faster_movement.get() {
+                    0.07
+                } else {
+                    0.11
+                };
 
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer

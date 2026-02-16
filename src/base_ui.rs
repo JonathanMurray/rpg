@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
+    color::{Color, BLACK, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
     input::{
         is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
     },
@@ -17,6 +17,7 @@ use std::{
 use crate::{
     action_button::{draw_tooltip, Side, TooltipPositionPreference},
     drawing::draw_rounded_rectangle_lines,
+    sounds::{SoundId, SoundPlayer},
     textures::{
         ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
         SWORD_SYMBOL, WARNING_SYMBOL,
@@ -716,6 +717,7 @@ pub struct Container {
     pub border_between_children: Option<Color>,
     pub scroll: Option<ContainerScroll>,
     pub tooltip: Option<(Font, String, Vec<String>)>,
+    pub last_drawn_rectangle: Cell<Rect>,
 }
 
 impl Container {
@@ -835,6 +837,8 @@ impl Container {
 
     fn _draw(&self, x: f32, y: f32, only_tooltips: bool) -> (f32, f32) {
         let size = self.size();
+        self.last_drawn_rectangle
+            .set(Rect::new(x, y, size.0, size.1));
         if !only_tooltips {
             self.style.draw_background(x, y, size);
         }
@@ -1167,5 +1171,51 @@ pub fn table(
 pub fn draw_debug(x: f32, y: f32, w: f32, h: f32) {
     if false {
         draw_rectangle_lines(x, y, w, h, 1.0, MAGENTA);
+    }
+}
+
+pub struct Checkbox {
+    size: (f32, f32),
+    sound_player: SoundPlayer,
+    checked: Rc<Cell<bool>>,
+}
+
+impl Checkbox {
+    pub fn new(size: (f32, f32), sound_player: SoundPlayer, checked: Rc<Cell<bool>>) -> Self {
+        Self {
+            size,
+            checked,
+            sound_player,
+        }
+    }
+}
+
+impl Drawable for Checkbox {
+    fn draw(&self, x: f32, y: f32) {
+        let (w, h) = self.size;
+
+        let hovered = Rect::new(x, y, w, h).contains(mouse_position().into());
+
+        if is_mouse_button_pressed(MouseButton::Left) && hovered {
+            self.checked.set(!self.checked.get());
+            self.sound_player.play(SoundId::ClickButton);
+        }
+
+        draw_rectangle(x, y, w, h, WHITE);
+        draw_rectangle(
+            x + 1.0,
+            y + 1.0,
+            w - 2.0,
+            h - 2.0,
+            if hovered { GRAY } else { DARKGRAY },
+        );
+        if self.checked.get() {
+            draw_line(x + 1.0, y + 1.0, x + w - 2.0, y + h - 2.0, 1.0, WHITE);
+            draw_line(x + 1.0, y + h - 2.0, x + w - 2.0, y + 1.0, 1.0, WHITE);
+        }
+    }
+
+    fn size(&self) -> (f32, f32) {
+        self.size
     }
 }

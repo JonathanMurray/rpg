@@ -21,6 +21,7 @@ use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, O
 use super::game_ui::{PlayerChose, UiState, UserInterface};
 
 pub static DEBUG: AtomicBool = AtomicBool::new(false);
+pub static PAUSED: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -327,6 +328,10 @@ impl _GameUserInterfaceConnection {
                 println!("Frame took {elapsed}");
                 println!("-----");
                 elapsed = MAX_FRAME_TIME;
+            }
+
+            if get_keys_pressed().contains(&KeyCode::Escape) {
+                PAUSED.fetch_not(Ordering::SeqCst);
             }
 
             let mut player_choice = user_interface.update(game, elapsed);
