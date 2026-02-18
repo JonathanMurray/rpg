@@ -18,7 +18,7 @@ pub fn build_settings(
     sound_player: SoundPlayer,
     faster_movement: Rc<Cell<bool>>,
 ) -> Container {
-    let menu = Container {
+    Container {
         layout_dir: LayoutDirection::Vertical,
         align: Align::Center,
         border_between_children: Some(LIGHTGRAY),
@@ -79,6 +79,5 @@ pub fn build_settings(
         ],
 
         ..Default::default()
-    };
-    menu
+    }
 }

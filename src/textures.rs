@@ -405,17 +405,73 @@ pub enum TerrainId {
     WaterBeachNorthSouth,
 }
 
-pub fn draw_terrain(
-    texture: &mut Texture2D,
-    terrain_id: TerrainId,
-    cell_w: f32,
-    mut x: f32,
-    mut y: f32,
-) {
+impl TerrainId {
+    pub fn is_new_water(&self) -> bool {
+        match self {
+            TerrainId::NewWaterNorthWest => true,
+            TerrainId::NewWaterNorth => true,
+            TerrainId::NewWaterNorthEast => true,
+            TerrainId::NewWaterWest => true,
+            TerrainId::NewWater => true,
+            TerrainId::NewWaterEast => true,
+            TerrainId::NewWaterSouthWest => true,
+            TerrainId::NewWaterSouth => true,
+            TerrainId::NewWaterSouthEast => true,
+            _ => false,
+        }
+    }
+
+    pub fn is_stone_wall(&self) -> bool {
+        match self {
+            TerrainId::StoneWall => true,
+            TerrainId::StoneWallConcaveNorthWest => true,
+            TerrainId::StoneWallNorth => true,
+            TerrainId::StoneWallConcaveNorthEast => true,
+            TerrainId::StoneWallWest => true,
+            TerrainId::StoneWallEast => true,
+            TerrainId::StoneWallConcaveSouthWest => true,
+            TerrainId::StoneWallSouth => true,
+            TerrainId::StoneWallConcaveSouthEast => true,
+            TerrainId::StoneWallConvexNorthWest => true,
+            TerrainId::StoneWallConvexNorthEast => true,
+            TerrainId::StoneWallConvexSouthWest => true,
+            TerrainId::StoneWallConvexSouthEast => true,
+            TerrainId::StoneWallInner => true,
+            _ => false,
+        }
+    }
+}
+
+pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: f32, y: f32) {
+    let (rotation, src_rect) = terrain_atlas_area(terrain_id);
+    let (w, h) = (32.0, 32.0);
+    let src_rect_size = src_rect.size();
+    let dst_size = (
+        cell_w * src_rect_size.x / w * CELLS_PER_ENTITY as f32,
+        cell_w * src_rect_size.y / h * CELLS_PER_ENTITY as f32,
+    );
+
+    let params = DrawTextureParams {
+        source: Some(src_rect),
+        dest_size: Some(dst_size.into()),
+        rotation,
+        ..Default::default()
+    };
+
+    draw_texture_ex(
+        texture,
+        (x - cell_w).floor(),
+        (y - cell_w).floor(),
+        WHITE,
+        params,
+    );
+}
+
+pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     let (w, h) = (32.0, 32.0);
 
     let src_margin = 2.0;
-    let dst_margin = src_margin * cell_w / 32.0;
+    //let dst_margin = src_margin * cell_w / 32.0;
     let mut top_margin = false;
     let mut right_margin = false;
     let mut bot_margin = false;
@@ -534,13 +590,14 @@ pub fn draw_terrain(
         }
     }
 
-    let mut src_sides = [
+    let src_sides = [
         col as f32 * w,
         row as f32 * h,
         col as f32 * w + w,
         row as f32 * h + h,
     ];
 
+    /*
     if top_margin {
         src_sides[1] -= src_margin;
         y -= dst_margin;
@@ -555,32 +612,14 @@ pub fn draw_terrain(
         src_sides[0] -= src_margin;
         x -= dst_margin;
     }
+     */
     let src_rect = Rect::new(
         src_sides[0],
         src_sides[1],
         src_sides[2] - src_sides[0],
         src_sides[3] - src_sides[1],
     );
-    let src_rect_size = src_rect.size();
-    let dst_size = (
-        cell_w * src_rect_size.x / w * CELLS_PER_ENTITY as f32,
-        cell_w * src_rect_size.y / h * CELLS_PER_ENTITY as f32,
-    );
-
-    let params = DrawTextureParams {
-        source: Some(src_rect),
-        dest_size: Some(dst_size.into()),
-        rotation,
-        ..Default::default()
-    };
-
-    draw_texture_ex(
-        texture,
-        (x - cell_w).floor(),
-        (y - cell_w).floor(),
-        WHITE,
-        params,
-    );
+    (rotation, src_rect)
 }
 
 async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {

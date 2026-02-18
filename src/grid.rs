@@ -316,6 +316,107 @@ impl GameGrid {
         &mut self.terrain_objects
     }
 
+    pub fn auto_tile_terrain_objects(&mut self) {
+        let mut new_map: HashMap<Position, TerrainId> = Default::default();
+        for (pos, mut terrain_id) in self.terrain_objects.iter() {
+            if terrain_id.is_new_water() {
+                let mut neighbors = vec![];
+                let neighbor_positions = &[
+                    // west
+                    (pos.0 - 3, pos.1),
+                    // east
+                    (pos.0 + 3, pos.1),
+                    // north
+                    (pos.0, pos.1 - 3),
+                    // south
+                    (pos.0, pos.1 + 3),
+                ];
+                for neighbor_pos in neighbor_positions {
+                    let is_neighbor_new_water = self
+                        .terrain_objects
+                        .get(neighbor_pos)
+                        .map(|n| n.is_new_water())
+                        .unwrap_or(false);
+                    neighbors.push(is_neighbor_new_water);
+                }
+                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                    (true, true, true, true) => &TerrainId::NewWater,
+                    (false, true, true, true) => &TerrainId::NewWaterWest,
+                    (false, true, false, true) => &TerrainId::NewWaterNorthWest,
+                    (true, true, false, true) => &TerrainId::NewWaterNorth,
+                    (true, false, false, true) => &TerrainId::NewWaterNorthEast,
+                    (true, false, true, true) => &TerrainId::NewWaterEast,
+                    (true, false, true, false) => &TerrainId::NewWaterSouthEast,
+                    (true, true, true, false) => &TerrainId::NewWaterSouth,
+                    (false, true, true, false) => &TerrainId::NewWaterSouthWest,
+
+                    neighbors => {
+                        println!("WARN: No water tile fits neighbors: {:?}", neighbors);
+                        &TerrainId::NewWaterSouth
+                    }
+                };
+            } else if terrain_id.is_stone_wall() {
+                let mut neighbors = vec![];
+                let neighbor_positions = &[
+                    // west
+                    (pos.0 - 3, pos.1),
+                    // east
+                    (pos.0 + 3, pos.1),
+                    // north
+                    (pos.0, pos.1 - 3),
+                    // south
+                    (pos.0, pos.1 + 3),
+                    // north-west
+                    (pos.0 - 3, pos.1 - 3),
+                    // north-east
+                    (pos.0 + 3, pos.1 - 3),
+                    // south-west
+                    (pos.0 - 3, pos.1 + 3),
+                    // south-east
+                    (pos.0 + 3, pos.1 + 3),
+                ];
+                for neighbor_pos in neighbor_positions {
+                    let is_neighbor_stone_wall = self
+                        .terrain_objects
+                        .get(neighbor_pos)
+                        .map(|n| n.is_stone_wall())
+                        .unwrap_or(!self.is_within_grid(*neighbor_pos));
+                    neighbors.push(is_neighbor_stone_wall);
+                }
+                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                    (true, true, true, true) => {
+                        if !neighbors[4] {
+                            &TerrainId::StoneWallConcaveSouthEast
+                        } else if !neighbors[5] {
+                            &TerrainId::StoneWallConcaveSouthWest
+                        } else if !neighbors[6] {
+                            &TerrainId::StoneWallConcaveNorthEast
+                        } else if !neighbors[7] {
+                            &TerrainId::StoneWallConcaveNorthWest
+                        } else {
+                            &TerrainId::StoneWallInner
+                        }
+                    }
+                    (false, true, true, true) => &TerrainId::StoneWallEast,
+                    (false, true, false, true) => &TerrainId::StoneWallConvexNorthWest,
+                    (true, true, false, true) => &TerrainId::StoneWallSouth,
+                    (true, false, false, true) => &TerrainId::StoneWallConvexNorthEast,
+                    (true, false, true, true) => &TerrainId::StoneWallWest,
+                    (true, false, true, false) => &TerrainId::StoneWallConvexSouthEast,
+                    (true, true, true, false) => &TerrainId::StoneWallNorth,
+                    (false, true, true, false) => &TerrainId::StoneWallConvexSouthWest,
+
+                    neighbors => {
+                        println!("WARN: No stonewall tile fits neighbors: {:?}", neighbors);
+                        &TerrainId::StoneWall
+                    }
+                };
+            }
+            new_map.insert(*pos, *terrain_id);
+        }
+        self.terrain_objects = new_map;
+    }
+
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
         self.target_damage_previews
             .insert(preview.character_id, preview);
@@ -730,7 +831,7 @@ impl GameGrid {
     pub fn draw_debug_cells(&self) {
         let weak_color = Color::new(0.5, 1.0, 0.5, 0.2);
         let mut strong_color = weak_color.clone();
-        strong_color.a = 0.7;
+        strong_color.a = 0.4;
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x = self.grid_x_to_screen(col);
             let y1 = self.grid_y_to_screen(0);

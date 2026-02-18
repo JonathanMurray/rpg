@@ -1177,7 +1177,7 @@ pub fn draw_debug(x: f32, y: f32, w: f32, h: f32) {
 pub struct Checkbox {
     size: (f32, f32),
     sound_player: SoundPlayer,
-    checked: Rc<Cell<bool>>,
+    pub checked: Rc<Cell<bool>>,
 }
 
 impl Checkbox {
