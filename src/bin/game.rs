@@ -43,8 +43,9 @@ use rpg::data::{
 };
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::GameUserInterfaceConnection;
-use rpg::init_fight_map::{init_fight_map, FightId};
+use rpg::init_fight_map::{init_fight_map, FightId, GameInitState};
 use rpg::map_scene::{MapChoice, MapScene};
+use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
 use rpg::skill_tree::run_skill_tree_scene;
@@ -55,13 +56,6 @@ use rpg::textures::{
     load_and_init_ui_textures, EquipmentIconId, IconId, PortraitId, SpriteId, DICE_SYMBOL,
 };
 use rpg::victory_scene::{run_victory_loop, Learning};
-
-async fn load_font(path: &str) -> Font {
-    let path = format!("fonts/{path}");
-    let mut font = load_ttf_font(&path).await.unwrap();
-    font.set_filter(FilterMode::Nearest);
-    font
-}
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -89,19 +83,12 @@ async fn main() {
     next_frame().await;
     dbg!(get_time());
 
-    let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
-    let font = load_font(font_path).await;
-
-    let equipment_icons = load_all_equipment_icons().await;
-
-    let icons = load_all_icons().await;
-
-    let portrait_textures = load_all_portraits().await;
-
-    let mut map_scene = MapScene::new(portrait_textures.clone()).await;
-
+    let resources = GameResources::load().await;
+    let ui_resources = UiResources::load().await;
     load_and_init_font_symbols().await;
     load_and_init_ui_textures().await;
+
+    let mut map_scene = MapScene::new(ui_resources.portrait_textures.clone()).await;
 
     let sound_player = SoundPlayer::new().await;
 
@@ -182,37 +169,36 @@ async fn main() {
     dbg!(get_time());
 
     player_characters = run_fight_loop(
+        resources.clone(),
         player_characters,
         FightId::VerticalSlice,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
+        ui_resources.clone(),
         sound_player.clone(),
     )
     .await;
 
     loop {
         let map_choice = map_scene
-            .run_map_loop(font.clone(), &player_characters[..])
+            .run_map_loop(resources.simple_font.clone(), &player_characters[..])
             .await;
         match map_choice {
             MapChoice::Rest => {
                 player_characters = run_rest_loop(
                     player_characters,
-                    font.clone(),
-                    &equipment_icons,
-                    icons.clone(),
-                    &portrait_textures,
+                    resources.simple_font.clone(),
+                    &ui_resources.equipment_icons,
+                    ui_resources.icons.clone(),
+                    &ui_resources.portrait_textures,
                 )
                 .await;
             }
             MapChoice::Shop(entries) => {
                 player_characters = run_shop_loop(
                     player_characters,
-                    font.clone(),
-                    &equipment_icons,
-                    icons.clone(),
-                    &portrait_textures,
+                    resources.simple_font.clone(),
+                    &ui_resources.equipment_icons,
+                    ui_resources.icons.clone(),
+                    &ui_resources.portrait_textures,
                     &party,
                     entries,
                 )
@@ -220,21 +206,20 @@ async fn main() {
             }
             MapChoice::Fight(fight_id) => {
                 player_characters = run_fight_loop(
+                    resources.clone(),
                     player_characters,
                     *fight_id,
-                    &equipment_icons,
-                    icons.clone(),
-                    portrait_textures.clone(),
+                    ui_resources.clone(),
                     sound_player.clone(),
                 )
                 .await;
 
                 player_characters = run_victory_loop(
                     player_characters,
-                    font.clone(),
-                    &equipment_icons,
-                    icons.clone(),
-                    &portrait_textures,
+                    resources.simple_font.clone(),
+                    &ui_resources.equipment_icons,
+                    ui_resources.icons.clone(),
+                    &ui_resources.portrait_textures,
                     &party,
                 )
                 .await;
@@ -242,10 +227,10 @@ async fn main() {
             MapChoice::Chest(entries) => {
                 player_characters = run_chest_loop(
                     player_characters,
-                    font.clone(),
-                    &equipment_icons,
-                    icons.clone(),
-                    &portrait_textures,
+                    resources.simple_font.clone(),
+                    &ui_resources.equipment_icons,
+                    ui_resources.icons.clone(),
+                    &ui_resources.portrait_textures,
                     entries,
                 )
                 .await;
@@ -255,95 +240,22 @@ async fn main() {
 }
 
 async fn run_fight_loop(
+    resources: GameResources,
     player_characters: Vec<Character>,
     fight_id: FightId,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
-    portrait_textures: HashMap<PortraitId, Texture2D>,
+    ui_resources: UiResources,
     sound_player: SoundPlayer,
 ) -> Vec<Character> {
-    let core_game = init_fight_scene(
-        player_characters,
-        fight_id,
-        &equipment_icons,
-        icons.clone(),
-        portrait_textures.clone(),
-        sound_player,
-    )
-    .await;
+    let init_state = init_fight_map(player_characters, fight_id);
+    let core_game = init_core_game(resources, ui_resources, sound_player, init_state);
     // Run one quick frame, so that the core game doesn't think that much time has elapsed on the very first frame
     next_frame().await;
     next_frame().await;
     dbg!(get_time());
-    core_game.run().await
-}
-
-async fn init_fight_scene(
-    player_characters: Vec<Character>,
-    fight_id: FightId,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
-    portrait_textures: HashMap<PortraitId, Texture2D>,
-    sound_player: SoundPlayer,
-) -> CoreGame {
-    let init_state = init_fight_map(player_characters, fight_id);
-
-    let mut game_ui = GameUserInterfaceConnection::uninitialized();
-
-    let core_game = CoreGame::new(game_ui.clone(), &init_state);
-
-    let sprites = load_all_sprites().await;
-
-    //let font_path = "manaspace/manaspc.ttf";
-    //let font_path = "yoster-island/yoster.ttf"; // <-- looks like yoshi's island. Not very readable
-    //let font_path = "pixy/PIXY.ttf"; // <-- only uppercase, looks a bit too sci-fi?
-    //let font_path = "return-of-ganon/retganon.ttf";
-    //let font_path = "press-start/prstart.ttf";
-    //let font_path = "lunchtime-doubly-so/lunchds.ttf";
-    //let font_path = "chonkypixels/ChonkyPixels.ttf";
-    let _font_path = "pixelon/Pixelon.ttf";
-    let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
-    let font = load_font(font_path).await;
-
-    let grid_big_font = load_font("manaspace/manaspc.ttf").await;
-
-    let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
-
-    /*
-    let empty_grass = load_and_init_texture("grass3.png").await;
-    let background_textures = vec![
-        load_and_init_texture("grass1.png").await,
-        load_and_init_texture("grass2.png").await,
-        empty_grass.clone(),
-        empty_grass.clone(),
-        empty_grass.clone(),
-    ];
-     */
-
-    let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
-    // TODO
-    //terrain_atlas.set_filter(FilterMode::Linear);
-
-    let status_textures = load_all_status_textures().await;
-
-    let gfx_user_interface = UserInterface::new(
-        &core_game,
-        sprites,
-        icons,
-        equipment_icons,
-        portrait_textures,
-        terrain_atlas,
-        font.clone(),
-        decorative_font,
-        grid_big_font,
-        init_state,
-        status_textures,
-        sound_player,
-    );
-
-    game_ui.init(gfx_user_interface);
-
     core_game
+        .run()
+        .await
+        .expect("'quit' is only implemented for Editor, as of yet")
 }
 
 fn window_conf() -> Conf {

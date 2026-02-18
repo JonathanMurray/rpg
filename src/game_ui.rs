@@ -46,6 +46,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
+    resources::{GameResources, UiResources},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
@@ -497,16 +498,9 @@ pub struct UserInterface {
 impl UserInterface {
     pub fn new(
         game: &CoreGame,
-        sprites: HashMap<SpriteId, Texture2D>,
-        icons: HashMap<IconId, Texture2D>,
-        equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-        portrait_textures: HashMap<PortraitId, Texture2D>,
-        terrain_atlas: Texture2D,
-        simple_font: Font,
-        decorative_font: Font,
-        big_font: Font,
+        resources: GameResources,
+        ui_resources: UiResources,
         init_state: GameInitState,
-        status_textures: HashMap<StatusId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let characters = game.characters.clone();
@@ -515,12 +509,12 @@ impl UserInterface {
         let event_queue = Rc::new(RefCell::new(vec![]));
 
         let character_uis = build_character_uis(
-            equipment_icons,
-            &icons,
+            &ui_resources.equipment_icons,
+            &ui_resources.icons,
             &event_queue,
-            &simple_font,
+            &resources.simple_font,
             characters.iter(),
-            status_textures.clone(),
+            resources.status_textures.clone(),
             sound_player.clone(),
         );
 
@@ -532,20 +526,17 @@ impl UserInterface {
             .unwrap()
             .0;
 
-        let terrain_objects = init_state.terrain_objects;
-        let background = init_state.background;
-
         let game_grid = GameGrid::new(
             first_player_character_id,
             characters.clone(),
-            sprites,
-            big_font.clone(),
-            simple_font.clone(),
-            terrain_atlas,
+            resources.sprites,
+            resources.big_font.clone(),
+            resources.simple_font.clone(),
+            resources.terrain_atlas,
             init_state.pathfind_grid.clone(),
-            background,
-            terrain_objects,
-            status_textures.clone(),
+            init_state.background,
+            init_state.terrain_objects,
+            resources.status_textures.clone(),
             sound_player.clone(),
         );
 
@@ -553,15 +544,20 @@ impl UserInterface {
             &characters,
             first_player_character_id,
             active_character_id,
-            simple_font.clone(),
-            portrait_textures.clone(),
-            status_textures.clone(),
+            resources.simple_font.clone(),
+            ui_resources.portrait_textures.clone(),
+            resources.status_textures.clone(),
             sound_player.clone(),
         );
 
         let character_sheet_toggle = CharacterSheetToggle {
             shown: Cell::new(false),
-            text_line: TextLine::new("Character sheet", 18, WHITE, Some(simple_font.clone())),
+            text_line: TextLine::new(
+                "Character sheet",
+                18,
+                WHITE,
+                Some(resources.simple_font.clone()),
+            ),
             padding: 7.0,
             sound_player: sound_player.clone(),
         };
@@ -569,23 +565,23 @@ impl UserInterface {
         let character_portraits = TopCharacterPortraits::new(
             &game.characters,
             game.active_character_id,
-            simple_font.clone(),
+            resources.simple_font.clone(),
             //decorative_font.clone(),
-            portrait_textures.clone(),
+            ui_resources.portrait_textures.clone(),
         );
 
         let target_ui = TargetUi::new(
-            big_font.clone(),
-            simple_font.clone(),
-            icons.clone(),
-            status_textures.clone(),
-            portrait_textures.clone(),
+            resources.big_font.clone(),
+            resources.simple_font.clone(),
+            ui_resources.icons.clone(),
+            resources.status_textures.clone(),
+            ui_resources.portrait_textures.clone(),
         );
 
         let activity_popup = ActivityPopup::new(
-            simple_font.clone(),
+            resources.simple_font.clone(),
             ui_state.clone(),
-            icons,
+            ui_resources.icons,
             characters.clone(),
             active_character_id,
             sound_player.clone(),
@@ -597,8 +593,8 @@ impl UserInterface {
         let faster_movement = Rc::new(Cell::new(false));
 
         let settings = build_settings(
-            &big_font,
-            &simple_font,
+            &resources.big_font,
+            &resources.simple_font,
             sound_player.clone(),
             faster_movement.clone(),
         );
@@ -615,18 +611,18 @@ impl UserInterface {
 
             banner,
 
-            simple_font: simple_font.clone(),
-            big_font: big_font.clone(),
+            simple_font: resources.simple_font.clone(),
+            big_font: resources.big_font.clone(),
 
             hovered_button: None,
-            log: Log::new(simple_font.clone()),
+            log: Log::new(resources.simple_font.clone()),
             character_uis,
             event_queue: Rc::clone(&event_queue),
             activity_popup,
             target_ui,
             state: ui_state,
             sound_player,
-            status_textures,
+            status_textures: resources.status_textures,
             faster_movement,
             settings,
         }

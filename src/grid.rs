@@ -13,7 +13,9 @@ use macroquad::{
     color::{Color, BLACK, BLUE, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
-    shapes::{draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams},
+    shapes::{
+        draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
+    },
     text::{draw_text, draw_text_ex, Font, TextParams},
     time::get_time,
     window::{screen_height, screen_width},
@@ -308,6 +310,10 @@ impl GameGrid {
             status_textures,
             sound_player,
         }
+    }
+
+    pub fn terrain_objects_mut(&mut self) -> &mut HashMap<(i32, i32), TerrainId> {
+        &mut self.terrain_objects
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
@@ -628,7 +634,7 @@ impl GameGrid {
         y.round()
     }
 
-    fn grid_pos_to_screen(&self, pos: Position) -> (f32, f32) {
+    pub fn grid_pos_to_screen(&self, pos: Position) -> (f32, f32) {
         (self.grid_x_to_screen(pos.0), self.grid_y_to_screen(pos.1))
     }
 
@@ -689,7 +695,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.background.get(&(col, row)) {
-                        draw_terrain(&mut self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                        self.draw_terrain(*terrain_id, x0, y0);
                     }
                 }
             }
@@ -703,7 +709,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.terrain_objects.get(&(col, row)) {
-                        draw_terrain(&mut self.terrain_atlas, *terrain_id, self.cell_w, x0, y0);
+                        self.draw_terrain(*terrain_id, x0, y0);
                     }
                 }
             }
@@ -717,15 +723,48 @@ impl GameGrid {
         }
     }
 
+    pub fn draw_terrain(&mut self, terrain_id: TerrainId, x: f32, y: f32) {
+        draw_terrain(&mut self.terrain_atlas, terrain_id, self.cell_w, x, y);
+    }
+
+    pub fn draw_debug_cells(&self) {
+        let weak_color = Color::new(0.5, 1.0, 0.5, 0.2);
+        let mut strong_color = weak_color.clone();
+        strong_color.a = 0.7;
+        for col in 0..self.grid_dimensions.0 as i32 + 1 {
+            let x = self.grid_x_to_screen(col);
+            let y1 = self.grid_y_to_screen(0);
+            let y2 = self.grid_y_to_screen(self.grid_dimensions.1 as i32);
+            let color = if col % 3 == 0 {
+                strong_color
+            } else {
+                weak_color
+            };
+            draw_line(x, y1, x, y2, 1.0, color);
+        }
+        for row in 0..self.grid_dimensions.1 as i32 + 1 {
+            let y = self.grid_y_to_screen(row);
+            let x1 = self.grid_x_to_screen(0);
+            let x2 = self.grid_x_to_screen(self.grid_dimensions.0 as i32);
+            let color = if row % 3 == 0 {
+                strong_color
+            } else {
+                weak_color
+            };
+            draw_line(x1, y, x2, y, 1.0, color);
+        }
+    }
+
+    pub fn entity_draw_size(&self) -> (f32, f32) {
+        (
+            self.cell_w * CELLS_PER_ENTITY as f32,
+            self.cell_w * CELLS_PER_ENTITY as f32,
+        )
+    }
+
     fn draw_character(&self, character: &Character) {
         let mut params = DrawTextureParams {
-            dest_size: Some(
-                (
-                    self.cell_w * CELLS_PER_ENTITY as f32,
-                    self.cell_w * CELLS_PER_ENTITY as f32,
-                )
-                    .into(),
-            ),
+            dest_size: Some(self.entity_draw_size().into()),
             flip_x: character.is_facing_east.get(),
             ..Default::default()
         };
@@ -868,6 +907,19 @@ impl GameGrid {
         }
     }
 
+    pub fn mouse_grid_pos(&self) -> (i32, i32) {
+        let (x, y) = self.position_on_screen;
+        let mouse_relative_to_grid = |(x, y): (f32, f32)| {
+            (
+                ((self.camera_position.0.get() + x) / self.cell_w).floor() as i32,
+                ((self.camera_position.1.get() + y) / self.cell_w).floor() as i32,
+            )
+        };
+        let (mouse_x, mouse_y) = mouse_position();
+        let mouse_relative = (mouse_x - x, mouse_y - y);
+        mouse_relative_to_grid(mouse_relative)
+    }
+
     pub fn draw(
         &mut self,
         receptive_to_dragging: bool,
@@ -888,15 +940,9 @@ impl GameGrid {
 
         let (x, y) = self.position_on_screen;
 
-        let mouse_relative_to_grid = |(x, y): (f32, f32)| {
-            (
-                ((self.camera_position.0.get() + x) / self.cell_w).floor() as i32,
-                ((self.camera_position.1.get() + y) / self.cell_w).floor() as i32,
-            )
-        };
         let (mouse_x, mouse_y) = mouse_position();
         let mouse_relative = (mouse_x - x, mouse_y - y);
-        let mouse_grid_pos = mouse_relative_to_grid(mouse_relative);
+        let mouse_grid_pos = self.mouse_grid_pos();
 
         let is_mouse_within_grid = self.is_within_grid(mouse_grid_pos);
 
@@ -1460,13 +1506,6 @@ impl GameGrid {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range =
                                 matches!(indicator, RangeIndicator::CannotReach);
-                            /*
-                            is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
-                                .pow(2)
-                                + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
-                                as f32)
-                                > range.squared();
-                                 */
                         }
 
                         let text = if is_mouse_pos_out_of_range {
@@ -2563,7 +2602,6 @@ impl GameGrid {
                         None => *thickness,
                     };
                     draw_dashed_line(from, to, thickness, *color, 5.0, None, false);
-                    //draw_line(from.0, from.1, to.0, to.1, thickness, *color);
                 }
             }
         }

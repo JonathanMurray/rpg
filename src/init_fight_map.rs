@@ -1,5 +1,8 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{
+        hash_map::{self, Entry},
+        HashMap, HashSet,
+    },
     fs,
     rc::Rc,
 };
@@ -81,13 +84,14 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     .into_iter()
     .collect();
 
-    let mut row = 0;
+    // Start on cell with index 1, since all entities are 3x3; if the middle is on index 1, the edge will be on index 0.
+    let mut row = 1;
     for line in map_str.lines() {
         if line.starts_with('+') {
             continue;
         }
 
-        let mut col = 0;
+        let mut col = 1;
         for ch in line.chars() {
             let pos = (col, row);
             if let Some(terrain_id) = terrain_object_chars.get(&ch) {
@@ -503,11 +507,11 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     ];
     let uniform_distr = Uniform::new(0, grass_variations.len()).unwrap();
     let mut grass_choices = uniform_distr.sample_iter(&mut rng);
-    for x in (0..grid_dimensions.0).step_by(CELLS_PER_ENTITY as usize) {
-        for y in (0..grid_dimensions.1).step_by(CELLS_PER_ENTITY as usize) {
+    for x in (1..grid_dimensions.0).step_by(CELLS_PER_ENTITY as usize) {
+        for y in (1..grid_dimensions.1).step_by(CELLS_PER_ENTITY as usize) {
             let i = grass_choices.next().unwrap();
             let pos = (x as i32, y as i32);
-            background.insert(pos, grass_variations[i]);
+            //background.insert(pos, grass_variations[i]);
             //TODO
             background.insert(pos, TerrainId::Floor);
         }
@@ -535,12 +539,38 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     }
 }
 
+#[derive(Clone)]
 pub struct GameInitState {
     pub characters: Characters,
     pub active_character_id: CharacterId,
     pub pathfind_grid: Rc<PathfindGrid>,
     pub background: HashMap<Position, TerrainId>,
     pub terrain_objects: HashMap<Position, TerrainId>,
+}
+
+impl GameInitState {
+    pub fn try_add_terrain_object(&mut self, pos: Position, terrain: TerrainId) -> bool {
+        if self.pathfind_grid.is_free(None, pos) {
+            assert_eq!(self.terrain_objects.get(&pos), None);
+            self.terrain_objects.insert(pos, terrain);
+            self.pathfind_grid
+                .set_occupied(pos, Some(Occupation::Terrain));
+            true
+        } else {
+            println!("Cannot add terrain. Space occupied");
+            false
+        }
+    }
+
+    pub fn try_remove_terrain_object(&mut self, pos: &Position) -> bool {
+        if self.pathfind_grid.occupied().get(pos).is_some() {
+            self.pathfind_grid.set_occupied(*pos, None);
+            self.terrain_objects.remove(pos);
+            true
+        } else {
+            false
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

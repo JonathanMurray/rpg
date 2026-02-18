@@ -98,7 +98,11 @@ impl PathfindGrid {
             for x in pos.0 - 1..=pos.0 + 1 {
                 for y in pos.1 - 1..=pos.1 + 1 {
                     let cell = (x, y);
-                    assert!(occupied_cells.contains_key(&cell));
+                    assert!(
+                        occupied_cells.contains_key(&cell),
+                        "Cannot free {:?}. It's already free.",
+                        cell
+                    );
                     occupied_cells.remove(&cell);
                 }
             }
@@ -194,10 +198,12 @@ impl PathfindGrid {
             && self.cache_key.get().range >= range
             && self.cache_key.get().target == target
         {
+            /*
             println!(
                 "explore_outward(char={}, start={:?}, range={}, target={:?}) CACHED",
                 character_id, start, range, target
             );
+             */
 
             return self.cached_exploration_chart.borrow();
         }
@@ -309,7 +315,7 @@ impl PathfindGrid {
             for (neighbor_pos, neighbor_dist) in neighbors.into_iter().rev() {
                 let within_grid = (0..self.dimensions.0 as i32).contains(&neighbor_pos.0)
                     && (0..self.dimensions.1 as i32).contains(&neighbor_pos.1);
-                if within_grid && self.is_free_for(character_id, neighbor_pos) {
+                if within_grid && self.is_free(Some(character_id), neighbor_pos) {
                     let neighbor_node = ChartNode {
                         distance_from_start: neighbor_dist,
                         position: neighbor_pos,
@@ -379,7 +385,7 @@ impl PathfindGrid {
         self.cached_exploration_chart.borrow()
     }
 
-    pub fn is_free_for(&self, character_id: CharacterId, pos: Position) -> bool {
+    pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
         // A character takes up 9 cells in a square. Check that each cell is free
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
@@ -392,9 +398,14 @@ impl PathfindGrid {
 
                 match self.occupied.borrow().get(&(x, y)) {
                     Some(Occupation::Character(id)) => {
-                        if *id != character_id {
-                            // This cell is occupied by another character
-                            return false;
+                        match &ignore_character {
+                            Some(ignored_id) => {
+                                if id != ignored_id {
+                                    // This cell is occupied by another character
+                                    return false;
+                                }
+                            }
+                            None => return false,
                         }
                     }
                     Some(Occupation::Terrain) => {

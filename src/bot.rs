@@ -313,7 +313,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
             let safe_adjacent_positions: Vec<Position> = adjacent_cells(bot_pos)
                 .into_iter()
                 .filter(|pos| {
-                    game.pathfind_grid.is_free_for(bot.id(), *pos)
+                    game.pathfind_grid.is_free(Some(bot.id()), *pos)
                         && !player_chars
                             .iter()
                             .any(|ch| are_entities_within_melee(ch.pos(), *pos))

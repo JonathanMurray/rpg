@@ -19,6 +19,7 @@ pub mod init_fight_map;
 pub mod map_scene;
 mod non_combat_ui;
 pub mod pathfind;
+pub mod resources;
 pub mod rest_scene;
 mod settings;
 pub mod shop_scene;

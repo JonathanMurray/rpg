@@ -14,7 +14,7 @@ use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
 
 use crate::data::PassiveSkill;
-use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection};
+use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
 use crate::grid::ParticleShape;
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Occupation, PathfindGrid};
@@ -59,7 +59,7 @@ impl CoreGame {
         }
     }
 
-    pub async fn run(mut self) -> Vec<Character> {
+    pub async fn run(mut self) -> Result<Vec<Character>, QuitEvent> {
         self.log("The battle begins").await;
         self.log("Round 1").await;
 
@@ -94,10 +94,10 @@ impl CoreGame {
                     character.stamina.set_to_max();
                 }
 
-                return self.characters.player_characters();
+                return Ok(self.characters.player_characters());
             }
 
-            let action_or_character_change = self.user_interface.select_action(&self).await;
+            let action_or_character_change = self.user_interface.select_action(&self).await?;
 
             let action = match action_or_character_change {
                 ActionOrSwitchTo::Action(action) => action,
@@ -118,7 +118,7 @@ impl CoreGame {
 
             if let Some(action) = action {
                 let mut killed_by_action = HashSet::new();
-                let action_outcome = self.perform_action(action).await;
+                let action_outcome = self.perform_action(action).await?;
 
                 if let ActionOutcome::AttackHit { victim_id, damage } = action_outcome {
                     let victim = self.characters.get(victim_id);
@@ -141,7 +141,7 @@ impl CoreGame {
                                 damage,
                                 is_within_melee,
                             )
-                            .await
+                            .await?
                         {
                             self.perform_on_hit_reaction(victim_id, reaction).await;
                         }
@@ -194,7 +194,7 @@ impl CoreGame {
                 self.perform_end_of_turn_character().await;
                 //let prev_index_in_round = self.active_character().index_in_round.unwrap();
                 self.active_character().is_part_of_active_group.set(false);
-                self.active_character_id = self.characters.next_id(self.active_character_id);
+                self.active_character_id = self.characters.next_id();
                 self.active_character().is_part_of_active_group.set(true);
                 self.notify_ui_of_new_active_char().await;
 
@@ -238,7 +238,7 @@ impl CoreGame {
                 self.active_character()
                     .has_taken_a_turn_this_round
                     .set(true);
-                self.active_character_id = self.characters.next_id(self.active_character_id);
+                self.active_character_id = self.characters.next_id();
                 dbg!(self.active_character_id);
             }
 
@@ -301,7 +301,7 @@ impl CoreGame {
 
         let positions: Vec<Position> = positions
             .into_iter()
-            .take_while(|pos| self.pathfind_grid.is_free_for(ch.id(), *pos))
+            .take_while(|pos| self.pathfind_grid.is_free(Some(ch.id()), *pos))
             .collect();
 
         let reduction_from_collision = original_distance - positions.len();
@@ -357,7 +357,7 @@ impl CoreGame {
         positions
     }
 
-    async fn perform_action(&mut self, action: Action) -> ActionOutcome {
+    async fn perform_action(&mut self, action: Action) -> Result<ActionOutcome, QuitEvent> {
         match action {
             Action::Attack {
                 hand,
@@ -413,7 +413,7 @@ impl CoreGame {
                                     attacker.id(),
                                     target,
                                 )
-                                .await;
+                                .await?;
 
                             dbg!(chooses_to_use_opportunity_attack);
 
@@ -446,7 +446,7 @@ impl CoreGame {
                 }
 
                 if attacker.is_dead() {
-                    ActionOutcome::Default
+                    Ok(ActionOutcome::Default)
                 } else {
                     // TODO: Should not be able to react when flanked?
                     let defender_can_react_to_attack = !defender
@@ -464,7 +464,7 @@ impl CoreGame {
                                 target,
                                 is_within_melee,
                             )
-                            .await;
+                            .await?;
 
                         maybe_self_reaction.map(|r| (target, r))
                     } else {
@@ -486,7 +486,7 @@ impl CoreGame {
                                             ch.id(),
                                             is_within_melee,
                                         )
-                                        .await;
+                                        .await?;
                                     if let Some(r) = r {
                                         maybe_ally_reaction = Some((ch.id(), r));
                                         break;
@@ -533,14 +533,15 @@ impl CoreGame {
                         AttackOutcome::Hit { damage, .. } => Some(damage),
                         _ => None,
                     };
-                    if let Some(damage) = maybe_damage {
+                    let outcome = if let Some(damage) = maybe_damage {
                         ActionOutcome::AttackHit {
                             victim_id: event.target,
                             damage,
                         }
                     } else {
                         ActionOutcome::Default
-                    }
+                    };
+                    Ok(outcome)
                 }
             }
 
@@ -564,13 +565,14 @@ impl CoreGame {
                     event.enemies_hit(&mut enemies_hit);
                 }
 
-                if enemies_hit.is_empty() {
+                let outcome = if enemies_hit.is_empty() {
                     ActionOutcome::Default
                 } else {
                     ActionOutcome::AbilityHitEnemies {
                         victim_ids: enemies_hit,
                     }
-                }
+                };
+                Ok(outcome)
             }
 
             Action::Move {
@@ -590,14 +592,14 @@ impl CoreGame {
 
                 self.perform_movement(self.active_character_id, positions, MovementType::Regular)
                     .await;
-                ActionOutcome::Default
+                Ok(ActionOutcome::Default)
             }
 
             Action::ChangeEquipment { from, to } => {
                 let character = self.active_character();
                 character.action_points.spend(1);
                 character.swap_equipment_slots(from, to);
-                ActionOutcome::Default
+                Ok(ActionOutcome::Default)
             }
 
             Action::UseConsumable {
@@ -637,13 +639,13 @@ impl CoreGame {
                 })
                 .await;
 
-                ActionOutcome::Default
+                Ok(ActionOutcome::Default)
             }
         }
     }
 
     async fn ui_handle_event(&self, event: GameEvent) {
-        self.user_interface.handle_event(self, event).await;
+        self.user_interface.handle_event(self, event).await
     }
 
     async fn perform_movement(
@@ -651,7 +653,7 @@ impl CoreGame {
         character_id: CharacterId,
         mut positions: Vec<Position>,
         movement_type: MovementType,
-    ) {
+    ) -> Result<(), QuitEvent> {
         let character = self.characters.get(character_id);
         //dbg!(("perform movement: {:?}", &positions));
         let start_position = positions.remove(0);
@@ -704,7 +706,7 @@ impl CoreGame {
                                 character.id(),
                                 (character.pos(), new_position),
                             )
-                            .await;
+                            .await?;
 
                         dbg!(chooses_to_use_opportunity_attack);
 
@@ -779,6 +781,8 @@ impl CoreGame {
         dbg!(character.pos());
 
         self.on_character_positions_changed();
+
+        Ok(())
     }
 
     fn on_character_positions_changed(&self) {
@@ -3214,34 +3218,13 @@ impl Characters {
         )
     }
 
-    fn next_id(&self, current_id: CharacterId) -> CharacterId {
+    fn next_id(&self) -> CharacterId {
         for ch in self.iter() {
             if !ch.has_taken_a_turn_this_round.get() {
                 return ch.id();
             }
         }
         self.0[0].0
-
-        /*
-        let mut i = 0;
-        let mut passed_current = false;
-        loop {
-            let (id, ch) = &self.0[i];
-
-            if passed_current && !ch.is_dead() {
-                return *id;
-            }
-
-            if *id == current_id {
-                if passed_current {
-                    panic!("No alive character found");
-                }
-                passed_current = true;
-            }
-
-            i = (i + 1) % self.0.len();
-        }
-         */
     }
 
     pub fn contains_alive(&self, character_id: CharacterId) -> bool {

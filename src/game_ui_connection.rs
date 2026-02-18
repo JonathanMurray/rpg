@@ -3,6 +3,7 @@ use std::sync::atomic::AtomicBool;
 use std::{cell::RefCell, sync::atomic::Ordering};
 
 use macroquad::color::MAGENTA;
+use macroquad::input::is_key_pressed;
 use macroquad::text::draw_text;
 use macroquad::time::{get_fps, get_time};
 use macroquad::{
@@ -21,7 +22,8 @@ use super::core::{Action, CharacterId, CoreGame, HandType, OnAttackedReaction, O
 use super::game_ui::{PlayerChose, UiState, UserInterface};
 
 pub static DEBUG: AtomicBool = AtomicBool::new(false);
-pub static PAUSED: AtomicBool = AtomicBool::new(false);
+
+pub static QUIT_WITH_ESCAPE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 enum UiOutcome {
@@ -75,6 +77,9 @@ pub struct GameUserInterfaceConnection {
     inner: Rc<RefCell<Option<_GameUserInterfaceConnection>>>,
 }
 
+#[derive(Debug)]
+pub struct QuitEvent;
+
 impl GameUserInterfaceConnection {
     pub fn uninitialized() -> Self {
         Self {
@@ -88,18 +93,22 @@ impl GameUserInterfaceConnection {
         });
     }
 
-    async fn run_ui(&self, game: &CoreGame, message: MessageFromGame) -> UiOutcome {
+    async fn run_ui(
+        &self,
+        game: &CoreGame,
+        message: MessageFromGame,
+    ) -> Result<UiOutcome, QuitEvent> {
         let inner_ref = self.inner.borrow_mut();
         inner_ref.as_ref().unwrap().run_ui(game, message).await
     }
 
-    pub async fn select_action(&self, game: &CoreGame) -> ActionOrSwitchTo {
+    pub async fn select_action(&self, game: &CoreGame) -> Result<ActionOrSwitchTo, QuitEvent> {
         match self
             .run_ui(game, MessageFromGame::AwaitingChooseAction)
-            .await
+            .await?
         {
-            UiOutcome::ChoseAction(action) => ActionOrSwitchTo::Action(action),
-            UiOutcome::SwitchedTo(character_id) => ActionOrSwitchTo::SwitchTo(character_id),
+            UiOutcome::ChoseAction(action) => Ok(ActionOrSwitchTo::Action(action)),
+            UiOutcome::SwitchedTo(character_id) => Ok(ActionOrSwitchTo::SwitchTo(character_id)),
             unexpected => panic!("Expected action (or char change) but got: {:?}", unexpected),
         }
     }
@@ -112,7 +121,7 @@ impl GameUserInterfaceConnection {
         hand: HandType,
         reactor: CharacterId,
         within_melee: bool,
-    ) -> Option<OnAttackedReaction> {
+    ) -> Result<Option<OnAttackedReaction>, QuitEvent> {
         match self
             .run_ui(
                 game,
@@ -124,9 +133,9 @@ impl GameUserInterfaceConnection {
                     is_within_melee: within_melee,
                 },
             )
-            .await
+            .await?
         {
-            UiOutcome::ChoseOnAttackedReaction(reaction) => reaction,
+            UiOutcome::ChoseOnAttackedReaction(reaction) => Ok(reaction),
             _ => unreachable!(),
         }
     }
@@ -138,7 +147,7 @@ impl GameUserInterfaceConnection {
         reactor: CharacterId,
         damage: u32,
         within_melee: bool,
-    ) -> Option<OnHitReaction> {
+    ) -> Result<Option<OnHitReaction>, QuitEvent> {
         match self
             .run_ui(
                 game,
@@ -149,9 +158,9 @@ impl GameUserInterfaceConnection {
                     is_within_melee: within_melee,
                 },
             )
-            .await
+            .await?
         {
-            UiOutcome::ChoseOnHitReaction(reaction) => reaction,
+            UiOutcome::ChoseOnHitReaction(reaction) => Ok(reaction),
             _ => unreachable!(),
         }
     }
@@ -162,7 +171,7 @@ impl GameUserInterfaceConnection {
         reactor: CharacterId,
         target: CharacterId,
         movement: (Position, Position),
-    ) -> bool {
+    ) -> Result<bool, QuitEvent> {
         match self
             .run_ui(
                 game,
@@ -172,9 +181,9 @@ impl GameUserInterfaceConnection {
                     movement,
                 },
             )
-            .await
+            .await?
         {
-            UiOutcome::ChoseOpportunityAttack(choice) => choice,
+            UiOutcome::ChoseOpportunityAttack(choice) => Ok(choice),
             _ => unreachable!(),
         }
     }
@@ -185,7 +194,7 @@ impl GameUserInterfaceConnection {
         reactor: CharacterId,
         attacker: CharacterId,
         victim: CharacterId,
-    ) -> bool {
+    ) -> Result<bool, QuitEvent> {
         match self
             .run_ui(
                 game,
@@ -195,17 +204,21 @@ impl GameUserInterfaceConnection {
                     victim,
                 },
             )
-            .await
+            .await?
         {
-            UiOutcome::ChoseOpportunityAttack(choice) => choice,
+            UiOutcome::ChoseOpportunityAttack(choice) => Ok(choice),
             _ => unreachable!(),
         }
     }
 
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
         let msg = MessageFromGame::Event(Box::new(event));
+
         match self.run_ui(game, msg).await {
-            UiOutcome::None => {}
+            Ok(UiOutcome::None) => {}
+            Err(QuitEvent) => {
+                println!("QUIT REQUESTED...");
+            }
             _ => unreachable!(),
         }
     }
@@ -216,7 +229,11 @@ struct _GameUserInterfaceConnection {
 }
 
 impl _GameUserInterfaceConnection {
-    async fn run_ui(&self, game: &CoreGame, msg_from_game: MessageFromGame) -> UiOutcome {
+    async fn run_ui(
+        &self,
+        game: &CoreGame,
+        msg_from_game: MessageFromGame,
+    ) -> Result<UiOutcome, QuitEvent> {
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();
@@ -229,7 +246,7 @@ impl _GameUserInterfaceConnection {
                     user_interface.set_state(UiState::ChoosingAction);
                 } else {
                     let action = bot_choose_action(game);
-                    return UiOutcome::ChoseAction(action);
+                    return Ok(UiOutcome::ChoseAction(action));
                 }
             }
             MessageFromGame::AwaitingChooseOnAttackedReaction {
@@ -241,7 +258,7 @@ impl _GameUserInterfaceConnection {
             } => {
                 if players_turn {
                     let reaction = bot_choose_attack_reaction(game, reactor, is_within_melee);
-                    return UiOutcome::ChoseOnAttackedReaction(reaction);
+                    return Ok(UiOutcome::ChoseOnAttackedReaction(reaction));
                 } else {
                     println!("awaiting player attack reaction");
                     user_interface.set_state(UiState::ReactingToAttack {
@@ -263,7 +280,7 @@ impl _GameUserInterfaceConnection {
             } => {
                 if players_turn {
                     let reaction = bot_choose_hit_reaction(game, reactor, is_within_melee);
-                    return UiOutcome::ChoseOnHitReaction(reaction);
+                    return Ok(UiOutcome::ChoseOnHitReaction(reaction));
                 } else {
                     println!("awaiting player hit reaction");
                     user_interface.set_state(UiState::ReactingToHit {
@@ -283,7 +300,7 @@ impl _GameUserInterfaceConnection {
             } => {
                 if players_turn {
                     // TODO
-                    return UiOutcome::ChoseOpportunityAttack(true);
+                    return Ok(UiOutcome::ChoseOpportunityAttack(true));
                 } else {
                     user_interface.set_state(UiState::ReactingToMovementAttackOpportunity {
                         reactor,
@@ -301,7 +318,7 @@ impl _GameUserInterfaceConnection {
             } => {
                 if players_turn {
                     // TODO
-                    return UiOutcome::ChoseOpportunityAttack(true);
+                    return Ok(UiOutcome::ChoseOpportunityAttack(true));
                 } else {
                     user_interface.set_state(UiState::ReactingToRangedAttackOpportunity {
                         reactor,
@@ -330,8 +347,8 @@ impl _GameUserInterfaceConnection {
                 elapsed = MAX_FRAME_TIME;
             }
 
-            if get_keys_pressed().contains(&KeyCode::Escape) {
-                PAUSED.fetch_not(Ordering::SeqCst);
+            if is_key_pressed(KeyCode::Escape) && QUIT_WITH_ESCAPE.load(Ordering::SeqCst) {
+                return Err(QuitEvent);
             }
 
             let mut player_choice = user_interface.update(game, elapsed);
@@ -364,27 +381,22 @@ impl _GameUserInterfaceConnection {
                 // PlayerChose::SwitchTo leads us back into selecting the action for the newly
                 // selected character (?)
                 next_frame().await;
-                match player_choice {
+                let ui_outcome = match player_choice {
                     PlayerChose::AttackedReaction(reaction) => {
-                        return UiOutcome::ChoseOnAttackedReaction(reaction);
+                        UiOutcome::ChoseOnAttackedReaction(reaction)
                     }
-                    PlayerChose::HitReaction(reaction) => {
-                        return UiOutcome::ChoseOnHitReaction(reaction);
-                    }
+                    PlayerChose::HitReaction(reaction) => UiOutcome::ChoseOnHitReaction(reaction),
                     PlayerChose::OpportunityAttack(choice) => {
-                        return UiOutcome::ChoseOpportunityAttack(choice)
+                        UiOutcome::ChoseOpportunityAttack(choice)
                     }
-                    PlayerChose::Action(action) => {
-                        return UiOutcome::ChoseAction(action);
-                    }
-                    PlayerChose::SwitchTo(character_id) => {
-                        return UiOutcome::SwitchedTo(character_id)
-                    }
-                }
+                    PlayerChose::Action(action) => UiOutcome::ChoseAction(action),
+                    PlayerChose::SwitchTo(character_id) => UiOutcome::SwitchedTo(character_id),
+                };
+                return Ok(ui_outcome);
             }
 
             if waiting_for_ui_animation_potentially && !user_interface.has_ongoing_animation() {
-                return UiOutcome::None;
+                return Ok(UiOutcome::None);
             }
 
             next_frame().await
