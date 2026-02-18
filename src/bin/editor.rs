@@ -231,6 +231,7 @@ impl Sidebar {
             TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
+            TerrainId::BookShelf,
             TerrainId::Table,
             TerrainId::NewWaterNorthEast,
             TerrainId::StoneWallConvexNorthEast,
