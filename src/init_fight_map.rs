@@ -535,12 +535,15 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let pathfind_grid = Rc::new(pathfind_grid);
 
     let characters = characters.into_iter().map(|ch| Rc::new(ch)).collect();
+
+    let decorations = Default::default();
     GameInitState {
         characters,
         active_character_id: 0,
         pathfind_grid,
         background,
         terrain_objects,
+        decorations,
     }
 }
 
@@ -551,6 +554,7 @@ pub struct GameInitState {
     pub pathfind_grid: Rc<PathfindGrid>,
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
+    pub decorations: IndexMap<Position, TerrainId>,
 }
 
 impl GameInitState {

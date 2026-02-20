@@ -536,6 +536,7 @@ impl UserInterface {
             init_state.pathfind_grid.clone(),
             init_state.background,
             init_state.terrain_objects,
+            init_state.decorations,
             resources.status_textures.clone(),
             sound_player.clone(),
         );

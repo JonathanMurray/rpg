@@ -100,6 +100,7 @@ async fn main() {
         pathfind_grid.clone(),
         map_data.background.clone(),
         map_data.terrain_objects.clone(),
+        map_data.decorations.clone(),
         resources.status_textures.clone(),
         sound_player.clone(),
     );
@@ -217,6 +218,32 @@ async fn main() {
                             snapped_mouse_screen_pos.1,
                         );
                     }
+
+                    EditorAction::PlaceDecoration(terrain_id) => {
+                        draw_rectangle(
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            Color::new(0.0, 0.0, 0.0, 0.3),
+                        );
+                        game_grid.draw_terrain(
+                            *terrain_id,
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                        );
+                    }
+
+                    EditorAction::PlaceCharacter(id) => {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                        draw_text(
+                            &format!("{:?}", id),
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
                     EditorAction::EraseTerrain => {
                         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
@@ -227,10 +254,10 @@ async fn main() {
                             WHITE,
                         );
                     }
-                    EditorAction::PlaceCharacter(id) => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                    EditorAction::EraseDecoration => {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
-                            &format!("{:?}", id),
+                            "Erase",
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                             16.0,
@@ -286,11 +313,18 @@ async fn main() {
                             if pathfind_grid.is_free(None, pos) {
                                 pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
                                 assert_eq!(map_data.terrain_objects.get(&pos), None);
-                                map_data.terrain_objects.insert(pos, *terrain_id);
                                 game_grid
-                                    .terrain_objects_mut()
+                                    .terrain_objects
                                     .insert(mouse_grid_pos, *terrain_id);
                                 game_grid.auto_tile_terrain_objects();
+                                map_data.terrain_objects.insert(pos, *terrain_id);
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::PlaceDecoration(terrain_id) => {
+                            if !game_grid.decorations.contains_key(&pos) {
+                                game_grid.decorations.insert(pos, *terrain_id);
+                                map_data.decorations.insert(pos, *terrain_id);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -307,16 +341,21 @@ async fn main() {
                                 has_unsaved_changes = true;
                             }
                         }
+
                         EditorAction::EraseTerrain => {
-                            if game_grid
-                                .terrain_objects_mut()
-                                .contains_key(&mouse_grid_pos)
-                            {
+                            if game_grid.terrain_objects.contains_key(&mouse_grid_pos) {
                                 assert!(pathfind_grid.occupied().get(&pos).is_some());
                                 pathfind_grid.set_occupied(pos, None);
-                                map_data.terrain_objects.swap_remove(&pos);
-                                game_grid.terrain_objects_mut().swap_remove(&mouse_grid_pos);
+                                game_grid.terrain_objects.swap_remove(&mouse_grid_pos);
                                 game_grid.auto_tile_terrain_objects();
+                                map_data.terrain_objects.swap_remove(&pos);
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::EraseDecoration => {
+                            if game_grid.decorations.contains_key(&mouse_grid_pos) {
+                                game_grid.decorations.swap_remove(&mouse_grid_pos);
+                                map_data.decorations.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -381,6 +420,7 @@ async fn main() {
                 pathfind_grid: pathfind_grid.clone(),
                 background: game_grid.background.clone(),
                 terrain_objects: game_grid.terrain_objects.clone(),
+                decorations: game_grid.decorations.clone(),
             };
             let core_game = init_core_game(
                 resources.clone(),
@@ -637,8 +677,10 @@ struct Sidebar {
 #[derive(Clone, PartialEq)]
 enum EditorAction {
     PlaceTerrain(TerrainId),
-    EraseTerrain,
+    PlaceDecoration(TerrainId),
     PlaceCharacter(CharacterType),
+    EraseTerrain,
+    EraseDecoration,
     EditCharacter,
     MoveCharacter(Cell<Option<CharacterId>>),
     RemoveCharacter,
@@ -650,7 +692,6 @@ impl Sidebar {
             TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
-            TerrainId::BookShelf,
             TerrainId::Table,
             TerrainId::NewWaterNorthEast,
             TerrainId::StoneWallConvexNorthEast,
@@ -660,6 +701,17 @@ impl Sidebar {
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
         terrain_actions.push(EditorAction::EraseTerrain);
+
+        let decorations = vec![
+            TerrainId::BookShelf,
+            TerrainId::WallPainting,
+            TerrainId::WallFlag,
+        ];
+        let mut decoration_actions: Vec<EditorAction> = decorations
+            .iter()
+            .map(|t| EditorAction::PlaceDecoration(*t))
+            .collect();
+        decoration_actions.push(EditorAction::EraseDecoration);
 
         let character_actions = vec![
             EditorAction::PlaceCharacter(CharacterType::Bob),
@@ -674,7 +726,7 @@ impl Sidebar {
             EditorAction::RemoveCharacter,
         ];
 
-        let sections = vec![terrain_actions, character_actions];
+        let sections = vec![terrain_actions, decoration_actions, character_actions];
 
         Self {
             terrain_atlas,
@@ -742,22 +794,11 @@ impl Sidebar {
                 draw_rectangle(x, y, icon_w, icon_w, bg);
                 match action {
                     EditorAction::PlaceTerrain(terrain_id) => {
-                        let (rotation, rect) = terrain_atlas_area(*terrain_id);
-                        draw_texture_ex(
-                            &self.terrain_atlas,
-                            x,
-                            y,
-                            WHITE,
-                            DrawTextureParams {
-                                dest_size: Some((icon_w, icon_w).into()),
-                                source: Some(rect),
-                                rotation,
-                                ..Default::default()
-                            },
-                        );
+                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
                     }
-                    EditorAction::EraseTerrain => {
-                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+
+                    EditorAction::PlaceDecoration(terrain_id) => {
+                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
                     }
                     EditorAction::PlaceCharacter(char_type) => {
                         draw_texture_ex(
@@ -788,6 +829,12 @@ impl Sidebar {
                             BLACK,
                         );
                     }
+                    EditorAction::EraseTerrain => {
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::EraseDecoration => {
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
                     EditorAction::EditCharacter => {
                         draw_text("EDIT", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
@@ -808,6 +855,22 @@ impl Sidebar {
 
             section_y += section_h + 10.0;
         }
+    }
+
+    fn draw_terrain_icon(&self, icon_w: f32, x: f32, y: f32, terrain_id: &TerrainId) {
+        let (rotation, rect) = terrain_atlas_area(*terrain_id);
+        draw_texture_ex(
+            &self.terrain_atlas,
+            x,
+            y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some((icon_w, icon_w).into()),
+                source: Some(rect),
+                rotation,
+                ..Default::default()
+            },
+        );
     }
 
     fn action(&self) -> Option<&EditorAction> {
@@ -1020,6 +1083,7 @@ fn build_settings(
 struct MapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<Position, TerrainId>,
+    pub decorations: IndexMap<Position, TerrainId>,
     pub background: IndexMap<Position, TerrainId>,
     pub characters: Vec<CharacterData>,
 }
@@ -1028,10 +1092,12 @@ impl MapData {
     fn save_to_file(&self, filename: &str) {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
         let background = keys_pos_to_str(&self.background);
+        let decorations = keys_pos_to_str(&self.decorations);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
             terrain_objects,
             background,
+            decorations,
             characters: self.characters.clone(),
         };
         let json_str = serde_json::to_string_pretty(&map_data).unwrap();
@@ -1051,6 +1117,7 @@ impl MapData {
             grid_dimensions: map_data.grid_dimensions,
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),
             background: keys_str_to_pos(&map_data.background),
+            decorations: keys_str_to_pos(&map_data.decorations),
             characters: map_data.characters,
         }
     }
@@ -1081,6 +1148,7 @@ struct SerializableMapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<String, TerrainId>,
     pub background: IndexMap<String, TerrainId>,
+    pub decorations: IndexMap<String, TerrainId>,
     pub characters: Vec<CharacterData>,
 }
 

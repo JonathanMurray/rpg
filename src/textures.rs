@@ -377,8 +377,11 @@ pub enum TerrainId {
     Bush,
     Boulder2,
     TreeStump,
-    BookShelf,
     Table,
+
+    BookShelf,
+    WallPainting,
+    WallFlag,
 
     NewWaterNorthWest,
     NewWaterNorth,
@@ -533,8 +536,11 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Bush => (0, 7),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
-        TerrainId::BookShelf => (2, 6),
         TerrainId::Table => (2, 7),
+
+        TerrainId::BookShelf => (2, 6),
+        TerrainId::WallPainting => (3, 6),
+        TerrainId::WallFlag => (4, 6),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {

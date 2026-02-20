@@ -234,6 +234,7 @@ pub struct GameGrid {
     terrain_atlas: Texture2D,
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
+    pub decorations: IndexMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
@@ -274,6 +275,7 @@ impl GameGrid {
         pathfind_grid: Rc<PathfindGrid>,
         background: IndexMap<Position, TerrainId>,
         terrain_objects: IndexMap<Position, TerrainId>,
+        decorations: IndexMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -307,13 +309,10 @@ impl GameGrid {
             terrain_atlas,
             background,
             terrain_objects,
+            decorations,
             status_textures,
             sound_player,
         }
-    }
-
-    pub fn terrain_objects_mut(&mut self) -> &mut IndexMap<(i32, i32), TerrainId> {
-        &mut self.terrain_objects
     }
 
     /// Should only be called from editor; not from in-game!
@@ -833,6 +832,20 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.terrain_objects.get(&(col, row)) {
+                        self.draw_terrain(*terrain_id, x0, y0);
+                    }
+                }
+            }
+        }
+
+        for col in 0..self.grid_dimensions.0 as i32 + 1 {
+            let x0 = self.grid_x_to_screen(col);
+
+            for row in 0..self.grid_dimensions.1 as i32 + 1 {
+                let y0 = self.grid_y_to_screen(row);
+
+                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    if let Some(terrain_id) = self.decorations.get(&(col, row)) {
                         self.draw_terrain(*terrain_id, x0, y0);
                     }
                 }

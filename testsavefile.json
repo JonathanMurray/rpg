@@ -461,6 +461,18 @@
     "(37, 10)": "Floor",
     "(43, 37)": "Floor"
   },
+  "decorations": {
+    "(10, 4)": "BookShelf",
+    "(13, 4)": "BookShelf",
+    "(16, 5)": "BookShelf",
+    "(25, 10)": "WallPainting",
+    "(37, 7)": "WallPainting",
+    "(52, 7)": "WallPainting",
+    "(46, 7)": "WallPainting",
+    "(7, 4)": "WallPainting",
+    "(34, 7)": "WallFlag",
+    "(43, 7)": "WallFlag"
+  },
   "characters": [
     {
       "type_": "Bob",
