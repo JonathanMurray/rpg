@@ -25,7 +25,7 @@ use crate::{
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     banner::Banner,
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
-    character_sheet::CharacterSheet,
+    character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
@@ -2673,9 +2673,14 @@ fn build_character_ui(
             *next_button_id += 1;
             if in_character_sheet {
                 btn.context = Some(ButtonContext::CharacterSheet);
+                if !matches!(btn_action, ButtonAction::Action(..)) {
+                    btn.set_parent_bg_color(CHARACTER_SHEET_BG_COLOR);
+                };
             }
             btn
         };
+
+    let buttons_row_bg = LIGHTGRAY;
 
     let mut tracked_action_buttons = IndexMap::new();
     let mut hoverable_buttons = vec![];
@@ -2700,7 +2705,9 @@ fn build_character_ui(
 
     for action in character.known_actions() {
         let btn_action = ButtonAction::Action(action);
-        let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
+        let mut btn = new_button(btn_action, Some(character.clone()), false);
+        //btn.set_parent_bg_color(buttons_row_bg);
+        let btn = Rc::new(btn);
         tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));
         hoverable_buttons.push(Rc::clone(&btn));
         match action {
@@ -2820,6 +2827,7 @@ fn build_character_ui(
     }
     buttons.push(Element::Rc(change_eq_btn.unwrap()));
     buttons.push(Element::Rc(use_consumable_btn.unwrap()));
+
     let button_row = buttons_row(buttons);
 
     let actions_section = Container {
@@ -2827,7 +2835,7 @@ fn build_character_ui(
         margin: 0.0,
         children: vec![button_row],
         style: Style {
-            background_color: Some(LIGHTGRAY),
+            background_color: Some(buttons_row_bg),
             padding: 2.0,
             ..Default::default()
         },

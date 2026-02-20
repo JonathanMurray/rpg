@@ -608,6 +608,7 @@ pub struct Style {
     pub background_color: Option<Color>,
     pub border_color: Option<Color>,
     pub border_inner_rounding: Option<f32>,
+    pub border_outer_rounding: Option<(Color, f32)>,
     pub border_width: Option<f32>,
     pub padding: f32,
 }
@@ -629,7 +630,14 @@ impl Style {
             let thickness = self.border_width.unwrap_or(1.0);
             if let Some(rounding) = self.border_inner_rounding {
                 draw_rounded_rectangle_lines(
-                    x, y, size.0, size.1, thickness, color, rounding, None,
+                    x,
+                    y,
+                    size.0,
+                    size.1,
+                    thickness,
+                    color,
+                    rounding,
+                    self.border_outer_rounding,
                 );
             } else {
                 draw_rectangle_lines(x, y, size.0, size.1, thickness, color);

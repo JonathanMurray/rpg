@@ -27,7 +27,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
     },
     data::PassiveSkill,
-    drawing::draw_dashed_rectangle_lines,
+    drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     textures::{IconId, MANA_SYMBOL},
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
@@ -695,6 +695,7 @@ pub struct ActionButton {
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
     pub context: Option<ButtonContext>,
     ap_color: Rc<Cell<Color>>,
+    parent_bg_color: Option<Color>,
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
@@ -722,11 +723,15 @@ impl ActionButton {
             _ => (REGULAR_ACTION_BUTTON_SIZE, (60.0, 48.0)),
         };
 
-        let style = Style {
+        let mut style = Style {
             background_color: Some(ACTION_BUTTON_BG_COLOR),
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
+        if !matches!(action, ButtonAction::Action(..)) {
+            style.border_inner_rounding = Some(5.0);
+            style.border_outer_rounding = Some((BLACK, 4.0));
+        }
         let hover_border_color = YELLOW;
 
         let r = 3.0;
@@ -839,6 +844,14 @@ impl ActionButton {
             hotkey: RefCell::new(None),
             context: None,
             ap_color,
+            parent_bg_color: None,
+        }
+    }
+
+    pub fn set_parent_bg_color(&mut self, color: Color) {
+        self.parent_bg_color = Some(color);
+        if let Some((rounding_color, _width)) = &mut self.style.border_outer_rounding {
+            *rounding_color = color;
         }
     }
 
@@ -1008,7 +1021,7 @@ impl Drawable for ActionButton {
 
         let (w, h) = self.size;
 
-        self.style.draw(x, y, self.size);
+        self.style.draw_background(x, y, self.size);
 
         let bottom_row_size = self.bottom_row.size();
 
@@ -1082,33 +1095,6 @@ impl Drawable for ActionButton {
             );
         }
 
-        match self.selected.get() {
-            ButtonSelected::Yes => {
-                let margin = 1.0;
-                draw_rectangle_lines(
-                    x - margin,
-                    y - margin,
-                    w + margin * 2.0,
-                    h + margin * 2.0,
-                    4.0,
-                    GREEN,
-                );
-            }
-            ButtonSelected::Partially => {
-                let margin = -0.0;
-                draw_dashed_rectangle_lines(
-                    x - margin,
-                    y - margin,
-                    w + margin * 2.0,
-                    h + margin * 2.0,
-                    4.0,
-                    GREEN,
-                    6.4,
-                );
-            }
-            ButtonSelected::No => {}
-        }
-
         // When viewed in the skill tree (editor), we can be so zoomed out that the bottom row doesn't fit well. In that case, don't show it.
         if self.size.0 > 45.0 {
             let bottom_row_h_pad = 2.0;
@@ -1127,6 +1113,37 @@ impl Drawable for ActionButton {
                 x + w - bottom_row_size.0 - 2.0,
                 y + h - bottom_row_h_pad - bottom_row_size.1,
             );
+        }
+
+        self.style.draw_foreground(x, y, self.size);
+
+        match self.selected.get() {
+            ButtonSelected::Yes => {
+                let margin = 1.0;
+                draw_rounded_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    4.0,
+                    GREEN,
+                    7.0,
+                    self.parent_bg_color.map(|color| (color, 5.0)),
+                );
+            }
+            ButtonSelected::Partially => {
+                let margin = -0.0;
+                draw_dashed_rectangle_lines(
+                    x - margin,
+                    y - margin,
+                    w + margin * 2.0,
+                    h + margin * 2.0,
+                    4.0,
+                    GREEN,
+                    6.4,
+                );
+            }
+            ButtonSelected::No => {}
         }
 
         if hovered {
@@ -1148,13 +1165,15 @@ impl Drawable for ActionButton {
             if self.enabled.get() {
                 let margin = -1.0;
 
-                draw_rectangle_lines(
+                draw_rounded_rectangle_lines(
                     x - margin,
                     y - margin,
                     w + margin * 2.0,
                     h + margin * 2.0,
                     2.0,
                     self.hover_border_color,
+                    5.0,
+                    self.parent_bg_color.map(|color| (color, 3.0)),
                 );
             }
         }

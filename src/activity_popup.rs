@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -29,6 +29,8 @@ use crate::{
 };
 
 use crate::action_button::ActionButton;
+
+const BG_COLOR: Color = BLACK;
 
 pub struct ActivityPopup {
     characters: Characters,
@@ -70,7 +72,7 @@ impl ActivityPopup {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
 
         let mut next_button_id = 0;
-        let proceed_button = ActionButton::new(
+        let mut proceed_button = ActionButton::new(
             ButtonAction::Proceed,
             Some(Rc::clone(&proceed_button_events)),
             next_button_id,
@@ -78,6 +80,7 @@ impl ActivityPopup {
             None,
             &font,
         );
+        proceed_button.set_parent_bg_color(BG_COLOR);
         next_button_id += 1;
 
         Self {
@@ -115,8 +118,6 @@ impl ActivityPopup {
             };
             return;
         }
-
-        let bg_color = BLACK;
 
         let top_pad = 10.0;
 
@@ -218,7 +219,7 @@ impl ActivityPopup {
         // Prevent warning text (drawn in top-right corner) from colliding with header, when no enhancements
         width = width.max(340.0);
 
-        draw_rectangle(x, y - height, width, height, bg_color);
+        draw_rectangle(x, y - height, width, height, BG_COLOR);
 
         let upper_border_color = ORANGE;
         draw_line(x, y, x, y - height, 1.0, upper_border_color);
@@ -662,7 +663,7 @@ impl ActivityPopup {
     }
 
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
-        let btn = ActionButton::new(
+        let mut btn = ActionButton::new(
             btn_action,
             Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
@@ -670,6 +671,7 @@ impl ActivityPopup {
             None,
             &self.font,
         );
+        btn.set_parent_bg_color(BG_COLOR);
         self.next_button_id.set(self.next_button_id.get() + 1);
         btn
     }
@@ -680,7 +682,7 @@ impl ActivityPopup {
         character: Rc<Character>,
         font: &Font,
     ) -> ActionButton {
-        let btn = ActionButton::new(
+        let mut btn = ActionButton::new(
             btn_action,
             Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
@@ -688,6 +690,7 @@ impl ActivityPopup {
             Some(character),
             font,
         );
+        btn.set_parent_bg_color(BG_COLOR);
         self.next_button_id.set(self.next_button_id.get() + 1);
         btn
     }

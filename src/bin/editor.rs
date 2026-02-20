@@ -759,7 +759,7 @@ impl Sidebar {
             TerrainId::BookShelf,
             TerrainId::WallPainting,
             TerrainId::WallFlag,
-            TerrainId::Mat
+            TerrainId::Mat,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()

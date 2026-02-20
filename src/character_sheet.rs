@@ -44,6 +44,8 @@ pub struct CharacterSheet {
     pub conditions_list: Rc<RefCell<ConditionsList>>,
 }
 
+pub const CHARACTER_SHEET_BG_COLOR: Color = Color::new(0.00, 0.3, 0.4, 1.00);
+
 impl CharacterSheet {
     pub fn new(
         font: &Font,
@@ -96,7 +98,7 @@ impl CharacterSheet {
             layout_dir: LayoutDirection::Horizontal,
             margin: 15.0,
             style: Style {
-                background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
+                background_color: Some(CHARACTER_SHEET_BG_COLOR),
                 padding: 10.0,
                 border_color: Some(BLACK),
                 border_inner_rounding: Some(5.0),
