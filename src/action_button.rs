@@ -1120,6 +1120,12 @@ impl Drawable for ActionButton {
         match self.selected.get() {
             ButtonSelected::Yes => {
                 let margin = 1.0;
+                let mut outer = None;
+                if !matches!(self.action, ButtonAction::Action(..)) {
+                    if let Some(color) = self.parent_bg_color {
+                        outer = Some((color, 5.0));
+                    }
+                }
                 draw_rounded_rectangle_lines(
                     x - margin,
                     y - margin,
@@ -1128,7 +1134,7 @@ impl Drawable for ActionButton {
                     4.0,
                     GREEN,
                     7.0,
-                    self.parent_bg_color.map(|color| (color, 5.0)),
+                    outer,
                 );
             }
             ButtonSelected::Partially => {
@@ -1164,7 +1170,12 @@ impl Drawable for ActionButton {
             }
             if self.enabled.get() {
                 let margin = -1.0;
-
+                let mut outer = None;
+                if !matches!(self.action, ButtonAction::Action(..)) {
+                    if let Some(color) = self.parent_bg_color {
+                        outer = Some((color, 3.0));
+                    }
+                }
                 draw_rounded_rectangle_lines(
                     x - margin,
                     y - margin,
@@ -1173,7 +1184,7 @@ impl Drawable for ActionButton {
                     2.0,
                     self.hover_border_color,
                     5.0,
-                    self.parent_bg_color.map(|color| (color, 3.0)),
+                    outer,
                 );
             }
         }

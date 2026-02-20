@@ -733,7 +733,12 @@ enum EditorAction {
 
 impl Sidebar {
     fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
-        let backgrounds = vec![TerrainId::Floor, TerrainId::Floor2, TerrainId::Floor3];
+        let backgrounds = vec![
+            TerrainId::Floor,
+            TerrainId::Floor2,
+            TerrainId::Floor3,
+            TerrainId::Floor4,
+        ];
 
         let mut background_actions: Vec<EditorAction> = backgrounds
             .iter()
@@ -758,7 +763,11 @@ impl Sidebar {
         let decorations = vec![
             TerrainId::BookShelf,
             TerrainId::WallPainting,
+            TerrainId::WallPainting2,
             TerrainId::WallFlag,
+            TerrainId::WallWindow,
+            TerrainId::WallOpeningNorth,
+            TerrainId::WallOpeningEast,
             TerrainId::Mat,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations

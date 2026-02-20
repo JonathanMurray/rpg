@@ -29,6 +29,8 @@ use crate::{
     util::COL_RED,
 };
 
+const BG_COLOR: Color = Color::new(0.4, 0.3, 0.2, 1.0);
+
 pub struct TargetUi {
     target: Option<Rc<Character>>,
     big_font: Font,
@@ -195,7 +197,7 @@ impl TargetUi {
             if !char.player_controlled() {
                 let mut next_btn_id = 0;
                 let mut new_btn = |action| {
-                    let btn = ActionButton::new(
+                    let mut btn = ActionButton::new(
                         action,
                         Some(Rc::clone(&self.button_events)),
                         next_btn_id,
@@ -204,6 +206,8 @@ impl TargetUi {
                         &self.simple_font,
                     );
                     next_btn_id += 1;
+
+                    btn.set_parent_bg_color(BG_COLOR);
                     btn
                 };
 
@@ -333,7 +337,7 @@ impl TargetUi {
                 children: rows,
                 margin: 15.0,
                 style: Style {
-                    background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
+                    background_color: Some(BG_COLOR),
                     border_color: Some(LIGHTGRAY),
                     border_inner_rounding: Some(6.0),
                     padding: 10.0,

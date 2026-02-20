@@ -217,7 +217,7 @@
     "(37, 22)": "Floor2",
     "(40, 25)": "Floor2",
     "(19, 43)": "Floor",
-    "(13, 13)": "Floor",
+    "(13, 13)": "Floor4",
     "(46, 40)": "Floor",
     "(52, 1)": "Floor",
     "(1, 25)": "Floor",
@@ -246,7 +246,7 @@
     "(10, 40)": "Floor",
     "(40, 1)": "Floor",
     "(22, 7)": "Floor2",
-    "(16, 28)": "Floor",
+    "(16, 28)": "Floor4",
     "(37, 25)": "Floor2",
     "(22, 4)": "Floor",
     "(31, 19)": "Floor2",
@@ -278,7 +278,7 @@
     "(13, 43)": "Floor",
     "(4, 13)": "Floor",
     "(46, 34)": "Floor2",
-    "(7, 22)": "Floor",
+    "(7, 22)": "Floor4",
     "(13, 34)": "Floor",
     "(37, 40)": "Floor",
     "(1, 10)": "Floor",
@@ -385,14 +385,14 @@
     "(16, 22)": "Floor",
     "(25, 13)": "Floor2",
     "(25, 19)": "Floor2",
-    "(13, 22)": "Floor",
+    "(13, 22)": "Floor4",
     "(49, 10)": "Floor2",
     "(46, 16)": "Floor2",
     "(16, 16)": "Floor",
     "(28, 1)": "Floor",
     "(28, 16)": "Floor3",
     "(16, 37)": "Floor",
-    "(10, 31)": "Floor",
+    "(10, 31)": "Floor4",
     "(22, 25)": "Floor",
     "(19, 28)": "Floor",
     "(1, 16)": "Floor",
@@ -424,7 +424,7 @@
     "(4, 34)": "Floor",
     "(43, 19)": "Floor2",
     "(55, 34)": "Floor2",
-    "(7, 34)": "Floor",
+    "(7, 34)": "Floor4",
     "(37, 7)": "Floor2",
     "(52, 40)": "Floor",
     "(10, 10)": "Floor",
@@ -483,16 +483,25 @@
     "(13, 4)": "BookShelf",
     "(52, 7)": "WallFlag",
     "(18, 4)": "BookShelf",
-    "(7, 4)": "WallPainting",
+    "(10, 4)": "WallOpeningNorth",
     "(34, 7)": "WallFlag",
-    "(25, 13)": "WallPainting"
+    "(25, 13)": "WallPainting",
+    "(58, 21)": "WallOpeningEast",
+    "(7, 4)": "WallPainting2",
+    "(18, 40)": "Mat",
+    "(37, 7)": "WallWindow",
+    "(40, 7)": "WallWindow",
+    "(46, 7)": "WallWindow",
+    "(49, 7)": "WallWindow",
+    "(55, 7)": "WallWindow",
+    "(31, 7)": "WallWindow"
   },
   "characters": [
     {
       "type_": "Bob",
       "pos": [
-        16,
-        22
+        14,
+        10
       ],
       "health": null,
       "main_hand": null,
@@ -571,8 +580,8 @@
     {
       "type_": "Alice",
       "pos": [
-        14,
-        18
+        10,
+        9
       ],
       "health": null,
       "main_hand": null,
@@ -581,8 +590,8 @@
     {
       "type_": "Clara",
       "pos": [
-        12,
-        22
+        6,
+        11
       ],
       "health": null,
       "main_hand": null,

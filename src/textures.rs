@@ -361,6 +361,7 @@ pub enum TerrainId {
     Floor,
     Floor2,
     Floor3,
+    Floor4,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -383,8 +384,12 @@ pub enum TerrainId {
 
     BookShelf,
     WallPainting,
+    WallPainting2,
     WallFlag,
     Mat,
+    WallOpeningNorth,
+    WallOpeningEast,
+    WallWindow,
 
     NewWaterNorthWest,
     NewWaterNorth,
@@ -494,32 +499,33 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Floor => (0, 9),
         TerrainId::Floor2 => (0, 10),
         TerrainId::Floor3 => (0, 11),
-        TerrainId::NewWaterNorthWest => (1, 9),
+        TerrainId::Floor4 => (1, 9),
+        TerrainId::NewWaterNorthWest => (5, 9),
         TerrainId::NewWaterNorth => {
             rotation = 0.5 * PI;
-            (1, 10)
+            (5, 10)
         }
         TerrainId::NewWaterNorthEast => {
             rotation = 0.5 * PI;
-            (1, 9)
+            (5, 9)
         }
-        TerrainId::NewWaterWest => (1, 10),
-        TerrainId::NewWater => (2, 10),
+        TerrainId::NewWaterWest => (5, 10),
+        TerrainId::NewWater => (6, 10),
         TerrainId::NewWaterEast => {
             rotation = PI;
-            (1, 10)
+            (5, 10)
         }
         TerrainId::NewWaterSouthWest => {
             rotation = 1.5 * PI;
-            (1, 9)
+            (5, 9)
         }
         TerrainId::NewWaterSouth => {
             rotation = 1.5 * PI;
-            (1, 10)
+            (5, 10)
         }
         TerrainId::NewWaterSouthEast => {
             rotation = PI;
-            (1, 9)
+            (5, 9)
         }
 
         TerrainId::StoneWall => (1, 7),
@@ -544,8 +550,12 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
 
         TerrainId::BookShelf => (2, 6),
         TerrainId::WallPainting => (3, 6),
+        TerrainId::WallPainting2 => (5, 5),
         TerrainId::WallFlag => (4, 6),
+        TerrainId::WallWindow => (7, 6),
         TerrainId::Mat => (4, 8),
+        TerrainId::WallOpeningNorth => (5, 6),
+        TerrainId::WallOpeningEast => (6, 6),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {
@@ -590,10 +600,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     let t = get_time();
     // animate water
     if ((t * 0.5) % (t * 0.5).floor()) < 0.5 {
-        if (col, row) == (1, 10) {
-            (col, row) = (1, 11);
-        } else if (col, row) == (1, 9) {
-            (col, row) = (2, 9);
+        if (col, row) == (5, 10) {
+            (col, row) = (5, 11);
+        } else if (col, row) == (5, 9) {
+            (col, row) = (6, 9);
         }
     }
 
