@@ -62,53 +62,19 @@ async fn main() {
     load_and_init_font_symbols().await;
     load_and_init_ui_textures().await;
 
+    let mut map_data = MapData::load_from_file(SAVE_FILE_NAME);
+
+    let sound_player = SoundPlayer::new().await;
+
     let party = Rc::new(Party {
         money: Cell::new(8),
         stash: Default::default(),
     });
 
-    let mut map_data = MapData::load_from_file(SAVE_FILE_NAME);
-
-    let mut characters: IndexMap<CharacterId, Rc<Character>> = Default::default();
-
-    let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
-
-    for (i, char_data) in map_data.characters.iter().enumerate() {
-        let pos = char_data.pos;
-        let char = create_character(pos, *char_data, &party, i as CharacterId);
-        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
-        characters.insert(char.id(), char);
-    }
-
-    for pos in map_data.terrain_objects.keys().copied() {
-        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
-    }
-
-    let sound_player = SoundPlayer::new().await;
-
-    let characters_map: HashMap<CharacterId, Rc<Character>> = characters
-        .iter()
-        .map(|(_id, ch)| (ch.id(), Rc::clone(ch)))
-        .collect();
-    let mut game_grid = GameGrid::new(
-        0,
-        characters_map,
-        resources.sprites.clone(),
-        resources.big_font.clone(),
-        resources.simple_font.clone(),
-        resources.terrain_atlas.clone(),
-        pathfind_grid.clone(),
-        map_data.background.clone(),
-        map_data.terrain_objects.clone(),
-        map_data.decorations.clone(),
-        resources.status_textures.clone(),
-        sound_player.clone(),
-    );
-
-    game_grid.auto_tile_terrain_objects();
+    let mut game_grid = create_game_grid(&map_data, sound_player.clone(), &resources, &party);
 
     let mut sidebar = Sidebar::new(resources.terrain_atlas.clone(), resources.sprites.clone());
-    let show_grid = Rc::new(Cell::new(true));
+    let show_grid = Rc::new(Cell::new(false));
     let snap_to_grid = Rc::new(Cell::new(false));
     let settings = build_settings(
         &resources.big_font,
@@ -135,7 +101,7 @@ async fn main() {
         if let Some(new_inspect_target) = grid_outcome.switched_inspect_target {
             inspect_target = new_inspect_target;
             if let Some(id) = inspect_target {
-                let char = characters.get(&id).unwrap();
+                let char = game_grid.characters.get(&id).unwrap();
                 character_editor = Some(build_character_editor(
                     &resources.big_font,
                     &resources.simple_font,
@@ -204,6 +170,20 @@ async fn main() {
                 );
 
                 match action {
+                    EditorAction::PlaceBackground(terrain_id) => {
+                        draw_rectangle(
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            Color::new(0.0, 0.0, 0.0, 0.3),
+                        );
+                        game_grid.draw_terrain(
+                            *terrain_id,
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                        );
+                    }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         draw_rectangle(
                             rect.x,
@@ -245,6 +225,16 @@ async fn main() {
                         );
                     }
                     EditorAction::EraseTerrain => {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            "Erase",
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+                    EditorAction::EraseBackground => {
                         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
@@ -309,14 +299,14 @@ async fn main() {
                 if is_mouse_button_down(MouseButton::Left) {
                     let pos = mouse_grid_pos;
                     match action {
+                        EditorAction::PlaceBackground(terrain_id) => {
+                            game_grid.background.insert(pos, *terrain_id);
+                            map_data.background.insert(pos, *terrain_id);
+                            has_unsaved_changes = true;
+                        }
                         EditorAction::PlaceTerrain(terrain_id) => {
-                            if pathfind_grid.is_free(None, pos) {
-                                pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+                            if game_grid.editor_add_terrain(pos, *terrain_id) {
                                 assert_eq!(map_data.terrain_objects.get(&pos), None);
-                                game_grid
-                                    .terrain_objects
-                                    .insert(mouse_grid_pos, *terrain_id);
-                                game_grid.auto_tile_terrain_objects();
                                 map_data.terrain_objects.insert(pos, *terrain_id);
                                 has_unsaved_changes = true;
                             }
@@ -329,23 +319,29 @@ async fn main() {
                             }
                         }
                         EditorAction::PlaceCharacter(char_type) => {
-                            if pathfind_grid.is_free(None, pos) {
-                                let max_id = characters.keys().copied().max().unwrap_or(0);
+                            if game_grid.pathfind_grid.is_free(None, pos) {
+                                let max_id =
+                                    game_grid.characters.keys().copied().max().unwrap_or(0);
                                 let char_data = CharacterData::base(*char_type, pos);
                                 let char = create_character(pos, char_data, &party, max_id + 1);
-                                pathfind_grid
+                                game_grid
+                                    .pathfind_grid
                                     .set_occupied(pos, Some(Occupation::Character(char.id())));
-                                game_grid.add_character(char.id(), Rc::clone(&char));
-                                characters.insert(char.id(), Rc::clone(&char));
+                                game_grid.editor_add_character(char.id(), Rc::clone(&char));
                                 map_data.characters.push(char_data);
                                 has_unsaved_changes = true;
                             }
                         }
-
+                        EditorAction::EraseBackground => {
+                            if game_grid.background.contains_key(&mouse_grid_pos) {
+                                game_grid.background.swap_remove(&mouse_grid_pos);
+                                map_data.background.swap_remove(&pos);
+                                has_unsaved_changes = true;
+                            }
+                        }
                         EditorAction::EraseTerrain => {
                             if game_grid.terrain_objects.contains_key(&mouse_grid_pos) {
-                                assert!(pathfind_grid.occupied().get(&pos).is_some());
-                                pathfind_grid.set_occupied(pos, None);
+                                game_grid.pathfind_grid.set_occupied(pos, None);
                                 game_grid.terrain_objects.swap_remove(&mouse_grid_pos);
                                 game_grid.auto_tile_terrain_objects();
                                 map_data.terrain_objects.swap_remove(&pos);
@@ -364,9 +360,9 @@ async fn main() {
                         }
                         EditorAction::MoveCharacter(maybe_id) => {
                             if let Some(char_id) = maybe_id.get() {
-                                let char = characters.get(&char_id).unwrap();
-                                if pathfind_grid.is_free(Some(char.id()), pos) {
-                                    pathfind_grid.set_occupied(char.pos(), None);
+                                let char = game_grid.characters.get(&char_id).unwrap();
+                                if game_grid.pathfind_grid.is_free(Some(char.id()), pos) {
+                                    game_grid.pathfind_grid.set_occupied(char.pos(), None);
 
                                     let char_data = map_data
                                         .characters
@@ -376,7 +372,8 @@ async fn main() {
                                     char_data.pos = pos;
 
                                     char.position.set(pos);
-                                    pathfind_grid
+                                    game_grid
+                                        .pathfind_grid
                                         .set_occupied(pos, Some(Occupation::Character(char.id())));
                                     has_unsaved_changes = true;
                                 }
@@ -385,14 +382,14 @@ async fn main() {
                             maybe_id.set(inspect_target);
                         }
                         EditorAction::RemoveCharacter => {
-                            let char_id = characters
+                            let char_id = game_grid
+                                .characters
                                 .values()
                                 .find(|ch| ch.pos() == pos)
                                 .map(|ch| ch.id());
                             if let Some(id) = char_id {
-                                characters.shift_remove(&id);
-                                game_grid.remove_character(id);
-                                pathfind_grid.set_occupied(pos, None);
+                                game_grid.editor_remove_character(id);
+
                                 map_data.characters.retain(|ch| ch.pos != pos);
                                 has_unsaved_changes = true;
                             }
@@ -415,9 +412,9 @@ async fn main() {
             println!("Running game ...");
             QUIT_WITH_ESCAPE.store(true, Ordering::SeqCst);
             let init_state = GameInitState {
-                characters: characters.values().cloned().collect(),
+                characters: game_grid.characters.values().cloned().collect(),
                 active_character_id: 0,
-                pathfind_grid: pathfind_grid.clone(),
+                pathfind_grid: game_grid.pathfind_grid.clone(),
                 background: game_grid.background.clone(),
                 terrain_objects: game_grid.terrain_objects.clone(),
                 decorations: game_grid.decorations.clone(),
@@ -432,6 +429,9 @@ async fn main() {
                 Ok(_chars) => println!("Game ended naturally"),
                 Err(QuitEvent) => println!("User quit from game"),
             }
+
+            // Restore the original map state, so that we can keep editing
+            game_grid = create_game_grid(&map_data, sound_player.clone(), &resources, &party);
         }
 
         if is_key_down(KeyCode::LeftControl) && is_key_pressed(KeyCode::S) {
@@ -439,6 +439,51 @@ async fn main() {
             has_unsaved_changes = false;
         }
     }
+}
+
+fn create_game_grid(
+    map_data: &MapData,
+    sound_player: SoundPlayer,
+    resources: &GameResources,
+    party: &Rc<Party>,
+) -> GameGrid {
+    let mut characters: IndexMap<CharacterId, Rc<Character>> = Default::default();
+
+    let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
+
+    for (i, char_data) in map_data.characters.iter().enumerate() {
+        let pos = char_data.pos;
+        let char = create_character(pos, *char_data, &party, i as CharacterId);
+        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+        characters.insert(char.id(), char);
+    }
+
+    for pos in map_data.terrain_objects.keys().copied() {
+        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+    }
+
+    let characters_map: HashMap<CharacterId, Rc<Character>> = characters
+        .iter()
+        .map(|(_id, ch)| (ch.id(), Rc::clone(ch)))
+        .collect();
+    let mut game_grid = GameGrid::new(
+        0,
+        characters_map,
+        resources.sprites.clone(),
+        resources.big_font.clone(),
+        resources.simple_font.clone(),
+        resources.terrain_atlas.clone(),
+        pathfind_grid.clone(),
+        map_data.background.clone(),
+        map_data.terrain_objects.clone(),
+        map_data.decorations.clone(),
+        resources.status_textures.clone(),
+        sound_player,
+    );
+
+    game_grid.auto_tile_terrain_objects();
+
+    game_grid
 }
 
 fn create_character(
@@ -663,8 +708,6 @@ fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
     })
 }
 
-// TODO: Create character edit UI
-
 struct Sidebar {
     terrain_atlas: Texture2D,
     sprites: HashMap<SpriteId, Texture2D>,
@@ -676,9 +719,11 @@ struct Sidebar {
 
 #[derive(Clone, PartialEq)]
 enum EditorAction {
+    PlaceBackground(TerrainId),
     PlaceTerrain(TerrainId),
     PlaceDecoration(TerrainId),
     PlaceCharacter(CharacterType),
+    EraseBackground,
     EraseTerrain,
     EraseDecoration,
     EditCharacter,
@@ -688,6 +733,14 @@ enum EditorAction {
 
 impl Sidebar {
     fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
+        let backgrounds = vec![TerrainId::Floor, TerrainId::Floor2, TerrainId::Floor3];
+
+        let mut background_actions: Vec<EditorAction> = backgrounds
+            .iter()
+            .map(|t| EditorAction::PlaceBackground(*t))
+            .collect();
+        background_actions.push(EditorAction::EraseBackground);
+
         let terrain_ids = vec![
             TerrainId::Bush,
             TerrainId::Boulder2,
@@ -706,6 +759,7 @@ impl Sidebar {
             TerrainId::BookShelf,
             TerrainId::WallPainting,
             TerrainId::WallFlag,
+            TerrainId::Mat
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
@@ -726,7 +780,12 @@ impl Sidebar {
             EditorAction::RemoveCharacter,
         ];
 
-        let sections = vec![terrain_actions, decoration_actions, character_actions];
+        let sections = vec![
+            background_actions,
+            terrain_actions,
+            decoration_actions,
+            character_actions,
+        ];
 
         Self {
             terrain_atlas,
@@ -793,6 +852,9 @@ impl Sidebar {
                 };
                 draw_rectangle(x, y, icon_w, icon_w, bg);
                 match action {
+                    EditorAction::PlaceBackground(terrain_id) => {
+                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                    }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);
                     }
@@ -828,6 +890,9 @@ impl Sidebar {
                             font_size as f32,
                             BLACK,
                         );
+                    }
+                    EditorAction::EraseBackground => {
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::EraseTerrain => {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);

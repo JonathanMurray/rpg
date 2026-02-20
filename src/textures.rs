@@ -359,6 +359,8 @@ pub enum TerrainId {
     Grass3,
     Grass4,
     Floor,
+    Floor2,
+    Floor3,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -382,6 +384,7 @@ pub enum TerrainId {
     BookShelf,
     WallPainting,
     WallFlag,
+    Mat,
 
     NewWaterNorthWest,
     NewWaterNorth,
@@ -489,7 +492,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Grass4 => (3, 8),
 
         TerrainId::Floor => (0, 9),
-        //TerrainId::Floor => (0, 10),
+        TerrainId::Floor2 => (0, 10),
+        TerrainId::Floor3 => (0, 11),
         TerrainId::NewWaterNorthWest => (1, 9),
         TerrainId::NewWaterNorth => {
             rotation = 0.5 * PI;
@@ -541,6 +545,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::BookShelf => (2, 6),
         TerrainId::WallPainting => (3, 6),
         TerrainId::WallFlag => (4, 6),
+        TerrainId::Mat => (4, 8),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {

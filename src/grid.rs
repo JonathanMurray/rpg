@@ -236,9 +236,9 @@ pub struct GameGrid {
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
-    pathfind_grid: Rc<PathfindGrid>,
+    pub pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
-    characters: HashMap<CharacterId, Rc<Character>>,
+    pub characters: HashMap<CharacterId, Rc<Character>>,
 
     ability_character_animation: Option<ParticleGroup>,
     target_damage_previews: HashMap<CharacterId, TargetEffectPreview>,
@@ -316,13 +316,27 @@ impl GameGrid {
     }
 
     /// Should only be called from editor; not from in-game!
-    pub fn add_character(&mut self, character_id: CharacterId, character: Rc<Character>) {
+    pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
+        if self.pathfind_grid.is_free(None, pos) {
+            self.pathfind_grid
+                .set_occupied(pos, Some(Occupation::Terrain));
+            self.terrain_objects.insert(pos, terrain_id);
+            self.auto_tile_terrain_objects();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_add_character(&mut self, character_id: CharacterId, character: Rc<Character>) {
         self.characters.insert(character_id, character);
     }
 
     /// Should only be called from editor; not from in-game!
-    pub fn remove_character(&mut self, character_id: CharacterId) {
-        self.characters.remove(&character_id);
+    pub fn editor_remove_character(&mut self, character_id: CharacterId) {
+        let ch = self.characters.remove(&character_id).unwrap();
+        self.pathfind_grid.set_occupied(ch.pos(), None);
         self.on_removed_character(character_id);
     }
 
