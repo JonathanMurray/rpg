@@ -61,7 +61,7 @@ use crate::{
     drawing::{draw_arrow, draw_dashed_line},
 };
 
-const BACKGROUND_COLOR: Color = COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
+const BACKGROUND_COLOR: Color = rgb(12, 64, 59); // COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
 const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.2);
@@ -2877,7 +2877,7 @@ impl GameGrid {
         for (pos, occupation) in self.pathfind_grid.occupied().iter() {
             let draw_occupation = match occupation {
                 Occupation::Character(id) => *id != self.active_character_id,
-                Occupation::Terrain => true,
+                Occupation::Terrain => false, //true,
             };
             if draw_occupation {
                 self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 0.0);
