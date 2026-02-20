@@ -557,7 +557,7 @@ impl GameInitState {
                 .set_occupied(pos, Some(Occupation::Terrain));
             true
         } else {
-            println!("Cannot add terrain. Space occupied");
+            //println!("Cannot add terrain. Space occupied");
             false
         }
     }

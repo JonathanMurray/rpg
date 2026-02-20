@@ -6,6 +6,7 @@ use macroquad::{
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
     time::{get_frame_time, get_time},
 };
+use serde::{Deserialize, Serialize};
 
 use crate::pathfind::CELLS_PER_ENTITY;
 
@@ -351,7 +352,7 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
     .await
 }
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum TerrainId {
     Grass,
     Grass2,
