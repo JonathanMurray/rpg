@@ -562,6 +562,10 @@ impl GameInitState {
         }
     }
 
+    pub fn try_add_character(&mut self, pos: Position, character: Character) -> bool {
+        todo!("Add character to gameinitstate")
+    }
+
     pub fn try_remove_terrain_object(&mut self, pos: &Position) -> bool {
         if self.pathfind_grid.occupied().get(pos).is_some() {
             self.pathfind_grid.set_occupied(*pos, None);

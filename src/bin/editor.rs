@@ -230,6 +230,16 @@ async fn main() {
                             WHITE,
                         );
                     }
+                    EditorAction::PlaceCharacter(id) => {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            &format!("{:?}", id),
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
                 }
 
                 if is_mouse_button_down(MouseButton::Left) {
@@ -255,6 +265,9 @@ async fn main() {
                                 map_data.terrain_objects.remove(&mouse_grid_pos);
                                 has_unsaved_changes = true;
                             }
+                        }
+                        EditorAction::PlaceCharacter(id) => {
+                            todo!("place character")
                         }
                     }
                 }
@@ -300,15 +313,17 @@ fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
 
 struct Sidebar {
     terrain_atlas: Texture2D,
-    selected_idx: Option<usize>,
+    selected_section_idx: usize,
+    selected_action_idx: Option<usize>,
     hovered: bool,
-    actions: Vec<EditorAction>,
+    sections: Vec<Vec<EditorAction>>,
 }
 
 #[derive(Copy, Clone)]
 enum EditorAction {
     PlaceTerrain(TerrainId),
     EraseTerrain,
+    PlaceCharacter(MapCharacterId),
 }
 
 impl Sidebar {
@@ -322,89 +337,115 @@ impl Sidebar {
             TerrainId::NewWaterNorthEast,
             TerrainId::StoneWallConvexNorthEast,
         ];
-        let mut actions: Vec<EditorAction> = terrain_ids
+        let mut terrain_actions: Vec<EditorAction> = terrain_ids
             .iter()
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
-        actions.push(EditorAction::EraseTerrain);
+        terrain_actions.push(EditorAction::EraseTerrain);
+
+        let character_actions = vec![EditorAction::PlaceCharacter(MapCharacterId::Enemy1)];
+
+        let sections = vec![terrain_actions, character_actions];
 
         Self {
             terrain_atlas,
-            actions,
-            selected_idx: None,
+            sections,
+            selected_section_idx: 0,
+            selected_action_idx: None,
             hovered: false,
         }
     }
 
     fn draw(&mut self) {
-        if let Some(i) = self.selected_idx {
-            if is_key_pressed(KeyCode::Left) {
-                self.selected_idx =
-                    Some(((i as i32 - 1).rem_euclid(self.actions.len() as i32)) as usize);
-            } else if is_key_pressed(KeyCode::Right) {
-                self.selected_idx =
-                    Some(((i as i32 + 1).rem_euclid(self.actions.len() as i32)) as usize);
-            }
-        }
-
-        let cols = 3;
-        let rows = 1 + self.actions.len() / cols;
-        let margin = 4.0;
-        let pad = 10.0;
-        let icon_w = 64.0;
-        let w = pad * 2.0 + cols as f32 * icon_w + (cols - 1) as f32 * margin;
-        let h = pad * 2.0 + rows as f32 * icon_w + (rows - 1) as f32 * margin;
-
-        let mouse_pos = mouse_position();
-        self.hovered = Rect::new(0.0, 0.0, w, h).contains(mouse_pos.into());
-
-        draw_rectangle(0.0, 0.0, w, h, Color::new(0.0, 0.0, 0.0, 0.5));
-
-        for (i, action) in self.actions.iter().enumerate() {
-            let col = i % cols;
-            let x = pad + col as f32 * (icon_w + margin);
-            let row = i / cols;
-            let y = pad + row as f32 * (icon_w + margin);
-            if is_mouse_button_pressed(MouseButton::Left)
-                && Rect::new(x, y, icon_w, icon_w).contains(mouse_pos.into())
-            {
-                self.selected_idx = Some(i);
-            }
-            let bg = if self.selected_idx == Some(i) {
-                YELLOW
-            } else {
-                WHITE
-            };
-            draw_rectangle(x, y, icon_w, icon_w, bg);
-            match action {
-                EditorAction::PlaceTerrain(terrain_id) => {
-                    let (rotation, rect) = terrain_atlas_area(*terrain_id);
-                    draw_texture_ex(
-                        &self.terrain_atlas,
-                        x,
-                        y,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some((icon_w, icon_w).into()),
-                            source: Some(rect),
-                            rotation,
-                            ..Default::default()
-                        },
-                    );
-                }
-                EditorAction::EraseTerrain => {
-                    draw_text("Erase", x, y + icon_w / 2.0, 16.0, BLACK);
+        self.hovered = false;
+        let mut section_y = 0.0;
+        for (section_i, actions) in self.sections.iter().enumerate() {
+            if let Some(i) = self.selected_action_idx {
+                if is_key_pressed(KeyCode::Left) {
+                    self.selected_action_idx =
+                        Some(((i as i32 - 1).rem_euclid(actions.len() as i32)) as usize);
+                } else if is_key_pressed(KeyCode::Right) {
+                    self.selected_action_idx =
+                        Some(((i as i32 + 1).rem_euclid(actions.len() as i32)) as usize);
                 }
             }
 
-            if self.selected_idx == Some(i) {
-                draw_rectangle_lines(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
+            let cols = 3;
+            let rows = 1 + actions.len() / cols;
+            let margin = 4.0;
+            let pad = 10.0;
+            let icon_w = 64.0;
+            let section_w = pad * 2.0 + cols as f32 * icon_w + (cols - 1) as f32 * margin;
+            let section_h = pad * 2.0 + rows as f32 * icon_w + (rows - 1) as f32 * margin;
+
+            let mouse_pos = mouse_position();
+            let section_hovered =
+                Rect::new(0.0, section_y, section_w, section_h).contains(mouse_pos.into());
+            self.hovered |= section_hovered;
+
+            draw_rectangle(
+                0.0,
+                section_y,
+                section_w,
+                section_h,
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
+
+            for (action_i, action) in actions.iter().enumerate() {
+                let col = action_i % cols;
+                let x = pad + col as f32 * (icon_w + margin);
+                let row = action_i / cols;
+                let y = section_y + pad + row as f32 * (icon_w + margin);
+                if is_mouse_button_pressed(MouseButton::Left)
+                    && Rect::new(x, y, icon_w, icon_w).contains(mouse_pos.into())
+                {
+                    self.selected_section_idx = section_i;
+                    self.selected_action_idx = Some(action_i);
+                }
+                let bg = if self.selected_section_idx == section_i
+                    && self.selected_action_idx == Some(action_i)
+                {
+                    YELLOW
+                } else {
+                    WHITE
+                };
+                draw_rectangle(x, y, icon_w, icon_w, bg);
+                match action {
+                    EditorAction::PlaceTerrain(terrain_id) => {
+                        let (rotation, rect) = terrain_atlas_area(*terrain_id);
+                        draw_texture_ex(
+                            &self.terrain_atlas,
+                            x,
+                            y,
+                            WHITE,
+                            DrawTextureParams {
+                                dest_size: Some((icon_w, icon_w).into()),
+                                source: Some(rect),
+                                rotation,
+                                ..Default::default()
+                            },
+                        );
+                    }
+                    EditorAction::EraseTerrain => {
+                        draw_text("Erase", x, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::PlaceCharacter(id) => {
+                        draw_text(&format!("{:?}", id), x, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                }
+
+                if self.selected_action_idx == Some(action_i) {
+                    draw_rectangle_lines(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
+                }
             }
+
+            section_y += section_h + 10.0;
         }
     }
 
     fn action(&self) -> Option<EditorAction> {
-        self.selected_idx.map(|i| self.actions[i])
+        let actions = &self.sections[self.selected_section_idx];
+        self.selected_action_idx.map(|i| actions[i])
     }
 }
 
