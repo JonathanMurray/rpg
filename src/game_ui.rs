@@ -528,7 +528,7 @@ impl UserInterface {
 
         let game_grid = GameGrid::new(
             first_player_character_id,
-            characters.clone(),
+            characters.as_map(),
             resources.sprites,
             resources.big_font.clone(),
             resources.simple_font.clone(),

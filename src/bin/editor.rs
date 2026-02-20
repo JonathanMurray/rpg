@@ -95,7 +95,10 @@ async fn main() {
         }
     }
 
-    let characters = Characters::new(characters);
+    //let characters = Characters::new(characters);
+    for (i, ch) in characters.iter_mut().enumerate() {
+        ch.set_id(i as CharacterId);
+    }
 
     let pathfind_grid = PathfindGrid::new(map_data.grid_dimensions);
 
@@ -108,6 +111,7 @@ async fn main() {
 
     let pathfind_grid = Rc::new(pathfind_grid);
 
+    let characters = characters.into_iter().map(|ch| Rc::new(ch)).collect();
     let mut init_state = GameInitState {
         characters,
         active_character_id: 0,
@@ -121,9 +125,14 @@ async fn main() {
 
     let sound_player = SoundPlayer::new().await;
 
+    let characters = init_state
+        .characters
+        .iter()
+        .map(|ch| (ch.id(), Rc::clone(ch)))
+        .collect();
     let mut game_grid = GameGrid::new(
         0,
-        init_state.characters.clone(),
+        characters,
         resources.sprites.clone(),
         resources.big_font.clone(),
         resources.simple_font.clone(),

@@ -517,7 +517,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
     }
 
-    let characters = Characters::new(characters);
+    //let characters = Characters::new(characters);
+    for (i, ch) in characters.iter_mut().enumerate() {
+        ch.set_id(i as CharacterId);
+    }
 
     let pathfind_grid = PathfindGrid::new(grid_dimensions);
 
@@ -530,6 +533,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
     let pathfind_grid = Rc::new(pathfind_grid);
 
+    let characters = characters.into_iter().map(|ch| Rc::new(ch)).collect();
     GameInitState {
         characters,
         active_character_id: 0,
@@ -541,7 +545,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
 #[derive(Clone)]
 pub struct GameInitState {
-    pub characters: Characters,
+    pub characters: Vec<Rc<Character>>,
     pub active_character_id: CharacterId,
     pub pathfind_grid: Rc<PathfindGrid>,
     pub background: HashMap<Position, TerrainId>,

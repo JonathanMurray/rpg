@@ -47,7 +47,8 @@ pub struct CoreGame {
 
 impl CoreGame {
     pub fn new(user_interface: GameUserInterfaceConnection, init_state: &GameInitState) -> Self {
-        let characters = init_state.characters.clone();
+        let characters = Characters::new(init_state.characters.clone());
+
         let round_length = characters.iter().count() as u32;
         Self {
             characters,
@@ -904,7 +905,7 @@ impl CoreGame {
     }
 
     fn current_time(&self) -> u32 {
-        self.round_index * self.round_length + self.active_character().index_in_round.unwrap()
+        self.round_index * self.round_length + self.active_character().index_in_round.get().unwrap()
     }
 
     fn perform_receive_condition(
@@ -3201,18 +3202,22 @@ pub fn prob_ability_hit(
 pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
 
 impl Characters {
-    pub fn new(characters: Vec<Character>) -> Self {
+    pub fn new(characters: Vec<Rc<Character>>) -> Self {
         let round_length = characters.len() as u32;
         Self(
             characters
                 .into_iter()
                 .enumerate()
-                .map(|(i, mut ch)| {
+                .map(|(i, ch)| {
                     let id = i as CharacterId;
-                    ch.id = Some(id);
-                    ch.index_in_round = Some(i as u32);
-                    ch.round_length = Some(round_length);
-                    (id, Rc::new(ch))
+                    if ch.id.get().is_none() {
+                        ch.set_id(id);
+                    } else {
+                        assert_eq!(ch.id(), id);
+                    }
+                    ch.index_in_round.set(Some(i as u32));
+                    ch.round_length.set(Some(round_length));
+                    (id, ch)
                 })
                 .collect(),
         )
@@ -3277,6 +3282,10 @@ impl Characters {
             }
         });
         removed
+    }
+
+    pub fn as_map(&self) -> HashMap<CharacterId, Rc<Character>> {
+        self.0.iter().map(|(k, v)| (*k, Rc::clone(v))).collect()
     }
 }
 
@@ -4414,10 +4423,10 @@ impl Party {
 
 #[derive(Debug, Clone)]
 pub struct Character {
-    id: Option<CharacterId>,
-    index_in_round: Option<u32>,
+    id: Cell<Option<CharacterId>>,
+    index_in_round: Cell<Option<u32>>,
     current_game_time: Cell<u32>,
-    round_length: Option<u32>,
+    round_length: Cell<Option<u32>>,
     pub is_part_of_active_group: Cell<bool>,
     pub has_taken_a_turn_this_round: Cell<bool>,
     pub has_used_main_hand_reaction_this_round: Cell<bool>,
@@ -4486,9 +4495,9 @@ impl Character {
         let action_points = NumberedResource::new(MAX_ACTION_POINTS);
         action_points.current.set(ACTION_POINTS_PER_TURN);
         Self {
-            id: None,
-            index_in_round: None,
-            round_length: None,
+            id: Cell::new(None),
+            index_in_round: Cell::new(None),
+            round_length: Cell::new(None),
             has_taken_a_turn_this_round: Cell::new(false),
             has_used_main_hand_reaction_this_round: Cell::new(false),
             has_used_off_hand_reaction_this_round: Cell::new(false),
@@ -4806,7 +4815,7 @@ impl Character {
         for (condition, state) in self.conditions.borrow().map.iter() {
             let remaining_rounds = state.ends_at.map(|ends_at| {
                 let remaining = ends_at - self.current_game_time.get();
-                (remaining as f32 / self.round_length.unwrap() as f32).ceil() as u32
+                (remaining as f32 / self.round_length.get().unwrap() as f32).ceil() as u32
             });
             let info = ConditionInfo {
                 condition: *condition,
@@ -4832,7 +4841,15 @@ impl Character {
     }
 
     pub fn id(&self) -> CharacterId {
-        self.id.unwrap()
+        self.id.get().unwrap()
+    }
+
+    pub fn set_id(&self, id: CharacterId) {
+        assert!(
+            self.id.get().is_none(),
+            "set_id() should only be used at initialisation"
+        );
+        self.id.set(Some(id));
     }
 
     fn hand(&self, hand_type: HandType) -> &Cell<Hand> {
