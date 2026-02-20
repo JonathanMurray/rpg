@@ -29,10 +29,13 @@ use rpg::bot::BotBehaviour;
 use rpg::core::{
     Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Bot, Character,
     CharacterId, CharacterKind, Characters, Condition, CoreGame, EquipmentEntry, HandType,
-    OnAttackedReaction, OnHitReaction, Party, Position,
+    OnAttackedReaction, OnHitReaction, Party, Position, Shield, Weapon,
 };
 
-use rpg::data::{BAD_BOW, BAD_SWORD, SWORD};
+use rpg::data::{
+    PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
+    ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, SHIRT, SWORD,
+};
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::GameGrid;
@@ -66,15 +69,15 @@ async fn main() {
 
     let mut map_data = MapData::load_from_file(SAVE_FILE_NAME);
 
-    let mut characters = vec![];
+    let mut characters: IndexMap<CharacterId, Rc<Character>> = Default::default();
 
     let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
 
-    for (i, (pos, char_type)) in map_data.characters.iter().enumerate() {
-        let char = create_character(*pos, *char_type, &party, i as CharacterId);
-        pathfind_grid.set_occupied(*pos, Some(Occupation::Character(char.id())));
-        dbg!(char.name, char.id());
-        characters.push(char);
+    for (i, char_data) in map_data.characters.iter().enumerate() {
+        let pos = char_data.pos;
+        let char = create_character(pos, *char_data, &party, i as CharacterId);
+        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+        characters.insert(char.id(), char);
     }
 
     for pos in map_data.terrain_objects.keys().copied() {
@@ -85,7 +88,7 @@ async fn main() {
 
     let characters_map: HashMap<CharacterId, Rc<Character>> = characters
         .iter()
-        .map(|ch| (ch.id(), Rc::clone(ch)))
+        .map(|(_id, ch)| (ch.id(), Rc::clone(ch)))
         .collect();
     let mut game_grid = GameGrid::new(
         0,
@@ -103,9 +106,9 @@ async fn main() {
 
     game_grid.auto_tile_terrain_objects();
 
-    let mut sidebar = Sidebar::new(resources.terrain_atlas.clone());
+    let mut sidebar = Sidebar::new(resources.terrain_atlas.clone(), resources.sprites.clone());
     let show_grid = Rc::new(Cell::new(true));
-    let snap_to_grid = Rc::new(Cell::new(true));
+    let snap_to_grid = Rc::new(Cell::new(false));
     let settings = build_settings(
         &resources.big_font,
         &resources.simple_font,
@@ -117,11 +120,30 @@ async fn main() {
     let file_text = format!("{:?}", SAVE_FILE_NAME);
     let mut has_unsaved_changes = false;
 
+    let mut inspect_target = None;
+
+    let mut character_editor: Option<Container> = None;
+
     loop {
         next_frame().await;
-        game_grid.draw(true, &mut UiState::Idle, false, None, (0, 0));
+        let grid_outcome = game_grid.draw(true, &mut UiState::Idle, false, None, (0, 0));
         if show_grid.get() {
             game_grid.draw_debug_cells();
+        }
+
+        if let Some(new_inspect_target) = grid_outcome.switched_inspect_target {
+            inspect_target = new_inspect_target;
+            if let Some(id) = inspect_target {
+                let char = characters.get(&id).unwrap();
+                character_editor = Some(build_character_editor(
+                    &resources.big_font,
+                    &resources.simple_font,
+                    char,
+                    &ui_resources.equipment_icons,
+                ));
+            } else {
+                character_editor = None;
+            }
         }
 
         sidebar.draw();
@@ -159,8 +181,17 @@ async fn main() {
             .last_drawn_rectangle
             .get()
             .contains(mouse_position().into());
+        let char_editor_hovered = character_editor
+            .as_ref()
+            .map(|container| {
+                container
+                    .last_drawn_rectangle
+                    .get()
+                    .contains(mouse_position().into())
+            })
+            .unwrap_or(false);
 
-        if !sidebar.hovered && !settings_hovered {
+        if !sidebar.hovered && !settings_hovered && !char_editor_hovered {
             if let Some(action) = sidebar.action() {
                 let entity_size = game_grid.entity_draw_size();
 
@@ -181,7 +212,7 @@ async fn main() {
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
                         game_grid.draw_terrain(
-                            terrain_id,
+                            *terrain_id,
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                         );
@@ -197,9 +228,49 @@ async fn main() {
                         );
                     }
                     EditorAction::PlaceCharacter(id) => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
                         draw_text(
                             &format!("{:?}", id),
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+                    EditorAction::EditCharacter => {
+                        draw_text(
+                            "Edit",
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+                    EditorAction::MoveCharacter(maybe_id) => match maybe_id.get() {
+                        Some(_) => {
+                            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                            draw_text(
+                                "Move",
+                                snapped_mouse_screen_pos.0,
+                                snapped_mouse_screen_pos.1,
+                                16.0,
+                                WHITE,
+                            );
+                        }
+                        None => {
+                            draw_text(
+                                "Select",
+                                snapped_mouse_screen_pos.0,
+                                snapped_mouse_screen_pos.1,
+                                16.0,
+                                WHITE,
+                            );
+                        }
+                    },
+                    EditorAction::RemoveCharacter => {
+                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            "Remove",
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                             16.0,
@@ -215,27 +286,24 @@ async fn main() {
                             if pathfind_grid.is_free(None, pos) {
                                 pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
                                 assert_eq!(map_data.terrain_objects.get(&pos), None);
-                                map_data.terrain_objects.insert(pos, terrain_id);
+                                map_data.terrain_objects.insert(pos, *terrain_id);
                                 game_grid
                                     .terrain_objects_mut()
-                                    .insert(mouse_grid_pos, terrain_id);
+                                    .insert(mouse_grid_pos, *terrain_id);
                                 game_grid.auto_tile_terrain_objects();
                                 has_unsaved_changes = true;
                             }
                         }
                         EditorAction::PlaceCharacter(char_type) => {
                             if pathfind_grid.is_free(None, pos) {
-                                let max_id = characters.iter().map(|ch| ch.id()).max().unwrap_or(0);
-                                let char = create_character(pos, char_type, &party, max_id + 1);
+                                let max_id = characters.keys().copied().max().unwrap_or(0);
+                                let char_data = CharacterData::base(*char_type, pos);
+                                let char = create_character(pos, char_data, &party, max_id + 1);
                                 pathfind_grid
                                     .set_occupied(pos, Some(Occupation::Character(char.id())));
-                                game_grid
-                                    .characters_mut()
-                                    .insert(char.id(), Rc::clone(&char));
-                                println!("Before adding char: {} entries", characters.len());
-                                characters.push(Rc::clone(&char));
-                                println!("After adding char: {} entries", characters.len());
-                                map_data.characters.insert(pos, char_type);
+                                game_grid.add_character(char.id(), Rc::clone(&char));
+                                characters.insert(char.id(), Rc::clone(&char));
+                                map_data.characters.push(char_data);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -246,9 +314,47 @@ async fn main() {
                             {
                                 assert!(pathfind_grid.occupied().get(&pos).is_some());
                                 pathfind_grid.set_occupied(pos, None);
-                                map_data.terrain_objects.remove(&pos);
-                                game_grid.terrain_objects_mut().remove(&mouse_grid_pos);
+                                map_data.terrain_objects.swap_remove(&pos);
+                                game_grid.terrain_objects_mut().swap_remove(&mouse_grid_pos);
                                 game_grid.auto_tile_terrain_objects();
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::EditCharacter => {
+                            // It's taken care of by tracking the game grid's inspect target
+                        }
+                        EditorAction::MoveCharacter(maybe_id) => {
+                            if let Some(char_id) = maybe_id.get() {
+                                let char = characters.get(&char_id).unwrap();
+                                if pathfind_grid.is_free(Some(char.id()), pos) {
+                                    pathfind_grid.set_occupied(char.pos(), None);
+
+                                    let char_data = map_data
+                                        .characters
+                                        .iter_mut()
+                                        .find(|ch| ch.pos == char.pos())
+                                        .unwrap();
+                                    char_data.pos = pos;
+
+                                    char.position.set(pos);
+                                    pathfind_grid
+                                        .set_occupied(pos, Some(Occupation::Character(char.id())));
+                                    has_unsaved_changes = true;
+                                }
+                            }
+
+                            maybe_id.set(inspect_target);
+                        }
+                        EditorAction::RemoveCharacter => {
+                            let char_id = characters
+                                .values()
+                                .find(|ch| ch.pos() == pos)
+                                .map(|ch| ch.id());
+                            if let Some(id) = char_id {
+                                characters.shift_remove(&id);
+                                game_grid.remove_character(id);
+                                pathfind_grid.set_occupied(pos, None);
+                                map_data.characters.retain(|ch| ch.pos != pos);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -257,15 +363,24 @@ async fn main() {
             }
         }
 
+        if let Some(character_editor) = &character_editor {
+            if sidebar.action() == Some(&EditorAction::EditCharacter) {
+                character_editor.draw(
+                    screen_width() / 2.0,
+                    screen_height() - character_editor.size().1 - 10.0,
+                );
+            }
+        }
+
         if is_key_pressed(KeyCode::Space) {
             println!("Running game ...");
             QUIT_WITH_ESCAPE.store(true, Ordering::SeqCst);
             let init_state = GameInitState {
-                characters: characters.clone(),
+                characters: characters.values().cloned().collect(),
                 active_character_id: 0,
                 pathfind_grid: pathfind_grid.clone(),
-                background: map_data.background.clone(),
-                terrain_objects: map_data.terrain_objects.clone(),
+                background: game_grid.background.clone(),
+                terrain_objects: game_grid.terrain_objects.clone(),
             };
             let core_game = init_core_game(
                 resources.clone(),
@@ -288,48 +403,215 @@ async fn main() {
 
 fn create_character(
     pos: Position,
-    char_type: CharacterType,
+    char_data: CharacterData,
     party: &Rc<Party>,
     id: CharacterId,
 ) -> Rc<Character> {
-    let char = match char_type {
-        CharacterType::Player1 => {
+    let char = match char_data.type_ {
+        CharacterType::Bob => {
             let bob = Character::new(
                 CharacterKind::Player(Rc::clone(&party)),
                 "Bob",
                 PortraitId::Bob,
-                SpriteId::Bob,
+                char_data.type_.sprite_id(),
                 Attributes::new(5, 3, 3, 3),
                 pos,
             );
             bob.set_weapon(HandType::MainHand, SWORD);
             bob
         }
-        CharacterType::SkeletonFighter => {
-            let skel = Character::new(
-                bot(BotBehaviour::Normal, 10.0),
+        CharacterType::Alice => {
+            let bob = Character::new(
+                CharacterKind::Player(Rc::clone(&party)),
+                "Alice",
+                PortraitId::Alice,
+                char_data.type_.sprite_id(),
+                Attributes::new(5, 3, 3, 3),
+                pos,
+            );
+            bob.set_weapon(HandType::MainHand, SWORD);
+            bob
+        }
+        CharacterType::Clara => {
+            let bob = Character::new(
+                CharacterKind::Player(Rc::clone(&party)),
+                "Clara",
+                PortraitId::Clara,
+                char_data.type_.sprite_id(),
+                Attributes::new(5, 3, 3, 3),
+                pos,
+            );
+            bob.set_weapon(HandType::MainHand, SWORD);
+            bob
+        }
+        CharacterType::Skeleton => {
+            let skeleton = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Skeleton",
                 PortraitId::Skeleton,
-                SpriteId::Skeleton,
-                Attributes::new(5, 3, 3, 3),
+                char_data.type_.sprite_id(),
+                Attributes::new(4, 4, 3, 1),
                 pos,
             );
-            skel.set_weapon(HandType::MainHand, BAD_SWORD);
-            skel
+            skeleton.health.change_max_value_to(35);
+            skeleton.armor_piece.set(Some(LEATHER_ARMOR));
+            skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
+            skeleton.set_shield(BAD_SMALL_SHIELD);
+            skeleton.learn_ability(ENEMY_BRACE);
+            skeleton.learn_ability(ENEMY_INSPIRE);
+            skeleton
         }
-        CharacterType::GhoulArcher => {
+        CharacterType::Ghoul1 => {
+            // TODO these should have archer behaviour, i.e. run away from melee
             let ghoul = Character::new(
-                bot(BotBehaviour::Normal, 10.0),
+                bot(BotBehaviour::Fighter(Default::default()), 9.0),
                 "Ghoul",
                 PortraitId::Ghoul,
-                SpriteId::Ghoul,
-                Attributes::new(5, 3, 3, 3),
+                char_data.type_.sprite_id(),
+                Attributes::new(1, 3, 2, 1),
                 pos,
             );
+            ghoul.health.change_max_value_to(9);
             ghoul.set_weapon(HandType::MainHand, BAD_BOW);
             ghoul
         }
+        CharacterType::Ghoul2 => {
+            let ghoul = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                "Ghoul",
+                PortraitId::Ghoul,
+                char_data.type_.sprite_id(),
+                Attributes::new(2, 2, 1, 1),
+                pos,
+            );
+            ghoul.health.change_max_value_to(12);
+            ghoul.armor_piece.set(Some(SHIRT));
+            ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+            ghoul
+        }
+        CharacterType::Ogre => {
+            let mut ogre = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 10.0),
+                "Ogre",
+                PortraitId::Ogre,
+                SpriteId::Ogre,
+                Attributes::new(12, 4, 3, 1),
+                pos,
+            );
+            ogre.health.change_max_value_to(56);
+            ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
+            ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
+            ogre.learn_ability(ENEMY_TACKLE);
+            ogre.known_passive_skills.push(PassiveSkill::BloodRage);
+            ogre
+        }
     };
+
+    if let Some(health) = char_data.health {
+        char.health.change_max_value_to(health);
+    }
+    if let Some(weapon_id) = char_data.main_hand {
+        char.set_weapon(HandType::MainHand, create_weapon(weapon_id));
+    }
+    if let Some(shield_id) = char_data.shield {
+        char.set_shield(create_shield(shield_id));
+    }
+
+    /*
+     for i in 0..=2 {
+                    let pos = *enemy_positions[&i].choose().unwrap();
+                    let ghoul = Character::new(
+                        bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                        "Ghoul",
+                        PortraitId::Ghoul,
+                        SpriteId::Ghoul,
+                        Attributes::new(2, 3, 1, 1),
+                        pos,
+                    );
+
+                    if i == 2 {
+                        ghoul.position.set((pos.0 - 2, pos.1));
+                    }
+                    ghoul.health.change_max_value_to(15 + i);
+                    ghoul.armor_piece.set(Some(SHIRT));
+                    ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+                    if i % 2 == 0 {
+                        ghoul.set_shield(BAD_SMALL_SHIELD);
+                        ghoul.learn_ability(ENEMY_BRACE);
+                    }
+                    characters.push(ghoul);
+                }
+                for i in 3..=4 {
+                    // TODO these should have archer behaviour, i.e. run away from melee
+                    let pos = *enemy_positions[&i].choose().unwrap();
+                    let archer = Character::new(
+                        bot(BotBehaviour::Fighter(Default::default()), 9.0),
+                        "Ghoul",
+                        PortraitId::Ghoul,
+                        SpriteId::Ghoul,
+                        Attributes::new(1, 3, 2, 1),
+                        pos,
+                    );
+                    archer.health.change_max_value_to(9);
+                    archer.set_weapon(HandType::MainHand, BAD_BOW);
+                    characters.push(archer);
+                }
+                for i in 5..=5 {
+                    let pos = *enemy_positions[&i].choose().unwrap();
+                    let skeleton = Character::new(
+                        bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                        "Skeleton",
+                        PortraitId::Skeleton,
+                        SpriteId::Skeleton,
+                        Attributes::new(4, 4, 3, 1),
+                        pos,
+                    );
+                    skeleton.health.change_max_value_to(35 + i - 5);
+                    skeleton.armor_piece.set(Some(LEATHER_ARMOR));
+                    skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
+                    skeleton.set_shield(BAD_SMALL_SHIELD);
+                    skeleton.learn_ability(ENEMY_BRACE);
+                    skeleton.learn_ability(ENEMY_INSPIRE);
+                    characters.push(skeleton);
+                }
+                for i in 6..=7 {
+                    let pos = *enemy_positions[&i].choose().unwrap();
+                    let ghoul = Character::new(
+                        bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                        "Ghoul",
+                        PortraitId::Ghoul,
+                        SpriteId::Ghoul,
+                        Attributes::new(2, 2, 1, 1),
+                        pos,
+                    );
+                    ghoul.health.change_max_value_to(12 + i - 6);
+                    ghoul.armor_piece.set(Some(SHIRT));
+                    ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
+                    if i % 2 == 0 {
+                        ghoul.set_weapon(HandType::MainHand, BAD_DAGGER);
+                    }
+                    characters.push(ghoul);
+                }
+                for i in 8..=8 {
+                    let pos = *enemy_positions[&i].choose().unwrap();
+                    let mut ogre = Character::new(
+                        bot(BotBehaviour::Fighter(Default::default()), 10.0),
+                        "Ogre",
+                        PortraitId::Ogre,
+                        SpriteId::Ogre,
+                        Attributes::new(12, 4, 3, 1),
+                        pos,
+                    );
+                    ogre.health.change_max_value_to(56);
+                    ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
+                    ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
+                    ogre.learn_ability(ENEMY_TACKLE);
+                    ogre.known_passive_skills.push(PassiveSkill::BloodRage);
+                    characters.push(ogre);
+                }
+
+    * */
+
     char.set_id(id);
     Rc::new(char)
 }
@@ -341,23 +623,29 @@ fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
     })
 }
 
+// TODO: Create character edit UI
+
 struct Sidebar {
     terrain_atlas: Texture2D,
+    sprites: HashMap<SpriteId, Texture2D>,
     selected_section_idx: usize,
     selected_action_idx: Option<usize>,
     hovered: bool,
     sections: Vec<Vec<EditorAction>>,
 }
 
-#[derive(Copy, Clone)]
+#[derive(Clone, PartialEq)]
 enum EditorAction {
     PlaceTerrain(TerrainId),
     EraseTerrain,
     PlaceCharacter(CharacterType),
+    EditCharacter,
+    MoveCharacter(Cell<Option<CharacterId>>),
+    RemoveCharacter,
 }
 
 impl Sidebar {
-    fn new(terrain_atlas: Texture2D) -> Self {
+    fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
         let terrain_ids = vec![
             TerrainId::Bush,
             TerrainId::Boulder2,
@@ -374,14 +662,23 @@ impl Sidebar {
         terrain_actions.push(EditorAction::EraseTerrain);
 
         let character_actions = vec![
-            EditorAction::PlaceCharacter(CharacterType::SkeletonFighter),
-            EditorAction::PlaceCharacter(CharacterType::GhoulArcher),
+            EditorAction::PlaceCharacter(CharacterType::Bob),
+            EditorAction::PlaceCharacter(CharacterType::Alice),
+            EditorAction::PlaceCharacter(CharacterType::Clara),
+            EditorAction::PlaceCharacter(CharacterType::Skeleton),
+            EditorAction::PlaceCharacter(CharacterType::Ghoul1),
+            EditorAction::PlaceCharacter(CharacterType::Ghoul2),
+            EditorAction::PlaceCharacter(CharacterType::Ogre),
+            EditorAction::EditCharacter,
+            EditorAction::MoveCharacter(Cell::new(None)),
+            EditorAction::RemoveCharacter,
         ];
 
         let sections = vec![terrain_actions, character_actions];
 
         Self {
             terrain_atlas,
+            sprites,
             sections,
             selected_section_idx: 0,
             selected_action_idx: None,
@@ -460,14 +757,51 @@ impl Sidebar {
                         );
                     }
                     EditorAction::EraseTerrain => {
-                        draw_text("Erase", x, y + icon_w / 2.0, 16.0, BLACK);
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
-                    EditorAction::PlaceCharacter(id) => {
-                        draw_text(&format!("{:?}", id), x, y + icon_w / 2.0, 16.0, BLACK);
+                    EditorAction::PlaceCharacter(char_type) => {
+                        draw_texture_ex(
+                            &self.sprites[&char_type.sprite_id()],
+                            x,
+                            y,
+                            WHITE,
+                            DrawTextureParams {
+                                dest_size: Some((icon_w, icon_w).into()),
+                                ..Default::default()
+                            },
+                        );
+                        let text = format!("{:?}", char_type);
+                        let font_size = 16;
+                        let text_dim = measure_text(&text, None, font_size, 1.0);
+                        draw_rectangle(
+                            x + icon_w / 2.0 - text_dim.width / 2.0,
+                            y + icon_w / 2.0 - text_dim.offset_y,
+                            text_dim.width,
+                            text_dim.height,
+                            WHITE,
+                        );
+                        draw_text(
+                            &text,
+                            x + icon_w / 2.0 - text_dim.width / 2.0,
+                            y + icon_w / 2.0,
+                            font_size as f32,
+                            BLACK,
+                        );
+                    }
+                    EditorAction::EditCharacter => {
+                        draw_text("EDIT", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::MoveCharacter { .. } => {
+                        draw_text("MOVE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::RemoveCharacter => {
+                        draw_text("REMOVE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                 }
 
-                if self.selected_action_idx == Some(action_i) {
+                if self.selected_section_idx == section_i
+                    && self.selected_action_idx == Some(action_i)
+                {
                     draw_rectangle_lines(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
                 }
             }
@@ -476,9 +810,138 @@ impl Sidebar {
         }
     }
 
-    fn action(&self) -> Option<EditorAction> {
+    fn action(&self) -> Option<&EditorAction> {
         let actions = &self.sections[self.selected_section_idx];
-        self.selected_action_idx.map(|i| actions[i])
+        self.selected_action_idx.map(|i| &actions[i])
+    }
+}
+
+fn build_character_editor(
+    big_font: &Font,
+    simple_font: &Font,
+    char: &Character,
+    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
+) -> Container {
+    let weapon = char.weapon(HandType::MainHand);
+    let main_hand_element = if let Some(weapon) = weapon {
+        Element::Text(TextLine::new(
+            weapon.name,
+            16,
+            WHITE,
+            Some(simple_font.clone()),
+        ))
+    } else {
+        Element::Empty(0.0, 0.0)
+    };
+    let shield = char.shield();
+    let off_hand_element = if let Some(shield) = shield {
+        Element::Text(TextLine::new(
+            shield.name,
+            16,
+            WHITE,
+            Some(simple_font.clone()),
+        ))
+    } else {
+        Element::Empty(0.0, 0.0)
+    };
+    Container {
+        layout_dir: LayoutDirection::Vertical,
+        align: Align::Center,
+        border_between_children: Some(LIGHTGRAY),
+        margin: 40.0,
+        style: Style {
+            background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+            padding: 15.0,
+            ..Default::default()
+        },
+        children: vec![
+            Element::Text(TextLine::new(
+                "Edit character",
+                12,
+                WHITE,
+                Some(big_font.clone()),
+            )),
+            Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                align: Align::End,
+                margin: 5.0,
+                children: vec![
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        align: Align::Center,
+                        margin: 5.0,
+                        children: vec![
+                            Element::Text(TextLine::new(
+                                "Name:",
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                            Element::Text(TextLine::new(
+                                char.name,
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                        ],
+                        ..Default::default()
+                    }),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        align: Align::Center,
+                        margin: 5.0,
+                        children: vec![
+                            Element::Text(TextLine::new(
+                                "Health:",
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                            Element::Text(TextLine::new(
+                                format!("{}", char.health.max()),
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                        ],
+                        ..Default::default()
+                    }),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        align: Align::Center,
+                        margin: 5.0,
+                        children: vec![
+                            Element::Text(TextLine::new(
+                                "Main-hand:",
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                            main_hand_element,
+                        ],
+                        ..Default::default()
+                    }),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        align: Align::Center,
+                        margin: 5.0,
+                        children: vec![
+                            Element::Text(TextLine::new(
+                                "Off-hand:",
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                            off_hand_element,
+                        ],
+                        ..Default::default()
+                    }),
+                ],
+                ..Default::default()
+            }),
+        ],
+
+        ..Default::default()
     }
 }
 
@@ -558,19 +1021,18 @@ struct MapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub background: IndexMap<Position, TerrainId>,
-    pub characters: IndexMap<Position, CharacterType>,
+    pub characters: Vec<CharacterData>,
 }
 
 impl MapData {
     fn save_to_file(&self, filename: &str) {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
         let background = keys_pos_to_str(&self.background);
-        let characters = keys_pos_to_str(&self.characters);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
             terrain_objects,
             background,
-            characters,
+            characters: self.characters.clone(),
         };
         let json_str = serde_json::to_string_pretty(&map_data).unwrap();
         fs::write(filename, json_str).expect("Writing json to file");
@@ -589,7 +1051,7 @@ impl MapData {
             grid_dimensions: map_data.grid_dimensions,
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),
             background: keys_str_to_pos(&map_data.background),
-            characters: keys_str_to_pos(&map_data.characters),
+            characters: map_data.characters,
         }
     }
 }
@@ -619,14 +1081,81 @@ struct SerializableMapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<String, TerrainId>,
     pub background: IndexMap<String, TerrainId>,
-    pub characters: IndexMap<String, CharacterType>,
+    pub characters: Vec<CharacterData>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone, PartialEq)]
+enum CharacterType {
+    Bob,
+    Alice,
+    Clara,
+    Skeleton,
+    Ogre,
+    Ghoul1,
+    Ghoul2,
+}
+
+impl CharacterType {
+    fn sprite_id(&self) -> SpriteId {
+        match self {
+            CharacterType::Bob => SpriteId::Bob,
+            CharacterType::Alice => SpriteId::Alice,
+            CharacterType::Clara => SpriteId::Clara,
+            CharacterType::Skeleton => SpriteId::Skeleton,
+            CharacterType::Ogre => SpriteId::Ogre,
+            CharacterType::Ghoul1 => SpriteId::Ghoul,
+            CharacterType::Ghoul2 => SpriteId::Ghoul,
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-enum CharacterType {
-    Player1,
-    SkeletonFighter,
-    GhoulArcher,
+struct CharacterData {
+    type_: CharacterType,
+    pos: Position,
+    health: Option<u32>,
+    main_hand: Option<WeaponId>,
+    shield: Option<ShieldId>,
+}
+
+impl CharacterData {
+    fn base(type_: CharacterType, pos: Position) -> Self {
+        Self {
+            type_,
+            pos,
+            health: None,
+            main_hand: None,
+            shield: None,
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+enum WeaponId {
+    Sword,
+    BadSword,
+    BadDagger,
+    BadBow,
+}
+
+#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+enum ShieldId {
+    BadSmallShield,
+}
+
+fn create_weapon(id: WeaponId) -> Weapon {
+    match id {
+        WeaponId::Sword => SWORD,
+        WeaponId::BadSword => BAD_SWORD,
+        WeaponId::BadDagger => BAD_DAGGER,
+        WeaponId::BadBow => BAD_BOW,
+    }
+}
+
+fn create_shield(id: ShieldId) -> Shield {
+    match id {
+        ShieldId::BadSmallShield => BAD_SMALL_SHIELD,
+    }
 }
 
 fn window_conf() -> Conf {

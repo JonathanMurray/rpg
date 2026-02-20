@@ -232,8 +232,8 @@ pub struct GameGrid {
     simple_font: Font,
     pub cell_w: f32,
     terrain_atlas: Texture2D,
-    background: IndexMap<Position, TerrainId>,
-    terrain_objects: IndexMap<Position, TerrainId>,
+    pub background: IndexMap<Position, TerrainId>,
+    pub terrain_objects: IndexMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
@@ -316,8 +316,15 @@ impl GameGrid {
         &mut self.terrain_objects
     }
 
-    pub fn characters_mut(&mut self) -> &mut HashMap<CharacterId, Rc<Character>> {
-        &mut self.characters
+    /// Should only be called from editor; not from in-game!
+    pub fn add_character(&mut self, character_id: CharacterId, character: Rc<Character>) {
+        self.characters.insert(character_id, character);
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn remove_character(&mut self, character_id: CharacterId) {
+        self.characters.remove(&character_id);
+        self.on_removed_character(character_id);
     }
 
     pub fn auto_tile_terrain_objects(&mut self) {
@@ -523,18 +530,22 @@ impl GameGrid {
             }
         });
         for id in removed {
-            if self.locked_inspection_target == Some(id) {
-                self.locked_inspection_target = None;
-            }
+            self.on_removed_character(id);
+        }
+    }
 
-            if self.selected_player_character_id == Some(id) {
-                // TODO what about when all PC:s have died?
-                self.selected_player_character_id = self
-                    .characters
-                    .values()
-                    .find(|ch| ch.player_controlled())
-                    .map(|ch| ch.id());
-            }
+    fn on_removed_character(&mut self, id: CharacterId) {
+        if self.locked_inspection_target == Some(id) {
+            self.locked_inspection_target = None;
+        }
+
+        if self.selected_player_character_id == Some(id) {
+            // TODO what about when all PC:s have died?
+            self.selected_player_character_id = self
+                .characters
+                .values()
+                .find(|ch| ch.player_controlled())
+                .map(|ch| ch.id());
         }
     }
 
