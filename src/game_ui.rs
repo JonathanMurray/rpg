@@ -521,10 +521,10 @@ impl UserInterface {
         let ui_state = Rc::new(RefCell::new(UiState::Idle));
 
         let first_player_character_id = characters
-            .iter_with_ids()
-            .find(|(_id, ch)| ch.player_controlled())
+            .iter()
+            .find(|ch| ch.player_controlled())
             .unwrap()
-            .0;
+            .id();
 
         let game_grid = GameGrid::new(
             first_player_character_id,
@@ -2581,7 +2581,8 @@ impl UserInterface {
     }
 
     fn update_character_status(&mut self, characters: &Characters) {
-        for (id, character) in characters.iter_with_ids() {
+        for character in characters.iter() {
+            let id = &character.id();
             if let Some(ui) = self.character_uis.get_mut(id) {
                 ui.health_bar
                     .borrow_mut()

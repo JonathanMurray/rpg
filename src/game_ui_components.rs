@@ -58,7 +58,7 @@ impl TopCharacterPortraits {
 
         let mut elements = vec![];
 
-        for (id, character) in characters.iter_with_ids() {
+        for character in characters.iter() {
             let texture = portrait_textures[&character.portrait].clone();
 
             let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(
@@ -67,7 +67,7 @@ impl TopCharacterPortraits {
                 texture,
             )));
             let cloned = Rc::downgrade(&portrait);
-            portraits.insert(*id, portrait);
+            portraits.insert(character.id(), portrait);
             elements.push(Element::WeakRefCell(cloned));
         }
 
@@ -357,12 +357,12 @@ impl PlayerPortraits {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
             Default::default();
 
-        for (id, character) in characters.iter_with_ids() {
+        for character in characters.iter() {
             if character.player_controlled() {
                 let texture = portrait_textures.get(&character.portrait).unwrap().clone();
 
                 portraits.insert(
-                    *id,
+                    character.id(),
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         character,
                         font.clone(),

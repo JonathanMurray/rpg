@@ -3198,8 +3198,7 @@ pub fn prob_ability_hit(
 }
 
 #[derive(Clone)]
-// TODO: Remove the CharacterId from the tuple? Not needed anymore now that Character has interior mutability
-pub struct Characters(Vec<(CharacterId, Rc<Character>)>);
+pub struct Characters(Vec<Rc<Character>>);
 
 impl Characters {
     pub fn new(characters: Vec<Rc<Character>>) -> Self {
@@ -3217,7 +3216,7 @@ impl Characters {
                     }
                     ch.index_in_round.set(Some(i as u32));
                     ch.round_length.set(Some(round_length));
-                    (id, ch)
+                    ch
                 })
                 .collect(),
         )
@@ -3229,13 +3228,13 @@ impl Characters {
                 return ch.id();
             }
         }
-        self.0[0].0
+        self.0[0].id()
     }
 
     pub fn contains_alive(&self, character_id: CharacterId) -> bool {
         self.0
             .iter()
-            .any(|(id, ch)| *id == character_id && !ch.is_dead())
+            .any(|ch| ch.id() == character_id && !ch.is_dead())
     }
 
     pub fn get(&self, character_id: CharacterId) -> &Character {
@@ -3243,21 +3242,21 @@ impl Characters {
     }
 
     pub fn safe_get(&self, character_id: CharacterId) -> Option<&Character> {
-        let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
-        entry.map(|(_id, ch)| &**ch)
+        let entry = self.0.iter().find(|ch| ch.id() == character_id);
+        entry.map(|ch| &**ch)
     }
 
     pub fn get_rc(&self, character_id: CharacterId) -> &Rc<Character> {
-        let entry = self.0.iter().find(|(id, _ch)| *id == character_id);
+        let entry = self.0.iter().find(|ch| ch.id() == character_id);
 
         match entry {
-            Some((_id, ch)) => ch,
+            Some(ch) => ch,
             None => panic!("No character with id: {character_id}"),
         }
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Rc<Character>> {
-        self.0.iter().map(|(_id, ch)| ch)
+        self.0.iter().map(|ch| ch)
     }
 
     pub fn player_characters(self) -> Vec<Character> {
@@ -3267,13 +3266,9 @@ impl Characters {
             .collect()
     }
 
-    pub fn iter_with_ids(&self) -> impl Iterator<Item = &(CharacterId, Rc<Character>)> {
-        self.0.iter()
-    }
-
     pub fn remove_dead(&mut self) -> Vec<CharacterId> {
         let mut removed = vec![];
-        self.0.retain(|(_id, ch)| {
+        self.0.retain(|ch| {
             if ch.is_dead() {
                 removed.push(ch.id());
                 false
@@ -3285,7 +3280,7 @@ impl Characters {
     }
 
     pub fn as_map(&self) -> HashMap<CharacterId, Rc<Character>> {
-        self.0.iter().map(|(k, v)| (*k, Rc::clone(v))).collect()
+        self.0.iter().map(|ch| (ch.id(), Rc::clone(ch))).collect()
     }
 }
 
