@@ -7,6 +7,7 @@ use std::{
     rc::Rc,
 };
 
+use indexmap::IndexMap;
 use macroquad::rand::ChooseRandom;
 use rand::{
     distr::{Distribution, Uniform},
@@ -50,7 +51,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::VerticalSlice => "map_vertical_slice.txt",
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
-    let mut terrain_objects: HashMap<Position, TerrainId> = Default::default();
+    let mut terrain_objects: IndexMap<Position, TerrainId> = Default::default();
     let mut terrain_center_positions: HashSet<Position> = Default::default();
     let mut water_grid: HashSet<Position> = Default::default();
 
@@ -498,7 +499,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     // TODO: This should be dynamic based on map file
     let grid_dimensions: (u32, u32) = (20 * CELLS_PER_ENTITY, 15 * CELLS_PER_ENTITY);
 
-    let mut background: HashMap<Position, TerrainId> = Default::default();
+    let mut background: IndexMap<Position, TerrainId> = Default::default();
     let grass_variations = [
         TerrainId::Grass,
         TerrainId::Grass2,
@@ -548,28 +549,11 @@ pub struct GameInitState {
     pub characters: Vec<Rc<Character>>,
     pub active_character_id: CharacterId,
     pub pathfind_grid: Rc<PathfindGrid>,
-    pub background: HashMap<Position, TerrainId>,
-    pub terrain_objects: HashMap<Position, TerrainId>,
+    pub background: IndexMap<Position, TerrainId>,
+    pub terrain_objects: IndexMap<Position, TerrainId>,
 }
 
 impl GameInitState {
-    pub fn try_add_terrain_object(&mut self, pos: Position, terrain: TerrainId) -> bool {
-        if self.pathfind_grid.is_free(None, pos) {
-            assert_eq!(self.terrain_objects.get(&pos), None);
-            self.terrain_objects.insert(pos, terrain);
-            self.pathfind_grid
-                .set_occupied(pos, Some(Occupation::Terrain));
-            true
-        } else {
-            //println!("Cannot add terrain. Space occupied");
-            false
-        }
-    }
-
-    pub fn try_add_character(&mut self, pos: Position, character: Character) -> bool {
-        todo!("Add character to gameinitstate")
-    }
-
     pub fn try_remove_terrain_object(&mut self, pos: &Position) -> bool {
         if self.pathfind_grid.occupied().get(pos).is_some() {
             self.pathfind_grid.set_occupied(*pos, None);

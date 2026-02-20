@@ -1,9 +1,11 @@
 use std::cell::{self, Cell, RefCell};
+use std::char::CharTryFromError;
 use std::collections::HashMap;
 use std::fs;
 use std::rc::{Rc, Weak};
 use std::sync::atomic::Ordering;
 
+use indexmap::IndexMap;
 use macroquad::color::{Color, BLACK, LIGHTGRAY, MAGENTA, RED, WHITE, YELLOW};
 use macroquad::input::{
     is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position,
@@ -30,7 +32,7 @@ use rpg::core::{
     OnAttackedReaction, OnHitReaction, Party, Position,
 };
 
-use rpg::data::{BAD_SWORD, SWORD};
+use rpg::data::{BAD_BOW, BAD_SWORD, SWORD};
 use rpg::game_ui::{PlayerChose, UiState, UserInterface};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::GameGrid;
@@ -66,80 +68,35 @@ async fn main() {
 
     let mut characters = vec![];
 
-    for (pos, map_char_id) in &map_data.characters {
-        match map_char_id {
-            MapCharacterId::Player1 => {
-                let bob = Character::new(
-                    CharacterKind::Player(Rc::clone(&party)),
-                    "Bob",
-                    PortraitId::Bob,
-                    SpriteId::Bob,
-                    Attributes::new(5, 3, 3, 3),
-                    *pos,
-                );
-                bob.set_weapon(HandType::MainHand, SWORD);
-                characters.push(bob);
-            }
-            MapCharacterId::Enemy1 => {
-                let enemy = Character::new(
-                    bot(BotBehaviour::Normal, 10.0),
-                    "Enemy 1",
-                    PortraitId::Skeleton,
-                    SpriteId::Skeleton,
-                    Attributes::new(5, 3, 3, 3),
-                    *pos,
-                );
-                enemy.set_weapon(HandType::MainHand, BAD_SWORD);
-                characters.push(enemy);
-            }
-        }
-    }
+    let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
 
-    //let characters = Characters::new(characters);
-    for (i, ch) in characters.iter_mut().enumerate() {
-        ch.set_id(i as CharacterId);
+    for (i, (pos, char_type)) in map_data.characters.iter().enumerate() {
+        let char = create_character(*pos, *char_type, &party, i as CharacterId);
+        pathfind_grid.set_occupied(*pos, Some(Occupation::Character(char.id())));
+        dbg!(char.name, char.id());
+        characters.push(char);
     }
-
-    let pathfind_grid = PathfindGrid::new(map_data.grid_dimensions);
 
     for pos in map_data.terrain_objects.keys().copied() {
         pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
     }
-    for ch in characters.iter() {
-        pathfind_grid.set_occupied(ch.pos(), Some(Occupation::Character(ch.id())));
-    }
-
-    let pathfind_grid = Rc::new(pathfind_grid);
-
-    let characters = characters.into_iter().map(|ch| Rc::new(ch)).collect();
-    let mut init_state = GameInitState {
-        characters,
-        active_character_id: 0,
-        pathfind_grid,
-        background: map_data.background.clone(),
-        terrain_objects: map_data.terrain_objects.clone(),
-    };
-
-    //let fight_id = FightId::VerticalSlice;
-    //let mut init_state = init_fight_map(vec![bob], fight_id);
 
     let sound_player = SoundPlayer::new().await;
 
-    let characters = init_state
-        .characters
+    let characters_map: HashMap<CharacterId, Rc<Character>> = characters
         .iter()
         .map(|ch| (ch.id(), Rc::clone(ch)))
         .collect();
     let mut game_grid = GameGrid::new(
         0,
-        characters,
+        characters_map,
         resources.sprites.clone(),
         resources.big_font.clone(),
         resources.simple_font.clone(),
         resources.terrain_atlas.clone(),
-        init_state.pathfind_grid.clone(),
-        init_state.background.clone(),
-        init_state.terrain_objects.clone(),
+        pathfind_grid.clone(),
+        map_data.background.clone(),
+        map_data.terrain_objects.clone(),
         resources.status_textures.clone(),
         sound_player.clone(),
     );
@@ -252,14 +209,33 @@ async fn main() {
                 }
 
                 if is_mouse_button_down(MouseButton::Left) {
+                    let pos = mouse_grid_pos;
                     match action {
                         EditorAction::PlaceTerrain(terrain_id) => {
-                            if init_state.try_add_terrain_object(mouse_grid_pos, terrain_id) {
+                            if pathfind_grid.is_free(None, pos) {
+                                pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+                                assert_eq!(map_data.terrain_objects.get(&pos), None);
+                                map_data.terrain_objects.insert(pos, terrain_id);
                                 game_grid
                                     .terrain_objects_mut()
                                     .insert(mouse_grid_pos, terrain_id);
                                 game_grid.auto_tile_terrain_objects();
-                                map_data.terrain_objects.insert(mouse_grid_pos, terrain_id);
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::PlaceCharacter(char_type) => {
+                            if pathfind_grid.is_free(None, pos) {
+                                let max_id = characters.iter().map(|ch| ch.id()).max().unwrap_or(0);
+                                let char = create_character(pos, char_type, &party, max_id + 1);
+                                pathfind_grid
+                                    .set_occupied(pos, Some(Occupation::Character(char.id())));
+                                game_grid
+                                    .characters_mut()
+                                    .insert(char.id(), Rc::clone(&char));
+                                println!("Before adding char: {} entries", characters.len());
+                                characters.push(Rc::clone(&char));
+                                println!("After adding char: {} entries", characters.len());
+                                map_data.characters.insert(pos, char_type);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -268,15 +244,13 @@ async fn main() {
                                 .terrain_objects_mut()
                                 .contains_key(&mouse_grid_pos)
                             {
-                                init_state.try_remove_terrain_object(&mouse_grid_pos);
+                                assert!(pathfind_grid.occupied().get(&pos).is_some());
+                                pathfind_grid.set_occupied(pos, None);
+                                map_data.terrain_objects.remove(&pos);
                                 game_grid.terrain_objects_mut().remove(&mouse_grid_pos);
                                 game_grid.auto_tile_terrain_objects();
-                                map_data.terrain_objects.remove(&mouse_grid_pos);
                                 has_unsaved_changes = true;
                             }
-                        }
-                        EditorAction::PlaceCharacter(id) => {
-                            todo!("place character")
                         }
                     }
                 }
@@ -286,13 +260,18 @@ async fn main() {
         if is_key_pressed(KeyCode::Space) {
             println!("Running game ...");
             QUIT_WITH_ESCAPE.store(true, Ordering::SeqCst);
-            // If the game grid has auto-tiled the terrain objects, that needs to be applied here as well, to be reflected in-game
-            init_state.terrain_objects = game_grid.terrain_objects_mut().clone();
+            let init_state = GameInitState {
+                characters: characters.clone(),
+                active_character_id: 0,
+                pathfind_grid: pathfind_grid.clone(),
+                background: map_data.background.clone(),
+                terrain_objects: map_data.terrain_objects.clone(),
+            };
             let core_game = init_core_game(
                 resources.clone(),
                 ui_resources.clone(),
                 sound_player.clone(),
-                init_state.clone(),
+                init_state,
             );
             match core_game.run().await {
                 Ok(_chars) => println!("Game ended naturally"),
@@ -302,15 +281,57 @@ async fn main() {
 
         if is_key_down(KeyCode::LeftControl) && is_key_pressed(KeyCode::S) {
             map_data.save_to_file(SAVE_FILE_NAME);
-            /*
-            let json_str = serde_json::to_string_pretty(&map_data).unwrap();
-
-            fs::write("testsavefile.json", json_str).expect("Writing json to file");
-            println!("Saved map data to {}", SAVE_FILE_NAME);
-             */
             has_unsaved_changes = false;
         }
     }
+}
+
+fn create_character(
+    pos: Position,
+    char_type: CharacterType,
+    party: &Rc<Party>,
+    id: CharacterId,
+) -> Rc<Character> {
+    let char = match char_type {
+        CharacterType::Player1 => {
+            let bob = Character::new(
+                CharacterKind::Player(Rc::clone(&party)),
+                "Bob",
+                PortraitId::Bob,
+                SpriteId::Bob,
+                Attributes::new(5, 3, 3, 3),
+                pos,
+            );
+            bob.set_weapon(HandType::MainHand, SWORD);
+            bob
+        }
+        CharacterType::SkeletonFighter => {
+            let skel = Character::new(
+                bot(BotBehaviour::Normal, 10.0),
+                "Skeleton",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(5, 3, 3, 3),
+                pos,
+            );
+            skel.set_weapon(HandType::MainHand, BAD_SWORD);
+            skel
+        }
+        CharacterType::GhoulArcher => {
+            let ghoul = Character::new(
+                bot(BotBehaviour::Normal, 10.0),
+                "Ghoul",
+                PortraitId::Ghoul,
+                SpriteId::Ghoul,
+                Attributes::new(5, 3, 3, 3),
+                pos,
+            );
+            ghoul.set_weapon(HandType::MainHand, BAD_BOW);
+            ghoul
+        }
+    };
+    char.set_id(id);
+    Rc::new(char)
 }
 
 fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
@@ -332,7 +353,7 @@ struct Sidebar {
 enum EditorAction {
     PlaceTerrain(TerrainId),
     EraseTerrain,
-    PlaceCharacter(MapCharacterId),
+    PlaceCharacter(CharacterType),
 }
 
 impl Sidebar {
@@ -352,7 +373,10 @@ impl Sidebar {
             .collect();
         terrain_actions.push(EditorAction::EraseTerrain);
 
-        let character_actions = vec![EditorAction::PlaceCharacter(MapCharacterId::Enemy1)];
+        let character_actions = vec![
+            EditorAction::PlaceCharacter(CharacterType::SkeletonFighter),
+            EditorAction::PlaceCharacter(CharacterType::GhoulArcher),
+        ];
 
         let sections = vec![terrain_actions, character_actions];
 
@@ -529,32 +553,18 @@ fn build_settings(
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
-pub struct MapData {
+#[derive(Debug)]
+struct MapData {
     pub grid_dimensions: (u32, u32),
-    pub terrain_objects: HashMap<Position, TerrainId>,
-    pub background: HashMap<Position, TerrainId>,
-    pub characters: HashMap<Position, MapCharacterId>,
+    pub terrain_objects: IndexMap<Position, TerrainId>,
+    pub background: IndexMap<Position, TerrainId>,
+    pub characters: IndexMap<Position, CharacterType>,
 }
 
 impl MapData {
-    fn new(
-        grid_dimensions: (u32, u32),
-        terrain_objects: HashMap<Position, TerrainId>,
-        background: HashMap<Position, TerrainId>,
-        characters: HashMap<Position, MapCharacterId>,
-    ) -> Self {
-        Self {
-            grid_dimensions,
-            terrain_objects,
-            background,
-            characters,
-        }
-    }
-
     fn save_to_file(&self, filename: &str) {
-        let terrain_objects: HashMap<String, TerrainId> = keys_pos_to_str(&self.terrain_objects);
-        let background: HashMap<String, TerrainId> = keys_pos_to_str(&self.background);
+        let terrain_objects = keys_pos_to_str(&self.terrain_objects);
+        let background = keys_pos_to_str(&self.background);
         let characters = keys_pos_to_str(&self.characters);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
@@ -584,11 +594,11 @@ impl MapData {
     }
 }
 
-fn keys_pos_to_str<V: Copy>(map: &HashMap<Position, V>) -> HashMap<String, V> {
-    map.iter().map(|(k, v)| (format!("{k:?}"), *v)).collect()
+fn keys_pos_to_str<V: Copy>(map: &IndexMap<Position, V>) -> IndexMap<String, V> {
+    map.iter().map(|(k, v)| (serialise_pos(*k), *v)).collect()
 }
 
-fn keys_str_to_pos<V: Copy>(map: &HashMap<String, V>) -> HashMap<Position, V> {
+fn keys_str_to_pos<V: Copy>(map: &IndexMap<String, V>) -> IndexMap<Position, V> {
     map.iter().map(|(k, v)| (deserialise_pos(k), *v)).collect()
 }
 
@@ -605,17 +615,18 @@ fn deserialise_pos(s: &str) -> Position {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-pub struct SerializableMapData {
+struct SerializableMapData {
     pub grid_dimensions: (u32, u32),
-    pub terrain_objects: HashMap<String, TerrainId>,
-    pub background: HashMap<String, TerrainId>,
-    pub characters: HashMap<String, MapCharacterId>,
+    pub terrain_objects: IndexMap<String, TerrainId>,
+    pub background: IndexMap<String, TerrainId>,
+    pub characters: IndexMap<String, CharacterType>,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-enum MapCharacterId {
+enum CharacterType {
     Player1,
-    Enemy1,
+    SkeletonFighter,
+    GhoulArcher,
 }
 
 fn window_conf() -> Conf {

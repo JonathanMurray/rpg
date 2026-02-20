@@ -232,8 +232,8 @@ pub struct GameGrid {
     simple_font: Font,
     pub cell_w: f32,
     terrain_atlas: Texture2D,
-    background: HashMap<Position, TerrainId>,
-    terrain_objects: HashMap<Position, TerrainId>,
+    background: IndexMap<Position, TerrainId>,
+    terrain_objects: IndexMap<Position, TerrainId>,
     sprites: HashMap<SpriteId, Texture2D>,
     pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
@@ -272,8 +272,8 @@ impl GameGrid {
         simple_font: Font,
         terrain_atlas: Texture2D,
         pathfind_grid: Rc<PathfindGrid>,
-        background: HashMap<Position, TerrainId>,
-        terrain_objects: HashMap<Position, TerrainId>,
+        background: IndexMap<Position, TerrainId>,
+        terrain_objects: IndexMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -312,12 +312,16 @@ impl GameGrid {
         }
     }
 
-    pub fn terrain_objects_mut(&mut self) -> &mut HashMap<(i32, i32), TerrainId> {
+    pub fn terrain_objects_mut(&mut self) -> &mut IndexMap<(i32, i32), TerrainId> {
         &mut self.terrain_objects
     }
 
+    pub fn characters_mut(&mut self) -> &mut HashMap<CharacterId, Rc<Character>> {
+        &mut self.characters
+    }
+
     pub fn auto_tile_terrain_objects(&mut self) {
-        let mut new_map: HashMap<Position, TerrainId> = Default::default();
+        let mut new_map: IndexMap<Position, TerrainId> = Default::default();
         for (pos, mut terrain_id) in self.terrain_objects.iter() {
             if terrain_id.is_new_water() {
                 let mut neighbors = vec![];

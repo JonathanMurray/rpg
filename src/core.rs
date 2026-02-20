@@ -1,5 +1,6 @@
 use std::cell::{Cell, RefCell};
 
+use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
 use std::ops::RemAssign;
@@ -2611,14 +2612,12 @@ impl CoreGame {
 
 fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
-        std::cmp::Ordering::Less => Some(format!(
+        Ordering::Less => Some(format!(
             "Rolled {} dice with disadvantage...",
             advantage.abs() + 1
         )),
-        std::cmp::Ordering::Equal => None,
-        std::cmp::Ordering::Greater => {
-            Some(format!("Rolled {} dice with advantage...", advantage + 1))
-        }
+        Ordering::Equal => None,
+        Ordering::Greater => Some(format!("Rolled {} dice with advantage...", advantage + 1)),
     }
 }
 
@@ -3201,19 +3200,35 @@ pub fn prob_ability_hit(
 pub struct Characters(Vec<Rc<Character>>);
 
 impl Characters {
-    pub fn new(characters: Vec<Rc<Character>>) -> Self {
+    pub fn new(mut characters: Vec<Rc<Character>>) -> Self {
+        println!(
+            "Creating Characters struct from {} entries",
+            characters.len()
+        );
         let round_length = characters.len() as u32;
+
+        let unique_ch_ids: HashSet<CharacterId> = characters.iter().map(|ch| ch.id()).collect();
+        assert_eq!(
+            unique_ch_ids.len(),
+            characters.len(),
+            "Each character must have a unique ID"
+        );
+
+        // Player characters act first
+        // TODO: it should be sorted by caller
+        characters.sort_by(
+            |a, b| match (a.player_controlled(), b.player_controlled()) {
+                (true, true) => Ordering::Equal,
+                (false, false) => Ordering::Equal,
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+            },
+        );
         Self(
             characters
                 .into_iter()
                 .enumerate()
                 .map(|(i, ch)| {
-                    let id = i as CharacterId;
-                    if ch.id.get().is_none() {
-                        ch.set_id(id);
-                    } else {
-                        assert_eq!(ch.id(), id);
-                    }
                     ch.index_in_round.set(Some(i as u32));
                     ch.round_length.set(Some(round_length));
                     ch
