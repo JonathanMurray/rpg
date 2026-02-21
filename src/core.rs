@@ -3503,32 +3503,32 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "-5 Evasion, Disadvantage on attacks.",
+            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|, Disadvantage on attacks.",
             Blinded => "Disadvantage, always Flanked when attacked.",
             Raging => "Advantage on melee attacks (until end of turn).",
-            Slowed => "-2 AP per turn, -25% movement",
-            Hastened => "+1 AP per turn, +25% movement",
-            Inspired => "+3 Will, +3 attack/spell modifier",
-            Exposed => "-5 to all defenses, -50% armor.",
-            Hindered => "-50% movement.",
-            Protected => "Takes 30% less damage from the next attack.",
-            Bleeding => "Deals x damage over time. (50% of remaining at the end of each turn)",
-            Burning => "End of turn: deals x damage. 50% spreads to adjacent.",
-            Braced => "+3 Evasion against the next attack.",
-            Distracted => "-6 Evasion against the next attack.",
-            Weakened => "-x to all defenses and actions.",
+            Slowed => "|<value>-2| AP per turn, |<value>-25%| movement",
+            Hastened => "|<value>+1| AP per turn, |<value>+25%| movement",
+            Inspired => "|<value>+3| |<shield>|<stat>Will|, |<value>+3| |<dice>| |<stat>Attack/Spell|",
+            Exposed => "|<value>-5| to all |<shield>|, |<value>-50%| armor.",
+            Hindered => "|<value>-50%| movement.",
+            Protected => "Takes |<value>-30%| damage from the next attack.",
+            Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
+            Burning => "End of turn: deals |<value>x| damage. 50% spreads to adjacent.",
+            Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
+            Distracted => "|<value>-6| |<shield>|<stat>Evasion| against the next attack.",
+            Weakened => "|<value>-x| to all |<shield>| and |dice>.",
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
-            Encumbered => "-x Evasion, -x on actions.",
-            NearDeath => "-1 AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 25% health)",
+            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|, |<value>-x| on |<dice>|.",
+            NearDeath => "|<value>-1| AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 25% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
-            BloodRage => "+5 attack modifier (passive skill).",
-            CriticalCharge => "+5 spell modifier (passive skill).",
-            ThrillOfBattle => "+5 attack/spell modifier (passive skill).",
-            Adrenalin => "+1 AP per turn.",
-            ArcaneSurge => "+x spell modifier. Decays 1 at end of turn.",
-            HealthPotionRecovering => "End of turn: heal 2.",
+            BloodRage => "|<value>+5| |<dice>| |<stat>Attack| (passive skill).",
+            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell| (passive skill).",
+            ThrillOfBattle => "|<value>+5| |<dice>| |<stat>Attack/Spell| (passive skill).",
+            Adrenalin => "|<value>+1| AP per turn.",
+            ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|. Decays 1 at end of turn.",
+            HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
         }
     }
 
@@ -3628,9 +3628,9 @@ impl ConditionInfo {
         if let Some(stacks) = self.stacks {
             self.condition
                 .description()
-                .replace("-x ", &format!("-{stacks} "))
-                .replace("+x ", &format!("+{stacks} "))
-                .replace(" x ", &format!(" {stacks} "))
+                .replace("|<value>-x|", &format!("|<value>-{stacks}|"))
+                .replace("|<value>+x|", &format!("|<value>+{stacks}|"))
+                .replace("|<value>x|", &format!("|<value>{stacks}|"))
         } else {
             self.condition.description().to_string()
         }

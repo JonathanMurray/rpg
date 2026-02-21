@@ -79,6 +79,7 @@ pub const COL_GREEN_1: Color = rgb(93, 146, 38);
 pub const COL_GREEN_2: Color = rgb(144, 181, 58);
 pub const COL_GREEN_3: Color = rgb(201, 226, 118);
 pub const COL_BLUE: Color = rgb(58, 139, 194);
+pub const COL_LIGHT_BLUE: Color = rgb(117, 217, 242);
 
 pub const COL_BLACK_BLUE: Color = rgb(34, 39, 52);
 

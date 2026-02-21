@@ -427,17 +427,17 @@ impl CharacterUi {
         } else if self.health_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                "Does not regenerate on its own. (Max health is affected by Strength)",
+                "Does not regenerate on its own. (Max |<heart>| is affected by |<stat>Strength|.)",
             ))
         } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                "Used for movement and certain actions. 25% is restored after ending your turn. (Max stamina is affected by Strength and Agility.)"
+                "Used for movement and certain actions. |<value>25%| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)"
             ))
         } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                "Used for spells. Regenerates a small amount after every encounter. (Max mana is affected by Spirit.)",
+                "Used for spells. Regenerates a small amount after every encounter. (Max |<mana>| is affected by |<stat>Spirit|.)",
             ))
         } else {
             None

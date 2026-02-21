@@ -117,14 +117,14 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
     });
 
     let movement_row = Element::Text(TextLine::new(
-        format!("Movement: {}", character.base_move_speed.get()),
+        format!("|<boot>| Move: {}", character.base_move_speed.get()),
         16,
         WHITE,
         Some(font.clone()),
     ));
 
     let spell_mod_row: Element = Element::Text(TextLine::new(
-        format!("|<dice>| Spell roll: +{}", character.spell_modifier()),
+        format!("|<dice>| Spell: +{}", character.spell_modifier()),
         16,
         WHITE,
         Some(font.clone()),

@@ -169,6 +169,26 @@ impl TargetUi {
                 ..Default::default()
             });
 
+            let defense_header: Element = Element::Text(TextLine::new(
+                "|<shield>| Defenses",
+                16,
+                WHITE,
+                Some(self.simple_font.clone()),
+            ));
+
+            let defense_header_row = Element::Container(Container {
+                layout_dir: LayoutDirection::Vertical,
+                align: Align::Center,
+                style: Style {
+                    background_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
+                    padding: 2.0,
+                    ..Default::default()
+                },
+                min_width: Some(150.0),
+                children: vec![defense_header],
+                ..Default::default()
+            });
+
             let centered_list = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Center,
@@ -179,6 +199,7 @@ impl TargetUi {
                     Element::Text(health_text_line),
                     Element::Box(Box::new(action_points_row)),
                     Element::Empty(1.0, 4.0),
+                    defense_header_row,
                     Element::Container(def_table),
                     Element::Empty(1.0, 4.0),
                     Element::Text(armor_text_line),
@@ -263,14 +284,14 @@ impl TargetUi {
 
             if !char.player_controlled() {
                 let movement_text_line = TextLine::new(
-                    format!("Movement: {:.1}", char.move_speed()),
+                    format!("|<boot>| Move: {:.1}", char.move_speed()),
                     16,
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),
                 );
                 let attack_text_line = TextLine::new(
                     format!(
-                        "|<dice>| Attack roll: +{}",
+                        "|<dice>| Attack: +{}",
                         char.attack_modifier(HandType::MainHand)
                     ),
                     16,
@@ -279,7 +300,7 @@ impl TargetUi {
                 );
                 let damage_text_line = TextLine::new(
                     format!(
-                        "Attack damage: {}",
+                        "|<sword>| Damage: {}",
                         char.weapon(HandType::MainHand).unwrap().damage
                     ),
                     16,
@@ -293,7 +314,7 @@ impl TargetUi {
                 ];
                 if bot_using_spells {
                     detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!("|<dice>| Spell roll: +{}", char.spell_modifier()),
+                        format!("|<dice>| Spell: +{}", char.spell_modifier()),
                         16,
                         LIGHTGRAY,
                         Some(self.simple_font.clone()),

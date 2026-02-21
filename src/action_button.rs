@@ -32,9 +32,9 @@ use crate::{
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
-const EVASION_STR: &str = "  |<shield>| Evasion";
-const WILL_STR: &str = "  |<shield>| Will";
-const TOUGHNESS_STR: &str = "  |<shield>| Toughness";
+pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
+const WILL_STR: &str = "  |<shield>| |<stat>Will|";
+const TOUGHNESS_STR: &str = "  |<shield>| |<stat>Toughness|";
 
 fn defense_str(defense_type: DefenseType) -> &'static str {
     match defense_type {
@@ -57,6 +57,8 @@ pub struct Tooltip {
 pub enum Keyword {
     Cond(Condition),
     Advantage,
+    Knockback,
+    Graze,
 }
 
 impl Keyword {
@@ -64,6 +66,8 @@ impl Keyword {
         match self {
             Keyword::Cond(condition) => condition.name(),
             Keyword::Advantage => "Advantage",
+            Keyword::Knockback => "Knockback",
+            Keyword::Graze => "Graze",
         }
     }
 
@@ -71,6 +75,8 @@ impl Keyword {
         match self {
             Keyword::Cond(condition) => condition.description(),
             Keyword::Advantage => "Roll extra dice and take the highest result",
+            Keyword::Knockback => "Pushed |<value>x| steps. On collision: |<value>1| damage per remaining distance",
+            Keyword::Graze => "|<value>-50%| effect. Triggers when a |<dice>| roll fails to match target's |<shield>|.",
         }
     }
 }
@@ -143,7 +149,10 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect.bonus_evasion > 0 {
-        technical_description.push(format!("+ {} evasion", reaction.effect.bonus_evasion));
+        technical_description.push(format!(
+            "|<value>+{}| |<shield>||<stat>Evasion|",
+            reaction.effect.bonus_evasion
+        ));
     }
     if reaction.effect.bonus_armor > 0 {
         technical_description.push(format!("+ {} armor", reaction.effect.bonus_armor));
@@ -166,7 +175,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect == OnHitReactionEffect::ShieldBash {
-        technical_description.push("|<dice>| Attack roll".to_string());
+        technical_description.push("|<dice>| Attack".to_string());
         technical_description.push("Targets the attacker".to_string());
         technical_description.push("  |<shield>| = toughness".to_string());
         technical_description.push("  Dazed (2+)".to_string());
@@ -222,7 +231,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
     if effect.bonus_damage > 0 {
         t.technical_description
-            .push(format!("+ {} damage", effect.bonus_damage));
+            .push(format!("|<value>+{}| |<sword>|", effect.bonus_damage));
     }
     if effect.range_bonus > 0 {
         t.technical_description
@@ -230,16 +239,22 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if effect.improved_graze {
-        t.technical_description
-            .push("-25% damage on Graze (instead of -50%)".to_string());
+        t.technical_description.push(
+            "|<value>-25%| damage on |<keyword>Graze| (instead of |<value>-50%|)".to_string(),
+        );
+        t.keywords.push(Keyword::Graze);
     }
     if effect.roll_advantage > 0 {
-        t.technical_description
-            .push(format!("+ {} |<keyword>Advantage|", effect.roll_advantage));
+        t.technical_description.push(format!(
+            "|<value>+{}| |<keyword>Advantage|",
+            effect.roll_advantage
+        ));
         t.keywords.push(Keyword::Advantage);
     } else if effect.roll_advantage < 0 {
-        t.technical_description
-            .push(format!("- {} |<keyword>Advantage|", -effect.roll_advantage));
+        t.technical_description.push(format!(
+            "|<value>-{}| |<keyword>Advantage|",
+            -effect.roll_advantage
+        ));
         t.keywords.push(Keyword::Advantage);
     }
     if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
@@ -257,8 +272,10 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if effect.armor_penetration > 0 {
-        t.technical_description
-            .push(format!("{} armor penetration", effect.armor_penetration));
+        t.technical_description.push(format!(
+            "|<value>{}| armor penetration",
+            effect.armor_penetration
+        ));
     }
 
     if let Some(effect) = effect.on_target {
@@ -314,13 +331,17 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         }
 
         if effect.bonus_target_damage > 0 {
-            t.technical_description
-                .push(format!("+ {} damage (target)", effect.bonus_target_damage));
+            t.technical_description.push(format!(
+                "|<value>+{}| |<sword>| (target)",
+                effect.bonus_target_damage
+            ));
         }
 
         if effect.bonus_area_damage > 0 {
-            t.technical_description
-                .push(format!("+ {} damage (area)", effect.bonus_area_damage));
+            t.technical_description.push(format!(
+                "|<value>+{}| |<sword>| (area)",
+                effect.bonus_area_damage
+            ));
         }
 
         for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
@@ -334,14 +355,14 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
 
         if effect.increased_range_tenths > 0 {
             t.technical_description.push(format!(
-                "+ {} range",
+                "|<value>+{}| range",
                 effect.increased_range_tenths as f32 * 0.1
             ));
         }
 
         if effect.increased_radius_tenths > 0 {
             t.technical_description.push(format!(
-                "+ {} radius",
+                "|<value>+{}| radius",
                 effect.increased_radius_tenths as f32 * 0.1
             ));
         }
@@ -353,7 +374,7 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
 
     if enhancement.apply_on_self_per_area_target_hit.is_some() {
         t.technical_description
-            .push("On self (per target hit):".to_string());
+            .push("|<faded>On self (per target hit):|".to_string());
         for apply_effect in enhancement
             .apply_on_self_per_area_target_hit
             .iter()
@@ -377,8 +398,9 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
-                "Move a limited distance for free every turn. Spend stamina to move further.",
+                "Move a limited distance for free every turn. Spend stamina |<stamina>| to move further.",
             ),
+            technical_description: vec!["Free: |<stat>Movement|".to_string(), "Pay 1 |<stamina>|: |<value>+4|".to_string()],
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {
@@ -401,10 +423,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             .push(format!("  Loses |<value>{}| AP", n)),
         ApplyEffect::GainStamina(n) => t
             .technical_description
-            .push(format!("  Gains |<value>{}| stamina", n)),
+            .push(format!("  |<stamina>| |<value>{}| stamina", n)),
         ApplyEffect::GainHealth(n) => t
             .technical_description
-            .push(format!("  Gains |<value>{}| health", n)),
+            .push(format!("  |<heart>| |<value>{}| healing", n)),
         ApplyEffect::Condition(apply_condition) => {
             let mut line = format!("  |<keyword>{}|", apply_condition.condition.name());
             if let Some(stacks) = apply_condition.stacks {
@@ -433,7 +455,8 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         }
         ApplyEffect::Knockback(amount) => {
             t.technical_description
-                .push(format!("  Knocked back ({})", amount));
+                .push(format!("  |<keyword>Knockback| ({})", amount));
+            t.keywords.push(Keyword::Knockback);
         }
     }
 }
@@ -459,15 +482,15 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
-            AbilityRollType::Spell => "|<dice>| Spell roll".to_string(),
-            AbilityRollType::RollAbilityWithAttackModifier => "|<dice>| Attack roll".to_string(),
+            AbilityRollType::Spell => "|<dice>| |<stat>Spell|".to_string(),
+            AbilityRollType::RollAbilityWithAttackModifier => "|<dice>| |<stat>Attack|".to_string(),
             AbilityRollType::RollDuringAttack(bonus) => {
                 if bonus < 0 {
-                    format!("|<dice>| Attack roll (-{})", -bonus)
+                    format!("|<dice>| |<stat>Attack (-{})|", -bonus)
                 } else if bonus > 0 {
-                    format!("|<dice>| Attack roll (+{})", bonus)
+                    format!("|<dice>| |<stat>Attack (+{})|", bonus)
                 } else {
-                    "|<dice>| Attack roll".to_string()
+                    "|<dice>| |<stat>Attack|".to_string()
                 }
             }
         };
@@ -629,10 +652,10 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             match effect.damage {
                 Some(AbilityDamage::Static(n)) => t
                     .technical_description
-                    .push(format!("  |<value>{}| damage", n)),
+                    .push(format!("  |<sword>| |<value>{}|", n)),
                 Some(AbilityDamage::AtLeast(n)) => t
                     .technical_description
-                    .push(format!("  |<value>{}| damage", n)),
+                    .push(format!("  |<sword>| |<value>{}|", n)),
                 None => {}
             }
 
@@ -643,7 +666,8 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
 
         AbilityNegativeEffect::PerformAttack => {
             t.technical_description.push(EVASION_STR.to_string());
-            t.technical_description.push("  weapon damage".to_string());
+            t.technical_description
+                .push("  weapon |<sword>|".to_string());
         }
     }
 }
@@ -651,7 +675,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
 fn describe_ability_ally_effect(effect: AbilityPositiveEffect, t: &mut Tooltip) {
     if effect.healing > 0 {
         t.technical_description
-            .push(format!("  |<value>{}| healing", effect.healing));
+            .push(format!("  |<heart>| |<value>{}| healing", effect.healing));
     }
 
     for apply in effect.apply.iter().flatten().flatten().copied() {
@@ -915,7 +939,7 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
-                    let mut technical_description = vec!["|<dice>| Attack roll".to_string()];
+                    let mut technical_description = vec!["|<dice>| |<stat>Attack|".to_string()];
                     let range = if weapon.is_melee() {
                         "melee".to_string()
                     } else {
@@ -924,7 +948,7 @@ impl ActionButton {
                     technical_description.push("".to_string());
                     technical_description.push(format!("|<faded>Target ({})|", range));
                     technical_description.push(EVASION_STR.to_string());
-                    technical_description.push(format!("  |<value>{}| damage", weapon.damage));
+                    technical_description.push(format!("  |<sword>| |<value>{}|", weapon.damage));
                     Tooltip {
                         header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
 
@@ -948,7 +972,7 @@ impl ActionButton {
                 *self.tooltip.borrow_mut() = Tooltip {
                     header: "Opportunity attack (1 AP)".to_string(),
                     technical_description: vec![
-                        format!("{} damage", equipped_weapon.unwrap().damage),
+                        format!("{} |<sword>|", equipped_weapon.unwrap().damage),
                         "vs Evasion".to_string(),
                     ],
                     ..Default::default()

@@ -1651,7 +1651,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
     icon: EquipmentIconId::HealthPotion,
     effect: Some(ApplyEffect::Condition(ApplyCondition {
         condition: Condition::HealthPotionRecovering,
-        stacks: Some(3),
+        stacks: Some(4),
         duration_rounds: None,
     })),
     ..Consumable::default()
@@ -1741,13 +1741,13 @@ impl PassiveSkill {
     pub fn description(&self) -> &'static str {
         use PassiveSkill::*;
         match self {
-            HardenedSkin => "+1 armor",
-            WeaponProficiency => "Attacks gain +1 armor penetration",
-            CriticalCharge => "+5 spell modifier while at/below 50% mana",
-            Reaper => "On kill: gain 1 stamina, 2 AP (max 2 AP per turn)",
-            BloodRage => "+5 attack modifier while at/below 50% health. Immune to the negative effects of Near-death",
-            ThrillOfBattle => "+5 attack/spell modifier while adjacent to more than one enemy. Immune to Flanked.",
-            Honorless => "Attacks deal +1 damage against Flanked targets",
+            HardenedSkin => "|<value>+1| armor",
+            WeaponProficiency => "Attacks gain |<value>+1| armor penetration",
+            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% mana",
+            Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
+            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% health. Immune to the negative effects of |<keyword>Near-death|",
+            ThrillOfBattle => "|<value>+5| |<dice>| |<stat>|Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
+            Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
         }
     }

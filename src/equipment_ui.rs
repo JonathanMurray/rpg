@@ -73,12 +73,16 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let mut t = Tooltip::new(consumable.name);
 
     if consumable.health_gain > 0 {
-        t.technical_description
-            .push(format!("Restores {} health", consumable.health_gain));
+        t.technical_description.push(format!(
+            "|<heart>| |<value>{}| healing",
+            consumable.health_gain
+        ));
     }
     if consumable.mana_gain > 0 {
-        t.technical_description
-            .push(format!("Restores {} mana", consumable.mana_gain));
+        t.technical_description.push(format!(
+            "Restores |<value>{}| |<mana>| mana",
+            consumable.mana_gain
+        ));
     }
     if let Some(apply_effect) = consumable.effect {
         t.technical_description.push("Self:".to_string());
@@ -96,7 +100,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
 fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     let mut t = Tooltip::new(weapon.name);
     t.technical_description.push(format!(
-        "{} damage / {} AP",
+        "|<sword>| |<value>{}|  ({} AP)",
         weapon.damage, weapon.action_point_cost
     ));
 
@@ -139,7 +143,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
 fn shield_tooltip(shield: &Shield) -> Tooltip {
     let mut t = Tooltip::new(shield.name);
     t.technical_description
-        .push(format!("+{} evasion", shield.evasion));
+        .push(format!("+{} |<shield>|<stat>Evasion|", shield.evasion));
     if shield.armor > 0 {
         t.technical_description
             .push(format!("+{} armor", shield.armor));
@@ -161,7 +165,7 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
 fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
     let mut t = Tooltip::new(armor.name);
     t.technical_description
-        .push(format!("{} armor", armor.protection));
+        .push(format!("|<value>{}| armor", armor.protection));
     if let Some(limit) = armor.limit_evasion_from_agi {
         t.technical_description
             .push(format!("Max {} evasion from agi", limit));
@@ -778,19 +782,19 @@ impl EquipmentStatsTable {
         for hand in [HandType::MainHand, HandType::OffHand] {
             if let Some(weapon) = character.weapon(hand) {
                 has_weapon = true;
-                cells.push("Attack damage".into());
+                cells.push("|<sword>| Damage".into());
                 cells.push(format!("{}", weapon.damage).into());
 
-                cells.push("|<dice>| Attack roll".into());
+                cells.push("|<dice>| Attack".into());
                 cells.push(format!("+{}", character.attack_modifier(hand)).into());
             }
         }
         if !has_weapon {
-            cells.push("Attack damage".into());
-            cells.push("".into());
+            cells.push("|<sword>| Damage".into());
+            cells.push("-".into());
 
-            cells.push("|<dice>| Attack roll".into());
-            cells.push("".into());
+            cells.push("|<dice>| Attack".into());
+            cells.push("-".into());
         }
 
         if let Some(shield) = character.shield() {

@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
+    color::{Color, BLACK, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE, YELLOW},
     input::{
         is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
     },
@@ -19,10 +19,10 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        ALT_KEY_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SYMBOL,
-        SWORD_SYMBOL, WARNING_SYMBOL,
+        ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL,
+        STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
     },
-    util::{COL_ALICE, COL_BOB, COL_CLARA},
+    util::{COL_ALICE, COL_BLUE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
 };
 
 pub trait Drawable {
@@ -413,6 +413,7 @@ pub fn measure_text_with_font_tags(
             "<warning>",
             "<heart>",
             "<stamina>",
+            "<boot>",
         ]
         .contains(&part)
         {
@@ -431,11 +432,13 @@ pub fn measure_text_with_font_tags(
             let mut font_size = font_size;
             if part.starts_with("<value>") {
                 part = &part["<value>".len()..];
-                font_size = (font_size as f32 * 1.5).floor() as u16;
+                //font_size = (font_size as f32 * 1.5).floor() as u16;
             } else if part.starts_with("<keyword>") {
                 part = &part["<keyword>".len()..];
             } else if part.starts_with("<faded>") {
                 part = &part["<faded>".len()..];
+            } else if part.starts_with("<stat>") {
+                part = &part["<stat>".len()..];
             } else if part.starts_with("<strikethrough>") {
                 part = &part["<strikethrough>".len()..];
             }
@@ -500,6 +503,11 @@ pub fn draw_text_with_font_tags(
                 draw_texture(STAMINA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
             }
             x += symbol_w;
+        } else if part == "<boot>" {
+            if render_tags {
+                draw_texture(BOOT_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+            }
+            x += symbol_w;
         } else if part == "<mana>" {
             if render_tags {
                 draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
@@ -529,7 +537,7 @@ pub fn draw_text_with_font_tags(
                 part = &part["<value>".len()..];
                 if render_tags {
                     params.color = Color::new(0.9, 0.7, 1.0, 1.0);
-                    params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
+                    //params.font_size = (params.font_size as f32 * 1.5).floor() as u16;
                 }
             } else if part.starts_with("<keyword>") {
                 part = &part["<keyword>".len()..];
@@ -540,6 +548,11 @@ pub fn draw_text_with_font_tags(
                 part = &part["<faded>".len()..];
                 if render_tags {
                     params.color = LIGHTGRAY;
+                }
+            } else if part.starts_with("<stat>") {
+                part = &part["<stat>".len()..];
+                if render_tags {
+                    params.color = COL_LIGHT_BLUE;
                 }
             } else if part.starts_with("<strikethrough>") {
                 part = &part["<strikethrough>".len()..];
