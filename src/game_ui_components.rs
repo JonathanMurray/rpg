@@ -6,7 +6,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{MAGENTA, PURPLE, SKYBLUE},
+    color::{MAGENTA, PURPLE, SKYBLUE, YELLOW},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
@@ -232,8 +232,8 @@ impl Drawable for TopCharacterPortrait {
                 y + 1.0,
                 portrait_w - 2.0,
                 portrait_h - 2.0,
-                2.0,
-                LIGHTGRAY,
+                4.0,
+                YELLOW,
             );
         }
 

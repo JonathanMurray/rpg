@@ -400,7 +400,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
             description: Some(
                 "Move a limited distance for free every turn. Spend stamina |<stamina>| to move further.",
             ),
-            technical_description: vec!["Free: |<stat>Movement|".to_string(), "Pay 1 |<stamina>|: |<value>+4|".to_string()],
+            technical_description: vec!["|<boot>||<stat>Move| + 4 / |<stamina>|".to_string()],
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {

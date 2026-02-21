@@ -6093,12 +6093,15 @@ fn are_flanking_target(attacker: Position, melee_engager: Position, target: Posi
                 // 000 111
                 // 000 111
                 //
-                panic!(
-                    "Invalid engagement direction: {:?}. Engager={:?}, target={:?}",
+                println!("-------------------------");
+                println!(
+                    "ERROR: Invalid engagement direction: {:?}. Engager={:?}, target={:?}",
                     (eng_x, eng_y),
                     melee_engager,
                     target
                 );
+                println!("-------------------------");
+                false
             }
         }
     }
