@@ -1154,7 +1154,7 @@ pub const HEAL: Ability = Ability {
     name: "Heal",
     description: "Restore an ally's health. Removes Bleeding and Burning.",
     icon: IconId::Heal,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
@@ -1163,7 +1163,7 @@ pub const HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Float(9.5),
         effect: AbilityPositiveEffect {
-            healing: 4,
+            healing: 3,
             apply: Some([
                 Some(ApplyEffect::ConsumeCondition {
                     condition: Condition::Bleeding,

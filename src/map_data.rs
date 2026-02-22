@@ -16,7 +16,7 @@ use crate::{
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, MAGI_HEAL,
-        MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS, SHIRT, SMALL_SHIELD, SWORD,
     },
     grid::GameGrid,
     pathfind::{Occupation, Path, PathfindGrid},
@@ -267,13 +267,13 @@ pub fn create_character(
                 "Skeleton",
                 PortraitId::Skeleton,
                 char_data.type_.sprite_id(),
-                Attributes::new(4, 4, 3, 1),
+                Attributes::new(4, 4, 4, 1),
                 pos,
             );
             skeleton.health.change_max_value_to(35);
             skeleton.armor_piece.set(Some(LEATHER_ARMOR));
             skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
-            skeleton.set_shield(BAD_SMALL_SHIELD);
+            skeleton.set_shield(SMALL_SHIELD);
             skeleton.learn_ability(ENEMY_BRACE);
             skeleton.learn_ability(ENEMY_INSPIRE);
             skeleton
@@ -285,7 +285,7 @@ pub fn create_character(
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
-                Attributes::new(1, 3, 2, 1),
+                Attributes::new(2, 3, 2, 1),
                 pos,
             );
             ghoul.health.change_max_value_to(9);
@@ -298,7 +298,7 @@ pub fn create_character(
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
-                Attributes::new(2, 2, 1, 1),
+                Attributes::new(3, 2, 1, 1),
                 pos,
             );
             ghoul.health.change_max_value_to(12);
@@ -312,10 +312,10 @@ pub fn create_character(
                 "Ogre",
                 PortraitId::Ogre,
                 SpriteId::Ogre,
-                Attributes::new(12, 4, 3, 1),
+                Attributes::new(9, 4, 3, 1),
                 pos,
             );
-            ogre.health.change_max_value_to(56);
+            ogre.health.change_max_value_to(45);
             ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
             ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
             ogre.learn_ability(ENEMY_TACKLE);

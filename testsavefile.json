@@ -175,10 +175,10 @@
     "(49, 10)": "NewWaterNorthEast",
     "(46, 10)": "NewWaterNorthEast",
     "(4, 7)": "Boulder2",
-    "(36, 18)": "Table",
+    "(4, 36)": "Boulder2",
     "(36, 25)": "Table",
     "(4, 40)": "Boulder2",
-    "(4, 36)": "Boulder2"
+    "(36, 19)": "Table"
   },
   "background": {
     "(7, 25)": "Floor",
@@ -530,8 +530,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        19,
-        36
+        14,
+        30
       ],
       "health": 12,
       "main_hand": null,
@@ -540,8 +540,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        14,
-        33
+        11,
+        27
       ],
       "health": 13,
       "main_hand": null,
@@ -550,8 +550,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        13,
-        38
+        11,
+        31
       ],
       "health": 11,
       "main_hand": "BadDagger",
