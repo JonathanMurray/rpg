@@ -25,6 +25,7 @@ use crate::{
         CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR,
         MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
     },
+    map_data::{create_character, create_game_grid, CharacterType, MapData},
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
 };
@@ -34,6 +35,57 @@ fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
         behaviour,
         base_movement: move_speed,
     })
+}
+
+pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) -> GameInitState {
+    let mut player_chars_by_name: HashMap<&'static str, Character> = player_characters
+        .into_iter()
+        .map(|ch| (ch.name, ch))
+        .collect();
+    let map_data = MapData::load_from_file("testsavefile.json");
+    let mut characters: Vec<Rc<Character>> = Default::default();
+    let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
+
+    for (i, char_data) in map_data.characters.iter().enumerate() {
+        let pos = char_data.pos;
+        let char: Rc<Character> = match char_data.type_ {
+            // TODO: Handle this better than string-matching on the name
+            CharacterType::Bob => {
+                let ch = Rc::new(player_chars_by_name.remove("Bob").unwrap());
+                ch.set_id(i as CharacterId);
+                ch.position.set(pos);
+                ch
+            }
+            CharacterType::Alice => {
+                let ch = Rc::new(player_chars_by_name.remove("Alice").unwrap());
+                ch.set_id(i as CharacterId);
+                ch.position.set(pos);
+                ch
+            }
+            CharacterType::Clara => {
+                let ch = Rc::new(player_chars_by_name.remove("Clara").unwrap());
+                ch.set_id(i as CharacterId);
+                ch.position.set(pos);
+                ch
+            }
+            _ => create_character(pos, *char_data, None, i as CharacterId),
+        };
+        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+        characters.push(char);
+    }
+
+    for pos in map_data.terrain_objects.keys().copied() {
+        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+    }
+
+    GameInitState {
+        characters: characters,
+        active_character_id: 0,
+        pathfind_grid,
+        background: map_data.background,
+        terrain_objects: map_data.terrain_objects,
+        decorations: map_data.decorations,
+    }
 }
 
 pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> GameInitState {
@@ -49,6 +101,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::EliteMagi => "map_elite2.txt",
         FightId::Test => "map_test.txt",
         FightId::VerticalSlice => "map_vertical_slice.txt",
+        FightId::VerticalSliceNew => {
+            return init_fight_map_new(player_characters, fight_id);
+        }
     };
     let map_str = fs::read_to_string(map_filename).unwrap();
     let mut terrain_objects: IndexMap<Position, TerrainId> = Default::default();
@@ -339,33 +394,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 Attributes::new(1, 1, 1, 1),
                 *enemy_positions[&1].choose().unwrap(),
             ));
-            /*
-
-            enemies.push(Character::new(
-                bot(BotBehaviour::Normal, 12.0),
-                "Enemy 1",
-                PortraitId::Ghoul,
-                SpriteId::Ghoul,
-                Attributes::new(1, 1, 1, 1),
-                *enemy_positions[&2].choose().unwrap(),
-            ));
-            enemies.push(Character::new(
-                bot(BotBehaviour::Normal, 12.0),
-                "Enemy 1",
-                PortraitId::Skeleton,
-                SpriteId::Ogre,
-                Attributes::new(1, 1, 1, 1),
-                *enemy_positions[&3].choose().unwrap(),
-            ));
-            enemies.push(Character::new(
-                bot(BotBehaviour::Normal, 12.0),
-                "Enemy 1",
-                PortraitId::Skeleton,
-                SpriteId::Magi,
-                Attributes::new(1, 1, 1, 1),
-                *enemy_positions[&4].choose().unwrap(),
-            ));
-             */
 
             for e in &enemies {
                 e.set_weapon(HandType::MainHand, BAD_DAGGER);
@@ -466,6 +494,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(ogre);
             }
         }
+        FightId::VerticalSliceNew => unreachable!(),
     }
 
     for (x, y) in water_grid.iter().copied() {
@@ -580,4 +609,5 @@ pub enum FightId {
     EliteMagi,
     Test,
     VerticalSlice,
+    VerticalSliceNew,
 }

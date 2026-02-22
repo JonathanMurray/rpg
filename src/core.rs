@@ -4857,7 +4857,8 @@ impl Character {
     pub fn set_id(&self, id: CharacterId) {
         assert!(
             self.id.get().is_none(),
-            "set_id() should only be used at initialisation"
+            "set_id() should only be used at initialisation. Tried to set id = {}, but {} already has id = {:?}",
+            id, self.name, self.id
         );
         self.id.set(Some(id));
     }

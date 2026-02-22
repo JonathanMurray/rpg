@@ -16,6 +16,7 @@ mod game_ui_components;
 pub mod game_ui_connection;
 pub mod grid;
 pub mod init_fight_map;
+pub mod map_data;
 pub mod map_scene;
 mod non_combat_ui;
 pub mod pathfind;

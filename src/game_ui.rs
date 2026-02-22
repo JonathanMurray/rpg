@@ -526,7 +526,7 @@ impl UserInterface {
             .unwrap()
             .id();
 
-        let game_grid = GameGrid::new(
+        let mut game_grid = GameGrid::new(
             first_player_character_id,
             characters.as_map(),
             resources.sprites,
@@ -540,6 +540,7 @@ impl UserInterface {
             resources.status_textures.clone(),
             sound_player.clone(),
         );
+        game_grid.auto_tile_terrain_objects();
 
         let player_portraits = PlayerPortraits::new(
             &characters,
