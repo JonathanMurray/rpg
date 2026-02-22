@@ -104,12 +104,14 @@ impl Element {
     pub fn draw_tooltips(&self, x: f32, y: f32) {
         match self {
             Element::Container(container) => container.draw_tooltips(x, y),
+            Element::Text(text) => text.draw_tooltips(x, y),
             Element::Box(drawable) => drawable.draw_tooltips(x, y),
             Element::RcRefCell(drawable) => drawable.borrow().draw_tooltips(x, y),
             Element::Rc(drawable) => drawable.draw_tooltips(x, y),
             Element::WeakRefCell(drawable) => {
                 drawable.upgrade().unwrap().borrow().draw_tooltips(x, y)
             }
+
             _ => {}
         }
     }
@@ -231,6 +233,7 @@ pub struct TextLine {
     depth: Option<(Color, f32)>,
 
     pub has_been_hovered: Cell<Option<(f32, f32)>>,
+    pub tooltip: Option<(Font, String, Vec<String>)>,
 }
 
 impl TextLine {
@@ -257,6 +260,7 @@ impl TextLine {
             font,
             depth: None,
             has_been_hovered: Cell::new(None),
+            tooltip: None,
         };
         this.measure();
         this
@@ -307,6 +311,16 @@ impl TextLine {
         self
     }
 
+    pub fn with_tooltip(
+        mut self,
+        font: Font,
+        header: impl Into<String>,
+        lines: Vec<String>,
+    ) -> Self {
+        self.tooltip = Some((font, header.into(), lines));
+        self
+    }
+
     pub fn with_hover_color(mut self, color: Color) -> Self {
         self.hover_color = Some(color);
         self
@@ -337,6 +351,8 @@ impl TextLine {
 
 impl Drawable for TextLine {
     fn draw(&self, x: f32, y: f32) {
+        //draw_rectangle(x, y, self.size.0, self.size.1, MAGENTA);
+
         let y0 = y + self.vert_padding;
 
         let x0 = if self.right_align {
@@ -387,6 +403,24 @@ impl Drawable for TextLine {
 
         if hovered {
             self.has_been_hovered.set(Some((x, y)));
+        }
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        if let Some((font, header, lines)) = self.tooltip.as_ref() {
+            let (w, h) = self.size();
+            let rect = Rect::new(x, y, w, h);
+            if rect.contains(mouse_position().into()) {
+                draw_tooltip(
+                    font,
+                    TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
+                    &header,
+                    None,
+                    &lines,
+                    &[],
+                    false,
+                );
+            }
         }
     }
 
@@ -1080,6 +1114,7 @@ pub struct TableCell {
     text: String,
     color_override: Option<Color>,
     depth: Option<Color>,
+    tooltip: Option<(String, Vec<String>)>,
 }
 
 impl TableCell {
@@ -1088,7 +1123,13 @@ impl TableCell {
             text: text.into(),
             color_override: color,
             depth,
+            tooltip: None,
         }
+    }
+
+    pub fn with_tooltip(mut self, header: impl Into<String>, lines: Vec<String>) -> Self {
+        self.tooltip = Some((header.into(), lines));
+        self
     }
 }
 
@@ -1101,6 +1142,7 @@ where
             text: text.into(),
             color_override: None,
             depth: None,
+            tooltip: None,
         }
     }
 }
@@ -1133,6 +1175,11 @@ pub fn table(
             cell.color_override.unwrap_or(style.default_text_color),
             Some(font.clone()),
         );
+
+        if let Some((header, lines)) = cell.tooltip {
+            text.tooltip = Some((font.clone(), header, lines));
+        }
+
         if let Some(depth) = cell.depth {
             text = text.with_depth(depth, 1.0);
         }

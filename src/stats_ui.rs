@@ -116,19 +116,35 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         ..Default::default()
     });
 
-    let movement_row = Element::Text(TextLine::new(
-        format!("|<boot>| Move: {}", character.base_move_speed.get()),
-        16,
-        WHITE,
-        Some(font.clone()),
-    ));
+    let movement_row = Element::Text(
+        TextLine::new(
+            format!("|<boot>| Move: {}", character.base_move_speed.get()),
+            16,
+            WHITE,
+            Some(font.clone()),
+        )
+        .with_padding(0.0, 7.0)
+        .with_tooltip(
+            font.clone(),
+            "Free movement",
+            vec!["Move this far every turn without spending stamina |<stamina>|.".to_string()],
+        ),
+    );
 
-    let spell_mod_row: Element = Element::Text(TextLine::new(
-        format!("|<dice>| Spell: +{}", character.spell_modifier()),
-        16,
-        WHITE,
-        Some(font.clone()),
-    ));
+    let spell_mod_row = Element::Text(
+        TextLine::new(
+            format!("|<dice>| Spell: +{}", character.spell_modifier()),
+            16,
+            WHITE,
+            Some(font.clone()),
+        )
+        .with_padding(0.0, 7.0)
+        .with_tooltip(
+            font.clone(),
+            "Spell modifier",
+            vec!["Added to your |<dice>| |<stat>Spell| rolls".to_string()],
+        ),
+    );
 
     let defense_header: Element = Element::Text(TextLine::new(
         "|<shield>| Defenses",
@@ -197,7 +213,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
     let element = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
         align: Align::Center,
-        margin: 13.0,
+        margin: 5.0,
         style: Style {
             border_color: Some(GRAY),
             padding: 10.0,
@@ -205,66 +221,16 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         },
         children: vec![
             stat_row,
-            Element::Empty(0.0, 0.0),
+            Element::Empty(0.0, 8.0),
             movement_row,
             spell_mod_row,
-            Element::Empty(0.0, 0.0),
+            Element::Empty(0.0, 8.0),
             defense_header_row,
+            Element::Empty(0.0, 0.0),
             defense_row,
         ],
         ..Default::default()
     });
-
-    /*
-    let element = build_stats_table(
-        font,
-        16,
-        &[
-            (
-                Some(("Strength", character.base_attributes.strength.get())),
-                &[
-                    //("Health", StatValue::U32(character.health.max())),
-                    (
-                        "|<shield>| Toughness",
-                        StatValue::U32(character.toughness()),
-                    ),
-                    //("Capacity", StatValue::U32(character.capacity.get())),
-                ],
-            ),
-            (
-                None,
-                &[
-                    //("Stamina", StatValue::U32(character.stamina.max()))
-                ],
-            ),
-            (
-                Some(("Agility", character.base_attributes.agility.get())),
-                &[("Movement", StatValue::F32(character.base_move_speed.get()))],
-            ),
-            (
-                None,
-                &[("|<shield>| Evasion", StatValue::U32(character.evasion()))],
-            ),
-            (
-                Some(("Intellect", character.base_attributes.intellect.get())),
-                &[("|<shield>| Will", StatValue::U32(character.will()))],
-            ),
-            (
-                None,
-                &[(
-                    "|<dice>| Spell mod",
-                    StatValue::String(format!("+{}", character.spell_modifier())),
-                )],
-            ),
-            (
-                Some(("Spirit", character.base_attributes.spirit.get())),
-                &[
-                //    ("Mana", StatValue::U32(character.mana.max()))
-                ],
-            ),
-        ],
-    );
-     */
 
     CharacterStatsTable {
         element,

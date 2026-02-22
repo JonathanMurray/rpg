@@ -782,10 +782,16 @@ impl EquipmentStatsTable {
         for hand in [HandType::MainHand, HandType::OffHand] {
             if let Some(weapon) = character.weapon(hand) {
                 has_weapon = true;
-                cells.push("|<sword>| Damage".into());
+                cells.push(TableCell::from("|<sword>| Damage").with_tooltip(
+                    "Attack damage",
+                    vec!["The unmodified base damage of one attack".to_string()],
+                ));
                 cells.push(format!("{}", weapon.damage).into());
 
-                cells.push("|<dice>| Attack".into());
+                cells.push(TableCell::from("|<dice>| Attack").with_tooltip(
+                    "Attack modifier",
+                    vec!["Added to your |<dice>| |<stat>Attack| rolls".to_string()],
+                ));
                 cells.push(format!("+{}", character.attack_modifier(hand)).into());
             }
         }
@@ -797,14 +803,22 @@ impl EquipmentStatsTable {
             cells.push("-".into());
         }
 
+        /*
         if let Some(shield) = character.shield() {
             cells.push("Evasion bonus".into());
             cells.push(format!("{}", shield.evasion).into());
         }
-        cells.push("Armor".into());
+         */
+        cells.push(TableCell::from("Armor").with_tooltip(
+            "Physical armor",
+            vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
+        ));
         cells.push(format!("{}", character.protection_from_armor()).into());
 
-        cells.push("Weight".into());
+        cells.push(TableCell::from("Weight").with_tooltip(
+            "Carrying capacity",
+            vec!["Going over your capacity makes you Encumbered.".to_string()],
+        ));
 
         let text = format!(
             "{} / {}",
@@ -837,6 +851,10 @@ impl EquipmentStatsTable {
 impl Drawable for EquipmentStatsTable {
     fn draw(&self, x: f32, y: f32) {
         self.element.draw(x, y)
+    }
+
+    fn draw_tooltips(&self, x: f32, y: f32) {
+        self.element.draw_tooltips(x, y);
     }
 
     fn size(&self) -> (f32, f32) {
