@@ -116,7 +116,7 @@ impl CoreGame {
                 }
             };
 
-            let mut ending_turn = false;
+            let mut turn_ended = false;
 
             if let Some(action) = action {
                 let mut killed_by_action = HashSet::new();
@@ -179,20 +179,10 @@ impl CoreGame {
                         }
                     }
                 }
-
-                /*
-                No, don't end turn automatically; what if the player wants to move when having 0 AP?
-                if self.active_character().action_points.current() == 0 {
-                    ending_turn = true;
-                }
-                 */
             } else {
                 let name = self.active_character().name;
                 self.log(format!("|{}| ended their turn", name)).await;
-                ending_turn = true;
-            }
 
-            if ending_turn {
                 self.perform_end_of_turn_character().await;
                 //let prev_index_in_round = self.active_character().index_in_round.unwrap();
                 self.active_character().is_part_of_active_group.set(false);
@@ -200,39 +190,14 @@ impl CoreGame {
                 self.active_character().is_part_of_active_group.set(true);
                 self.notify_ui_of_new_active_char().await;
 
-                let new_round = self
-                    .characters
-                    .iter()
-                    .all(|ch| ch.has_taken_a_turn_this_round.get());
-
-                if new_round {
-                    println!("NEW ROUND STARTED!");
-
-                    for character in self.characters.iter() {
-                        character.on_new_round();
-                    }
-
-                    if self.active_character().player_controlled() {
-                        // Player chars can act "simultaneously"
-                        for player_char in self.player_characters() {
-                            player_char.is_part_of_active_group.set(true);
-                        }
-                    }
-
-                    self.round_index += 1;
-
-                    self.log(format!("Round {}", self.round_index + 1)).await;
-                }
-
-                let game_time = self.current_time();
-
-                for character in self.characters.iter() {
-                    character.set_current_game_time(game_time);
-                }
+                turn_ended = true;
             }
 
-            // TODO: What if the enemy that's last in the turn order dies on its own turn? Will we not fail to detect new
-            // round then? (potential bug)
+            for ch in self.characters.iter() {
+                if let Some((dx, dy)) = ch.is_being_pushed_in_direction.take() {
+                    self.perform_character_pushed(ch, dx, dy).await?;
+                }
+            }
 
             // We must make sure to have a valid (alive, existing) active_character_id before handing over control
             // to the UI, as it may ask us about the active character.
@@ -247,11 +212,6 @@ impl CoreGame {
                 dbg!(self.active_character_id);
             }
 
-            for ch in self.characters.iter() {
-                if let Some((dx, dy)) = ch.is_being_pushed_in_direction.take() {
-                    self.perform_character_pushed(ch, dx, dy).await?;
-                }
-            }
             for ch in self.characters.iter() {
                 if ch.is_dead() {
                     println!(
@@ -292,6 +252,39 @@ impl CoreGame {
             // before the character died.
             if active_character_died {
                 self.notify_ui_of_new_active_char().await;
+                turn_ended = true;
+            }
+
+            if turn_ended {
+                let new_round = self
+                    .characters
+                    .iter()
+                    .all(|ch| ch.has_taken_a_turn_this_round.get());
+
+                if new_round {
+                    println!("NEW ROUND STARTED!");
+
+                    for character in self.characters.iter() {
+                        character.on_new_round();
+                    }
+
+                    if self.active_character().player_controlled() {
+                        // Player chars can act "simultaneously"
+                        for player_char in self.player_characters() {
+                            player_char.is_part_of_active_group.set(true);
+                        }
+                    }
+
+                    self.round_index += 1;
+
+                    self.log(format!("Round {}", self.round_index + 1)).await;
+                }
+
+                let game_time = self.current_time();
+
+                for character in self.characters.iter() {
+                    character.set_current_game_time(game_time);
+                }
             }
         }
     }
