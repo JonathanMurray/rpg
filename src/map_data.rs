@@ -332,6 +332,7 @@ pub fn create_character(
     }
     if let Some(shield_id) = char_data.shield {
         char.set_shield(create_shield(shield_id));
+        char.learn_ability(ENEMY_BRACE);
     }
 
     char.set_id(id);

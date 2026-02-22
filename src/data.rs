@@ -1007,7 +1007,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    description: "Cause enemies to start bleeding",
+    description: "Deal damage and cause Bleeding in an area",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 1,
@@ -1520,7 +1520,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireball,
     name: "Fireball",
-    description: "Hurl fire at an enemy, dealing area damage",
+    description: "Deal damage to an enemy and its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
     mana_cost: 2,

@@ -133,7 +133,7 @@ async fn main() {
     bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
     bob.learn_ability(INSPIRE);
     bob.known_attack_enhancements.push(SMITE);
-    bob.known_attack_enhancements.push(EMPOWER);
+    //bob.known_attack_enhancements.push(EMPOWER);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
 
     let mut clara = Character::new(
@@ -171,8 +171,8 @@ async fn main() {
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
-        //FightId::VerticalSliceNew,
-        FightId::Test,
+        FightId::VerticalSliceNew,
+        //FightId::Test,
         ui_resources.clone(),
         sound_player.clone(),
     )
