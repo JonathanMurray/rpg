@@ -551,6 +551,9 @@ impl GameGrid {
         if self.locked_inspection_target == Some(id) {
             self.locked_inspection_target = None;
         }
+        if self.hovered_character == Some(id) {
+            self.hovered_character = None;
+        }
 
         if self.selected_player_character_id == Some(id) {
             // TODO what about when all PC:s have died?

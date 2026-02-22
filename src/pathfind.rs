@@ -164,6 +164,11 @@ impl PathfindGrid {
             }),
         );
         let mut shortest_path: Option<Path> = None;
+        /*
+        println!("vvvvvvvvvvvvvvvvvvvv");
+        dbg!(&chart.keys());
+        println!("^^^^^^^^^^^^^^^^^^^^");
+         */
         for (pos, chart_node) in chart.iter() {
             if within_range_squared(proximity_squared, *pos, target) {
                 //if distance_between(*pos, target) <= proximity {
@@ -194,29 +199,31 @@ impl PathfindGrid {
         range: f32,
         target: Option<Target>,
     ) -> Ref<IndexMap<Position, ChartNode>> {
+        /*
+        println!(
+            "explore_outward(char={}, start={:?}, range={}, target={:?} ...",
+            character_id, start, range, target
+        );
+        println!("cache key: {:?}", self.cache_key);
+        println!("cached unexplored: {:?}", self.cached_unexplored);
+         */
+
         if self.cache_key.get().from == start
             && self.cache_key.get().range >= range
             && self.cache_key.get().target == target
         {
             /*
             println!(
-                "explore_outward(char={}, start={:?}, range={}, target={:?}) CACHED",
-                character_id, start, range, target
+                "CACHED",
             );
              */
 
             return self.cached_exploration_chart.borrow();
         }
 
-        /*
-        println!(
-            "explore_outward(char={}, start={:?}, range={}, target={:?} ...",
-            character_id, start, range, target
-        );
-         */
-
         // If we're exploring from a new starting point than previous exploration, we must clear the cached results
         if self.cache_key.get().from != start {
+            //println!("Clearing cache, because cache_key.from={:?}, start={:?}", self.cache_key.get().from, start);
             *self.cached_exploration_chart.borrow_mut() = Default::default();
             self.cached_unexplored.borrow_mut().clear();
         }
@@ -238,6 +245,7 @@ impl PathfindGrid {
 
         // Otherwise, we're free to re-use however much was explored previously, and just extend out from it
         let mut mut_chart = self.cached_exploration_chart.borrow_mut();
+        //println!("Reusing cached exploration chart: {:?}", mut_chart);
 
         let mut next = BinaryHeap::from(self.cached_unexplored.take());
 
@@ -256,6 +264,8 @@ impl PathfindGrid {
             target,
         });
 
+        //println!("Setting cache key = {:?}", self.cache_key);
+
         let mut unexplored = vec![];
 
         /*
@@ -270,6 +280,7 @@ impl PathfindGrid {
 
         while !next.is_empty() {
             let chart_node = next.pop().unwrap();
+            //println!("  visiting: {:?}", chart_node.position);
 
             assert!(chart_node.position.0 >= 0 && chart_node.position.1 >= 0);
 
@@ -364,8 +375,13 @@ impl PathfindGrid {
                         mut_chart.len()
                     );
                     //dbg!(&next);
-                    // We're done!
-                    next.clear();
+                    // We're done! Empty 'next' to exit the loop, but all the nodes in 'next' that we didn't visit must
+                    // be saved as 'unexplored'.
+                    // If another exploration reuses our chart, it will need to visit those to continue the
+                    // exploration correctly.
+                    for unvisited in next.drain() {
+                        unexplored.push(unvisited);
+                    }
                 }
             }
         }

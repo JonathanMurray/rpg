@@ -193,7 +193,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     }
 
     for character in &player_characters {
-        let i = rng.random_range(..player_positions.len());
+        let i = 0; //rng.random_range(..player_positions.len());
         let pos = player_positions.remove(i);
         character.position.set(pos);
     }
@@ -372,28 +372,28 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Test => {
             let mut enemies = vec![];
 
-            let mut e1 = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 10.0),
-                "Enemy 1",
-                PortraitId::Skeleton,
-                SpriteId::Skeleton,
-                Attributes::new(1, 10, 1, 1),
-                *enemy_positions[&0].choose().unwrap(),
-            );
-            e1.armor_piece.set(Some(GOOD_CHAIN_MAIL));
-            e1.learn_ability(ENEMY_TACKLE);
-            e1.known_passive_skills.push(PassiveSkill::BloodRage);
-            e1.health.change_max_value_to(300);
-            enemies.push(e1);
-
             enemies.push(Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enemy 2",
                 PortraitId::Skeleton,
                 SpriteId::Skeleton2,
                 Attributes::new(1, 1, 1, 1),
-                *enemy_positions[&1].choose().unwrap(),
+                *enemy_positions[&0].choose().unwrap(),
             ));
+
+            let mut e1 = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 10.0),
+                "Enemy 1",
+                PortraitId::Skeleton,
+                SpriteId::Skeleton,
+                Attributes::new(1, 10, 1, 1),
+                *enemy_positions[&1].choose().unwrap(),
+            );
+            //e1.armor_piece.set(Some(GOOD_CHAIN_MAIL));
+            //e1.learn_ability(ENEMY_TACKLE);
+            e1.known_passive_skills.push(PassiveSkill::BloodRage);
+            e1.health.change_max_value_to(1);
+            enemies.push(e1);
 
             for e in &enemies {
                 e.set_weapon(HandType::MainHand, BAD_DAGGER);

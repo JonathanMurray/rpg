@@ -90,7 +90,7 @@ impl CoreGame {
                 // If the active character is player controlled, it's important that it runs end-of-turn
                 // to let debuffs decay.
                 // TODO: extremely iffy. We should instead have a proper 'end of fight' cleanup.
-                self.perform_end_of_turn_character().await;
+                //self.perform_end_of_turn_character().await;
 
                 for character in self.characters.iter() {
                     character.stamina.set_to_max();
@@ -231,6 +231,9 @@ impl CoreGame {
                 }
             }
 
+            // TODO: What if the enemy that's last in the turn order dies on its own turn? Will we not fail to detect new
+            // round then? (potential bug)
+
             // We must make sure to have a valid (alive, existing) active_character_id before handing over control
             // to the UI, as it may ask us about the active character.
             let active_character_died = self.active_character().is_dead();
@@ -245,10 +248,18 @@ impl CoreGame {
             }
 
             for ch in self.characters.iter() {
+                if let Some((dx, dy)) = ch.is_being_pushed_in_direction.take() {
+                    self.perform_character_pushed(ch, dx, dy).await?;
+                }
+            }
+            for ch in self.characters.iter() {
                 if ch.is_dead() {
+                    println!(
+                        "{} is dead. Marking pos {:?} as not occupied",
+                        ch.name,
+                        ch.pos()
+                    );
                     self.pathfind_grid.set_occupied(ch.pos(), None);
-                } else if let Some((dx, dy)) = ch.is_being_pushed_in_direction.take() {
-                    self.perform_character_pushed(ch, dx, dy).await;
                 }
             }
             let dead_character_ids = self.characters.remove_dead();
@@ -285,7 +296,12 @@ impl CoreGame {
         }
     }
 
-    async fn perform_character_pushed(&self, ch: &Rc<Character>, dx: i32, dy: i32) {
+    async fn perform_character_pushed(
+        &self,
+        ch: &Rc<Character>,
+        dx: i32,
+        dy: i32,
+    ) -> Result<(), QuitEvent> {
         assert!((dx, dy) != (0, 0) && (dx == 0 || dy == 0));
         let mut positions = vec![];
         if dx != 0 {
@@ -312,7 +328,7 @@ impl CoreGame {
             self.ui_handle_event(GameEvent::CharacterReceivedKnockback { character: ch.id() })
                 .await;
             self.perform_movement(ch.id(), positions, MovementType::KnockedBack)
-                .await;
+                .await?;
         }
         if reduction_from_collision > 0 {
             let collision_damage = reduction_from_collision as u32;
@@ -324,6 +340,8 @@ impl CoreGame {
             })
             .await;
         }
+
+        Ok(())
     }
 
     async fn notify_ui_of_new_active_char(&self) {
@@ -593,7 +611,7 @@ impl CoreGame {
                 }
 
                 self.perform_movement(self.active_character_id, positions, MovementType::Regular)
-                    .await;
+                    .await?;
                 Ok(ActionOutcome::Default)
             }
 

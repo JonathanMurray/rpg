@@ -940,7 +940,7 @@ impl ActionPointsRow {
             animation.gained_so_far =
                 1 + (animation.age / animation.duration_per_ap).floor() as u32;
             if prev < animation.total_gain && animation.gained_so_far > prev {
-                dbg!(animation.gained_so_far);
+                //dbg!(animation.gained_so_far);
                 let sound = match animation.gained_so_far {
                     1 => SoundId::Scale1,
                     2 => SoundId::Scale2,

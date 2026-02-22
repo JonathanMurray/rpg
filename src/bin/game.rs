@@ -164,14 +164,15 @@ async fn main() {
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
 
-    let mut player_characters = vec![clara, bob, alice];
+    let mut player_characters = vec![clara, alice, bob];
 
     dbg!(get_time());
 
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
-        FightId::VerticalSliceNew,
+        //FightId::VerticalSliceNew,
+        FightId::Test,
         ui_resources.clone(),
         sound_player.clone(),
     )
