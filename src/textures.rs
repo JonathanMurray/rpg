@@ -676,12 +676,15 @@ pub async fn load_and_init_font_symbols() {
     let img = font_atlas.get_texture_data();
 
     let symbol = |x, y| {
-        Texture2D::from_image(&img.sub_image(Rect::new(
+        let texture = Texture2D::from_image(&img.sub_image(Rect::new(
             x as f32 * 16.0,
             y as f32 * 16.0,
             16.0,
             16.0,
-        )))
+        )));
+
+        texture.set_filter(FilterMode::Nearest);
+        texture
     };
 
     DICE_SYMBOL.get_or_init(|| symbol(0, 0));
