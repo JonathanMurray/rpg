@@ -111,7 +111,6 @@ impl Element {
             Element::WeakRefCell(drawable) => {
                 drawable.upgrade().unwrap().borrow().draw_tooltips(x, y)
             }
-
             _ => {}
         }
     }

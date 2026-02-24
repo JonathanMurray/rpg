@@ -21,6 +21,7 @@ pub struct ConditionsList {
     pub infos: Vec<ConditionInfo>,
     size: Cell<(f32, f32)>,
     status_textures: HashMap<StatusId, Texture2D>,
+    hovered_tooltip: Cell<Option<(Rect, ConditionInfo)>>,
 }
 
 impl ConditionsList {
@@ -36,6 +37,7 @@ impl ConditionsList {
             infos,
             size: Cell::new(approx_size),
             status_textures,
+            hovered_tooltip: Default::default(),
         }
     }
 }
@@ -44,6 +46,18 @@ impl Drawable for ConditionsList {
     fn draw(&self, x: f32, y: f32) {
         let size = self.draw_conditions(x, y, &self.font, &self.infos);
         self.size.set(size);
+    }
+
+    fn draw_tooltips(&self, _x: f32, _y: f32) {
+        if let Some((rect, condition_info)) = self.hovered_tooltip.get() {
+            draw_regular_tooltip(
+                &self.font,
+                TooltipPositionPreference::RelativeToRect(rect, Side::Right),
+                condition_info.name,
+                None,
+                &[condition_info.populated_description()],
+            );
+        }
     }
 
     fn size(&self) -> (f32, f32) {
@@ -61,6 +75,7 @@ impl ConditionsList {
         font: &Font,
         condition_infos: &[ConditionInfo],
     ) -> (f32, f32) {
+        self.hovered_tooltip.set(None);
         let text_params = TextParams {
             font: Some(font),
             font_size: 18,
@@ -68,8 +83,6 @@ impl ConditionsList {
             ..Default::default()
         };
         let (mouse_x, mouse_y) = mouse_position();
-
-        let mut tooltip = None;
 
         let mut max_w = 0.0;
 
@@ -101,15 +114,15 @@ impl ConditionsList {
             if (x..x0 + dimensions.width).contains(&mouse_x)
                 && (y0 - dimensions.height..y0).contains(&mouse_y)
             {
-                tooltip = Some((
+                self.hovered_tooltip.set(Some((
                     Rect::new(
                         x,
                         y0 - dimensions.height,
                         dimensions.width,
                         dimensions.height,
                     ),
-                    info,
-                ));
+                    *info,
+                )));
             }
 
             let w = dimensions.width + status_w + 2.0;
@@ -117,16 +130,6 @@ impl ConditionsList {
             if w > max_w {
                 max_w = w;
             }
-        }
-
-        if let Some((rect, condition_info)) = tooltip {
-            draw_regular_tooltip(
-                font,
-                TooltipPositionPreference::RelativeToRect(rect, Side::Right),
-                condition_info.name,
-                None,
-                &[condition_info.populated_description()],
-            );
         }
 
         (max_w, y_offset)

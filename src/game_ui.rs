@@ -555,8 +555,8 @@ impl UserInterface {
         let character_sheet_toggle = CharacterSheetToggle {
             shown: Cell::new(false),
             text_line: TextLine::new(
-                "Character sheet",
-                18,
+                "Character sheet (A)",
+                16,
                 WHITE,
                 Some(resources.simple_font.clone()),
             ),

@@ -52,7 +52,6 @@ use crate::{
     game_ui_components::ActionPointsRow,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     sounds::{SoundId, SoundPlayer},
-    target_ui::draw_action,
     textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
     util::{line_collision, rgb, COL_GRAY, COL_RED},
 };
@@ -691,16 +690,24 @@ impl GameGrid {
 
         let mut font = &self.big_font;
         let mut font_size = 20;
+        let mut rise_indefinitely = true;
+        let mut background = false;
         let color = match style {
             TextEffectStyle::FriendlyEffect => {
                 font = &self.simple_font;
                 font_size = 16;
-                Color::new(0.8, 1.0, 0.8, 1.0)
+                rise_indefinitely = false;
+                background = true;
+                WHITE
+                //Color::new(0.8, 1.0, 0.8, 1.0)
             }
             TextEffectStyle::HostileEffect => {
                 font = &self.simple_font;
                 font_size = 16;
-                ORANGE
+                rise_indefinitely = false;
+                background = true;
+                WHITE
+                //Color::new(1.0, 0.8, 0.8, 1.0)
             }
             TextEffectStyle::Miss => WHITE,
             TextEffectStyle::ReactionExclamation => ORANGE,
@@ -715,7 +722,15 @@ impl GameGrid {
             end_time: start_time + duration,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(status_texture, text, font.clone(), font_size, color),
+                EffectGraphics::Text(TextEffect {
+                    status_texture,
+                    text,
+                    font: font.clone(),
+                    font_size,
+                    color,
+                    rise_indefinitely,
+                    background,
+                }),
             ),
             source_pos: pos,
             destination_pos: pos,
@@ -3191,7 +3206,18 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(Option<Texture2D>, String, Font, u16, Color),
+    Text(TextEffect),
+}
+
+#[derive(Debug)]
+struct TextEffect {
+    status_texture: Option<Texture2D>,
+    text: String,
+    font: Font,
+    font_size: u16,
+    color: Color,
+    rise_indefinitely: bool,
+    background: bool,
 }
 
 impl EffectGraphics {
@@ -3265,12 +3291,20 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(status_texture, text, font, font_size, color) => {
+            EffectGraphics::Text(TextEffect {
+                status_texture,
+                text,
+                font,
+                font_size,
+                color,
+                rise_indefinitely,
+                background,
+            }) => {
                 //let font_size = 20;
                 //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
                 let text_dimensions = measure_text_with_font_tags(text, Some(font), *font_size);
 
-                let grow_duration = 0.15;
+                let grow_duration = 0.25;
 
                 let font_scale = if effect.age < grow_duration {
                     1.0 * effect.age / grow_duration
@@ -3279,7 +3313,18 @@ impl EffectGraphics {
                 };
 
                 let x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
-                let y0 = y - cell_w - t * cell_w * 2.0;
+
+                let y_offset = if *rise_indefinitely {
+                    t * cell_w * 2.0
+                } else {
+                    if t < 0.3 {
+                        t / 0.3 * cell_w
+                    } else {
+                        cell_w
+                    }
+                };
+
+                let y0 = y - cell_w - y_offset;
 
                 let remaining = effect.end_time - effect.age;
                 let fade_duration = 0.4;
@@ -3304,8 +3349,21 @@ impl EffectGraphics {
                             ..Default::default()
                         },
                     );
+                    draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 }
 
+                if *background {
+                    let text_dim = measure_text_with_font_tags(text, Some(font), *font_size);
+                    draw_rectangle(
+                        x0,
+                        y0 - text_dim.offset_y,
+                        text_dim.width,
+                        text_dim.height,
+                        Color::new(0.0, 0.0, 0.0, alpha.min(0.6)),
+                    );
+                }
+
+                // First draw shadow
                 let mut text_params = TextParams {
                     font: Some(font),
                     font_size: *font_size,
@@ -3313,14 +3371,11 @@ impl EffectGraphics {
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
-                // First draw shadow
-                //draw_text_ex(text, x0 + 2.0, y0 + 2.0, text_params.clone());
-                draw_text_with_font_tags(text, x0 + 2.0, y0 + 2.0, text_params.clone(), false);
-                text_params.color = *color;
-                text_params.color.a = alpha;
+                draw_text_with_font_tags(text, x0 + 1.0, y0 + 1.0, text_params.clone(), false);
 
                 // Then the regular text
-                //draw_text_ex(text, x0, y0, text_params);
+                text_params.color = *color;
+                text_params.color.a = alpha;
                 draw_text_with_font_tags(text, x0, y0, text_params, true);
             }
         }
@@ -3350,5 +3405,129 @@ fn has_non_empty_movement_path(ui_state: &UiState) -> bool {
             ..
         }) => !selected_movement_path.is_empty(),
         _ => false,
+    }
+}
+
+pub fn draw_action(
+    pos: (f32, f32),
+    header_font: &Font,
+    header: &str,
+    details_font: &Font,
+    details: &[(&'static str, Goodness)],
+) {
+    let (mut x, y) = pos;
+
+    let header_font_size = 16;
+    let detail_font_size = 13;
+    let params = TextParams {
+        font: Some(header_font),
+        font_size: header_font_size,
+        color: WHITE,
+        ..Default::default()
+    };
+
+    let vert_margin = 2.0;
+    let detail_hor_margin = 2.0;
+    let header_pad = 2.0;
+    let detail_pad = 2.0;
+
+    let header_dimensions =
+        measure_text_with_font_tags(header, Some(header_font), header_font_size);
+    let header_w = header_dimensions.width + header_pad * 2.0;
+    let mut header_h = 0.0;
+    if header_dimensions.height.is_finite() {
+        header_h = header_dimensions.offset_y + header_pad * 2.0;
+    }
+
+    let mut details_w = 0.0;
+    let mut details_h = 0.0;
+    let mut details_max_offset = 0.0;
+    if !details.is_empty() {
+        let mut details_relative_y_interval = [f32::MAX, f32::MIN];
+
+        for (line, _goodness) in details.iter() {
+            let dim = measure_text(line, Some(details_font), detail_font_size, 1.0);
+            details_w += dim.width;
+            if dim.height.is_finite() {
+                if dim.offset_y > details_max_offset {
+                    details_max_offset = dim.offset_y;
+                }
+                let top = -dim.offset_y;
+                let bot = -dim.offset_y + dim.height;
+                if top < details_relative_y_interval[0] {
+                    details_relative_y_interval[0] = top;
+                }
+                if bot > details_relative_y_interval[1] {
+                    details_relative_y_interval[1] = bot;
+                }
+            }
+        }
+        details_w += details.len() as f32 * detail_pad * 2.0
+            + (details.len() - 1) as f32 * detail_hor_margin;
+        details_h =
+            details_relative_y_interval[1] - details_relative_y_interval[0] + detail_pad * 2.0;
+    }
+
+    x -= header_w / 2.0;
+
+    let mut x0 = x;
+    let mut y0 = y; // - h;
+    draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
+
+    draw_text_with_font_tags(
+        header,
+        x0 + header_pad,
+        y0 + header_pad + header_dimensions.offset_y,
+        params.clone(),
+        true,
+    );
+    y0 += header_dimensions.offset_y + header_pad * 2.0 + vert_margin;
+
+    x0 += (header_w - details_w) / 2.0;
+
+    for (line, goodness) in details {
+        let mut params = params.clone();
+        params.font = Some(details_font);
+        params.font_size = detail_font_size;
+
+        let dim = measure_text(line, Some(details_font), params.font_size, 1.0);
+
+        let bg_color = match goodness {
+            Goodness::Good => Color::new(0.0, 0.4, 0.0, 1.0),
+            Goodness::Neutral => BLACK,
+            Goodness::Bad => Color::new(0.5, 0.0, 0.0, 1.0),
+        };
+        draw_rectangle(
+            x0,
+            y0,
+            dim.width + 2.0 * detail_pad,
+            dim.height + 2.0 * detail_pad,
+            bg_color,
+        );
+        draw_rectangle_lines(
+            x0,
+            y0,
+            dim.width + 2.0 * detail_pad,
+            dim.height + 2.0 * detail_pad,
+            1.0,
+            BLACK,
+        );
+
+        params.color = BLACK;
+        draw_text_rounded(
+            line,
+            x0 + detail_pad,
+            y0 + detail_pad + details_max_offset,
+            params.clone(),
+        );
+        params.color = WHITE;
+        draw_text_rounded(
+            line,
+            x0 + detail_pad - 1.0,
+            y0 + detail_pad + details_max_offset - 1.0,
+            params,
+        );
+
+        x0 += dim.width + detail_pad * 2.0 + detail_hor_margin;
     }
 }

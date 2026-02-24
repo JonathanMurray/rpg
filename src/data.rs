@@ -524,7 +524,7 @@ pub const SMITE: AttackEnhancement = AttackEnhancement {
     icon: IconId::Smite,
     mana_cost: 1,
     effect: AttackEnhancementEffect {
-        bonus_damage: 2,
+        bonus_damage: 3,
         armor_penetration: 1,
         ..AttackEnhancementEffect::default()
     },
@@ -1743,9 +1743,9 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "|<value>+1| armor",
             WeaponProficiency => "Attacks gain |<value>+1| armor penetration",
-            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% mana",
+            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
-            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% health. Immune to the negative effects of |<keyword>Near-death|",
+            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to the negative effects of |<keyword>Near-death|",
             ThrillOfBattle => "|<value>+5| |<dice>| |<stat>|Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"

@@ -308,7 +308,8 @@ impl Drawable for CharacterSheetToggle {
 
         let (mouse_x, mouse_y) = mouse_position();
         let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
-        if hovered && is_mouse_button_pressed(MouseButton::Left) {
+
+        if (hovered && is_mouse_button_pressed(MouseButton::Left)) || is_key_pressed(KeyCode::A) {
             self.set_shown(!self.shown.get());
         }
 
@@ -589,8 +590,8 @@ impl PlayerCharacterPortrait {
             ..Default::default()
         });
 
-        let done_text = TextLine::new("Done", 18, LIGHTGRAY, Some(font.clone()));
-        let end_turn_text = TextLine::new("End turn", 18, WHITE, Some(font.clone()));
+        let done_text = TextLine::new("Done", 16, LIGHTGRAY, Some(font.clone()));
+        let end_turn_text = TextLine::new("End turn", 16, WHITE, Some(font.clone()));
 
         Self {
             character: Rc::clone(character),

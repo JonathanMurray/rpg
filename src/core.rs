@@ -3655,7 +3655,7 @@ impl Display for ConditionInfo {
             write!(f, " x {}", stacks)?;
         }
         if let Some(remaining_rounds) = self.remaining_rounds {
-            write!(f, " (remaining: {})", remaining_rounds)?;
+            write!(f, " ({} remaining)", remaining_rounds)?;
         }
 
         Ok(())

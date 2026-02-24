@@ -1098,13 +1098,13 @@ impl Drawable for ActionButton {
             let text_dim = measure_text(text, Some(font), font_size, 1.0);
             let x0 = x + margin;
             let y0 = y + margin;
-            let padding = 2.0;
+            let padding = 3.0;
             draw_rectangle(
                 x0,
                 y0,
                 text_dim.width + padding * 2.0,
                 text_dim.height + padding * 2.0,
-                Color::new(0.0, 0.0, 0.0, 0.6),
+                Color::new(0.0, 0.0, 0.0, 0.8),
             );
             draw_text_rounded(
                 text,

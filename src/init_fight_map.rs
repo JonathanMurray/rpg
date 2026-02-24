@@ -392,7 +392,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             //e1.armor_piece.set(Some(GOOD_CHAIN_MAIL));
             //e1.learn_ability(ENEMY_TACKLE);
             e1.known_passive_skills.push(PassiveSkill::BloodRage);
-            e1.health.change_max_value_to(1);
+            //e1.health.change_max_value_to(1);
             enemies.push(e1);
 
             for e in &enemies {
