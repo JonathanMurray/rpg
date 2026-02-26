@@ -3,13 +3,11 @@ use std::cell::{Cell, RefCell};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Display;
-use std::ops::RemAssign;
 use std::rc::{Rc, Weak};
 use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
-use macroquad::rand::ChooseRandom;
 
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
@@ -510,26 +508,23 @@ impl CoreGame {
                         let mut maybe_ally_reaction: Option<(u32, OnAttackedReaction)> = None;
                         for ch in self.characters.iter() {
                             let is_ally = ch.player_controlled() == defender.player_controlled();
-                            if is_ally && are_entities_within_melee(defender.pos(), ch.pos()) {
-                                if !ch
+                            if is_ally && are_entities_within_melee(defender.pos(), ch.pos()) && !ch
                                     .usable_on_attacked_reactions(is_within_melee, false)
-                                    .is_empty()
-                                {
-                                    let r = self
-                                        .user_interface
-                                        .choose_attack_reaction(
-                                            self,
-                                            self.active_character_id,
-                                            target,
-                                            hand,
-                                            ch.id(),
-                                            is_within_melee,
-                                        )
-                                        .await?;
-                                    if let Some(r) = r {
-                                        maybe_ally_reaction = Some((ch.id(), r));
-                                        break;
-                                    }
+                                    .is_empty() {
+                                let r = self
+                                    .user_interface
+                                    .choose_attack_reaction(
+                                        self,
+                                        self.active_character_id,
+                                        target,
+                                        hand,
+                                        ch.id(),
+                                        is_within_melee,
+                                    )
+                                    .await?;
+                                if let Some(r) = r {
+                                    maybe_ally_reaction = Some((ch.id(), r));
+                                    break;
                                 }
                             }
                         }
@@ -3308,7 +3303,7 @@ impl Characters {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Rc<Character>> {
-        self.0.iter().map(|ch| ch)
+        self.0.iter()
     }
 
     pub fn player_characters(self) -> Vec<Character> {
@@ -6416,7 +6411,7 @@ impl Display for WeaponRange {
 impl WeaponRange {
     pub fn squared(&self) -> f32 {
         match self {
-            Self::Melee => TOUCHING_MELEE_RANGE_SQUARED as f32,
+            Self::Melee => TOUCHING_MELEE_RANGE_SQUARED,
             Self::Ranged(range) => range.powf(2.0),
         }
     }

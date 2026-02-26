@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -21,7 +21,7 @@ use crate::{
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
-    drawing::{draw_cross, draw_dashed_line},
+    drawing::draw_dashed_line,
     game_ui::{ConfiguredAction, UiState},
     sounds::{SoundId, SoundPlayer},
     textures::IconId,
@@ -308,14 +308,14 @@ impl ActivityPopup {
             if let Some(error) = &self.proceed_button_error {
                 let font_size = 22;
                 let text_dim =
-                    measure_text_with_font_tags(&error, Some(&self.font), font_size, 1.0);
+                    measure_text_with_font_tags(error, Some(&self.font), font_size, 1.0);
                 draw_text_with_font_tags(
-                    &error,
+                    error,
                     x + width - text_dim.width - 10.0,
                     y - height + top_pad + 15.0,
                     TextParams {
                         font: Some(&self.font),
-                        font_size: font_size,
+                        font_size,
                         color: RED,
                         ..Default::default()
                     },

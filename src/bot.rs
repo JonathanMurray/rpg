@@ -524,7 +524,7 @@ pub fn bot_choose_attack_reaction(
     is_within_melee: bool,
 ) -> Option<OnAttackedReaction> {
     // TODO: it needs to be more intuitive/clear for player how/when/why bot reacts
-    return None;
+    None
 }
 
 pub fn bot_choose_hit_reaction(

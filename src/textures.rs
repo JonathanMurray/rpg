@@ -4,7 +4,7 @@ use macroquad::{
     color::WHITE,
     math::Rect,
     texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
-    time::{get_frame_time, get_time},
+    time::get_time,
 };
 use serde::{Deserialize, Serialize};
 
@@ -617,10 +617,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     }
 
     // animate table candle
-    if (t * 0.7) % (t * 0.7).floor() < 0.5 {
-        if (col, row) == (2, 7) {
-            (col, row) = (3, 7);
-        }
+    if (t * 0.7) % (t * 0.7).floor() < 0.5 && (col, row) == (2, 7) {
+        (col, row) = (3, 7);
     }
 
     let src_sides = [

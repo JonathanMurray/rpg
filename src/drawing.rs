@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, MAGENTA},
+    color::Color,
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle},
     time::get_time,
 };

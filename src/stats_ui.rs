@@ -1,14 +1,13 @@
-use std::{default, fmt, rc::Rc};
+use std::{fmt, rc::Rc};
 
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, SKYBLUE, WHITE, YELLOW},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, WHITE},
     text::Font,
 };
 
 use crate::{
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::Character,
-    util::COL_BLUE,
 };
 
 type AttributeCell = (&'static str, u32);

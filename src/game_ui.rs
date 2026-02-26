@@ -6,12 +6,11 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, BLUE, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, RED, WHITE},
-    conf,
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     shapes::draw_rectangle,
-    text::{self, Font},
+    text::{Font},
     texture::{draw_texture, Texture2D},
     window::{screen_height, screen_width},
 };
@@ -32,8 +31,7 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
         AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
-        DamageInterval, DamageSource, GameEvent, Goodness, HandType, MovementType,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource, GameEvent, Goodness, HandType, MovementType,
         OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
@@ -50,8 +48,8 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, UI_TEXTURE},
-    util::{COL_BLACK_BLUE, COL_BLUE, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_RED},
+    textures::{EquipmentIconId, IconId, StatusId, UI_TEXTURE},
+    util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -158,7 +156,7 @@ pub enum ConfiguredAction {
     UseConsumable(Option<EquipmentConsumption>),
 }
 
-const OUT_OF_REACH: &'static str = "Out of reach";
+const OUT_OF_REACH: &str = "Out of reach";
 
 impl ConfiguredAction {
     fn has_target(&self) -> bool {
@@ -1698,7 +1696,7 @@ impl UserInterface {
                     self.add_effects_for_area_outcomes(
                         0.0,
                         animation_color,
-                        &center,
+                        center,
                         Some(*shape),
                         targets,
                     );
@@ -1899,7 +1897,7 @@ impl UserInterface {
             caster_pos,
             target_pos,
             Effect {
-                start_time: start_time,
+                start_time,
                 end_time: start_time + duration,
                 variant: EffectVariant::At(
                     EffectPosition::Projectile,
@@ -2315,7 +2313,7 @@ impl UserInterface {
             self.player_portraits.selected_id() == self.active_character_id,
         );
 
-        for (_id, character_ui) in &mut self.character_uis {
+        for character_ui in self.character_uis.values_mut() {
             character_ui
                 .action_points_row
                 .update(elapsed, &self.sound_player);
@@ -2713,7 +2711,7 @@ fn build_character_ui(
 
     for action in character.known_actions() {
         let btn_action = ButtonAction::Action(action);
-        let mut btn = new_button(btn_action, Some(character.clone()), false);
+        let btn = new_button(btn_action, Some(character.clone()), false);
         //btn.set_parent_bg_color(buttons_row_bg);
         let btn = Rc::new(btn);
         tracked_action_buttons.insert(button_action_id(btn_action), Rc::clone(&btn));

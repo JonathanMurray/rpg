@@ -5,18 +5,17 @@ use std::{
     f32::consts::PI,
     iter,
     rc::Rc,
-    str::CharIndices,
 };
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, BLUE, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
-    text::{draw_text, draw_text_ex, Font, TextParams},
+    text::{draw_text_ex, Font, TextParams},
     texture::draw_texture,
     time::get_time,
     window::{screen_height, screen_width},
@@ -54,10 +53,10 @@ use crate::{
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     sounds::{SoundId, SoundPlayer},
     textures::{character_sprite_height, draw_terrain, EffectId, SpriteId, StatusId, TerrainId},
-    util::{line_collision, rgb, COL_GRAY, COL_RED},
+    util::{line_collision, rgb, COL_RED},
 };
 use crate::{
-    core::{CharacterId, Characters, HandType, Range},
+    core::{CharacterId, HandType, Range},
     drawing::{draw_arrow, draw_dashed_line},
 };
 
@@ -918,7 +917,7 @@ impl GameGrid {
 
     pub fn draw_debug_cells(&self) {
         let weak_color = Color::new(0.5, 1.0, 0.5, 0.2);
-        let mut strong_color = weak_color.clone();
+        let mut strong_color = weak_color;
         strong_color.a = 0.4;
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x = self.grid_x_to_screen(col);
@@ -1699,12 +1698,10 @@ impl GameGrid {
 
                         let text = if is_mouse_pos_out_of_range {
                             "Out of reach"
+                        } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
+                            "Select enemy"
                         } else {
-                            if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                                "Select enemy"
-                            } else {
-                                "Select ally"
-                            }
+                            "Select ally"
                         };
                         self.draw_cursor_text(text, mouse_grid_pos);
 
@@ -2608,7 +2605,7 @@ impl GameGrid {
                 ORANGE,
             );
 
-            let mut text = if damage.max > 0 {
+            let text = if damage.max > 0 {
                 format!("|<sword>|{}-{}", damage.min, damage.max)
             } else if preview.prediction.is_buff {
                 "|<heart>|".to_string()
@@ -3338,12 +3335,10 @@ impl EffectGraphics {
 
                 let y_offset = if *rise_indefinitely {
                     t * cell_w * 2.0
+                } else if t < 0.3 {
+                    t / 0.3 * cell_w
                 } else {
-                    if t < 0.3 {
-                        t / 0.3 * cell_w
-                    } else {
-                        cell_w
-                    }
+                    cell_w
                 };
 
                 let y0 = y - cell_w - y_offset;

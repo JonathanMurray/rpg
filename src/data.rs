@@ -1,7 +1,4 @@
-use macroquad::{
-    color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, MAGENTA, PURPLE, RED, YELLOW},
-    input::KeyCode,
-};
+use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
 
 use crate::{
     action_button::Keyword,

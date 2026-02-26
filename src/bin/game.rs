@@ -1,61 +1,43 @@
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
+use std::cell::Cell;
 use std::rc::Rc;
-use std::sync::atomic::{AtomicBool, Ordering};
 
-use macroquad::audio::load_sound;
-use macroquad::color::{Color, LIGHTGRAY, MAGENTA, WHITE};
-use macroquad::input::{get_keys_pressed, mouse_position};
-use macroquad::math::{vec2, Rect};
-use macroquad::miniquad::window::{self, set_window_position, set_window_size};
-use macroquad::miniquad::KeyCode;
+use macroquad::color::LIGHTGRAY;
+use macroquad::miniquad::window::{self, set_window_position};
 
-use macroquad::shapes::draw_rectangle;
-use macroquad::text::{draw_text, load_ttf_font, Font};
-use macroquad::texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
+use macroquad::text::draw_text;
 use macroquad::time::get_time;
 use macroquad::window::{clear_background, next_frame, screen_height, screen_width};
 use macroquad::{
     color::BLACK,
     miniquad,
     rand::{self},
-    time::get_frame_time,
     window::Conf,
 };
 
-use rpg::bot::{bot_choose_attack_reaction, bot_choose_hit_reaction};
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{
-    Action, ArrowStack, Attributes, BaseAction, Character, CharacterId, CharacterKind, Condition,
-    CoreGame, EquipmentEntry, HandType, OnAttackedReaction, OnHitReaction, Party,
+    ArrowStack, Attributes, Character, CharacterKind, EquipmentEntry, HandType, Party,
 };
 
 use rpg::data::{
-    PassiveSkill, ADRENALIN_POTION, ARCANE_POTION, BARBED_ARROWS, BONE_CRUSHER, BOW, BRACE,
-    CHAIN_MAIL, COLD_ARROWS, CRIPPLING_SHOT, DAGGER, EMPOWER, ENERGY_POTION, EXPLODING_ARROWS,
-    FIREBALL, FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HASTE, HEAL, HEALING_NOVA,
-    HEALING_RAIN, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE,
-    INSPIRE, KILL, LEATHER_ARMOR, LONGER_REACH, LUNGE_ATTACK, LUNGE_ATTACK_HEAVY_IMPACT,
-    LUNGE_ATTACK_REACH, MANA_POTION, MEDIUM_SHIELD, MIND_BLAST, OVERWHELMING, PENETRATING_ARROWS,
-    PIERCING_SHOT, RAGE, ROBE, SCREAM, SCREAM_SHRIEK, SEARING_LIGHT, SEARING_LIGHT_BURN,
-    SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SIDE_STEP, SMALL_SHIELD, SMITE,
-    SWEEP_ATTACK, SWEEP_ATTACK_PRECISE, SWORD,
+    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS,
+    FIREBALL, FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE,
+    INSPIRE, LEATHER_ARMOR, MANA_POTION, MEDIUM_SHIELD,
+    PIERCING_SHOT,
+    SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
+    SWEEP_ATTACK, SWORD,
 };
-use rpg::game_ui::{PlayerChose, UiState, UserInterface};
-use rpg::game_ui_connection::GameUserInterfaceConnection;
-use rpg::init_fight_map::{init_fight_map, FightId, GameInitState};
+use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
-use rpg::shop_scene::{generate_shop_contents, run_shop_loop};
-use rpg::skill_tree::run_skill_tree_scene;
+use rpg::shop_scene::run_shop_loop;
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-    load_all_status_textures, load_and_init_font_symbols, load_and_init_texture,
-    load_and_init_ui_textures, EquipmentIconId, IconId, PortraitId, SpriteId, DICE_SYMBOL,
+    load_and_init_font_symbols,
+    load_and_init_ui_textures, PortraitId, SpriteId,
 };
-use rpg::victory_scene::{run_victory_loop, Learning};
+use rpg::victory_scene::run_victory_loop;
 
 #[macroquad::main(window_conf)]
 async fn main() {

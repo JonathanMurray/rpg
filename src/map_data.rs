@@ -1,29 +1,23 @@
 use core::f32;
-use std::{cell::Cell, collections::HashMap, fs, iter, rc::Rc};
+use std::{collections::HashMap, fs, rc::Rc};
 
 use indexmap::IndexMap;
-use macroquad::rand::ChooseRandom;
-use rand::{random_range, Rng};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     bot::BotBehaviour,
     core::{
-        Ability, AbilityId, AbilityTarget, Action, ActionReach, ActionTarget, Attributes,
-        BaseAction, Bot, Character, CharacterId, CharacterKind, Condition, CoreGame, HandType,
-        OnAttackedReaction, OnHitReaction, Party, Position, Shield, Weapon,
+        Attributes, Bot, Character, CharacterId, CharacterKind, HandType, Party, Position, Shield, Weapon,
     },
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, MAGI_HEAL,
-        MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS, SHIRT, SMALL_SHIELD, SWORD,
+        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, SHIRT, SMALL_SHIELD, SWORD,
     },
     grid::GameGrid,
-    pathfind::{Occupation, Path, PathfindGrid},
+    pathfind::{Occupation, PathfindGrid},
     resources::GameResources,
     sounds::SoundPlayer,
     textures::{PortraitId, SpriteId, TerrainId},
-    util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
 
 pub fn create_game_grid(
@@ -38,7 +32,7 @@ pub fn create_game_grid(
 
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
-        let char = create_character(pos, *char_data, Some(&party), i as CharacterId);
+        let char = create_character(pos, *char_data, Some(party), i as CharacterId);
         pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
         characters.insert(char.id(), char);
     }

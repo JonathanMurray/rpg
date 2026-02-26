@@ -2,17 +2,16 @@ use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
     rc::Rc,
-    str::CharIndices,
 };
 
 use macroquad::{
-    color::{MAGENTA, PURPLE, SKYBLUE, YELLOW},
+    color::{SKYBLUE, YELLOW},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
-    text::{draw_text, measure_text, TextParams},
-    texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode},
-    time::{get_frame_time, get_time},
+    text::{measure_text, TextParams},
+    texture::{draw_texture, draw_texture_ex, DrawTextureParams},
+    time::get_time,
 };
 
 use indexmap::IndexMap;
@@ -31,7 +30,7 @@ use crate::{
         Rectangle, Style, TextLine,
     },
     core::{
-        Character, CharacterId, Characters, Condition, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
+        Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS,
     },
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     sounds::{SoundId, SoundPlayer},

@@ -6,12 +6,10 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
+    color::{Color, BLACK, GRAY, LIGHTGRAY, WHITE},
     math::Rect,
-    shapes::{draw_rectangle, draw_rectangle_lines},
-    text::{measure_text, Font, TextParams},
+    text::Font,
     texture::Texture2D,
-    window::screen_width,
 };
 
 use crate::{
@@ -23,7 +21,7 @@ use crate::{
         TextLine,
     },
     conditions_ui::ConditionsList,
-    core::{AbilityRollType, BaseAction, Character, CharacterId, Goodness, HandType},
+    core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
     textures::{IconId, PortraitId, StatusId},
     util::COL_RED,

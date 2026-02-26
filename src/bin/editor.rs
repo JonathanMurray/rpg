@@ -1,55 +1,42 @@
-use std::cell::{self, Cell, RefCell};
-use std::char::CharTryFromError;
+use std::cell::{Cell};
 use std::collections::HashMap;
-use std::fs;
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
-use indexmap::IndexMap;
-use macroquad::color::{Color, BLACK, LIGHTGRAY, MAGENTA, RED, WHITE, YELLOW};
+use macroquad::color::{Color, BLACK, LIGHTGRAY, RED, WHITE, YELLOW};
 use macroquad::input::{
-    is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position,
-    mouse_position_local, KeyCode, MouseButton,
+    is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
 };
 use macroquad::math::Rect;
 use macroquad::miniquad::window::set_window_position;
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
 use macroquad::text::{
-    self, draw_text, draw_text_ex, load_ttf_font, measure_text, Font, TextDimensions, TextParams,
+    draw_text, draw_text_ex, measure_text, Font, TextParams,
 };
-use macroquad::texture::{draw_texture, draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
-use macroquad::window::{clear_background, screen_width, Conf};
+use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
+use macroquad::window::{screen_width, Conf};
 use macroquad::window::{next_frame, screen_height};
 
 use rpg::base_ui::{
-    draw_text_rounded, draw_text_with_font_tags, Align, Checkbox, Container, Drawable, Element,
+    Align, Checkbox, Container, Drawable, Element,
     LayoutDirection, Style, TextLine,
 };
-use rpg::bot::BotBehaviour;
 use rpg::core::{
-    Ability, Action, ArrowStack, AttackEnhancement, Attributes, BaseAction, Bot, Character,
-    CharacterId, CharacterKind, Characters, Condition, CoreGame, EquipmentEntry, HandType,
-    OnAttackedReaction, OnHitReaction, Party, Position, Shield, Weapon,
+    Character,
+    CharacterId, HandType, Party,
 };
 
-use rpg::data::{
-    PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-    ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, SHIRT, SWORD,
-};
-use rpg::game_ui::{PlayerChose, UiState, UserInterface};
+use rpg::game_ui::UiState;
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
-use rpg::grid::GameGrid;
-use rpg::init_fight_map::{init_fight_map, FightId, GameInitState};
+use rpg::init_fight_map::GameInitState;
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
-use rpg::map_scene::{MapChoice, MapScene};
-use rpg::pathfind::{Occupation, PathfindGrid};
+use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    draw_terrain, load_and_init_font_symbols, load_and_init_texture, load_and_init_ui_textures,
-    terrain_atlas_area, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId, TerrainId,
+    load_and_init_font_symbols, load_and_init_ui_textures,
+    terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
 };
-use serde::{Deserialize, Serialize};
 
 const SAVE_FILE_NAME: &str = "ogre_room.json";
 
@@ -468,12 +455,10 @@ enum EditorAction {
 
 impl Sidebar {
     fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
-        let backgrounds = vec![
-            TerrainId::Floor,
+        let backgrounds = [TerrainId::Floor,
             TerrainId::Floor2,
             TerrainId::Floor3,
-            TerrainId::Floor4,
-        ];
+            TerrainId::Floor4];
 
         let mut background_actions: Vec<EditorAction> = backgrounds
             .iter()
@@ -481,30 +466,26 @@ impl Sidebar {
             .collect();
         background_actions.push(EditorAction::EraseBackground);
 
-        let terrain_ids = vec![
-            TerrainId::Bush,
+        let terrain_ids = [TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
             TerrainId::NewWaterNorthEast,
-            TerrainId::StoneWallConvexNorthEast,
-        ];
+            TerrainId::StoneWallConvexNorthEast];
         let mut terrain_actions: Vec<EditorAction> = terrain_ids
             .iter()
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
         terrain_actions.push(EditorAction::EraseTerrain);
 
-        let decorations = vec![
-            TerrainId::BookShelf,
+        let decorations = [TerrainId::BookShelf,
             TerrainId::WallPainting,
             TerrainId::WallPainting2,
             TerrainId::WallFlag,
             TerrainId::WallWindow,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
-            TerrainId::Mat,
-        ];
+            TerrainId::Mat];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
             .map(|t| EditorAction::PlaceDecoration(*t))

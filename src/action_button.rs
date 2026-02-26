@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     miniquad::window::screen_size,
@@ -28,7 +28,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
-    textures::{IconId, MANA_SYMBOL},
+    textures::IconId,
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
@@ -642,12 +642,9 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
 fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
-            match effect.defense_type {
-                Some(defense_type) => t
-                    .technical_description
-                    .push(defense_str(defense_type).to_string()),
-                None => {}
-            };
+            if let Some(defense_type) = effect.defense_type { t
+            .technical_description
+            .push(defense_str(defense_type).to_string()) };
 
             match effect.damage {
                 Some(AbilityDamage::Static(n)) => t

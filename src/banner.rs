@@ -1,10 +1,8 @@
-use std::cell::Cell;
 
 use macroquad::{
     color::{Color, GOLD},
-    miniquad::window::screen_size,
     shapes::draw_rectangle,
-    text::{draw_text, draw_text_ex, measure_text, Font, TextParams},
+    text::{draw_text_ex, measure_text, Font, TextParams},
     time::get_frame_time,
     window::{screen_height, screen_width},
 };

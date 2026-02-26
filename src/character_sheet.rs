@@ -1,7 +1,7 @@
 use std::cell::{Cell, RefCell};
 use std::{collections::HashMap, rc::Rc};
 
-use macroquad::color::{DARKBLUE, DARKGRAY, MAGENTA, SKYBLUE};
+use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,

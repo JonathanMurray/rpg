@@ -1,6 +1,5 @@
 use std::{
     collections::{
-        hash_map::{self, Entry},
         HashMap, HashSet,
     },
     fs,
@@ -17,15 +16,15 @@ use rand::{
 use crate::{
     bot::BotBehaviour,
     core::{
-        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Characters, HandType,
+        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, HandType,
         Position,
     },
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
         CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR,
-        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT, SWORD,
+        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
     },
-    map_data::{create_character, create_game_grid, CharacterType, MapData},
+    map_data::{create_character, CharacterType, MapData},
     pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
 };
@@ -79,7 +78,7 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
     }
 
     GameInitState {
-        characters: characters,
+        characters,
         active_character_id: 0,
         pathfind_grid,
         background: map_data.background,
@@ -563,7 +562,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
     let pathfind_grid = Rc::new(pathfind_grid);
 
-    let characters = characters.into_iter().map(|ch| Rc::new(ch)).collect();
+    let characters = characters.into_iter().map(Rc::new).collect();
 
     let decorations = Default::default();
     GameInitState {

@@ -1,10 +1,8 @@
-use std::{cell::Cell, default, rc::Rc};
+use std::{cell::Cell, rc::Rc};
 
 use macroquad::{
-    color::{Color, BLACK, LIGHTGRAY, MAGENTA, WHITE},
-    shapes::draw_rectangle,
+    color::{Color, LIGHTGRAY, WHITE},
     text::Font,
-    window::{screen_height, screen_width},
 };
 
 use crate::{

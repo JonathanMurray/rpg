@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE, YELLOW},
+    color::{Color, DARKGRAY, DARKGREEN, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE},
     input::{
         is_mouse_button_down, is_mouse_button_pressed, mouse_position, mouse_wheel, MouseButton,
     },
@@ -22,7 +22,7 @@ use crate::{
         ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL,
         STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
     },
-    util::{COL_ALICE, COL_BLUE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
+    util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
 };
 
 pub trait Drawable {
@@ -414,9 +414,9 @@ impl Drawable for TextLine {
                 draw_tooltip(
                     font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
-                    &header,
+                    header,
                     None,
-                    &lines,
+                    lines,
                     &[],
                     false,
                 );
@@ -478,7 +478,7 @@ pub fn measure_text_with_font_tags(
                 part = &part["<strikethrough>".len()..];
             }
 
-            if part.len() > 0 {
+            if !part.is_empty() {
                 let dim = measure_text(part, font, font_size, font_scale);
                 offset_y = Some(dim.offset_y);
 
@@ -556,10 +556,10 @@ pub fn draw_text_with_font_tags(
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
             if render_tags {
-                params.color = match &part {
-                    &"Bob" => COL_BOB,
-                    &"Alice" => COL_ALICE,
-                    &"Clara" => COL_CLARA,
+                params.color = match part {
+                    "Bob" => COL_BOB,
+                    "Alice" => COL_ALICE,
+                    "Clara" => COL_CLARA,
                     _ => unreachable!(),
                 };
             }
@@ -794,7 +794,7 @@ impl Container {
     }
 
     fn content_size_larger_than_container(&self) -> bool {
-        let (mut w, mut h) = self.content_size();
+        let (w, h) = self.content_size();
 
         if let Some(max_h) = self.max_height {
             if h > max_h {
@@ -881,9 +881,9 @@ impl Container {
                 draw_tooltip(
                     font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
-                    &header,
+                    header,
                     None,
-                    &lines,
+                    lines,
                     &[],
                     false,
                 );
@@ -939,7 +939,7 @@ impl Container {
                 }
             };
 
-            let mut y_element = y0 + offset.1;
+            let y_element = y0 + offset.1;
 
             /*
             if self.reverse_vertical {
@@ -1004,7 +1004,7 @@ impl Container {
                 if self.content_size_larger_than_container() {
                     let content_size = self.content_size();
 
-                    let mut bar_y = y + scroll.offset.get() / content_size.1 * size.1;
+                    let bar_y = y + scroll.offset.get() / content_size.1 * size.1;
 
                     let bar_h = (size.1.powf(2.0) / content_size.1).min(size.1);
 
@@ -1035,12 +1035,8 @@ impl Container {
                     }
 
                     // Scrolling by dragging with mouse
-                    if (x + size.0..x + size.0 + bar_w).contains(&mouse_x)
-                        && (y..y + size.1).contains(&mouse_y)
-                    {
-                        if is_mouse_button_pressed(MouseButton::Left) {
-                            scroll.is_dragging.set(true);
-                        }
+                    if (x + size.0..x + size.0 + bar_w).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) && is_mouse_button_pressed(MouseButton::Left) {
+                        scroll.is_dragging.set(true);
                     }
 
                     if scroll.is_dragging.get() {
