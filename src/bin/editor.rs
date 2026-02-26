@@ -51,7 +51,7 @@ use rpg::textures::{
 };
 use serde::{Deserialize, Serialize};
 
-const SAVE_FILE_NAME: &str = "testsavefile.json";
+const SAVE_FILE_NAME: &str = "ogre_room.json";
 
 #[macroquad::main(window_conf)]
 async fn main() {

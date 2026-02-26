@@ -42,7 +42,7 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
         .into_iter()
         .map(|ch| (ch.name, ch))
         .collect();
-    let map_data = MapData::load_from_file("testsavefile.json");
+    let map_data = MapData::load_from_file("ogre_room.json");
     let mut characters: Vec<Rc<Character>> = Default::default();
     let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
 
