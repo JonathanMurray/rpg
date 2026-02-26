@@ -538,6 +538,7 @@ impl UserInterface {
             init_state.terrain_objects,
             init_state.decorations,
             resources.status_textures.clone(),
+            resources.effect_textures.clone(),
             sound_player.clone(),
         );
         game_grid.auto_tile_terrain_objects();
@@ -1856,7 +1857,13 @@ impl UserInterface {
                     format!("{}", amount),
                     TextEffectStyle::HostileHit,
                 );
+                if source == DamageSource::KnockbackCollision {
+                    self.game_grid
+                        .animate_character_shaking(character.id(), 0.2);
+                    self.game_grid.animate_pow_effect(character.id(), 0.2);
+                }
                 self.animate_character_damage(character.id(), amount);
+                self.animation_stopwatch.set_to_at_least(0.15);
             }
             GameEvent::CharacterReceivedCondition {
                 character,

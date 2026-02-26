@@ -12,9 +12,9 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::SoundPlayer,
     textures::{
-        load_all_equipment_icons, load_all_icons, load_all_portraits, load_all_sprites,
-        load_all_status_textures, load_and_init_texture, EquipmentIconId, IconId, PortraitId,
-        SpriteId, StatusId,
+        load_all_effects, load_all_equipment_icons, load_all_icons, load_all_portraits,
+        load_all_sprites, load_all_status_textures, load_and_init_texture, EffectId,
+        EquipmentIconId, IconId, PortraitId, SpriteId, StatusId,
     },
 };
 
@@ -26,6 +26,7 @@ pub struct GameResources {
     pub decorative_font: Font,
     pub terrain_atlas: Texture2D,
     pub status_textures: HashMap<StatusId, Texture2D>,
+    pub effect_textures: HashMap<EffectId, Texture2D>,
 }
 
 impl GameResources {
@@ -45,6 +46,7 @@ impl GameResources {
         let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
         let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
         let status_textures = load_all_status_textures().await;
+        let effect_textures = load_all_effects().await;
 
         Self {
             sprites,
@@ -53,6 +55,7 @@ impl GameResources {
             decorative_font,
             terrain_atlas,
             status_textures,
+            effect_textures,
         }
     }
 }

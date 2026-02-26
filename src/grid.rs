@@ -17,6 +17,7 @@ use macroquad::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
     text::{draw_text, draw_text_ex, Font, TextParams},
+    texture::draw_texture,
     time::get_time,
     window::{screen_height, screen_width},
 };
@@ -52,7 +53,7 @@ use crate::{
     game_ui_components::ActionPointsRow,
     pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
     sounds::{SoundId, SoundPlayer},
-    textures::{character_sprite_height, draw_terrain, SpriteId, StatusId, TerrainId},
+    textures::{character_sprite_height, draw_terrain, EffectId, SpriteId, StatusId, TerrainId},
     util::{line_collision, rgb, COL_GRAY, COL_RED},
 };
 use crate::{
@@ -259,6 +260,7 @@ pub struct GameGrid {
     hovered_character: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
     status_textures: HashMap<StatusId, Texture2D>,
+    effect_textures: HashMap<EffectId, Texture2D>,
 
     sound_player: SoundPlayer,
 }
@@ -276,6 +278,7 @@ impl GameGrid {
         terrain_objects: IndexMap<Position, TerrainId>,
         decorations: IndexMap<Position, TerrainId>,
         status_textures: HashMap<StatusId, Texture2D>,
+        effect_textures: HashMap<EffectId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let zoom_index = 1;
@@ -310,6 +313,7 @@ impl GameGrid {
             terrain_objects,
             decorations,
             status_textures,
+            effect_textures,
             sound_player,
         }
     }
@@ -516,6 +520,22 @@ impl GameGrid {
             duration,
             AnimationKind::Shake { random_time_offset },
         ));
+    }
+
+    pub fn animate_pow_effect(&mut self, character_id: CharacterId, duration: f32) {
+        let pos = self.characters.get(&character_id).unwrap().pos();
+        let pos = (pos.0 as f32, pos.1 as f32);
+        self.effects.push(ConcreteEffect {
+            age: 0.0,
+            start_time: 0.0,
+            end_time: duration,
+            source_pos: pos,
+            destination_pos: pos,
+            variant: EffectVariant::At(
+                EffectPosition::Source,
+                EffectGraphics::Texture(self.effect_textures[&EffectId::Pow].clone()),
+            ),
+        });
     }
 
     pub fn animate_character_speaking(
@@ -3207,6 +3227,7 @@ pub enum EffectGraphics {
         stroke: Option<(Color, f32)>,
     },
     Text(TextEffect),
+    Texture(Texture2D),
 }
 
 #[derive(Debug)]
@@ -3302,7 +3323,8 @@ impl EffectGraphics {
             }) => {
                 //let font_size = 20;
                 //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
-                let text_dimensions = measure_text_with_font_tags(text, Some(font), *font_size);
+                let text_dimensions =
+                    measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
 
                 let grow_duration = 0.25;
 
@@ -3353,7 +3375,8 @@ impl EffectGraphics {
                 }
 
                 if *background {
-                    let text_dim = measure_text_with_font_tags(text, Some(font), *font_size);
+                    let text_dim =
+                        measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
                     draw_rectangle(
                         x0,
                         y0 - text_dim.offset_y,
@@ -3377,6 +3400,9 @@ impl EffectGraphics {
                 text_params.color = *color;
                 text_params.color.a = alpha;
                 draw_text_with_font_tags(text, x0, y0, text_params, true);
+            }
+            EffectGraphics::Texture(texture) => {
+                draw_texture(texture, x, y, WHITE);
             }
         }
     }
@@ -3432,7 +3458,7 @@ pub fn draw_action(
     let detail_pad = 2.0;
 
     let header_dimensions =
-        measure_text_with_font_tags(header, Some(header_font), header_font_size);
+        measure_text_with_font_tags(header, Some(header_font), header_font_size, 1.0);
     let header_w = header_dimensions.width + header_pad * 2.0;
     let mut header_h = 0.0;
     if header_dimensions.height.is_finite() {

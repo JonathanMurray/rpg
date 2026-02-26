@@ -253,6 +253,15 @@ pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
+pub enum EffectId {
+    Pow,
+}
+
+pub async fn load_all_effects() -> HashMap<EffectId, Texture2D> {
+    load_and_init_textures(vec![(EffectId::Pow, "effects.png")]).await
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum PortraitId {
     Alice,
     Bob,

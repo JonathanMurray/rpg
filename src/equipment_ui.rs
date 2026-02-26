@@ -80,7 +80,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     }
     if consumable.mana_gain > 0 {
         t.technical_description.push(format!(
-            "Restores |<value>{}| |<mana>| mana",
+            "Restores |<value>{}| |<mana>|",
             consumable.mana_gain
         ));
     }
@@ -792,7 +792,9 @@ impl EquipmentStatsTable {
                     "Attack modifier",
                     vec!["Added to your |<dice>| |<stat>Attack| rolls".to_string()],
                 ));
-                cells.push(format!("+{}", character.attack_modifier(hand)).into());
+                // Use the "base" value; don't include buffs, since we don't take care to rebuild
+                // this when buffs change, so it just gets confusing.
+                cells.push(format!("+{}", character.base_attack_modifier(hand)).into());
             }
         }
         if !has_weapon {

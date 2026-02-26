@@ -19,8 +19,8 @@ use crate::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
     },
     base_ui::{
-        draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, table, Align,
-        Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle, TextLine,
+        table, Align, Container, Drawable, Element, LayoutDirection, Style, TableCell, TableStyle,
+        TextLine,
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, Goodness, HandType},

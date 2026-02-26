@@ -1503,7 +1503,7 @@ pub fn draw_tooltip(
     let text_margin = 8.0;
 
     let mut measure_width = |line, size| {
-        let dimensions = measure_text_with_font_tags(line, Some(font), size);
+        let dimensions = measure_text_with_font_tags(line, Some(font), size, 1.0);
         if dimensions.width > max_line_w {
             max_line_w = dimensions.width;
         }

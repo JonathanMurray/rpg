@@ -434,6 +434,49 @@ impl PathfindGrid {
         }
         true
     }
+
+    pub fn check_collision(&self, character: CharacterId, pos: Position) -> Option<Collision> {
+        // A character takes up 9 cells in a square. Check that each cell is free
+        let mut other_chars: HashSet<CharacterId> = Default::default();
+        let mut terrain_collision = false;
+        for x in pos.0 - 1..=pos.0 + 1 {
+            for y in pos.1 - 1..=pos.1 + 1 {
+                if !(0..self.dimensions.0 as i32).contains(&x)
+                    || !(0..self.dimensions.1 as i32).contains(&y)
+                {
+                    // This cell is outside of the grid
+                    terrain_collision = true;
+                }
+
+                match self.occupied.borrow().get(&(x, y)) {
+                    Some(Occupation::Character(id)) => {
+                        if *id != character {
+                            // This cell is occupied by another character
+                            other_chars.insert(*id);
+                        }
+                    }
+                    Some(Occupation::Terrain) => {
+                        // This cell is occupied by terrain
+                        terrain_collision = true;
+                    }
+                    None => {}
+                }
+            }
+        }
+        if !other_chars.is_empty() {
+            Some(Collision::Characters(other_chars))
+        } else if terrain_collision {
+            Some(Collision::Terrain)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum Collision {
+    Terrain,
+    Characters(HashSet<CharacterId>),
 }
 
 impl Ord for ChartNode {

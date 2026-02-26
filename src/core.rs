@@ -18,7 +18,7 @@ use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
 use crate::grid::ParticleShape;
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::{Occupation, PathfindGrid};
+use crate::pathfind::{Collision, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::util::{are_entities_within_melee, line_collision, CustomShuffle};
@@ -291,7 +291,7 @@ impl CoreGame {
 
     async fn perform_character_pushed(
         &self,
-        ch: &Rc<Character>,
+        character: &Rc<Character>,
         dx: i32,
         dy: i32,
     ) -> Result<(), QuitEvent> {
@@ -299,39 +299,65 @@ impl CoreGame {
         let mut positions = vec![];
         if dx != 0 {
             for i in 0..=dx.abs() {
-                positions.push((ch.pos().0 + i * dx.signum(), ch.pos().1));
+                positions.push((character.pos().0 + i * dx.signum(), character.pos().1));
             }
         }
         if dy != 0 {
             for i in 0..=dy.abs() {
-                positions.push((ch.pos().0, ch.pos().1 + i * dy.signum()));
+                positions.push((character.pos().0, character.pos().1 + i * dy.signum()));
             }
         }
 
         let original_distance = positions.len();
 
-        let positions: Vec<Position> = positions
-            .into_iter()
-            .take_while(|pos| self.pathfind_grid.is_free(Some(ch.id()), *pos))
-            .collect();
+        let mut colliding_chars: Vec<&Character> = Vec::new();
+        for i in 0..positions.len() {
+            if let Some(collision) = self
+                .pathfind_grid
+                .check_collision(character.id(), positions[i])
+            {
+                dbg!(&collision);
+                colliding_chars = vec![character];
+                if let Collision::Characters(chars) = collision {
+                    for other_id in chars {
+                        colliding_chars.push(self.characters.get(other_id));
+                    }
+                }
+                positions.truncate(i);
+                break;
+            }
+        }
 
-        let reduction_from_collision = original_distance - positions.len();
+        let total_collision_dmg = original_distance - positions.len();
 
         if positions.len() > 1 {
-            self.ui_handle_event(GameEvent::CharacterReceivedKnockback { character: ch.id() })
-                .await;
-            self.perform_movement(ch.id(), positions, MovementType::KnockedBack)
-                .await?;
-        }
-        if reduction_from_collision > 0 {
-            let collision_damage = reduction_from_collision as u32;
-            self.perform_losing_health(ch, collision_damage);
-            self.ui_handle_event(GameEvent::CharacterTookDamage {
-                character: ch.id(),
-                amount: collision_damage,
-                source: DamageSource::KnockbackCollision,
+            self.ui_handle_event(GameEvent::CharacterReceivedKnockback {
+                character: character.id(),
             })
             .await;
+            self.perform_movement(character.id(), positions, MovementType::KnockedBack)
+                .await?;
+        }
+        if total_collision_dmg > 0 {
+            // Dive the damage evenly among all colliding characters
+            let collision_dmg = (total_collision_dmg / colliding_chars.len()) as u32;
+            let mut remainder = (total_collision_dmg % colliding_chars.len()) as u32;
+            for ch in colliding_chars {
+                let mut dmg = collision_dmg;
+                if remainder > 0 {
+                    remainder -= 1;
+                    dmg += 1;
+                }
+                if dmg > 0 {
+                    self.perform_losing_health(ch, dmg);
+                    self.ui_handle_event(GameEvent::CharacterTookDamage {
+                        character: ch.id(),
+                        amount: dmg,
+                        source: DamageSource::KnockbackCollision,
+                    })
+                    .await;
+                }
+            }
         }
 
         Ok(())
@@ -5661,7 +5687,7 @@ impl Character {
         protection
     }
 
-    pub fn attack_modifier(&self, hand: HandType) -> u32 {
+    pub fn base_attack_modifier(&self, hand: HandType) -> u32 {
         let str = self.strength();
         let agi = self.agility();
 
@@ -5675,7 +5701,11 @@ impl Character {
             AttackAttribute::Finesse => str.max(agi),
         };
 
-        let mut res = physical_attr + self.intellect();
+        physical_attr + self.intellect()
+    }
+
+    pub fn attack_modifier(&self, hand: HandType) -> u32 {
+        let mut res = self.base_attack_modifier(hand);
 
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Inspired) {

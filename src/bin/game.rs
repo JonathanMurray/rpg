@@ -171,8 +171,8 @@ async fn main() {
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
-        //FightId::VerticalSliceNew,
-        FightId::Test,
+        FightId::VerticalSliceNew,
+        //FightId::Test,
         ui_resources.clone(),
         sound_player.clone(),
     )

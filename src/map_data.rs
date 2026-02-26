@@ -63,6 +63,7 @@ pub fn create_game_grid(
         map_data.terrain_objects.clone(),
         map_data.decorations.clone(),
         resources.status_textures.clone(),
+        resources.effect_textures.clone(),
         sound_player,
     );
 
