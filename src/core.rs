@@ -1746,7 +1746,7 @@ impl CoreGame {
     }
 
     fn perform_spell_enemy_effect(
-        caster: &Character,
+        caster: &Rc<Character>,
         ability_name: &'static str,
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
@@ -1756,6 +1756,8 @@ impl CoreGame {
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
+        println!("perform_spell_enemy_effect({}) ...", ability_name);
+        dbg!(ability_roll);
         let real_game = mode.real_game();
 
         let success = match spell_enemy_effect.defense_type {
@@ -1823,9 +1825,7 @@ impl CoreGame {
                     }
                 }
 
-                let graze = degree_of_success == -1;
-
-                if graze {
+                if degree_of_success == -1 {
                     dmg_str.push_str(" -50% (Graze)");
                     dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
                 } else if increased_by_good_roll && degree_of_success > 0 {
@@ -1833,14 +1833,29 @@ impl CoreGame {
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                 }
 
+                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                    // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
+                    println!("does target have prot?");
+                    if target.conditions.borrow().has(&Condition::Protected) {
+                        println!("yes it does");
+                        apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                        dbg!(&dmg_str);
+                        dbg!(&dmg_calculation);
+                    } else {
+                        println!("no it doesn't");
+                    }
+                } else {
+                    println!("ability did not roll with atk mod: {}", ability_name);
+                }
+
                 let damage = dmg_calculation.max(0) as u32;
 
                 if let Some(game) = real_game {
-                    if dmg_calculation > 0 {
-                        game.perform_losing_health(target, damage);
-                        dmg_str.push_str(&format!(" = {damage}"));
-                        detail_lines.push(dmg_str);
-                    }
+                    //if dmg_calculation > 0 {
+                    game.perform_losing_health(target, damage);
+                    dmg_str.push_str(&format!(" = {damage}"));
+                    detail_lines.push(dmg_str);
+                    //}
                 }
 
                 Some(damage)
@@ -1953,6 +1968,23 @@ impl CoreGame {
                         }
                         damage_from_effects += damage;
                         detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                    }
+                }
+
+                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                    // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
+                    if target.lose_protected() {
+                        detail_lines.push(format!("{} lost Protected", target.name));
+                    }
+
+                    if are_entities_within_melee(caster.pos(), target.pos()) {
+                        if let Some(previously_engaged) = caster.engagement_target.take() {
+                            game.characters
+                                .get(previously_engaged)
+                                .set_not_engaged_by(caster.id());
+                        }
+                        target.set_engaged_by(Rc::clone(caster));
+                        caster.engagement_target.set(Some(target.id()));
                     }
                 }
             }
@@ -2218,8 +2250,7 @@ impl CoreGame {
             }
 
             if defender.conditions.borrow().has(&Condition::Protected) {
-                dmg_str.push_str(" -30% (Protected)");
-                dmg_calculation -= (dmg_calculation as f32 * 0.3).ceil() as i32;
+                apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
             }
 
             if !armor_penetrators.is_empty() {
@@ -3471,6 +3502,11 @@ impl Display for AttackHitEffect {
             AttackHitEffect::SkipExertion => f.write_fmt(format_args!("No exertion")),
         }
     }
+}
+
+fn apply_protected_bonus_against_attack(dmg_str: &mut String, dmg_calculation: &mut i32) {
+    dmg_str.push_str(" -30% (Protected)");
+    *dmg_calculation -= (*dmg_calculation as f32 * 0.3).ceil() as i32;
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -5664,12 +5700,6 @@ impl Character {
         if let Some(shield) = self.shield() {
             protection += shield.armor;
         }
-
-        /*
-        if let Some(state) = self.conditions.borrow().get(&Condition::Protected) {
-            protection += state.stacks.unwrap();
-        }
-         */
 
         if self
             .known_passive_skills

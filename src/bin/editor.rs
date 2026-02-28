@@ -506,7 +506,7 @@ impl Sidebar {
             EditorAction::PlaceCharacter(CharacterType::Bob),
             EditorAction::PlaceCharacter(CharacterType::Alice),
             EditorAction::PlaceCharacter(CharacterType::Clara),
-            EditorAction::PlaceCharacter(CharacterType::Skeleton),
+            EditorAction::PlaceCharacter(CharacterType::SkeletonLeader),
             EditorAction::PlaceCharacter(CharacterType::Ghoul1),
             EditorAction::PlaceCharacter(CharacterType::Ghoul2),
             EditorAction::PlaceCharacter(CharacterType::Ogre),

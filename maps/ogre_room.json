@@ -518,7 +518,7 @@
       "shield": null
     },
     {
-      "type_": "Skeleton",
+      "type_": "SkeletonLeader",
       "pos": [
         30,
         21

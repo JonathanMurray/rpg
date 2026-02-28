@@ -1436,7 +1436,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        dbg!(&event);
+        //dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {

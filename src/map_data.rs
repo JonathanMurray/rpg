@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
-        HandType, Party, Position, Shield, Weapon,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
+        EquipmentEntry, HandType, Party, Position, Shield, Weapon,
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, ENEMY_BRACE,
@@ -154,6 +154,7 @@ pub enum CharacterType {
     Alice,
     Clara,
     Skeleton,
+    SkeletonLeader,
     Ogre,
     Ghoul1,
     Ghoul2,
@@ -166,6 +167,7 @@ impl CharacterType {
             CharacterType::Alice => SpriteId::Alice,
             CharacterType::Clara => SpriteId::Clara,
             CharacterType::Skeleton => SpriteId::Skeleton,
+            CharacterType::SkeletonLeader => SpriteId::Skeleton,
             CharacterType::Ogre => SpriteId::Ogre,
             CharacterType::Ghoul1 => SpriteId::Ghoul,
             CharacterType::Ghoul2 => SpriteId::Ghoul,
@@ -245,6 +247,23 @@ pub fn create_character(
             char
         }
         CharacterType::Skeleton => {
+            let skeleton = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                "Skeleton",
+                PortraitId::Skeleton,
+                char_data.type_.sprite_id(),
+                Attributes::new(4, 4, 4, 1),
+                pos,
+            );
+            skeleton.health.change_max_value_to(35);
+            skeleton.armor_piece.set(Some(SHIRT));
+            skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
+            skeleton.set_shield(SMALL_SHIELD);
+            skeleton.learn_ability(ENEMY_BRACE);
+
+            skeleton
+        }
+        CharacterType::SkeletonLeader => {
             let skeleton = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Skeleton",
