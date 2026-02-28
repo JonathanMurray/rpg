@@ -63,16 +63,17 @@ async fn main() {
     let (party, mut player_characters) = make_low_level_party();
 
     dbg!(get_time());
+
     /*
-       player_characters = run_fight_loop(
-           resources.clone(),
-           player_characters,
-           FightId::EasyCluster,
-           //FightId::Test,
-           ui_resources.clone(),
-           sound_player.clone(),
-       )
-       .await;
+      player_characters = run_fight_loop(
+          resources.clone(),
+          player_characters,
+          FightId::EasyCluster,
+          //FightId::Test,
+          ui_resources.clone(),
+          sound_player.clone(),
+      )
+      .await;
     */
 
     let bob = player_characters
@@ -86,14 +87,16 @@ async fn main() {
         .unwrap();
     alice.learn_ability(INSPIRE);
 
-    player_characters = run_fight_loop(
-        resources.clone(),
-        player_characters,
-        FightId::EasyGuard,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::EasyGuard,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
 
     player_characters.push(make_medium_clara(&party));
     let alice = player_characters

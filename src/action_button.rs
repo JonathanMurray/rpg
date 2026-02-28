@@ -285,7 +285,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if let Some(effect) = effect.on_damage_effect {
         t.technical_description
-            .push("(If attack deals damage)".to_string());
+            .push("|<faded>On damage:|".to_string());
         match effect {
             AttackEnhancementOnHitEffect::RegainActionPoint => {
                 t.technical_description.push("Regain AP".to_string())
@@ -662,10 +662,18 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             }
         }
 
-        AbilityNegativeEffect::PerformAttack => {
-            t.technical_description.push(EVASION_STR.to_string());
+        AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
             t.technical_description
-                .push("  weapon |<sword>|".to_string());
+                .push(defense_str(DefenseType::Evasion).to_string());
+            let dmg_str = ability_attack_effect
+                .override_damage
+                .map(|dmg| dmg.to_string())
+                .unwrap_or("weapon".to_string());
+            t.technical_description
+                .push(format!("  |<sword>| |<value>{dmg_str}|"));
+            if let Some(apply_effect) = ability_attack_effect.on_hit {
+                describe_apply_effect(apply_effect, t);
+            }
         }
     }
 }

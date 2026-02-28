@@ -284,7 +284,7 @@ impl GameGrid {
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();
-        Self {
+        let self_ = Self {
             sprites,
             pathfind_grid,
             //routes: Default::default(),
@@ -314,7 +314,12 @@ impl GameGrid {
             status_textures,
             effect_textures,
             sound_player,
-        }
+        };
+
+        // Adjust the camera position, based on the map dimensions
+        self_.pan_camera(0.0, 0.0);
+
+        self_
     }
 
     /// Should only be called from editor; not from in-game!

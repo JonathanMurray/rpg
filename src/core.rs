@@ -475,6 +475,7 @@ impl CoreGame {
                                     None,
                                     0,
                                     ActionPerformanceMode::Real(self),
+                                    None,
                                 );
 
                                 self.ui_handle_event(GameEvent::Attacked(event)).await;
@@ -563,6 +564,7 @@ impl CoreGame {
                         reaction,
                         0,
                         ActionPerformanceMode::Real(self),
+                        None,
                     );
                     self.ui_handle_event(GameEvent::Attacked(event.clone()))
                         .await;
@@ -774,6 +776,7 @@ impl CoreGame {
                                 None,
                                 0,
                                 ActionPerformanceMode::Real(self),
+                                None,
                             );
                             self.ui_handle_event(GameEvent::Attacked(event)).await;
                         }
@@ -1638,7 +1641,7 @@ impl CoreGame {
                             }
                         }
                     }
-                    AbilityNegativeEffect::PerformAttack => {
+                    AbilityNegativeEffect::PerformAttack { .. } => {
                         // The relevant details will come from perform_attack, not from here.
                     }
                 }
@@ -1722,7 +1725,7 @@ impl CoreGame {
                 area_center,
                 mode,
             ),
-            AbilityNegativeEffect::PerformAttack => {
+            AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
                 let attack_enhancement_effects: Vec<(&str, AttackEnhancementEffect)> = enhancements
                     .iter()
                     .filter_map(|e| e.attack_enhancement_effect())
@@ -1738,6 +1741,7 @@ impl CoreGame {
                     None,
                     roll_modifier,
                     mode,
+                    Some(ability_attack_effect),
                 );
 
                 AbilityTargetOutcome::AttackedEnemy(event)
@@ -1835,27 +1839,19 @@ impl CoreGame {
 
                 if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
                     // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                    println!("does target have prot?");
                     if target.conditions.borrow().has(&Condition::Protected) {
-                        println!("yes it does");
                         apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
                         dbg!(&dmg_str);
                         dbg!(&dmg_calculation);
-                    } else {
-                        println!("no it doesn't");
                     }
-                } else {
-                    println!("ability did not roll with atk mod: {}", ability_name);
                 }
 
                 let damage = dmg_calculation.max(0) as u32;
 
                 if let Some(game) = real_game {
-                    //if dmg_calculation > 0 {
                     game.perform_losing_health(target, damage);
                     dmg_str.push_str(&format!(" = {damage}"));
                     detail_lines.push(dmg_str);
-                    //}
                 }
 
                 Some(damage)
@@ -2039,6 +2035,7 @@ impl CoreGame {
         maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
         ability_roll_modifier: i32,
         mode: ActionPerformanceMode,
+        ability_attack_effect: Option<AbilityAttackEffect>,
     ) -> AttackedEvent {
         let game = match mode {
             ActionPerformanceMode::Real(core_game) => Some(core_game),
@@ -2185,15 +2182,22 @@ impl CoreGame {
         let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = if roll_result >= evasion.saturating_sub(10) {
             let mut on_true_hit_effect = None;
-            let mut dmg_calculation = weapon.damage as i32;
-
-            let mut dmg_str = format!("  Damage: {} ({})", dmg_calculation, weapon.name);
-            let mut hit_type = AttackHitType::Regular;
-
-            if matches!(weapon.grip, WeaponGrip::Versatile) && attacker.off_hand.get().is_empty() {
-                let bonus_dmg = 1;
-                dmg_str.push_str(&format!(" +{} (two-handed)", bonus_dmg));
-                dmg_calculation += bonus_dmg;
+            let dmg_override = ability_attack_effect.map(|e| e.override_damage).flatten();
+            let mut dmg_str = "  Damage: ".to_string();
+            let mut dmg_calculation;
+            if let Some(dmg) = dmg_override {
+                dmg_calculation = dmg as i32;
+                dmg_str.push_str(&dmg.to_string());
+            } else {
+                dmg_calculation = weapon.damage as i32;
+                dmg_str.push_str(&format!("{} ({})", dmg_calculation, weapon.name));
+                if matches!(weapon.grip, WeaponGrip::Versatile)
+                    && attacker.off_hand.get().is_empty()
+                {
+                    let bonus_dmg = 1;
+                    dmg_str.push_str(&format!(" +{} (two-handed)", bonus_dmg));
+                    dmg_calculation += bonus_dmg;
+                }
             }
 
             let mut graze_improvement = None;
@@ -2220,11 +2224,13 @@ impl CoreGame {
                 }
             }
 
-            if roll_result < evasion {
-                hit_type = AttackHitType::Graze;
+            let hit_type = if roll_result < evasion {
+                AttackHitType::Graze
             } else if roll_result >= evasion + 10 {
-                hit_type = AttackHitType::Critical;
-            }
+                AttackHitType::Critical
+            } else {
+                AttackHitType::Regular
+            };
 
             match hit_type {
                 AttackHitType::Graze => {
@@ -2287,6 +2293,12 @@ impl CoreGame {
                         }
                         AttackHitEffect::SkipExertion => skip_attack_exertion = true,
                     }
+                }
+
+                if let Some(effect) = ability_attack_effect.map(|e| e.on_hit).flatten() {
+                    let (applied, log_line, _damage) =
+                        game.perform_effect_application(effect, Some(attacker), None, defender);
+                    detail_lines.push(log_line);
                 }
 
                 if damage > 0 {
@@ -2855,6 +2867,7 @@ pub fn predict_attack(
             reaction,
             ability_roll_modifier,
             ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
+            None,
         );
 
         let damage = match event.outcome {
@@ -4032,6 +4045,7 @@ pub enum AbilityId {
     SearingLight,
     Kill,
 
+    EnemySlashingAttack,
     MagiHeal,
     MagiInflictWounds,
     MagiInflictHorrors,
@@ -4066,14 +4080,14 @@ pub struct SpellNegativeEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityNegativeEffect {
     Spell(SpellNegativeEffect),
-    PerformAttack,
+    PerformAttack(AbilityAttackEffect),
 }
 
 impl AbilityNegativeEffect {
     fn unwrap_spell(&self) -> &SpellNegativeEffect {
         match self {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => spell_enemy_effect,
-            AbilityNegativeEffect::PerformAttack => panic!(),
+            AbilityNegativeEffect::PerformAttack { .. } => panic!(),
         }
     }
 
@@ -4086,6 +4100,21 @@ impl AbilityNegativeEffect {
             }
         }
         false
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub struct AbilityAttackEffect {
+    pub override_damage: Option<u32>,
+    pub on_hit: Option<ApplyEffect>,
+}
+
+impl AbilityAttackEffect {
+    pub const fn default() -> Self {
+        Self {
+            override_damage: None,
+            on_hit: None,
+        }
     }
 }
 

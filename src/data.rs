@@ -1,17 +1,19 @@
+use std::default;
+
 use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
 
 use crate::{
     action_button::Keyword,
     core::{
-        Ability, AbilityChargeFx, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityId,
-        AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget,
-        ApplyCondition, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition, ArmorPiece,
-        Arrow, AttackAttribute, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, AttackHitEffect, AttackType, Condition, Consumable,
-        DefenseType, EquipEffect, EquipmentRequirement, Fraction, HandType, OnAttackedReaction,
-        OnAttackedReactionEffect, OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction,
-        OnHitReactionEffect, Range, Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon,
-        WeaponGrip, WeaponRange, WeaponType,
+        Ability, AbilityAttackEffect, AbilityChargeFx, AbilityDamage, AbilityEffect,
+        AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach,
+        AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
+        AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
+        AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
+        Condition, Consumable, DefenseType, EquipEffect, EquipmentRequirement, Fraction, HandType,
+        OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
+        OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
+        SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
     grid::ParticleShape,
     sounds::SoundId,
@@ -129,6 +131,25 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
                 duration_rounds: None,
             }),
         )),
+        //inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
+        ..AttackEnhancementEffect::default()
+    },
+    ..AttackEnhancement::default()
+};
+
+pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
+    name: "Slashing",
+    icon: IconId::Slashing,
+    effect: AttackEnhancementEffect {
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            None,
+            ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Bleeding,
+                stacks: Some(4),
+                duration_rounds: None,
+            }),
+        )),
+        roll_modifier: -5,
         //inflict_x_condition_per_damage: Some((Fraction::new(1, 2), Condition::Bleeding)),
         ..AttackEnhancementEffect::default()
     },
@@ -391,7 +412,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     description: "Push the target away in a straight line",
     // TODO: unique icon
     icon: IconId::Extend,
-    stamina_cost: 2,
+    stamina_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
         target_on_hit: Some([Some(ApplyEffect::Knockback(3)), None]),
         ..SpellEnhancementEffect::default()
@@ -409,8 +430,20 @@ pub const SHIELD_BASH: Ability = Ability {
     requirement: Some(EquipmentRequirement::Shield),
     possible_enhancements: [Some(SHIELD_BASH_KNOCKBACK), None, None],
 
+    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
+        /*
+        effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect {
+            override_damage: Some(3),
+            on_hit: Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Dazed,
+                duration_rounds: Some(1),
+                stacks: None,
+            })),
+            ..AbilityAttackEffect::default()
+        }),
+         */
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::AtLeast(3)),
@@ -426,7 +459,6 @@ pub const SHIELD_BASH: Ability = Ability {
         impact_circle: None,
     },
     animation_color: GRAY,
-    roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: None,
@@ -461,6 +493,38 @@ pub const ENEMY_TACKLE: Ability = Ability {
     },
     animation_color: GRAY,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
+    initiate_sound: None,
+    resolve_sound: Some(SoundId::Explosion),
+    charge_fx: None,
+};
+
+pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
+    id: AbilityId::EnemySlashingAttack,
+    name: "Slashing attack",
+    description: "Deal a small amount of damage and causes Bleeding",
+    icon: IconId::Slashing,
+    action_point_cost: 3,
+    stamina_cost: 0,
+    mana_cost: 0,
+    requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
+    possible_enhancements: [None, None, None],
+
+    roll: Some(AbilityRollType::RollDuringAttack(0)),
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect {
+            override_damage: Some(2),
+            on_hit: Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Bleeding,
+                duration_rounds: None,
+                stacks: Some(5),
+            })),
+            ..AbilityAttackEffect::default()
+        }),
+        impact_circle: None,
+    },
+    animation_color: GRAY,
+
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: None,
@@ -684,9 +748,12 @@ pub const SWEEP_ATTACK: Ability = Ability {
     possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
+            // Melee
             shape: AreaShape::Circle(Range::Float(2.5)),
             acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
+                AbilityAttackEffect::default(),
+            )),
         }),
         self_effect: None,
     },
@@ -750,7 +817,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
     ],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::MoveIntoMelee(Range::Float(10.0)),
-        effect: AbilityNegativeEffect::PerformAttack,
+        effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect::default()),
         impact_circle: None,
     },
     animation_color: GRAY,
@@ -768,7 +835,7 @@ pub const ENEMY_BRACE: Ability = Ability {
     name: "Brace",
     description: "",
     icon: IconId::Brace,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: Some(EquipmentRequirement::Shield),
@@ -1155,7 +1222,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Energize,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([Some(ApplyEffect::GainStamina(2)), None]),
+        target_on_hit: Some([Some(ApplyEffect::GainStamina(4)), None]),
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -1472,7 +1539,9 @@ pub const PIERCING_SHOT: Ability = Ability {
         area_effect: AreaEffect {
             shape: AreaShape::Line,
             acquisition: AreaTargetAcquisition::Enemies,
-            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack),
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
+                AbilityAttackEffect::default(),
+            )),
         },
     },
     animation_color: RED,
@@ -1756,7 +1825,7 @@ impl PassiveSkill {
             WeaponProficiency => "Attacks gain |<value>+1| armor penetration",
             CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
-            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to the negative effects of |<keyword>Near-death|",
+            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
             ThrillOfBattle => "|<value>+5| |<dice>| |<stat>|Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"

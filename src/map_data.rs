@@ -12,7 +12,8 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, ENEMY_BRACE,
-        ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, SMALL_SHIELD,
+        ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE, GOOD_CHAIN_MAIL,
+        SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -247,7 +248,7 @@ pub fn create_character(
             char
         }
         CharacterType::Skeleton => {
-            let skeleton = Character::new(
+            let mut skeleton = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Skeleton",
                 PortraitId::Skeleton,
@@ -259,7 +260,10 @@ pub fn create_character(
             skeleton.armor_piece.set(Some(SHIRT));
             skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
             skeleton.set_shield(SMALL_SHIELD);
-            skeleton.learn_ability(ENEMY_BRACE);
+
+            //skeleton.learn_ability(ENEMY_BRACE);
+            //skeleton.learn_ability(ENEMY_SLASHING_ATTACK);
+            skeleton.known_attack_enhancements.push(ENEMY_SLASHING);
 
             skeleton
         }

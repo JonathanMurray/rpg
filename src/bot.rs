@@ -2,13 +2,13 @@ use core::f32;
 use std::{cell::Cell, iter, rc::Rc};
 
 use macroquad::rand::ChooseRandom;
-use rand::{random_range, Rng};
+use rand::{random_bool, random_range, Rng};
 
 use crate::{
     core::{
-        Ability, AbilityId, AbilityTarget, Action, ActionReach, ActionTarget, BaseAction,
-        Character, CharacterId, Condition, CoreGame, HandType, OnAttackedReaction, OnHitReaction,
-        Position,
+        Ability, AbilityId, AbilityTarget, Action, ActionReach, ActionTarget, AttackEnhancement,
+        BaseAction, Character, CharacterId, Condition, CoreGame, HandType, OnAttackedReaction,
+        OnHitReaction, Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
     pathfind::Path,
@@ -180,7 +180,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
             BotAction::Attack => {
                 if attack_reaches(bot, target) {
                     println!("bot attacks target");
-                    return Some(simple_attack_action(target));
+                    return Some(attack_action(bot, target));
                 }
             }
             BotAction::SingleTargetAbility(ability) => {
@@ -219,7 +219,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                         for player_char in &player_chars {
                             if attack_reaches(bot, player_char) {
                                 println!("bot attacks someone before moving to target");
-                                return Some(simple_attack_action(player_char));
+                                return Some(attack_action(bot, player_char));
                             }
                         }
                     }
@@ -267,10 +267,18 @@ enum BotAction {
     NonTargetAbility(Ability),
 }
 
-fn simple_attack_action(target: &Character) -> Action {
+fn attack_action(bot: &Character, target: &Character) -> Action {
+    let mut enhancements = vec![];
+
+    if random_bool(0.5) {
+        if let Some(e) = bot.known_attack_enhancements.first() {
+            enhancements.push(*e);
+        }
+    }
+
     Action::Attack {
         hand: HandType::MainHand,
-        enhancements: vec![],
+        enhancements,
         target: target.id(),
     }
 }
@@ -342,7 +350,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
                 != ActionReach::No
             {
                 if bot.can_attack(attack) {
-                    return Some(simple_attack_action(player_char));
+                    return Some(attack_action(bot, player_char));
                 } else {
                     println!("bot reaches a player char but doesn't have enough AP to attack. Let it chill.");
                     return None;

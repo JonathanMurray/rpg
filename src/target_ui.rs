@@ -246,6 +246,13 @@ impl TargetUi {
                     children.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
+                for e in &char.known_attack_enhancements {
+                    let btn = new_btn(ButtonAction::AttackEnhancement(*e));
+                    let id = btn.id;
+                    let btn = Rc::new(RefCell::new(btn));
+                    children.push(Element::RcRefCell(btn.clone()));
+                    self.buttons.insert(id, btn);
+                }
                 for ability in char.known_abilities() {
                     if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                         bot_using_spells = true;
