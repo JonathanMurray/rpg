@@ -1,11 +1,6 @@
-
-
-use macroquad::text::{
-    load_ttf_font, Font,
-};
+use macroquad::text::{load_ttf_font, Font};
 use macroquad::texture::FilterMode;
 use macroquad::window::Conf;
-
 
 use rpg::skill_tree::run_editor;
 

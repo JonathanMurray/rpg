@@ -1,7 +1,5 @@
 use std::{
-    collections::{
-        HashMap, HashSet,
-    },
+    collections::{HashMap, HashSet},
     fs,
     rc::Rc,
 };
@@ -16,8 +14,7 @@ use rand::{
 use crate::{
     bot::BotBehaviour,
     core::{
-        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, HandType,
-        Position,
+        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, HandType, Position,
     },
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
@@ -41,7 +38,12 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
         .into_iter()
         .map(|ch| (ch.name, ch))
         .collect();
-    let map_data = MapData::load_from_file("ogre_room.json");
+    let filename = match fight_id {
+        FightId::VerticalSliceNew => "ogre_room.json",
+        FightId::EasyCluster => "easy_map.json",
+        unhandled => todo!("Handle map: {:?}", unhandled),
+    };
+    let map_data = MapData::load_from_file(&format!("maps/{filename}"));
     let mut characters: Vec<Rc<Character>> = Default::default();
     let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
 
@@ -73,6 +75,13 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
         characters.push(char);
     }
 
+    assert_eq!(
+        player_chars_by_name.len(),
+        0,
+        "Unassigned player characters: {:?}",
+        player_chars_by_name.keys()
+    );
+
     for pos in map_data.terrain_objects.keys().copied() {
         pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
     }
@@ -93,13 +102,13 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let map_filename = match fight_id {
         FightId::EasyPair => "map_easy_pair.txt",
         FightId::EasyGuard => "map_easy_guard.txt",
-        FightId::EasyCluster => "map_easy_cluster.txt",
         FightId::EasySurrounded => "map_easy_surrounded.txt",
         FightId::EasyRiver => "map_easy_river.txt",
         FightId::EliteOgre => "map_elite.txt",
         FightId::EliteMagi => "map_elite2.txt",
         FightId::Test => "map_test.txt",
         FightId::VerticalSlice => "map_vertical_slice.txt",
+        FightId::EasyCluster => return init_fight_map_new(player_characters, fight_id),
         FightId::VerticalSliceNew => {
             return init_fight_map_new(player_characters, fight_id);
         }

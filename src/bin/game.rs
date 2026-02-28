@@ -20,23 +20,20 @@ use rpg::core::{
 };
 
 use rpg::data::{
-    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS,
-    FIREBALL, FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE, INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE,
-    INSPIRE, LEATHER_ARMOR, MANA_POTION, MEDIUM_SHIELD,
-    PIERCING_SHOT,
-    SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
+    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
+    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE,
+    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MANA_POTION,
+    MEDIUM_SHIELD, PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
     SWEEP_ATTACK, SWORD,
 };
 use rpg::init_fight_map::{init_fight_map, FightId};
+use rpg::map_data::{make_high_level_party, make_low_level_clara, make_low_level_party};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::run_shop_loop;
 use rpg::sounds::SoundPlayer;
-use rpg::textures::{
-    load_and_init_font_symbols,
-    load_and_init_ui_textures, PortraitId, SpriteId,
-};
+use rpg::textures::{load_and_init_font_symbols, load_and_init_ui_textures, PortraitId, SpriteId};
 use rpg::victory_scene::run_victory_loop;
 
 #[macroquad::main(window_conf)]
@@ -74,87 +71,37 @@ async fn main() {
 
     let sound_player = SoundPlayer::new().await;
 
-    let party = Rc::new(Party {
-        money: Cell::new(8),
-        stash: Default::default(),
-    });
-
-    let mut alice = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
-        "Alice",
-        PortraitId::Alice,
-        SpriteId::Alice,
-        Attributes::new(3, 5, 3, 3),
-        (1, 10),
-    );
-    alice.set_weapon(HandType::MainHand, BOW);
-    alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    alice.learn_ability(HEAL);
-    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
-    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
-    alice
-        .known_passive_skills
-        .push(PassiveSkill::WeaponProficiency);
-    alice.learn_ability(PIERCING_SHOT);
-
-    let mut bob = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
-        "Bob",
-        PortraitId::Bob,
-        SpriteId::Bob,
-        Attributes::new(5, 3, 3, 3),
-        (2, 10),
-    );
-    bob.set_weapon(HandType::MainHand, SWORD);
-    bob.set_shield(MEDIUM_SHIELD);
-    bob.armor_piece.set(Some(LEATHER_ARMOR));
-    bob.known_passive_skills.push(PassiveSkill::Reaper);
-    bob.learn_ability(SWEEP_ATTACK);
-    bob.learn_ability(SHIELD_BASH);
-    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(INSPIRE);
-    bob.known_attack_enhancements.push(SMITE);
-    //bob.known_attack_enhancements.push(EMPOWER);
-    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-
-    let mut clara = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
-        "Clara",
-        PortraitId::Clara,
-        SpriteId::Clara,
-        Attributes::new(2, 2, 3, 7),
-        (3, 10),
-    );
-    clara.set_weapon(HandType::MainHand, DAGGER);
-    // TODO:
-    clara.armor_piece.set(Some(SHIRT));
-    clara
-        .known_passive_skills
-        .push(PassiveSkill::CriticalCharge);
-    clara.learn_ability(FIREBALL);
-    clara.known_ability_enhancements.push(FIREBALL_INFERNO);
-    clara.known_ability_enhancements.push(FIREBALL_REACH);
-    clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
-    clara.learn_ability(SHACKLED_MIND);
-    clara.learn_ability(INFLICT_WOUNDS);
-    clara
-        .known_ability_enhancements
-        .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
-    //clara.learn_ability(MIND_BLAST);
-
-    clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
-    clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
-
-    let mut player_characters = vec![clara, alice, bob];
+    let (party, mut player_characters) = make_low_level_party();
 
     dbg!(get_time());
 
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
-        FightId::VerticalSliceNew,
+        FightId::EasyCluster,
         //FightId::Test,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
+
+    let bob = player_characters
+        .iter()
+        .find(|ch| ch.name == "Bob")
+        .unwrap();
+    bob.learn_ability(SWEEP_ATTACK);
+    let alice = player_characters
+        .iter()
+        .find(|ch| ch.name == "Alice")
+        .unwrap();
+    alice.learn_ability(PIERCING_SHOT);
+
+    player_characters.push(make_low_level_clara(&party));
+
+    player_characters = run_fight_loop(
+        resources.clone(),
+        player_characters,
+        FightId::VerticalSliceNew,
         ui_resources.clone(),
         sound_player.clone(),
     )

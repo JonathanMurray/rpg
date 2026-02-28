@@ -1,30 +1,26 @@
-use std::cell::{Cell};
+use std::cell::Cell;
 use std::collections::HashMap;
+use std::env;
 use std::rc::Rc;
 use std::sync::atomic::Ordering;
 
 use macroquad::color::{Color, BLACK, LIGHTGRAY, RED, WHITE, YELLOW};
 use macroquad::input::{
-    is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
+    is_key_down, is_key_pressed, is_mouse_button_down, is_mouse_button_pressed, mouse_position,
+    KeyCode, MouseButton,
 };
 use macroquad::math::Rect;
 use macroquad::miniquad::window::set_window_position;
 use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
-use macroquad::text::{
-    draw_text, draw_text_ex, measure_text, Font, TextParams,
-};
+use macroquad::text::{draw_text, draw_text_ex, measure_text, Font, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
-use macroquad::window::{screen_width, Conf};
 use macroquad::window::{next_frame, screen_height};
+use macroquad::window::{screen_width, Conf};
 
 use rpg::base_ui::{
-    Align, Checkbox, Container, Drawable, Element,
-    LayoutDirection, Style, TextLine,
+    Align, Checkbox, Container, Drawable, Element, LayoutDirection, Style, TextLine,
 };
-use rpg::core::{
-    Character,
-    CharacterId, HandType, Party,
-};
+use rpg::core::{Character, CharacterId, HandType, Party};
 
 use rpg::game_ui::UiState;
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
@@ -34,14 +30,21 @@ use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_and_init_font_symbols, load_and_init_ui_textures,
-    terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
+    load_and_init_font_symbols, load_and_init_ui_textures, terrain_atlas_area, EquipmentIconId,
+    SpriteId, TerrainId,
 };
 
-const SAVE_FILE_NAME: &str = "ogre_room.json";
+const DEFAULT_FILENAME: &str = "ogre_room.json";
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    let args: Vec<String> = env::args().collect();
+    let filepath = "maps/".to_string()
+        + &args
+            .into_iter()
+            .nth(1)
+            .unwrap_or(DEFAULT_FILENAME.to_string());
+
     // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
     set_window_position(100, 100);
 
@@ -50,7 +53,7 @@ async fn main() {
     load_and_init_font_symbols().await;
     load_and_init_ui_textures().await;
 
-    let mut map_data = MapData::load_from_file(SAVE_FILE_NAME);
+    let mut map_data = MapData::load_from_file(&filepath);
 
     let sound_player = SoundPlayer::new().await;
 
@@ -72,7 +75,7 @@ async fn main() {
         Rc::clone(&snap_to_grid),
     );
 
-    let file_text = format!("{:?}", SAVE_FILE_NAME);
+    let file_text = format!("{:?}", filepath);
     let mut has_unsaved_changes = false;
 
     let mut inspect_target = None;
@@ -424,7 +427,7 @@ async fn main() {
         }
 
         if is_key_down(KeyCode::LeftControl) && is_key_pressed(KeyCode::S) {
-            map_data.save_to_file(SAVE_FILE_NAME);
+            map_data.save_to_file(&filepath);
             has_unsaved_changes = false;
         }
     }
@@ -455,10 +458,12 @@ enum EditorAction {
 
 impl Sidebar {
     fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
-        let backgrounds = [TerrainId::Floor,
+        let backgrounds = [
+            TerrainId::Floor,
             TerrainId::Floor2,
             TerrainId::Floor3,
-            TerrainId::Floor4];
+            TerrainId::Floor4,
+        ];
 
         let mut background_actions: Vec<EditorAction> = backgrounds
             .iter()
@@ -466,26 +471,30 @@ impl Sidebar {
             .collect();
         background_actions.push(EditorAction::EraseBackground);
 
-        let terrain_ids = [TerrainId::Bush,
+        let terrain_ids = [
+            TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
             TerrainId::NewWaterNorthEast,
-            TerrainId::StoneWallConvexNorthEast];
+            TerrainId::StoneWallConvexNorthEast,
+        ];
         let mut terrain_actions: Vec<EditorAction> = terrain_ids
             .iter()
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
         terrain_actions.push(EditorAction::EraseTerrain);
 
-        let decorations = [TerrainId::BookShelf,
+        let decorations = [
+            TerrainId::BookShelf,
             TerrainId::WallPainting,
             TerrainId::WallPainting2,
             TerrainId::WallFlag,
             TerrainId::WallWindow,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
-            TerrainId::Mat];
+            TerrainId::Mat,
+        ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
             .map(|t| EditorAction::PlaceDecoration(*t))

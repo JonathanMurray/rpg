@@ -1,4 +1,3 @@
-
 use macroquad::{
     color::{Color, GOLD},
     shapes::draw_rectangle,

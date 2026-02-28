@@ -346,6 +346,7 @@ impl CoreGame {
                     remainder -= 1;
                     dmg += 1;
                 }
+                let dmg = total_collision_dmg as u32;
                 if dmg > 0 {
                     self.perform_losing_health(ch, dmg);
                     self.ui_handle_event(GameEvent::CharacterTookDamage {
@@ -508,9 +509,12 @@ impl CoreGame {
                         let mut maybe_ally_reaction: Option<(u32, OnAttackedReaction)> = None;
                         for ch in self.characters.iter() {
                             let is_ally = ch.player_controlled() == defender.player_controlled();
-                            if is_ally && are_entities_within_melee(defender.pos(), ch.pos()) && !ch
+                            if is_ally
+                                && are_entities_within_melee(defender.pos(), ch.pos())
+                                && !ch
                                     .usable_on_attacked_reactions(is_within_melee, false)
-                                    .is_empty() {
+                                    .is_empty()
+                            {
                                 let r = self
                                     .user_interface
                                     .choose_attack_reaction(
@@ -4887,10 +4891,9 @@ impl Character {
     }
 
     pub fn set_id(&self, id: CharacterId) {
-        assert!(
-            self.id.get().is_none(),
-            "set_id() should only be used at initialisation. Tried to set id = {}, but {} already has id = {:?}",
-            id, self.name, self.id
+        println!(
+            "Setting {} ID = {}. Previous value = {:?}",
+            self.name, id, self.id
         );
         self.id.set(Some(id));
     }

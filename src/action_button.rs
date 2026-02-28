@@ -642,9 +642,10 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
 fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
-            if let Some(defense_type) = effect.defense_type { t
-            .technical_description
-            .push(defense_str(defense_type).to_string()) };
+            if let Some(defense_type) = effect.defense_type {
+                t.technical_description
+                    .push(defense_str(defense_type).to_string())
+            };
 
             match effect.damage {
                 Some(AbilityDamage::Static(n)) => t

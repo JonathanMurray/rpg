@@ -473,7 +473,21 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 0,
     on_hit_reaction: None,
-    on_attacked_reaction: None,
+    on_attacked_reaction: Some(OnAttackedReaction {
+        id: OnAttackedReactionId::Block,
+        name: "Block",
+        description: "Mitigate an attack against you or an adjacent ally (once per round)",
+        icon: IconId::Block,
+        action_point_cost: 0,
+        stamina_cost: 1,
+        effect: OnAttackedReactionEffect {
+            bonus_evasion: 10,
+            bonus_armor: 0,
+        },
+        required_attack_type: None,
+        used_hand: Some(HandType::OffHand),
+        target: OnAttackedReactionTarget::SelfOrAdjacentAlly,
+    }),
     weight: 2,
 };
 

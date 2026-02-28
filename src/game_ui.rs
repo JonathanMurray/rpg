@@ -10,7 +10,7 @@ use macroquad::{
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     shapes::draw_rectangle,
-    text::{Font},
+    text::Font,
     texture::{draw_texture, Texture2D},
     window::{screen_height, screen_width},
 };
@@ -31,8 +31,9 @@ use crate::{
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
         AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource, GameEvent, Goodness, HandType, MovementType,
-        OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
+        DamageSource, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction,
+        OnHitReaction, Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -2919,15 +2920,20 @@ impl ResourceBars {
             "<stamina>",
         )));
 
+        let mut children = vec![Element::RcRefCell(health_bar.clone())];
+
+        if character.stamina.max() > 0 {
+            children.push(Element::RcRefCell(stamina_bar.clone()));
+        }
+        if character.mana.max() > 0 {
+            children.push(Element::RcRefCell(mana_bar.clone()));
+        }
+
         let container = Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 9.0,
             align: Align::Start,
-            children: vec![
-                Element::RcRefCell(health_bar.clone()),
-                Element::RcRefCell(stamina_bar.clone()),
-                Element::RcRefCell(mana_bar.clone()),
-            ],
+            children,
             style: Style {
                 border_color: Some(DARKGRAY),
                 padding: 5.0,

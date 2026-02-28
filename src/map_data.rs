@@ -1,5 +1,5 @@
 use core::f32;
-use std::{collections::HashMap, fs, rc::Rc};
+use std::{cell::Cell, collections::HashMap, fs, rc::Rc};
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -7,17 +7,26 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        Attributes, Bot, Character, CharacterId, CharacterKind, HandType, Party, Position, Shield, Weapon,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
+        HandType, Party, Position, Shield, Weapon,
     },
     data::{
-        PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR, SHIRT, SMALL_SHIELD, SWORD,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, ENEMY_BRACE,
+        ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
     resources::GameResources,
     sounds::SoundPlayer,
     textures::{PortraitId, SpriteId, TerrainId},
+};
+
+use crate::data::{
+    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
+    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE,
+    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MANA_POTION,
+    MEDIUM_SHIELD, PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
+    SWEEP_ATTACK, SWORD,
 };
 
 pub fn create_game_grid(
@@ -76,7 +85,7 @@ pub struct MapData {
 }
 
 impl MapData {
-    pub fn save_to_file(&self, filename: &str) {
+    pub fn save_to_file(&self, filepath: &str) {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
         let background = keys_pos_to_str(&self.background);
         let decorations = keys_pos_to_str(&self.decorations);
@@ -88,11 +97,11 @@ impl MapData {
             characters: self.characters.clone(),
         };
         let json_str = serde_json::to_string_pretty(&map_data).unwrap();
-        fs::write(filename, json_str).expect("Writing json to file");
+        fs::write(filepath, json_str).expect("Writing json to file");
     }
 
-    pub fn load_from_file(filename: &str) -> Self {
-        let json = fs::read_to_string(filename).unwrap();
+    pub fn load_from_file(filepath: &str) -> Self {
+        let json = fs::read_to_string(filepath).unwrap();
         let map_data = match serde_json::from_str::<SerializableMapData>(&json) {
             Ok(map_data) => map_data,
             Err(e) => {
@@ -339,4 +348,138 @@ fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
         behaviour,
         base_movement: move_speed,
     })
+}
+
+pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
+    let party = Rc::new(Party {
+        money: Cell::new(8),
+        stash: Default::default(),
+    });
+
+    let mut alice = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Alice",
+        PortraitId::Alice,
+        SpriteId::Alice,
+        Attributes::new(3, 5, 3, 3),
+        (1, 10),
+    );
+    alice.set_weapon(HandType::MainHand, BOW);
+    alice.armor_piece.set(Some(SHIRT));
+    alice.learn_ability(HEAL);
+    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
+
+    let mut bob = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Bob",
+        PortraitId::Bob,
+        SpriteId::Bob,
+        Attributes::new(5, 3, 3, 1),
+        (2, 10),
+    );
+    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_shield(SMALL_SHIELD);
+    bob.armor_piece.set(Some(SHIRT));
+    bob.learn_ability(SHIELD_BASH);
+    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
+
+    let player_characters = vec![alice, bob];
+
+    (party, player_characters)
+}
+
+pub fn make_low_level_clara(party: &Rc<Party>) -> Character {
+    let mut clara = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Clara",
+        PortraitId::Clara,
+        SpriteId::Clara,
+        Attributes::new(2, 2, 3, 7),
+        (3, 10),
+    );
+    clara.set_weapon(HandType::MainHand, DAGGER);
+    // TODO:
+    clara.armor_piece.set(Some(SHIRT));
+    clara.learn_ability(FIREBALL);
+    clara.known_ability_enhancements.push(FIREBALL_REACH);
+    clara.learn_ability(SHACKLED_MIND);
+    clara
+}
+
+pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
+    let party = Rc::new(Party {
+        money: Cell::new(8),
+        stash: Default::default(),
+    });
+
+    let mut alice = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Alice",
+        PortraitId::Alice,
+        SpriteId::Alice,
+        Attributes::new(3, 5, 3, 3),
+        (1, 10),
+    );
+    alice.set_weapon(HandType::MainHand, BOW);
+    alice.armor_piece.set(Some(SHIRT));
+    alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
+    alice.learn_ability(HEAL);
+    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
+    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
+    alice
+        .known_passive_skills
+        .push(PassiveSkill::WeaponProficiency);
+    alice.learn_ability(PIERCING_SHOT);
+
+    let mut bob = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Bob",
+        PortraitId::Bob,
+        SpriteId::Bob,
+        Attributes::new(5, 3, 3, 3),
+        (2, 10),
+    );
+    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_shield(MEDIUM_SHIELD);
+    bob.armor_piece.set(Some(LEATHER_ARMOR));
+    bob.known_passive_skills.push(PassiveSkill::Reaper);
+    bob.learn_ability(SWEEP_ATTACK);
+    bob.learn_ability(SHIELD_BASH);
+    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability(INSPIRE);
+    bob.known_attack_enhancements.push(SMITE);
+    //bob.known_attack_enhancements.push(EMPOWER);
+    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+
+    let mut clara = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Clara",
+        PortraitId::Clara,
+        SpriteId::Clara,
+        Attributes::new(2, 2, 3, 7),
+        (3, 10),
+    );
+    clara.set_weapon(HandType::MainHand, DAGGER);
+    // TODO:
+    clara.armor_piece.set(Some(SHIRT));
+    clara
+        .known_passive_skills
+        .push(PassiveSkill::CriticalCharge);
+    clara.learn_ability(FIREBALL);
+    clara.known_ability_enhancements.push(FIREBALL_INFERNO);
+    clara.known_ability_enhancements.push(FIREBALL_REACH);
+    clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
+    clara.learn_ability(SHACKLED_MIND);
+    clara.learn_ability(INFLICT_WOUNDS);
+    clara
+        .known_ability_enhancements
+        .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
+    //clara.learn_ability(MIND_BLAST);
+
+    clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+
+    let player_characters = vec![clara, alice, bob];
+
+    (party, player_characters)
 }

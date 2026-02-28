@@ -1035,7 +1035,10 @@ impl Container {
                     }
 
                     // Scrolling by dragging with mouse
-                    if (x + size.0..x + size.0 + bar_w).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y) && is_mouse_button_pressed(MouseButton::Left) {
+                    if (x + size.0..x + size.0 + bar_w).contains(&mouse_x)
+                        && (y..y + size.1).contains(&mouse_y)
+                        && is_mouse_button_pressed(MouseButton::Left)
+                    {
                         scroll.is_dragging.set(true);
                     }
 
