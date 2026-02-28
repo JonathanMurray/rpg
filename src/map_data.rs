@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
-        EquipmentEntry, HandType, Party, Position, Shield, Weapon,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
+        HandType, Party, Position, Shield, Weapon,
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, ENEMY_BRACE,
@@ -388,7 +388,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
 pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     let mut clara = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(party)),
         "Clara",
         PortraitId::Clara,
         SpriteId::Clara,
@@ -406,7 +406,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
 
 pub fn make_high_bob(party: &Rc<Party>) -> Character {
     let mut char = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(party)),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -429,7 +429,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
 
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
     let mut char = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(party)),
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
@@ -456,7 +456,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 
     let alice = make_high_alice(&party);
 
-    let mut bob = make_high_bob(&party);
+    let bob = make_high_bob(&party);
 
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),

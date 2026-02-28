@@ -1,6 +1,3 @@
-use std::cell::Cell;
-use std::rc::Rc;
-
 use macroquad::color::LIGHTGRAY;
 use macroquad::miniquad::window::{self, set_window_position};
 
@@ -15,25 +12,17 @@ use macroquad::{
 };
 
 use rpg::chest_scene::run_chest_loop;
-use rpg::core::{
-    ArrowStack, Attributes, Character, CharacterKind, EquipmentEntry, HandType, Party,
-};
+use rpg::core::Character;
 
-use rpg::data::{
-    PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
-    FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE,
-    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MANA_POTION,
-    MEDIUM_SHIELD, PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
-    SWEEP_ATTACK, SWORD,
-};
+use rpg::data::{CRIPPLING_SHOT, INSPIRE, SWEEP_ATTACK};
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_high_level_party, make_low_level_party, make_medium_clara};
+use rpg::map_data::{make_low_level_party, make_medium_clara};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::run_shop_loop;
 use rpg::sounds::SoundPlayer;
-use rpg::textures::{load_and_init_font_symbols, load_and_init_ui_textures, PortraitId, SpriteId};
+use rpg::textures::{load_and_init_font_symbols, load_and_init_ui_textures};
 use rpg::victory_scene::run_victory_loop;
 
 #[macroquad::main(window_conf)]
