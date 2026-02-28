@@ -398,6 +398,7 @@ pub enum TerrainId {
     Mat,
     WallOpeningNorth,
     WallOpeningEast,
+    WallOpeningWest,
     WallWindow,
 
     NewWaterNorthWest,
@@ -565,6 +566,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Mat => (4, 8),
         TerrainId::WallOpeningNorth => (5, 6),
         TerrainId::WallOpeningEast => (6, 6),
+        TerrainId::WallOpeningWest => (6, 7),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {

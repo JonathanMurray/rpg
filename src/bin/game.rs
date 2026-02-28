@@ -27,7 +27,7 @@ use rpg::data::{
     SWEEP_ATTACK, SWORD,
 };
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_high_level_party, make_low_level_clara, make_low_level_party};
+use rpg::map_data::{make_high_level_party, make_low_level_party, make_medium_clara};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
@@ -94,9 +94,23 @@ async fn main() {
         .iter()
         .find(|ch| ch.name == "Alice")
         .unwrap();
-    alice.learn_ability(PIERCING_SHOT);
+    alice.learn_ability(INSPIRE);
 
-    player_characters.push(make_low_level_clara(&party));
+    player_characters = run_fight_loop(
+        resources.clone(),
+        player_characters,
+        FightId::EasyGuard,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
+
+    player_characters.push(make_medium_clara(&party));
+    let alice = player_characters
+        .iter_mut()
+        .find(|ch| ch.name == "Alice")
+        .unwrap();
+    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
 
     player_characters = run_fight_loop(
         resources.clone(),

@@ -493,6 +493,7 @@ impl Sidebar {
             TerrainId::WallWindow,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
+            TerrainId::WallOpeningWest,
             TerrainId::Mat,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations

@@ -4,8 +4,8 @@
     30
   ],
   "terrain_objects": {
-    "(13, 28)": "StoneWallConvexNorthEast",
-    "(1, 25)": "StoneWallConvexNorthEast",
+    "(28, 19)": "StoneWallConvexNorthEast",
+    "(28, 22)": "StoneWallConvexNorthEast",
     "(1, 22)": "StoneWallConvexNorthEast",
     "(1, 19)": "StoneWallConvexNorthEast",
     "(1, 16)": "StoneWallConvexNorthEast",
@@ -21,50 +21,39 @@
     "(16, 1)": "StoneWallConvexNorthEast",
     "(19, 1)": "StoneWallConvexNorthEast",
     "(22, 1)": "StoneWallConvexNorthEast",
-    "(25, 1)": "StoneWallConvexNorthEast",
+    "(28, 16)": "StoneWallConvexNorthEast",
     "(28, 1)": "StoneWallConvexNorthEast",
     "(28, 4)": "StoneWallConvexNorthEast",
     "(28, 7)": "StoneWallConvexNorthEast",
     "(28, 10)": "StoneWallConvexNorthEast",
     "(28, 13)": "StoneWallConvexNorthEast",
-    "(28, 16)": "StoneWallConvexNorthEast",
-    "(28, 19)": "StoneWallConvexNorthEast",
-    "(28, 22)": "StoneWallConvexNorthEast",
-    "(28, 25)": "StoneWallConvexNorthEast",
-    "(28, 28)": "StoneWallConvexNorthEast",
-    "(10, 28)": "StoneWallConvexNorthEast",
-    "(7, 28)": "StoneWallConvexNorthEast",
-    "(4, 25)": "StoneWallConvexNorthEast",
-    "(22, 28)": "StoneWallConvexNorthEast",
-    "(25, 28)": "StoneWallConvexNorthEast",
-    "(13, 7)": "NewWaterNorthEast",
-    "(22, 25)": "StoneWallConvexNorthEast",
+    "(1, 25)": "StoneWallConvexNorthEast",
+    "(1, 28)": "StoneWallConvexNorthEast",
     "(4, 28)": "StoneWallConvexNorthEast",
-    "(25, 4)": "StoneWallConvexNorthEast",
-    "(25, 7)": "StoneWallConvexNorthEast",
-    "(25, 10)": "StoneWallConvexNorthEast",
-    "(25, 13)": "StoneWallConvexNorthEast",
-    "(25, 16)": "StoneWallConvexNorthEast",
-    "(25, 19)": "StoneWallConvexNorthEast",
-    "(25, 22)": "StoneWallConvexNorthEast",
-    "(25, 25)": "StoneWallConvexNorthEast",
-    "(10, 7)": "NewWaterNorthEast",
-    "(10, 10)": "NewWaterNorthEast",
-    "(13, 10)": "NewWaterNorthEast",
-    "(10, 4)": "NewWaterNorthEast",
-    "(16, 16)": "NewWaterNorthEast",
-    "(16, 13)": "NewWaterNorthEast",
-    "(13, 13)": "NewWaterNorthEast",
-    "(13, 16)": "NewWaterNorthEast",
-    "(13, 4)": "NewWaterNorthEast",
-    "(16, 10)": "NewWaterNorthEast",
-    "(10, 13)": "NewWaterNorthEast",
-    "(10, 16)": "NewWaterNorthEast",
-    "(16, 4)": "NewWaterNorthEast",
-    "(16, 7)": "NewWaterNorthEast",
-    "(19, 28)": "StoneWallConvexNorthEast",
+    "(7, 28)": "StoneWallConvexNorthEast",
+    "(10, 28)": "StoneWallConvexNorthEast",
+    "(13, 28)": "StoneWallConvexNorthEast",
     "(16, 28)": "StoneWallConvexNorthEast",
-    "(1, 28)": "StoneWallConvexNorthEast"
+    "(19, 28)": "StoneWallConvexNorthEast",
+    "(22, 28)": "StoneWallConvexNorthEast",
+    "(28, 28)": "StoneWallConvexNorthEast",
+    "(25, 28)": "StoneWallConvexNorthEast",
+    "(28, 25)": "StoneWallConvexNorthEast",
+    "(25, 1)": "StoneWallConvexNorthEast",
+    "(4, 13)": "StoneWallConvexNorthEast",
+    "(7, 13)": "StoneWallConvexNorthEast",
+    "(10, 13)": "StoneWallConvexNorthEast",
+    "(13, 13)": "StoneWallConvexNorthEast",
+    "(13, 10)": "StoneWallConvexNorthEast",
+    "(10, 10)": "StoneWallConvexNorthEast",
+    "(7, 10)": "StoneWallConvexNorthEast",
+    "(4, 10)": "StoneWallConvexNorthEast",
+    "(25, 13)": "StoneWallConvexNorthEast",
+    "(22, 13)": "StoneWallConvexNorthEast",
+    "(22, 10)": "StoneWallConvexNorthEast",
+    "(25, 10)": "StoneWallConvexNorthEast",
+    "(25, 25)": "StoneWallConvexNorthEast",
+    "(22, 25)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -224,43 +213,27 @@
     "(7, 28)": "Floor4"
   },
   "decorations": {
-    "(4, 1)": "WallWindow",
-    "(10, 1)": "WallWindow",
+    "(1, 21)": "WallOpeningWest",
+    "(4, 1)": "BookShelf",
+    "(10, 1)": "BookShelf",
+    "(13, 1)": "BookShelf",
+    "(22, 1)": "BookShelf",
+    "(25, 1)": "BookShelf",
+    "(7, 1)": "WallWindow",
     "(16, 1)": "WallWindow",
-    "(22, 1)": "WallWindow",
-    "(7, 1)": "WallOpeningNorth",
-    "(19, 1)": "WallOpeningNorth",
-    "(13, 1)": "WallPainting",
-    "(25, 16)": "WallOpeningEast",
-    "(25, 4)": "WallOpeningEast",
-    "(25, 10)": "WallOpeningEast"
+    "(19, 1)": "WallWindow",
+    "(28, 6)": "WallOpeningEast",
+    "(7, 6)": "Mat",
+    "(4, 13)": "WallPainting",
+    "(10, 13)": "WallPainting2",
+    "(28, 19)": "WallOpeningEast"
   },
   "characters": [
     {
       "type_": "Bob",
       "pos": [
         6,
-        7
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        6,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        4,
-        17
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -269,18 +242,28 @@
     {
       "type_": "Alice",
       "pos": [
-        4,
-        4
+        5,
+        24
       ],
       "health": null,
       "main_hand": null,
       "shield": null
     },
     {
-      "type_": "Ghoul1",
+      "type_": "Skeleton",
       "pos": [
-        20,
-        15
+        14,
+        21
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        5,
+        6
       ],
       "health": null,
       "main_hand": null,

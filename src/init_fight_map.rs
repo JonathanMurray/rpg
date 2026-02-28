@@ -41,6 +41,7 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
     let filename = match fight_id {
         FightId::VerticalSliceNew => "ogre_room.json",
         FightId::EasyCluster => "easy_map.json",
+        FightId::EasyGuard => "medium_map.json",
         unhandled => todo!("Handle map: {:?}", unhandled),
     };
     let map_data = MapData::load_from_file(&format!("maps/{filename}"));
@@ -101,7 +102,6 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
     let map_filename = match fight_id {
         FightId::EasyPair => "map_easy_pair.txt",
-        FightId::EasyGuard => "map_easy_guard.txt",
         FightId::EasySurrounded => "map_easy_surrounded.txt",
         FightId::EasyRiver => "map_easy_river.txt",
         FightId::EliteOgre => "map_elite.txt",
@@ -109,6 +109,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::Test => "map_test.txt",
         FightId::VerticalSlice => "map_vertical_slice.txt",
         FightId::EasyCluster => return init_fight_map_new(player_characters, fight_id),
+        FightId::EasyGuard => return init_fight_map_new(player_characters, fight_id),
         FightId::VerticalSliceNew => {
             return init_fight_map_new(player_characters, fight_id);
         }

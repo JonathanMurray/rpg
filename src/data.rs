@@ -391,7 +391,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     description: "Push the target away in a straight line",
     // TODO: unique icon
     icon: IconId::Extend,
-    stamina_cost: 1,
+    stamina_cost: 2,
     spell_effect: Some(SpellEnhancementEffect {
         target_on_hit: Some([Some(ApplyEffect::Knockback(3)), None]),
         ..SpellEnhancementEffect::default()

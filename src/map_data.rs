@@ -230,40 +230,19 @@ pub fn create_character(
 ) -> Rc<Character> {
     let char = match char_data.type_ {
         CharacterType::Bob => {
-            let bob = Character::new(
-                CharacterKind::Player(Rc::clone(party.unwrap())),
-                "Bob",
-                PortraitId::Bob,
-                char_data.type_.sprite_id(),
-                Attributes::new(5, 3, 3, 3),
-                pos,
-            );
-            bob.set_weapon(HandType::MainHand, SWORD);
-            bob
+            let char = make_high_bob(party.unwrap());
+            char.position.set(pos);
+            char
         }
         CharacterType::Alice => {
-            let bob = Character::new(
-                CharacterKind::Player(Rc::clone(party.unwrap())),
-                "Alice",
-                PortraitId::Alice,
-                char_data.type_.sprite_id(),
-                Attributes::new(5, 3, 3, 3),
-                pos,
-            );
-            bob.set_weapon(HandType::MainHand, SWORD);
-            bob
+            let char = make_high_alice(party.unwrap());
+            char.position.set(pos);
+            char
         }
         CharacterType::Clara => {
-            let bob = Character::new(
-                CharacterKind::Player(Rc::clone(party.unwrap())),
-                "Clara",
-                PortraitId::Clara,
-                char_data.type_.sprite_id(),
-                Attributes::new(5, 3, 3, 3),
-                pos,
-            );
-            bob.set_weapon(HandType::MainHand, SWORD);
-            bob
+            let char = make_medium_clara(party.unwrap());
+            char.position.set(pos);
+            char
         }
         CharacterType::Skeleton => {
             let skeleton = Character::new(
@@ -388,7 +367,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     (party, player_characters)
 }
 
-pub fn make_low_level_clara(party: &Rc<Party>) -> Character {
+pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Clara",
@@ -406,32 +385,8 @@ pub fn make_low_level_clara(party: &Rc<Party>) -> Character {
     clara
 }
 
-pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
-    let party = Rc::new(Party {
-        money: Cell::new(8),
-        stash: Default::default(),
-    });
-
-    let mut alice = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
-        "Alice",
-        PortraitId::Alice,
-        SpriteId::Alice,
-        Attributes::new(3, 5, 3, 3),
-        (1, 10),
-    );
-    alice.set_weapon(HandType::MainHand, BOW);
-    alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    alice.learn_ability(HEAL);
-    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
-    alice.known_attack_enhancements.push(CRIPPLING_SHOT);
-    alice
-        .known_passive_skills
-        .push(PassiveSkill::WeaponProficiency);
-    alice.learn_ability(PIERCING_SHOT);
-
-    let mut bob = Character::new(
+pub fn make_high_bob(party: &Rc<Party>) -> Character {
+    let mut char = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
         "Bob",
         PortraitId::Bob,
@@ -439,17 +394,50 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
         Attributes::new(5, 3, 3, 3),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, SWORD);
-    bob.set_shield(MEDIUM_SHIELD);
-    bob.armor_piece.set(Some(LEATHER_ARMOR));
-    bob.known_passive_skills.push(PassiveSkill::Reaper);
-    bob.learn_ability(SWEEP_ATTACK);
-    bob.learn_ability(SHIELD_BASH);
-    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(INSPIRE);
-    bob.known_attack_enhancements.push(SMITE);
+    char.set_weapon(HandType::MainHand, SWORD);
+    char.set_shield(MEDIUM_SHIELD);
+    char.armor_piece.set(Some(LEATHER_ARMOR));
+    char.known_passive_skills.push(PassiveSkill::Reaper);
+    char.learn_ability(SWEEP_ATTACK);
+    char.learn_ability(SHIELD_BASH);
+    char.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
+    char.learn_ability(INSPIRE);
+    char.known_attack_enhancements.push(SMITE);
     //bob.known_attack_enhancements.push(EMPOWER);
-    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    char.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    char
+}
+
+pub fn make_high_alice(party: &Rc<Party>) -> Character {
+    let mut char = Character::new(
+        CharacterKind::Player(Rc::clone(&party)),
+        "Alice",
+        PortraitId::Alice,
+        SpriteId::Alice,
+        Attributes::new(3, 5, 3, 3),
+        (1, 10),
+    );
+    char.set_weapon(HandType::MainHand, BOW);
+    char.armor_piece.set(Some(SHIRT));
+    char.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
+    char.learn_ability(HEAL);
+    char.known_ability_enhancements.push(HEAL_ENERGIZE);
+    char.known_attack_enhancements.push(CRIPPLING_SHOT);
+    char.known_passive_skills
+        .push(PassiveSkill::WeaponProficiency);
+    char.learn_ability(PIERCING_SHOT);
+    char
+}
+
+pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
+    let party = Rc::new(Party {
+        money: Cell::new(8),
+        stash: Default::default(),
+    });
+
+    let alice = make_high_alice(&party);
+
+    let mut bob = make_high_bob(&party);
 
     let mut clara = Character::new(
         CharacterKind::Player(Rc::clone(&party)),
