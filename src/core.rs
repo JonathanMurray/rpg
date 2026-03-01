@@ -6235,8 +6235,7 @@ pub fn is_target_within_shape(
 }
 
 pub fn within_range_squared(range_squared: f32, source: Position, destination: Position) -> bool {
-    let distance_squared = (destination.0 - source.0).pow(2) + (destination.1 - source.1).pow(2);
-    distance_squared as f32 <= range_squared
+    sq_distance_between(source, destination) <= range_squared
 }
 
 pub fn target_within_range_squared(range_squared: f32, source: Position, target: Position) -> bool {

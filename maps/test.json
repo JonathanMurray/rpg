@@ -88,7 +88,17 @@
     "(10, 4)": "StoneWallConvexNorthEast",
     "(13, 4)": "StoneWallConvexNorthEast",
     "(16, 4)": "StoneWallConvexNorthEast",
-    "(19, 4)": "StoneWallConvexNorthEast"
+    "(19, 4)": "StoneWallConvexNorthEast",
+    "(22, 19)": "StoneWallConvexNorthEast",
+    "(22, 16)": "StoneWallConvexNorthEast",
+    "(19, 16)": "StoneWallConvexNorthEast",
+    "(16, 16)": "StoneWallConvexNorthEast",
+    "(13, 16)": "StoneWallConvexNorthEast",
+    "(10, 16)": "StoneWallConvexNorthEast",
+    "(7, 16)": "StoneWallConvexNorthEast",
+    "(7, 13)": "StoneWallConvexNorthEast",
+    "(7, 10)": "StoneWallConvexNorthEast",
+    "(16, 7)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -252,7 +262,7 @@
     {
       "type_": "Clara",
       "pos": [
-        13,
+        22,
         7
       ],
       "health": null,
@@ -260,20 +270,10 @@
       "shield": null
     },
     {
-      "type_": "Ghoul1",
+      "type_": "Ghoul2",
       "pos": [
-        22,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        13,
-        16
+        7,
+        7
       ],
       "health": null,
       "main_hand": null,

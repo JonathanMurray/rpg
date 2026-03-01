@@ -162,7 +162,7 @@ impl PathfindGrid {
     ) -> Option<Path> {
         let before = Instant::now();
 
-        //println!("find shortest path to proxy ...");
+        println!("find shortest path to proxy ...");
         let chart = self.explore_outward(
             character_id,
             start,
@@ -172,7 +172,8 @@ impl PathfindGrid {
                 proximity_squared,
             }),
         );
-        let mut shortest_path: Option<Path> = None;
+        let mut shortest_valid_path: Option<Path> = None;
+        let mut closest_fallback_path: Option<(f32, Path)> = None;
 
         /*
         println!("vvvvvvvvvvvvvvvvvvvv");
@@ -181,28 +182,44 @@ impl PathfindGrid {
          */
 
         for (pos, chart_node) in chart.iter() {
-            if within_range_squared(proximity_squared, *pos, target)
-                && !self.obstructed_line_of_sight(*pos, target)
-            {
+            let sq_distance = sq_distance_between(*pos, target);
+            if sq_distance <= proximity_squared && !self.obstructed_line_of_sight(*pos, target) {
                 //if distance_between(*pos, target) <= proximity {
                 //println!("Build path from chart... start={:?}, pos={:?}", start, pos);
                 let path = build_path_from_chart(&chart, start, *pos);
 
                 //dbg!(&path);
 
-                if let Some(shortest) = &shortest_path {
+                if let Some(shortest) = &shortest_valid_path {
                     if chart_node.distance_from_start < shortest.total_distance {
-                        shortest_path = Some(path);
+                        shortest_valid_path = Some(path);
                     }
                 } else {
-                    shortest_path = Some(path);
+                    shortest_valid_path = Some(path);
+                }
+            } else {
+                if let Some((closest_sq_dist, _)) = closest_fallback_path {
+                    if sq_distance < closest_sq_dist {
+                        let path = build_path_from_chart(&chart, start, *pos);
+                        closest_fallback_path = Some((sq_distance, path));
+                    }
+                } else {
+                    let path = build_path_from_chart(&chart, start, *pos);
+                    closest_fallback_path = Some((sq_distance, path));
                 }
             }
         }
 
-        //println!("find shortest path to proxy ... DONE");
-
-        shortest_path
+        if let Some(path) = shortest_valid_path {
+            println!("Found valid path");
+            Some(path)
+        } else if let Some((_, path)) = closest_fallback_path {
+            println!("Using fallback path");
+            Some(path)
+        } else {
+            println!("Found no path (not even fallback)");
+            None
+        }
     }
 
     pub fn explore_outward(
