@@ -47,8 +47,8 @@ pub fn create_game_grid(
         characters.insert(char.id(), char);
     }
 
-    for pos in map_data.terrain_objects.keys().copied() {
-        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+    for (pos, terrain_id) in map_data.terrain_objects.iter() {
+        pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
 
     let characters_map: HashMap<CharacterId, Rc<Character>> = characters

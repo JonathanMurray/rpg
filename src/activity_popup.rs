@@ -23,6 +23,7 @@ use crate::{
     core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
     drawing::draw_dashed_line,
     game_ui::{ConfiguredAction, UiState},
+    pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
     textures::IconId,
     util::COL_GREEN_0,
@@ -48,7 +49,6 @@ pub struct ActivityPopup {
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
     proceed_button_error: Option<String>,
-
     movement_cost_slider: Option<MovementStaminaSlider>,
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -58,6 +58,7 @@ pub struct ActivityPopup {
 
     pub last_drawn_rectangle: Rect,
     sound_player: SoundPlayer,
+    pathfind_grid: Rc<PathfindGrid>,
 }
 
 impl ActivityPopup {
@@ -68,6 +69,7 @@ impl ActivityPopup {
         characters: Characters,
         active_character_id: CharacterId,
         sound_player: SoundPlayer,
+        pathfind_grid: Rc<PathfindGrid>,
     ) -> Self {
         let proceed_button_events = Rc::new(RefCell::new(vec![]));
 
@@ -102,6 +104,7 @@ impl ActivityPopup {
             hovered_choice_button_id: None,
             last_drawn_rectangle: Default::default(),
             sound_player,
+            pathfind_grid,
         }
     }
 
@@ -610,6 +613,7 @@ impl ActivityPopup {
     }
 
     pub fn refresh_on_attacked_state(&mut self) {
+        println!("popup::refresh_on_attacked_state()...");
         let UiState::ReactingToAttack {
             hand,
             attacker,
@@ -891,6 +895,7 @@ impl ActivityPopup {
         let usability_problem = self.ui_state.borrow().action_usability_problem(
             self.characters.get(self.relevant_character_id),
             &self.characters,
+            &self.pathfind_grid,
         );
 
         let mut enabled = false;

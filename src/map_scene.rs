@@ -86,7 +86,7 @@ impl MapScene {
             Node::new((0, 0), None),
             Node::new((1, 0), Some(MapChoice::Fight(FightId::EasyCluster))),
             Node::new((1, 1), Some(MapChoice::Fight(FightId::EasyPair))),
-            Node::new((2, 0), Some(MapChoice::Fight(FightId::EasyGuard))),
+            Node::new((2, 0), Some(MapChoice::Fight(FightId::Medium))),
             Node::new((2, 1), Some(MapChoice::Fight(FightId::EasyRiver))),
             Node::new((2, 2), Some(MapChoice::Shop(generate_shop_contents()))),
             Node::new((3, 0), Some(MapChoice::Shop(generate_shop_contents()))),

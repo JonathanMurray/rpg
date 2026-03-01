@@ -45,6 +45,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
+    pathfind::PathfindGrid,
     resources::{GameResources, UiResources},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
@@ -92,10 +93,11 @@ impl UiState {
         &self,
         relevant_character: &Character,
         characters: &Characters,
+        pathfind_grid: &PathfindGrid,
     ) -> Option<&'static str> {
         match self {
             UiState::ConfiguringAction(configured_action) => {
-                configured_action.usability_problem(relevant_character, characters)
+                configured_action.usability_problem(relevant_character, characters, pathfind_grid)
             }
 
             _ => None,
@@ -158,6 +160,7 @@ pub enum ConfiguredAction {
 }
 
 const OUT_OF_REACH: &str = "Out of reach";
+const NO_LINE_OF_SIGHT: &str = "No line of sight";
 
 impl ConfiguredAction {
     fn has_target(&self) -> bool {
@@ -174,6 +177,7 @@ impl ConfiguredAction {
         &self,
         relevant_character: &Character,
         characters: &Characters,
+        pathfind_grid: &PathfindGrid,
     ) -> Option<&'static str> {
         match self {
             ConfiguredAction::Attack {
@@ -186,14 +190,20 @@ impl ConfiguredAction {
                     let target_char = characters.get(*target_id);
                     let (_range, reach) = relevant_character.reaches_with_attack(
                         attack.hand,
-                        target_char.position.get(),
+                        target_char.pos(),
                         selected_enhancements.iter().map(|e| e.effect),
                     );
                     if matches!(
                         reach,
                         ActionReach::Yes | ActionReach::YesButDisadvantage(..)
                     ) {
-                        None
+                        if pathfind_grid
+                            .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
+                        {
+                            Some(NO_LINE_OF_SIGHT)
+                        } else {
+                            None
+                        }
                     } else {
                         Some(OUT_OF_REACH)
                     }
@@ -220,7 +230,13 @@ impl ConfiguredAction {
                         selected_enhancements,
                         target_char.position.get(),
                     ) {
-                        None
+                        if pathfind_grid
+                            .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
+                        {
+                            Some(NO_LINE_OF_SIGHT)
+                        } else {
+                            None
+                        }
                     } else {
                         Some(OUT_OF_REACH)
                     }
@@ -532,7 +548,7 @@ impl UserInterface {
             resources.big_font.clone(),
             resources.simple_font.clone(),
             resources.terrain_atlas,
-            init_state.pathfind_grid.clone(),
+            Rc::clone(&init_state.pathfind_grid),
             init_state.background,
             init_state.terrain_objects,
             init_state.decorations,
@@ -587,6 +603,7 @@ impl UserInterface {
             characters.clone(),
             active_character_id,
             sound_player.clone(),
+            Rc::clone(&init_state.pathfind_grid),
         );
 
         let mut banner = Banner::new();
@@ -986,11 +1003,12 @@ impl UserInterface {
                     selected_enhancements.iter().map(|e| e.effect),
                 );
 
+                /*
                 let mut details: Vec<(&'static str, Goodness)> = vec![];
-
                 if matches!(reach, ActionReach::No) {
-                    details.push(("Out of reach!", Goodness::Bad));
+                    details.push((OUT_OF_REACH, Goodness::Bad));
                 }
+                 */
 
                 let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
                     selected_enhancements
@@ -1008,6 +1026,7 @@ impl UserInterface {
                     0,
                 );
 
+                /*
                 for (term, bonus) in self.active_character().outgoing_attack_bonuses(
                     attack.hand,
                     &selected_enhancement_effects,
@@ -1023,6 +1042,7 @@ impl UserInterface {
                     "|<sword>| {}-{}",
                     prediction.min_damage, prediction.max_damage,
                 );
+                 */
 
                 self.game_grid.clear_target_damage_previews();
                 self.game_grid
@@ -1113,8 +1133,11 @@ impl UserInterface {
 
         self.game_grid.clear_target_damage_previews();
 
-        let usability_problem =
-            configured_action.usability_problem(self.active_character(), &self.characters);
+        let usability_problem = configured_action.usability_problem(
+            self.active_character(),
+            &self.characters,
+            &self.game_grid.pathfind_grid,
+        );
 
         if matches!(usability_problem, None | Some(OUT_OF_REACH)) {
             let prediction = predict_ability(
@@ -1166,7 +1189,11 @@ impl UserInterface {
     fn refresh_selected_action_button(&mut self) {
         if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
             let fully_selected = configured_action
-                .usability_problem(self.active_character(), &self.characters)
+                .usability_problem(
+                    self.active_character(),
+                    &self.characters,
+                    &self.game_grid.pathfind_grid,
+                )
                 .is_none();
             self.set_selected_action(Some((
                 ButtonAction::Action(configured_action.base_action()),

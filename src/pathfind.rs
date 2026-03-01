@@ -7,9 +7,12 @@ use std::{
 
 use indexmap::IndexMap;
 
-use crate::core::{
-    distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
-    CENTER_MELEE_RANGE_SQUARED,
+use crate::{
+    core::{
+        distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
+        CENTER_MELEE_RANGE_SQUARED,
+    },
+    util::line_visitor,
 };
 
 pub const CELLS_PER_ENTITY: u32 = 3;
@@ -17,7 +20,13 @@ pub const CELLS_PER_ENTITY: u32 = 3;
 #[derive(Debug, Copy, Clone)]
 pub enum Occupation {
     Character(CharacterId),
-    Terrain,
+    Terrain(TerrainType),
+}
+
+#[derive(Debug, Copy, Clone)]
+pub enum TerrainType {
+    Tall,
+    Low,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -164,13 +173,17 @@ impl PathfindGrid {
             }),
         );
         let mut shortest_path: Option<Path> = None;
+
         /*
         println!("vvvvvvvvvvvvvvvvvvvv");
         dbg!(&chart.keys());
         println!("^^^^^^^^^^^^^^^^^^^^");
          */
+
         for (pos, chart_node) in chart.iter() {
-            if within_range_squared(proximity_squared, *pos, target) {
+            if within_range_squared(proximity_squared, *pos, target)
+                && !self.obstructed_line_of_sight(*pos, target)
+            {
                 //if distance_between(*pos, target) <= proximity {
                 //println!("Build path from chart... start={:?}, pos={:?}", start, pos);
                 let path = build_path_from_chart(&chart, start, *pos);
@@ -369,18 +382,28 @@ impl PathfindGrid {
             {
                 if sq_distance_between(chart_node.position, target_pos) <= proximity_squared {
                     println!(
-                        "Found a path to proximity ({:?}), pos={:?}. Chart size={}",
-                        target,
-                        chart_node.position,
-                        mut_chart.len()
+                        "Checking if unobstructed line between {:?} and {:?} ...",
+                        chart_node.position, target_pos
                     );
-                    //dbg!(&next);
-                    // We're done! Empty 'next' to exit the loop, but all the nodes in 'next' that we didn't visit must
-                    // be saved as 'unexplored'.
-                    // If another exploration reuses our chart, it will need to visit those to continue the
-                    // exploration correctly.
-                    for unvisited in next.drain() {
-                        unexplored.push(unvisited);
+                    let obstructed_line_of_sight =
+                        self.obstructed_line_of_sight(chart_node.position, target_pos);
+                    if !obstructed_line_of_sight {
+                        println!(
+                            "Found a path to proximity ({:?}), pos={:?}. Chart size={}",
+                            target,
+                            chart_node.position,
+                            mut_chart.len()
+                        );
+                        //dbg!(&next);
+                        // We're done! Empty 'next' to exit the loop, but all the nodes in 'next' that we didn't visit must
+                        // be saved as 'unexplored'.
+                        // If another exploration reuses our chart, it will need to visit those to continue the
+                        // exploration correctly.
+                        for unvisited in next.drain() {
+                            unexplored.push(unvisited);
+                        }
+                    } else {
+                        println!("Found proximity ({:?}), but does not have unobstructed line-of-sight to target", chart_node.position);
                     }
                 }
             }
@@ -399,6 +422,15 @@ impl PathfindGrid {
         *self.cached_unexplored.borrow_mut() = unexplored;
 
         self.cached_exploration_chart.borrow()
+    }
+
+    pub fn obstructed_line_of_sight(&self, from: Position, to: Position) -> bool {
+        line_visitor(from, to, |x, y| {
+            matches!(
+                self.occupied.borrow().get(&(x, y)),
+                Some(Occupation::Terrain(TerrainType::Tall))
+            )
+        })
     }
 
     pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
@@ -424,7 +456,7 @@ impl PathfindGrid {
                             None => return false,
                         }
                     }
-                    Some(Occupation::Terrain) => {
+                    Some(Occupation::Terrain { .. }) => {
                         // This cell is occupied by terrain
                         return false;
                     }
@@ -455,7 +487,7 @@ impl PathfindGrid {
                             other_chars.insert(*id);
                         }
                     }
-                    Some(Occupation::Terrain) => {
+                    Some(Occupation::Terrain { .. }) => {
                         // This cell is occupied by terrain
                         terrain_collision = true;
                     }

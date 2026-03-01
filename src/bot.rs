@@ -11,8 +11,8 @@ use crate::{
         OnHitReaction, Position,
     },
     data::{MAGI_HEAL, MAGI_INFLICT_HORRORS, MAGI_INFLICT_WOUNDS},
-    pathfind::Path,
-    util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
+    pathfind::{Occupation, Path, PathfindGrid},
+    util::{adjacent_cells, are_entities_within_melee, line_visitor, CustomShuffle},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -178,7 +178,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         //dbg!(("bot preferred action", preferred_action));
         match preferred_action {
             BotAction::Attack => {
-                if attack_reaches(bot, target) {
+                if attack_reaches(bot, target, &game.pathfind_grid) {
                     println!("bot attacks target");
                     return Some(attack_action(bot, target));
                 }
@@ -217,7 +217,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
                 match action {
                     BotAction::Attack => {
                         for player_char in &player_chars {
-                            if attack_reaches(bot, player_char) {
+                            if attack_reaches(bot, player_char, &game.pathfind_grid) {
                                 println!("bot attacks someone before moving to target");
                                 return Some(attack_action(bot, player_char));
                             }
@@ -291,10 +291,16 @@ fn simple_targetted_ability_action(ability: Ability, target: &Character) -> Acti
     }
 }
 
-fn attack_reaches(bot: &Character, target: &Character) -> bool {
-    bot.reaches_with_attack(HandType::MainHand, target.pos(), iter::empty())
-        .1
-        != ActionReach::No
+fn attack_reaches(bot: &Character, target: &Character, pathfind_grid: &PathfindGrid) -> bool {
+    println!("bot::attack_reaches()...");
+    let action_reach = bot
+        .reaches_with_attack(HandType::MainHand, target.pos(), iter::empty())
+        .1;
+    if action_reach == ActionReach::No {
+        return false;
+    }
+
+    !pathfind_grid.obstructed_line_of_sight(bot.pos(), target.pos())
 }
 
 fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
@@ -344,11 +350,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
         attack_range = Some(bot.weapon(attack.hand).unwrap().range);
         CustomShuffle::shuffle(&mut player_chars);
         for player_char in player_chars {
-            if bot
-                .reaches_with_attack(attack.hand, player_char.position.get(), iter::empty())
-                .1
-                != ActionReach::No
-            {
+            if attack_reaches(bot, player_char, &game.pathfind_grid) {
                 if bot.can_attack(attack) {
                     return Some(attack_action(bot, player_char));
                 } else {

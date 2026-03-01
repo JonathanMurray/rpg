@@ -16,7 +16,7 @@ use rpg::core::Character;
 
 use rpg::data::{CRIPPLING_SHOT, INSPIRE, SWEEP_ATTACK};
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_low_level_party, make_medium_clara};
+use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
@@ -65,15 +65,28 @@ async fn main() {
     dbg!(get_time());
 
     /*
-      player_characters = run_fight_loop(
-          resources.clone(),
-          player_characters,
-          FightId::EasyCluster,
-          //FightId::Test,
-          ui_resources.clone(),
-          sound_player.clone(),
-      )
-      .await;
+       let mut player_characters = vec![make_high_alice(&party), make_high_bob(&party)];
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::Test,
+           //FightId::Test,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
+
+    /*
+    player_characters = run_fight_loop(
+        resources.clone(),
+        player_characters,
+        FightId::EasyCluster,
+        //FightId::Test,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
     */
 
     let bob = player_characters
@@ -87,16 +100,14 @@ async fn main() {
         .unwrap();
     alice.learn_ability(INSPIRE);
 
-    /*
-       player_characters = run_fight_loop(
-           resources.clone(),
-           player_characters,
-           FightId::EasyGuard,
-           ui_resources.clone(),
-           sound_player.clone(),
-       )
-       .await;
-    */
+    player_characters = run_fight_loop(
+        resources.clone(),
+        player_characters,
+        FightId::Medium,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
 
     player_characters.push(make_medium_clara(&party));
     let alice = player_characters

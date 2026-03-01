@@ -44,7 +44,11 @@ impl<T> CustomShuffle<T> for Vec<T> {
     }
 }
 
-pub fn line_collision(from: (i32, i32), to: (i32, i32), mut visitor: impl FnMut(i32, i32)) {
+pub fn line_visitor(
+    from: (i32, i32),
+    to: (i32, i32),
+    mut visitor: impl FnMut(i32, i32) -> bool,
+) -> bool {
     // Bresenham's line algorithm
     let dx = (to.0 - from.0).abs();
     let dy = (to.1 - from.1).abs();
@@ -53,9 +57,12 @@ pub fn line_collision(from: (i32, i32), to: (i32, i32), mut visitor: impl FnMut(
     let mut err = dx - dy;
     let (mut x, mut y) = from;
     loop {
-        visitor(x, y);
+        let done = visitor(x, y);
+        if done {
+            return true;
+        }
         if x == to.0 && y == to.1 {
-            break;
+            return false;
         }
         let e2 = 2 * err;
         if e2 > -dy {

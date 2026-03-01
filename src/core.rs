@@ -19,7 +19,7 @@ use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
-use crate::util::{are_entities_within_melee, line_collision, CustomShuffle};
+use crate::util::{are_entities_within_melee, line_visitor, CustomShuffle};
 
 pub type Position = (i32, i32);
 
@@ -2858,6 +2858,8 @@ pub fn predict_attack(
     }
 
     // TODO: The average doesn't account for advantage!
+    // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
+    // (like checking wall collisions for ranged attacks?)
     for unmodified_roll in 1..=20 {
         let event = CoreGame::perform_attack(
             attacker,
@@ -5198,11 +5200,8 @@ impl Character {
 
         match weapon_range {
             WeaponRange::Melee => {
-                if target_within_range_squared(
-                    weapon_range.squared(),
-                    self.position.get(),
-                    target_position,
-                ) {
+                if target_within_range_squared(weapon_range.squared(), self.pos(), target_position)
+                {
                     (weapon_range.into_range(), ActionReach::Yes)
                 } else {
                     (weapon_range.into_range(), ActionReach::No)
@@ -5221,7 +5220,7 @@ impl Character {
                 ) {
                     if target_within_range_squared(
                         Range::Melee.squared(),
-                        self.position.get(),
+                        self.pos(),
                         target_position,
                     ) {
                         (Range::Melee, ActionReach::YesButDisadvantage("Too close"))
@@ -6231,15 +6230,7 @@ pub fn is_target_within_shape(
             //let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
             target_within_range_squared((f32::from(radius)).powf(2.0), area_pos, target.pos())
         }
-        AreaShape::Line => {
-            let mut is_hit = false;
-            line_collision(caster_pos, area_pos, |x, y| {
-                if target.occupies_cell((x, y)) {
-                    is_hit = true;
-                }
-            });
-            is_hit
-        }
+        AreaShape::Line => line_visitor(caster_pos, area_pos, |x, y| target.occupies_cell((x, y))),
     }
 }
 

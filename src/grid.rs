@@ -50,10 +50,13 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{build_path_from_chart, ChartNode, Occupation, PathfindGrid, CELLS_PER_ENTITY},
+    pathfind::{
+        build_path_from_chart, ChartNode, Collision, Occupation, PathfindGrid, TerrainType,
+        CELLS_PER_ENTITY,
+    },
     sounds::{SoundId, SoundPlayer},
     textures::{character_sprite_height, draw_terrain, EffectId, SpriteId, StatusId, TerrainId},
-    util::{line_collision, rgb, COL_RED},
+    util::{line_visitor, rgb, COL_RED},
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -190,6 +193,7 @@ pub enum RangeIndicator {
     TargetAreaEffect,
     CanReachButDisadvantage,
     CannotReach,
+    ObstructedLineOfSight,
 }
 
 const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
@@ -326,7 +330,7 @@ impl GameGrid {
     pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if self.pathfind_grid.is_free(None, pos) {
             self.pathfind_grid
-                .set_occupied(pos, Some(Occupation::Terrain));
+                .set_occupied(pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
             self.terrain_objects.insert(pos, terrain_id);
             self.auto_tile_terrain_objects();
             true
@@ -1515,8 +1519,23 @@ impl GameGrid {
                             to = (from.0 + dx, from.1 + dy);
                             snapped_position_target = Some(to);
 
-                            line_collision(from, to, |x, y| {
-                                self.fill_cell((x, y), Color::new(1.0, 1.0, 1.0, 0.15), 0.0)
+                            line_visitor(from, to, |x, y| {
+                                let obstructed = matches!(
+                                    self.pathfind_grid.occupied().get(&(x, y)),
+                                    Some(Occupation::Terrain(TerrainType::Tall))
+                                );
+                                let color = if obstructed {
+                                    Color::new(1.0, 0.4, 0.4, 0.55)
+                                } else {
+                                    Color::new(1.0, 1.0, 1.0, 0.15)
+                                };
+                                self.fill_cell((x, y), color, 0.0);
+                                if obstructed {
+                                    snapped_position_target = Some((x, y));
+                                    true
+                                } else {
+                                    false
+                                }
                             });
                         }
                     }
@@ -2013,14 +2032,20 @@ impl GameGrid {
                 if let Some(positions) = movement {
                     self.draw_movement_to_target(active_char_pos, target_pos, positions);
                 } else {
-                    let cannot_reach =
-                        matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
+                    let valid = range_indicator
+                        .map(|indicator| {
+                            !matches!(
+                                indicator.2,
+                                RangeIndicator::CannotReach | RangeIndicator::ObstructedLineOfSight
+                            )
+                        })
+                        .unwrap_or(true);
                     self.draw_target_crosshair(
                         active_char_pos,
                         target_pos,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
                         5.0,
-                        !cannot_reach,
+                        valid,
                     );
                 }
 
@@ -2029,6 +2054,7 @@ impl GameGrid {
             ActionTarget::Position(target_pos) => {
                 let cannot_reach =
                     matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
+                println!("draw pos crosshair (player target, based on reach)");
                 self.draw_target_crosshair(
                     active_char_pos,
                     target_pos,
@@ -2314,6 +2340,8 @@ impl GameGrid {
                 } => {
                     let active_char = &self.characters[&self.active_character_id];
 
+                    let mut obstructed_line_of_sight = false;
+
                     let (range, reach) = match target.or(self.hovered_character) {
                         Some(target) => {
                             let target_pos = self.characters[&target].position.get();
@@ -2323,6 +2351,10 @@ impl GameGrid {
                                 target_pos,
                                 selected_enhancements.iter().map(|e| e.effect),
                             );
+
+                            obstructed_line_of_sight = self
+                                .pathfind_grid
+                                .obstructed_line_of_sight(active_char.pos(), target_pos);
 
                             (range, reach)
                         }
@@ -2344,12 +2376,13 @@ impl GameGrid {
                         }
                     };
 
-                    let indicator = match reach {
-                        ActionReach::Yes => RangeIndicator::ActionTargetRange,
-                        ActionReach::YesButDisadvantage(..) => {
+                    let indicator = match (reach, obstructed_line_of_sight) {
+                        (ActionReach::No, _) => RangeIndicator::CannotReach,
+                        (_, true) => RangeIndicator::ObstructedLineOfSight,
+                        (ActionReach::Yes, _) => RangeIndicator::ActionTargetRange,
+                        (ActionReach::YesButDisadvantage(..), _) => {
                             RangeIndicator::CanReachButDisadvantage
                         }
-                        ActionReach::No => RangeIndicator::CannotReach,
                     };
 
                     Some((self.active_character_id, range, indicator))
@@ -2830,7 +2863,7 @@ impl GameGrid {
         target_pos: Position,
         crosshair_color: Color,
         thickness: f32,
-        within_range: bool,
+        animated: bool,
     ) {
         let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
         let actor_y = self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0;
@@ -2846,7 +2879,7 @@ impl GameGrid {
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
             Some(self.cell_w * 0.8),
-            within_range,
+            animated,
         );
 
         let cross_hair_r = self.cell_w * 0.4;
@@ -2917,7 +2950,7 @@ impl GameGrid {
         for (pos, occupation) in self.pathfind_grid.occupied().iter() {
             let draw_occupation = match occupation {
                 Occupation::Character(id) => *id != self.active_character_id,
-                Occupation::Terrain => false, //true,
+                Occupation::Terrain { .. } => false,
             };
             if draw_occupation {
                 self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 0.0);
@@ -3083,6 +3116,7 @@ impl GameGrid {
             RangeIndicator::TargetAreaEffect => ORANGE,
             RangeIndicator::CanReachButDisadvantage => RANGE_INDICATOR_SEMI_BAD_COLOR,
             RangeIndicator::CannotReach => RANGE_INDICATOR_BAD_COLOR,
+            RangeIndicator::ObstructedLineOfSight => RANGE_INDICATOR_BAD_COLOR,
         };
         let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;

@@ -22,7 +22,7 @@ use crate::{
         MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
     },
     map_data::{create_character, CharacterType, MapData},
-    pathfind::{Occupation, PathfindGrid, CELLS_PER_ENTITY},
+    pathfind::{Occupation, PathfindGrid, TerrainType, CELLS_PER_ENTITY},
     textures::{PortraitId, SpriteId, TerrainId},
 };
 
@@ -41,7 +41,8 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
     let filename = match fight_id {
         FightId::VerticalSliceNew => "ogre_room.json",
         FightId::EasyCluster => "easy_map.json",
-        FightId::EasyGuard => "medium_map.json",
+        FightId::Medium => "medium_map.json",
+        FightId::Test => "test.json",
         unhandled => todo!("Handle map: {:?}", unhandled),
     };
     let map_data = MapData::load_from_file(&format!("maps/{filename}"));
@@ -83,8 +84,8 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
         player_chars_by_name.keys()
     );
 
-    for pos in map_data.terrain_objects.keys().copied() {
-        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+    for (pos, terrain_id) in map_data.terrain_objects.iter() {
+        pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
 
     GameInitState {
@@ -106,10 +107,10 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::EasyRiver => "map_easy_river.txt",
         FightId::EliteOgre => "map_elite.txt",
         FightId::EliteMagi => "map_elite2.txt",
-        FightId::Test => "map_test.txt",
         FightId::VerticalSlice => "map_vertical_slice.txt",
+        FightId::Test => return init_fight_map_new(player_characters, fight_id),
         FightId::EasyCluster => return init_fight_map_new(player_characters, fight_id),
-        FightId::EasyGuard => return init_fight_map_new(player_characters, fight_id),
+        FightId::Medium => return init_fight_map_new(player_characters, fight_id),
         FightId::VerticalSliceNew => {
             return init_fight_map_new(player_characters, fight_id);
         }
@@ -235,7 +236,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
 
             characters.extend_from_slice(&[melee, ranged]);
         }
-        FightId::EasyGuard => {
+        FightId::Medium => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let tanky = Character::new(
                 bot(BotBehaviour::Normal, 12.0),
@@ -564,7 +565,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
     let pathfind_grid = PathfindGrid::new(grid_dimensions);
 
     for pos in terrain_center_positions {
-        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain));
+        // TODO: Not all terrain is "tall", but this whole map initialization should be removed anyway (in favour of the new json-based
+        // map format).
+        pathfind_grid.set_occupied(pos, Some(Occupation::Terrain(TerrainType::Tall)));
     }
     for ch in characters.iter() {
         pathfind_grid.set_occupied(ch.pos(), Some(Occupation::Character(ch.id())));
@@ -610,7 +613,7 @@ impl GameInitState {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum FightId {
     EasyPair,
-    EasyGuard,
+    Medium,
     EasyCluster,
     EasySurrounded,
     EasyRiver,

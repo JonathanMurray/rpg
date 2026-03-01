@@ -8,7 +8,7 @@ use macroquad::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::pathfind::CELLS_PER_ENTITY;
+use crate::pathfind::{TerrainType, CELLS_PER_ENTITY};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
@@ -461,6 +461,14 @@ impl TerrainId {
             TerrainId::StoneWallConvexSouthEast => true,
             TerrainId::StoneWallInner => true,
             _ => false,
+        }
+    }
+
+    pub fn terrain_type(&self) -> TerrainType {
+        if self.is_stone_wall() {
+            TerrainType::Tall
+        } else {
+            TerrainType::Low
         }
     }
 }
