@@ -422,7 +422,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
-    description: "Deal a small amount of damage and daze the enemy",
+    description: "Deal minor damage and inflict Dazed",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
     stamina_cost: 1,
@@ -486,7 +486,8 @@ pub const ENEMY_TACKLE: Ability = Ability {
                     duration_rounds: Some(1),
                     stacks: None,
                 })),
-                Some(ApplyEffect::Knockback(3)),
+                // Better keep this somewhat low. Critting while knocking into an obstacle can lead to crazy numbers.
+                Some(ApplyEffect::Knockback(2)),
             ]),
         }),
         impact_circle: None,
@@ -501,7 +502,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
 pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
     id: AbilityId::EnemySlashingAttack,
     name: "Slashing attack",
-    description: "Deal a small amount of damage and causes Bleeding",
+    description: "",
     icon: IconId::Slashing,
     action_point_cost: 3,
     stamina_cost: 0,
@@ -1230,7 +1231,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
-    description: "Restore an ally's health. Removes Bleeding and Burning.",
+    description: "Restore target's health. Remove Bleeding and Burning.",
     icon: IconId::Heal,
     action_point_cost: 3,
     mana_cost: 1,
