@@ -265,8 +265,18 @@
         5,
         6
       ],
-      "health": null,
+      "health": 9,
       "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        8,
+        4
+      ],
+      "health": 9,
+      "main_hand": "BadDagger",
       "shield": null
     }
   ]
