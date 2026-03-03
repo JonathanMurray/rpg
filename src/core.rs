@@ -1043,7 +1043,8 @@ impl CoreGame {
                     AbilityRollType::Spell => {
                         let modifier = caster.spell_modifier() as i32;
                         roll_calculation += modifier;
-                        dice_roll_line.push_str(&format!(" +{} (|<dice> |<stat>Spell|)", modifier));
+                        dice_roll_line
+                            .push_str(&format!(" +{} (|<dice>| |<stat>Spell|)", modifier));
 
                         for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
@@ -1057,7 +1058,7 @@ impl CoreGame {
                                 }
                             }
                         }
-                        let ability_result = roll_calculation as u32;
+                        let ability_result = roll_calculation;
                         dice_roll_line.push_str(&format!(" = |<value>{}|", ability_result));
 
                         maybe_ability_roll = Some(AbilityRoll::RolledWithSpellModifier {
@@ -1083,7 +1084,7 @@ impl CoreGame {
                                 }
                             }
                         }
-                        let ability_result = roll_calculation as u32;
+                        let ability_result = roll_calculation;
                         dice_roll_line.push_str(&format!(" = |<value>{}|", ability_result));
 
                         maybe_ability_roll = Some(AbilityRoll::RolledWithAttackModifier {
@@ -1141,48 +1142,35 @@ impl CoreGame {
 
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
-                    match &mut ability_roll {
-                        AbilityRoll::RolledWithSpellModifier { line, .. } => {
-                            let spell_enemy_effect = effect.unwrap_spell();
-                            if let Some(contest) = spell_enemy_effect.defense_type {
-                                match contest {
-                                    DefenseType::Will => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Will| = |<value>{}|",
-                                        target.will()
-                                    )),
-                                    DefenseType::Evasion => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Evasion| = |<value>{}|",
-                                        target.evasion()
-                                    )),
-                                    DefenseType::Toughness => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Toughness| = |<value>{}|",
-                                        target.toughness()
-                                    )),
-                                }
-                            }
-                            detail_lines.push(line.to_string());
+                    let rolled = match &mut ability_roll {
+                        AbilityRoll::RolledWithSpellModifier { result, line } => {
+                            Some((result, line))
                         }
-                        AbilityRoll::RolledWithAttackModifier { line, .. } => {
-                            let spell_enemy_effect = effect.unwrap_spell();
-                            if let Some(contest) = spell_enemy_effect.defense_type {
-                                match contest {
-                                    DefenseType::Will => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Will| = |<value>{}|",
-                                        target.will()
-                                    )),
-                                    DefenseType::Evasion => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Evasion| = |<value>{}|",
-                                        target.evasion()
-                                    )),
-                                    DefenseType::Toughness => line.push_str(&format!(
-                                        ", vs |<shield>||<stat>Toughness| = |<value>{}|",
-                                        target.toughness()
-                                    )),
-                                }
-                            }
-                            detail_lines.push(line.to_string());
+                        AbilityRoll::RolledWithAttackModifier { result, line } => {
+                            Some((result, line))
                         }
-                        AbilityRoll::WillRollDuringAttack { .. } => {}
+                        AbilityRoll::WillRollDuringAttack { .. } => None,
+                    };
+
+                    if let Some((result, line)) = rolled {
+                        detail_lines.push(line.clone());
+
+                        let spell_enemy_effect = effect.unwrap_spell();
+                        if let Some(contest) = spell_enemy_effect.defense_type {
+                            let (def_str, def_value) = match contest {
+                                DefenseType::Will => ("Will", target.will()),
+                                DefenseType::Evasion => ("Evasion", target.evasion()),
+                                DefenseType::Toughness => ("Toughness", target.toughness()),
+                            };
+                            let def_line = format!(
+                                "{} - {} (|<shield>|<stat>{}|) = |<value>{}|",
+                                result,
+                                def_value,
+                                def_str,
+                                *result - def_value as i32
+                            );
+                            detail_lines.push(def_line);
+                        }
                     }
 
                     let before = SystemTime::now();
@@ -1262,7 +1250,7 @@ impl CoreGame {
                         effect,
                         target,
                         &mut detail_lines,
-                        degree_of_success,
+                        degree_of_success as u32,
                         mode,
                     );
 
@@ -1350,7 +1338,7 @@ impl CoreGame {
                             effect,
                             caster,
                             &mut detail_lines,
-                            degree_of_success,
+                            degree_of_success as u32,
                             mode,
                         );
                         target_outcome = Some((caster_id, outcome));
@@ -1503,7 +1491,7 @@ impl CoreGame {
                     effect,
                     other_char,
                     detail_lines,
-                    degree_of_success,
+                    degree_of_success as u32,
                     mode,
                 );
 
@@ -1574,8 +1562,8 @@ impl CoreGame {
                     game.perform_effect_application(effect, None, None, target);
                 if let Some(applied) = applied {
                     applied_effects.push(applied);
+                    detail_lines.push(log_line);
                 }
-                detail_lines.push(log_line);
             }
 
             for enhancement in enhancements {
@@ -1630,24 +1618,23 @@ impl CoreGame {
             }
 
             if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
-                let mut line = other_char.name.to_string();
+                let mut line = format!("|{}|", other_char.name);
                 match effect {
                     AbilityNegativeEffect::Spell(spell_enemy_effect) => {
                         if let Some(contest) = spell_enemy_effect.defense_type {
-                            match contest {
-                                DefenseType::Will => line.push_str(&format!(
-                                    " |<shield>|<stat>Will| = {}",
-                                    other_char.will()
-                                )),
-                                DefenseType::Evasion => line.push_str(&format!(
-                                    " |<shield>|<stat>Evasion| = {}",
-                                    other_char.evasion()
-                                )),
-                                DefenseType::Toughness => line.push_str(&format!(
-                                    " |<shield>|<stat>Toughness| = {}",
-                                    other_char.toughness()
-                                )),
-                            }
+                            let roll_result = ability_roll.unwrap_actual_roll().0;
+                            let (def_str, def_value) = match contest {
+                                DefenseType::Will => ("Will", other_char.will()),
+                                DefenseType::Evasion => ("Evasion", other_char.evasion()),
+                                DefenseType::Toughness => ("Toughness", other_char.toughness()),
+                            };
+                            line.push_str(&format!(
+                                ": {} - {} (|<shield>|<stat>{}) = |<value>{}|",
+                                roll_result,
+                                def_value,
+                                def_str,
+                                roll_result - def_value as i32
+                            ));
                         }
                     }
                     AbilityNegativeEffect::PerformAttack { .. } => {
@@ -1773,256 +1760,222 @@ impl CoreGame {
         dbg!(ability_roll);
         let real_game = mode.real_game();
 
-        let success = match spell_enemy_effect.defense_type {
+        let degree_of_success = match spell_enemy_effect.defense_type {
             Some(contest) => {
-                let ability_result = ability_roll.unwrap_actual_roll().0;
                 let defense = match contest {
                     DefenseType::Will => target.will(),
                     DefenseType::Evasion => target.evasion(),
                     DefenseType::Toughness => target.toughness(),
                 };
 
-                if ability_result >= defense {
-                    Some(((ability_result - defense) / 10) as i32)
-                } else if ability_result >= defense - 10 {
-                    // graze
-                    Some(-1)
+                let final_result = ability_roll.unwrap_actual_roll().0 - defense as i32;
+
+                if final_result < 6 {
+                    detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
+                    -1
+                } else if final_result < 16 {
+                    detail_lines.push("  Hit |<faded>(6-15)|".to_string());
+                    0
                 } else {
-                    None
+                    detail_lines.push("  Crit |<faded>(16 or higher)|".to_string());
+                    1
                 }
             }
-            None => Some(0),
+            None => 0,
         };
 
-        if let Some(degree_of_success) = success {
-            let success_label = match degree_of_success {
-                -1 => {
-                    detail_lines.push("  Graze".to_string());
-                    "Graze".to_string()
+        let damage = if let Some(ability_damage) = spell_enemy_effect.damage {
+            let mut dmg_calculation;
+            let mut increased_by_good_roll = true;
+            let mut dmg_str = "  Damage: ".to_string();
+
+            match ability_damage {
+                AbilityDamage::Static(n) => {
+                    dmg_calculation = n as i32;
+                    increased_by_good_roll = false;
+
+                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
-                0 => "".to_string(),
-                _ => {
-                    detail_lines.push("  Crit".to_string());
-                    "Crit".to_string()
+                AbilityDamage::AtLeast(n) => {
+                    dmg_calculation = n as i32;
+                    dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
             };
 
-            let damage = if let Some(ability_damage) = spell_enemy_effect.damage {
-                let mut dmg_calculation;
-                let mut increased_by_good_roll = true;
-                let mut dmg_str = "  Damage: ".to_string();
-
-                match ability_damage {
-                    AbilityDamage::Static(n) => {
-                        dmg_calculation = n as i32;
-                        increased_by_good_roll = false;
-
-                        dmg_str
-                            .push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
-                    }
-                    AbilityDamage::AtLeast(n) => {
-                        dmg_calculation = n as i32;
-                        dmg_str
-                            .push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
-                    }
+            for enhancement in enhancements {
+                let e = enhancement.spell_effect.unwrap();
+                let bonus_dmg = if area_center.is_some() {
+                    e.bonus_area_damage
+                } else {
+                    e.bonus_target_damage
                 };
-
-                for enhancement in enhancements {
-                    let e = enhancement.spell_effect.unwrap();
-                    let bonus_dmg = if area_center.is_some() {
-                        e.bonus_area_damage
-                    } else {
-                        e.bonus_target_damage
-                    };
-                    if bonus_dmg > 0 {
-                        dmg_str
-                            .push_str(&format!(" +{} |<faded>({})|", bonus_dmg, enhancement.name));
-                        dmg_calculation += bonus_dmg as i32;
-                    }
-                }
-
-                if degree_of_success == -1 {
-                    dmg_str.push_str(" -50% |<faded>(Graze)|");
-                    dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
-                } else if increased_by_good_roll && degree_of_success > 0 {
-                    dmg_str.push_str(&format!(" +50% |<faded>(Crit)|"));
-                    dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
-                }
-
-                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
-                    // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                    if target.conditions.borrow().has(&Condition::Protected) {
-                        apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
-                        dbg!(&dmg_str);
-                        dbg!(&dmg_calculation);
-                    }
-                }
-
-                let damage = dmg_calculation.max(0) as u32;
-
-                if let Some(game) = real_game {
-                    game.perform_losing_health(target, damage);
-                    dmg_str.push_str(&format!(" = |<value>{damage}|"));
-                    detail_lines.push(dmg_str);
-                }
-
-                Some(damage)
-            } else {
-                None
-            };
-
-            let mut applied_effects = vec![];
-
-            fn apply_degree_of_success(
-                stacks: &mut u32,
-                degree_of_success: i32,
-                reduced_to_nothing: &mut bool,
-            ) {
-                if degree_of_success == -1 {
-                    // -25% Graze
-                    *stacks -= (*stacks as f32 * 0.25).ceil() as u32;
-                } else if degree_of_success > 0 {
-                    // +50% Crit
-                    *stacks += (*stacks as f32 * 0.5).ceil() as u32;
-                }
-
-                if *stacks <= 0 {
-                    *reduced_to_nothing = true;
+                if bonus_dmg > 0 {
+                    dmg_str.push_str(&format!(" +{} |<faded>({})|", bonus_dmg, enhancement.name));
+                    dmg_calculation += bonus_dmg as i32;
                 }
             }
 
-            let mut damage_from_effects = 0;
+            if degree_of_success == -1 {
+                dmg_str.push_str(" -50% |<faded>(Graze)|");
+                dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
+            } else if increased_by_good_roll && degree_of_success > 0 {
+                dmg_str.push_str(&format!(" +50% |<faded>(Crit)|"));
+                dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+            }
+
+            if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
+                if target.conditions.borrow().has(&Condition::Protected) {
+                    apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                    dbg!(&dmg_str);
+                    dbg!(&dmg_calculation);
+                }
+            }
+
+            let damage = dmg_calculation.max(0) as u32;
 
             if let Some(game) = real_game {
-                for mut effect in spell_enemy_effect
-                    .on_hit
-                    .unwrap_or_default()
-                    .iter()
-                    .copied()
-                    .flatten()
-                {
-                    let mut reduced_to_nothing = false;
-                    match effect {
-                        ApplyEffect::RemoveActionPoints(ref mut n) => {
-                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing);
-                        }
-                        ApplyEffect::GainStamina(ref mut n) => {
-                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
-                        }
-                        ApplyEffect::GainHealth(ref mut n) => {
-                            apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
-                        }
-                        ApplyEffect::Condition(ref mut apply_condition) => {
-                            if let Some(stacks) = &mut apply_condition.stacks {
-                                apply_degree_of_success(
-                                    stacks,
-                                    degree_of_success,
-                                    &mut reduced_to_nothing,
-                                );
-                            }
-                            if let Some(rounds) = &mut apply_condition.duration_rounds {
-                                apply_degree_of_success(
-                                    rounds,
-                                    degree_of_success,
-                                    &mut reduced_to_nothing,
-                                );
-                            }
-                        }
-                        ApplyEffect::PerBleeding { .. } => {}
-                        ApplyEffect::ConsumeCondition { .. } => {}
-                        ApplyEffect::Knockback(ref mut distance) => {
+                game.perform_losing_health(target, damage);
+                dmg_str.push_str(&format!(" = |<value>{damage}|"));
+                detail_lines.push(dmg_str);
+            }
+
+            Some(damage)
+        } else {
+            None
+        };
+
+        let mut applied_effects = vec![];
+
+        fn apply_degree_of_success(
+            stacks: &mut u32,
+            degree_of_success: i32,
+            reduced_to_nothing: &mut bool,
+        ) {
+            if degree_of_success == -1 {
+                // -25% Graze
+                *stacks -= (*stacks as f32 * 0.25).ceil() as u32;
+            } else if degree_of_success > 0 {
+                // +50% Crit
+                *stacks += (*stacks as f32 * 0.5).ceil() as u32;
+            }
+
+            if *stacks <= 0 {
+                *reduced_to_nothing = true;
+            }
+        }
+
+        let mut damage_from_effects = 0;
+
+        if let Some(game) = real_game {
+            for mut effect in spell_enemy_effect
+                .on_hit
+                .unwrap_or_default()
+                .iter()
+                .copied()
+                .flatten()
+            {
+                let mut reduced_to_nothing = false;
+                match effect {
+                    ApplyEffect::RemoveActionPoints(ref mut n) => {
+                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing);
+                    }
+                    ApplyEffect::GainStamina(ref mut n) => {
+                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
+                    }
+                    ApplyEffect::GainHealth(ref mut n) => {
+                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
+                    }
+                    ApplyEffect::Condition(ref mut apply_condition) => {
+                        if let Some(stacks) = &mut apply_condition.stacks {
                             apply_degree_of_success(
-                                distance,
+                                stacks,
+                                degree_of_success,
+                                &mut reduced_to_nothing,
+                            );
+                        }
+                        if let Some(rounds) = &mut apply_condition.duration_rounds {
+                            apply_degree_of_success(
+                                rounds,
                                 degree_of_success,
                                 &mut reduced_to_nothing,
                             );
                         }
                     }
-
-                    if reduced_to_nothing {
-                        detail_lines.push(format!(
-                            "|<keyword>{}| was reduced to nothing |<faded>(Graze)|",
-                            effect
-                        ));
-                    } else {
-                        let (applied, log_line, damage) = game.perform_effect_application(
-                            effect,
-                            Some(caster),
-                            area_center,
-                            target,
+                    ApplyEffect::PerBleeding { .. } => {}
+                    ApplyEffect::ConsumeCondition { .. } => {}
+                    ApplyEffect::Knockback(ref mut distance) => {
+                        apply_degree_of_success(
+                            distance,
+                            degree_of_success,
+                            &mut reduced_to_nothing,
                         );
-                        if let Some(applied) = applied {
-                            applied_effects.push(applied);
-                        }
-                        damage_from_effects += damage;
-                        detail_lines.push(log_line);
                     }
                 }
 
-                for enhancement in enhancements {
-                    // TODO: shouldn't these also be affected by degree of success?
-                    let e = enhancement.spell_effect.unwrap();
-                    let effects = if area_center.is_some() {
-                        e.area_on_hit
-                    } else {
-                        e.target_on_hit
-                    };
-                    for effect in effects.iter().flatten().flatten() {
-                        let (applied, log_line, damage) = game.perform_effect_application(
-                            *effect,
-                            Some(caster),
-                            area_center,
-                            target,
-                        );
-                        if let Some(applied) = applied {
-                            applied_effects.push(applied);
-                        }
-                        damage_from_effects += damage;
-                        detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
+                if reduced_to_nothing {
+                    detail_lines.push(format!(
+                        "|<keyword>{}| was reduced to nothing |<faded>(Graze)|",
+                        effect
+                    ));
+                } else {
+                    let (applied, log_line, damage) =
+                        game.perform_effect_application(effect, Some(caster), area_center, target);
+                    if let Some(applied) = applied {
+                        applied_effects.push(applied);
                     }
-                }
-
-                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
-                    // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                    if target.lose_protected() {
-                        detail_lines.push(format!("{} lost Protected", target.name));
-                    }
-
-                    if are_entities_within_melee(caster.pos(), target.pos()) {
-                        if let Some(previously_engaged) = caster.engagement_target.take() {
-                            game.characters
-                                .get(previously_engaged)
-                                .set_not_engaged_by(caster.id());
-                        }
-                        target.set_engaged_by(Rc::clone(caster));
-                        caster.engagement_target.set(Some(target.id()));
-                    }
+                    damage_from_effects += damage;
+                    detail_lines.push(log_line);
                 }
             }
 
-            let damage = match damage {
-                Some(dmg) => Some(dmg + damage_from_effects),
-                None if damage_from_effects > 0 => Some(damage_from_effects),
-                _ => None,
-            };
-
-            AbilityTargetOutcome::HitEnemy {
-                damage,
-                graze: degree_of_success == -1,
-                applied_effects,
+            for enhancement in enhancements {
+                // TODO: shouldn't these also be affected by degree of success?
+                let e = enhancement.spell_effect.unwrap();
+                let effects = if area_center.is_some() {
+                    e.area_on_hit
+                } else {
+                    e.target_on_hit
+                };
+                for effect in effects.iter().flatten().flatten() {
+                    let (applied, log_line, damage) =
+                        game.perform_effect_application(*effect, Some(caster), area_center, target);
+                    if let Some(applied) = applied {
+                        applied_effects.push(applied);
+                    }
+                    damage_from_effects += damage;
+                    detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
+                }
             }
-        } else {
-            let line = match spell_enemy_effect.defense_type {
-                Some(DefenseType::Will | DefenseType::Toughness) => {
-                    format!("  {} resisted", target.name)
+
+            if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
+                if target.lose_protected() {
+                    detail_lines.push(format!("{} lost Protected", target.name));
                 }
-                Some(DefenseType::Evasion) => {
-                    format!("  The spell missed {}", target.name)
+
+                if are_entities_within_melee(caster.pos(), target.pos()) {
+                    if let Some(previously_engaged) = caster.engagement_target.take() {
+                        game.characters
+                            .get(previously_engaged)
+                            .set_not_engaged_by(caster.id());
+                    }
+                    target.set_engaged_by(Rc::clone(caster));
+                    caster.engagement_target.set(Some(target.id()));
                 }
-                None => unreachable!("uncontested effect cannot fail"),
-            };
-            detail_lines.push(line);
-            AbilityTargetOutcome::Resisted
+            }
+        }
+
+        let damage = match damage {
+            Some(dmg) => Some(dmg + damage_from_effects),
+            None if damage_from_effects > 0 => Some(damage_from_effects),
+            _ => None,
+        };
+
+        AbilityTargetOutcome::HitEnemy {
+            damage,
+            graze: degree_of_success == -1,
+            applied_effects,
         }
     }
 
@@ -2068,9 +2021,11 @@ impl CoreGame {
 
         let mut evasion = defender.evasion();
 
+        /*
         let mut evasion_from_parry = 0;
         let mut evasion_from_sidestep = 0;
         let mut evasion_from_block = 0;
+        */
         let mut skip_attack_exertion = false;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
@@ -2120,18 +2075,20 @@ impl CoreGame {
                 armor_value += bonus_armor;
             }
 
+            /*
             match reaction.id {
                 OnAttackedReactionId::Parry => evasion_from_parry = bonus_evasion,
                 OnAttackedReactionId::SideStep => evasion_from_sidestep = bonus_evasion,
                 OnAttackedReactionId::Block => evasion_from_block = bonus_evasion,
             }
+             */
         }
 
         let unmodified_roll = mode
             .simulated_roll()
             .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
-        let roll_result =
-            ((unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount) as u32;
+        let roll_result = (unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount;
+        let final_result = roll_result - evasion as i32;
 
         if game.is_some() {
             if let Some(description) = roll_description(attack_bonus.advantage) {
@@ -2180,24 +2137,25 @@ impl CoreGame {
         }
 
         if game.is_some() {
+            let attack_bonus_str = if attack_bonus.flat_amount > 0 {
+                format!("(+{}) ", attack_bonus.flat_amount)
+            } else if attack_bonus.flat_amount < 0 {
+                format!("(-{}) ", -attack_bonus.flat_amount)
+            } else {
+                "".to_string()
+            };
             detail_lines.push(format!(
-                "Rolled: {} +{} (|<dice>|<stat>Attack|)| {}= |<value>{}|, vs |<shield>|<stat>Evasion| = |<value>{}|",
-                unmodified_roll,
-                attack_modifier,
-                if attack_bonus.flat_amount > 0 {
-                    format!("(+{}) ", attack_bonus.flat_amount)
-                } else if attack_bonus.flat_amount < 0 {
-                    format!("(-{}) ", -attack_bonus.flat_amount)
-                } else {
-                    "".to_string()
-                },
-                roll_result,
-                evasion,
+                "Rolled: {} +{} (|<dice>|<stat>Attack|)| {}= |<value>{}|",
+                unmodified_roll, attack_modifier, attack_bonus_str, roll_result,
             ));
+            detail_lines.push(format!(
+                "{} - {} (|<shield>|<stat>Evasion|) = |<value>{}|",
+                roll_result, evasion, final_result
+            ))
         }
 
         let weapon = attacker.weapon(hand_type).unwrap();
-        let outcome = if roll_result >= evasion.saturating_sub(10) {
+        let outcome = {
             let mut on_true_hit_effect = None;
             let dmg_override = ability_attack_effect.map(|e| e.override_damage).flatten();
             let mut dmg_str = "  Damage: ".to_string();
@@ -2249,12 +2207,15 @@ impl CoreGame {
                 dmg_calculation -= armor_value as i32;
             }
 
-            let hit_type = if roll_result < evasion {
+            //  <=5: graze
+            // 6-15: hit
+            // >=16: crit
+            let hit_type = if final_result <= 5 {
                 AttackHitType::Graze
-            } else if roll_result >= evasion + 10 {
-                AttackHitType::Critical
-            } else {
+            } else if final_result <= 15 {
                 AttackHitType::Regular
+            } else {
+                AttackHitType::Critical
             };
 
             match hit_type {
@@ -2266,17 +2227,17 @@ impl CoreGame {
                         dmg_str.push_str(" -50% |<faded>(graze)|");
                         dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    detail_lines.push("  Graze!".to_string());
+                    detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
                 }
                 AttackHitType::Regular => {
                     on_true_hit_effect = weapon.on_true_hit;
-                    detail_lines.push("  Hit".to_string());
+                    detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
                 AttackHitType::Critical => {
                     on_true_hit_effect = weapon.on_true_hit;
-                    detail_lines.push("  Critical hit".to_string());
                     dmg_str.push_str(" +50% |<faded>(crit)|");
                     dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                    detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
                 }
             }
 
@@ -2339,7 +2300,7 @@ impl CoreGame {
                                             defense_type.name(),
                                             defense
                                         ));
-                                        if roll_result < defense {
+                                        if roll_result < defense as i32 {
                                             resist = true;
                                         }
                                     }
@@ -2403,24 +2364,6 @@ impl CoreGame {
                 hit_type,
                 applied_effects,
             }
-        } else if roll_result
-            < evasion.saturating_sub(
-                evasion_from_parry + evasion_from_sidestep + evasion_from_block + 10,
-            )
-        {
-            detail_lines.push("  Missed!".to_string());
-            AttackOutcome::Miss
-        } else if evasion_from_parry > 0 {
-            detail_lines.push("  Parried!".to_string());
-            AttackOutcome::Parry
-        } else if evasion_from_sidestep > 0 {
-            detail_lines.push("  Side stepped!".to_string());
-            AttackOutcome::Dodge
-        } else if evasion_from_block > 0 {
-            detail_lines.push("  Blocked!".to_string());
-            AttackOutcome::Block
-        } else {
-            unreachable!("{roll_result}, {evasion}, {evasion_from_parry}, {evasion_from_sidestep}");
         };
 
         let mut area_outcomes = None;
@@ -2918,20 +2861,20 @@ pub fn predict_attack(
 
 #[derive(Debug)]
 enum AbilityRoll {
-    RolledWithSpellModifier { result: u32, line: String },
-    RolledWithAttackModifier { result: u32, line: String },
+    RolledWithSpellModifier { result: i32, line: String },
+    RolledWithAttackModifier { result: i32, line: String },
     WillRollDuringAttack { bonus: i32 },
 }
 
 impl AbilityRoll {
-    fn actual_roll(&self) -> Option<(u32, &str)> {
+    fn actual_roll(&self) -> Option<(i32, &str)> {
         match self {
             AbilityRoll::RolledWithSpellModifier { result, line } => Some((*result, line)),
             AbilityRoll::RolledWithAttackModifier { result, line } => Some((*result, line)),
             AbilityRoll::WillRollDuringAttack { .. } => None,
         }
     }
-    fn unwrap_actual_roll(&self) -> (u32, &str) {
+    fn unwrap_actual_roll(&self) -> (i32, &str) {
         self.actual_roll()
             .unwrap_or_else(|| panic!("haven't rolled"))
     }
@@ -3117,10 +3060,12 @@ pub enum AttackOutcome {
         hit_type: AttackHitType,
         applied_effects: Vec<ApplyEffect>,
     },
+    /*
     Dodge,
     Block,
     Parry,
     Miss,
+     */
 }
 
 impl AttackOutcome {
@@ -5659,7 +5604,7 @@ impl Character {
     }
 
     pub fn evasion(&self) -> u32 {
-        let mut res = 10;
+        let mut res = 0;
         res += self.evasion_from_agility();
         res += self.evasion_from_intellect();
         res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
@@ -5714,7 +5659,7 @@ impl Character {
     }
 
     pub fn will(&self) -> u32 {
-        let mut res = 10 + self.intellect() * 2;
+        let mut res = self.intellect() * 2;
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Inspired) {
             res += INSPIRED_WILL_BONUS;
@@ -5727,7 +5672,7 @@ impl Character {
     }
 
     pub fn toughness(&self) -> u32 {
-        let mut res = 10 + self.strength() * 2;
+        let mut res = self.strength() * 2;
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);

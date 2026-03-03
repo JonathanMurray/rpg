@@ -249,7 +249,7 @@ pub fn create_character(
         }
         CharacterType::Skeleton => {
             let mut skeleton = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Skeleton",
                 PortraitId::Skeleton,
                 char_data.type_.sprite_id(),
@@ -269,7 +269,7 @@ pub fn create_character(
         }
         CharacterType::SkeletonLeader => {
             let skeleton = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Skeleton",
                 PortraitId::Skeleton,
                 char_data.type_.sprite_id(),
@@ -287,7 +287,7 @@ pub fn create_character(
         CharacterType::Ghoul1 => {
             // TODO these should have archer behaviour, i.e. run away from melee
             let ghoul = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 9.0),
+                bot(BotBehaviour::Fighter(Default::default()), 11.0),
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
@@ -300,7 +300,7 @@ pub fn create_character(
         }
         CharacterType::Ghoul2 => {
             let ghoul = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
@@ -314,7 +314,7 @@ pub fn create_character(
         }
         CharacterType::Ogre => {
             let mut ogre = Character::new(
-                bot(BotBehaviour::Fighter(Default::default()), 10.0),
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Ogre",
                 PortraitId::Ogre,
                 SpriteId::Ogre,

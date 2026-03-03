@@ -2126,15 +2126,16 @@ impl UserInterface {
                     AttackHitType::Critical => "crit",
                 };
                 applied_effects = effects.clone();
-            }
-            AttackOutcome::Block | AttackOutcome::Parry => {
-                self.sound_player.play(SoundId::ArmorAbsorbed);
-                verb = "missed";
-            }
-            AttackOutcome::Dodge | AttackOutcome::Miss => {
-                self.sound_player.play(SoundId::AttackMiss);
-                verb = "missed";
-            }
+            } /*
+              AttackOutcome::Block | AttackOutcome::Parry => {
+                  self.sound_player.play(SoundId::ArmorAbsorbed);
+                  verb = "missed";
+              }
+              AttackOutcome::Dodge | AttackOutcome::Miss => {
+                  self.sound_player.play(SoundId::AttackMiss);
+                  verb = "missed";
+              }
+               */
         };
 
         let mut line = format!(
@@ -2154,11 +2155,12 @@ impl UserInterface {
                 self.animate_character_damage(target, actual_health_lost);
                 damage_was_dealt = damage > 0;
                 line.push_str(&format!(" (|<value>{}| damage)", damage))
-            }
-            AttackOutcome::Dodge => line.push_str(" (dodge)"),
-            AttackOutcome::Parry => line.push_str(" (parry)"),
-            AttackOutcome::Block => line.push_str(" (block)"),
-            AttackOutcome::Miss => {}
+            } /*
+              AttackOutcome::Dodge => line.push_str(" (dodge)"),
+              AttackOutcome::Parry => line.push_str(" (parry)"),
+              AttackOutcome::Block => line.push_str(" (block)"),
+              AttackOutcome::Miss => {}
+               */
         }
 
         self.log.add_with_details(line, detail_lines);
@@ -2181,10 +2183,12 @@ impl UserInterface {
                 hit_type: AttackHitType::Critical,
                 ..
             } => (format!("{}!", damage), TextEffectStyle::HostileCrit),
+            /*
             AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
             AttackOutcome::Block => ("Block".to_string(), TextEffectStyle::Miss),
+             */
         };
 
         self.game_grid
