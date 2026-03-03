@@ -64,18 +64,19 @@ async fn main() {
 
     dbg!(get_time());
 
-    let mut player_characters = vec![make_medium_clara(&party)];
-    player_characters = run_fight_loop(
-        resources.clone(),
-        player_characters,
-        FightId::Test,
-        //FightId::Test,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
-
     /*
+       let mut player_characters = vec![make_medium_clara(&party)];
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::Test,
+           //FightId::Test,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
+
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
@@ -85,7 +86,6 @@ async fn main() {
         sound_player.clone(),
     )
     .await;
-    */
 
     let bob = player_characters
         .iter()

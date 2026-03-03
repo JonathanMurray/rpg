@@ -817,7 +817,7 @@ impl Log {
             self.line_details.remove(0);
         }
         // TODO Support setting max width for TextLine, and having it line-wrap to fit inside the given width
-        let mut text_line = TextLine::new(text, 18, WHITE, Some(self.font.clone()));
+        let mut text_line = TextLine::new(text, 16, WHITE, Some(self.font.clone()));
         text_line.set_padding(3.0, 3.0);
         text_line.set_max_width(self.container.min_width.unwrap());
         text_line.set_min_height(20.0);
@@ -839,7 +839,7 @@ impl Log {
                 children: details
                     .iter()
                     .map(|s| {
-                        let mut text = TextLine::new(s, 18, WHITE, Some(self.font.clone()));
+                        let mut text = TextLine::new(s, 16, WHITE, Some(self.font.clone()));
                         text.set_min_height(20.0);
                         text.set_max_height(20.0);
                         Element::Text(text)

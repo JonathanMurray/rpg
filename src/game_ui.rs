@@ -1651,7 +1651,7 @@ impl UserInterface {
                             applied_effects,
                         } => {
                             if let Some(dmg) = damage {
-                                line.push_str(&format!(" ({} damage)", dmg))
+                                line.push_str(&format!(" (|<value>{}| damage)", dmg))
                             } else if applied_effects.is_empty() {
                                 if *graze {
                                     line.push_str(" (graze)");
@@ -2153,7 +2153,7 @@ impl UserInterface {
             } => {
                 self.animate_character_damage(target, actual_health_lost);
                 damage_was_dealt = damage > 0;
-                line.push_str(&format!(" ({} damage)", damage))
+                line.push_str(&format!(" (|<value>{}| damage)", damage))
             }
             AttackOutcome::Dodge => line.push_str(" (dodge)"),
             AttackOutcome::Parry => line.push_str(" (parry)"),

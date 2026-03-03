@@ -538,21 +538,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 0,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(OnAttackedReaction {
-        id: OnAttackedReactionId::Block,
-        name: "Block",
-        description: "Mitigate an attack against you or an adjacent ally (once per round)",
-        icon: IconId::Block,
-        action_point_cost: 0,
-        stamina_cost: 1,
-        effect: OnAttackedReactionEffect {
-            bonus_evasion: 10,
-            bonus_armor: 0,
-        },
-        required_attack_type: None,
-        used_hand: Some(HandType::OffHand),
-        target: OnAttackedReactionTarget::SelfOrAdjacentAlly,
-    }),
+    on_attacked_reaction: Some(BLOCK),
     weight: 2,
 };
 
@@ -563,21 +549,7 @@ pub const MEDIUM_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 1,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(OnAttackedReaction {
-        id: OnAttackedReactionId::Block,
-        name: "Block",
-        description: "Mitigate an attack against you or an adjacent ally (once per round)",
-        icon: IconId::Block,
-        action_point_cost: 0,
-        stamina_cost: 1,
-        effect: OnAttackedReactionEffect {
-            bonus_evasion: 10,
-            bonus_armor: 0,
-        },
-        required_attack_type: None,
-        used_hand: Some(HandType::OffHand),
-        target: OnAttackedReactionTarget::SelfOrAdjacentAlly,
-    }),
+    on_attacked_reaction: Some(BLOCK),
     weight: 3,
 };
 
@@ -687,14 +659,30 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     description: "Mitigate an incoming melee attack (once per round)",
     icon: IconId::Parry,
     action_point_cost: 0,
-    stamina_cost: 1,
+    stamina_cost: 2,
     effect: OnAttackedReactionEffect {
-        bonus_evasion: 10,
+        bonus_evasion: 7,
         bonus_armor: 0,
     },
     required_attack_type: Some(AttackType::Melee),
     used_hand: Some(HandType::MainHand),
     target: OnAttackedReactionTarget::OnlySelf,
+};
+
+pub const BLOCK: OnAttackedReaction = OnAttackedReaction {
+    id: OnAttackedReactionId::Block,
+    name: "Block",
+    description: "Mitigate an attack against you or an adjacent ally (once per round)",
+    icon: IconId::Block,
+    action_point_cost: 0,
+    stamina_cost: 1,
+    effect: OnAttackedReactionEffect {
+        bonus_evasion: 7,
+        bonus_armor: 0,
+    },
+    required_attack_type: None,
+    used_hand: Some(HandType::OffHand),
+    target: OnAttackedReactionTarget::SelfOrAdjacentAlly,
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
