@@ -2241,6 +2241,14 @@ impl CoreGame {
                 }
             }
 
+            if !armor_penetrators.is_empty() {
+                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
+            }
+            if armor_value > 0 {
+                dmg_str.push_str(&format!(" -{armor_value} |<faded>(armor)|"));
+                dmg_calculation -= armor_value as i32;
+            }
+
             let hit_type = if roll_result < evasion {
                 AttackHitType::Graze
             } else if roll_result >= evasion + 10 {
@@ -2274,14 +2282,6 @@ impl CoreGame {
 
             if defender.conditions.borrow().has(&Condition::Protected) {
                 apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
-            }
-
-            if !armor_penetrators.is_empty() {
-                detail_lines.push(format!("  Armor: {} = {}", armor_str, armor_value));
-            }
-            if armor_value > 0 {
-                dmg_str.push_str(&format!(" -{armor_value} |<faded>(armor)|"));
-                dmg_calculation -= armor_value as i32;
             }
 
             let damage = dmg_calculation.max(0) as u32;
@@ -3624,7 +3624,7 @@ impl Condition {
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<shield>|<stat>Evasion|, |<value>-x| on |<dice>|.",
-            NearDeath => "|<value>-1| AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 25% health)",
+            NearDeath => "|<value>-1| AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "|<value>+5| |<dice>| |<stat>Attack| (passive skill).",
@@ -4722,7 +4722,7 @@ impl Character {
         } else {
             self.conditions.borrow_mut().remove(&Condition::BloodRage);
         }
-        if !has_blood_rage_passive && health_ratio < 0.25 {
+        if !has_blood_rage_passive && health_ratio < 0.20 {
             self.conditions.borrow_mut().add(Condition::NearDeath);
         } else {
             self.conditions.borrow_mut().remove(&Condition::NearDeath);
