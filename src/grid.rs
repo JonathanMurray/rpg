@@ -2515,7 +2515,7 @@ impl GameGrid {
             health_y += 6.0;
         }
 
-        let font_size = 14;
+        let font_size = 12;
         let header = character.name;
         let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;

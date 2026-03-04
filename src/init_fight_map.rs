@@ -342,9 +342,9 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             let pos = *enemy_positions[&0].choose().unwrap();
             let magi = Character::new(
                 bot(BotBehaviour::Magi(Default::default()), 9.0),
-                "Magi",
-                PortraitId::Magi,
-                SpriteId::Magi,
+                "Huldra",
+                PortraitId::Huldra,
+                SpriteId::Huldra,
                 Attributes::new(4, 1, 3, 5),
                 pos,
             );

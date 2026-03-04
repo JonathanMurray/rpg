@@ -100,7 +100,7 @@ impl TargetUi {
         if let Some(char) = character {
             self.target = Some(Rc::clone(char));
             let mut name_text_line =
-                TextLine::new(char.name, 16, WHITE, Some(self.big_font.clone()));
+                TextLine::new(char.name, 18, WHITE, Some(self.big_font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
 
