@@ -171,6 +171,36 @@ pub const BAD_SWORD: Weapon = Weapon {
     weight: 2,
 };
 
+pub const ENSLAVED_SWORD: Weapon = Weapon {
+    name: "Enslaved Sword",
+    range: WeaponRange::Melee,
+    action_point_cost: 4,
+    damage: 6,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(SLASHING),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Sword),
+    icon: EquipmentIconId::Sword,
+    weight: 2,
+};
+
+pub const ENSLAVED_RAPIER: Weapon = Weapon {
+    name: "Enslaved Rapier",
+    range: WeaponRange::Melee,
+    action_point_cost: 4,
+    damage: 7,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(SLASHING),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Rapier),
+    icon: EquipmentIconId::Rapier,
+    weight: 2,
+};
+
 pub const SWORD: Weapon = Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
@@ -1115,7 +1145,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::MagiInflictWounds,
     name: "Inflict wounds",
     description: "",
-    icon: IconId::Mindblast,
+    icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
@@ -1130,7 +1160,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Bleeding,
-                    stacks: Some(6),
+                    stacks: Some(7),
                     duration_rounds: None,
                 })),
                 None,
@@ -1193,7 +1223,7 @@ pub const MAGI_HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Ranged(15),
         effect: AbilityPositiveEffect {
-            healing: 5,
+            healing: 11,
             apply: None,
         },
     },

@@ -3558,7 +3558,7 @@ impl Condition {
             Slowed => "|<value>-2| AP per turn, |<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn, |<value>+25%| movement",
             Inspired => "|<value>+3| |<shield>|<stat>Will|, |<value>+3| |<dice>| |<stat>Attack/Spell|",
-            Exposed => "|<value>-5| to all |<shield>|, |<value>-50%| armor.",
+            Exposed => "|<value>-3| to all |<shield>|, |<value>-50%| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes |<value>-30%| damage from the next attack.",
             Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
@@ -3657,7 +3657,7 @@ const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 5;
-const EXPOSED_DEFENSE_PENALTY: u32 = 5;
+const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const INSPIRED_WILL_BONUS: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 2;
 const HASTENED_AP_BONUS: u32 = 1;

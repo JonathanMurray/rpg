@@ -401,10 +401,14 @@ pub enum TerrainId {
     WallPainting2,
     WallFlag,
     Mat,
+    Cauldron,
+    Cauldron2,
     WallOpeningNorth,
     WallOpeningEast,
     WallOpeningWest,
     WallWindow,
+    SuitOfArmor,
+    AnimalHead,
 
     NewWaterNorthWest,
     NewWaterNorth,
@@ -577,9 +581,13 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::WallFlag => (4, 6),
         TerrainId::WallWindow => (7, 6),
         TerrainId::Mat => (4, 8),
+        TerrainId::Cauldron => (5, 8),
+        TerrainId::Cauldron2 => (6, 8),
         TerrainId::WallOpeningNorth => (5, 6),
         TerrainId::WallOpeningEast => (6, 6),
         TerrainId::WallOpeningWest => (6, 7),
+        TerrainId::SuitOfArmor => (4, 7),
+        TerrainId::AnimalHead => (5, 7),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => {
@@ -634,6 +642,11 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     // animate table candle
     if (t * 0.7) % (t * 0.7).floor() < 0.5 && (col, row) == (2, 7) {
         (col, row) = (3, 7);
+    }
+
+    // cauldron bubbles
+    if (t * 0.6) % (t * 0.6).floor() < 0.5 && (col, row) == (6, 8) {
+        (col, row) = (7, 8);
     }
 
     let src_sides = [

@@ -43,6 +43,7 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
         FightId::EasyCluster => "easy_map.json",
         FightId::Medium => "medium_map.json",
         FightId::Test => "test.json",
+        FightId::EliteHuldra => "huldra.json",
         unhandled => todo!("Handle map: {:?}", unhandled),
     };
     let map_data = MapData::load_from_file(&format!("maps/{filename}"));
@@ -106,8 +107,8 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         FightId::EasySurrounded => "map_easy_surrounded.txt",
         FightId::EasyRiver => "map_easy_river.txt",
         FightId::EliteOgre => "map_elite.txt",
-        FightId::EliteMagi => "map_elite2.txt",
         FightId::VerticalSlice => "map_vertical_slice.txt",
+        FightId::EliteHuldra => return init_fight_map_new(player_characters, fight_id),
         FightId::Test => return init_fight_map_new(player_characters, fight_id),
         FightId::EasyCluster => return init_fight_map_new(player_characters, fight_id),
         FightId::Medium => return init_fight_map_new(player_characters, fight_id),
@@ -338,7 +339,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 characters.push(archer);
             }
         }
-        FightId::EliteMagi => {
+        FightId::EliteHuldra => {
             let pos = *enemy_positions[&0].choose().unwrap();
             let magi = Character::new(
                 bot(BotBehaviour::Magi(Default::default()), 9.0),
@@ -618,7 +619,7 @@ pub enum FightId {
     EasySurrounded,
     EasyRiver,
     EliteOgre,
-    EliteMagi,
+    EliteHuldra,
     Test,
     VerticalSlice,
     VerticalSliceNew,

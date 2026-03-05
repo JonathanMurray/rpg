@@ -7,13 +7,14 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
-        HandType, Party, Position, Shield, Weapon,
+        ArrowStack, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind,
+        EquipmentEntry, HandType, Party, Position, Shield, Weapon,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, ENEMY_BRACE,
-        ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE, GOOD_CHAIN_MAIL,
-        SMALL_SHIELD,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
+        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_HORRORS,
+        MAGI_INFLICT_WOUNDS, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -157,6 +158,8 @@ pub enum CharacterType {
     Skeleton,
     SkeletonLeader,
     Ogre,
+    Huldra,
+    Enslaved,
     Ghoul1,
     Ghoul2,
 }
@@ -170,6 +173,8 @@ impl CharacterType {
             CharacterType::Skeleton => SpriteId::Skeleton,
             CharacterType::SkeletonLeader => SpriteId::Skeleton,
             CharacterType::Ogre => SpriteId::Ogre,
+            CharacterType::Huldra => SpriteId::Huldra,
+            CharacterType::Enslaved => SpriteId::Skeleton2,
             CharacterType::Ghoul1 => SpriteId::Ghoul,
             CharacterType::Ghoul2 => SpriteId::Ghoul,
         }
@@ -202,6 +207,8 @@ enum WeaponId {
     Sword,
     BadSword,
     BadDagger,
+    BadRapier,
+    EnslavedRapier,
     BadBow,
 }
 
@@ -215,6 +222,8 @@ fn create_weapon(id: WeaponId) -> Weapon {
         WeaponId::Sword => SWORD,
         WeaponId::BadSword => BAD_SWORD,
         WeaponId::BadDagger => BAD_DAGGER,
+        WeaponId::BadRapier => BAD_RAPIER,
+        WeaponId::EnslavedRapier => ENSLAVED_RAPIER,
         WeaponId::BadBow => BAD_BOW,
     }
 }
@@ -327,6 +336,37 @@ pub fn create_character(
             ogre.learn_ability(ENEMY_TACKLE);
             ogre.known_passive_skills.push(PassiveSkill::BloodRage);
             ogre
+        }
+        CharacterType::Huldra => {
+            let huldra = Character::new(
+                bot(BotBehaviour::Magi(Default::default()), 9.0),
+                "Huldra",
+                PortraitId::Huldra,
+                SpriteId::Huldra,
+                Attributes::new(2, 5, 9, 5),
+                pos,
+            );
+            huldra.learn_ability(MAGI_HEAL);
+            huldra.learn_ability(MAGI_INFLICT_WOUNDS);
+            huldra.learn_ability(MAGI_INFLICT_HORRORS);
+            huldra.armor_piece.set(Some(SHIRT));
+            huldra.set_weapon(HandType::MainHand, BAD_SWORD);
+            huldra.health.change_max_value_to(40);
+            huldra
+        }
+        CharacterType::Enslaved => {
+            let enslaved = Character::new(
+                bot(BotBehaviour::Normal, 12.0),
+                "Enslaved",
+                PortraitId::Ghoul,
+                SpriteId::Skeleton2,
+                Attributes::new(5, 5, 2, 1),
+                pos,
+            );
+            enslaved.health.change_max_value_to(24);
+            enslaved.armor_piece.set(Some(CHAIN_MAIL));
+            enslaved.set_weapon(HandType::MainHand, ENSLAVED_SWORD);
+            enslaved
         }
     };
 

@@ -927,7 +927,7 @@ impl GameGrid {
     pub fn draw_debug_cells(&self) {
         let weak_color = Color::new(0.5, 1.0, 0.5, 0.2);
         let mut strong_color = weak_color;
-        strong_color.a = 0.4;
+        strong_color.a = 0.7;
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x = self.grid_x_to_screen(col);
             let y1 = self.grid_y_to_screen(0);

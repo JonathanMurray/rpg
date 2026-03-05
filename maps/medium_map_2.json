@@ -619,10 +619,13 @@
     "(7, 7)": "WallWindow",
     "(4, 7)": "WallWindow",
     "(58, 19)": "WallOpeningEast",
-    "(29, 34)": "BookShelf",
-    "(33, 34)": "BookShelf",
-    "(37, 34)": "BookShelf",
-    "(40, 34)": "BookShelf"
+    "(29, 34)": "SuitOfArmor",
+    "(39, 34)": "SuitOfArmor",
+    "(31, 1)": "WallFlag",
+    "(55, 1)": "WallFlag",
+    "(49, 1)": "WallFlag",
+    "(43, 1)": "WallFlag",
+    "(37, 1)": "WallFlag"
   },
   "characters": [
     {

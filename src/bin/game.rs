@@ -64,26 +64,30 @@ async fn main() {
 
     dbg!(get_time());
 
-    let mut player_characters = vec![make_medium_clara(&party)];
-    player_characters = run_fight_loop(
-        resources.clone(),
-        player_characters,
-        FightId::EliteMagi,
-        //FightId::Test,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+       let mut player_characters = vec![make_medium_clara(&party)];
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::EliteHuldra,
+           //FightId::Test,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
 
-    player_characters = run_fight_loop(
-        resources.clone(),
-        player_characters,
-        FightId::EasyCluster,
-        //FightId::Test,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::EasyCluster,
+           //FightId::Test,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
 
     let bob = player_characters
         .iter()
@@ -96,14 +100,16 @@ async fn main() {
         .unwrap();
     alice.learn_ability(INSPIRE);
 
-    player_characters = run_fight_loop(
-        resources.clone(),
-        player_characters,
-        FightId::Medium,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+       player_characters = run_fight_loop(
+           resources.clone(),
+           player_characters,
+           FightId::Medium,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
 
     player_characters.push(make_medium_clara(&party));
     let alice = player_characters
@@ -111,6 +117,15 @@ async fn main() {
         .find(|ch| ch.name == "Alice")
         .unwrap();
     alice.known_attack_enhancements.push(CRIPPLING_SHOT);
+
+    player_characters = run_fight_loop(
+        resources.clone(),
+        player_characters,
+        FightId::EliteHuldra,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
 
     player_characters = run_fight_loop(
         resources.clone(),

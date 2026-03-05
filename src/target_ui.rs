@@ -208,7 +208,7 @@ impl TargetUi {
                 ..Default::default()
             };
 
-            let mut actions_row = None;
+            let mut action_rows = vec![];
             let mut passives_row = None;
             let mut bot_using_spells = false;
 
@@ -230,27 +230,27 @@ impl TargetUi {
                     btn
                 };
 
-                let mut children: Vec<Element> = vec![];
+                let mut buttons: Vec<Element> = vec![];
                 let mut passive_children: Vec<Element> = vec![];
 
                 let btn = new_btn(ButtonAction::Action(BaseAction::Move));
                 let id = btn.id;
                 let btn = Rc::new(RefCell::new(btn));
-                children.push(Element::RcRefCell(btn.clone()));
+                buttons.push(Element::RcRefCell(btn.clone()));
                 self.buttons.insert(id, btn);
 
                 if let Some(attack) = char.attack_action() {
                     let btn = new_btn(ButtonAction::Action(BaseAction::Attack(attack)));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
-                    children.push(Element::RcRefCell(btn.clone()));
+                    buttons.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
                 for e in &char.known_attack_enhancements {
                     let btn = new_btn(ButtonAction::AttackEnhancement(*e));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
-                    children.push(Element::RcRefCell(btn.clone()));
+                    buttons.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
                 for ability in char.known_abilities() {
@@ -260,7 +260,7 @@ impl TargetUi {
                     let btn = new_btn(ButtonAction::Action(BaseAction::UseAbility(ability)));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
-                    children.push(Element::RcRefCell(btn.clone()));
+                    buttons.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
                 for skill in &char.known_passive_skills {
@@ -271,11 +271,21 @@ impl TargetUi {
                     self.buttons.insert(id, btn);
                 }
 
-                actions_row = Some(Element::Container(Container {
-                    layout_dir: LayoutDirection::Horizontal,
-                    children,
-                    ..Default::default()
-                }));
+                while buttons.len() > 3 {
+                    action_rows.push(Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        children: buttons.drain(0..3).collect(),
+                        ..Default::default()
+                    }));
+                }
+                if !buttons.is_empty() {
+                    action_rows.push(Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        children: buttons,
+                        ..Default::default()
+                    }));
+                }
+
                 if !passive_children.is_empty() {
                     passives_row = Some(Element::Container(Container {
                         layout_dir: LayoutDirection::Horizontal,
@@ -340,7 +350,7 @@ impl TargetUi {
                 rows.push(Element::Container(detailed_stats));
             }
 
-            if let Some(row) = actions_row {
+            for row in action_rows {
                 rows.push(row);
             }
             if let Some(row) = passives_row {

@@ -478,6 +478,8 @@ impl Sidebar {
             TerrainId::Table,
             TerrainId::NewWaterNorthEast,
             TerrainId::StoneWallConvexNorthEast,
+            TerrainId::Cauldron,
+            TerrainId::Cauldron2,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_ids
             .iter()
@@ -495,6 +497,8 @@ impl Sidebar {
             TerrainId::WallOpeningEast,
             TerrainId::WallOpeningWest,
             TerrainId::Mat,
+            TerrainId::SuitOfArmor,
+            TerrainId::AnimalHead,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
@@ -510,6 +514,8 @@ impl Sidebar {
             EditorAction::PlaceCharacter(CharacterType::Ghoul1),
             EditorAction::PlaceCharacter(CharacterType::Ghoul2),
             EditorAction::PlaceCharacter(CharacterType::Ogre),
+            EditorAction::PlaceCharacter(CharacterType::Huldra),
+            EditorAction::PlaceCharacter(CharacterType::Enslaved),
             EditorAction::EditCharacter,
             EditorAction::MoveCharacter(Cell::new(None)),
             EditorAction::RemoveCharacter,

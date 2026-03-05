@@ -18,19 +18,93 @@ use crate::{
 #[derive(Debug, Clone, PartialEq)]
 pub enum BotBehaviour {
     Normal,
-    Magi(MagiBehaviour),
+    Magi(HuldraBehaviour),
     Fighter(FighterBehaviour),
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct MagiBehaviour {
+pub struct HuldraBehaviour {
     current_goal: Cell<Option<(Ability, CharacterId)>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
 pub struct FighterBehaviour {
+    target_selection: FighterTargetSelection,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct FighterTargetSelection {
     current_target: Cell<Option<CharacterId>>,
     chance_of_switching_target: Cell<f32>,
+}
+
+impl FighterTargetSelection {
+    fn run<'a>(&self, game: &'a CoreGame) -> (Vec<&'a Rc<Character>>, CharacterId) {
+        let bot = game.active_character();
+
+        let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
+
+        if let Some(target_id) = self.current_target.get() {
+            if !player_chars.iter().any(|ch| ch.id() == target_id) {
+                // Player char must have died. Force a target switch.
+                self.current_target.set(None);
+            }
+        }
+
+        if random_bool(0.5) {
+            println!("Sort player chars by proximity");
+            player_chars.sort_by_key(|ch| {
+                let distance_to = find_path_to_attack_target(game, bot, ch)
+                    .map(|p| p.total_distance)
+                    .unwrap_or(f32::MAX);
+
+                // convert from f32 to make it sortable
+                (distance_to * 10.0) as u32
+            });
+        } else {
+            println!("Shuffle player chars");
+            CustomShuffle::shuffle(&mut player_chars);
+        }
+
+        if self.current_target.get().is_none() {
+            // TODO: this panics if all player chars have died
+            self.current_target.set(Some(player_chars[0].id()));
+        }
+
+        let mut target_id = self.current_target.get().unwrap();
+
+        let chance_switch_target = self.chance_of_switching_target.get();
+        dbg!(chance_switch_target);
+        let should_switch_target = random_range(0.0..1.0) < chance_switch_target;
+        dbg!(should_switch_target);
+        if should_switch_target {
+            self.chance_of_switching_target.set(0.0);
+        } else if self.chance_of_switching_target.get() == 0.0 {
+            // Make it very rare to switch target immediately after acquiring it
+            self.chance_of_switching_target.set(0.01);
+        } else {
+            // After that, the chance increases steadily
+            self.chance_of_switching_target
+                .set(chance_switch_target + 0.1);
+        }
+
+        if should_switch_target {
+            println!("bot should try switching target");
+            if let Some(new_target) = player_chars.iter().find(|ch| ch.id() != target_id) {
+                println!("switching to new target?: {}", new_target.id());
+
+                if find_path_to_attack_target(game, bot, new_target).is_some() {
+                    println!("Yes, there's a path to it ");
+                    self.current_target.set(Some(new_target.id()));
+                    target_id = new_target.id();
+                }
+            }
+        } else {
+            println!("bot sticks with current target: {:?}", self.current_target);
+        }
+
+        (player_chars, target_id)
+    }
 }
 
 const EXPLORATION_RANGE: f32 = 60.0;
@@ -43,7 +117,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 
     let result = match character.kind.unwrap_bot_behaviour() {
         BotBehaviour::Normal => run_normal_behaviour(game),
-        BotBehaviour::Magi(magi) => run_magi_behaviour(game, magi),
+        BotBehaviour::Magi(magi) => run_huldra_behaviour(game, magi),
         BotBehaviour::Fighter(fighter) => run_fighter_behaviour(game, fighter),
     };
     println!("Bot chose: {:?}", result);
@@ -60,99 +134,11 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
 
     println!("bot AP: {}", bot.action_points.current());
 
-    let bot_pos = bot.position.get();
-
-    let attack = bot.attack_action().unwrap();
-    let weapon_range = bot.weapon(attack.hand).unwrap().range;
-
-    let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
-
-    if random_range(0.0..1.0) < 0.5 {
-        println!("Sort player chars by proximity");
-        player_chars.sort_by_key(|ch| {
-            let distance_to = game
-                .pathfind_grid
-                .find_shortest_path_to_proximity(
-                    bot.id(),
-                    bot_pos,
-                    ch.pos(),
-                    weapon_range.center_to_center_squared(),
-                    EXPLORATION_RANGE,
-                )
-                .map(|p| p.total_distance)
-                .unwrap_or(f32::MAX);
-
-            // convert from f32 to make it sortable
-            (distance_to * 10.0) as u32
-        });
-    } else {
-        println!("Shuffle player chars");
-        CustomShuffle::shuffle(&mut player_chars);
-    }
-
-    if let Some(target_id) = behaviour.current_target.get() {
-        if !player_chars.iter().any(|ch| ch.id() == target_id) {
-            // Player char must have died. Force a target switch.
-            behaviour.current_target.set(None);
-        }
-    }
-
-    if behaviour.current_target.get().is_none() {
-        // TODO: this panics if all player chars have died
-        behaviour.current_target.set(Some(player_chars[0].id()));
-    }
-
-    let mut target_id = behaviour.current_target.get().unwrap();
-
-    let chance_switch_target = behaviour.chance_of_switching_target.get();
-    dbg!(chance_switch_target);
-    let switch_target = random_range(0.0..1.0) < chance_switch_target;
-    dbg!(switch_target);
-    if switch_target {
-        behaviour.chance_of_switching_target.set(0.0);
-    } else if behaviour.chance_of_switching_target.get() == 0.0 {
-        // Make it very rare to switch target immediately after acquiring it
-        behaviour.chance_of_switching_target.set(0.01);
-    } else {
-        // After that, the chance increases steadily
-        behaviour
-            .chance_of_switching_target
-            .set(chance_switch_target + 0.1);
-    }
-
-    if switch_target {
-        println!("bot should try switching target");
-        if let Some(new_target) = player_chars.iter().find(|ch| ch.id() != target_id) {
-            println!("switching to new target?: {}", new_target.id());
-
-            let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
-                bot.id(),
-                bot_pos,
-                new_target.pos(),
-                weapon_range.center_to_center_squared(),
-                EXPLORATION_RANGE,
-            );
-
-            if maybe_path.is_some() {
-                println!("Yes, there's a path to it ");
-
-                behaviour.current_target.set(Some(new_target.id()));
-                target_id = new_target.id();
-            } else {
-                println!("no, no path to it");
-            }
-        }
-    } else {
-        println!(
-            "bot sticks with current target: {:?}",
-            behaviour.current_target
-        );
-    }
-
+    let (player_chars, target_id) = behaviour.target_selection.run(game);
     let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
 
     let mut candidates = vec![];
-    if bot.can_attack(attack) {
+    if bot.can_attack(bot.attack_action().unwrap()) {
         candidates.push(BotAction::Attack);
     }
     for a in bot.usable_single_target_abilities() {
@@ -199,15 +185,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
         }
     }
 
-    let maybe_path = game.pathfind_grid.find_shortest_path_to_proximity(
-        bot.id(),
-        bot_pos,
-        target.pos(),
-        weapon_range.center_to_center_squared(),
-        EXPLORATION_RANGE,
-    );
-
-    if let Some(path) = maybe_path {
+    if let Some(path) = find_path_to_attack_target(game, bot, target) {
         if bot.remaining_movement.get() < path.total_distance {
             println!(
                 "Bot will not reach target this turn; look for other things to do before moving"
@@ -248,7 +226,7 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
     } else {
         println!(
             "bot finds no path to target (from {:?} to {:?})",
-            bot_pos,
+            bot.pos(),
             target.pos()
         );
         //dbg!(&game.pathfind_grid.occupied());
@@ -256,8 +234,25 @@ fn run_fighter_behaviour(game: &CoreGame, behaviour: &FighterBehaviour) -> Optio
 
     println!("No bot action");
 
-    // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
+    // There are valid cases where a bot cannot take any action (such as not having enough AP)
     None
+}
+
+fn find_path_to_attack_target(
+    game: &CoreGame,
+    bot: &Character,
+    target: &&Rc<Character>,
+) -> Option<Path> {
+    let attack = bot.attack_action().unwrap();
+    let weapon_range = bot.weapon(attack.hand).unwrap().range;
+
+    game.pathfind_grid.find_shortest_path_to_proximity(
+        bot.id(),
+        bot.pos(),
+        target.pos(),
+        weapon_range.center_to_center_squared(),
+        EXPLORATION_RANGE,
+    )
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -401,35 +396,37 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     None
 }
 
-fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Action> {
+fn run_huldra_behaviour(game: &CoreGame, behaviour: &HuldraBehaviour) -> Option<Action> {
+    // TODO Rewrite this behaviour (reuse "fighter behaviour"?)
+    // Don't pick and move toward a target that you cannot reach (thereby wasting all AP).
+
     let bot = game.active_character();
 
     if let Some((_, target_id)) = behaviour.current_goal.get() {
         if !game.characters.contains_alive(target_id) {
-            dbg!("MAGI, TARGET HAS DIED?", target_id);
+            dbg!("Huldra, TARGET HAS DIED?", target_id);
             behaviour.current_goal.set(None);
         }
     }
 
     if behaviour.current_goal.get().is_none() {
         let mut rng = rand::rng();
-        let i = rng.random_range(0..2);
 
         let is_healing_warranted = game
             .enemies()
-            .any(|char| char.health.current() < char.health.max() - 2);
+            .any(|char| char.health.current() < char.health.max() - 5);
 
         let are_all_players_bleeding = game.player_characters().all(|ch| ch.is_bleeding());
 
-        if i == 0 && is_healing_warranted {
+        if is_healing_warranted && rng.random_bool(0.6) {
             let target: &Rc<Character> = game
                 .enemies()
                 .min_by(|a, b| a.health.ratio().total_cmp(&b.health.ratio()))
                 .unwrap();
 
             behaviour.current_goal.set(Some((MAGI_HEAL, target.id())));
-            dbg!("NEW MAGI HEAL GOAL: {:?}", target.id());
-        } else if !are_all_players_bleeding {
+            dbg!("NEW Huldra HEAL GOAL: {:?}", target.id());
+        } else if !are_all_players_bleeding && rng.random_bool(0.5) {
             let non_bleeding_player_chars: Vec<&Rc<Character>> = game
                 .player_characters()
                 .filter(|ch| !ch.is_bleeding())
@@ -440,7 +437,7 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
             behaviour
                 .current_goal
                 .set(Some((MAGI_INFLICT_WOUNDS, target.id())));
-            dbg!("NEW MAGI WOUND GOAL: {:?}", target.id());
+            dbg!("NEW Huldra WOUND GOAL: {:?}", target.id());
         } else {
             let player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
             let target = player_chars[rng.random_range(0..player_chars.len())];
@@ -448,7 +445,7 @@ fn run_magi_behaviour(game: &CoreGame, behaviour: &MagiBehaviour) -> Option<Acti
             behaviour
                 .current_goal
                 .set(Some((MAGI_INFLICT_HORRORS, target.id())));
-            dbg!("NEW MAGI HORROR GOAL: {:?}", target.id());
+            dbg!("NEW Huldra HORROR GOAL: {:?}", target.id());
         }
     }
 
@@ -498,7 +495,7 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     //let max_sprint_usage = character.stamina.current();
     let mut positions = vec![];
     let mut total_distance = 0.0;
-    for (dist, pos) in path.positions {
+    for (dist, pos) in path.positions.iter().copied() {
         if dist <= remaining_free_movement {
             positions.push(pos);
             total_distance = dist;
@@ -514,6 +511,13 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
             extra_cost,
         })
     } else {
+        println!("---");
+        println!(
+            "bot path resulting in no action: {:?}, from pos: {:?}",
+            path,
+            character.pos()
+        );
+        println!("---");
         None
     }
 }
