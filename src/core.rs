@@ -2137,6 +2137,7 @@ impl CoreGame {
         }
 
         if game.is_some() {
+            // TODO: Include details here about where this attack bonus comes from
             let attack_bonus_str = if attack_bonus.flat_amount > 0 {
                 format!("(+{}) ", attack_bonus.flat_amount)
             } else if attack_bonus.flat_amount < 0 {
@@ -3809,7 +3810,7 @@ impl Conditions {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Action {
     Attack {
         hand: HandType,
@@ -4458,13 +4459,13 @@ impl Attributes {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub enum CharacterKind {
     Player(Rc<Party>),
     Bot(Bot),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Bot {
     pub behaviour: BotBehaviour,
     pub base_movement: f32,
@@ -5242,6 +5243,12 @@ impl Character {
         None
     }
 
+    pub fn attack_weapon_range(&self) -> Option<WeaponRange> {
+        self.attack_action()
+            .map(|attack| self.weapon(attack.hand).map(|wpn| wpn.range))
+            .flatten()
+    }
+
     pub fn usable_actions(&self) -> Vec<BaseAction> {
         self.known_actions
             .borrow()
@@ -5268,17 +5275,7 @@ impl Character {
             BaseAction::Attack(attack) => {
                 matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
             }
-            BaseAction::UseAbility(ability) => {
-                if ability.requires_shield() && self.shield().is_none() {
-                    return false;
-                }
-                if ability.requires_melee_weapon() && !self.has_equipped_melee_weapon() {
-                    return false;
-                }
-                ap >= ability.action_point_cost
-                    && self.stamina.current() >= ability.stamina_cost
-                    && self.mana.current() >= ability.mana_cost
-            }
+            BaseAction::UseAbility(ability) => self.can_use_ability(ability),
             BaseAction::Move => self.remaining_movement.get() > 1.0 || sta > 0,
             BaseAction::ChangeEquipment => {
                 ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
@@ -5288,6 +5285,19 @@ impl Character {
                     && ap as i32 >= BaseAction::UseConsumable.action_point_cost()
             }
         }
+    }
+
+    pub fn can_use_ability(&self, ability: Ability) -> bool {
+        let ap = self.action_points.current();
+        if ability.requires_shield() && self.shield().is_none() {
+            return false;
+        }
+        if ability.requires_melee_weapon() && !self.has_equipped_melee_weapon() {
+            return false;
+        }
+        ap >= ability.action_point_cost
+            && self.stamina.current() >= ability.stamina_cost
+            && self.mana.current() >= ability.mana_cost
     }
 
     pub fn has_enough_ap_for_action(&self, action: BaseAction) -> bool {
@@ -5318,7 +5328,7 @@ impl Character {
             .collect();
     }
 
-    pub fn usable_single_target_abilities(&self) -> Vec<Ability> {
+    pub fn usable_single_enemy_target_abilities(&self) -> Vec<Ability> {
         return self
             .known_actions
             .borrow()
@@ -6218,8 +6228,8 @@ This is the max distance to be considered melee:
 AAA
 AAA
 AAABBB
-BBB
-BBB
+   BBB
+   BBB
 
 I.e. two sides must be touching. The distance from A center to B edge
 is therefore sqrt(1^2 + 2^2)
@@ -6277,6 +6287,12 @@ impl NumberedResource {
     }
 
     fn spend(&self, amount: u32) {
+        assert!(
+            amount <= self.current.get(),
+            "Tried to spend {} but only have {}",
+            amount,
+            self.current.get()
+        );
         // The caller must have checked that we have the required amount
         self.current.set(self.current.get() - amount);
     }

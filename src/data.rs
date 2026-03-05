@@ -988,7 +988,7 @@ pub const SHACKLED_MIND: Ability = Ability {
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Slowed,
                     stacks: None,
-                    duration_rounds: Some(2),
+                    duration_rounds: Some(1),
                 })),
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Exposed,
@@ -1141,7 +1141,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     }),
 };
 
-pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
+pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::MagiInflictWounds,
     name: "Inflict wounds",
     description: "",
@@ -1167,7 +1167,7 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
             ]),
         }),
         impact_circle: None,
-        reach: AbilityReach::Range(Range::Ranged(15)),
+        reach: AbilityReach::Range(Range::Melee),
     },
     animation_color: BROWN,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1175,12 +1175,12 @@ pub const MAGI_INFLICT_WOUNDS: Ability = Ability {
     charge_fx: None,
 };
 
-pub const MAGI_INFLICT_HORRORS: Ability = Ability {
+pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     id: AbilityId::MagiInflictHorrors,
-    name: "Inflict horrors",
+    name: "Curse",
     description: "",
     icon: IconId::Mindblast,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: None,
@@ -1188,7 +1188,7 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Ranged(15)),
+        reach: AbilityReach::Range(Range::Ranged(22)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: None,
@@ -1209,9 +1209,9 @@ pub const MAGI_INFLICT_HORRORS: Ability = Ability {
     charge_fx: None,
 };
 
-pub const MAGI_HEAL: Ability = Ability {
+pub static HULDRA_HEAL: Ability = Ability {
     id: AbilityId::MagiHeal,
-    name: "Heal",
+    name: "Bless",
     description: "",
     icon: IconId::Heal,
     action_point_cost: 3,
@@ -1224,7 +1224,14 @@ pub const MAGI_HEAL: Ability = Ability {
         range: Range::Ranged(15),
         effect: AbilityPositiveEffect {
             healing: 11,
-            apply: None,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Protected,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })),
+                None,
+            ]),
         },
     },
     possible_enhancements: [None, None, None],

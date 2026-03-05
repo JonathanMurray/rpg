@@ -162,7 +162,7 @@ impl PathfindGrid {
     ) -> Option<Path> {
         let before = Instant::now();
 
-        println!("find shortest path to proxy ...");
+        //println!("find shortest path to proxy ...");
         let chart = self.explore_outward(
             character_id,
             start,
@@ -211,7 +211,7 @@ impl PathfindGrid {
         }
 
         if let Some(path) = shortest_valid_path {
-            println!("Found valid path");
+            //println!("Found valid path");
             Some(path)
         } else if let Some((_, path)) = closest_fallback_path {
             println!("Using fallback path");
@@ -264,10 +264,12 @@ impl PathfindGrid {
         {
             for (pos, _chart_node) in self.cached_exploration_chart.borrow().iter() {
                 if within_range_squared(proximity_squared, *pos, target_pos) {
+                    /*
                     println!(
                         "explore_outward(char={}, start={:?}, range={}, target={:?}. Found target within cache: pos={:?}",
                         character_id, start, range, target, pos
                     );
+                     */
                     return self.cached_exploration_chart.borrow();
                 }
             }

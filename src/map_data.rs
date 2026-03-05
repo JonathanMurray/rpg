@@ -13,8 +13,8 @@ use crate::{
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
-        ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, MAGI_HEAL, MAGI_INFLICT_HORRORS,
-        MAGI_INFLICT_WOUNDS, SMALL_SHIELD,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
+        HULDRA_INFLICT_WOUNDS, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -339,16 +339,17 @@ pub fn create_character(
         }
         CharacterType::Huldra => {
             let huldra = Character::new(
-                bot(BotBehaviour::Magi(Default::default()), 9.0),
+                //bot(BotBehaviour::Magi(Default::default()), 9.0),
+                bot(BotBehaviour::Huldra(Default::default()), 12.0),
                 "Huldra",
                 PortraitId::Huldra,
                 SpriteId::Huldra,
                 Attributes::new(2, 5, 9, 5),
                 pos,
             );
-            huldra.learn_ability(MAGI_HEAL);
-            huldra.learn_ability(MAGI_INFLICT_WOUNDS);
-            huldra.learn_ability(MAGI_INFLICT_HORRORS);
+            huldra.learn_ability(HULDRA_HEAL);
+            huldra.learn_ability(HULDRA_INFLICT_WOUNDS);
+            huldra.learn_ability(HULDRA_INFLICT_HORRORS);
             huldra.armor_piece.set(Some(SHIRT));
             huldra.set_weapon(HandType::MainHand, BAD_SWORD);
             huldra.health.change_max_value_to(40);
@@ -356,7 +357,7 @@ pub fn create_character(
         }
         CharacterType::Enslaved => {
             let enslaved = Character::new(
-                bot(BotBehaviour::Normal, 12.0),
+                bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enslaved",
                 PortraitId::Ghoul,
                 SpriteId::Skeleton2,

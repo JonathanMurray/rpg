@@ -18,8 +18,8 @@ use crate::{
     },
     data::{
         PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, LEATHER_ARMOR,
-        MAGI_HEAL, MAGI_INFLICT_WOUNDS, SHIRT,
+        CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, HULDRA_HEAL,
+        HULDRA_INFLICT_WOUNDS, LEATHER_ARMOR, SHIRT,
     },
     map_data::{create_character, CharacterType, MapData},
     pathfind::{Occupation, PathfindGrid, TerrainType, CELLS_PER_ENTITY},
@@ -235,7 +235,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             );
             ranged.set_weapon(HandType::MainHand, BAD_BOW);
 
-            characters.extend_from_slice(&[melee, ranged]);
+            characters.extend([melee, ranged]);
         }
         FightId::Medium => {
             let pos = *enemy_positions[&0].choose().unwrap();
@@ -252,7 +252,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
             tanky.set_shield(BAD_SMALL_SHIELD);
             tanky.set_weapon(HandType::MainHand, BAD_RAPIER);
 
-            characters.extend_from_slice(&[tanky]);
+            characters.extend([tanky]);
         }
         FightId::EasyCluster => {
             for i in 0..4 {
@@ -341,24 +341,26 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
         }
         FightId::EliteHuldra => {
             let pos = *enemy_positions[&0].choose().unwrap();
-            let magi = Character::new(
-                bot(BotBehaviour::Magi(Default::default()), 9.0),
+            let huldra = Character::new(
+                bot(BotBehaviour::Huldra(Default::default()), 9.0),
                 "Huldra",
                 PortraitId::Huldra,
                 SpriteId::Huldra,
                 Attributes::new(4, 1, 3, 5),
                 pos,
             );
-            magi.known_actions
+            huldra
+                .known_actions
                 .borrow_mut()
-                .push(BaseAction::UseAbility(MAGI_HEAL));
-            magi.armor_piece.set(Some(SHIRT));
-            magi.set_weapon(HandType::MainHand, BAD_SWORD);
-            magi.known_actions
+                .push(BaseAction::UseAbility(HULDRA_HEAL));
+            huldra.armor_piece.set(Some(SHIRT));
+            huldra.set_weapon(HandType::MainHand, BAD_SWORD);
+            huldra
+                .known_actions
                 .borrow_mut()
-                .push(BaseAction::UseAbility(MAGI_INFLICT_WOUNDS));
-            magi.health.change_max_value_to(25);
-            characters.push(magi);
+                .push(BaseAction::UseAbility(HULDRA_INFLICT_WOUNDS));
+            huldra.health.change_max_value_to(25);
+            characters.push(huldra);
 
             for i in 1..3 {
                 let pos = *enemy_positions[&i].choose().unwrap();
@@ -410,7 +412,7 @@ pub fn init_fight_map(player_characters: Vec<Character>, fight_id: FightId) -> G
                 e.set_weapon(HandType::MainHand, BAD_DAGGER);
             }
 
-            characters.extend_from_slice(&enemies);
+            characters.extend(enemies);
         }
         FightId::VerticalSlice => {
             for i in 0..=2 {

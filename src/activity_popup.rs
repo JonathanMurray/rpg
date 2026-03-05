@@ -139,7 +139,7 @@ impl ActivityPopup {
 
         let mut measured_lines = vec![];
 
-        let header_dimensions = measure_text(
+        let header_dimensions = measure_text_with_font_tags(
             &self.base_lines[0],
             header_params.font,
             header_params.font_size,
@@ -148,14 +148,22 @@ impl ActivityPopup {
         measured_lines.push((&self.base_lines[0], header_dimensions));
 
         for line in self.base_lines.iter().skip(1) {
-            let dimensions =
-                measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
+            let dimensions = measure_text_with_font_tags(
+                line,
+                base_text_params.font,
+                base_text_params.font_size,
+                1.0,
+            );
             measured_lines.push((line, dimensions));
         }
 
         if let Some(line) = &self.additional_line {
-            let dimensions =
-                measure_text(line, base_text_params.font, base_text_params.font_size, 1.0);
+            let dimensions = measure_text_with_font_tags(
+                line,
+                base_text_params.font,
+                base_text_params.font_size,
+                1.0,
+            );
             measured_lines.push((line, dimensions));
         }
 
@@ -626,15 +634,17 @@ impl ActivityPopup {
             unreachable!()
         };
 
+        /*
         let reaction = *selected;
 
         let attacker = self.characters.get_rc(*attacker);
         let defender = self.characters.get(*defender);
-        let reactor = self.characters.get(*reactor);
 
         let attack_enhancements = &[];
 
+
         let mut explanation = String::new();
+
 
         for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements, defender)
         {
@@ -646,24 +656,10 @@ impl ActivityPopup {
             explanation.push(' ');
         }
 
-        let prediction = predict_attack(
-            &self.characters,
-            attacker,
-            *hand,
-            attack_enhancements,
-            defender,
-            reaction.map(|r| (reactor.id(), r)),
-            0,
-        );
-
-        let mut line = format!(
-            "Damage chance: {}%, {} - {}",
-            prediction.percentage_chance_deal_damage, prediction.min_damage, prediction.max_damage
-        );
         if !explanation.is_empty() {
-            line.push_str(&format!("  ({explanation})"));
+            self.additional_line = Some(explanation);
         }
-        self.additional_line = Some(line);
+        */
     }
 
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
@@ -787,14 +783,12 @@ impl ActivityPopup {
                 let attacker = self.characters.get_rc(*attacker_id);
                 let defender = self.characters.get(*defender_id);
                 lines.push("React (on attacked)".to_string());
-                let attacks_str = format!(
-                    "{} attacks {} (d20+{} vs {})",
-                    attacker.name,
-                    defender.name,
+                lines.push(format!("{} attacks {}", attacker.name, defender.name,));
+                lines.push(format!(
+                    "|<dice>| |<stat>Attack| +{} vs |<shield>|<stat>Evasion| {}",
                     attacker.attack_modifier(*hand),
-                    defender.evasion(),
-                );
-                lines.push(attacks_str);
+                    defender.evasion()
+                ));
 
                 let reactor = self.characters.get(*reactor_id);
 
