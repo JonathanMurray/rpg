@@ -991,7 +991,7 @@ impl GameGrid {
                     from,
                     to,
                 } => {
-                    let cycle_time = (game_time * 2.0) % (game_time * 2.0).floor();
+                    let cycle_time = ((game_time * 1.5) % (game_time * 1.5).floor()) as f32;
                     if movement_type == MovementType::KnockedBack {
                         let amount = PI * 0.1;
                         if from.0 < to.0 {
@@ -999,17 +999,35 @@ impl GameGrid {
                         } else {
                             params.rotation = -amount;
                         }
-                    } else if cycle_time < 0.25 {
-                        y += 3.0;
-                    } else if cycle_time < 0.5 {
-                        if animation.custom_toggle.get() {
-                            animation.custom_toggle.set(false);
-                        }
-                        params.rotation = -0.07;
-                    } else if cycle_time < 0.75 {
-                        y += 3.0;
                     } else {
-                        params.rotation = 0.07;
+                        let amount = 0.05;
+                        if cycle_time < 0.5 {
+                            params.rotation = -amount + cycle_time / 0.5 * amount * 2.0;
+                        } else {
+                            params.rotation = amount - (cycle_time - 0.5) / 0.5 * amount * 2.0;
+                        }
+                        if (cycle_time > 0.15 && cycle_time < 0.35)
+                            || (cycle_time > 0.65 && cycle_time < 0.85)
+                        {
+                            y += 3.0;
+                        }
+                        //params.rotation = (cycle_time - 0.5) * 0.25 ;
+                        //dbg!(cycle_time);
+                        //dbg!(params.rotation);
+                        /*
+                        if cycle_time < 0.25 {
+                            y += 3.0;
+                        } else if cycle_time < 0.5 {
+                            if animation.custom_toggle.get() {
+                                animation.custom_toggle.set(false);
+                            }
+                            params.rotation = -0.07;
+                        } else if cycle_time < 0.75 {
+                            y += 3.0;
+                        } else {
+                            params.rotation = 0.07;
+                        }
+                         */
                     }
                 }
                 AnimationKind::Shake { random_time_offset } => {

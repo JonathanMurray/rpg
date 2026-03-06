@@ -205,7 +205,7 @@ pub const SWORD: Weapon = Weapon {
     name: "Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 7,
+    damage: 6,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -973,7 +973,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     name: "Shackle",
     description: "Slow an enemy and lower their defenses",
     icon: IconId::ShackledMind,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 2,
     stamina_cost: 0,
     requirement: None,
@@ -1223,7 +1223,7 @@ pub static HULDRA_HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Ranged(15),
         effect: AbilityPositiveEffect {
-            healing: 11,
+            healing: 8,
             apply: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Protected,

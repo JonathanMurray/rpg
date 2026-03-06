@@ -1844,7 +1844,7 @@ impl UserInterface {
                 let mut duration = if self.faster_movement.get() {
                     0.07
                 } else {
-                    0.11
+                    0.14
                 };
 
                 if from.0 != to.0 || from.1 != to.1 {

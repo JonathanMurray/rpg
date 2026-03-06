@@ -52,30 +52,32 @@ pub fn init_fight_map_new(player_characters: Vec<Character>, fight_id: FightId) 
 
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
-        let char: Rc<Character> = match char_data.type_ {
+        let char: Option<Rc<Character>> = match char_data.type_ {
             // TODO: Handle this better than string-matching on the name
-            CharacterType::Bob => {
-                let ch = Rc::new(player_chars_by_name.remove("Bob").unwrap());
+            CharacterType::Bob => player_chars_by_name.remove("Bob").map(|ch| {
+                let ch = Rc::new(ch);
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
                 ch
-            }
-            CharacterType::Alice => {
-                let ch = Rc::new(player_chars_by_name.remove("Alice").unwrap());
+            }),
+            CharacterType::Alice => player_chars_by_name.remove("Alice").map(|ch| {
+                let ch = Rc::new(ch);
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
                 ch
-            }
-            CharacterType::Clara => {
-                let ch = Rc::new(player_chars_by_name.remove("Clara").unwrap());
+            }),
+            CharacterType::Clara => player_chars_by_name.remove("Clara").map(|ch| {
+                let ch = Rc::new(ch);
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
                 ch
-            }
-            _ => create_character(pos, *char_data, None, i as CharacterId),
+            }),
+            _ => Some(create_character(pos, *char_data, None, i as CharacterId)),
         };
-        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
-        characters.push(char);
+        if let Some(char) = char {
+            pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+            characters.push(char);
+        }
     }
 
     assert_eq!(

@@ -1188,7 +1188,7 @@ impl CoreGame {
                     target_outcome = Some((*target_id, outcome));
 
                     if let Some((radius, acquisition, area_effect)) = impact_circle {
-                        detail_lines.push("Area of effect:".to_string());
+                        detail_lines.push("|<faded>Area of effect:|".to_string());
 
                         let area_target_outcomes = Self::perform_ability_area_enemy_effect(
                             AreaShape::Circle(radius),
@@ -2167,6 +2167,8 @@ impl CoreGame {
             } else {
                 dmg_calculation = weapon.damage as i32;
                 dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, weapon.name));
+                /*
+                // Versatile is confusing; especially as it's not reflected graphically
                 if matches!(weapon.grip, WeaponGrip::Versatile)
                     && attacker.off_hand.get().is_empty()
                 {
@@ -2174,6 +2176,7 @@ impl CoreGame {
                     dmg_str.push_str(&format!(" +{} |<faded>(two-handed)|", bonus_dmg));
                     dmg_calculation += bonus_dmg;
                 }
+                 */
             }
 
             let mut graze_improvement = None;

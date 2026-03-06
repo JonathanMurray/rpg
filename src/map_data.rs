@@ -300,7 +300,7 @@ pub fn create_character(
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
-                Attributes::new(2, 3, 2, 1),
+                Attributes::new(1, 2, 1, 1),
                 pos,
             );
             ghoul.health.change_max_value_to(9);
@@ -313,7 +313,7 @@ pub fn create_character(
                 "Ghoul",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
-                Attributes::new(3, 2, 1, 1),
+                Attributes::new(2, 1, 1, 1),
                 pos,
             );
             ghoul.health.change_max_value_to(12);
