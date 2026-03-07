@@ -48,6 +48,10 @@ pub enum Element {
 }
 
 impl Element {
+    pub fn boxed(e: impl Drawable + 'static) -> Self {
+        Self::Box(Box::new(e))
+    }
+
     pub fn size(&self) -> (f32, f32) {
         let size = match self {
             Element::Empty(w, h) => (*w, *h),

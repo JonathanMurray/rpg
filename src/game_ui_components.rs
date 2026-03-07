@@ -529,7 +529,7 @@ impl PlayerPortraits {
     }
 }
 
-struct PlayerCharacterPortrait {
+pub struct PlayerCharacterPortrait {
     text: TextLine,
     character: Rc<Character>,
     is_character_shown: Cell<bool>,
@@ -551,7 +551,7 @@ struct PlayerCharacterPortrait {
 }
 
 impl PlayerCharacterPortrait {
-    fn new(
+    pub fn new(
         character: &Rc<Character>,
         font: Font,
         texture: Texture2D,
@@ -1264,14 +1264,7 @@ pub struct LabelledResourceBar {
 }
 
 impl LabelledResourceBar {
-    pub fn new(
-        current: u32,
-        max: u32,
-        label: &'static str,
-        color: Color,
-        font: Font,
-        symbol: &'static str,
-    ) -> Self {
+    pub fn new(current: u32, max: u32, color: Color, font: Font, symbol: &'static str) -> Self {
         assert!(current <= max);
 
         let cell_h = 12.0;
@@ -1305,13 +1298,17 @@ impl LabelledResourceBar {
             ..Default::default()
         };
 
-        Self {
+        let mut self_ = Self {
             list,
             bar,
             value_text,
             max_value: max,
             symbol,
-        }
+        };
+
+        self_.set_current(current);
+
+        self_
     }
 
     pub fn update(&mut self, elapsed: f32) {

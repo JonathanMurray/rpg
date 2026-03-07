@@ -29,5 +29,6 @@ pub mod sounds;
 pub mod stats_ui;
 pub mod target_ui;
 pub mod textures;
+pub mod transition_scene;
 mod util;
 pub mod victory_scene;

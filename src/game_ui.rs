@@ -2927,7 +2927,6 @@ impl ResourceBars {
         let health_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.health.current(),
             character.health.max(),
-            "Health",
             COL_RED,
             font.clone(),
             "<heart>",
@@ -2936,7 +2935,6 @@ impl ResourceBars {
         let mana_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.mana.current(),
             character.mana.max(),
-            "Mana",
             COL_BLUE,
             font.clone(),
             "<mana>",
@@ -2945,7 +2943,6 @@ impl ResourceBars {
         let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.stamina.current(),
             character.stamina.max(),
-            "Stamina",
             COL_GREEN_0,
             font.clone(),
             "<stamina>",

@@ -343,6 +343,21 @@ pub const BAD_BOW: Weapon = Weapon {
     weight: 2,
 };
 
+pub const CHEAT_BOW: Weapon = Weapon {
+    name: "Bow",
+    range: WeaponRange::Ranged(50.0),
+    action_point_cost: 0,
+    damage: 99,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Agility,
+    attack_enhancement: Some(CAREFUL_AIM),
+    on_attacked_reaction: None,
+    on_true_hit: None,
+    sprite: Some(SpriteId::Bow),
+    icon: EquipmentIconId::Bow,
+    weight: 2,
+};
+
 pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(15.5),
@@ -1669,7 +1684,7 @@ pub const FIREBALL: Ability = Ability {
 pub const KILL: Ability = Ability {
     id: AbilityId::Kill,
     name: "Kill",
-    description: "Kill an enemy",
+    description: "Kill all enemies",
     icon: IconId::Fireball,
     action_point_cost: 1,
     mana_cost: 0,
@@ -1678,14 +1693,17 @@ pub const KILL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None; 3],
-    target: AbilityTarget::Enemy {
-        reach: AbilityReach::Range(Range::Ranged(30)),
-        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
-            defense_type: None,
-            damage: Some(AbilityDamage::Static(99)),
-            on_hit: None,
+    target: AbilityTarget::None {
+        self_area: Some(AreaEffect {
+            shape: AreaShape::Circle(Range::Ranged(50)),
+            acquisition: AreaTargetAcquisition::Enemies,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: None,
+                damage: Some(AbilityDamage::Static(99)),
+                on_hit: None,
+            })),
         }),
-        impact_circle: None,
+        self_effect: None,
     },
     animation_color: BLACK,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1852,7 +1870,7 @@ impl PassiveSkill {
             CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
             BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
-            ThrillOfBattle => "|<value>+5| |<dice>| |<stat>|Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
+            ThrillOfBattle => "|<value>+5| |<dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
         }

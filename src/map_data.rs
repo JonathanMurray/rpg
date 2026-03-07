@@ -12,9 +12,9 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
+        CHEAT_BOW, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
-        HULDRA_INFLICT_WOUNDS, SMALL_SHIELD,
+        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -407,7 +407,11 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, BOW);
+    //alice.set_weapon(HandType::MainHand, BOW);
+    // TODO
+    alice.set_weapon(HandType::MainHand, CHEAT_BOW);
+    alice.learn_ability(KILL);
+
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(HEAL);
     alice.known_ability_enhancements.push(HEAL_ENERGIZE);
