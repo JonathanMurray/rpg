@@ -15,7 +15,7 @@ use macroquad::{
 
 use rpg::action_button::ButtonAction;
 use rpg::chest_scene::run_chest_loop;
-use rpg::core::{BaseAction, Character, Party};
+use rpg::core::{BaseAction, Character, Condition, Party, PlayerId};
 
 use rpg::data::{CRIPPLING_SHOT, FIREBALL, INSPIRE, PIERCING_SHOT, SHACKLED_MIND, SWEEP_ATTACK};
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -66,6 +66,16 @@ async fn main() {
 
     let (party, mut player_characters) = make_low_level_party();
 
+    /*
+    for char in &player_characters {
+        if char.player_id() == PlayerId::Alice {
+            char.health.lose(5);
+            char.mana.lose(2);
+            char.receive_condition(Condition::Bleeding, Some(10), None);
+        }
+    }
+     */
+
     player_characters = run_fight_loop(
         resources.clone(),
         player_characters,
@@ -80,13 +90,13 @@ async fn main() {
         player_characters,
         [
             (
-                "Bob",
+                PlayerId::Bob,
                 CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
                     BaseAction::UseAbility(SWEEP_ATTACK),
                 )]),
             ),
             (
-                "Alice",
+                PlayerId::Alice,
                 CharacterGrowth::just_new_skills(vec![ButtonAction::AttackEnhancement(
                     CRIPPLING_SHOT,
                 )]),
@@ -114,12 +124,12 @@ async fn main() {
         player_characters,
         [
             (
-                "Alice",
+                PlayerId::Alice,
                 CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
                     BaseAction::UseAbility(INSPIRE),
                 )]),
             ),
-            ("Clara", CharacterGrowth::new_joiner()),
+            (PlayerId::Clara, CharacterGrowth::new_joiner()),
         ]
         .into(),
         &resources,
@@ -140,7 +150,7 @@ async fn main() {
     player_characters = grow_players(
         player_characters,
         [(
-            "Alice",
+            PlayerId::Alice,
             CharacterGrowth::just_new_skills(vec![ButtonAction::Action(BaseAction::UseAbility(
                 PIERCING_SHOT,
             ))]),
@@ -225,13 +235,13 @@ async fn main() {
 
 fn build_player_growths(
     player_characters: Vec<Character>,
-    mut growths: HashMap<&'static str, CharacterGrowth>,
+    mut growths: HashMap<PlayerId, CharacterGrowth>,
 ) -> Vec<(Character, CharacterGrowth)> {
     player_characters
         .into_iter()
         .map(|ch| {
             let growth = growths
-                .remove(ch.name)
+                .remove(&ch.player_id())
                 .unwrap_or(CharacterGrowth::unchanged());
             (ch, growth)
         })
@@ -240,7 +250,7 @@ fn build_player_growths(
 
 async fn grow_players(
     player_characters: Vec<Character>,
-    growths: HashMap<&'static str, CharacterGrowth>,
+    growths: HashMap<PlayerId, CharacterGrowth>,
     resources: &GameResources,
     ui_resources: &UiResources,
     party: &Party,

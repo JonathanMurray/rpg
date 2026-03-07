@@ -1,6 +1,7 @@
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    default,
     rc::Rc,
 };
 
@@ -26,7 +27,7 @@ use crate::{
     },
     core::{
         Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, Party, WeaponType,
+        OnHitReaction, Party, PlayerId, WeaponType,
     },
     data::{
         PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
@@ -76,6 +77,7 @@ pub async fn run_transition_loop(
     ui_resources: &UiResources,
     party: &Party,
 ) -> Vec<Character> {
+    let mut restoration_texts = HashMap::<PlayerId, Vec<String>>::default();
     for (char, growth) in &mut player_characters {
         for new_skill in &growth.new_skills {
             match new_skill {
@@ -90,6 +92,29 @@ pub async fn run_transition_loop(
                 }
                 other => todo!("handle growth: {:?}", other),
             }
+        }
+
+        let mut recovered = vec![];
+
+        char.conditions.borrow_mut().clear();
+
+        let health_gain = char
+            .health
+            .gain((char.health.max() as f32 * 0.1).ceil() as u32);
+        if health_gain > 0 {
+            recovered.push(format!("{} |<heart>|", health_gain));
+        }
+
+        let mana_gain = char.mana.gain((char.mana.max() as f32 * 0.1).ceil() as u32);
+        if mana_gain > 0 {
+            recovered.push(format!("{} |<mana>|", mana_gain));
+        }
+
+        if !recovered.is_empty() {
+            restoration_texts.insert(
+                char.player_id(),
+                vec![format!("Restored: {}", recovered.join("  "))],
+            );
         }
     }
 
@@ -119,15 +144,26 @@ pub async fn run_transition_loop(
                 status_textures.clone(),
             );
             let name = Element::Text(TextLine::new(char.name, 18, WHITE, Some(big_font.clone())));
+            let mut portrait_rows = vec![
+                Element::boxed(portrait),
+                name,
+                Element::boxed(resources_bars),
+            ];
+            if let Some(lines) = restoration_texts.get(&char.player_id()) {
+                for line in lines {
+                    portrait_rows.push(Element::Text(TextLine::new(
+                        line,
+                        16,
+                        WHITE,
+                        Some(simple_font.clone()),
+                    )));
+                }
+            }
             let portrait_section = Container {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Center,
                 margin: 10.0,
-                children: vec![
-                    Element::boxed(portrait),
-                    name,
-                    Element::boxed(resources_bars),
-                ],
+                children: portrait_rows,
                 ..Default::default()
             };
             let mut char_sections = vec![Element::Container(portrait_section)];

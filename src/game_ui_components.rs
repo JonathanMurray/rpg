@@ -590,7 +590,7 @@ impl PlayerCharacterPortrait {
         let done_text = TextLine::new("Done", 16, LIGHTGRAY, Some(font.clone()));
         let end_turn_text = TextLine::new("End turn", 16, WHITE, Some(font.clone()));
 
-        Self {
+        let mut self_ = Self {
             character: Rc::clone(character),
             text,
             is_character_shown: Cell::new(false),
@@ -609,7 +609,11 @@ impl PlayerCharacterPortrait {
             hovered_status_rect: Cell::new(None),
             font,
             last_drawn_rect: Cell::new(Rect::default()),
-        }
+        };
+
+        self_.set_statuses(&character.condition_infos());
+
+        self_
     }
 
     fn set_statuses(&mut self, statuses: &[ConditionInfo]) {

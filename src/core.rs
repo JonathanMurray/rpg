@@ -3811,6 +3811,10 @@ impl Conditions {
             false
         }
     }
+
+    pub fn clear(&mut self) {
+        self.map.clear();
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -4462,9 +4466,16 @@ impl Attributes {
     }
 }
 
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
+pub enum PlayerId {
+    Bob,
+    Alice,
+    Clara,
+}
+
 #[derive(Debug, Clone)]
 pub enum CharacterKind {
-    Player(Rc<Party>),
+    Player(Rc<Party>, PlayerId),
     Bot(Bot),
 }
 
@@ -4650,14 +4661,21 @@ impl Character {
 
     pub fn party_money(&self) -> u32 {
         match &self.kind {
-            CharacterKind::Player(party) => party.money.get(),
+            CharacterKind::Player(party, ..) => party.money.get(),
             CharacterKind::Bot(..) => panic!(),
+        }
+    }
+
+    pub fn player_id(&self) -> PlayerId {
+        match &self.kind {
+            CharacterKind::Player(party, player_id) => *player_id,
+            CharacterKind::Bot(bot) => panic!(),
         }
     }
 
     pub fn party_stash(&self) -> &[Cell<Option<EquipmentEntry>>; 6] {
         match &self.kind {
-            CharacterKind::Player(party) => &party.stash,
+            CharacterKind::Player(party, ..) => &party.stash,
             CharacterKind::Bot(..) => panic!(),
         }
     }

@@ -442,7 +442,7 @@ impl CharacterUi {
         } else if self.health_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                "Does not regenerate on its own. (Max |<heart>| is affected by |<stat>Strength|.)",
+                "If this reaches |<value>0|, you die. |<value>10%| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)",
             ))
         } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
             Some((
@@ -452,7 +452,7 @@ impl CharacterUi {
         } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                "Used for spells. Regenerates a small amount after every encounter. (Max |<mana>| is affected by |<stat>Spirit|.)",
+                "Used for spells. |<value>10%| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)",
             ))
         } else {
             None

@@ -8,7 +8,7 @@ use crate::{
     bot::BotBehaviour,
     core::{
         ArrowStack, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind,
-        EquipmentEntry, HandType, Party, Position, Shield, Weapon,
+        EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
@@ -400,24 +400,26 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     });
 
     let mut alice = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party), PlayerId::Alice),
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    //alice.set_weapon(HandType::MainHand, BOW);
+    alice.set_weapon(HandType::MainHand, BOW);
     // TODO
+    /*
     alice.set_weapon(HandType::MainHand, CHEAT_BOW);
     alice.learn_ability(KILL);
+     */
 
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(HEAL);
     alice.known_ability_enhancements.push(HEAL_ENERGIZE);
 
     let mut bob = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -437,7 +439,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
 pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     let mut clara = Character::new(
-        CharacterKind::Player(Rc::clone(party)),
+        CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
         PortraitId::Clara,
         SpriteId::Clara,
@@ -455,7 +457,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
 
 pub fn make_high_bob(party: &Rc<Party>) -> Character {
     let mut char = Character::new(
-        CharacterKind::Player(Rc::clone(party)),
+        CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
         "Bob",
         PortraitId::Bob,
         SpriteId::Bob,
@@ -478,7 +480,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
 
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
     let mut char = Character::new(
-        CharacterKind::Player(Rc::clone(party)),
+        CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Alice",
         PortraitId::Alice,
         SpriteId::Alice,
@@ -508,7 +510,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
     let bob = make_high_bob(&party);
 
     let mut clara = Character::new(
-        CharacterKind::Player(Rc::clone(&party)),
+        CharacterKind::Player(Rc::clone(&party), PlayerId::Clara),
         "Clara",
         PortraitId::Clara,
         SpriteId::Clara,
