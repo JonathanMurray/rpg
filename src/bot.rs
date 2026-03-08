@@ -512,7 +512,7 @@ fn attack_action(bot: &Character, target: &Character) -> Action {
     let mut enhancements = vec![];
 
     if random_bool(0.5) {
-        if let Some(e) = bot.known_attack_enhancements.first() {
+        if let Some(e) = bot.known_attack_enhancements.borrow().first() {
             enhancements.push(*e);
         }
     }

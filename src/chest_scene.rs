@@ -28,14 +28,14 @@ use crate::{
 };
 
 pub async fn run_chest_loop(
-    player_characters: Vec<Character>,
+    player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     items: &mut Vec<ChestEntry>,
-) -> Vec<Character> {
-    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
+) -> Vec<Rc<Character>> {
+    let characters: Vec<Rc<Character>> = player_characters;
 
     let sound_player = SoundPlayer::new().await;
 
@@ -202,9 +202,6 @@ pub async fn run_chest_loop(
     }
 
     characters
-        .into_iter()
-        .map(|character| Rc::into_inner(character).unwrap())
-        .collect()
 }
 
 #[derive(Clone, Debug)]

@@ -59,7 +59,7 @@ impl CoreGame {
         }
     }
 
-    pub async fn run(mut self) -> Result<Vec<Character>, QuitEvent> {
+    pub async fn run(mut self) -> Result<(), QuitEvent> {
         self.log("The battle begins").await;
         self.log("Round 1").await;
 
@@ -85,16 +85,7 @@ impl CoreGame {
             if !enemies_remaining {
                 println!("No enemies remaining. Exiting game loop");
 
-                // If the active character is player controlled, it's important that it runs end-of-turn
-                // to let debuffs decay.
-                // TODO: extremely iffy. We should instead have a proper 'end of fight' cleanup.
-                //self.perform_end_of_turn_character().await;
-
-                for character in self.characters.iter() {
-                    character.stamina.set_to_max();
-                }
-
-                return Ok(self.characters.player_characters());
+                return Ok(());
             }
 
             let action_or_character_change = self.user_interface.select_action(&self).await?;
@@ -835,6 +826,7 @@ impl CoreGame {
         for character in self.characters.iter() {
             if character
                 .known_passive_skills
+                .borrow()
                 .contains(&PassiveSkill::ThrillOfBattle)
             {
                 let mut num_adjacent_enemies = 0;
@@ -2125,6 +2117,7 @@ impl CoreGame {
 
         if attacker
             .known_passive_skills
+            .borrow()
             .contains(&PassiveSkill::WeaponProficiency)
         {
             armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
@@ -2194,6 +2187,7 @@ impl CoreGame {
 
             if attacker
                 .known_passive_skills
+                .borrow()
                 .contains(&PassiveSkill::Honorless)
             {
                 let bonus_dmg = 1;
@@ -3322,10 +3316,10 @@ impl Characters {
         self.0.iter()
     }
 
-    pub fn player_characters(self) -> Vec<Character> {
+    pub fn cloned_player_characters(self) -> Vec<Rc<Character>> {
         self.iter()
             .filter(|ch| ch.player_controlled())
-            .map(|ch| Character::clone(ch))
+            .map(|ch| Rc::clone(ch))
             .collect()
     }
 
@@ -4546,12 +4540,12 @@ pub struct Character {
     pub conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub stamina: NumberedResource,
-    pub known_attack_enhancements: Vec<AttackEnhancement>,
+    pub known_attack_enhancements: RefCell<Vec<AttackEnhancement>>,
     pub known_actions: RefCell<Vec<BaseAction>>,
-    pub known_attacked_reactions: Vec<OnAttackedReaction>,
-    pub known_on_hit_reactions: Vec<OnHitReaction>,
-    pub known_ability_enhancements: Vec<AbilityEnhancement>,
-    pub known_passive_skills: Vec<PassiveSkill>,
+    pub known_attacked_reactions: RefCell<Vec<OnAttackedReaction>>,
+    pub known_on_hit_reactions: RefCell<Vec<OnHitReaction>>,
+    pub known_ability_enhancements: RefCell<Vec<AbilityEnhancement>>,
+    pub known_passive_skills: RefCell<Vec<PassiveSkill>>,
 
     pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
     engagement_target: Cell<Option<CharacterId>>,
@@ -4654,6 +4648,30 @@ impl Character {
             .push(BaseAction::UseAbility(ability));
     }
 
+    pub fn learn_attack_enhancement(&self, enhancement: AttackEnhancement) {
+        self.known_attack_enhancements
+            .borrow_mut()
+            .push(enhancement);
+    }
+
+    pub fn learn_ability_enhancement(&self, enhancement: AbilityEnhancement) {
+        self.known_ability_enhancements
+            .borrow_mut()
+            .push(enhancement);
+    }
+
+    pub fn learn_attacked_reaction(&self, reaction: OnAttackedReaction) {
+        self.known_attacked_reactions.borrow_mut().push(reaction);
+    }
+
+    pub fn learn_on_hit_reaction(&self, reaction: OnHitReaction) {
+        self.known_on_hit_reactions.borrow_mut().push(reaction);
+    }
+
+    pub fn learn_passive(&self, passive: PassiveSkill) {
+        self.known_passive_skills.borrow_mut().push(passive);
+    }
+
     fn set_current_game_time(&self, game_time: u32) {
         self.current_game_time.set(game_time);
         self.conditions.borrow_mut().maybe_expire(game_time);
@@ -4682,7 +4700,10 @@ impl Character {
 
     fn on_health_changed(&self) {
         let health_ratio = self.health.ratio();
-        let has_blood_rage_passive = self.known_passive_skills.contains(&PassiveSkill::BloodRage);
+        let has_blood_rage_passive = self
+            .known_passive_skills
+            .borrow()
+            .contains(&PassiveSkill::BloodRage);
 
         if has_blood_rage_passive && health_ratio <= 0.5 {
             self.conditions.borrow_mut().add(Condition::BloodRage);
@@ -4709,6 +4730,7 @@ impl Character {
     fn on_mana_changed(&self) {
         let add = self
             .known_passive_skills
+            .borrow()
             .contains(&PassiveSkill::CriticalCharge)
             && self.mana.ratio() <= 0.5;
         self.conditions
@@ -4743,7 +4765,11 @@ impl Character {
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
-        if self.known_passive_skills.contains(&PassiveSkill::Reaper) {
+        if self
+            .known_passive_skills
+            .borrow()
+            .contains(&PassiveSkill::Reaper)
+        {
             let sta = self.stamina.gain(num_killed);
             let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 0
@@ -5371,7 +5397,7 @@ impl Character {
             if let Some(enhancement) = weapon.attack_enhancement {
                 known.push((weapon.name.to_string(), enhancement))
             }
-            for enhancement in &self.known_attack_enhancements {
+            for enhancement in self.known_attack_enhancements.borrow().iter() {
                 known.push(("".to_owned(), *enhancement))
             }
 
@@ -5414,7 +5440,11 @@ impl Character {
     }
 
     pub fn can_use_opportunity_attack(&self, target: CharacterId) -> bool {
-        if !self.known_passive_skills.contains(&PassiveSkill::Vigilant) {
+        if !self
+            .known_passive_skills
+            .borrow()
+            .contains(&PassiveSkill::Vigilant)
+        {
             if let Some(engaged_target) = self.engagement_target.get() {
                 if engaged_target != target {
                     // If you're engaging someone else, you're focused on that and miss the opportunity
@@ -5451,7 +5481,7 @@ impl Character {
 
     pub fn known_on_attacked_reactions(&self) -> Vec<OnAttackedReaction> {
         let mut known = vec![];
-        for reaction in &self.known_attacked_reactions {
+        for reaction in self.known_attacked_reactions.borrow().iter() {
             known.push(*reaction);
         }
         if let Some(weapon) = &self.weapon(HandType::MainHand) {
@@ -5521,7 +5551,7 @@ impl Character {
 
     pub fn known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
         let mut known = vec![];
-        for reaction in &self.known_on_hit_reactions {
+        for reaction in self.known_on_hit_reactions.borrow().iter() {
             known.push(("".to_string(), *reaction));
         }
         if let Some(shield) = self.shield() {
@@ -5578,7 +5608,9 @@ impl Character {
     }
 
     pub fn knows_ability_enhancement(&self, enhancement: AbilityEnhancement) -> bool {
-        self.known_ability_enhancements.contains(&enhancement)
+        self.known_ability_enhancements
+            .borrow()
+            .contains(&enhancement)
     }
 
     pub fn can_use_ability_enhancement(
@@ -5724,6 +5756,7 @@ impl Character {
 
         if self
             .known_passive_skills
+            .borrow()
             .contains(&PassiveSkill::HardenedSkin)
         {
             protection += 1;
@@ -6114,6 +6147,7 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
      */
     let target_is_immune_to_flanking = target
         .known_passive_skills
+        .borrow()
         .contains(&PassiveSkill::ThrillOfBattle);
 
     if target_is_immune_to_flanking {

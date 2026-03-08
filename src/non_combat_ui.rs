@@ -257,7 +257,7 @@ impl NonCombatCharacterUi {
             hoverable_buttons.push(Rc::clone(&btn));
             attack_enhancement_buttons.push(btn);
         }
-        for passive_skill in &character.known_passive_skills {
+        for passive_skill in character.known_passive_skills.borrow().iter() {
             let btn_action = ButtonAction::Passive(*passive_skill);
             let btn = Rc::new(new_button(btn_action, Some(character.clone()), false));
             hoverable_buttons.push(Rc::clone(&btn));

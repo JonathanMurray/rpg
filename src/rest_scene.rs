@@ -21,18 +21,18 @@ use crate::{
 };
 
 pub async fn run_rest_loop(
-    mut player_characters: Vec<Character>,
+    mut player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
-) -> Vec<Character> {
+) -> Vec<Rc<Character>> {
     for character in &mut player_characters {
         character.health.gain(character.health.max() / 2);
         character.mana.set_to_max();
     }
 
-    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
+    let characters: Vec<Rc<Character>> = player_characters;
 
     let sound_player = SoundPlayer::new().await;
 
@@ -128,7 +128,4 @@ pub async fn run_rest_loop(
     }
 
     characters
-        .into_iter()
-        .map(|character| Rc::into_inner(character).unwrap())
-        .collect()
 }

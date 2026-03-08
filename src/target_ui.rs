@@ -246,7 +246,7 @@ impl TargetUi {
                     buttons.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
-                for e in &char.known_attack_enhancements {
+                for e in char.known_attack_enhancements.borrow().iter() {
                     let btn = new_btn(ButtonAction::AttackEnhancement(*e));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));
@@ -263,7 +263,7 @@ impl TargetUi {
                     buttons.push(Element::RcRefCell(btn.clone()));
                     self.buttons.insert(id, btn);
                 }
-                for skill in &char.known_passive_skills {
+                for skill in char.known_passive_skills.borrow().iter() {
                     let btn = new_btn(ButtonAction::Passive(*skill));
                     let id = btn.id;
                     let btn = Rc::new(RefCell::new(btn));

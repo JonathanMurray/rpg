@@ -272,7 +272,7 @@ pub fn create_character(
 
             //skeleton.learn_ability(ENEMY_BRACE);
             //skeleton.learn_ability(ENEMY_SLASHING_ATTACK);
-            skeleton.known_attack_enhancements.push(ENEMY_SLASHING);
+            skeleton.learn_attack_enhancement(ENEMY_SLASHING);
 
             skeleton
         }
@@ -334,7 +334,7 @@ pub fn create_character(
             ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
             ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
             ogre.learn_ability(ENEMY_TACKLE);
-            ogre.known_passive_skills.push(PassiveSkill::BloodRage);
+            ogre.learn_passive(PassiveSkill::BloodRage);
             ogre
         }
         CharacterType::Huldra => {
@@ -408,6 +408,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         (1, 10),
     );
     alice.set_weapon(HandType::MainHand, BOW);
+
     // TODO
     /*
     alice.set_weapon(HandType::MainHand, CHEAT_BOW);
@@ -429,7 +430,9 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(SHIRT));
     bob.learn_ability(SHIELD_BASH);
-    bob.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    // TODO
+    bob.learn_ability(KILL);
 
     let player_characters = vec![alice, bob];
 
@@ -449,7 +452,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_ability(FIREBALL);
-    clara.known_ability_enhancements.push(FIREBALL_REACH);
+    clara.learn_ability_enhancement(FIREBALL_REACH);
     clara.learn_ability(SHACKLED_MIND);
     clara
 }
@@ -466,13 +469,13 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     char.set_weapon(HandType::MainHand, SWORD);
     char.set_shield(MEDIUM_SHIELD);
     char.armor_piece.set(Some(LEATHER_ARMOR));
-    char.known_passive_skills.push(PassiveSkill::Reaper);
+    char.learn_passive(PassiveSkill::Reaper);
     char.learn_ability(SWEEP_ATTACK);
     char.learn_ability(SHIELD_BASH);
-    char.known_ability_enhancements.push(SHIELD_BASH_KNOCKBACK);
+    char.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
     char.learn_ability(INSPIRE);
-    char.known_attack_enhancements.push(SMITE);
-    //bob.known_attack_enhancements.push(EMPOWER);
+    char.learn_attack_enhancement(SMITE);
+    //bob.learn_attack_enhancement(EMPOWER);
     char.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     char
 }
@@ -490,10 +493,9 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     char.armor_piece.set(Some(SHIRT));
     char.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
     char.learn_ability(HEAL);
-    char.known_ability_enhancements.push(HEAL_ENERGIZE);
-    char.known_attack_enhancements.push(CRIPPLING_SHOT);
-    char.known_passive_skills
-        .push(PassiveSkill::WeaponProficiency);
+    char.learn_ability_enhancement(HEAL_ENERGIZE);
+    char.learn_attack_enhancement(CRIPPLING_SHOT);
+    char.learn_passive(PassiveSkill::WeaponProficiency);
     char.learn_ability(PIERCING_SHOT);
     char
 }
@@ -519,18 +521,14 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
     clara.set_weapon(HandType::MainHand, DAGGER);
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
-    clara
-        .known_passive_skills
-        .push(PassiveSkill::CriticalCharge);
+    clara.learn_passive(PassiveSkill::CriticalCharge);
     clara.learn_ability(FIREBALL);
-    clara.known_ability_enhancements.push(FIREBALL_INFERNO);
-    clara.known_ability_enhancements.push(FIREBALL_REACH);
-    clara.known_ability_enhancements.push(FIREBALL_MASSIVE);
+    clara.learn_ability_enhancement(FIREBALL_INFERNO);
+    clara.learn_ability_enhancement(FIREBALL_REACH);
+    clara.learn_ability_enhancement(FIREBALL_MASSIVE);
     clara.learn_ability(SHACKLED_MIND);
     clara.learn_ability(INFLICT_WOUNDS);
-    clara
-        .known_ability_enhancements
-        .push(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
+    clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     //clara.learn_ability(MIND_BLAST);
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));

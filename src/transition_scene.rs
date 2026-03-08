@@ -72,59 +72,66 @@ impl CharacterGrowth {
 }
 
 pub async fn run_transition_loop(
-    mut player_characters: Vec<(Character, CharacterGrowth)>,
+    mut player_characters: Vec<(Rc<Character>, CharacterGrowth)>,
     resources: &GameResources,
     ui_resources: &UiResources,
     party: &Party,
-) -> Vec<Character> {
+) -> Vec<Rc<Character>> {
     let mut restoration_texts = HashMap::<PlayerId, Vec<String>>::default();
     for (char, growth) in &mut player_characters {
-        for new_skill in &growth.new_skills {
-            match new_skill {
-                ButtonAction::Action(base_action) => match base_action {
-                    BaseAction::UseAbility(ability) => {
-                        char.learn_ability(*ability);
-                    }
-                    other => panic!("{:?}", other),
-                },
-                ButtonAction::AttackEnhancement(attack_enhancement) => {
-                    char.known_attack_enhancements.push(*attack_enhancement);
-                }
-                ButtonAction::AbilityEnhancement(ability_enhancement) => {
-                    char.known_ability_enhancements.push(*ability_enhancement)
-                }
-                other => todo!("handle growth: {:?}", other),
-            }
-        }
-
-        let mut recovered = vec![];
-
-        char.conditions.borrow_mut().clear();
-
-        let health_gain = char
-            .health
-            .gain((char.health.max() as f32 * 0.1).ceil() as u32);
-        if health_gain > 0 {
-            recovered.push(format!("{} |<heart>|", health_gain));
-        }
-
-        let mana_gain = char.mana.gain((char.mana.max() as f32 * 0.1).ceil() as u32);
-        if mana_gain > 0 {
-            recovered.push(format!("{} |<mana>|", mana_gain));
-        }
-
-        if !recovered.is_empty() {
+        char.has_taken_a_turn_this_round.set(false); // to prevent "Done" from showing under portrait
+        if char.is_dead() {
             restoration_texts.insert(
                 char.player_id(),
-                vec![format!("Restored: {}", recovered.join("  "))],
+                vec![format!("Dead until revived at an altar...")],
             );
+        } else {
+            for new_skill in &growth.new_skills {
+                match new_skill {
+                    ButtonAction::Action(base_action) => match base_action {
+                        BaseAction::UseAbility(ability) => {
+                            char.learn_ability(*ability);
+                        }
+                        other => panic!("{:?}", other),
+                    },
+                    ButtonAction::AttackEnhancement(attack_enhancement) => {
+                        char.learn_attack_enhancement(*attack_enhancement);
+                    }
+                    ButtonAction::AbilityEnhancement(ability_enhancement) => {
+                        char.learn_ability_enhancement(*ability_enhancement)
+                    }
+                    other => todo!("handle growth: {:?}", other),
+                }
+            }
+
+            let mut recovered = vec![];
+
+            char.conditions.borrow_mut().clear();
+
+            let health_gain = char
+                .health
+                .gain((char.health.max() as f32 * 0.1).ceil() as u32);
+            if health_gain > 0 {
+                recovered.push(format!("{} |<heart>|", health_gain));
+            }
+
+            let mana_gain = char.mana.gain((char.mana.max() as f32 * 0.1).ceil() as u32);
+            if mana_gain > 0 {
+                recovered.push(format!("{} |<mana>|", mana_gain));
+            }
+
+            char.stamina.set_to_max();
+
+            if !recovered.is_empty() {
+                restoration_texts.insert(
+                    char.player_id(),
+                    vec![format!("Restored: {}", recovered.join("  "))],
+                );
+            }
         }
     }
 
-    let characters: Vec<(Rc<Character>, CharacterGrowth)> = player_characters
-        .into_iter()
-        .map(|(char, new_skills)| (Rc::new(char), new_skills))
-        .collect();
+    let characters: Vec<(Rc<Character>, CharacterGrowth)> = player_characters;
 
     let portrait_textures = &ui_resources.portrait_textures;
     let status_textures = &resources.status_textures;
@@ -284,17 +291,49 @@ pub async fn run_transition_loop(
                 draw_button_tooltip(simple_font, btn.hovered_pos.unwrap(), &tooltip, true);
             }
 
-            next_frame().await;
-
+            let text = "Continue";
+            let font_size = 30;
+            let margin = 25.0;
+            let padding = 15.0;
+            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
+            let rect = Rect::new(
+                screen_width() - margin - text_dim.width - padding * 2.0,
+                screen_height() - margin - text_dim.height - padding * 2.0,
+                text_dim.width + padding * 2.0,
+                text_dim.height + padding * 2.0,
+            );
+            let rect_color = if rect.contains(mouse_position().into()) {
+                LIGHTGRAY
+            } else {
+                GRAY
+            };
+            draw_rectangle(rect.x, rect.y, rect.w, rect.h, rect_color);
+            draw_text_rounded(
+                text,
+                rect.x + padding,
+                rect.y + padding + text_dim.offset_y,
+                TextParams {
+                    font: Some(&simple_font),
+                    font_size,
+                    color: YELLOW,
+                    ..Default::default()
+                },
+            );
+            if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
+            {
+                break;
+            }
             if is_key_pressed(macroquad::input::KeyCode::Space) {
                 break;
             }
+
+            next_frame().await;
         }
     }
 
-    let characters: Vec<Character> = characters
+    let characters: Vec<Rc<Character>> = characters
         .into_iter()
-        .map(|(character, _new_skills)| Rc::into_inner(character).unwrap())
+        .map(|(character, _new_skills)| character)
         .collect();
 
     characters

@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
@@ -172,7 +172,11 @@ impl MapScene {
         }
     }
 
-    pub async fn run_map_loop(&mut self, font: Font, characters: &[Character]) -> &mut MapChoice {
+    pub async fn run_map_loop(
+        &mut self,
+        font: Font,
+        characters: &[Rc<Character>],
+    ) -> &mut MapChoice {
         let (screen_w, screen_h) = screen_size();
         let radius = 60.0;
         let mut selected_node_i = None;
@@ -362,7 +366,7 @@ impl MapScene {
         }
     }
 
-    fn draw_characters(&self, characters: &[Character], x: f32, y: f32) {
+    fn draw_characters(&self, characters: &[Rc<Character>], x: f32, y: f32) {
         let portrait_w = 32.0;
         let portrait_h = 40.0;
         let total_w = portrait_w * characters.len() as f32;

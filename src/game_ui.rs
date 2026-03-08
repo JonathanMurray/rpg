@@ -2827,7 +2827,7 @@ fn build_character_ui(
         attack_enhancement_buttons_for_character_sheet.push(btn);
     }
 
-    for passive_skill in &character.known_passive_skills {
+    for passive_skill in character.known_passive_skills.borrow().iter() {
         let btn_action = ButtonAction::Passive(*passive_skill);
         let btn = Rc::new(new_button(btn_action, Some(character.clone()), true));
         hoverable_buttons.push(Rc::clone(&btn));

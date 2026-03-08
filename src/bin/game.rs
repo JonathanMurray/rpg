@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use macroquad::color::LIGHTGRAY;
 use macroquad::miniquad::window::{self, set_window_position};
@@ -67,21 +68,23 @@ async fn main() {
 
     let sound_player = SoundPlayer::new().await;
 
-    let (party, mut player_characters) = make_low_level_party();
+    let (party, player_characters) = make_low_level_party();
+    let mut player_characters: Vec<Rc<Character>> = player_characters
+        .into_iter()
+        .map(|ch| Rc::new(ch))
+        .collect();
 
-    /*
     for char in &player_characters {
         if char.player_id() == PlayerId::Alice {
-            char.health.lose(10);
+            char.health.lose(16);
             char.mana.lose(2);
-            char.receive_condition(Condition::Bleeding, Some(10), None);
+            char.receive_condition(Condition::Bleeding, Some(20), None);
         }
     }
-     */
 
-    player_characters = run_fight_loop(
+    run_fight_loop(
         resources.clone(),
-        player_characters,
+        &player_characters,
         FightId::EasyCluster,
         //FightId::Test,
         ui_resources.clone(),
@@ -113,16 +116,16 @@ async fn main() {
     )
     .await;
 
-    player_characters = run_fight_loop(
+    run_fight_loop(
         resources.clone(),
-        player_characters,
+        &player_characters,
         FightId::Medium,
         ui_resources.clone(),
         sound_player.clone(),
     )
     .await;
 
-    player_characters.push(make_medium_clara(&party));
+    player_characters.push(Rc::new(make_medium_clara(&party)));
 
     player_characters = grow_players(
         player_characters,
@@ -142,9 +145,9 @@ async fn main() {
     )
     .await;
 
-    player_characters = run_fight_loop(
+    run_fight_loop(
         resources.clone(),
-        player_characters,
+        &player_characters,
         FightId::EliteHuldra,
         ui_resources.clone(),
         sound_player.clone(),
@@ -166,9 +169,9 @@ async fn main() {
     )
     .await;
 
-    player_characters = run_fight_loop(
+    run_fight_loop(
         resources.clone(),
-        player_characters,
+        &player_characters,
         FightId::VerticalSliceNew,
         ui_resources.clone(),
         sound_player.clone(),
@@ -203,9 +206,9 @@ async fn main() {
                 .await;
             }
             MapChoice::Fight(fight_id) => {
-                player_characters = run_fight_loop(
+                run_fight_loop(
                     resources.clone(),
-                    player_characters,
+                    &player_characters,
                     *fight_id,
                     ui_resources.clone(),
                     sound_player.clone(),
@@ -238,9 +241,9 @@ async fn main() {
 }
 
 fn build_player_growths(
-    player_characters: Vec<Character>,
+    player_characters: Vec<Rc<Character>>,
     mut growths: HashMap<PlayerId, CharacterGrowth>,
-) -> Vec<(Character, CharacterGrowth)> {
+) -> Vec<(Rc<Character>, CharacterGrowth)> {
     player_characters
         .into_iter()
         .map(|ch| {
@@ -253,23 +256,28 @@ fn build_player_growths(
 }
 
 async fn grow_players(
-    player_characters: Vec<Character>,
+    player_characters: Vec<Rc<Character>>,
     growths: HashMap<PlayerId, CharacterGrowth>,
     resources: &GameResources,
     ui_resources: &UiResources,
     party: &Party,
-) -> Vec<Character> {
+) -> Vec<Rc<Character>> {
     let player_growths = build_player_growths(player_characters, growths.into());
     run_transition_loop(player_growths, &resources, &ui_resources, &party).await
 }
 
 async fn run_fight_loop(
     resources: GameResources,
-    player_characters: Vec<Character>,
+    player_characters: &[Rc<Character>],
     fight_id: FightId,
     ui_resources: UiResources,
     sound_player: SoundPlayer,
-) -> Vec<Character> {
+) {
+    let player_characters: Vec<Rc<Character>> = player_characters
+        .iter()
+        .filter(|ch| !ch.is_dead())
+        .map(|ch| Rc::clone(&ch))
+        .collect();
     let init_state = init_fight_map(player_characters, fight_id);
     let core_game = init_core_game(resources, ui_resources, sound_player, init_state);
     // Run one quick frame, so that the core game doesn't think that much time has elapsed on the very first frame
@@ -279,7 +287,7 @@ async fn run_fight_loop(
     core_game
         .run()
         .await
-        .expect("'quit' is only implemented for Editor, as of yet")
+        .expect("'quit' is only implemented for Editor, as of yet");
 }
 
 fn window_conf() -> Conf {

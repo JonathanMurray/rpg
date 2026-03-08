@@ -385,14 +385,14 @@ impl RewardSelectionUi {
 }
 
 pub async fn run_victory_loop(
-    player_characters: Vec<Character>,
+    player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
-) -> Vec<Character> {
-    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
+) -> Vec<Rc<Character>> {
+    let characters: Vec<Rc<Character>> = player_characters;
     let mut selected_learnings: Vec<Option<Learning>> = vec![];
     let sound_player = SoundPlayer::new().await;
     {
@@ -633,14 +633,9 @@ pub async fn run_victory_loop(
         }
     }
 
-    let mut characters: Vec<Character> = characters
-        .into_iter()
-        .map(|character| Rc::into_inner(character).unwrap())
-        .collect();
-
     assert_eq!(characters.len(), selected_learnings.len());
 
-    for (i, character) in characters.iter_mut().enumerate() {
+    for (i, character) in characters.iter().enumerate() {
         if let Some(learning) = selected_learnings[i] {
             apply_learning(learning, character);
         }
@@ -652,38 +647,42 @@ pub async fn run_victory_loop(
 fn can_learn(character: &Character, learning: Learning) -> bool {
     match learning {
         Learning::Ability(ability) => !character.known_abilities().contains(&ability),
-        Learning::OnAttackedReaction(reaction) => {
-            !character.known_attacked_reactions.contains(&reaction)
-        }
-        Learning::OnHitReaction(reaction) => !character.known_on_hit_reactions.contains(&reaction),
-        Learning::AttackEnhancement(enhancement) => {
-            !character.known_attack_enhancements.contains(&enhancement)
-        }
+        Learning::OnAttackedReaction(reaction) => !character
+            .known_attacked_reactions
+            .borrow()
+            .contains(&reaction),
+        Learning::OnHitReaction(reaction) => !character
+            .known_on_hit_reactions
+            .borrow()
+            .contains(&reaction),
+        Learning::AttackEnhancement(enhancement) => !character
+            .known_attack_enhancements
+            .borrow()
+            .contains(&enhancement),
         Learning::AbilityEnhancement(enhancement) => {
             character.knows_ability(enhancement.ability_id)
-                && !character.known_ability_enhancements.contains(&enhancement)
+                && !character.knows_ability_enhancement(enhancement)
         }
-        Learning::Passive(passive_skill) => {
-            !character.known_passive_skills.contains(&passive_skill)
-        }
+        Learning::Passive(passive_skill) => !character
+            .known_passive_skills
+            .borrow()
+            .contains(&passive_skill),
     }
 }
 
-fn apply_learning(learning: Learning, character: &mut Character) {
+fn apply_learning(learning: Learning, character: &Character) {
     match learning {
         Learning::Ability(ability) => character
             .known_actions
             .borrow_mut()
             .push(BaseAction::UseAbility(ability)),
-        Learning::OnAttackedReaction(reaction) => character.known_attacked_reactions.push(reaction),
-        Learning::OnHitReaction(reaction) => character.known_on_hit_reactions.push(reaction),
-        Learning::AttackEnhancement(enhancement) => {
-            character.known_attack_enhancements.push(enhancement)
-        }
+        Learning::OnAttackedReaction(reaction) => character.learn_attacked_reaction(reaction),
+        Learning::OnHitReaction(reaction) => character.learn_on_hit_reaction(reaction),
+        Learning::AttackEnhancement(enhancement) => character.learn_attack_enhancement(enhancement),
         Learning::AbilityEnhancement(enhancement) => {
-            character.known_ability_enhancements.push(enhancement)
+            character.learn_ability_enhancement(enhancement)
         }
-        Learning::Passive(passive_skill) => character.known_passive_skills.push(passive_skill),
+        Learning::Passive(passive_skill) => character.learn_passive(passive_skill),
     }
 }
 

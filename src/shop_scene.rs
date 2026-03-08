@@ -29,15 +29,15 @@ use crate::{
 };
 
 pub async fn run_shop_loop(
-    player_characters: Vec<Character>,
+    player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
     entries: &mut Vec<ShopEntry>,
-) -> Vec<Character> {
-    let characters: Vec<Rc<Character>> = player_characters.into_iter().map(Rc::new).collect();
+) -> Vec<Rc<Character>> {
+    let characters: Vec<Rc<Character>> = player_characters;
 
     let sound_player = SoundPlayer::new().await;
 
@@ -222,9 +222,6 @@ pub async fn run_shop_loop(
     }
 
     characters
-        .into_iter()
-        .map(|character| Rc::into_inner(character).unwrap())
-        .collect()
 }
 
 pub fn generate_shop_contents() -> Vec<ShopEntry> {
