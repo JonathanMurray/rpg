@@ -11,6 +11,7 @@ mod d20;
 pub mod data;
 pub mod drawing;
 pub mod equipment_ui;
+pub mod game_over_scene;
 pub mod game_ui;
 mod game_ui_components;
 pub mod game_ui_connection;

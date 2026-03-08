@@ -45,7 +45,7 @@ use crate::{
 
 pub struct CharacterGrowth {
     new_skills: Vec<ButtonAction>,
-    is_new_joiner: bool,
+    pub is_new_joiner: bool,
 }
 
 impl CharacterGrowth {

@@ -22,6 +22,7 @@ use rpg::data::{
     CRIPPLING_SHOT, FIREBALL, HEAL, HEAL_ENERGIZE, INSPIRE, PIERCING_SHOT, SHACKLED_MIND,
     SWEEP_ATTACK,
 };
+use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::map_scene::{MapChoice, MapScene};
@@ -64,117 +65,12 @@ async fn main() {
     load_and_init_font_symbols().await;
     load_and_init_ui_textures().await;
 
-    let mut map_scene = MapScene::new(ui_resources.portrait_textures.clone()).await;
-
     let sound_player = SoundPlayer::new().await;
 
-    let (party, player_characters) = make_low_level_party();
-    let mut player_characters: Vec<Rc<Character>> = player_characters
-        .into_iter()
-        .map(|ch| Rc::new(ch))
-        .collect();
+    run_demo(&resources, &ui_resources, sound_player).await;
 
-    for char in &player_characters {
-        char.health.lose(16);
-        char.mana.lose(2);
-        char.receive_condition(Condition::Bleeding, Some(50), None);
-    }
-
-    run_fight_loop(
-        resources.clone(),
-        &player_characters,
-        FightId::EasyCluster,
-        //FightId::Test,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
-
-    player_characters = grow_players(
-        player_characters,
-        [
-            (
-                PlayerId::Bob,
-                CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
-                    BaseAction::UseAbility(SWEEP_ATTACK),
-                )]),
-            ),
-            (
-                PlayerId::Alice,
-                CharacterGrowth::just_new_skills(vec![
-                    ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                    ButtonAction::Action(BaseAction::UseAbility(HEAL)),
-                ]),
-            ),
-        ]
-        .into(),
-        &resources,
-        &ui_resources,
-        &party,
-    )
-    .await;
-
-    run_fight_loop(
-        resources.clone(),
-        &player_characters,
-        FightId::Medium,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
-
-    player_characters.push(Rc::new(make_medium_clara(&party)));
-
-    player_characters = grow_players(
-        player_characters,
-        [
-            (
-                PlayerId::Alice,
-                CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
-                    HEAL_ENERGIZE,
-                )]),
-            ),
-            (PlayerId::Clara, CharacterGrowth::new_joiner()),
-        ]
-        .into(),
-        &resources,
-        &ui_resources,
-        &party,
-    )
-    .await;
-
-    run_fight_loop(
-        resources.clone(),
-        &player_characters,
-        FightId::EliteHuldra,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
-
-    player_characters = grow_players(
-        player_characters,
-        [(
-            PlayerId::Alice,
-            CharacterGrowth::just_new_skills(vec![ButtonAction::Action(BaseAction::UseAbility(
-                PIERCING_SHOT,
-            ))]),
-        )]
-        .into(),
-        &resources,
-        &ui_resources,
-        &party,
-    )
-    .await;
-
-    run_fight_loop(
-        resources.clone(),
-        &player_characters,
-        FightId::VerticalSliceNew,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+    let mut map_scene = MapScene::new(ui_resources.portrait_textures.clone()).await;
 
     loop {
         let map_choice = map_scene
@@ -236,13 +132,109 @@ async fn main() {
             }
         }
     }
+     */
+}
+
+async fn run_demo(
+    resources: &GameResources,
+    ui_resources: &UiResources,
+    sound_player: SoundPlayer,
+) {
+    loop {
+        let (party, player_characters) = make_low_level_party();
+        let mut player_characters: Vec<Rc<Character>> = player_characters
+            .into_iter()
+            .map(|ch| Rc::new(ch))
+            .collect();
+
+        let mut demo_sequence = [
+            (
+                FightId::EasyCluster,
+                vec![
+                    (
+                        PlayerId::Bob,
+                        CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
+                            BaseAction::UseAbility(SWEEP_ATTACK),
+                        )]),
+                    ),
+                    (
+                        PlayerId::Alice,
+                        CharacterGrowth::just_new_skills(vec![
+                            ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
+                            ButtonAction::Action(BaseAction::UseAbility(HEAL)),
+                        ]),
+                    ),
+                ],
+            ),
+            (
+                FightId::Medium,
+                vec![
+                    (
+                        PlayerId::Alice,
+                        CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
+                            HEAL_ENERGIZE,
+                        )]),
+                    ),
+                    (PlayerId::Clara, CharacterGrowth::new_joiner()),
+                ],
+            ),
+            (
+                FightId::EliteHuldra,
+                vec![(
+                    PlayerId::Alice,
+                    CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
+                        BaseAction::UseAbility(PIERCING_SHOT),
+                    )]),
+                )],
+            ),
+            (FightId::VerticalSliceNew, vec![]),
+        ]
+        .into_iter()
+        .peekable();
+
+        while let Some((fight, growths)) = demo_sequence.next() {
+            run_fight_loop(
+                resources.clone(),
+                &player_characters,
+                fight,
+                ui_resources.clone(),
+                sound_player.clone(),
+            )
+            .await;
+
+            if player_characters.iter().all(|ch| ch.is_dead()) {
+                run_game_over_scene(
+                    &resources,
+                    &ui_resources,
+                    "Your party has perished! Try again, or submit a balancing complaint!",
+                )
+                .await;
+                break;
+            } else if demo_sequence.peek().is_none() {
+                run_game_over_scene(&resources, &ui_resources, "You have completed the demo!")
+                    .await;
+                break;
+            }
+
+            player_characters = grow_players(
+                player_characters,
+                growths.into_iter().collect(),
+                &resources,
+                &ui_resources,
+                &party,
+            )
+            .await;
+        }
+    }
 }
 
 fn build_player_growths(
     player_characters: Vec<Rc<Character>>,
     mut growths: HashMap<PlayerId, CharacterGrowth>,
+    party: &Rc<Party>,
 ) -> Vec<(Rc<Character>, CharacterGrowth)> {
-    player_characters
+    // Grow existing chars
+    let mut result: Vec<(Rc<Character>, CharacterGrowth)> = player_characters
         .into_iter()
         .map(|ch| {
             let growth = growths
@@ -250,7 +242,20 @@ fn build_player_growths(
                 .unwrap_or(CharacterGrowth::unchanged());
             (ch, growth)
         })
-        .collect()
+        .collect();
+
+    // Add new chars
+    for (player_id, growth) in growths {
+        assert!(growth.is_new_joiner);
+        let new_char = match player_id {
+            PlayerId::Bob => make_high_bob(party),
+            PlayerId::Alice => make_high_alice(party),
+            PlayerId::Clara => make_medium_clara(party),
+        };
+        result.push((Rc::new(new_char), growth));
+    }
+
+    result
 }
 
 async fn grow_players(
@@ -258,9 +263,9 @@ async fn grow_players(
     growths: HashMap<PlayerId, CharacterGrowth>,
     resources: &GameResources,
     ui_resources: &UiResources,
-    party: &Party,
+    party: &Rc<Party>,
 ) -> Vec<Rc<Character>> {
-    let player_growths = build_player_growths(player_characters, growths.into());
+    let player_growths = build_player_growths(player_characters, growths.into(), party);
     run_transition_loop(player_growths, &resources, &ui_resources, &party).await
 }
 
