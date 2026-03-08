@@ -41,7 +41,7 @@ use crate::{
     resources::{GameResources, UiResources},
     sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId, StatusId},
-    util::select_n_random,
+    util::{rgb, select_n_random},
 };
 
 pub async fn run_game_over_scene(
@@ -54,7 +54,14 @@ pub async fn run_game_over_scene(
     let x_mid = screen_width() / 2.0;
     let y_mid = screen_height() / 2.0;
 
+    //let bg = rgb(128, 61, 17);
+    //let bg = rgb(122, 50, 67);
+    //let bg = rgb(34, 39, 52);
+    let bg = rgb(12, 64, 59);
+
     loop {
+        clear_background(bg);
+
         let header_font = Some(&resources.big_font);
         let header_font_size = 24;
 

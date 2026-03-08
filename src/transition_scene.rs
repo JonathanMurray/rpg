@@ -100,6 +100,9 @@ pub async fn run_transition_loop(
                     ButtonAction::AbilityEnhancement(ability_enhancement) => {
                         char.learn_ability_enhancement(*ability_enhancement)
                     }
+                    ButtonAction::Passive(passive) => {
+                        char.learn_passive(*passive);
+                    }
                     other => todo!("handle growth: {:?}", other),
                 }
             }
@@ -115,7 +118,9 @@ pub async fn run_transition_loop(
                 recovered.push(format!("{} |<heart>|", health_gain));
             }
 
-            let mana_gain = char.mana.gain((char.mana.max() as f32 * 0.1).ceil() as u32);
+            let mana_gain = char
+                .mana
+                .gain((char.mana.max() as f32 * 0.25).ceil() as u32);
             if mana_gain > 0 {
                 recovered.push(format!("{} |<mana>|", mana_gain));
             }
@@ -232,7 +237,7 @@ pub async fn run_transition_loop(
                     0,
                     Element::Text(TextLine::new(
                         "New character:",
-                        18,
+                        24,
                         WHITE,
                         Some(big_font.clone()),
                     )),

@@ -418,7 +418,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(INSPIRE);
 
-    let mut bob = Character::new(
+    let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
         "Bob",
         PortraitId::Bob,
@@ -432,7 +432,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability(SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
     // TODO
-    bob.learn_ability(KILL);
+    //bob.learn_ability(KILL);
 
     let player_characters = vec![alice, bob];
 

@@ -452,7 +452,7 @@ impl CharacterUi {
         } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                "Used for spells. |<value>10%| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)",
+                "Used for spells. |<value>25%| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)",
             ))
         } else {
             None

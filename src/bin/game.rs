@@ -19,8 +19,8 @@ use rpg::chest_scene::run_chest_loop;
 use rpg::core::{BaseAction, Character, Condition, Party, PlayerId};
 
 use rpg::data::{
-    CRIPPLING_SHOT, FIREBALL, HEAL, HEAL_ENERGIZE, INSPIRE, PIERCING_SHOT, SHACKLED_MIND,
-    SWEEP_ATTACK,
+    PassiveSkill, CRIPPLING_SHOT, FIREBALL, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE, INSPIRE,
+    PIERCING_SHOT, SHACKLED_MIND, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -180,12 +180,26 @@ async fn run_demo(
             ),
             (
                 FightId::EliteHuldra,
-                vec![(
-                    PlayerId::Alice,
-                    CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
-                        BaseAction::UseAbility(PIERCING_SHOT),
-                    )]),
-                )],
+                vec![
+                    (
+                        PlayerId::Alice,
+                        CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
+                            BaseAction::UseAbility(PIERCING_SHOT),
+                        )]),
+                    ),
+                    (
+                        PlayerId::Clara,
+                        CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
+                            FIREBALL_MASSIVE,
+                        )]),
+                    ),
+                    (
+                        PlayerId::Bob,
+                        CharacterGrowth::just_new_skills(vec![ButtonAction::Passive(
+                            PassiveSkill::Reaper,
+                        )]),
+                    ),
+                ],
             ),
             (FightId::VerticalSliceNew, vec![]),
         ]
