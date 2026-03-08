@@ -5619,10 +5619,10 @@ impl Character {
             res += 3;
         }
         if conditions.has(&Condition::CriticalCharge) {
-            res += 5;
+            res += 3;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
-            res += 5;
+            res += 3;
         }
         res += conditions.get_stacks(&Condition::ArcaneSurge);
 
@@ -5761,10 +5761,10 @@ impl Character {
             res += 3;
         }
         if conditions.has(&Condition::BloodRage) {
-            res += 5;
+            res += 3;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
-            res += 5;
+            res += 3;
         }
 
         res

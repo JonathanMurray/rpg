@@ -90,6 +90,9 @@ pub async fn run_transition_loop(
                 ButtonAction::AttackEnhancement(attack_enhancement) => {
                     char.known_attack_enhancements.push(*attack_enhancement);
                 }
+                ButtonAction::AbilityEnhancement(ability_enhancement) => {
+                    char.known_ability_enhancements.push(*ability_enhancement)
+                }
                 other => todo!("handle growth: {:?}", other),
             }
         }

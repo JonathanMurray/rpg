@@ -415,8 +415,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
      */
 
     alice.armor_piece.set(Some(SHIRT));
-    alice.learn_ability(HEAL);
-    alice.known_ability_enhancements.push(HEAL_ENERGIZE);
+    alice.learn_ability(INSPIRE);
 
     let mut bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),

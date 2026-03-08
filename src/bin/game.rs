@@ -17,7 +17,10 @@ use rpg::action_button::ButtonAction;
 use rpg::chest_scene::run_chest_loop;
 use rpg::core::{BaseAction, Character, Condition, Party, PlayerId};
 
-use rpg::data::{CRIPPLING_SHOT, FIREBALL, INSPIRE, PIERCING_SHOT, SHACKLED_MIND, SWEEP_ATTACK};
+use rpg::data::{
+    CRIPPLING_SHOT, FIREBALL, HEAL, HEAL_ENERGIZE, INSPIRE, PIERCING_SHOT, SHACKLED_MIND,
+    SWEEP_ATTACK,
+};
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::map_scene::{MapChoice, MapScene};
@@ -69,7 +72,7 @@ async fn main() {
     /*
     for char in &player_characters {
         if char.player_id() == PlayerId::Alice {
-            char.health.lose(5);
+            char.health.lose(10);
             char.mana.lose(2);
             char.receive_condition(Condition::Bleeding, Some(10), None);
         }
@@ -97,9 +100,10 @@ async fn main() {
             ),
             (
                 PlayerId::Alice,
-                CharacterGrowth::just_new_skills(vec![ButtonAction::AttackEnhancement(
-                    CRIPPLING_SHOT,
-                )]),
+                CharacterGrowth::just_new_skills(vec![
+                    ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
+                    ButtonAction::Action(BaseAction::UseAbility(HEAL)),
+                ]),
             ),
         ]
         .into(),
@@ -125,8 +129,8 @@ async fn main() {
         [
             (
                 PlayerId::Alice,
-                CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
-                    BaseAction::UseAbility(INSPIRE),
+                CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
+                    HEAL_ENERGIZE,
                 )]),
             ),
             (PlayerId::Clara, CharacterGrowth::new_joiner()),

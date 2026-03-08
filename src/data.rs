@@ -278,7 +278,7 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
 pub const BAD_WAR_HAMMER: Weapon = Weapon {
     name: "Bad war hammer",
     range: WeaponRange::Melee,
-    action_point_cost: 3,
+    action_point_cost: 4,
     damage: 6,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
@@ -1361,7 +1361,7 @@ pub const INSPIRE: Ability = Ability {
     name: "Inspire",
     description: "Inspire nearby allies",
     icon: IconId::Inspire,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
@@ -1867,10 +1867,10 @@ impl PassiveSkill {
         match self {
             HardenedSkin => "|<value>+1| armor",
             WeaponProficiency => "Attacks gain |<value>+1| armor penetration",
-            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
+            CriticalCharge => "|<value>+3| |<dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
-            BloodRage => "|<value>+5| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
-            ThrillOfBattle => "|<value>+5| |<dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
+            BloodRage => "|<value>+3| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
+            ThrillOfBattle => "|<value>+3| |<dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
         }

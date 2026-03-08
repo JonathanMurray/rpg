@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, ORANGE, PURPLE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
@@ -259,7 +259,10 @@ impl ActivityPopup {
         for (i, (line, dim)) in measured_lines.iter().enumerate() {
             if i == 0 {
                 let mut params = header_params.clone();
-                draw_text_rounded(line, x0 + 2.0, y0 + 2.0, params.clone());
+                /*
+                params.color = RED;
+                draw_text_rounded(line, x0 + 1.0, y0 + 1.0, params.clone());
+                 */
                 params.color = YELLOW;
                 draw_text_rounded(line, x0, y0, params.clone());
             } else {
@@ -782,8 +785,8 @@ impl ActivityPopup {
                 self.relevant_character_id = *reactor_id;
                 let attacker = self.characters.get_rc(*attacker_id);
                 let defender = self.characters.get(*defender_id);
-                lines.push("React (on attacked)".to_string());
-                lines.push(format!("{} attacks {}", attacker.name, defender.name,));
+                lines.push("Reaction?".to_string());
+                lines.push(format!("{} attacks |{}|!", attacker.name, defender.name));
                 lines.push(format!(
                     "|<dice>| |<stat>Attack| +{} vs |<shield>|<stat>Evasion| {}",
                     attacker.attack_modifier(*hand),
