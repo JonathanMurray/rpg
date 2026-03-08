@@ -77,14 +77,19 @@ impl CoreGame {
                 self.active_character().name
             );
 
-            let enemies_remaining = self
+            let enemy_count = self
                 .characters
                 .iter()
-                .any(|character| !character.player_controlled());
+                .filter(|character| !character.player_controlled())
+                .count();
 
-            if !enemies_remaining {
+            if enemy_count == 0 {
                 println!("No enemies remaining. Exiting game loop");
-
+                self.ui_handle_event(GameEvent::GameOver("Victory")).await;
+                return Ok(());
+            }
+            if enemy_count == self.characters.0.len() {
+                self.ui_handle_event(GameEvent::GameOver("Defeat")).await;
                 return Ok(());
             }
 
@@ -177,6 +182,8 @@ impl CoreGame {
                 self.active_character().is_part_of_active_group.set(false);
                 self.active_character_id = self.characters.next_id();
                 self.active_character().is_part_of_active_group.set(true);
+                println!("active char ended their turn");
+
                 self.notify_ui_of_new_active_char().await;
 
                 turn_ended = true;
@@ -240,6 +247,8 @@ impl CoreGame {
             // ... but at the same time, we don't want to lie to the UI and claim that the new turn started
             // before the character died.
             if active_character_died {
+                println!("active char died");
+
                 self.notify_ui_of_new_active_char().await;
                 turn_ended = true;
             }
@@ -276,6 +285,12 @@ impl CoreGame {
                 }
             }
         }
+    }
+
+    fn some_alive_player_chars(&self) -> bool {
+        self.characters
+            .iter()
+            .any(|character| character.player_controlled() && !character.is_dead())
     }
 
     async fn perform_character_pushed(
@@ -2891,6 +2906,7 @@ pub trait GameEventHandler {
 #[derive(Debug, Clone)]
 pub enum GameEvent {
     LogLine(String),
+    GameOver(&'static str),
     Moved {
         character: CharacterId,
         from: Position,
@@ -3316,11 +3332,9 @@ impl Characters {
         self.0.iter()
     }
 
-    pub fn cloned_player_characters(self) -> Vec<Rc<Character>> {
+    pub fn any_alive_player_chars(&self) -> bool {
         self.iter()
-            .filter(|ch| ch.player_controlled())
-            .map(|ch| Rc::clone(ch))
-            .collect()
+            .any(|ch| ch.player_controlled() && !ch.is_dead())
     }
 
     pub fn remove_dead(&mut self) -> Vec<CharacterId> {

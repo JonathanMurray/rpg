@@ -75,11 +75,9 @@ async fn main() {
         .collect();
 
     for char in &player_characters {
-        if char.player_id() == PlayerId::Alice {
-            char.health.lose(16);
-            char.mana.lose(2);
-            char.receive_condition(Condition::Bleeding, Some(20), None);
-        }
+        char.health.lose(16);
+        char.mana.lose(2);
+        char.receive_condition(Condition::Bleeding, Some(50), None);
     }
 
     run_fight_loop(

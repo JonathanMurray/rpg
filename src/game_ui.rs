@@ -1805,7 +1805,11 @@ impl UserInterface {
                     }
                 } else {
                     if was_players_turn {
-                        self.banner.set("Enemy turn", 1.5);
+                        // If all player chars are dead, we'll want to immediately show "Defeat" instead of
+                        // first showing "Enemy turn"
+                        if self.characters.any_alive_player_chars() {
+                            self.banner.set("Enemy turn", 1.5);
+                        }
                     }
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
@@ -1909,6 +1913,10 @@ impl UserInterface {
                     condition.name().to_string(),
                     TextEffectStyle::HostileEffect,
                 );
+            }
+            GameEvent::GameOver(text) => {
+                self.banner.set(text, 1.5);
+                self.animation_stopwatch.set_to_at_least(1.5);
             }
         }
     }
