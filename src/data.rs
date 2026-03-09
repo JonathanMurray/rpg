@@ -563,7 +563,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
             on_hit: Some(ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Bleeding,
                 duration_rounds: None,
-                stacks: Some(5),
+                stacks: Some(4),
             })),
             ..AbilityAttackEffect::default()
         }),
@@ -1273,7 +1273,7 @@ pub const HEAL: Ability = Ability {
     name: "Heal",
     description: "Restore target's health. Remove Bleeding and Burning.",
     icon: IconId::Heal,
-    action_point_cost: 3,
+    action_point_cost: 2,
     mana_cost: 1,
     stamina_cost: 0,
     requirement: None,

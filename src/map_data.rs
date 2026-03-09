@@ -330,8 +330,8 @@ pub fn create_character(
                 Attributes::new(9, 4, 3, 1),
                 pos,
             );
-            ogre.health.change_max_value_to(45);
-            ogre.armor_piece.set(Some(GOOD_CHAIN_MAIL));
+            ogre.health.change_max_value_to(43);
+            ogre.armor_piece.set(Some(CHAIN_MAIL));
             ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
             ogre.learn_ability(ENEMY_TACKLE);
             ogre.learn_passive(PassiveSkill::BloodRage);
