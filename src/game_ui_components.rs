@@ -1265,6 +1265,7 @@ pub struct LabelledResourceBar {
     value_text: Rc<RefCell<TextLine>>,
     max_value: u32,
     symbol: &'static str,
+    pub hovered: Cell<bool>,
 }
 
 impl LabelledResourceBar {
@@ -1308,6 +1309,7 @@ impl LabelledResourceBar {
             value_text,
             max_value: max,
             symbol,
+            hovered: Cell::new(false),
         };
 
         self_.set_current(current);
@@ -1341,6 +1343,12 @@ impl Drawable for LabelledResourceBar {
         if self.max_value > 0 {
             self.list.draw(x, y);
         }
+        self.hovered.set(
+            self.list
+                .last_drawn_rectangle
+                .get()
+                .contains(mouse_position().into()),
+        );
     }
 
     fn size(&self) -> (f32, f32) {

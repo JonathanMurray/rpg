@@ -439,17 +439,17 @@ impl CharacterUi {
                 "Action Points (AP)",
                 "Used for actions. 4 AP is restored after ending your turn.",
             ))
-        } else if self.health_bar.borrow().bar.borrow().hovered.get() {
+        } else if self.health_bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
                 "If this reaches |<value>0|, you die. |<value>10%| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)",
             ))
-        } else if self.stamina_bar.borrow().bar.borrow().hovered.get() {
+        } else if self.stamina_bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
                 "Used for movement and certain actions. |<value>25%| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)"
             ))
-        } else if self.mana_bar.borrow().bar.borrow().hovered.get() {
+        } else if self.mana_bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
                 "Used for spells. |<value>25%| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)",
