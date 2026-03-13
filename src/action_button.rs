@@ -730,6 +730,7 @@ pub struct ActionButton {
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
 pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
+pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.5, 0.4, 0.3, 1.0);
 
 impl ActionButton {
     pub fn new(
@@ -754,7 +755,6 @@ impl ActionButton {
         };
 
         let mut style = Style {
-            background_color: Some(ACTION_BUTTON_BG_COLOR),
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
@@ -1051,8 +1051,6 @@ impl Drawable for ActionButton {
 
         let (w, h) = self.size;
 
-        self.style.draw_background(x, y, self.size);
-
         let bottom_row_size = self.bottom_row.size();
 
         let (mouse_x, mouse_y) = mouse_position();
@@ -1068,6 +1066,12 @@ impl Drawable for ActionButton {
                     context: self.context,
                 }));
             }
+        }
+
+        if matches!(self.selected.get(), ButtonSelected::Yes) {
+            draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR_SELECTED);
+        } else {
+            draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR);
         }
 
         if !self.enabled.get() {
@@ -1156,12 +1160,13 @@ impl Drawable for ActionButton {
                         outer = Some((color, 5.0));
                     }
                 }
+                //draw_rectangle(x, y, w, h, Color::new(1.0, 1.0, 1.0, 0.15));
                 draw_rounded_rectangle_lines(
                     x - margin,
                     y - margin,
                     w + margin * 2.0,
                     h + margin * 2.0,
-                    4.0,
+                    7.0,
                     GREEN,
                     7.0,
                     outer,
