@@ -701,7 +701,7 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
 pub const PARRY: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Parry,
     name: "Parry",
-    description: "Mitigate an incoming melee attack (once per round)",
+    description: "Protect against melee attack (1 per round)",
     icon: IconId::Parry,
     action_point_cost: 0,
     stamina_cost: 2,
@@ -717,13 +717,13 @@ pub const PARRY: OnAttackedReaction = OnAttackedReaction {
 pub const BLOCK: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Block",
-    description: "Mitigate an attack against you or an adjacent ally (once per round)",
+    description: "Protect yourself or adjacent ally (1 attack per round)",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect {
-        bonus_evasion: 7,
-        bonus_armor: 0,
+        bonus_evasion: 0,
+        bonus_armor: 3,
     },
     required_attack_type: None,
     used_hand: Some(HandType::OffHand),
