@@ -728,7 +728,9 @@ pub async fn load_and_init_font_symbols() {
     WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
     HEART_SYMBOL.get_or_init(|| symbol(0, 1));
     STAMINA_SYMBOL.get_or_init(|| symbol(1, 1));
+    STAMINA_SMALL_SYMBOL.get_or_init(|| symbol(1, 3));
     MANA_SYMBOL.get_or_init(|| symbol(2, 1));
+    MANA_SMALL_SYMBOL.get_or_init(|| symbol(0, 3));
     SWORD_SYMBOL.get_or_init(|| symbol(0, 2));
     BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
 }
@@ -750,7 +752,9 @@ pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HEART_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static STAMINA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MANA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static MANA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 

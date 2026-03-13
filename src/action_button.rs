@@ -711,7 +711,7 @@ pub struct ActionButton {
     pub texture_draw_size: (f32, f32),
     style: Style,
     pub hover_border_color: Color,
-    bottom_row: Container,
+    ap_row: Container,
     hovered: Cell<bool>,
     pub enabled: Cell<bool>,
     pub selected: Cell<ButtonSelected>,
@@ -726,6 +726,7 @@ pub struct ActionButton {
     pub context: Option<ButtonContext>,
     ap_color: Rc<Cell<Color>>,
     parent_bg_color: Option<Color>,
+    bottom_resource_text: Option<Element>,
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
@@ -764,73 +765,33 @@ impl ActionButton {
         }
         let hover_border_color = YELLOW;
 
-        let r = 3.0;
-        let mut bottom_row_elements = vec![];
+        let r = 2.5;
+        let mut ap_circles = vec![];
 
         let ap_color = Rc::new(Cell::new(GOLD));
 
         for _ in 0..action_points {
-            bottom_row_elements.push(Element::Circle(Circle {
+            ap_circles.push(Element::Circle(Circle {
                 r,
                 color: Rc::clone(&ap_color),
             }))
         }
 
+        let mut bottom_resource_text = "".to_string();
+
         if mana_points > 0 {
-            let text = TextLine::new(format!("{}", mana_points), 16, WHITE, Some(font.clone()))
-                .with_padding(3.0, 0.0)
-                .with_depth(BLACK, 1.0);
-
-            let element = Element::Container(Container {
-                children: vec![Element::Text(text)],
-                style: Style {
-                    background_color: Some(COL_BLUE), // Some(Color::new(0.0, 0.4, 0.8, 1.00)),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-
-            if !bottom_row_elements.is_empty() {
-                bottom_row_elements.push(Element::Empty(0.0, 0.0)); // For some extra margin
-            }
-            bottom_row_elements.push(element);
+            bottom_resource_text.push_str(&"|<mana_small>|".repeat(mana_points as usize));
         }
         if stamina_points > 0 {
-            let text = TextLine::new(format!("{}", stamina_points), 16, WHITE, Some(font.clone()))
-                .with_padding(3.0, 0.0)
-                .with_depth(BLACK, 1.0);
-
-            let element = Element::Container(Container {
-                children: vec![Element::Text(text)],
-                style: Style {
-                    background_color: Some(COL_GREEN_0), // Some(Color::new(0.00, 0.5, 0.05, 1.00)),
-                    ..Default::default()
-                },
-                ..Default::default()
-            });
-
-            if !bottom_row_elements.is_empty() {
-                bottom_row_elements.push(Element::Empty(0.0, 0.0)); // For some extra margin
-            }
-            bottom_row_elements.push(element);
+            bottom_resource_text.push_str(&"|<stamina_small>|".repeat(stamina_points as usize));
         }
-
         if action.costs_arrow() {
-            bottom_row_elements.push(Element::Text(TextLine::new(
-                "Item",
-                16,
-                WHITE,
-                Some(font.clone()),
-            )));
+            bottom_resource_text.push_str("Item");
         }
 
-        let padding = if bottom_row_elements.is_empty() {
-            0.0
-        } else {
-            4.0
-        };
-        let bottom_row = Container {
-            children: bottom_row_elements,
+        let padding = if ap_circles.is_empty() { 0.0 } else { 4.0 };
+        let ap_row = Container {
+            children: ap_circles,
             margin: 4.0,
             layout_dir: LayoutDirection::Horizontal,
             align: Align::Center,
@@ -840,6 +801,17 @@ impl ActionButton {
                 ..Default::default()
             },
             ..Default::default()
+        };
+
+        let bottom_resource_text = if !bottom_resource_text.is_empty() {
+            Some(Element::Text(TextLine::new(
+                bottom_resource_text,
+                16,
+                WHITE,
+                Some(font.clone()),
+            )))
+        } else {
+            None
         };
 
         let mut dynamic_icons: HashMap<IconId, Texture2D> = Default::default();
@@ -860,7 +832,8 @@ impl ActionButton {
             texture_draw_size,
             style,
             hover_border_color,
-            bottom_row,
+            ap_row,
+            bottom_resource_text,
             hovered: Cell::new(false),
             enabled: Cell::new(true),
             selected: Cell::new(ButtonSelected::No),
@@ -1051,7 +1024,7 @@ impl Drawable for ActionButton {
 
         let (w, h) = self.size;
 
-        let bottom_row_size = self.bottom_row.size();
+        let ap_row_size = self.ap_row.size();
 
         let (mouse_x, mouse_y) = mouse_position();
 
@@ -1133,20 +1106,24 @@ impl Drawable for ActionButton {
         if self.size.0 > 45.0 {
             let bottom_row_h_pad = 2.0;
 
-            if bottom_row_size.1 > 0.0 {
+            if ap_row_size.1 > 0.0 || self.bottom_resource_text.is_some() {
+                let row_h = 13.0;
                 draw_rectangle(
                     x + 1.0,
-                    y + h - bottom_row_size.1 - bottom_row_h_pad,
+                    y + h - bottom_row_h_pad - row_h,
                     w - 2.0,
-                    bottom_row_size.1,
+                    row_h,
                     Color::new(0.1, 0.1, 0.1, 0.8),
                 );
             }
 
-            self.bottom_row.draw(
-                x + w - bottom_row_size.0 - 2.0,
-                y + h - bottom_row_h_pad - bottom_row_size.1,
+            self.ap_row.draw(
+                x + 2.0, // + w - bottom_row_size.0 - 2.0,
+                y + h - bottom_row_h_pad - ap_row_size.1,
             );
+            if let Some(text) = &self.bottom_resource_text {
+                text.draw(x + w - text.size().0, y + h - text.size().1);
+            }
         }
 
         self.style.draw_foreground(x, y, self.size);

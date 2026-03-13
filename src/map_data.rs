@@ -410,6 +410,10 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.set_weapon(HandType::MainHand, BOW);
 
     // TODO
+    alice.mana.change_max_value_to(20);
+    alice.learn_ability(FIREBALL);
+
+    // TODO
     /*
     alice.set_weapon(HandType::MainHand, CHEAT_BOW);
     alice.learn_ability(KILL);

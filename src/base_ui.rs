@@ -11,7 +11,9 @@ use macroquad::{
 };
 use std::{
     cell::{Cell, RefCell},
+    collections::HashMap,
     rc::{Rc, Weak},
+    sync::OnceLock,
 };
 
 use crate::{
@@ -19,8 +21,8 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL,
-        STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
+        ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
+        SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
     },
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
 };
@@ -433,6 +435,27 @@ impl Drawable for TextLine {
     }
 }
 
+use lazy_static::lazy_static;
+
+lazy_static! {
+    static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
+        let symbol_w = 16.0;
+        HashMap::from([
+            ("<dice>", (symbol_w, &DICE_SYMBOL)),
+            ("<shield>", (symbol_w, &SHIELD_SYMBOL)),
+            ("<alt_key>", (symbol_w, &ALT_KEY_SYMBOL)),
+            ("<warning>", (symbol_w, &WARNING_SYMBOL)),
+            ("<heart>", (symbol_w, &HEART_SYMBOL)),
+            ("<boot>", (symbol_w, &BOOT_SYMBOL)),
+            ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
+            ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
+            ("<mana>", (12.0, &MANA_SYMBOL)),
+            ("<mana_small>", (9.0, &MANA_SMALL_SYMBOL)),
+            ("<sword>", (12.0, &SWORD_SYMBOL)),
+        ])
+    };
+}
+
 pub fn measure_text_with_font_tags(
     line: &str,
     font: Option<&Font>,
@@ -444,25 +467,8 @@ pub fn measure_text_with_font_tags(
     let mut h: f32 = 0.0;
     let mut offset_y = None;
     for mut part in parts {
-        let symbol_w = 16.0;
-        if [
-            "<dice>",
-            "<shield>",
-            "<alt_key>",
-            "<warning>",
-            "<heart>",
-            "<stamina>",
-            "<boot>",
-        ]
-        .contains(&part)
-        {
+        if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
-            h = h.max(symbol_w);
-            if offset_y.is_none() {
-                offset_y = Some(13.0);
-            }
-        } else if ["<mana>", "<sword>"].contains(&part) {
-            w += symbol_w * 0.6;
             h = h.max(symbol_w);
             if offset_y.is_none() {
                 offset_y = Some(13.0);
@@ -511,52 +517,11 @@ pub fn draw_text_with_font_tags(
 ) {
     let parts = line.split("|");
     for mut part in parts {
-        let symbol_w = 16.0;
-        if part == "<dice>" {
+        if let Some((symbol_w, texture)) = TAGS.get(part) {
             if render_tags {
-                draw_texture(DICE_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
+                draw_texture(texture.get().unwrap(), x, y - 13.0, WHITE);
             }
             x += symbol_w;
-        } else if part == "<shield>" {
-            if render_tags {
-                draw_texture(SHIELD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<alt_key>" {
-            if render_tags {
-                draw_texture(ALT_KEY_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<warning>" {
-            if render_tags {
-                draw_texture(WARNING_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<heart>" {
-            if render_tags {
-                draw_texture(HEART_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<stamina>" {
-            if render_tags {
-                draw_texture(STAMINA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<boot>" {
-            if render_tags {
-                draw_texture(BOOT_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w;
-        } else if part == "<mana>" {
-            if render_tags {
-                draw_texture(MANA_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w * 0.6;
-        } else if part == "<sword>" {
-            if render_tags {
-                draw_texture(SWORD_SYMBOL.get().unwrap(), x, y - 13.0, WHITE);
-            }
-            x += symbol_w * 0.6;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
             if render_tags {
