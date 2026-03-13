@@ -22,7 +22,8 @@ use crate::{
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
-    game_ui_components::{ActionPointsRow, ResourceBar},
+    game_ui::ResourceBars,
+    game_ui_components::{ActionPointsRow, LabelledResourceBar, ResourceBar},
     textures::{IconId, PortraitId, StatusId},
     util::COL_RED,
 };
@@ -145,14 +146,34 @@ impl TargetUi {
             let mut health_bar = ResourceBar::horizontal(char.health.max(), COL_RED, (80.0, 10.0));
             health_bar.current = char.health.current();
 
-            let health_text_line = TextLine::new(
-                format!("{} / {}", char.health.current(), char.health.max()),
-                18,
+            let health_text = TextLine::new(
+                format!("|<heart>| {}/{}", char.health.current(), char.health.max()),
+                16,
                 WHITE,
                 Some(self.simple_font.clone()),
             );
-            //health_text_line.set_depth(BLACK, 2.0);
-            //health_text_line.set_min_height(20.0);
+            let mut resource_texts = vec![Element::Text(health_text)];
+
+            if char.player_controlled() {
+                for (icon, stat) in [("<stamina>", &char.stamina), ("<mana>", &char.mana)] {
+                    if stat.max() > 0 {
+                        let text = TextLine::new(
+                            format!("|{}| {}/{}", icon, stat.current(), stat.max()),
+                            16,
+                            WHITE,
+                            Some(self.simple_font.clone()),
+                        );
+                        resource_texts.push(Element::Text(text));
+                    }
+                }
+            }
+
+            let resource_row = Container {
+                layout_dir: LayoutDirection::Horizontal,
+                children: resource_texts,
+                margin: 10.0,
+                ..Default::default()
+            };
 
             let portrait = Element::Container(Container {
                 style: Style {
@@ -193,8 +214,9 @@ impl TargetUi {
                 children: vec![
                     Element::Text(name_text_line),
                     portrait,
-                    Element::Box(Box::new(health_bar)),
-                    Element::Text(health_text_line),
+                    Element::Empty(1.0, 4.0),
+                    Element::Container(resource_row),
+                    Element::Empty(1.0, 4.0),
                     Element::Box(Box::new(action_points_row)),
                     Element::Empty(1.0, 4.0),
                     defense_header_row,
@@ -297,7 +319,10 @@ impl TargetUi {
 
             let mut rows = vec![Element::Container(centered_list)];
 
-            if !char.player_controlled() {
+            if char.player_controlled() {
+
+                // TODO show stamina and mana
+            } else {
                 let movement_text_line = TextLine::new(
                     format!("|<boot>| Move: {:.1}", char.move_speed()),
                     16,
