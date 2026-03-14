@@ -358,6 +358,7 @@ pub struct PlayerPortraits {
     portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>>,
     sound_player: SoundPlayer,
     font: Font,
+    pub is_hovering_end_turn: Cell<bool>,
 }
 
 pub struct PlayerPortraitOutcome {
@@ -415,6 +416,7 @@ impl PlayerPortraits {
             portraits,
             sound_player,
             font,
+            is_hovering_end_turn: Cell::new(false),
         };
 
         this.set_selected_id(selected_id);
@@ -507,7 +509,8 @@ impl PlayerPortraits {
         let prev_selected = self.selected_id.get();
 
         let mut change_attempt = false;
-        let mut ended_turn = false;
+        let mut clicked_end_turn = false;
+        self.is_hovering_end_turn.set(false);
 
         for (i, portrait) in &self.portraits {
             if portrait.borrow().has_been_clicked.take() {
@@ -518,7 +521,10 @@ impl PlayerPortraits {
                 break;
             }
             if portrait.borrow().has_clicked_end_turn.take() {
-                ended_turn = true;
+                clicked_end_turn = true;
+            }
+            if portrait.borrow().is_end_turn_hovered.get() {
+                self.is_hovering_end_turn.set(true);
             }
         }
 
@@ -532,7 +538,7 @@ impl PlayerPortraits {
 
         PlayerPortraitOutcome {
             changed_character,
-            clicked_end_turn: ended_turn,
+            clicked_end_turn,
         }
     }
 

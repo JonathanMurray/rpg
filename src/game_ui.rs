@@ -2495,7 +2495,17 @@ impl UserInterface {
             .character_uis
             .get_mut(&self.player_portraits.selected_id())
             .unwrap();
-        if let Some(hovered_btn) = &self.hovered_button {
+
+        // HOVERING END OF TURN
+        if self.player_portraits.is_hovering_end_turn.get() {
+            let ap_gain = self
+                .characters
+                .get(self.active_character_id)
+                .end_of_turn_ap_gain() as i32;
+            character_ui.action_points_row.reserved_and_hovered_ap = (0, -ap_gain);
+        }
+        // HOVERING ACTION
+        else if let Some(hovered_btn) = &self.hovered_button {
             if hovered_btn.context != Some(ButtonContext::CharacterSheet) {
                 character_ui.action_points_row.reserved_and_hovered_ap = (
                     self.activity_popup.reserved_and_hovered_action_points().0,
@@ -2510,7 +2520,9 @@ impl UserInterface {
                     .borrow_mut()
                     .set_reserved(hovered_btn.action.stamina_cost());
             }
-        } else {
+        }
+        // CONFIGURING ACTION ETC
+        else {
             character_ui.action_points_row.reserved_and_hovered_ap =
                 self.activity_popup.reserved_and_hovered_action_points();
             character_ui
