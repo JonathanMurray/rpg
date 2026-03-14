@@ -1345,6 +1345,8 @@ impl UserInterface {
         }
 
         if let Some(reactor) = is_reacting {
+            self.sound_player.play(SoundId::YourTurn);
+
             //self.target_ui
             //    .set_action("Reaction!".to_string(), vec![], false);
             self.set_allowed_to_use_action_buttons(false);
@@ -1387,7 +1389,7 @@ impl UserInterface {
         let attacker = self.characters.get_rc(*attacker);
         let defender = self.characters.get(*defender);
 
-        dbg!(&selected);
+        //dbg!(&selected);
         let prediction = predict_attack(
             &self.characters,
             attacker,
@@ -1397,7 +1399,7 @@ impl UserInterface {
             selected.map(|r| (*reactor, r)),
             0,
         );
-        dbg!(&prediction);
+        //dbg!(&prediction);
         self.game_grid
             .set_target_effect_preview(TargetEffectPreview {
                 character_id: defender.id(),
@@ -1869,6 +1871,7 @@ impl UserInterface {
                 if source == DamageSource::Condition(Condition::Burning) {
                     self.sound_player.play(SoundId::Burning);
                 }
+                self.sound_player.play(SoundId::Damage);
 
                 self.game_grid.add_text_effect(
                     character.pos(),
@@ -2114,10 +2117,13 @@ impl UserInterface {
             } => {
                 if *damage == 0 {
                     self.sound_player.play(SoundId::ArmorAbsorbed);
-                } else if self.characters.get(attacker).has_equipped_ranged_weapon() {
-                    self.sound_player.play(SoundId::HitArrow);
                 } else {
-                    self.sound_player.play(SoundId::MeleeAttack);
+                    if self.characters.get(attacker).has_equipped_ranged_weapon() {
+                        self.sound_player.play(SoundId::HitArrow);
+                    } else {
+                        self.sound_player.play(SoundId::MeleeAttack);
+                    }
+                    self.sound_player.play(SoundId::Damage);
                 }
                 verb = match hit_type {
                     AttackHitType::Regular => "hit",
@@ -2125,16 +2131,7 @@ impl UserInterface {
                     AttackHitType::Critical => "crit",
                 };
                 applied_effects = effects.clone();
-            } /*
-              AttackOutcome::Block | AttackOutcome::Parry => {
-                  self.sound_player.play(SoundId::ArmorAbsorbed);
-                  verb = "missed";
-              }
-              AttackOutcome::Dodge | AttackOutcome::Miss => {
-                  self.sound_player.play(SoundId::AttackMiss);
-                  verb = "missed";
-              }
-               */
+            }
         };
 
         let mut line = format!(
@@ -2245,6 +2242,7 @@ impl UserInterface {
             } => {
                 if let Some(dmg) = damage {
                     self.animate_character_damage(target, *dmg);
+                    self.sound_player.play(SoundId::Damage);
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
                     if *graze {

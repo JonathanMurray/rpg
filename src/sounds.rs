@@ -60,6 +60,10 @@ impl SoundPlayer {
             (SoundId::Scale3, vec!["fl_scale_3.ogg"]),
             (SoundId::Scale4, vec!["fl_scale_4.ogg"]),
             (SoundId::Scale5, vec!["fl_scale_5.ogg"]),
+            (
+                SoundId::Damage,
+                vec!["fl_damage_1.ogg", "fl_damage_2.ogg", "fl_damage_3.ogg"],
+            ),
         ] {
             let mut sounds = vec![];
             for name in names {
@@ -150,4 +154,5 @@ pub enum SoundId {
     Scale3,
     Scale4,
     Scale5,
+    Damage,
 }

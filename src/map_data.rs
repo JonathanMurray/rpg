@@ -434,7 +434,9 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability(SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
 
+    // TODO
     //bob.learn_ability(KILL);
+    //bob.learn_ability(SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];
 
