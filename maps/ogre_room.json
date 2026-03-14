@@ -482,7 +482,7 @@
     "(43, 7)": "WallFlag",
     "(13, 4)": "BookShelf",
     "(52, 7)": "WallFlag",
-    "(18, 4)": "BookShelf",
+    "(25, 13)": "WallPainting",
     "(10, 4)": "WallOpeningNorth",
     "(34, 7)": "WallFlag",
     "(31, 7)": "WallWindow",
@@ -494,7 +494,7 @@
     "(46, 7)": "WallWindow",
     "(49, 7)": "WallWindow",
     "(55, 7)": "WallWindow",
-    "(25, 13)": "WallPainting"
+    "(16, 4)": "BookShelf"
   },
   "characters": [
     {

@@ -223,11 +223,10 @@
     "(25, 1)": "SuitOfArmor",
     "(19, 1)": "WallWindow",
     "(4, 1)": "SuitOfArmor",
-    "(13, 1)": "WallWindow",
-    "(10, 1)": "WallWindow",
-    "(16, 1)": "WallWindow",
     "(22, 1)": "WallWindow",
-    "(25, 13)": "BookShelf"
+    "(10, 1)": "WallWindow",
+    "(13, 1)": "BookShelf",
+    "(16, 1)": "BookShelf"
   },
   "characters": [
     {
