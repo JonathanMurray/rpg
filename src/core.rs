@@ -2531,14 +2531,15 @@ impl CoreGame {
 
         let bleed_stacks = conditions.borrow().get_stacks(&Condition::Bleeding);
         if bleed_stacks > 0 {
-            let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
-            let damage = self.perform_losing_health(character, decay);
+            //let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
+            let damage = self.perform_losing_health(character, bleed_stacks);
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
                 amount: damage,
                 source: DamageSource::Condition(Condition::Bleeding),
             })
             .await;
+            let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
             if conditions
                 .borrow_mut()
                 .lose_stacks(&Condition::Bleeding, decay)
@@ -3560,7 +3561,8 @@ impl Condition {
             Exposed => "|<value>-3| to all |<shield>|, |<value>-50%| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes |<value>-30%| damage from the next attack.",
-            Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
+            //Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
+            Bleeding => "End of turn: lose |<value>x| health. Halved every turn.",
             Burning => "End of turn: deals |<value>x| damage. 50% spreads to adjacent.",
             Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<shield>|<stat>Evasion| against the next attack.",

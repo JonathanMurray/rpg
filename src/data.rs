@@ -128,7 +128,7 @@ pub const SLASHING: AttackEnhancement = AttackEnhancement {
             None,
             ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Bleeding,
-                stacks: Some(5),
+                stacks: Some(4),
                 duration_rounds: None,
             }),
         )),
@@ -146,7 +146,7 @@ pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
             None,
             ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Bleeding,
-                stacks: Some(4),
+                stacks: Some(2),
                 duration_rounds: None,
             }),
         )),
@@ -564,7 +564,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
             on_hit: Some(ApplyEffect::Condition(ApplyCondition {
                 condition: Condition::Bleeding,
                 duration_rounds: None,
-                stacks: Some(4),
+                stacks: Some(2),
             })),
             ..AbilityAttackEffect::default()
         }),
@@ -1140,7 +1140,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
                 on_hit: Some([
                     Some(ApplyEffect::Condition(ApplyCondition {
                         condition: Condition::Bleeding,
-                        stacks: Some(8),
+                        stacks: Some(5),
                         duration_rounds: None,
                     })),
                     None,
@@ -1176,7 +1176,7 @@ pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Bleeding,
-                    stacks: Some(7),
+                    stacks: Some(4),
                     duration_rounds: None,
                 })),
                 None,
