@@ -120,6 +120,7 @@ pub const DAGGER: Weapon = Weapon {
 
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
     name: "Slashing",
+    description: "Inflict |<keyword>Bleeding|",
     icon: IconId::Slashing,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
@@ -642,7 +643,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "", // "Spend more time on the attack, aiming carefully",
+    description: "Reduce |<keyword>Graze| penalty, and roll with |<keyword>Advantage|", // "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
