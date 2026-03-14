@@ -20,7 +20,9 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
-    core::{predict_attack, Character, CharacterId, Characters, MOVE_DISTANCE_PER_STAMINA},
+    core::{
+        predict_attack, Character, CharacterId, Characters, HandType, MOVE_DISTANCE_PER_STAMINA,
+    },
     drawing::draw_dashed_line,
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
@@ -727,13 +729,16 @@ impl ActivityPopup {
                         selected_enhancements,
                         ..
                     } => {
-                        let known_attack_enhancements = self
-                            .characters
-                            .get(active_character_id)
-                            .known_attack_enhancements(attack.hand);
+                        let character = self.characters.get(active_character_id);
+                        let known_attack_enhancements =
+                            character.known_attack_enhancements(attack.hand);
 
                         for (_label, enhancement) in known_attack_enhancements {
                             let btn = self.new_button(ButtonAction::AttackEnhancement(enhancement));
+                            btn.enabled.set(
+                                character
+                                    .can_use_attack_enhancement(HandType::MainHand, &enhancement),
+                            );
                             if selected_enhancements.contains(&enhancement) {
                                 self.selected_choice_button_ids.push(btn.id);
                                 btn.selected.set(ButtonSelected::Yes);
@@ -745,11 +750,14 @@ impl ActivityPopup {
                     ConfiguredAction::UseAbility { ability, .. } => {
                         for enhancement in ability.possible_enhancements.iter().flatten().copied() {
                             let character = self.characters.get(active_character_id);
-                            if character.knows_ability_enhancement(enhancement)
-                                && character.can_use_ability_enhancement(*ability, enhancement)
-                            {
+                            if character.knows_ability_enhancement(enhancement) {
                                 let btn =
                                     self.new_button(ButtonAction::AbilityEnhancement(enhancement));
+
+                                btn.enabled.set(
+                                    character.can_use_ability_enhancement(*ability, enhancement),
+                                );
+
                                 popup_buttons.push(btn);
                             }
                         }

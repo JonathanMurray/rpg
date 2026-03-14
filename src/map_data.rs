@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind,
+        ArrowStack, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Condition,
         EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
     },
     data::{
@@ -410,11 +410,9 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.set_weapon(HandType::MainHand, BOW);
 
     // TODO
-    alice.mana.change_max_value_to(20);
-    alice.learn_ability(FIREBALL);
-
-    // TODO
     /*
+    alice.mana.change_max_value_to(20);
+
     alice.set_weapon(HandType::MainHand, CHEAT_BOW);
     alice.learn_ability(KILL);
      */
@@ -435,7 +433,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.armor_piece.set(Some(SHIRT));
     bob.learn_ability(SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
-    // TODO
+
     //bob.learn_ability(KILL);
 
     let player_characters = vec![alice, bob];
