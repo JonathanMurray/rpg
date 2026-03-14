@@ -1890,6 +1890,7 @@ impl GameGrid {
                         } else if mouse_state == MouseState::RequiresAllyTarget {
                             ui_state.set_target(ActionTarget::Character(hovered_id, None));
                             outcome.switched_players_action_target = true;
+                            self.locked_inspection_target = Some(hovered_id);
                         } else {
                             outcome.tried_switching_selected_player_char = Some(hovered_id);
                         }
