@@ -30,9 +30,13 @@ use crate::{
         Rectangle, Style, TextLine,
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
-    drawing::{draw_cross, draw_rounded_rectangle_lines},
+    drawing::{
+        draw_cross, draw_dashed_rectangle_lines, draw_dashed_rectangle_sides,
+        draw_rounded_rectangle_lines,
+    },
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
+    util::oscillate,
 };
 
 pub struct TopCharacterPortraits {
@@ -707,10 +711,18 @@ impl Drawable for PlayerCharacterPortrait {
             if !has_taken_a_turn {
                 // Just after the char has ended their turn, and AP/stamina is being animated, the character is "active"
                 // even though we've already pressed "End turn".
-                self.end_turn_text.draw(
-                    x + w / 2.0 - self.end_turn_text.size().0 / 2.0,
-                    button_y + button_text_vert_pad,
-                );
+                let end_turn_x = x + w / 2.0 - self.end_turn_text.size().0 / 2.0;
+                let end_turn_y = button_y + button_text_vert_pad;
+                self.end_turn_text.draw(end_turn_x, end_turn_y);
+
+                let can_end_turn_without_wasting_ap = self.character.action_points.current()
+                    + self.character.end_of_turn_ap_gain()
+                    <= self.character.action_points.max();
+                if self.may_show_end_turn_button.get() && can_end_turn_without_wasting_ap {
+                    let mut color = GOLD;
+                    color.a = oscillate(1.3, 0.2, 0.9);
+                    draw_rectangle_lines(x, button_y, w, button_h, 3.0, color);
+                }
             }
             if self.may_show_end_turn_button.get()
                 && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into())
@@ -1047,10 +1059,12 @@ impl Drawable for ActionPointsRow {
                 );
 
                 // Pulsating glowing border
-                let game_time = get_time();
-                let t = (game_time * 1.1).fract() as f32;
+                //let game_time = get_time();
+                //let t = (game_time * 1.1).fract() as f32;
                 // 0.5 to 0.7
-                let alpha = 0.5 + 0.4 * (if t < 0.5 { t } else { 1.0 - t });
+                //let alpha = 0.5 + 0.4 * (if t < 0.5 { t } else { 1.0 - t });
+                let alpha = oscillate(0.9, 0.5, 0.7);
+
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,

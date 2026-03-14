@@ -2628,22 +2628,9 @@ impl CoreGame {
             self.log(format!("{} lost Arcane surge", name)).await;
         }
 
-        //let mut new_ap = MAX_ACTION_POINTS;
-        let mut gain_ap = ACTION_POINTS_PER_TURN;
-        if conditions.borrow().has(&Condition::Adrenalin) {
-            gain_ap += 1;
-        }
-        if conditions.borrow().has(&Condition::NearDeath) {
-            gain_ap = gain_ap.saturating_sub(1);
-        }
-        if conditions.borrow().has(&Condition::Slowed) {
-            gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
-        }
-        if conditions.borrow().has(&Condition::Hastened) {
-            gain_ap += HASTENED_AP_BONUS;
-        }
-        let gained_ap = character.action_points.gain(gain_ap);
-        //character.action_points.current.set(new_ap);
+        let gained_ap = character
+            .action_points
+            .gain(character.end_of_turn_ap_gain());
 
         conditions.borrow_mut().remove(&Condition::MainHandExertion);
         conditions.borrow_mut().remove(&Condition::OffHandExertion);
@@ -4641,6 +4628,23 @@ impl Character {
             is_facing_east: Cell::new(false),
             is_being_pushed_in_direction: Cell::new(None),
         }
+    }
+
+    pub fn end_of_turn_ap_gain(&self) -> u32 {
+        let mut gain_ap = ACTION_POINTS_PER_TURN;
+        if self.conditions.borrow().has(&Condition::Adrenalin) {
+            gain_ap += 1;
+        }
+        if self.conditions.borrow().has(&Condition::NearDeath) {
+            gain_ap = gain_ap.saturating_sub(1);
+        }
+        if self.conditions.borrow().has(&Condition::Slowed) {
+            gain_ap = gain_ap.saturating_sub(SLOWED_AP_PENALTY);
+        }
+        if self.conditions.borrow().has(&Condition::Hastened) {
+            gain_ap += HASTENED_AP_BONUS;
+        }
+        gain_ap
     }
 
     fn set_facing_toward(&self, position: Position) {
