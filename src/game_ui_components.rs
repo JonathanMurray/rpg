@@ -1038,11 +1038,19 @@ impl Drawable for ActionPointsRow {
                     r,
                     GOLD,
                 );
+                // Make it brighter
+                draw_circle(
+                    x0 + self.cell_size.0 / 2.0,
+                    y0 + self.cell_size.1 / 2.0,
+                    r,
+                    Color::new(1.0, 1.0, 1.0, 0.5),
+                );
 
+                // Pulsating glowing border
                 let game_time = get_time();
-                let t = (game_time * 0.7).fract() as f32;
-                let alpha = 0.2 + if t < 0.5 { t } else { 1.0 - t };
-
+                let t = (game_time * 1.1).fract() as f32;
+                // 0.5 to 0.7
+                let alpha = 0.5 + 0.4 * (if t < 0.5 { t } else { 1.0 - t });
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
@@ -1073,12 +1081,12 @@ impl Drawable for ActionPointsRow {
                     2.0,
                     RED,
                 );
-            } else if is_point_hovered {
+            } else if is_point_hovered && !reserved {
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    2.0,
+                    3.0,
                     SKYBLUE,
                 );
             }
