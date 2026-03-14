@@ -236,6 +236,7 @@ async fn run_demo(
                 &resources,
                 &ui_resources,
                 &party,
+                sound_player.clone(),
             )
             .await;
         }
@@ -278,9 +279,17 @@ async fn grow_players(
     resources: &GameResources,
     ui_resources: &UiResources,
     party: &Rc<Party>,
+    sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let player_growths = build_player_growths(player_characters, growths.into(), party);
-    run_transition_loop(player_growths, &resources, &ui_resources, &party).await
+    run_transition_loop(
+        player_growths,
+        &resources,
+        &ui_resources,
+        &party,
+        sound_player,
+    )
+    .await
 }
 
 async fn run_fight_loop(

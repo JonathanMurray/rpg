@@ -34,6 +34,7 @@ use crate::{
         draw_cross, draw_dashed_rectangle_lines, draw_dashed_rectangle_sides,
         draw_rounded_rectangle_lines,
     },
+    resources::{GameResources, UiResources},
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
@@ -282,9 +283,20 @@ pub struct CharacterSheetToggle {
     pub text_line: TextLine,
     pub padding: f32,
     pub sound_player: SoundPlayer,
+    is_hovered: Cell<bool>,
 }
 
 impl CharacterSheetToggle {
+    pub fn new(font: Font, sound_player: SoundPlayer) -> Self {
+        CharacterSheetToggle {
+            shown: Cell::new(false),
+            text_line: TextLine::new("Character sheet (A)", 16, WHITE, Some(font)),
+            padding: 7.0,
+            sound_player: sound_player,
+            is_hovered: Cell::new(false),
+        }
+    }
+
     pub fn set_shown(&self, shown: bool) {
         if self.shown.get() != shown {
             self.shown.set(shown);
@@ -309,6 +321,13 @@ impl Drawable for CharacterSheetToggle {
 
         let (mouse_x, mouse_y) = mouse_position();
         let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
+
+        if hovered {
+            if !self.is_hovered.get() {
+                self.sound_player.play(SoundId::HoverButton);
+            }
+        }
+        self.is_hovered.set(hovered);
 
         if (hovered && is_mouse_button_pressed(MouseButton::Left)) || is_key_pressed(KeyCode::A) {
             self.set_shown(!self.shown.get());
@@ -370,6 +389,7 @@ impl PlayerPortraits {
                         font.clone(),
                         texture,
                         status_textures.clone(),
+                        sound_player.clone(),
                     ))),
                 );
             }
@@ -550,8 +570,11 @@ pub struct PlayerCharacterPortrait {
     pub has_clicked_end_turn: Cell<bool>,
     may_show_end_turn_button: Cell<bool>,
     hovered_status_rect: Cell<Option<(usize, ConditionInfo)>>,
+    is_end_turn_hovered: Cell<bool>,
+    is_portrait_hovered: Cell<bool>,
     font: Font,
     last_drawn_rect: Cell<Rect>,
+    sound_player: SoundPlayer,
 }
 
 impl PlayerCharacterPortrait {
@@ -560,6 +583,7 @@ impl PlayerCharacterPortrait {
         font: Font,
         texture: Texture2D,
         status_textures: HashMap<StatusId, Texture2D>,
+        sound_player: SoundPlayer,
     ) -> Self {
         let mut text = TextLine::new(character.name, 20, WHITE, Some(font.clone()));
         text.set_depth(BLACK, 2.0);
@@ -611,8 +635,11 @@ impl PlayerCharacterPortrait {
             has_clicked_end_turn: Cell::new(false),
             may_show_end_turn_button: Cell::new(false),
             hovered_status_rect: Cell::new(None),
+            is_end_turn_hovered: Cell::new(false),
+            is_portrait_hovered: Cell::new(false),
             font,
             last_drawn_rect: Cell::new(Rect::default()),
+            sound_player,
         };
 
         self_.set_statuses(&character.condition_infos());
@@ -727,10 +754,16 @@ impl Drawable for PlayerCharacterPortrait {
             if self.may_show_end_turn_button.get()
                 && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into())
             {
+                if !self.is_end_turn_hovered.get() {
+                    self.sound_player.play(SoundId::HoverButton);
+                }
+                self.is_end_turn_hovered.set(true);
                 draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     self.has_clicked_end_turn.set(true);
                 }
+            } else {
+                self.is_end_turn_hovered.set(false);
             }
         }
 
@@ -752,9 +785,16 @@ impl Drawable for PlayerCharacterPortrait {
         }
 
         let (mouse_x, mouse_y) = mouse_position();
-        let hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
+        let portrait_hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
 
-        if hovered && !self.is_character_shown.get() {
+        if portrait_hovered {
+            if !self.is_portrait_hovered.get() {
+                self.sound_player.play(SoundId::HoverButton);
+            }
+        }
+        self.is_portrait_hovered.set(portrait_hovered);
+
+        if portrait_hovered && !self.is_character_shown.get() {
             draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
             if is_mouse_button_pressed(MouseButton::Left) {
                 println!(

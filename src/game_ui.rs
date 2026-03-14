@@ -547,7 +547,7 @@ impl UserInterface {
             resources.sprites,
             resources.big_font.clone(),
             resources.simple_font.clone(),
-            resources.terrain_atlas,
+            resources.terrain_atlas.clone(),
             Rc::clone(&init_state.pathfind_grid),
             init_state.background,
             init_state.terrain_objects,
@@ -568,17 +568,8 @@ impl UserInterface {
             sound_player.clone(),
         );
 
-        let character_sheet_toggle = CharacterSheetToggle {
-            shown: Cell::new(false),
-            text_line: TextLine::new(
-                "Character sheet (A)",
-                16,
-                WHITE,
-                Some(resources.simple_font.clone()),
-            ),
-            padding: 7.0,
-            sound_player: sound_player.clone(),
-        };
+        let character_sheet_toggle =
+            CharacterSheetToggle::new(resources.simple_font.clone(), sound_player.clone());
 
         let character_portraits = TopCharacterPortraits::new(
             &game.characters,

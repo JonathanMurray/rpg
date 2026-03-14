@@ -76,6 +76,7 @@ pub async fn run_transition_loop(
     resources: &GameResources,
     ui_resources: &UiResources,
     party: &Party,
+    sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let mut restoration_texts = HashMap::<PlayerId, Vec<String>>::default();
     for (char, growth) in &mut player_characters {
@@ -157,6 +158,7 @@ pub async fn run_transition_loop(
                 simple_font.clone(),
                 texture,
                 status_textures.clone(),
+                sound_player.clone(),
             );
             let name = Element::Text(TextLine::new(char.name, 18, WHITE, Some(big_font.clone())));
             let mut portrait_rows = vec![
