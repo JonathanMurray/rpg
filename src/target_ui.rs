@@ -360,7 +360,7 @@ impl TargetUi {
                 let detailed_stats = Container {
                     layout_dir: LayoutDirection::Vertical,
                     children: detailed_stats_lines,
-                    margin: 9.0,
+                    margin: 13.0,
                     style: Style {
                         padding: 5.0,
                         ..Default::default()

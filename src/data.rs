@@ -436,7 +436,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
         effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::Static(2)),
-            on_hit: Some([Some(ApplyEffect::Knockback(2)), None]),
+            on_hit: Some([Some(ApplyEffect::Pushed(2)), None]),
         })),
     }),
 };
@@ -455,12 +455,12 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::ShieldBash,
     name: "Knockback",
-    description: "Push the target away in a straight line",
+    description: "|<keyword>Push| the target away in a straight line",
     // TODO: unique icon
     icon: IconId::Extend,
     stamina_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        target_on_hit: Some([Some(ApplyEffect::Knockback(3)), None]),
+        target_on_hit: Some([Some(ApplyEffect::Pushed(3)), None]),
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -468,7 +468,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
-    description: "Deal minor damage and inflict Dazed",
+    description: "Deal minor damage and inflict |<keyword>Dazed|",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
     stamina_cost: 1,
@@ -533,7 +533,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
                     stacks: None,
                 })),
                 // Better keep this somewhat low. Critting while knocking into an obstacle can lead to crazy numbers.
-                Some(ApplyEffect::Knockback(2)),
+                Some(ApplyEffect::Pushed(2)),
             ]),
         }),
         impact_circle: None,
@@ -987,7 +987,7 @@ pub const SCREAM: Ability = Ability {
 pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
-    description: "Slow an enemy and lower their defenses",
+    description: "|<keyword>Slow| and |<keyword>Expose| an enemy",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
     mana_cost: 2,
@@ -1120,7 +1120,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
-    description: "Deal damage and cause Bleeding in an area",
+    description: "Deal damage and cause |<keyword>Bleeding| in an area",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
     mana_cost: 1,
@@ -1360,7 +1360,7 @@ pub const HASTE: Ability = Ability {
 pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
-    description: "Inspire nearby allies",
+    description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 2,
     mana_cost: 1,
@@ -1399,7 +1399,7 @@ pub const INSPIRE: Ability = Ability {
 pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
-    description: "Inspire nearby allies",
+    description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1645,7 +1645,7 @@ pub const FIREBALL: Ability = Ability {
     description: "Deal damage to an enemy and its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
-    mana_cost: 2,
+    mana_cost: 1,
     stamina_cost: 0,
     requirement: None,
 

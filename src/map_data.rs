@@ -252,7 +252,7 @@ pub fn create_character(
             char
         }
         CharacterType::Clara => {
-            let char = make_medium_clara(party.unwrap());
+            let char = make_high_clara(party.unwrap());
             char.position.set(pos);
             char
         }
@@ -514,8 +514,16 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 
     let bob = make_high_bob(&party);
 
+    let clara = make_high_clara(&party);
+
+    let player_characters = vec![clara, alice, bob];
+
+    (party, player_characters)
+}
+
+fn make_high_clara(party: &Rc<Party>) -> Character {
     let mut clara = Character::new(
-        CharacterKind::Player(Rc::clone(&party), PlayerId::Clara),
+        CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
         PortraitId::Clara,
         SpriteId::Clara,
@@ -537,8 +545,5 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
-
-    let player_characters = vec![clara, alice, bob];
-
-    (party, player_characters)
+    clara
 }

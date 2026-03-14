@@ -57,7 +57,7 @@ pub struct Tooltip {
 pub enum Keyword {
     Cond(Condition),
     Advantage,
-    Knockback,
+    Pushed,
     Graze,
     Crit,
 }
@@ -67,7 +67,7 @@ impl Keyword {
         match self {
             Keyword::Cond(condition) => condition.name(),
             Keyword::Advantage => "Advantage",
-            Keyword::Knockback => "Knockback",
+            Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
             Keyword::Crit => "Crit",
         }
@@ -77,8 +77,8 @@ impl Keyword {
         match self {
             Keyword::Cond(condition) => condition.description(),
             Keyword::Advantage => "Roll extra dice and take the highest result",
-            Keyword::Knockback => {
-                "Pushed |<value>x| steps. On collision: |<value>1| damage per remaining distance"
+            Keyword::Pushed => {
+                "Moves up to |<value>x| steps. On collision: |<value>1| damage per remaining distance"
             }
             Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
             Keyword::Crit => "|<value>+50%| effect. Triggers on |<dice>| roll is 16 or higher",
@@ -463,10 +463,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             t.technical_description.push(line);
             t.keywords.push(Keyword::Cond(condition));
         }
-        ApplyEffect::Knockback(amount) => {
+        ApplyEffect::Pushed(amount) => {
             t.technical_description
-                .push(format!("  |<keyword>Knockback| ({})", amount));
-            t.keywords.push(Keyword::Knockback);
+                .push(format!("  |<keyword>Pushed| ({})", amount));
+            t.keywords.push(Keyword::Pushed);
         }
     }
 }

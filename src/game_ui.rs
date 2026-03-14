@@ -437,22 +437,22 @@ impl CharacterUi {
         let tooltip = if self.action_points_row.hovered.get() {
             Some((
                 "Action Points (AP)",
-                "Used for actions. 4 AP is restored after ending your turn.",
+                vec!["Used for actions.".to_string(), "".to_string(), "|<value>4| AP is restored after ending your turn, although this amount can be changed by certain conditions.".to_string()],
             ))
         } else if self.health_bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                "If this reaches |<value>0|, you die. |<value>10%| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)",
+                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>10%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string()],
             ))
         } else if self.stamina_bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                "Used for movement and certain actions. |<value>25%| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)"
+                vec!["Used for movement and certain actions.".to_string(), "".to_string(), "|<value>25%| |<stamina>| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)".to_string()]
             ))
         } else if self.mana_bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
-                "Used for spells. |<value>25%| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)",
+                vec!["Used for spells.".to_string(), "".to_string(), "|<value>25%| |<mana>| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)".to_string()],
             ))
         } else {
             None
@@ -472,7 +472,7 @@ impl CharacterUi {
                 ),
                 header,
                 None,
-                &[content.to_string()],
+                &content,
                 &[],
                 false,
             );

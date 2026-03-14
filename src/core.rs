@@ -924,7 +924,7 @@ impl CoreGame {
                 }
                 line
             }
-            e @ ApplyEffect::Knockback(amount) => {
+            e @ ApplyEffect::Pushed(amount) => {
                 let giver = giver.unwrap();
                 let mut source_pos = giver.pos();
 
@@ -1562,7 +1562,7 @@ impl CoreGame {
                     }
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
-                    ApplyEffect::Knockback { .. } => {}
+                    ApplyEffect::Pushed { .. } => {}
                 }
 
                 let (applied, log_line, _damage) =
@@ -1911,7 +1911,7 @@ impl CoreGame {
                     }
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
-                    ApplyEffect::Knockback(ref mut distance) => {
+                    ApplyEffect::Pushed(ref mut distance) => {
                         apply_degree_of_success(
                             distance,
                             degree_of_success,
@@ -3365,7 +3365,7 @@ pub enum ApplyEffect {
     ConsumeCondition {
         condition: Condition,
     },
-    Knockback(u32),
+    Pushed(u32),
 }
 
 impl ApplyEffect {
@@ -3387,7 +3387,7 @@ impl ApplyEffect {
                 caster_healing_percentage,
             } => todo!(),
             ApplyEffect::ConsumeCondition { condition } => todo!(),
-            ApplyEffect::Knockback(n) => *n *= factor,
+            ApplyEffect::Pushed(n) => *n *= factor,
         }
     }
 }
@@ -3412,7 +3412,7 @@ impl Display for ApplyEffect {
             ApplyEffect::ConsumeCondition { condition } => {
                 f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
-            ApplyEffect::Knockback(..) => f.write_str("Knockback"),
+            ApplyEffect::Pushed(..) => f.write_str("Pushed"),
         }
     }
 }
@@ -4072,7 +4072,7 @@ impl AbilityNegativeEffect {
     pub fn has_knockback(&self) -> bool {
         if let AbilityNegativeEffect::Spell(sne) = self {
             for effect in sne.on_hit.iter().flatten().flatten() {
-                if matches!(effect, ApplyEffect::Knockback { .. }) {
+                if matches!(effect, ApplyEffect::Pushed { .. }) {
                     return true;
                 }
             }

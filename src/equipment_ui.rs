@@ -91,7 +91,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     //lines.push("<Right-click to use>".to_string());
     if consumable.weight > 0 {
         t.technical_description
-            .push(format!("Weight: {}", consumable.weight));
+            .push(format!("|<faded>Weight: {}|", consumable.weight));
     }
 
     t
@@ -128,37 +128,39 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description
-            .push(format!("[attacked?] {}", reaction.name));
+            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
         t.technical_description
-            .push(format!("~ {}", enhancement.name));
+            .push(format!("Unlocks: |<keyword>{}|", enhancement.name));
     }
     t.technical_description
-        .push(format!("Weight: {}", weapon.weight));
+        .push(format!("|<faded>Weight: {}|", weapon.weight));
 
     t
 }
 
 fn shield_tooltip(shield: &Shield) -> Tooltip {
     let mut t = Tooltip::new(shield.name);
-    t.technical_description
-        .push(format!("+{} |<shield>|<stat>Evasion|", shield.evasion));
+    t.technical_description.push(format!(
+        "|<value>+{}| |<shield>|<stat>Evasion|",
+        shield.evasion
+    ));
     if shield.armor > 0 {
         t.technical_description
-            .push(format!("+{} armor", shield.armor));
+            .push(format!("|<value>+{}| armor", shield.armor));
     }
 
     if let Some(reaction) = shield.on_attacked_reaction {
         t.technical_description
-            .push(format!("[attacked?] {}", reaction.name));
+            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
     }
     if let Some(reaction) = shield.on_hit_reaction {
         t.technical_description
-            .push(format!("[hit?] {}", reaction.name));
+            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
     }
     t.technical_description
-        .push(format!("Weight: {}", shield.weight));
+        .push(format!("|<faded>Weight: {}|", shield.weight));
     t
 }
 
@@ -175,7 +177,7 @@ fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
             .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
     }
     t.technical_description
-        .push(format!("Weight: {}", armor.weight));
+        .push(format!("|<faded>Weight: {}|", armor.weight));
     t
 }
 

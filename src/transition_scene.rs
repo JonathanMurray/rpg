@@ -114,7 +114,7 @@ pub async fn run_transition_loop(
 
             let health_gain = char
                 .health
-                .gain((char.health.max() as f32 * 0.1).ceil() as u32);
+                .gain(((char.health.max() - char.health.current()) as f32 * 0.1).ceil() as u32);
             if health_gain > 0 {
                 recovered.push(format!("{} |<heart>|", health_gain));
             }
