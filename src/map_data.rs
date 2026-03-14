@@ -351,7 +351,7 @@ pub fn create_character(
             huldra.learn_ability(HULDRA_INFLICT_WOUNDS);
             huldra.learn_ability(HULDRA_INFLICT_HORRORS);
             huldra.armor_piece.set(Some(SHIRT));
-            huldra.set_weapon(HandType::MainHand, BAD_SWORD);
+            //huldra.set_weapon(HandType::MainHand, BAD_SWORD);
             huldra.health.change_max_value_to(40);
             huldra
         }

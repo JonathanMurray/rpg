@@ -319,39 +319,35 @@ impl TargetUi {
 
             let mut rows = vec![Element::Container(centered_list)];
 
-            if char.player_controlled() {
-
-                // TODO show stamina and mana
-            } else {
+            if !char.player_controlled() {
                 let movement_text_line = TextLine::new(
                     format!("|<boot>| Move: {:.1}", char.move_speed()),
                     16,
                     LIGHTGRAY,
                     Some(self.simple_font.clone()),
                 );
-                let attack_text_line = TextLine::new(
-                    format!(
-                        "|<dice>| Attack: +{}",
-                        char.attack_modifier(HandType::MainHand)
-                    ),
-                    16,
-                    LIGHTGRAY,
-                    Some(self.simple_font.clone()),
-                );
-                let damage_text_line = TextLine::new(
-                    format!(
-                        "|<sword>| Damage: {}",
-                        char.weapon(HandType::MainHand).unwrap().damage
-                    ),
-                    16,
-                    LIGHTGRAY,
-                    Some(self.simple_font.clone()),
-                );
-                let mut detailed_stats_lines = vec![
-                    Element::Text(movement_text_line),
-                    Element::Text(damage_text_line),
-                    Element::Text(attack_text_line),
-                ];
+                let mut detailed_stats_lines = vec![Element::Text(movement_text_line)];
+                if char.weapon(HandType::MainHand).is_some() {
+                    detailed_stats_lines.push(Element::Text(TextLine::new(
+                        format!(
+                            "|<sword>| Damage: {}",
+                            char.weapon(HandType::MainHand).unwrap().damage
+                        ),
+                        16,
+                        LIGHTGRAY,
+                        Some(self.simple_font.clone()),
+                    )));
+                    detailed_stats_lines.push(Element::Text(TextLine::new(
+                        format!(
+                            "|<dice>| Attack: +{}",
+                            char.attack_modifier(HandType::MainHand)
+                        ),
+                        16,
+                        LIGHTGRAY,
+                        Some(self.simple_font.clone()),
+                    )));
+                }
+
                 if bot_using_spells {
                     detailed_stats_lines.push(Element::Text(TextLine::new(
                         format!("|<dice>| Spell: +{}", char.spell_modifier()),

@@ -99,7 +99,7 @@ impl HuldraBehaviour {
 
         let goal = BotGoal {
             action,
-            fallback_actions: vec![inflict_horrors, inflict_wounds, BotAction::Attack, heal],
+            fallback_actions: vec![inflict_horrors, inflict_wounds, heal],
         };
 
         let chosen_action = pursue_goal(game, goal.clone());
