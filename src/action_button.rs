@@ -59,6 +59,7 @@ pub enum Keyword {
     Advantage,
     Knockback,
     Graze,
+    Crit,
 }
 
 impl Keyword {
@@ -68,6 +69,7 @@ impl Keyword {
             Keyword::Advantage => "Advantage",
             Keyword::Knockback => "Knockback",
             Keyword::Graze => "Graze",
+            Keyword::Crit => "Crit",
         }
     }
 
@@ -75,8 +77,11 @@ impl Keyword {
         match self {
             Keyword::Cond(condition) => condition.description(),
             Keyword::Advantage => "Roll extra dice and take the highest result",
-            Keyword::Knockback => "Pushed |<value>x| steps. On collision: |<value>1| damage per remaining distance",
-            Keyword::Graze => "|<value>-50%| effect. Triggers when a |<dice>| roll fails to match target's |<shield>|.",
+            Keyword::Knockback => {
+                "Pushed |<value>x| steps. On collision: |<value>1| damage per remaining distance"
+            }
+            Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
+            Keyword::Crit => "|<value>+50%| effect. Triggers on |<dice>| roll is 16 or higher",
         }
     }
 }
@@ -243,6 +248,11 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
             "|<value>-25%| damage on |<keyword>Graze| (instead of |<value>-50%|)".to_string(),
         );
         t.keywords.push(Keyword::Graze);
+    }
+    if effect.improved_crit {
+        t.technical_description
+            .push("|<value>+75%| damage on |<keyword>Crit| (instead of |<value>+50%|)".to_string());
+        t.keywords.push(Keyword::Crit);
     }
     if effect.roll_advantage > 0 {
         t.technical_description.push(format!(

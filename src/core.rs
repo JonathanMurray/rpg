@@ -2188,6 +2188,7 @@ impl CoreGame {
             }
 
             let mut graze_improvement = None;
+            let mut crit_improvement = None;
 
             for (name, effect) in enhancements {
                 let bonus_dmg = effect.bonus_damage;
@@ -2197,6 +2198,9 @@ impl CoreGame {
                 }
                 if effect.improved_graze {
                     graze_improvement = Some(name);
+                }
+                if effect.improved_crit {
+                    crit_improvement = Some(name);
                 }
             }
 
@@ -2247,9 +2251,14 @@ impl CoreGame {
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
                 AttackHitType::Critical => {
+                    if let Some(source) = crit_improvement {
+                        dmg_str.push_str(&format!(" +75% |<faded>(crit, {})|", source));
+                        dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
+                    } else {
+                        dmg_str.push_str(" +50% |<faded>(crit)|");
+                        dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                    }
                     on_true_hit_effect = weapon.on_true_hit;
-                    dmg_str.push_str(" +50% |<faded>(crit)|");
-                    dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                     detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
                 }
             }
@@ -4315,6 +4324,7 @@ pub struct AttackEnhancementEffect {
     pub consume_equipped_arrow: bool,
 
     pub improved_graze: bool,
+    pub improved_crit: bool,
 }
 
 impl AttackEnhancementEffect {
@@ -4333,6 +4343,7 @@ impl AttackEnhancementEffect {
             on_target: None,
             consume_equipped_arrow: false,
             improved_graze: false,
+            improved_crit: false,
         }
     }
 }

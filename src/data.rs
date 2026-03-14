@@ -643,12 +643,12 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "Reduce |<keyword>Graze| penalty, and roll with |<keyword>Advantage|", // "Spend more time on the attack, aiming carefully",
+    description: "Increase |<keyword>Crit| bonus, and roll with |<keyword>Advantage|", // "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
         roll_advantage: 1,
-        improved_graze: true,
+        improved_crit: true,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
