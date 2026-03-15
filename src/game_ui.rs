@@ -547,6 +547,7 @@ impl UserInterface {
             resources.sprites,
             resources.big_font.clone(),
             resources.simple_font.clone(),
+            resources.tiny_font.clone(),
             resources.terrain_atlas.clone(),
             Rc::clone(&init_state.pathfind_grid),
             init_state.background,

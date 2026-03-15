@@ -563,7 +563,7 @@
         39,
         16
       ],
-      "health": null,
+      "health": 8,
       "main_hand": null,
       "shield": null
     },
@@ -573,7 +573,7 @@
         41,
         20
       ],
-      "health": null,
+      "health": 10,
       "main_hand": null,
       "shield": null
     },

@@ -437,6 +437,8 @@ impl Drawable for TextLine {
 
 use lazy_static::lazy_static;
 
+const SYMBOL_H: f32 = 16.0;
+
 lazy_static! {
     static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
         let symbol_w = 16.0;
@@ -469,7 +471,7 @@ pub fn measure_text_with_font_tags(
     for mut part in parts {
         if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
-            h = h.max(symbol_w);
+            h = h.max(SYMBOL_H);
             if offset_y.is_none() {
                 offset_y = Some(13.0);
             }

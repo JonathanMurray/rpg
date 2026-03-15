@@ -62,6 +62,7 @@ pub fn create_game_grid(
         resources.sprites.clone(),
         resources.big_font.clone(),
         resources.simple_font.clone(),
+        resources.tiny_font.clone(),
         resources.terrain_atlas.clone(),
         pathfind_grid.clone(),
         map_data.background.clone(),
@@ -435,7 +436,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
 
     // TODO
-    //bob.learn_ability(KILL);
+    bob.learn_ability(KILL);
     //bob.learn_ability(SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];

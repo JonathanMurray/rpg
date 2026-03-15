@@ -30,7 +30,9 @@ use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::rest_scene::run_rest_loop;
 use rpg::shop_scene::run_shop_loop;
 use rpg::sounds::SoundPlayer;
-use rpg::textures::{load_and_init_font_symbols, load_and_init_ui_textures};
+use rpg::textures::{
+    load_and_init_font_symbols, load_and_init_tiny_font, load_and_init_ui_textures,
+};
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
 use rpg::victory_scene::run_victory_loop;
 
@@ -63,6 +65,7 @@ async fn main() {
     let resources = GameResources::load().await;
     let ui_resources = UiResources::load().await;
     load_and_init_font_symbols().await;
+    load_and_init_tiny_font().await;
     load_and_init_ui_textures().await;
 
     let sound_player = SoundPlayer::new().await;

@@ -24,6 +24,7 @@ pub struct GameResources {
     pub simple_font: Font,
     pub big_font: Font,
     pub decorative_font: Font,
+    pub tiny_font: Font,
     pub terrain_atlas: Texture2D,
     pub status_textures: HashMap<StatusId, Texture2D>,
     pub effect_textures: HashMap<EffectId, Texture2D>,
@@ -44,6 +45,9 @@ impl GameResources {
 
         let big_font = load_font("manaspace/manaspc.ttf").await;
         let decorative_font = load_font("dpcomic/dpcomic.ttf").await;
+        let tiny_font = load_font("micro/Micro5-Regular.ttf").await;
+        //let tiny_font = load_font("tiny5/Tiny5-SolidRegular.ttf").await;
+
         let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
         let status_textures = load_all_status_textures().await;
         let effect_textures = load_all_effects().await;
@@ -53,6 +57,7 @@ impl GameResources {
             simple_font,
             big_font,
             decorative_font,
+            tiny_font,
             terrain_atlas,
             status_textures,
             effect_textures,

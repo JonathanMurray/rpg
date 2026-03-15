@@ -1,9 +1,9 @@
 use std::{collections::HashMap, f32::consts::PI, hash::Hash, sync::OnceLock};
 
 use macroquad::{
-    color::WHITE,
+    color::{Color, WHITE},
     math::Rect,
-    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
+    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Image, Texture2D},
     time::get_time,
 };
 use serde::{Deserialize, Serialize};
@@ -706,9 +706,80 @@ pub async fn load_and_init_texture(path: &str) -> Texture2D {
     texture
 }
 
+pub async fn load_and_init_tiny_font() {
+    let texture = load_and_init_texture("tiny_font.png").await;
+    replace_color(&texture, [0, 0, 0, 255], [100, 200, 100, 255]);
+    TINY_FONT_GREEN_TEXTURE.get_or_init(|| texture);
+
+    let texture = load_and_init_texture("tiny_font.png").await;
+    replace_color(&texture, [0, 0, 0, 255], [255, 100, 100, 255]);
+    TINY_FONT_RED_TEXTURE.get_or_init(|| texture);
+}
+
+fn replace_color(texture: &Texture2D, from: [u8; 4], to: [u8; 4]) {
+    let mut img = texture.get_texture_data();
+    for pixel in img.get_image_data_mut() {
+        if pixel == &from {
+            *pixel = to;
+        }
+    }
+    texture.update(&img);
+}
+
+pub enum TinyFontColor {
+    Green,
+    Red,
+}
+
+const TINY_FONT_W: f32 = 6.0;
+const TINY_FONT_H: f32 = 7.0;
+
+pub fn measure_tiny_font(text: &str) -> (f32, f32) {
+    (text.len() as f32 * TINY_FONT_W, TINY_FONT_H)
+}
+
+pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
+    let texture = match color {
+        TinyFontColor::Green => TINY_FONT_GREEN_TEXTURE.get().unwrap(),
+        TinyFontColor::Red => TINY_FONT_RED_TEXTURE.get().unwrap(),
+    };
+
+    let x = x.floor();
+    let y = y.floor();
+    let mut x0 = x;
+    let ch_w = TINY_FONT_W;
+    let ch_h = TINY_FONT_H;
+    let vert_i = 2;
+    for ch in text.chars() {
+        let hor_i = if ch >= '0' && ch <= '9' {
+            ch as u8 - '0' as u8
+        } else if ch == '%' {
+            10
+        } else {
+            11
+        };
+        draw_texture_ex(
+            texture,
+            x0,
+            y - ch_h,
+            WHITE,
+            DrawTextureParams {
+                source: Some(Rect::new(
+                    hor_i as f32 * ch_w,
+                    vert_i as f32 * ch_h,
+                    ch_w,
+                    ch_h,
+                )),
+                ..Default::default()
+            },
+        );
+        x0 += ch_w;
+    }
+}
+
 pub async fn load_and_init_font_symbols() {
-    let font_atlas = load_and_init_texture("font.png").await;
-    let img = font_atlas.get_texture_data();
+    let symbol_atlas = load_and_init_texture("font.png").await;
+    let img = symbol_atlas.get_texture_data();
 
     let symbol = |x, y| {
         let texture = Texture2D::from_image(&img.sub_image(Rect::new(
@@ -757,6 +828,9 @@ pub static MANA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MANA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+
+pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

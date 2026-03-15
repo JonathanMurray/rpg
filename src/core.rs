@@ -2713,6 +2713,8 @@ pub struct AttackPrediction {
     pub max_damage: u32,
     pub avg_damage: f32,
     pub details: Vec<(&'static str, Goodness)>,
+    pub graze_chance: f32,
+    pub crit_chance: f32,
 }
 
 pub struct AbilityPrediction {
@@ -2724,6 +2726,8 @@ pub struct TargetPrediction {
     pub damage: DamageInterval,
     pub is_buff: bool,
     pub details: Vec<(&'static str, Goodness)>,
+    pub graze_chance: f32,
+    pub crit_chance: f32,
 }
 
 impl From<AttackPrediction> for TargetPrediction {
@@ -2735,6 +2739,8 @@ impl From<AttackPrediction> for TargetPrediction {
             },
             is_buff: false,
             details: value.details,
+            graze_chance: value.graze_chance,
+            crit_chance: value.crit_chance,
         }
     }
 }
@@ -2784,6 +2790,9 @@ pub fn predict_ability(
                 },
                 is_buff: result.is_buff,
                 details,
+                // TODO calculate these also for abilities (not just attacks)
+                graze_chance: 0.0,
+                crit_chance: 0.0,
             },
         );
     }
@@ -2818,14 +2827,25 @@ pub fn predict_attack(
     let mut max_dmg = 0;
     let mut percentage_deal_damage = 0;
 
+    let mut advantage = 0;
+
     let mut details = vec![];
     for (label, contributor) in attacker.outgoing_attack_bonuses(hand_type, enhancements, defender)
     {
         details.push((label, contributor.goodness()));
+        if let RollBonusContributor::Advantage(adv) = contributor {
+            advantage += adv;
+        }
     }
     for (label, contributor) in defender.incoming_attack_bonuses(reaction.map(|(_id, r)| r)) {
         details.push((label, contributor.goodness()));
+        if let RollBonusContributor::Advantage(adv) = contributor {
+            advantage += adv;
+        }
     }
+
+    let mut regular_hit_threshold = 21;
+    let mut crit_threshold = 21;
 
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
@@ -2842,10 +2862,17 @@ pub fn predict_attack(
             None,
         );
 
-        let damage = match event.outcome {
-            AttackOutcome::Hit { damage, .. } => damage,
-            _ => 0,
-        };
+        let AttackOutcome::Hit {
+            damage, hit_type, ..
+        } = event.outcome;
+
+        match hit_type {
+            AttackHitType::Graze => {}
+            AttackHitType::Regular => {
+                regular_hit_threshold = regular_hit_threshold.min(unmodified_roll)
+            }
+            AttackHitType::Critical => crit_threshold = crit_threshold.min(unmodified_roll),
+        }
 
         if min_dmg.is_none() {
             min_dmg = Some(damage);
@@ -2860,12 +2887,23 @@ pub fn predict_attack(
 
     let avg_damage = damage_outcomes.iter().map(|dmg| *dmg as f32).sum::<f32>() / 20.0;
 
+    let hit_chance = probability_of_d20_reaching(
+        regular_hit_threshold,
+        DiceRollBonus::from_advantage(advantage),
+    );
+
+    let graze_chance = 1.0 - hit_chance;
+    let crit_chance =
+        probability_of_d20_reaching(crit_threshold, DiceRollBonus::from_advantage(advantage));
+
     AttackPrediction {
         percentage_chance_deal_damage: percentage_deal_damage,
         min_damage: min_dmg.unwrap(),
         max_damage: max_dmg,
         avg_damage,
         details,
+        graze_chance,
+        crit_chance,
     }
 }
 

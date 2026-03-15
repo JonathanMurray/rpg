@@ -43,3 +43,12 @@ pub struct DiceRollBonus {
     pub advantage: i32,
     pub flat_amount: i32,
 }
+
+impl DiceRollBonus {
+    pub fn from_advantage(advantage: i32) -> Self {
+        Self {
+            advantage,
+            flat_amount: 0,
+        }
+    }
+}

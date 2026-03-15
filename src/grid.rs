@@ -50,12 +50,16 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
+    game_ui_connection::DEBUG,
     pathfind::{
         build_path_from_chart, ChartNode, Collision, Occupation, PathfindGrid, TerrainType,
         CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
-    textures::{character_sprite_height, draw_terrain, EffectId, SpriteId, StatusId, TerrainId},
+    textures::{
+        character_sprite_height, draw_terrain, draw_tiny_font, measure_tiny_font, EffectId,
+        SpriteId, StatusId, TerrainId, TinyFontColor, TINY_FONT_GREEN_TEXTURE,
+    },
     util::{line_visitor, rgb, COL_RED},
 };
 use crate::{
@@ -233,6 +237,7 @@ pub enum ParticleShape {
 pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
+    tiny_font: Font,
     pub cell_w: f32,
     terrain_atlas: Texture2D,
     pub background: IndexMap<Position, TerrainId>,
@@ -275,6 +280,7 @@ impl GameGrid {
         sprites: HashMap<SpriteId, Texture2D>,
         big_font: Font,
         simple_font: Font,
+        tiny_font: Font,
         terrain_atlas: Texture2D,
         pathfind_grid: Rc<PathfindGrid>,
         background: IndexMap<Position, TerrainId>,
@@ -311,6 +317,7 @@ impl GameGrid {
             character_animations: Default::default(),
             big_font,
             simple_font,
+            tiny_font,
             terrain_atlas,
             background,
             terrain_objects,
@@ -2662,7 +2669,7 @@ impl GameGrid {
                 ORANGE,
             );
 
-            let text = if damage.max > 0 {
+            let header = if damage.max > 0 {
                 format!("|<sword>|{}-{}", damage.min, damage.max)
             } else if preview.prediction.is_buff {
                 "|<heart>|".to_string()
@@ -2671,22 +2678,29 @@ impl GameGrid {
                 "|<sword>|".to_string()
             };
 
-            // TODO: Render the details with red/green backgrounds, like in target ui
-            /*
-            for (detail_str, _goodness) in &preview.details {
-                text.push_str(&format!(" {}", detail_str));
-            }
-             */
-
             let x0 = health_x + health_w / 2.0;
             let y0 = health_y + health_h + 2.0;
+
+            let graze_text = if preview.prediction.graze_chance > 0.0 {
+                Some(chance_to_perc_str(preview.prediction.graze_chance))
+            } else {
+                None
+            };
+            let crit_text = if preview.prediction.crit_chance > 0.0 {
+                Some(chance_to_perc_str(preview.prediction.crit_chance))
+            } else {
+                None
+            };
 
             draw_action(
                 (x0, y0),
                 &self.simple_font,
-                &text,
+                &header,
                 &self.simple_font,
                 &preview.prediction.details,
+                &self.tiny_font,
+                graze_text,
+                crit_text,
             );
         }
 
@@ -3213,6 +3227,16 @@ impl GameGrid {
     }
 }
 
+fn chance_to_perc_str(chance: f32) -> String {
+    let mut perc = chance * 100.0;
+    if perc > 99.0 && perc < 100.0 {
+        perc = 99.0;
+    } else if perc < 1.0 && perc > 0.0 {
+        perc = 1.0;
+    }
+    format!("{}%", perc.round() as u32)
+}
+
 #[derive(Debug, Default)]
 pub struct GridOutcome {
     pub switched_state: Option<NewState>,
@@ -3493,12 +3517,15 @@ pub fn draw_action(
     header: &str,
     details_font: &Font,
     details: &[(&'static str, Goodness)],
+    percentage_font: &Font,
+    graze_text: Option<String>,
+    crit_text: Option<String>,
 ) {
     let (mut x, y) = pos;
 
     let header_font_size = 16;
     let detail_font_size = 13;
-    let params = TextParams {
+    let header_params = TextParams {
         font: Some(header_font),
         font_size: header_font_size,
         color: WHITE,
@@ -3507,15 +3534,14 @@ pub fn draw_action(
 
     let vert_margin = 2.0;
     let detail_hor_margin = 2.0;
-    let header_pad = 2.0;
+    let header_pad = 5.0; //2.0;
     let detail_pad = 2.0;
 
-    let header_dimensions =
-        measure_text_with_font_tags(header, Some(header_font), header_font_size, 1.0);
-    let header_w = header_dimensions.width + header_pad * 2.0;
+    let header_dim = measure_text_with_font_tags(header, Some(header_font), header_font_size, 1.0);
+    let header_w = header_dim.width + header_pad * 2.0;
     let mut header_h = 0.0;
-    if header_dimensions.height.is_finite() {
-        header_h = header_dimensions.offset_y + header_pad * 2.0;
+    if header_dim.height.is_finite() {
+        header_h = header_dim.offset_y + header_pad * 2.0;
     }
 
     let mut details_w = 0.0;
@@ -3551,21 +3577,50 @@ pub fn draw_action(
 
     let mut x0 = x;
     let mut y0 = y; // - h;
-    draw_rectangle(x0, y0, header_w, header_h, Color::new(0.0, 0.0, 0.0, 0.7));
+
+    let header_y = y0 + header_pad + header_dim.offset_y;
+
+    let perc_pad = 5.0;
+    let graze_w = graze_text
+        .as_ref()
+        .map(|s| measure_tiny_font(s).0 + perc_pad)
+        .unwrap_or(0.0);
+
+    let crit_w = crit_text
+        .as_ref()
+        .map(|s| measure_tiny_font(s).0 + perc_pad)
+        .unwrap_or(0.0);
+
+    draw_rectangle(
+        x0 - graze_w,
+        y0,
+        graze_w + header_w + crit_w,
+        header_h,
+        Color::new(0.0, 0.0, 0.0, 0.8),
+    );
+
+    if let Some(s) = graze_text {
+        draw_tiny_font(&s, x0 - graze_w + perc_pad, header_y, TinyFontColor::Red);
+    }
 
     draw_text_with_font_tags(
         header,
         x0 + header_pad,
-        y0 + header_pad + header_dimensions.offset_y,
-        params.clone(),
+        header_y,
+        header_params.clone(),
         true,
     );
-    y0 += header_dimensions.offset_y + header_pad * 2.0 + vert_margin;
+
+    if let Some(s) = &crit_text {
+        draw_tiny_font(s, x0 + header_w, header_y, TinyFontColor::Green);
+    }
+
+    y0 += header_dim.offset_y + header_pad * 2.0 + vert_margin;
 
     x0 += (header_w - details_w) / 2.0;
 
     for (line, goodness) in details {
-        let mut params = params.clone();
+        let mut params = header_params.clone();
         params.font = Some(details_font);
         params.font_size = detail_font_size;
 
