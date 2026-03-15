@@ -575,17 +575,9 @@ impl CoreGame {
                     self.ui_handle_event(GameEvent::Attacked(event.clone()))
                         .await;
 
-                    let maybe_damage = match event.outcome {
-                        AttackOutcome::Hit { damage, .. } => Some(damage),
-                        _ => None,
-                    };
-                    let outcome = if let Some(damage) = maybe_damage {
-                        ActionOutcome::AttackHit {
-                            victim_id: event.target,
-                            damage,
-                        }
-                    } else {
-                        ActionOutcome::Default
+                    let outcome = ActionOutcome::AttackHit {
+                        victim_id: event.target,
+                        damage: event.outcome.damage,
                     };
                     Ok(outcome)
                 }
@@ -1764,10 +1756,10 @@ impl CoreGame {
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         println!("perform_spell_enemy_effect({}) ...", ability_name);
-        dbg!(ability_roll);
+        //dbg!(ability_roll);
         let real_game = mode.real_game();
 
-        let degree_of_success = match spell_enemy_effect.defense_type {
+        let hit_type = match spell_enemy_effect.defense_type {
             Some(contest) => {
                 let defense = match contest {
                     DefenseType::Will => target.will(),
@@ -1779,16 +1771,16 @@ impl CoreGame {
 
                 if final_result < 6 {
                     detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
-                    -1
+                    HitType::Graze
                 } else if final_result < 16 {
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
-                    0
+                    HitType::Regular
                 } else {
                     detail_lines.push("  Crit |<faded>(16 or higher)|".to_string());
-                    1
+                    HitType::Critical
                 }
             }
-            None => 0,
+            None => HitType::Regular,
         };
 
         let damage = if let Some(ability_damage) = spell_enemy_effect.damage {
@@ -1822,10 +1814,10 @@ impl CoreGame {
                 }
             }
 
-            if degree_of_success == -1 {
+            if hit_type == HitType::Graze {
                 dmg_str.push_str(" -50% |<faded>(Graze)|");
                 dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
-            } else if increased_by_good_roll && degree_of_success > 0 {
+            } else if increased_by_good_roll && hit_type == HitType::Critical {
                 dmg_str.push_str(&format!(" +50% |<faded>(Crit)|"));
                 dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
             }
@@ -1854,15 +1846,11 @@ impl CoreGame {
 
         let mut applied_effects = vec![];
 
-        fn apply_degree_of_success(
-            stacks: &mut u32,
-            degree_of_success: i32,
-            reduced_to_nothing: &mut bool,
-        ) {
-            if degree_of_success == -1 {
-                // -25% Graze
-                *stacks -= (*stacks as f32 * 0.25).ceil() as u32;
-            } else if degree_of_success > 0 {
+        fn apply_hit_type(stacks: &mut u32, hit_type: HitType, reduced_to_nothing: &mut bool) {
+            if hit_type == HitType::Graze {
+                // -50% Graze
+                *stacks -= (*stacks as f32 * 0.5).ceil() as u32;
+            } else if hit_type == HitType::Critical {
                 // +50% Crit
                 *stacks += (*stacks as f32 * 0.5).ceil() as u32;
             }
@@ -1885,38 +1873,26 @@ impl CoreGame {
                 let mut reduced_to_nothing = false;
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => {
-                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing);
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing);
                     }
                     ApplyEffect::GainStamina(ref mut n) => {
-                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
                     }
                     ApplyEffect::GainHealth(ref mut n) => {
-                        apply_degree_of_success(n, degree_of_success, &mut reduced_to_nothing)
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
                     }
                     ApplyEffect::Condition(ref mut apply_condition) => {
                         if let Some(stacks) = &mut apply_condition.stacks {
-                            apply_degree_of_success(
-                                stacks,
-                                degree_of_success,
-                                &mut reduced_to_nothing,
-                            );
+                            apply_hit_type(stacks, hit_type, &mut reduced_to_nothing);
                         }
                         if let Some(rounds) = &mut apply_condition.duration_rounds {
-                            apply_degree_of_success(
-                                rounds,
-                                degree_of_success,
-                                &mut reduced_to_nothing,
-                            );
+                            apply_hit_type(rounds, hit_type, &mut reduced_to_nothing);
                         }
                     }
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
                     ApplyEffect::Pushed(ref mut distance) => {
-                        apply_degree_of_success(
-                            distance,
-                            degree_of_success,
-                            &mut reduced_to_nothing,
-                        );
+                        apply_hit_type(distance, hit_type, &mut reduced_to_nothing);
                     }
                 }
 
@@ -1981,7 +1957,7 @@ impl CoreGame {
 
         AbilityTargetOutcome::HitEnemy {
             damage,
-            graze: degree_of_success == -1,
+            hit_type,
             applied_effects,
         }
     }
@@ -2228,15 +2204,15 @@ impl CoreGame {
             // 6-15: hit
             // >=16: crit
             let hit_type = if final_result <= 5 {
-                AttackHitType::Graze
+                HitType::Graze
             } else if final_result <= 15 {
-                AttackHitType::Regular
+                HitType::Regular
             } else {
-                AttackHitType::Critical
+                HitType::Critical
             };
 
             match hit_type {
-                AttackHitType::Graze => {
+                HitType::Graze => {
                     if let Some(source) = graze_improvement {
                         dmg_str.push_str(&format!(" -25% |<faded>(graze, {})|", source));
                         dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
@@ -2246,11 +2222,11 @@ impl CoreGame {
                     }
                     detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
                 }
-                AttackHitType::Regular => {
+                HitType::Regular => {
                     on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
-                AttackHitType::Critical => {
+                HitType::Critical => {
                     if let Some(source) = crit_improvement {
                         dmg_str.push_str(&format!(" +75% |<faded>(crit, {})|", source));
                         dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
@@ -2380,7 +2356,7 @@ impl CoreGame {
                 }
             }
 
-            AttackOutcome::Hit {
+            AttackOutcome {
                 damage,
                 actual_health_lost,
                 hit_type,
@@ -2726,8 +2702,8 @@ pub struct TargetPrediction {
     pub damage: DamageInterval,
     pub is_buff: bool,
     pub details: Vec<(&'static str, Goodness)>,
-    pub graze_chance: f32,
-    pub crit_chance: f32,
+    pub graze_chance: Option<f32>,
+    pub crit_chance: Option<f32>,
 }
 
 impl From<AttackPrediction> for TargetPrediction {
@@ -2739,8 +2715,8 @@ impl From<AttackPrediction> for TargetPrediction {
             },
             is_buff: false,
             details: value.details,
-            graze_chance: value.graze_chance,
-            crit_chance: value.crit_chance,
+            graze_chance: Some(value.graze_chance),
+            crit_chance: Some(value.crit_chance),
         }
     }
 }
@@ -2759,55 +2735,66 @@ pub fn predict_ability(
     selected_target: &ActionTarget,
 ) -> AbilityPrediction {
     let mut targets: HashMap<CharacterId, TargetPrediction> = Default::default();
+    // PERFORMANCE NOTE: This is very inefficient. A single frame can take > 100ms due to calling this. Luckily, prediction happens infrequently
+    // and there's currently not much animation in the game that is noticeably affected.
+    for unmodified_roll in 1..=20 {
+        let event = &pollster::FutureExt::block_on(CoreGame::perform_ability(
+            caster,
+            ability,
+            enhancements,
+            selected_target,
+            ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
+        ))[0];
 
-    // To predict the possible range, we first roll a 1 ...
-    let resolved_events = pollster::FutureExt::block_on(CoreGame::perform_ability(
-        caster,
-        ability,
-        enhancements,
-        selected_target,
-        ActionPerformanceMode::SimulatedRoll(1, characters),
-    ));
-    let event = &resolved_events[0];
-    for (target_id, result) in event.affected_targets() {
-        let mut details: Vec<(&'static str, Goodness)> = vec![];
+        for (target_id, result) in event.affected_targets() {
+            if unmodified_roll == 1 {
+                let mut details: Vec<(&'static str, Goodness)> = vec![];
 
-        if let Some(roll) = ability.roll {
-            for (label, contributor) in caster.outgoing_ability_roll_bonuses(enhancements, roll) {
-                details.push((label, contributor.goodness()));
+                if let Some(roll) = ability.roll {
+                    for (label, contributor) in
+                        caster.outgoing_ability_roll_bonuses(enhancements, roll)
+                    {
+                        details.push((label, contributor.goodness()));
+                    }
+                    for (label, contributor) in characters.get(target_id).incoming_ability_bonuses()
+                    {
+                        details.push((label, contributor.goodness()));
+                    }
+                }
+
+                targets.insert(
+                    target_id,
+                    TargetPrediction {
+                        damage: DamageInterval {
+                            min: result.damage,
+                            max: 0, // filled in later
+                        },
+                        is_buff: result.is_buff,
+                        details,
+                        graze_chance: None, // filled in later
+                        crit_chance: None,  // filled in later
+                    },
+                );
+            } else if unmodified_roll == 20 {
+                targets.get_mut(&target_id).unwrap().damage.max = result.damage;
             }
-            for (label, contributor) in characters.get(target_id).incoming_ability_bonuses() {
-                details.push((label, contributor.goodness()));
+
+            match result.hit_type {
+                Some(HitType::Regular) => {
+                    let graze_chance = &mut targets.get_mut(&target_id).unwrap().graze_chance;
+                    graze_chance.get_or_insert_with(|| {
+                        1.0 - probability_of_d20_reaching(unmodified_roll, DiceRollBonus::none())
+                    });
+                }
+                Some(HitType::Critical) => {
+                    let crit_chance = &mut targets.get_mut(&target_id).unwrap().crit_chance;
+                    crit_chance.get_or_insert_with(|| {
+                        probability_of_d20_reaching(unmodified_roll, DiceRollBonus::none())
+                    });
+                }
+                _ => {}
             }
         }
-
-        targets.insert(
-            target_id,
-            TargetPrediction {
-                damage: DamageInterval {
-                    min: result.damage,
-                    max: 0,
-                },
-                is_buff: result.is_buff,
-                details,
-                // TODO calculate these also for abilities (not just attacks)
-                graze_chance: 0.0,
-                crit_chance: 0.0,
-            },
-        );
-    }
-
-    // ... and then roll a 20
-    let resolved_events = pollster::FutureExt::block_on(CoreGame::perform_ability(
-        caster,
-        ability,
-        enhancements,
-        selected_target,
-        ActionPerformanceMode::SimulatedRoll(20, characters),
-    ));
-    let event = &resolved_events[0];
-    for (target_id, result) in event.affected_targets() {
-        targets.get_mut(&target_id).unwrap().damage.max = result.damage;
     }
 
     AbilityPrediction { targets }
@@ -2862,16 +2849,14 @@ pub fn predict_attack(
             None,
         );
 
-        let AttackOutcome::Hit {
+        let AttackOutcome {
             damage, hit_type, ..
         } = event.outcome;
 
         match hit_type {
-            AttackHitType::Graze => {}
-            AttackHitType::Regular => {
-                regular_hit_threshold = regular_hit_threshold.min(unmodified_roll)
-            }
-            AttackHitType::Critical => crit_threshold = crit_threshold.min(unmodified_roll),
+            HitType::Graze => {}
+            HitType::Regular => regular_hit_threshold = regular_hit_threshold.min(unmodified_roll),
+            HitType::Critical => crit_threshold = crit_threshold.min(unmodified_roll),
         }
 
         if min_dmg.is_none() {
@@ -3068,6 +3053,7 @@ impl AbilityResolvedEvent {
                 TargetResult {
                     damage: outcome.damage().unwrap_or(0),
                     is_buff: outcome.is_buff(),
+                    hit_type: outcome.hit_type(),
                 },
             );
         }
@@ -3076,6 +3062,7 @@ impl AbilityResolvedEvent {
                 let entry = affected_targets.entry(*target_id).or_insert(TargetResult {
                     damage: 0,
                     is_buff: false,
+                    hit_type: outcome.hit_type(),
                 });
                 entry.damage += outcome.damage().unwrap_or(0);
                 if outcome.is_buff() {
@@ -3090,6 +3077,7 @@ impl AbilityResolvedEvent {
 struct TargetResult {
     damage: u32,
     is_buff: bool,
+    hit_type: Option<HitType>,
 }
 
 #[derive(Debug, Clone)]
@@ -3102,13 +3090,11 @@ pub struct AttackedEvent {
 }
 
 #[derive(Debug, Clone)]
-pub enum AttackOutcome {
-    Hit {
-        damage: u32,
-        actual_health_lost: u32,
-        hit_type: AttackHitType,
-        applied_effects: Vec<ApplyEffect>,
-    },
+pub struct AttackOutcome {
+    pub damage: u32,
+    pub actual_health_lost: u32,
+    pub hit_type: HitType,
+    pub applied_effects: Vec<ApplyEffect>,
     /*
     Dodge,
     Block,
@@ -3117,17 +3103,8 @@ pub enum AttackOutcome {
      */
 }
 
-impl AttackOutcome {
-    fn damage(&self) -> Option<u32> {
-        match self {
-            AttackOutcome::Hit { damage, .. } => Some(*damage),
-            _ => None,
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
-pub enum AttackHitType {
+pub enum HitType {
     Regular,
     Graze,
     Critical,
@@ -3148,8 +3125,8 @@ pub struct OffensiveHitReactionOutcome {
 pub enum AbilityTargetOutcome {
     HitEnemy {
         damage: Option<u32>,
-        graze: bool,
         applied_effects: Vec<ApplyEffect>,
+        hit_type: HitType,
     },
     AttackedEnemy(AttackedEvent),
     Resisted,
@@ -3162,7 +3139,9 @@ impl AbilityTargetOutcome {
     fn damage(&self) -> Option<u32> {
         match self {
             AbilityTargetOutcome::HitEnemy { damage, .. } => *damage,
-            AbilityTargetOutcome::AttackedEnemy(attacked_event) => attacked_event.outcome.damage(),
+            AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
+                Some(attacked_event.outcome.damage)
+            }
             AbilityTargetOutcome::Resisted => None,
             AbilityTargetOutcome::AffectedAlly { .. } => None,
         }
@@ -3170,6 +3149,16 @@ impl AbilityTargetOutcome {
 
     fn is_buff(&self) -> bool {
         matches!(self, AbilityTargetOutcome::AffectedAlly { .. })
+    }
+
+    fn hit_type(&self) -> Option<HitType> {
+        match self {
+            AbilityTargetOutcome::HitEnemy { hit_type, .. } => Some(*hit_type),
+            AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
+                Some(attacked_event.outcome.hit_type)
+            }
+            _ => None,
+        }
     }
 
     /*

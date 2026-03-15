@@ -51,4 +51,11 @@ impl DiceRollBonus {
             flat_amount: 0,
         }
     }
+
+    pub fn none() -> Self {
+        Self {
+            advantage: 0,
+            flat_amount: 0,
+        }
+    }
 }

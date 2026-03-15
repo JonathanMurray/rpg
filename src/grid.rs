@@ -2681,16 +2681,17 @@ impl GameGrid {
             let x0 = health_x + health_w / 2.0;
             let y0 = health_y + health_h + 2.0;
 
-            let graze_text = if preview.prediction.graze_chance > 0.0 {
-                Some(chance_to_perc_str(preview.prediction.graze_chance))
-            } else {
-                None
-            };
-            let crit_text = if preview.prediction.crit_chance > 0.0 {
-                Some(chance_to_perc_str(preview.prediction.crit_chance))
-            } else {
-                None
-            };
+            let graze_text = preview
+                .prediction
+                .graze_chance
+                .filter(|chance| *chance > 0.0)
+                .map(|chance| chance_to_perc_str(chance));
+
+            let crit_text = preview
+                .prediction
+                .crit_chance
+                .filter(|chance| *chance > 0.0)
+                .map(|chance| chance_to_perc_str(chance));
 
             draw_action(
                 (x0, y0),

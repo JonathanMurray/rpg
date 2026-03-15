@@ -30,10 +30,10 @@ use crate::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
-        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackHitType, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
-        DamageSource, GameEvent, Goodness, HandType, MovementType, OnAttackedReaction,
-        OnHitReaction, Position, TargetPrediction,
+        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
+        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource,
+        GameEvent, Goodness, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction,
+        Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -1641,17 +1641,18 @@ impl UserInterface {
                     match outcome {
                         AbilityTargetOutcome::HitEnemy {
                             damage,
-                            graze,
+                            hit_type,
                             applied_effects,
                         } => {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" (|<value>{}| damage)", dmg))
                             } else if applied_effects.is_empty() {
-                                if *graze {
-                                    line.push_str(" (graze)");
-                                } else {
-                                    line.push_str(" (hit)");
-                                }
+                                let suffix = match hit_type {
+                                    HitType::Regular => " (hit)",
+                                    HitType::Graze => " (graze)",
+                                    HitType::Critical => " (crit)",
+                                };
+                                line.push_str(suffix);
                             } else if applied_effects.len() == 1 {
                                 line.push_str(&format!("  ({})", applied_effects[0]));
                             }
@@ -2110,7 +2111,7 @@ impl UserInterface {
 
         let verb;
         match &event.outcome {
-            AttackOutcome::Hit {
+            AttackOutcome {
                 hit_type,
                 damage,
                 applied_effects: effects,
@@ -2127,9 +2128,9 @@ impl UserInterface {
                     self.sound_player.play(SoundId::Damage);
                 }
                 verb = match hit_type {
-                    AttackHitType::Regular => "hit",
-                    AttackHitType::Graze => "grazed",
-                    AttackHitType::Critical => "crit",
+                    HitType::Regular => "hit",
+                    HitType::Graze => "grazed",
+                    HitType::Critical => "crit",
                 };
                 applied_effects = effects.clone();
             }
@@ -2144,7 +2145,7 @@ impl UserInterface {
 
         let mut damage_was_dealt = false;
         match event.outcome {
-            AttackOutcome::Hit {
+            AttackOutcome {
                 damage,
                 actual_health_lost,
                 ..
@@ -2165,19 +2166,19 @@ impl UserInterface {
         let target_pos = self.characters.get(target).pos();
 
         let (impact_text, text_style) = match event.outcome {
-            AttackOutcome::Hit {
+            AttackOutcome {
                 damage,
-                hit_type: AttackHitType::Regular,
+                hit_type: HitType::Regular,
                 ..
             } => (format!("{}", damage), TextEffectStyle::HostileHit),
-            AttackOutcome::Hit {
+            AttackOutcome {
                 damage,
-                hit_type: AttackHitType::Graze,
+                hit_type: HitType::Graze,
                 ..
             } => (format!("{}", damage), TextEffectStyle::HostileGraze),
-            AttackOutcome::Hit {
+            AttackOutcome {
                 damage,
-                hit_type: AttackHitType::Critical,
+                hit_type: HitType::Critical,
                 ..
             } => (format!("{}!", damage), TextEffectStyle::HostileCrit),
             /*
@@ -2238,7 +2239,7 @@ impl UserInterface {
         match &outcome {
             AbilityTargetOutcome::HitEnemy {
                 damage,
-                graze,
+                hit_type,
                 applied_effects,
             } => {
                 if let Some(dmg) = damage {
@@ -2246,16 +2247,21 @@ impl UserInterface {
                     self.sound_player.play(SoundId::Damage);
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
-                    if *graze {
-                        effects.push((
+                    let effect = match hit_type {
+                        HitType::Regular => {
+                            (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
+                        }
+                        HitType::Graze => (
                             None,
                             "Graze".to_string(),
                             TextEffectStyle::HostileGraze,
                             1.0,
-                        ));
-                    } else {
-                        effects.push((None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0));
-                    }
+                        ),
+                        HitType::Critical => {
+                            (None, "Crit".to_string(), TextEffectStyle::HostileCrit, 1.0)
+                        }
+                    };
+                    effects.push(effect);
                 }
 
                 if !applied_effects.is_empty() {
