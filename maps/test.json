@@ -254,6 +254,36 @@
       "health": null,
       "main_hand": null,
       "shield": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        15,
+        30
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        10,
+        30
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        13,
+        23
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
     }
   ]
 }
