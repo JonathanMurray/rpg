@@ -665,7 +665,7 @@ impl GameGrid {
         attacker: CharacterId,
         target: CharacterId,
         ranged: bool,
-        target_reaction: Option<bool>,
+        target_reaction: Option<(CharacterId, bool)>,
     ) -> f32 {
         let attacker_pos = self.characters.get(&attacker).unwrap().pos();
         let target_pos = self.characters.get(&target).unwrap().pos();
@@ -677,9 +677,9 @@ impl GameGrid {
                 AnimationDetails::RangedAttack { toward: target_pos },
             ));
 
-            if let Some(with_shield) = target_reaction {
+            if let Some((reactor_id, with_shield)) = target_reaction {
                 self.character_animations.push(CharacterAnimation::new(
-                    target,
+                    reactor_id,
                     // keep the animation going slightly after the projectil hits
                     projectile_duration + 0.1,
                     AnimationDetails::ReactingToAttacked {
@@ -733,9 +733,9 @@ impl GameGrid {
                     with_shield: false,
                 },
             ));
-            if let Some(with_shield) = target_reaction {
+            if let Some((reactor, with_shield)) = target_reaction {
                 self.character_animations.push(CharacterAnimation::new(
-                    target,
+                    reactor,
                     duration + 0.1,
                     AnimationDetails::ReactingToAttacked {
                         toward: attacker_pos,
@@ -3053,7 +3053,11 @@ impl GameGrid {
             );
 
             let header = if damage.max > 0 {
-                format!("|<sword>|{}-{}", damage.min, damage.max)
+                if damage.max > damage.min {
+                    format!("|<sword>|{}-{}", damage.min, damage.max)
+                } else {
+                    format!("|<sword>|{}", damage.min)
+                }
             } else if preview.prediction.is_buff {
                 "|<heart>|".to_string()
             } else {

@@ -1995,7 +1995,7 @@ impl UserInterface {
         &mut self,
         attacker: CharacterId,
         target: CharacterId,
-        target_reaction: Option<bool>,
+        target_reaction: Option<(CharacterId, bool)>,
     ) {
         let ranged = self.characters.get(attacker).has_equipped_ranged_weapon();
         if ranged {

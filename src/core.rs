@@ -552,11 +552,14 @@ impl CoreGame {
 
                     let defender_facing = defender.is_facing_east.get();
                     let target_reaction = if let Some((reactor, reaction)) = reaction {
-                        defender.set_facing_toward(attacker.pos());
+                        let reactor = self.characters.get(reactor);
+                        reactor.set_facing_toward(attacker.pos());
                         let with_shield = reaction.used_hand == Some(HandType::OffHand);
-                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked { reactor })
-                            .await;
-                        Some(with_shield)
+                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
+                            reactor: reactor.id(),
+                        })
+                        .await;
+                        Some((reactor.id(), with_shield))
                     } else {
                         None
                     };
@@ -2872,7 +2875,10 @@ pub fn predict_attack(
         match hit_type {
             HitType::Graze => {}
             HitType::Regular => regular_hit_threshold = regular_hit_threshold.min(unmodified_roll),
-            HitType::Critical => crit_threshold = crit_threshold.min(unmodified_roll),
+            HitType::Critical => {
+                regular_hit_threshold = regular_hit_threshold.min(unmodified_roll);
+                crit_threshold = crit_threshold.min(unmodified_roll);
+            }
         }
 
         if min_dmg.is_none() {
@@ -2965,7 +2971,7 @@ pub enum GameEvent {
     AttackWasInitiated {
         actor: CharacterId,
         target: CharacterId,
-        target_reaction: Option<bool>,
+        target_reaction: Option<(CharacterId, bool)>,
     },
     Attacked(AttackedEvent),
     AbilityWasInitiated {
@@ -5005,8 +5011,6 @@ impl Character {
 
         for (condition, state) in self.conditions.borrow().map.iter() {
             let remaining_rounds = state.ends_at.map(|ends_at| {
-                // TODO:
-                // Bug: subtract with overflow; huldra map, used Inspire on Alice as the very first action (?)
                 assert!(
                     ends_at >= self.current_game_time.get(),
                     "{} < {}",
@@ -5122,6 +5126,13 @@ impl Character {
         self.has_taken_a_turn_this_round.set(false);
         self.has_used_main_hand_reaction_this_round.set(false);
         self.has_used_off_hand_reaction_this_round.set(false);
+
+        self.set_current_game_time(0);
+        assert!(
+            self.current_game_time.get() == 0,
+            "{}",
+            self.current_game_time.get()
+        );
     }
 
     fn on_new_round(&self) {
