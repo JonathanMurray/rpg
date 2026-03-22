@@ -49,11 +49,11 @@
     "(7, 10)": "StoneWallConvexNorthEast",
     "(4, 10)": "StoneWallConvexNorthEast",
     "(25, 13)": "StoneWallConvexNorthEast",
-    "(22, 13)": "StoneWallConvexNorthEast",
-    "(22, 10)": "StoneWallConvexNorthEast",
+    "(10, 22)": "StoneWallConvexNorthEast",
+    "(10, 25)": "StoneWallConvexNorthEast",
     "(25, 10)": "StoneWallConvexNorthEast",
-    "(25, 25)": "StoneWallConvexNorthEast",
-    "(22, 25)": "StoneWallConvexNorthEast"
+    "(13, 25)": "StoneWallConvexNorthEast",
+    "(13, 22)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -213,7 +213,7 @@
     "(7, 28)": "Floor4"
   },
   "decorations": {
-    "(1, 21)": "WallOpeningWest",
+    "(16, 1)": "BookShelf",
     "(4, 13)": "WallPainting",
     "(28, 19)": "WallOpeningEast",
     "(10, 13)": "WallPainting2",
@@ -226,7 +226,7 @@
     "(22, 1)": "WallWindow",
     "(10, 1)": "WallWindow",
     "(13, 1)": "BookShelf",
-    "(16, 1)": "BookShelf"
+    "(1, 22)": "WallOpeningWest"
   },
   "characters": [
     {
@@ -243,7 +243,7 @@
       "type_": "Alice",
       "pos": [
         5,
-        24
+        23
       ],
       "health": null,
       "main_hand": null,
@@ -252,8 +252,8 @@
     {
       "type_": "Skeleton",
       "pos": [
-        14,
-        21
+        19,
+        19
       ],
       "health": 31,
       "main_hand": null,
@@ -277,6 +277,26 @@
       ],
       "health": 8,
       "main_hand": "BadDagger",
+      "shield": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        23,
+        5
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        24,
+        17
+      ],
+      "health": null,
+      "main_hand": null,
       "shield": null
     }
   ]

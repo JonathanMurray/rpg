@@ -176,7 +176,7 @@ pub const ENSLAVED_SWORD: Weapon = Weapon {
     name: "Enslaved Sword",
     range: WeaponRange::Melee,
     action_point_cost: 4,
-    damage: 6,
+    damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
@@ -662,7 +662,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "Roll with |<keyword>Advantage| and gain increased |<keyword>Crit| damage", // "Spend more time on the attack, aiming carefully",
+    description: "Roll with |<keyword>Advantage| and gain increased |<keyword>Crit| damage",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
@@ -1720,7 +1720,7 @@ pub const KILL: Ability = Ability {
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
-                damage: Some(AbilityDamage::Static(0)),
+                damage: Some(AbilityDamage::Static(99)),
                 on_hit: None,
             })),
         }),
@@ -1848,6 +1848,7 @@ pub enum PassiveSkill {
     ThrillOfBattle,
     Honorless,
     Vigilant,
+    UnbridledRage,
 }
 
 impl PassiveSkill {
@@ -1862,6 +1863,7 @@ impl PassiveSkill {
             ThrillOfBattle => "Thrill of battle",
             Honorless => "Honorless",
             Vigilant => "Vigilant",
+            UnbridledRage => "Unbridled rage",
         }
     }
 
@@ -1880,6 +1882,8 @@ impl PassiveSkill {
             Honorless => IconId::RangedAttack,
             // TODO: unique icon
             Vigilant => IconId::MeleeAttack,
+            // TODO: unique icon
+            UnbridledRage => IconId::Rage,
         }
     }
 
@@ -1893,7 +1897,8 @@ impl PassiveSkill {
             BloodRage => "|<value>+3| |<dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
             ThrillOfBattle => "|<value>+3| |<dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
-            Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them"
+            Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
+            UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
         }
     }
 
@@ -1901,6 +1906,7 @@ impl PassiveSkill {
         use PassiveSkill::*;
         match self {
             BloodRage => &[Keyword::Cond(Condition::NearDeath)],
+            UnbridledRage => &[Keyword::Cond(Condition::Ferocity)],
             _ => &[],
         }
     }

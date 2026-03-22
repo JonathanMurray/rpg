@@ -846,11 +846,7 @@ impl CoreGame {
         }
 
         for character in self.characters.iter() {
-            if character
-                .known_passive_skills
-                .borrow()
-                .contains(&PassiveSkill::ThrillOfBattle)
-            {
+            if character.knows_passive(PassiveSkill::ThrillOfBattle) {
                 let mut num_adjacent_enemies = 0;
                 for (pos, player_controlled) in &positions {
                     if *player_controlled != character.player_controlled()
@@ -2121,11 +2117,7 @@ impl CoreGame {
             }
         }
 
-        if attacker
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::WeaponProficiency)
-        {
+        if attacker.knows_passive(PassiveSkill::WeaponProficiency) {
             armor_penetrators.push((1, PassiveSkill::WeaponProficiency.name()));
         }
 
@@ -2195,16 +2187,21 @@ impl CoreGame {
                 }
             }
 
-            if attacker
-                .known_passive_skills
-                .borrow()
-                .contains(&PassiveSkill::Honorless)
-            {
+            if attacker.knows_passive(PassiveSkill::Honorless) {
                 let bonus_dmg = 1;
                 if is_target_flanked(attacker.pos(), defender) {
                     dmg_str.push_str(&format!(" +{} |<faded>(Honorless)|", bonus_dmg));
                     dmg_calculation += bonus_dmg;
                 }
+            }
+
+            let ferocity = attacker
+                .conditions
+                .borrow()
+                .get_stacks(&Condition::Ferocity);
+            if ferocity > 0 {
+                dmg_str.push_str(&format!(" +{} |<faded>(Ferocity)|", ferocity));
+                dmg_calculation += ferocity as i32;
             }
 
             if !armor_penetrators.is_empty() {
@@ -2627,6 +2624,10 @@ impl CoreGame {
                 .lose_stacks(&Condition::ArcaneSurge, 1)
         {
             self.log(format!("{} lost Arcane surge", name)).await;
+        }
+
+        if character.knows_passive(PassiveSkill::UnbridledRage) {
+            character.receive_condition(Condition::Ferocity, Some(1), None);
         }
 
         let gained_ap = character
@@ -3565,6 +3566,7 @@ pub enum Condition {
     Adrenalin,
     ArcaneSurge,
     HealthPotionRecovering,
+    Ferocity,
 }
 
 impl Condition {
@@ -3597,6 +3599,7 @@ impl Condition {
             Adrenalin => "Adrenalin",
             ArcaneSurge => "Arcane surge",
             HealthPotionRecovering => "Recovering",
+            Ferocity => "Ferocity",
         }
     }
 
@@ -3630,6 +3633,7 @@ impl Condition {
             Adrenalin => "|<value>+1| AP per turn.",
             ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|. Decays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
+            Ferocity => "|<value>+x| attack damage"
         }
     }
 
@@ -3662,13 +3666,14 @@ impl Condition {
             Adrenalin => true,
             ArcaneSurge => true,
             HealthPotionRecovering => true,
+            Ferocity => true,
         }
     }
 
     pub const fn has_cumulative_stacking(&self) -> bool {
         use Condition::*;
         match self {
-            Bleeding | Burning | ArcaneSurge => true,
+            Bleeding | Burning | ArcaneSurge | Ferocity => true,
             _ => false,
         }
     }
@@ -3694,6 +3699,7 @@ impl Condition {
             ReaperApCooldown => StatusId::ReaperApCooldown,
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
+            Ferocity => StatusId::Rage,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -4773,10 +4779,7 @@ impl Character {
 
     fn on_health_changed(&self) {
         let health_ratio = self.health.ratio();
-        let has_blood_rage_passive = self
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::BloodRage);
+        let has_blood_rage_passive = self.knows_passive(PassiveSkill::BloodRage);
 
         if has_blood_rage_passive && health_ratio <= 0.5 {
             self.conditions.borrow_mut().add(Condition::BloodRage);
@@ -4801,11 +4804,7 @@ impl Character {
     }
 
     fn on_mana_changed(&self) {
-        let add = self
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::CriticalCharge)
-            && self.mana.ratio() <= 0.5;
+        let add = self.knows_passive(PassiveSkill::CriticalCharge) && self.mana.ratio() <= 0.5;
         self.conditions
             .borrow_mut()
             .add_or_remove(Condition::CriticalCharge, add);
@@ -4838,11 +4837,7 @@ impl Character {
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
-        if self
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::Reaper)
-        {
+        if self.knows_passive(PassiveSkill::Reaper) {
             let sta = self.stamina.gain(num_killed);
             let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 0
@@ -5010,6 +5005,14 @@ impl Character {
 
         for (condition, state) in self.conditions.borrow().map.iter() {
             let remaining_rounds = state.ends_at.map(|ends_at| {
+                // TODO:
+                // Bug: subtract with overflow; huldra map, used Inspire on Alice as the very first action (?)
+                assert!(
+                    ends_at >= self.current_game_time.get(),
+                    "{} < {}",
+                    ends_at,
+                    self.current_game_time.get()
+                );
                 let remaining = ends_at - self.current_game_time.get();
                 (remaining as f32 / self.round_length.get().unwrap() as f32).ceil() as u32
             });
@@ -5513,11 +5516,7 @@ impl Character {
     }
 
     pub fn can_use_opportunity_attack(&self, target: CharacterId) -> bool {
-        if !self
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::Vigilant)
-        {
+        if !self.knows_passive(PassiveSkill::Vigilant) {
             if let Some(engaged_target) = self.engagement_target.get() {
                 if engaged_target != target {
                     // If you're engaging someone else, you're focused on that and miss the opportunity
@@ -5667,6 +5666,10 @@ impl Character {
                 BaseAction::UseAbility(ability) => ability.id == id,
                 _ => false,
             })
+    }
+
+    pub fn knows_passive(&self, passive: PassiveSkill) -> bool {
+        self.known_passive_skills.borrow().contains(&passive)
     }
 
     pub fn known_abilities(&self) -> Vec<Ability> {
@@ -5827,11 +5830,7 @@ impl Character {
             protection += shield.armor;
         }
 
-        if self
-            .known_passive_skills
-            .borrow()
-            .contains(&PassiveSkill::HardenedSkin)
-        {
+        if self.knows_passive(PassiveSkill::HardenedSkin) {
             protection += 1;
         }
 
@@ -6218,10 +6217,7 @@ fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
         attacker_pos
     );
      */
-    let target_is_immune_to_flanking = target
-        .known_passive_skills
-        .borrow()
-        .contains(&PassiveSkill::ThrillOfBattle);
+    let target_is_immune_to_flanking = target.knows_passive(PassiveSkill::ThrillOfBattle);
 
     if target_is_immune_to_flanking {
         return false;

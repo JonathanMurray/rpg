@@ -368,6 +368,7 @@ pub fn create_character(
             enslaved.health.change_max_value_to(24);
             enslaved.armor_piece.set(Some(CHAIN_MAIL));
             enslaved.set_weapon(HandType::MainHand, ENSLAVED_SWORD);
+            enslaved.learn_passive(PassiveSkill::UnbridledRage);
             enslaved
         }
     };
@@ -410,7 +411,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     );
     alice.set_weapon(HandType::MainHand, BOW);
     // TODO:
-    alice.set_weapon(HandType::MainHand, ZERO_BOW);
+    //alice.set_weapon(HandType::MainHand, ZERO_BOW);
 
     // TODO
     /*
@@ -440,7 +441,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     // TODO
     bob.learn_ability(KILL);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
-    bob.learn_ability(SWEEP_ATTACK);
+    //bob.learn_ability(SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];
 

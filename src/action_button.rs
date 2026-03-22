@@ -250,7 +250,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
     if effect.improved_crit {
         t.technical_description
-            .push("|<value>+75%| |<keyword>Crit| damage (instead of |<value>+50%|)".to_string());
+            .push("|<keyword>Crit| bonus damage increased by |<value>25%|".to_string());
         t.keywords.push(Keyword::Crit);
     }
     if effect.roll_advantage > 0 {
