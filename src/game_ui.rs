@@ -1467,6 +1467,7 @@ impl UserInterface {
                 reactor,
                 with_shield,
             } => {
+                let attacker_pos = self.active_character().pos();
                 let reactor_pos = self.characters.get(reactor).pos();
                 self.game_grid.add_text_effect(
                     reactor_pos,
@@ -1476,9 +1477,12 @@ impl UserInterface {
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
-
-                self.game_grid
-                    .animate_character_acting(reactor, with_shield, 0.8);
+                self.game_grid.animate_character_acting(
+                    reactor,
+                    Some(attacker_pos),
+                    with_shield,
+                    0.8,
+                );
 
                 self.animation_stopwatch.set_to_at_least(0.4);
             }
@@ -1558,8 +1562,11 @@ impl UserInterface {
                 }
 
                 let with_shield = ability.id == AbilityId::ShieldBash;
+                let target_pos = target
+                    .map(|char_id| self.characters.get(char_id).pos())
+                    .or(area_at.map(|(_shape, pos)| pos));
                 self.game_grid
-                    .animate_character_acting(actor, with_shield, 0.3);
+                    .animate_character_acting(actor, target_pos, with_shield, 0.3);
 
                 let duration;
 
@@ -2054,32 +2061,40 @@ impl UserInterface {
     }
 
     fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
-        if self.characters.get(attacker).has_equipped_ranged_weapon() {
+        let ranged = self.characters.get(attacker).has_equipped_ranged_weapon();
+        if ranged {
             self.sound_player.play(SoundId::ShootArrow);
         }
 
         let attacker_pos = self.characters.get(attacker).pos();
         let target_pos = self.characters.get(target).pos();
 
-        let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.3);
+        let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
 
-        self.game_grid
-            .animate_character_acting(attacker, false, projectile_duration.max(0.2));
-
-        self.game_grid.add_effect(
-            attacker_pos,
-            target_pos,
-            Effect {
-                start_time: 0.0,
-                end_time: projectile_duration,
-                variant: EffectVariant::Line {
-                    thickness: 1.0,
-                    end_thickness: Some(4.0),
-                    color: RED,
-                    extend_gradually: true,
-                },
-            },
+        self.game_grid.animate_character_acting(
+            attacker,
+            if ranged { None } else { Some(target_pos) },
+            false,
+            projectile_duration.max(0.4),
         );
+
+        if ranged {
+            self.game_grid.add_effect(
+                attacker_pos,
+                target_pos,
+                Effect {
+                    start_time: 0.0,
+                    end_time: projectile_duration,
+                    variant: EffectVariant::Line {
+                        thickness: 1.0,
+                        end_thickness: Some(4.0),
+                        color: RED,
+                        extend_gradually: true,
+                    },
+                },
+            );
+        }
+
         self.game_grid.add_effect(
             attacker_pos,
             target_pos,

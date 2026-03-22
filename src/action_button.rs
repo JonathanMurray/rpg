@@ -244,14 +244,13 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if effect.improved_graze {
-        t.technical_description.push(
-            "|<value>-25%| damage on |<keyword>Graze| (instead of |<value>-50%|)".to_string(),
-        );
+        t.technical_description
+            .push("|<value>-25%| |<keyword>Graze| damage (instead of |<value>-50%|)".to_string());
         t.keywords.push(Keyword::Graze);
     }
     if effect.improved_crit {
         t.technical_description
-            .push("|<value>+75%| damage on |<keyword>Crit| (instead of |<value>+50%|)".to_string());
+            .push("|<value>+75%| |<keyword>Crit| damage (instead of |<value>+50%|)".to_string());
         t.keywords.push(Keyword::Crit);
     }
     if effect.roll_advantage > 0 {

@@ -217,6 +217,21 @@ pub const SWORD: Weapon = Weapon {
     weight: 2,
 };
 
+pub const ZERO_SWORD: Weapon = Weapon {
+    name: "Useless sword",
+    range: WeaponRange::Melee,
+    action_point_cost: 0,
+    damage: 0,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(SLASHING),
+    on_attacked_reaction: Some(PARRY),
+    on_true_hit: None,
+    sprite: Some(SpriteId::Sword),
+    icon: EquipmentIconId::Sword,
+    weight: 2,
+};
+
 const FEINT: AttackEnhancement = AttackEnhancement {
     name: "Feint",
     description: "Reduce the target's defense by 6 against the next attack",
@@ -643,7 +658,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "Increase |<keyword>Crit| bonus, and roll with |<keyword>Advantage|", // "Spend more time on the attack, aiming carefully",
+    description: "Roll with |<keyword>Advantage| and gain increased |<keyword>Crit| damage", // "Spend more time on the attack, aiming carefully",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
@@ -681,7 +696,7 @@ pub const EMPOWER: AttackEnhancement = AttackEnhancement {
 
 pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     name: "Crippling shot",
-    description: "Attempt to cripple the target",
+    description: "Attempt to |<keyword>Hinder| the target",
     icon: IconId::CripplingShot,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {
@@ -1272,7 +1287,8 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
-    description: "Restore target's health. Remove Bleeding and Burning.",
+    description:
+        "Restore target's |<heart>| health. Remove |<keyword>Bleeding| and |<keyword>Burning|.",
     icon: IconId::Heal,
     action_point_cost: 2,
     mana_cost: 1,

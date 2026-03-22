@@ -4,6 +4,7 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::PI,
     iter,
+    path::Display,
     rc::Rc,
 };
 
@@ -145,6 +146,7 @@ enum AnimationKind {
     Act {
         random_rotation: f32,
         with_shield: bool,
+        toward: Option<(i32, i32)>,
     },
     HealthLost {
         previous: u32,
@@ -498,6 +500,7 @@ impl GameGrid {
     pub fn animate_character_acting(
         &mut self,
         character_id: CharacterId,
+        toward: Option<Position>,
         with_shield: bool,
         duration: f32,
     ) {
@@ -507,6 +510,7 @@ impl GameGrid {
             duration,
             AnimationKind::Act {
                 random_rotation,
+                toward,
                 with_shield,
             },
         ));
@@ -1050,25 +1054,59 @@ impl GameGrid {
                 }
                 AnimationKind::Act {
                     random_rotation,
+                    toward,
                     with_shield,
                 } => {
-                    y -= self.cell_w * 0.2;
+                    // t goes from 0 to 1
+                    let t = 1.0 - animation.remaining_duration_ratio();
+
+                    if let Some(toward) = toward {
+                        let toward = Vec2::new(
+                            self.grid_x_to_screen(toward.0) - self.cell_w,
+                            self.grid_y_to_screen(toward.1) - self.cell_w,
+                        );
+                        let max_displacement = self.cell_w * 0.6;
+                        let displacement = if t < 0.1 {
+                            max_displacement * t / 0.1
+                        } else if t < 0.8 {
+                            max_displacement
+                        } else {
+                            max_displacement * (1.0 - (t - 0.8) / 0.2)
+                        };
+                        /*
+                        let displacement = max_displacement
+                            * (1.0 - animation.remaining_duration_ratio().powf(3.0));
+                             */
+                        //let displacement = max_displacement;
+                        let displaced = Vec2::new(x, y).move_towards(toward, displacement);
+                        x = displaced.x;
+                        y = displaced.y;
+                    } else {
+                        y -= self.cell_w * 0.2;
+                    }
+
                     params.rotation = random_rotation;
                     if with_shield {
                         shield_offset = (2.0, -5.0);
                     } else {
-                        weapon_rotation_modifier = PI * 0.3;
-                        if !character.is_facing_east.get() {
-                            weapon_rotation_modifier *= -1.0;
-                        }
-                        if character.has_equipped_ranged_weapon() {
-                            weapon_rotation_modifier *= -1.0;
+                        if t > 0.05 && t < 0.85 {
+                            let max_rot = PI * 0.3;
+                            weapon_rotation_modifier = if t < 0.2 {
+                                max_rot * (t - 0.05) / 0.15
+                            } else {
+                                max_rot * 1.0 - (t - 0.15) / 0.7
+                            };
+                            if !character.is_facing_east.get() {
+                                weapon_rotation_modifier *= -1.0;
+                            }
+                            if character.has_equipped_ranged_weapon() {
+                                weapon_rotation_modifier *= -1.0;
+                            }
                         }
                     }
                 }
                 AnimationKind::HealthLost { .. } => {
-                    show_sprite = ((remaining) / 0.1).floor() as i32 % 2 == 0;
-                    // This affects how the healthbar is drawn
+                    show_sprite = (remaining / 0.1).floor() as i32 % 2 == 0;
                 }
                 AnimationKind::SpeechBubble { .. } => {
                     // This is drawn separately, after all the characters
