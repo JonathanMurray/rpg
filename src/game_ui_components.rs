@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
+    collections::{btree_map, HashMap},
     rc::Rc,
 };
 
@@ -740,7 +740,10 @@ impl Drawable for PlayerCharacterPortrait {
             draw_triangle(v1, v2, v3, GOLD);
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
 
-            draw_rectangle_lines(x, button_y, w, button_h, 1.0, LIGHTGRAY);
+            let mut btn_rect = Rect::new(x, button_y, w, button_h);
+
+            let mut highlight_btn = false;
+
             if !has_taken_a_turn {
                 // Just after the char has ended their turn, and AP/stamina is being animated, the character is "active"
                 // even though we've already pressed "End turn".
@@ -748,18 +751,35 @@ impl Drawable for PlayerCharacterPortrait {
                 let end_turn_y = button_y + button_text_vert_pad;
                 self.end_turn_text.draw(end_turn_x, end_turn_y);
 
-                let can_end_turn_without_wasting_ap = self.character.action_points.current()
+                let can_end_turn_without_waste = self.character.action_points.current()
                     + self.character.end_of_turn_ap_gain()
                     <= self.character.action_points.max();
-                if self.may_show_end_turn_button.get() && can_end_turn_without_wasting_ap {
-                    let mut color = GOLD;
-                    color.a = oscillate(1.3, 0.2, 0.9);
-                    draw_rectangle_lines(x, button_y, w, button_h, 3.0, color);
+                let should_glow_btn =
+                    self.may_show_end_turn_button.get() && can_end_turn_without_waste;
+                if should_glow_btn {
+                    highlight_btn = true;
                 }
             }
-            if self.may_show_end_turn_button.get()
-                && Rect::new(x, button_y, w, 20.0).contains(mouse_position().into())
-            {
+
+            if highlight_btn {
+                let hor_pad = 6.0;
+                let vert_pad = 3.0;
+                btn_rect = Rect::new(
+                    btn_rect.x - hor_pad,
+                    btn_rect.y - vert_pad,
+                    btn_rect.w + hor_pad * 2.0,
+                    btn_rect.h + vert_pad * 2.0,
+                );
+                let mut color = GOLD;
+                color.a = oscillate(1.3, 0.2, 0.9);
+                draw_rectangle_lines(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 3.0, color);
+            } else {
+                draw_rectangle_lines(
+                    btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 1.0, LIGHTGRAY,
+                );
+            }
+
+            if self.may_show_end_turn_button.get() && btn_rect.contains(mouse_position().into()) {
                 if !self.is_end_turn_hovered.get() {
                     self.sound_player.play(SoundId::HoverButton);
                 }
