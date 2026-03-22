@@ -462,6 +462,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     clara.learn_ability(FIREBALL);
     clara.learn_ability_enhancement(FIREBALL_REACH);
     clara.learn_ability(SHACKLED_MIND);
+
     clara
 }
 
@@ -546,6 +547,9 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.learn_ability(INFLICT_WOUNDS);
     clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     //clara.learn_ability(MIND_BLAST);
+
+    // TODO
+    clara.learn_ability(HULDRA_HEAL);
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));

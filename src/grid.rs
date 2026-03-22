@@ -217,6 +217,7 @@ const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
     FriendlyEffect,
+    FriendlyHeal,
     Miss,
     ReactionExclamation,
     HostileEffect,
@@ -580,7 +581,7 @@ impl GameGrid {
                             area_pos,
                             Effect {
                                 start_time: casting_duration,
-                                end_time: duration,
+                                end_time: casting_duration + duration,
                                 variant: EffectVariant::Line {
                                     color: animation_color,
                                     thickness: 10.0,
@@ -988,6 +989,7 @@ impl GameGrid {
                 WHITE
                 //Color::new(0.8, 1.0, 0.8, 1.0)
             }
+            TextEffectStyle::FriendlyHeal => GREEN,
             TextEffectStyle::HostileEffect => {
                 font = &self.simple_font;
                 font_size = 16;

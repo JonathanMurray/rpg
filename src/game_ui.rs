@@ -2172,9 +2172,9 @@ impl UserInterface {
                 }
 
                 if !applied_effects.is_empty() {
-                    let mut s = String::new();
-                    let mut texture = None;
                     for apply_effect in applied_effects {
+                        let mut s = String::new();
+                        let mut texture = None;
                         if let ApplyEffect::Condition(condition) = *apply_effect {
                             texture = Some(
                                 self.status_textures
@@ -2184,17 +2184,18 @@ impl UserInterface {
                             );
                         }
                         s.push_str(&format!("{} ", apply_effect));
+                        effects.push((texture, s, TextEffectStyle::HostileEffect, 2.0));
                     }
-                    effects.push((texture, s, TextEffectStyle::HostileEffect, 2.0));
                 };
             }
             AbilityTargetOutcome::Resisted => {
                 effects.push((None, "Resist".to_string(), TextEffectStyle::Miss, 1.0))
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
-                let mut s = String::new();
-                let mut texture = None;
+                dbg!(applied_effects);
                 for apply_effect in applied_effects {
+                    let mut s = String::new();
+                    let mut texture = None;
                     if let ApplyEffect::Condition(condition) = *apply_effect {
                         texture = Some(
                             self.status_textures
@@ -2204,24 +2205,30 @@ impl UserInterface {
                         );
                     }
                     s.push_str(&format!("{} ", apply_effect));
+                    let style = if matches!(apply_effect, ApplyEffect::GainHealth(..)) {
+                        TextEffectStyle::FriendlyHeal
+                    } else {
+                        TextEffectStyle::FriendlyEffect
+                    };
+                    effects.push((texture, s, style, 2.0))
                 }
-
-                effects.push((texture, s, TextEffectStyle::FriendlyEffect, 2.0))
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
                 // The text effect is handled by the AttackedEvent; we shouldn't do anything additional here.
             }
         };
 
+        let mut effect_start_time = start_time;
         for (texture, target_text, goodness, duration) in effects {
             self.game_grid.add_text_effect(
                 target_pos,
-                start_time,
+                effect_start_time,
                 duration,
                 texture,
                 target_text,
                 goodness,
             );
+            effect_start_time += 0.35;
         }
     }
 

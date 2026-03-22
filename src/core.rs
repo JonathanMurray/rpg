@@ -3533,8 +3533,8 @@ impl Display for AttackHitEffect {
 }
 
 fn apply_protected_bonus_against_attack(dmg_str: &mut String, dmg_calculation: &mut i32) {
-    dmg_str.push_str(" -30% (Protected)");
-    *dmg_calculation -= (*dmg_calculation as f32 * 0.3).ceil() as i32;
+    dmg_str.push_str(" max 1 (Protected)");
+    *dmg_calculation = *dmg_calculation.min(&mut 1);
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash, Eq)]
@@ -3611,7 +3611,7 @@ impl Condition {
             Inspired => "|<value>+3| |<shield>|<stat>Will|, |<value>+3| |<dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all |<shield>|, |<value>-50%| armor.",
             Hindered => "|<value>-50%| movement.",
-            Protected => "Takes |<value>-30%| damage from the next attack.",
+            Protected => "Takes no more than |<value>1| damage from the next attack.",
             //Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
             Bleeding => "End of turn: lose |<value>x| health. Halved every turn.",
             Burning => "End of turn: deals |<value>x| damage. 50% spreads to adjacent.",
