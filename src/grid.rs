@@ -13,6 +13,7 @@ use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::Vec2,
+    rand::rand,
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
@@ -41,9 +42,10 @@ use crate::{
         draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable, Style,
     },
     core::{
-        target_within_range_squared, within_range_squared, AbilityId, AbilityReach, AbilityTarget,
-        ActionReach, ActionTarget, AreaEffect, AreaShape, AttackAction, BaseAction, Character,
-        Goodness, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_STAMINA,
+        distance_between, target_within_range_squared, within_range_squared, Ability, AbilityId,
+        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaEffect, AreaShape,
+        AttackAction, BaseAction, Character, Goodness, MovementType, Position, TargetPrediction,
+        MOVE_DISTANCE_PER_STAMINA,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -112,12 +114,12 @@ struct CharacterAnimation {
     character_id: CharacterId,
     duration: f32,
     remaining_duration: f32,
-    kind: AnimationKind,
+    kind: AnimationDetails,
     custom_toggle: Cell<bool>,
 }
 
 impl CharacterAnimation {
-    fn new(character_id: CharacterId, duration: f32, kind: AnimationKind) -> CharacterAnimation {
+    fn new(character_id: CharacterId, duration: f32, kind: AnimationDetails) -> CharacterAnimation {
         Self {
             character_id,
             duration,
@@ -133,7 +135,7 @@ impl CharacterAnimation {
 }
 
 #[derive(Debug, Copy, Clone)]
-enum AnimationKind {
+enum AnimationDetails {
     Motion {
         from: Position,
         to: Position,
@@ -143,10 +145,18 @@ enum AnimationKind {
         random_time_offset: f32,
     },
     Death,
-    Act {
-        random_rotation: f32,
+    ReactingToAttacked {
+        toward: Position,
         with_shield: bool,
-        toward: Option<(i32, i32)>,
+    },
+    CastingSpell {},
+    MeleeAttack {
+        toward: Position,
+        with_shield: bool,
+    },
+    Spinning,
+    RangedAttack {
+        toward: Position,
     },
     HealthLost {
         previous: u32,
@@ -481,7 +491,7 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::Motion {
+            AnimationDetails::Motion {
                 from,
                 to,
                 movement_type,
@@ -493,27 +503,265 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::Death,
+            AnimationDetails::Death,
         ));
     }
 
-    pub fn animate_character_acting(
+    pub fn animate_character_initiating_ability(
         &mut self,
-        character_id: CharacterId,
-        toward: Option<Position>,
-        with_shield: bool,
+        actor: CharacterId,
+        target: Option<CharacterId>,
+        ability: Ability,
+        area_at: Option<(AreaShape, Position)>,
+    ) -> f32 {
+        let actor = self.characters.get(&actor).unwrap();
+
+        let target_pos = target
+            .map(|char_id| self.characters.get(&char_id).unwrap().pos())
+            .or(area_at.map(|(_shape, pos)| pos));
+
+        if ability.id == AbilityId::SweepAttack {
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                0.4,
+                AnimationDetails::Spinning,
+            ));
+            // The ability should resolve in the middle of the character's animation
+            0.2
+        } else if ability.id == AbilityId::ShieldBash {
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                0.4,
+                AnimationDetails::MeleeAttack {
+                    toward: target_pos.unwrap(),
+                    with_shield: true,
+                },
+            ));
+            // The ability should resolve in the middle of the character's animation, before they retract from the target
+            0.1
+        } else {
+            let casting_duration = 0.4;
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                casting_duration,
+                AnimationDetails::CastingSpell {},
+            ));
+
+            let animation_color = ability.animation_color;
+            let caster_pos = actor.pos();
+            let mut duration = 0.0;
+            if let Some(target) = &target {
+                let target_pos = target_pos.unwrap();
+
+                duration = 0.04 * distance_between(caster_pos, target_pos);
+
+                self.add_circle_projectile_effect(
+                    casting_duration,
+                    duration,
+                    animation_color,
+                    caster_pos,
+                    target_pos,
+                );
+            } else if let Some((shape, area_pos)) = area_at {
+                duration = 0.05 * distance_between(caster_pos, area_pos);
+                match shape {
+                    AreaShape::Circle(range) => {
+                        self.add_circle_projectile_effect(
+                            casting_duration,
+                            duration,
+                            animation_color,
+                            caster_pos,
+                            area_pos,
+                        );
+                    }
+                    AreaShape::Line => {
+                        self.add_effect(
+                            caster_pos,
+                            area_pos,
+                            Effect {
+                                start_time: casting_duration,
+                                end_time: duration,
+                                variant: EffectVariant::Line {
+                                    color: animation_color,
+                                    thickness: 10.0,
+                                    end_thickness: None,
+                                    extend_gradually: true,
+                                },
+                            },
+                        );
+                    }
+                }
+            }
+
+            casting_duration + duration
+        }
+    }
+
+    fn add_circle_projectile_effect(
+        &mut self,
+        start_time: f32,
         duration: f32,
+        animation_color: Color,
+        caster_pos: (i32, i32),
+        target_pos: (i32, i32),
     ) {
-        let random_rotation = random_range(-0.1..0.1);
-        self.character_animations.push(CharacterAnimation::new(
-            character_id,
-            duration,
-            AnimationKind::Act {
-                random_rotation,
-                toward,
-                with_shield,
+        self.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time,
+                end_time: start_time + duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 10.0,
+                        end_radius: None,
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
             },
-        ));
+        );
+
+        self.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time: start_time + 0.025,
+                end_time: start_time + duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 8.0,
+                        end_radius: None,
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
+            },
+        );
+        self.add_effect(
+            caster_pos,
+            target_pos,
+            Effect {
+                start_time: start_time + 0.05,
+                end_time: start_time + duration,
+                variant: EffectVariant::At(
+                    EffectPosition::Projectile,
+                    EffectGraphics::Circle {
+                        radius: 6.0,
+                        end_radius: None,
+                        fill: Some(animation_color),
+                        stroke: None,
+                    },
+                ),
+            },
+        );
+    }
+
+    pub fn animate_character_attacking(
+        &mut self,
+        attacker: CharacterId,
+        target: CharacterId,
+        ranged: bool,
+        target_reaction: Option<bool>,
+    ) -> f32 {
+        let attacker_pos = self.characters.get(&attacker).unwrap().pos();
+        let target_pos = self.characters.get(&target).unwrap().pos();
+        if ranged {
+            let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
+            self.character_animations.push(CharacterAnimation::new(
+                attacker,
+                1.0,
+                AnimationDetails::RangedAttack { toward: target_pos },
+            ));
+
+            if let Some(with_shield) = target_reaction {
+                self.character_animations.push(CharacterAnimation::new(
+                    target,
+                    // keep the animation going slightly after the projectil hits
+                    projectile_duration + 0.1,
+                    AnimationDetails::ReactingToAttacked {
+                        toward: attacker_pos,
+                        with_shield,
+                    },
+                ));
+            }
+
+            self.add_effect(
+                attacker_pos,
+                target_pos,
+                Effect {
+                    start_time: 0.0,
+                    end_time: projectile_duration,
+                    variant: EffectVariant::Line {
+                        thickness: 1.0,
+                        end_thickness: Some(4.0),
+                        color: RED,
+                        extend_gradually: true,
+                    },
+                },
+            );
+
+            self.add_effect(
+                attacker_pos,
+                target_pos,
+                Effect {
+                    start_time: projectile_duration,
+                    end_time: projectile_duration + 0.2,
+                    variant: EffectVariant::At(
+                        EffectPosition::Destination,
+                        EffectGraphics::Circle {
+                            radius: 25.0,
+                            end_radius: Some(5.0),
+                            fill: None,
+                            stroke: Some((MAGENTA, 2.0)),
+                        },
+                    ),
+                },
+            );
+            projectile_duration
+        } else {
+            let attacker_pos = self.characters.get(&attacker).unwrap().pos();
+            let duration = 0.4;
+            self.character_animations.push(CharacterAnimation::new(
+                attacker,
+                duration,
+                AnimationDetails::MeleeAttack {
+                    toward: target_pos,
+                    with_shield: false,
+                },
+            ));
+            if let Some(with_shield) = target_reaction {
+                self.character_animations.push(CharacterAnimation::new(
+                    target,
+                    duration + 0.1,
+                    AnimationDetails::ReactingToAttacked {
+                        toward: attacker_pos,
+                        with_shield,
+                    },
+                ));
+            }
+
+            self.add_effect(
+                attacker_pos,
+                target_pos,
+                Effect {
+                    start_time: 0.1,
+                    end_time: 0.4,
+                    variant: EffectVariant::At(
+                        EffectPosition::Destination,
+                        EffectGraphics::Circle {
+                            radius: 25.0,
+                            end_radius: Some(5.0),
+                            fill: None,
+                            stroke: Some((MAGENTA, 2.0)),
+                        },
+                    ),
+                },
+            );
+            0.1
+        }
     }
 
     pub fn animate_character_health_change(
@@ -525,7 +773,7 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::HealthLost {
+            AnimationDetails::HealthLost {
                 previous: previous_health,
             },
         ));
@@ -537,7 +785,7 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::Shake { random_time_offset },
+            AnimationDetails::Shake { random_time_offset },
         ));
     }
 
@@ -566,7 +814,7 @@ impl GameGrid {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             duration,
-            AnimationKind::SpeechBubble { text },
+            AnimationDetails::SpeechBubble { text },
         ));
     }
 
@@ -834,7 +1082,7 @@ impl GameGrid {
 
     fn character_screen_pos(&self, character: &Character) -> (f32, f32) {
         for animation in &self.character_animations {
-            if let AnimationKind::Motion { from, to, .. } = animation.kind {
+            if let AnimationDetails::Motion { from, to, .. } = animation.kind {
                 if animation.character_id == character.id() {
                     let from = self.grid_pos_to_screen(from);
                     let to = self.grid_pos_to_screen(to);
@@ -980,7 +1228,7 @@ impl GameGrid {
         let (mut x, mut y) = self.character_screen_pos(character);
         x -= self.cell_w;
         y -= self.cell_w;
-        let (shadow_x, mut shadow_y) = (x, y);
+        let (mut shadow_x, mut shadow_y) = (x, y);
 
         let mut dying = false;
 
@@ -997,7 +1245,7 @@ impl GameGrid {
         {
             let remaining = animation.remaining_duration;
             match animation.kind {
-                AnimationKind::Motion {
+                AnimationDetails::Motion {
                     movement_type,
                     from,
                     to,
@@ -1022,74 +1270,135 @@ impl GameGrid {
                         {
                             y += 3.0;
                         }
-                        //params.rotation = (cycle_time - 0.5) * 0.25 ;
-                        //dbg!(cycle_time);
-                        //dbg!(params.rotation);
-                        /*
-                        if cycle_time < 0.25 {
-                            y += 3.0;
-                        } else if cycle_time < 0.5 {
-                            if animation.custom_toggle.get() {
-                                animation.custom_toggle.set(false);
-                            }
-                            params.rotation = -0.07;
-                        } else if cycle_time < 0.75 {
-                            y += 3.0;
-                        } else {
-                            params.rotation = 0.07;
-                        }
-                         */
                     }
                 }
-                AnimationKind::Shake { random_time_offset } => {
+                AnimationDetails::Shake { random_time_offset } => {
                     if (((remaining + random_time_offset) / 0.1).floor()) as i32 % 2 == 0 {
                         x -= 3.0;
                     } else {
                         x += 3.0;
                     }
                 }
-                AnimationKind::Death => {
+                AnimationDetails::Death => {
                     params.rotation = PI * 0.5;
                     dying = true;
                 }
-                AnimationKind::Act {
-                    random_rotation,
+                AnimationDetails::RangedAttack { toward } => {
+                    // t goes from 0 to 1
+                    let t = 1.0 - animation.remaining_duration_ratio();
+
+                    let toward = Vec2::new(
+                        self.grid_x_to_screen(toward.0) - self.cell_w,
+                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                    );
+
+                    if t < 0.6 {
+                        let max_displacement = -self.cell_w * 0.5;
+                        let displacement = if t < 0.1 {
+                            max_displacement * t / 0.1
+                        } else if t < 0.5 {
+                            max_displacement
+                        } else {
+                            (t - 0.5) * t / 0.1
+                        };
+                        let displaced = Vec2::new(x, y).move_towards(toward, displacement);
+                        x = displaced.x;
+                        y = displaced.y;
+                        // The attacker is actually moving (not jumping), so the shadow should follow
+                        shadow_x = x;
+                        shadow_y = y;
+
+                        params.rotation = if character.is_facing_east.get() {
+                            -0.1
+                        } else {
+                            0.1
+                        };
+                    }
+
+                    if t > 0.05 && t < 0.6 {
+                        let max_rot = PI * 0.2;
+                        weapon_rotation_modifier = if t < 0.1 {
+                            max_rot * (t - 0.05) / 0.05
+                        } else if t < 0.5 {
+                            max_rot
+                        } else {
+                            max_rot * 1.0 - (t - 0.5) / 0.1
+                        };
+                        if !character.is_facing_east.get() {
+                            weapon_rotation_modifier *= -1.0;
+                        }
+                        if character.has_equipped_ranged_weapon() {
+                            weapon_rotation_modifier *= -1.0;
+                        }
+                    }
+                }
+                AnimationDetails::CastingSpell {} => {
+                    // t goes from 0 to 1
+                    let t = 1.0 - animation.remaining_duration_ratio();
+
+                    let max_levitation = self.cell_w * 0.2;
+
+                    y -= max_levitation * t;
+
+                    if ((remaining / 0.1).floor()) as i32 % 2 == 0 {
+                        x += random_range(-3.0..3.0);
+                        y += random_range(-3.0..3.0);
+                    }
+                }
+
+                AnimationDetails::Spinning => {
+                    // t goes from 0 to 1
+                    let t = 1.0 - animation.remaining_duration_ratio();
+                    if t % 0.4 < 0.2 {
+                        params.flip_x = !params.flip_x;
+                    }
+                    if ((remaining / 0.1).floor()) as i32 % 2 == 0 {
+                        x += random_range(-3.0..3.0);
+                        y += random_range(-3.0..3.0);
+                    }
+                }
+
+                AnimationDetails::MeleeAttack {
                     toward,
                     with_shield,
                 } => {
                     // t goes from 0 to 1
                     let t = 1.0 - animation.remaining_duration_ratio();
 
-                    if let Some(toward) = toward {
-                        let toward = Vec2::new(
-                            self.grid_x_to_screen(toward.0) - self.cell_w,
-                            self.grid_y_to_screen(toward.1) - self.cell_w,
-                        );
-                        let max_displacement = self.cell_w * 0.6;
-                        let displacement = if t < 0.1 {
-                            max_displacement * t / 0.1
-                        } else if t < 0.8 {
-                            max_displacement
-                        } else {
-                            max_displacement * (1.0 - (t - 0.8) / 0.2)
-                        };
-                        /*
-                        let displacement = max_displacement
-                            * (1.0 - animation.remaining_duration_ratio().powf(3.0));
-                             */
-                        //let displacement = max_displacement;
-                        let displaced = Vec2::new(x, y).move_towards(toward, displacement);
-                        x = displaced.x;
-                        y = displaced.y;
+                    let toward = Vec2::new(
+                        self.grid_x_to_screen(toward.0) - self.cell_w,
+                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                    );
+                    let max_displacement = self.cell_w * 0.6;
+                    let displacement = if t < 0.1 {
+                        max_displacement * t / 0.1
+                    } else if t < 0.8 {
+                        max_displacement
                     } else {
-                        y -= self.cell_w * 0.2;
-                    }
+                        max_displacement * (1.0 - (t - 0.8) / 0.2)
+                    };
+                    let displaced = Vec2::new(x, y).move_towards(toward, displacement);
+                    x = displaced.x;
+                    y = displaced.y;
+                    // The attacker is actually moving (not jumping), so the shadow should follow
+                    shadow_x = x;
+                    shadow_y = y;
 
-                    params.rotation = random_rotation;
-                    if with_shield {
-                        shield_offset = (2.0, -5.0);
+                    params.rotation = if character.is_facing_east.get() {
+                        0.1
                     } else {
-                        if t > 0.05 && t < 0.85 {
+                        -0.1
+                    };
+
+                    if t > 0.05 && t < 0.85 {
+                        if with_shield {
+                            let x_mult = if character.is_facing_east.get() {
+                                1.0
+                            } else {
+                                -1.0
+                            };
+                            shield_offset = (self.cell_w * 0.2 * x_mult, -self.cell_w * 0.4);
+                        } else {
                             let max_rot = PI * 0.3;
                             weapon_rotation_modifier = if t < 0.2 {
                                 max_rot * (t - 0.05) / 0.15
@@ -1105,10 +1414,44 @@ impl GameGrid {
                         }
                     }
                 }
-                AnimationKind::HealthLost { .. } => {
+
+                AnimationDetails::ReactingToAttacked {
+                    toward,
+                    with_shield,
+                } => {
+                    let toward = Vec2::new(
+                        self.grid_x_to_screen(toward.0) - self.cell_w,
+                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                    );
+                    let displaced = Vec2::new(x, y).move_towards(toward, self.cell_w * 0.1);
+                    x = displaced.x;
+                    y = displaced.y;
+
+                    // Lean slightly backwards
+                    params.rotation = if character.is_facing_east.get() {
+                        -0.05
+                    } else {
+                        0.05
+                    };
+
+                    if with_shield {
+                        let x_mult = if character.is_facing_east.get() {
+                            1.0
+                        } else {
+                            -1.0
+                        };
+                        shield_offset = (self.cell_w * 0.2 * x_mult, -self.cell_w * 0.4);
+                    } else {
+                        weapon_rotation_modifier = PI * 0.2;
+                        if !character.is_facing_east.get() {
+                            weapon_rotation_modifier *= -1.0;
+                        }
+                    }
+                }
+                AnimationDetails::HealthLost { .. } => {
                     show_sprite = (remaining / 0.1).floor() as i32 % 2 == 0;
                 }
-                AnimationKind::SpeechBubble { .. } => {
+                AnimationDetails::SpeechBubble { .. } => {
                     // This is drawn separately, after all the characters
                 }
             }
@@ -2160,7 +2503,7 @@ impl GameGrid {
         }
 
         for char_animation in &self.character_animations {
-            if let AnimationKind::SpeechBubble { text } = char_animation.kind {
+            if let AnimationDetails::SpeechBubble { text } = char_animation.kind {
                 self.draw_speech_bubble(text, char_animation.character_id);
             }
         }
@@ -2744,7 +3087,7 @@ impl GameGrid {
         }
 
         for animation in &self.character_animations {
-            if let AnimationKind::HealthLost { previous } = animation.kind {
+            if let AnimationDetails::HealthLost { previous } = animation.kind {
                 if animation.character_id == character.id() {
                     let mut lost_health_w = (health_w)
                         * ((previous as f32 - character.health.current() as f32)

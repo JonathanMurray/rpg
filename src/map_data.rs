@@ -14,7 +14,7 @@ use crate::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         CHEAT_BOW, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
-        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD, ZERO_SWORD,
+        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD, ZERO_BOW, ZERO_SWORD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -409,6 +409,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         (1, 10),
     );
     alice.set_weapon(HandType::MainHand, BOW);
+    // TODO:
+    alice.set_weapon(HandType::MainHand, ZERO_BOW);
 
     // TODO
     /*
@@ -437,8 +439,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
     bob.learn_ability(KILL);
-    bob.set_weapon(HandType::MainHand, ZERO_SWORD);
-    //bob.learn_ability(SWEEP_ATTACK);
+    //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
+    bob.learn_ability(SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];
 

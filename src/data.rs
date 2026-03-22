@@ -232,6 +232,21 @@ pub const ZERO_SWORD: Weapon = Weapon {
     weight: 2,
 };
 
+pub const ZERO_BOW: Weapon = Weapon {
+    name: "Useless bow",
+    range: WeaponRange::Ranged(15.5),
+    action_point_cost: 0,
+    damage: 1,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Agility,
+    attack_enhancement: Some(CAREFUL_AIM),
+    on_attacked_reaction: None,
+    on_true_hit: None,
+    sprite: Some(SpriteId::Bow),
+    icon: EquipmentIconId::Bow,
+    weight: 2,
+};
+
 const FEINT: AttackEnhancement = AttackEnhancement {
     name: "Feint",
     description: "Reduce the target's defense by 6 against the next attack",
@@ -494,17 +509,6 @@ pub const SHIELD_BASH: Ability = Ability {
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
-        /*
-        effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect {
-            override_damage: Some(3),
-            on_hit: Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Dazed,
-                duration_rounds: Some(1),
-                stacks: None,
-            })),
-            ..AbilityAttackEffect::default()
-        }),
-         */
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
             damage: Some(AbilityDamage::AtLeast(3)),
@@ -1716,7 +1720,7 @@ pub const KILL: Ability = Ability {
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
-                damage: Some(AbilityDamage::Static(99)),
+                damage: Some(AbilityDamage::Static(0)),
                 on_hit: None,
             })),
         }),

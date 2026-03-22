@@ -471,6 +471,13 @@ impl CoreGame {
                                 )
                                 .await;
 
+                                self.ui_handle_event(GameEvent::AttackWasInitiated {
+                                    actor: reactor.id(),
+                                    target: attacker.id(),
+                                    target_reaction: None,
+                                })
+                                .await;
+
                                 reactor.action_points.spend(1);
 
                                 let event = Self::perform_attack(
@@ -543,13 +550,16 @@ impl CoreGame {
                         maybe_ally_reaction
                     };
 
-                    if let Some((reactor, reaction)) = reaction {
-                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked {
-                            reactor,
-                            with_shield: reaction.used_hand == Some(HandType::OffHand),
-                        })
-                        .await;
-                    }
+                    let defender_facing = defender.is_facing_east.get();
+                    let target_reaction = if let Some((reactor, reaction)) = reaction {
+                        defender.set_facing_toward(attacker.pos());
+                        let with_shield = reaction.used_hand == Some(HandType::OffHand);
+                        self.ui_handle_event(GameEvent::CharacterReactedToAttacked { reactor })
+                            .await;
+                        Some(with_shield)
+                    } else {
+                        None
+                    };
 
                     let enhancements: Vec<(&str, AttackEnhancementEffect)> =
                         enhancements.iter().map(|e| (e.name, e.effect)).collect();
@@ -559,6 +569,7 @@ impl CoreGame {
                     self.ui_handle_event(GameEvent::AttackWasInitiated {
                         actor: self.active_character_id,
                         target,
+                        target_reaction,
                     })
                     .await;
 
@@ -574,6 +585,9 @@ impl CoreGame {
                     );
                     self.ui_handle_event(GameEvent::Attacked(event.clone()))
                         .await;
+
+                    // in case defender turned around to react, restore their original direction
+                    defender.is_facing_east.set(defender_facing);
 
                     let outcome = ActionOutcome::AttackHit {
                         victim_id: event.target,
@@ -763,6 +777,7 @@ impl CoreGame {
                             self.ui_handle_event(GameEvent::AttackWasInitiated {
                                 actor: reactor.id(),
                                 target: character.id(),
+                                target_reaction: None,
                             })
                             .await;
 
@@ -2936,7 +2951,6 @@ pub enum GameEvent {
     },
     CharacterReactedToAttacked {
         reactor: CharacterId,
-        with_shield: bool,
     },
     CharacterReactedToHit {
         main_line: String,
@@ -2950,6 +2964,7 @@ pub enum GameEvent {
     AttackWasInitiated {
         actor: CharacterId,
         target: CharacterId,
+        target_reaction: Option<bool>,
     },
     Attacked(AttackedEvent),
     AbilityWasInitiated {

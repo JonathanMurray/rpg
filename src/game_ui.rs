@@ -1463,11 +1463,7 @@ impl UserInterface {
             GameEvent::LogLine(line) => {
                 self.log.add(line);
             }
-            GameEvent::CharacterReactedToAttacked {
-                reactor,
-                with_shield,
-            } => {
-                let attacker_pos = self.active_character().pos();
+            GameEvent::CharacterReactedToAttacked { reactor } => {
                 let reactor_pos = self.characters.get(reactor).pos();
                 self.game_grid.add_text_effect(
                     reactor_pos,
@@ -1477,28 +1473,22 @@ impl UserInterface {
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
-                self.game_grid.animate_character_acting(
-                    reactor,
-                    Some(attacker_pos),
-                    with_shield,
-                    0.8,
-                );
-
-                self.animation_stopwatch.set_to_at_least(0.4);
+                self.animation_stopwatch.set_to_at_least(0.5);
             }
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
                 self.log.add("Opportunity attack:".to_string());
+                let duration = 0.5;
                 self.game_grid.add_text_effect(
                     reactor.pos(),
                     0.0,
-                    0.5,
+                    duration,
                     None,
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
 
-                self.animation_stopwatch.set_to_at_least(0.4);
+                self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::CharacterReactedToHit {
                 main_line,
@@ -1545,8 +1535,12 @@ impl UserInterface {
                 }
                 self.animation_stopwatch.set_to_at_least(0.5);
             }
-            GameEvent::AttackWasInitiated { actor, target } => {
-                self.handle_attack_initiated(actor, target);
+            GameEvent::AttackWasInitiated {
+                actor,
+                target,
+                target_reaction,
+            } => {
+                self.handle_attack_initiated(actor, target, target_reaction);
             }
             GameEvent::Attacked(event) => {
                 self.handle_attacked_event(&event);
@@ -1561,62 +1555,11 @@ impl UserInterface {
                     self.sound_player.play(sound_id);
                 }
 
-                let with_shield = ability.id == AbilityId::ShieldBash;
-                let target_pos = target
-                    .map(|char_id| self.characters.get(char_id).pos())
-                    .or(area_at.map(|(_shape, pos)| pos));
-                self.game_grid
-                    .animate_character_acting(actor, target_pos, with_shield, 0.3);
+                let duration = self
+                    .game_grid
+                    .animate_character_initiating_ability(actor, target, ability, area_at);
 
-                let duration;
-
-                let animation_color = ability.animation_color;
-                let caster_pos = self.characters.get(actor).pos();
-                if let Some(target) = &target {
-                    let target_pos = self.characters.get(*target).pos();
-
-                    duration = 0.04 * distance_between(caster_pos, target_pos);
-
-                    self.add_circle_projectile_effect(
-                        0.1,
-                        duration,
-                        animation_color,
-                        caster_pos,
-                        target_pos,
-                    );
-                } else if let Some((shape, area_pos)) = area_at {
-                    duration = 0.05 * distance_between(caster_pos, area_pos);
-                    match shape {
-                        AreaShape::Circle(range) => {
-                            self.add_circle_projectile_effect(
-                                0.0,
-                                duration,
-                                animation_color,
-                                caster_pos,
-                                area_pos,
-                            );
-                        }
-                        AreaShape::Line => {
-                            self.game_grid.add_effect(
-                                caster_pos,
-                                area_pos,
-                                Effect {
-                                    start_time: 0.0,
-                                    end_time: duration,
-                                    variant: EffectVariant::Line {
-                                        color: animation_color,
-                                        thickness: 10.0,
-                                        end_thickness: None,
-                                        extend_gradually: true,
-                                    },
-                                },
-                            );
-                        }
-                    }
-                } else {
-                    duration = 0.3;
-                }
-                self.animation_stopwatch.set_to_at_least(duration + 0.1);
+                self.animation_stopwatch.set_to_at_least(duration);
             }
             GameEvent::AbilityResolved(AbilityResolvedEvent {
                 actor,
@@ -1816,19 +1759,7 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
-            GameEvent::CharacterReceivedKnockback { character } => {
-                /*
-                let char = self.characters.get(character);
-                self.game_grid.add_text_effect(
-                    char.pos(),
-                    0.0,
-                    1.5,
-                    None,
-                    "Knockback",
-                    TextEffectStyle::HostileHit,
-                );
-                 */
-            }
+            GameEvent::CharacterReceivedKnockback { character } => {}
             GameEvent::CharacterGainedAP { character } => {
                 let char = self.characters.get(character);
                 self.game_grid.add_text_effect(
@@ -2060,61 +1991,22 @@ impl UserInterface {
         }
     }
 
-    fn handle_attack_initiated(&mut self, attacker: CharacterId, target: CharacterId) {
+    fn handle_attack_initiated(
+        &mut self,
+        attacker: CharacterId,
+        target: CharacterId,
+        target_reaction: Option<bool>,
+    ) {
         let ranged = self.characters.get(attacker).has_equipped_ranged_weapon();
         if ranged {
             self.sound_player.play(SoundId::ShootArrow);
         }
 
-        let attacker_pos = self.characters.get(attacker).pos();
-        let target_pos = self.characters.get(target).pos();
+        let duration =
+            self.game_grid
+                .animate_character_attacking(attacker, target, ranged, target_reaction);
 
-        let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
-
-        self.game_grid.animate_character_acting(
-            attacker,
-            if ranged { None } else { Some(target_pos) },
-            false,
-            projectile_duration.max(0.4),
-        );
-
-        if ranged {
-            self.game_grid.add_effect(
-                attacker_pos,
-                target_pos,
-                Effect {
-                    start_time: 0.0,
-                    end_time: projectile_duration,
-                    variant: EffectVariant::Line {
-                        thickness: 1.0,
-                        end_thickness: Some(4.0),
-                        color: RED,
-                        extend_gradually: true,
-                    },
-                },
-            );
-        }
-
-        self.game_grid.add_effect(
-            attacker_pos,
-            target_pos,
-            Effect {
-                start_time: projectile_duration,
-                end_time: projectile_duration + 0.2,
-                variant: EffectVariant::At(
-                    EffectPosition::Destination,
-                    EffectGraphics::Circle {
-                        radius: 25.0,
-                        end_radius: Some(5.0),
-                        fill: None,
-                        stroke: Some((MAGENTA, 2.0)),
-                    },
-                ),
-            },
-        );
-
-        self.animation_stopwatch
-            .set_to_at_least(projectile_duration);
+        self.animation_stopwatch.set_to_at_least(duration);
     }
 
     fn handle_attacked_event(&mut self, event: &AttackedEvent) {
