@@ -817,7 +817,9 @@ impl EquipmentStatsTable {
             "Physical armor",
             vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
         ));
-        cells.push(format!("{}", character.protection_from_armor()).into());
+        // Use the "base" value; don't include buffs, since we don't take care to rebuild
+        // this when buffs change, so it just gets confusing.
+        cells.push(format!("{}", character.base_armor()).into());
 
         cells.push(TableCell::from("Weight").with_tooltip(
             "Carrying capacity",

@@ -5848,7 +5848,7 @@ impl Character {
         res
     }
 
-    pub fn protection_from_armor(&self) -> u32 {
+    pub fn base_armor(&self) -> u32 {
         let mut protection = 0;
         if let Some(armor) = self.armor_piece.get() {
             protection += armor.protection;
@@ -5860,12 +5860,28 @@ impl Character {
         if self.knows_passive(PassiveSkill::HardenedSkin) {
             protection += 1;
         }
+        protection
+    }
+
+    pub fn protection_from_armor(&self) -> u32 {
+        let mut protection = self.base_armor();
 
         if self.has_condition(&Condition::Exposed) {
             protection /= 2;
         }
 
         protection
+    }
+
+    pub fn armor_str(&self) -> String {
+        let protection = self.base_armor();
+
+        if self.has_condition(&Condition::Exposed) {
+            let reduction = protection - protection / 2;
+            format!("{} - {} (|<keyword>Exposed|)", protection, reduction)
+        } else {
+            protection.to_string()
+        }
     }
 
     pub fn base_attack_modifier(&self, hand: HandType) -> u32 {

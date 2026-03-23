@@ -106,7 +106,7 @@ impl TargetUi {
             name_text_line.set_min_height(20.0);
 
             let armor_text_line = TextLine::new(
-                format!("Armor: {}", char.protection_from_armor()),
+                format!("Armor: {}", char.armor_str()),
                 22,
                 WHITE,
                 Some(self.simple_font.clone()),
