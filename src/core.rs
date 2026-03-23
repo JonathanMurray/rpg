@@ -1797,6 +1797,8 @@ impl CoreGame {
             None => HitType::Regular,
         };
 
+        let mut actual_health_lost = 0;
+
         let damage = if let Some(ability_damage) = spell_enemy_effect.damage {
             let mut dmg_calculation;
             let mut increased_by_good_roll = true;
@@ -1848,7 +1850,7 @@ impl CoreGame {
             let damage = dmg_calculation.max(0) as u32;
 
             if let Some(game) = real_game {
-                game.perform_losing_health(target, damage);
+                actual_health_lost += game.perform_losing_health(target, damage);
                 dmg_str.push_str(&format!(" = |<value>{damage}|"));
                 detail_lines.push(dmg_str);
             }
@@ -1922,6 +1924,7 @@ impl CoreGame {
                         applied_effects.push(applied);
                     }
                     damage_from_effects += damage;
+                    actual_health_lost += damage;
                     detail_lines.push(log_line);
                 }
             }
@@ -1941,6 +1944,7 @@ impl CoreGame {
                         applied_effects.push(applied);
                     }
                     damage_from_effects += damage;
+                    actual_health_lost += damage;
                     detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
                 }
             }
@@ -1973,6 +1977,7 @@ impl CoreGame {
             damage,
             hit_type,
             applied_effects,
+            actual_health_lost,
         }
     }
 
@@ -3155,6 +3160,7 @@ pub enum AbilityTargetOutcome {
         damage: Option<u32>,
         applied_effects: Vec<ApplyEffect>,
         hit_type: HitType,
+        actual_health_lost: u32,
     },
     AttackedEnemy(AttackedEvent),
     Resisted,

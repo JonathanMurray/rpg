@@ -63,7 +63,7 @@ use crate::{
         character_sprite_height, draw_terrain, draw_tiny_font, measure_tiny_font, EffectId,
         SpriteId, StatusId, TerrainId, TinyFontColor, TINY_FONT_GREEN_TEXTURE,
     },
-    util::{line_visitor, rgb, COL_RED},
+    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED},
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -3044,12 +3044,14 @@ impl GameGrid {
             );
             let potential_damage_w =
                 (health_w) * (effective_max - effective_min) as f32 / character.health.max() as f32;
+            let mut potential_color = ORANGE;
+            potential_color.a = oscillate(1.3, 0.5, 1.0);
             draw_rectangle(
                 health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
                 health_y,
                 potential_damage_w,
                 health_h,
-                ORANGE,
+                potential_color,
             );
 
             let header = if damage.max > 0 {

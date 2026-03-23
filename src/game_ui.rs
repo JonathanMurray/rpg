@@ -1593,6 +1593,7 @@ impl UserInterface {
                             damage,
                             hit_type,
                             applied_effects,
+                            ..
                         } => {
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" (|<value>{}| damage)", dmg))
@@ -2148,9 +2149,10 @@ impl UserInterface {
                 damage,
                 hit_type,
                 applied_effects,
+                actual_health_lost,
             } => {
                 if let Some(dmg) = damage {
-                    self.animate_character_damage(target, *dmg);
+                    self.animate_character_damage(target, *actual_health_lost);
                     self.sound_player.play(SoundId::Damage);
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
