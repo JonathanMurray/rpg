@@ -3355,6 +3355,7 @@ impl GameGrid {
     fn draw_movement_path_background(&self, character_id: CharacterId) {
         let character = &self.characters[&character_id];
 
+        /*
         if character.player_controlled() {
             // This part only makes sense for player characters, that can choose to move further by paying stamina
             for (pos, chart_node) in self.routes(character_id).iter() {
@@ -3366,9 +3367,20 @@ impl GameGrid {
                 }
             }
         }
+         */
+
+        let extended_range = if character.player_controlled() {
+            Some(self.movement_range.max())
+        } else {
+            None
+        };
 
         self.draw_filled_occupied_cells();
-        self.draw_move_range_indicator(character, character.remaining_movement.get());
+        self.draw_move_range_indicator(
+            character,
+            character.remaining_movement.get(),
+            extended_range,
+        );
     }
 
     fn draw_filled_occupied_cells(&self) {
@@ -3495,16 +3507,30 @@ impl GameGrid {
         );
     }
 
-    fn draw_move_range_indicator(&self, character: &Character, range: f32) {
-        let range_floor = range.floor() as i32;
+    fn draw_move_range_indicator(
+        &self,
+        character: &Character,
+        range: f32,
+        extended_range: Option<f32>,
+    ) {
+        let range_floor = extended_range.map(|r| r.floor()).unwrap_or(range.floor()) as i32;
         let origin = character.pos();
 
-        let within = |x: i32, y: i32| {
-            self.routes(character.id())
-                .get(&(x, y))
-                .map(|route| route.distance_from_start <= range)
-                .unwrap_or(false)
+        let within = |x: i32, y: i32, range| {
+            for x0 in x - 1..=x + 1 {
+                for y0 in y - 1..=y + 1 {
+                    if let Some(route) = self.routes(character.id()).get(&(x0, y0)) {
+                        if route.distance_from_start <= range {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         };
+
+        let within_inner = |x: i32, y: i32| within(x, y, range);
+        let within_outer = |x: i32, y: i32| within(x, y, extended_range.unwrap());
 
         for x in (origin.0 - range_floor).max(0)
             ..=(origin.0 + range_floor).min(self.grid_dimensions.0 as i32 - 1)
@@ -3514,19 +3540,20 @@ impl GameGrid {
             {
                 let thickness = 2.0;
 
-                if within(x, y) {
-                    let margin = 0.0; //self.cell_w / 20.0;
-                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, margin);
+                if within_inner(x, y) {
+                    self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
                     self.draw_dashed_borders(
                         x,
                         y,
-                        !within(x - 1, y),
-                        !within(x + 1, y),
-                        !within(x, y - 1),
-                        !within(x, y + 1),
+                        !within_inner(x - 1, y),
+                        !within_inner(x + 1, y),
+                        !within_inner(x, y - 1),
+                        !within_inner(x, y + 1),
                         thickness,
                         MOVE_RANGE_COLOR,
                     );
+                } else if extended_range.is_some() && within_outer(x, y) {
+                    self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
                 }
             }
         }
