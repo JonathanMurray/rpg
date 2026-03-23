@@ -12,7 +12,7 @@ use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
-    math::Vec2,
+    math::{Rect, Vec2},
     rand::rand,
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
@@ -3104,13 +3104,15 @@ impl GameGrid {
                     if ratio < animated_ratio {
                         lost_health_w *= ratio / animated_ratio;
                     }
-                    draw_rectangle(
+                    let extra_h = 2.0;
+                    let rect = Rect::new(
                         health_x + current_health_w,
-                        health_y,
+                        health_y - extra_h / 2.0,
                         lost_health_w,
-                        health_h,
-                        ORANGE,
+                        health_h + extra_h,
                     );
+                    draw_rectangle(rect.x, rect.y, rect.w, rect.h, ORANGE);
+                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
                 }
             }
         }

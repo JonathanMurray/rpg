@@ -191,7 +191,7 @@ pub const ENSLAVED_RAPIER: Weapon = Weapon {
     name: "Enslaved Rapier",
     range: WeaponRange::Melee,
     action_point_cost: 4,
-    damage: 7,
+    damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
