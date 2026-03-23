@@ -2630,7 +2630,13 @@ impl CoreGame {
         }
 
         if character.knows_passive(PassiveSkill::UnbridledRage) {
-            character.receive_condition(Condition::Ferocity, Some(1), None);
+            let condition = Condition::Ferocity;
+            character.receive_condition(condition, Some(1), None);
+            self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+                character: character.id(),
+                condition,
+            })
+            .await;
         }
 
         let gained_ap = character
@@ -5064,6 +5070,16 @@ impl Character {
 
     pub fn weapon(&self, hand: HandType) -> Option<Weapon> {
         self.hand(hand).get().weapon
+    }
+
+    pub fn weapon_damage_str(&self, hand: HandType) -> String {
+        let weapon = self.weapon(hand).unwrap();
+        let ferocity = self.conditions.borrow().get_stacks(&Condition::Ferocity);
+        if ferocity > 0 {
+            format!("{} + {} (|<keyword>Ferocity|)", weapon.damage, ferocity)
+        } else {
+            weapon.damage.to_string()
+        }
     }
 
     pub fn attack_range(

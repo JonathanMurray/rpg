@@ -331,7 +331,7 @@ impl TargetUi {
                     detailed_stats_lines.push(Element::Text(TextLine::new(
                         format!(
                             "|<sword>| Damage: {}",
-                            char.weapon(HandType::MainHand).unwrap().damage
+                            char.weapon_damage_str(HandType::MainHand)
                         ),
                         16,
                         LIGHTGRAY,
