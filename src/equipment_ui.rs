@@ -21,10 +21,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        describe_apply_effect, describe_area_effect, draw_regular_tooltip, draw_tooltip, Keyword,
-        Side, Tooltip, TooltipPositionPreference,
-    },
+    action_button::{describe_apply_effect, describe_area_effect, Tooltip},
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
         TableCell, TableStyle, TextLine,
@@ -37,6 +34,7 @@ use crate::{
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     sounds::{SoundId, SoundPlayer},
     textures::EquipmentIconId,
+    tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
 };
 
 const INVENTORY_SIZE: usize = 6;

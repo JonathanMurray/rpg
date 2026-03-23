@@ -3,7 +3,6 @@ use std::default;
 use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
 
 use crate::{
-    action_button::Keyword,
     core::{
         Ability, AbilityAttackEffect, AbilityChargeFx, AbilityDamage, AbilityEffect,
         AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach,
@@ -18,6 +17,7 @@ use crate::{
     grid::ParticleShape,
     sounds::SoundId,
     textures::{EquipmentIconId, IconId, SpriteId},
+    tooltip::Keyword,
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {

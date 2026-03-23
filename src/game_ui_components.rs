@@ -14,17 +14,10 @@ use macroquad::{
     time::get_time,
 };
 
-use indexmap::IndexMap;
-use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, RED, WHITE},
-    input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
-    text::Font,
-    texture::Texture2D,
+use crate::tooltip::{
+    draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, TooltipPositionPreference,
 };
-
 use crate::{
-    action_button::{draw_tooltip, TooltipPositionPreference},
     base_ui::{
         draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
         Rectangle, Style, TextLine,
@@ -38,6 +31,14 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
+};
+use indexmap::IndexMap;
+use macroquad::{
+    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, RED, WHITE},
+    input::{is_mouse_button_pressed, mouse_position, MouseButton},
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
+    text::Font,
+    texture::Texture2D,
 };
 
 pub struct TopCharacterPortraits {

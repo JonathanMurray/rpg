@@ -10,10 +10,10 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{draw_regular_tooltip, Side, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
     textures::StatusId,
+    tooltip::{draw_regular_tooltip, Side, TooltipPositionPreference},
 };
 
 pub struct ConditionsList {

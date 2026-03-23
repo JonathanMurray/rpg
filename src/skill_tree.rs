@@ -26,8 +26,8 @@ use macroquad::{
 };
 
 use crate::action_button::{
-    button_action_tooltip, draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction,
-    ButtonHovered, InternalUiEvent, Side, TooltipPositionPreference,
+    button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
+    InternalUiEvent,
 };
 use crate::base_ui::{Container, Drawable, Element, LayoutDirection, Style};
 use crate::core::BaseAction;
@@ -40,6 +40,7 @@ use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::textures::{
     load_all_icons, load_all_portraits, load_and_init_font_symbols, IconId, PortraitId,
 };
+use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
 
 async fn load_font(path: &str) -> Font {

@@ -14,7 +14,6 @@ use macroquad::{
 use rand::Rng;
 
 use crate::{
-    action_button::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
     base_ui::{draw_text_rounded, Drawable},
     core::{ArrowStack, Character, EquipmentEntry},
     data::{
@@ -25,6 +24,7 @@ use crate::{
     non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
     textures::{EquipmentIconId, IconId, PortraitId},
+    tooltip::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
 };
 
 pub async fn run_chest_loop(

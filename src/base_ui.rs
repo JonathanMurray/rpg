@@ -17,13 +17,13 @@ use std::{
 };
 
 use crate::{
-    action_button::{draw_tooltip, Side, TooltipPositionPreference},
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
         ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
         SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
     },
+    tooltip::{draw_tooltip, Side, TooltipPositionPreference},
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
 };
 

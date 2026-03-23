@@ -15,11 +15,13 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
+use crate::tooltip::{
+    draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference,
+};
 use crate::{
     action_button::{
-        draw_button_tooltip, draw_tooltip, ActionButton, ButtonAction, ButtonContext,
-        ButtonHovered, ButtonSelected, InternalUiEvent, Side, TooltipPositionPreference,
-        ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
+        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     banner::Banner,
