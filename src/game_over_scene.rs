@@ -1,47 +1,18 @@
-use std::{
-    cell::{Cell, RefCell},
-    collections::HashMap,
-    default,
-    ops::Rem,
-    rc::Rc,
-};
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE, YELLOW},
+    color::{GRAY, LIGHTGRAY, WHITE, YELLOW},
     input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
-    text::{measure_text, Font, TextParams},
-    texture::Texture2D,
-    time::{get_frame_time, get_time},
+    shapes::draw_rectangle,
+    text::{measure_text, TextParams},
+    time::get_time,
     window::{clear_background, next_frame, screen_height, screen_width},
 };
 
 use crate::{
-    action_button::{
-        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
-        ButtonSelected, InternalUiEvent,
-    },
-    base_ui::{
-        draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
-    },
-    core::{
-        Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, Party, PlayerId, WeaponType,
-    },
-    data::{
-        PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
-        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
-        SMITE, SWEEP_ATTACK,
-    },
-    game_ui::ResourceBars,
-    game_ui_components::PlayerCharacterPortrait,
-    non_combat_ui::{NonCombatCharacterUi, PortraitRow},
+    base_ui::draw_text_rounded,
     resources::{GameResources, UiResources},
-    sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId, StatusId},
-    util::{rgb, select_n_random},
+    util::rgb,
 };
 
 pub async fn run_game_over_scene(
@@ -96,7 +67,7 @@ pub async fn run_game_over_scene(
         let font_size = 30;
         let margin = 25.0;
         let padding = 15.0;
-        let text_dim = measure_text(btn_text, Some(&simple_font), font_size, 1.0);
+        let text_dim = measure_text(btn_text, Some(simple_font), font_size, 1.0);
         let rect = Rect::new(
             screen_width() - margin - text_dim.width - padding * 2.0,
             screen_height() - margin - text_dim.height - padding * 2.0,
@@ -114,7 +85,7 @@ pub async fn run_game_over_scene(
             rect.x + padding,
             rect.y + padding + text_dim.offset_y,
             TextParams {
-                font: Some(&simple_font),
+                font: Some(simple_font),
                 font_size,
                 color: YELLOW,
                 ..Default::default()

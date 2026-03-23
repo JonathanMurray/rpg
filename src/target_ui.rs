@@ -22,8 +22,7 @@ use crate::{
     },
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
-    game_ui::ResourceBars,
-    game_ui_components::{ActionPointsRow, LabelledResourceBar, ResourceBar},
+    game_ui_components::{ActionPointsRow, ResourceBar},
     textures::{IconId, PortraitId, StatusId},
     util::COL_RED,
 };

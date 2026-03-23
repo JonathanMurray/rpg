@@ -5,32 +5,31 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_lines},
+    shapes::draw_rectangle,
     text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags,
+        draw_debug, draw_text_rounded,
         Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
+        AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
         OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     textures::IconId,
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{COL_BLUE, COL_GREEN_0, COL_RED},
+    util::COL_RED,
 };
 
 pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";

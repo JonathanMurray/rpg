@@ -1,29 +1,18 @@
 use std::{
-    collections::{HashMap, HashSet},
-    fs,
+    collections::HashMap,
     rc::Rc,
 };
 
 use indexmap::IndexMap;
-use macroquad::rand::ChooseRandom;
-use rand::{
-    distr::{Distribution, Uniform},
-    Rng,
-};
+use rand::distr::Distribution;
 
 use crate::{
-    bot::BotBehaviour,
     core::{
-        Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, HandType, Position,
-    },
-    data::{
-        PassiveSkill, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_TACKLE, GOOD_CHAIN_MAIL, HULDRA_HEAL,
-        HULDRA_INFLICT_WOUNDS, LEATHER_ARMOR, SHIRT,
+        Character, CharacterId, Position,
     },
     map_data::{create_character, CharacterType, MapData},
-    pathfind::{Occupation, PathfindGrid, TerrainType, CELLS_PER_ENTITY},
-    textures::{PortraitId, SpriteId, TerrainId},
+    pathfind::{Occupation, PathfindGrid},
+    textures::TerrainId,
 };
 
 pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) -> GameInitState {
@@ -47,20 +36,17 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         let pos = char_data.pos;
         let char: Option<Rc<Character>> = match char_data.type_ {
             // TODO: Handle this better than string-matching on the name
-            CharacterType::Bob => player_chars_by_name.remove("Bob").map(|ch| {
+            CharacterType::Bob => player_chars_by_name.remove("Bob").inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
-                ch
             }),
-            CharacterType::Alice => player_chars_by_name.remove("Alice").map(|ch| {
+            CharacterType::Alice => player_chars_by_name.remove("Alice").inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
-                ch
             }),
-            CharacterType::Clara => player_chars_by_name.remove("Clara").map(|ch| {
+            CharacterType::Clara => player_chars_by_name.remove("Clara").inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
-                ch
             }),
             _ => Some(create_character(pos, *char_data, None, i as CharacterId)),
         };

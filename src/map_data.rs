@@ -7,14 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, BaseAction, Bot, Character, CharacterId, CharacterKind, Condition,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind,
         EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        CHEAT_BOW, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_SLASHING_ATTACK, ENEMY_TACKLE,
-        ENSLAVED_RAPIER, ENSLAVED_SWORD, GOOD_CHAIN_MAIL, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
-        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD, ZERO_BOW, ZERO_SWORD,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
+        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},
@@ -258,7 +257,7 @@ pub fn create_character(
             char
         }
         CharacterType::Skeleton => {
-            let mut skeleton = Character::new(
+            let skeleton = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Skeleton",
                 PortraitId::Skeleton,
@@ -323,7 +322,7 @@ pub fn create_character(
             ghoul
         }
         CharacterType::Ogre => {
-            let mut ogre = Character::new(
+            let ogre = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Ogre",
                 PortraitId::Ogre,
@@ -401,7 +400,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         stash: Default::default(),
     });
 
-    let mut alice = Character::new(
+    let alice = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Alice),
         "Alice",
         PortraitId::Alice,
@@ -449,7 +448,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 }
 
 pub fn make_medium_clara(party: &Rc<Party>) -> Character {
-    let mut clara = Character::new(
+    let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
         PortraitId::Clara,
@@ -468,7 +467,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
 }
 
 pub fn make_high_bob(party: &Rc<Party>) -> Character {
-    let mut char = Character::new(
+    let char = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
         "Bob",
         PortraitId::Bob,
@@ -491,7 +490,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
 }
 
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
-    let mut char = Character::new(
+    let char = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Alice",
         PortraitId::Alice,
@@ -528,7 +527,7 @@ pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {
 }
 
 fn make_high_clara(party: &Rc<Party>) -> Character {
-    let mut clara = Character::new(
+    let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
         PortraitId::Clara,

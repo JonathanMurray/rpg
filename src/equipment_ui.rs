@@ -786,7 +786,7 @@ impl EquipmentStatsTable {
                     "Attack damage",
                     vec!["The unmodified base damage of one attack".to_string()],
                 ));
-                cells.push(format!("{}", character.weapon_damage_str(hand)).into());
+                cells.push(character.weapon_damage_str(hand).to_string().into());
 
                 cells.push(TableCell::from("|<dice>| Attack").with_tooltip(
                     "Attack modifier",

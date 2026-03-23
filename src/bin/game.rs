@@ -15,26 +15,21 @@ use macroquad::{
 };
 
 use rpg::action_button::ButtonAction;
-use rpg::chest_scene::run_chest_loop;
-use rpg::core::{BaseAction, Character, Condition, Party, PlayerId};
+use rpg::core::{BaseAction, Character, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, CRIPPLING_SHOT, FIREBALL, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE, INSPIRE,
-    PIERCING_SHOT, SHACKLED_MIND, SWEEP_ATTACK,
+    PassiveSkill, CRIPPLING_SHOT, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE,
+    PIERCING_SHOT, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
-use rpg::map_scene::{MapChoice, MapScene};
 use rpg::resources::{init_core_game, GameResources, UiResources};
-use rpg::rest_scene::run_rest_loop;
-use rpg::shop_scene::run_shop_loop;
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_and_init_font_symbols, load_and_init_tiny_font, load_and_init_ui_textures,
 };
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
-use rpg::victory_scene::run_victory_loop;
 
 #[macroquad::main(window_conf)]
 async fn main() {
@@ -147,7 +142,7 @@ async fn run_demo(
         let (party, player_characters) = make_low_level_party();
         let mut player_characters: Vec<Rc<Character>> = player_characters
             .into_iter()
-            .map(|ch| Rc::new(ch))
+            .map(Rc::new)
             .collect();
 
         let mut demo_sequence = [
@@ -221,14 +216,14 @@ async fn run_demo(
 
             if player_characters.iter().all(|ch| ch.is_dead()) {
                 run_game_over_scene(
-                    &resources,
-                    &ui_resources,
+                    resources,
+                    ui_resources,
                     "Your party has perished! Try again, or submit a balancing complaint!",
                 )
                 .await;
                 break;
             } else if demo_sequence.peek().is_none() {
-                run_game_over_scene(&resources, &ui_resources, "You have completed the demo!")
+                run_game_over_scene(resources, ui_resources, "You have completed the demo!")
                     .await;
                 break;
             }
@@ -236,8 +231,8 @@ async fn run_demo(
             player_characters = grow_players(
                 player_characters,
                 growths.into_iter().collect(),
-                &resources,
-                &ui_resources,
+                resources,
+                ui_resources,
                 &party,
                 sound_player.clone(),
             )
@@ -284,12 +279,12 @@ async fn grow_players(
     party: &Rc<Party>,
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
-    let player_growths = build_player_growths(player_characters, growths.into(), party);
+    let player_growths = build_player_growths(player_characters, growths, party);
     run_transition_loop(
         player_growths,
-        &resources,
-        &ui_resources,
-        &party,
+        resources,
+        ui_resources,
+        party,
         sound_player,
     )
     .await
@@ -305,7 +300,7 @@ async fn run_fight_loop(
     let player_characters: Vec<Rc<Character>> = player_characters
         .iter()
         .filter(|ch| !ch.is_dead())
-        .map(|ch| Rc::clone(&ch))
+        .map(Rc::clone)
         .collect();
     let init_state = init_fight_map(player_characters, fight_id);
     let core_game = init_core_game(resources, ui_resources, sound_player, init_state);

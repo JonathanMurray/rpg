@@ -1834,7 +1834,7 @@ impl CoreGame {
                 dmg_str.push_str(" -50% |<faded>(Graze)|");
                 dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
             } else if increased_by_good_roll && hit_type == HitType::Critical {
-                dmg_str.push_str(&format!(" +50% |<faded>(Crit)|"));
+                dmg_str.push_str(" +50% |<faded>(Crit)|");
                 dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
             }
 
@@ -2157,7 +2157,7 @@ impl CoreGame {
         let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = {
             let mut on_true_hit_effect = None;
-            let dmg_override = ability_attack_effect.map(|e| e.override_damage).flatten();
+            let dmg_override = ability_attack_effect.and_then(|e| e.override_damage);
             let mut dmg_str = "  Damage: ".to_string();
             let mut dmg_calculation;
             if let Some(dmg) = dmg_override {
@@ -2291,7 +2291,7 @@ impl CoreGame {
                     }
                 }
 
-                if let Some(effect) = ability_attack_effect.map(|e| e.on_hit).flatten() {
+                if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
                     let (applied, log_line, _damage) =
                         game.perform_effect_application(effect, Some(attacker), None, defender);
                     detail_lines.push(log_line);
@@ -5401,8 +5401,7 @@ impl Character {
 
     pub fn attack_weapon_range(&self) -> Option<WeaponRange> {
         self.attack_action()
-            .map(|attack| self.weapon(attack.hand).map(|wpn| wpn.range))
-            .flatten()
+            .and_then(|attack| self.weapon(attack.hand).map(|wpn| wpn.range))
     }
 
     pub fn usable_actions(&self) -> Vec<BaseAction> {

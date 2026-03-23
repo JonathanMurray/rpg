@@ -1,9 +1,9 @@
 use std::{collections::HashMap, f32::consts::PI, hash::Hash, sync::OnceLock};
 
 use macroquad::{
-    color::{Color, WHITE},
+    color::WHITE,
     math::Rect,
-    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Image, Texture2D},
+    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
     time::get_time,
 };
 use serde::{Deserialize, Serialize};
@@ -751,8 +751,8 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
     let ch_h = TINY_FONT_H;
     let vert_i = 2;
     for ch in text.chars() {
-        let hor_i = if ch >= '0' && ch <= '9' {
-            ch as u8 - '0' as u8
+        let hor_i = if ch.is_ascii_digit() {
+            ch as u8 - b'0'
         } else if ch == '%' {
             10
         } else {

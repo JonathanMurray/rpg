@@ -4,7 +4,6 @@ use std::{
     collections::{HashMap, HashSet},
     f32::consts::PI,
     iter,
-    path::Display,
     rc::Rc,
 };
 
@@ -13,7 +12,6 @@ use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::{Rect, Vec2},
-    rand::rand,
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
@@ -53,17 +51,16 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    game_ui_connection::DEBUG,
     pathfind::{
-        build_path_from_chart, ChartNode, Collision, Occupation, PathfindGrid, TerrainType,
+        build_path_from_chart, ChartNode, Occupation, PathfindGrid, TerrainType,
         CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_terrain, draw_tiny_font, measure_tiny_font, EffectId,
-        SpriteId, StatusId, TerrainId, TinyFontColor, TINY_FONT_GREEN_TEXTURE,
+        SpriteId, StatusId, TerrainId, TinyFontColor,
     },
-    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED},
+    util::{line_visitor, oscillate, rgb, COL_RED},
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -3074,13 +3071,13 @@ impl GameGrid {
                 .prediction
                 .graze_chance
                 .filter(|chance| *chance > 0.0)
-                .map(|chance| chance_to_perc_str(chance));
+                .map(chance_to_perc_str);
 
             let crit_text = preview
                 .prediction
                 .crit_chance
                 .filter(|chance| *chance > 0.0)
-                .map(|chance| chance_to_perc_str(chance));
+                .map(chance_to_perc_str);
 
             draw_action(
                 (x0, y0),
@@ -3535,7 +3532,7 @@ impl GameGrid {
                     }
                 }
             }
-            return false;
+            false
         };
 
         let within_inner = |x: i32, y: i32| within(x, y, range);

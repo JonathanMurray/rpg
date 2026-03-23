@@ -7,13 +7,13 @@ use rand::{random_bool, random_range, Rng};
 use crate::{
     core::{
         distance_between, sq_distance_between, Ability, AbilityId, AbilityTarget, Action,
-        ActionReach, ActionTarget, AttackEnhancement, BaseAction, Character, CharacterId,
+        ActionReach, ActionTarget, Character, CharacterId,
         Condition, CoreGame, HandType, OnAttackedReaction, OnHitReaction, Position, Range,
         CENTER_MELEE_RANGE_SQUARED,
     },
-    data::{HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, INFLICT_WOUNDS},
-    pathfind::{Occupation, Path, PathfindGrid},
-    util::{adjacent_cells, are_entities_within_melee, line_visitor, CustomShuffle},
+    data::{HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS},
+    pathfind::{Path, PathfindGrid},
+    util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
 
 #[derive(Debug, Clone)]
@@ -62,7 +62,7 @@ impl HuldraBehaviour {
                 .min_by(|a, b| a.health.ratio().total_cmp(&b.health.ratio()))
                 .unwrap();
 
-            action = (heal, Some(Rc::clone(&target)));
+            action = (heal, Some(Rc::clone(target)));
             dbg!("NEW Huldra HEAL GOAL: {:?}", target.id());
         } else if self.last_action.get() != Some(AbilityId::MagiInflictWounds)
             && !are_all_players_bleeding
@@ -87,14 +87,14 @@ impl HuldraBehaviour {
 
             dbg!("NEW Huldra WOUND GOAL: {:?}", target.id());
 
-            action = (inflict_wounds, Some(Rc::clone(&target)));
+            action = (inflict_wounds, Some(Rc::clone(target)));
         } else {
             let player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
             let target = player_chars[rng.random_range(0..player_chars.len())];
 
             dbg!("NEW Huldra HORROR GOAL: {:?}", target.id());
 
-            action = (inflict_horrors, Some(Rc::clone(&target)));
+            action = (inflict_horrors, Some(Rc::clone(target)));
         }
 
         let goal = BotGoal {
@@ -104,21 +104,18 @@ impl HuldraBehaviour {
 
         let chosen_action = pursue_goal(game, goal.clone());
 
-        match &chosen_action {
-            Some(action) => {
-                match action {
-                    Action::UseAbility { ability, .. } => {
-                        self.last_action.set(Some(ability.id));
-                    }
-                    Action::Move { .. } => {
-                        // We probably chose movement to get into range, so we should stick to the same action
-                        self.saved_goal
-                            .set(Some((goal.action.0, goal.action.1.map(|ch| ch.id()))));
-                    }
-                    _ => {}
+        if let Some(action) = &chosen_action {
+            match action {
+                Action::UseAbility { ability, .. } => {
+                    self.last_action.set(Some(ability.id));
                 }
+                Action::Move { .. } => {
+                    // We probably chose movement to get into range, so we should stick to the same action
+                    self.saved_goal
+                        .set(Some((goal.action.0, goal.action.1.map(|ch| ch.id()))));
+                }
+                _ => {}
             }
-            None => {}
         }
 
         chosen_action

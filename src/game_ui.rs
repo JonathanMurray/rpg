@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, RED, WHITE},
+    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, WHITE},
     input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
     math::Rect,
     shapes::draw_rectangle,
@@ -16,7 +16,7 @@ use macroquad::{
 };
 
 use crate::tooltip::{
-    draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, Side, TooltipPositionPreference,
+    draw_tooltip, Side, TooltipPositionPreference,
 };
 use crate::{
     action_button::{
@@ -25,16 +25,16 @@ use crate::{
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     banner::Banner,
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine},
+    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Rectangle, Style},
     character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
-        distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
+        predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
         AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
         AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
         BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource,
-        GameEvent, Goodness, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction,
+        GameEvent, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction,
         Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},

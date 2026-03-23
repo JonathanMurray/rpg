@@ -1,46 +1,32 @@
 use std::{
-    cell::{Cell, RefCell},
+    cell::RefCell,
     collections::HashMap,
-    default,
     rc::Rc,
 };
 
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, ORANGE, WHITE, YELLOW},
+    color::{DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
     input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
-    text::{measure_text, Font, TextParams},
-    texture::Texture2D,
-    time::get_frame_time,
-    window::{clear_background, next_frame, screen_height, screen_width},
+    shapes::draw_rectangle,
+    text::{measure_text, TextParams},
+    window::{next_frame, screen_height, screen_width},
 };
 
 use crate::{
     action_button::{
-        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered,
-        ButtonSelected, InternalUiEvent,
+        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent,
     },
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
     core::{
-        Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
-        OnHitReaction, Party, PlayerId, WeaponType,
-    },
-    data::{
-        PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
-        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
-        SMITE, SWEEP_ATTACK,
+        BaseAction, Character, Party, PlayerId,
     },
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
-    non_combat_ui::{NonCombatCharacterUi, PortraitRow},
     resources::{GameResources, UiResources},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId, StatusId},
-    util::select_n_random,
 };
 
 pub struct CharacterGrowth {
@@ -189,12 +175,12 @@ pub async fn run_transition_loop(
                 let mut buttons = vec![];
                 for action in &growth.new_skills {
                     let btn = ActionButton::new(
-                        action.clone(),
+                        *action,
                         Some(Rc::clone(&event_queue)),
                         next_btn_id,
                         &ui_resources.icons,
                         Some(Rc::clone(char)),
-                        &simple_font,
+                        simple_font,
                     );
                     next_btn_id += 1;
                     buttons.push(Element::boxed(btn));
@@ -283,11 +269,9 @@ pub async fn run_transition_loop(
                 if let InternalUiEvent::ButtonHovered(hover_event) = event {
                     if hover_event.hovered_pos.is_some() {
                         hovered_btn = Some(hover_event);
-                    } else {
-                        if let Some(prev_hovered_button) = &hovered_btn {
-                            if prev_hovered_button.id == hover_event.id {
-                                hovered_btn = None;
-                            }
+                    } else if let Some(prev_hovered_button) = &hovered_btn {
+                        if prev_hovered_button.id == hover_event.id {
+                            hovered_btn = None;
                         }
                     }
                 }
@@ -302,7 +286,7 @@ pub async fn run_transition_loop(
             let font_size = 30;
             let margin = 25.0;
             let padding = 15.0;
-            let text_dim = measure_text(text, Some(&simple_font), font_size, 1.0);
+            let text_dim = measure_text(text, Some(simple_font), font_size, 1.0);
             let rect = Rect::new(
                 screen_width() - margin - text_dim.width - padding * 2.0,
                 screen_height() - margin - text_dim.height - padding * 2.0,
@@ -320,7 +304,7 @@ pub async fn run_transition_loop(
                 rect.x + padding,
                 rect.y + padding + text_dim.offset_y,
                 TextParams {
-                    font: Some(&simple_font),
+                    font: Some(simple_font),
                     font_size,
                     color: YELLOW,
                     ..Default::default()

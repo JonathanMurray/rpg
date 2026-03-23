@@ -1,45 +1,19 @@
-use std::{
-    cell::{Cell, Ref, RefCell},
-    collections::HashMap,
-    rc::Rc,
-};
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, GREEN, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
-    input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
+    color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
-    text::{measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    text::{Font, TextParams},
 };
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags,
-        Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
+        draw_text_with_font_tags, measure_text_with_font_tags,
     },
-    core::{
-        Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
-        AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
-        AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
-    },
-    data::PassiveSkill,
-    drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
-    textures::IconId,
-    util::{COL_BLUE, COL_GREEN_0, COL_RED},
+    core::Condition,
 };
 
-#[derive(Default, Debug)]
-pub struct Tooltip {
-    pub header: String,
-    pub description: Option<&'static str>,
-    pub error: Option<&'static str>,
-    pub technical_description: Vec<String>,
-    pub keywords: Vec<Keyword>,
-}
 
 #[derive(Debug, Copy, Clone)]
 pub enum Keyword {
@@ -71,42 +45,6 @@ impl Keyword {
             Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
             Keyword::Crit => "|<value>+50%| effect. Triggers on |<dice>| roll is 16 or higher",
         }
-    }
-}
-
-impl Tooltip {
-    pub fn new(header: impl Into<String>) -> Self {
-        Self {
-            header: header.into(),
-            description: None,
-            error: None,
-            technical_description: vec![],
-            keywords: vec![],
-        }
-    }
-
-    pub fn content_lines(&self, detailed: bool) -> Vec<String> {
-        let mut lines = vec![];
-        let mut has_description = false;
-        let show_details = detailed || self.technical_description.len() < 2;
-        if let Some(description) = self.description {
-            if !description.is_empty() {
-                has_description = true;
-                lines.push(description.to_string());
-                if show_details && !self.technical_description.is_empty() {
-                    lines.push("".to_string());
-                }
-            }
-        }
-        if show_details {
-            lines.extend_from_slice(&self.technical_description);
-        } else if !self.technical_description.is_empty() {
-            if has_description {
-                lines.push("".to_string());
-            }
-            lines.push("|<alt_key>| |<faded>details|".to_string());
-        }
-        lines
     }
 }
 

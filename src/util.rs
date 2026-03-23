@@ -80,13 +80,13 @@ pub fn oscillate(cycle_duration: f32, from: f32, to: f32) -> f32 {
     let game_time = get_time();
     let t = ((game_time as f32) / cycle_duration).fract();
 
-    let result = if t < 0.5 {
+    
+
+    if t < 0.5 {
         from + (to - from) * t / 0.5
     } else {
         to - (to - from) * (t - 0.5) / 0.5
-    };
-
-    result
+    }
 }
 
 pub fn oscillate_square(cycle_duration: f32, from: f32, to: f32) -> f32 {

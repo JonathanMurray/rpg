@@ -197,16 +197,14 @@ impl PathfindGrid {
                 } else {
                     shortest_valid_path = Some(path);
                 }
-            } else {
-                if let Some((closest_sq_dist, _)) = closest_fallback_path {
-                    if sq_distance < closest_sq_dist {
-                        let path = build_path_from_chart(&chart, start, *pos);
-                        closest_fallback_path = Some((sq_distance, path));
-                    }
-                } else {
+            } else if let Some((closest_sq_dist, _)) = closest_fallback_path {
+                if sq_distance < closest_sq_dist {
                     let path = build_path_from_chart(&chart, start, *pos);
                     closest_fallback_path = Some((sq_distance, path));
                 }
+            } else {
+                let path = build_path_from_chart(&chart, start, *pos);
+                closest_fallback_path = Some((sq_distance, path));
             }
         }
 

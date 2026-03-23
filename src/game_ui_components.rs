@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::{btree_map, HashMap},
+    collections::HashMap,
     rc::Rc,
 };
 
@@ -11,11 +11,10 @@ use macroquad::{
     shapes::{draw_triangle, draw_triangle_lines},
     text::{measure_text, TextParams},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams},
-    time::get_time,
 };
 
 use crate::tooltip::{
-    draw_keyword_tooltips, draw_regular_tooltip, draw_tooltip, TooltipPositionPreference,
+    draw_tooltip, TooltipPositionPreference,
 };
 use crate::{
     base_ui::{
@@ -24,10 +23,9 @@ use crate::{
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::{
-        draw_cross, draw_dashed_rectangle_lines, draw_dashed_rectangle_sides,
+        draw_cross,
         draw_rounded_rectangle_lines,
     },
-    resources::{GameResources, UiResources},
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
@@ -293,7 +291,7 @@ impl CharacterSheetToggle {
             shown: Cell::new(false),
             text_line: TextLine::new("Character sheet (A)", 16, WHITE, Some(font)),
             padding: 7.0,
-            sound_player: sound_player,
+            sound_player,
             is_hovered: Cell::new(false),
         }
     }
@@ -323,10 +321,8 @@ impl Drawable for CharacterSheetToggle {
         let (mouse_x, mouse_y) = mouse_position();
         let hovered = (x..x + size.0).contains(&mouse_x) && (y..y + size.1).contains(&mouse_y);
 
-        if hovered {
-            if !self.is_hovered.get() {
-                self.sound_player.play(SoundId::HoverButton);
-            }
+        if hovered && !self.is_hovered.get() {
+            self.sound_player.play(SoundId::HoverButton);
         }
         self.is_hovered.set(hovered);
 
@@ -814,10 +810,8 @@ impl Drawable for PlayerCharacterPortrait {
         let (mouse_x, mouse_y) = mouse_position();
         let portrait_hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
 
-        if portrait_hovered {
-            if !self.is_portrait_hovered.get() {
-                self.sound_player.play(SoundId::HoverButton);
-            }
+        if portrait_hovered && !self.is_portrait_hovered.get() {
+            self.sound_player.play(SoundId::HoverButton);
         }
         self.is_portrait_hovered.set(portrait_hovered);
 
