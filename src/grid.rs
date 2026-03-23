@@ -3460,6 +3460,7 @@ impl GameGrid {
         let mut b = path.next().expect("Second cell in path");
 
         loop {
+            /*
             draw_dashed_line(
                 (
                     self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
@@ -3474,6 +3475,14 @@ impl GameGrid {
                 5.0,
                 Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0)),
                 animated,
+            );
+             */
+
+            draw_circle(
+                self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
+                self.grid_y_to_screen(a.1) + self.cell_w / 2.0,
+                3.0,
+                Color::new(1.0, 1.0, 1.0, 0.5),
             );
 
             if let Some(next) = path.next() {
