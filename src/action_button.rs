@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, Ref, RefCell},
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     rc::Rc,
 };
 
@@ -90,7 +90,7 @@ impl Tooltip {
 }
 
 pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
-    match action {
+    let mut tooltip = match action {
         ButtonAction::Action(base_action) => base_action_tooltip(base_action),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
         ButtonAction::AbilityEnhancement(enhancement) => ability_enhancement_tooltip(enhancement),
@@ -105,7 +105,20 @@ pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
             ..Default::default()
         },
         ButtonAction::Passive(skill) => passive_skill_tooltip(skill),
+    };
+
+    // If any of the tooltip's keywords mention other keywords, add them as well
+    let mut additional_keywords = HashSet::new();
+    for keyword in &tooltip.keywords {
+        if let Keyword::Cond(condition) = keyword {
+            for k in condition.related_keywords().into_iter().flatten() {
+                additional_keywords.insert(k);
+            }
+        }
     }
+    tooltip.keywords.extend(additional_keywords);
+
+    tooltip
 }
 
 fn passive_skill_tooltip(skill: &PassiveSkill) -> Tooltip {

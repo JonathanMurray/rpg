@@ -1,5 +1,5 @@
 use macroquad::{
-    color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, GRAY, GREEN, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
     miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_lines},
@@ -8,11 +8,12 @@ use macroquad::{
 
 use crate::{
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
-    core::Condition,
+    core::{Condition, Goodness},
+    drawing::{draw_cornered_rectangle_lines, draw_rounded_rectangle_lines},
     textures::{draw_status_icon, StatusId},
 };
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Cond(Condition),
     Advantage,
@@ -25,7 +26,7 @@ impl Keyword {
     fn name(&self) -> &str {
         match self {
             Keyword::Cond(condition) => condition.name(),
-            Keyword::Advantage => "Advantage",
+            Keyword::Advantage => "Advantage / Disadvantage",
             Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
             Keyword::Crit => "Crit",
@@ -35,12 +36,28 @@ impl Keyword {
     fn description(&self) -> &str {
         match self {
             Keyword::Cond(condition) => condition.description(),
-            Keyword::Advantage => "Roll extra dice and take the highest result",
+            Keyword::Advantage => "Roll extra dice and take the highest / lowest result",
             Keyword::Pushed => {
                 "Moves up to |<value>x| steps. On collision: |<value>1| damage per remaining distance"
             }
             Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
             Keyword::Crit => "|<value>+50%| effect. Triggers on |<dice>| roll is 16 or higher",
+        }
+    }
+
+    fn goodness(&self) -> Goodness {
+        match self {
+            Keyword::Cond(condition) => {
+                if condition.is_positive() {
+                    Goodness::Good
+                } else {
+                    Goodness::Bad
+                }
+            }
+            Keyword::Advantage => Goodness::Neutral,
+            Keyword::Pushed => Goodness::Bad,
+            Keyword::Graze => Goodness::Bad,
+            Keyword::Crit => Goodness::Good,
         }
     }
 }
@@ -85,12 +102,18 @@ pub fn draw_tooltip(
     error: Option<&'static str>,
     content_lines: &[String],
     has_keywords: &[Keyword],
-    is_keyword: Option<Keyword>,
+    header_keyword: Option<Keyword>,
 ) -> Rect {
-    let header_font_size = if is_keyword.is_some() { 16 } else { 24 };
+    let header_font_size = if header_keyword.is_some() { 16 } else { 24 };
     let font_size = 16;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
+
+    let goodness = if let Some(keyword) = header_keyword {
+        keyword.goodness()
+    } else {
+        Goodness::Neutral
+    };
 
     let mut measure_width = |line, size| {
         let dimensions = measure_text_with_font_tags(line, Some(font), size, 1.0);
@@ -106,7 +129,7 @@ pub fn draw_tooltip(
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
     // the width of the tooltip window.
-    let line_width_limit = if is_keyword.is_some() { 25 } else { 40 };
+    let line_width_limit = if header_keyword.is_some() { 25 } else { 40 };
     let mut physical_content_lines = vec![];
     for line in content_lines {
         let mut line = &line[..];
@@ -182,20 +205,27 @@ pub fn draw_tooltip(
     };
 
     let tooltip_rect = Rect::new(x, y, tooltip_w, tooltip_h);
+    let bg_color = match goodness {
+        Goodness::Good => Color::new(0.0, 0.2, 0.0, 0.8),
+        Goodness::Neutral => Color::new(0.0, 0.0, 0.0, 0.8),
+        Goodness::Bad => Color::new(0.2, 0.0, 0.0, 0.9),
+    };
     draw_rectangle(
         tooltip_rect.x,
         tooltip_rect.y,
         tooltip_rect.w,
         tooltip_rect.h,
-        Color::new(0.0, 0.0, 0.0, 0.8),
+        bg_color,
     );
-    draw_rectangle_lines(
+    draw_rounded_rectangle_lines(
         tooltip_rect.x,
         tooltip_rect.y,
         tooltip_rect.w,
         tooltip_rect.h,
         1.0,
         GRAY,
+        3.0,
+        None,
     );
 
     let text_params = TextParams {
@@ -238,9 +268,13 @@ pub fn draw_tooltip(
             }
         };
 
-    let header_color = if is_keyword.is_some() { ORANGE } else { YELLOW };
+    let header_color = if header_keyword.is_some() {
+        ORANGE
+    } else {
+        YELLOW
+    };
 
-    let header_status_icon = is_keyword.and_then(|keyword| match keyword {
+    let header_status_icon = header_keyword.and_then(|keyword| match keyword {
         Keyword::Cond(condition) => Some(condition.status_icon()),
         _ => None,
     });
@@ -274,6 +308,7 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
             &[],
             Some(*keyword),
         );
+        rect.y += 2.0;
         //y += rect.h;
     }
 }

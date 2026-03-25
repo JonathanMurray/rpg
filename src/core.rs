@@ -19,6 +19,7 @@ use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
+use crate::tooltip::Keyword;
 use crate::util::{are_entities_within_melee, line_visitor, CustomShuffle};
 
 pub type Position = (i32, i32);
@@ -3624,9 +3625,9 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|, Disadvantage on attacks.",
-            Blinded => "Disadvantage, always Flanked when attacked.",
-            Raging => "Advantage on melee attacks (until end of turn).",
+            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|, |<keyword>Disadvantage| on attacks.",
+            Blinded => "|<keyword>Disadvantage|, always Flanked when attacked.",
+            Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn, |<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn, |<value>+25%| movement",
             Inspired => "|<value>+3| |<shield>|<stat>Will|, |<value>+3| |<dice>| |<stat>Attack/Spell|",
@@ -3642,7 +3643,7 @@ impl Condition {
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
             Encumbered => "|<value>-x| |<shield>|<stat>Evasion|, |<value>-x| on |<dice>|.",
-            NearDeath => "|<value>-1| AP regen, Disadvantage on actions, enemies have Advantage. (Triggers on < 20% health)",
+            NearDeath => "|<value>-1| AP regen, |<keyword>Disadvantage| on actions, enemies have |<keyword>Advantage|. (Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "|<value>+5| |<dice>| |<stat>Attack| (passive skill).",
@@ -3725,6 +3726,15 @@ impl Condition {
                     StatusId::PlaceholderNegative
                 }
             }
+        }
+    }
+
+    pub const fn related_keywords(&self) -> [Option<Keyword>; 2] {
+        use Condition::*;
+        match self {
+            Dazed => [Some(Keyword::Advantage), None],
+            NearDeath => [Some(Keyword::Advantage), None],
+            _ => [None, None],
         }
     }
 }
