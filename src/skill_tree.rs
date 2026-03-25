@@ -38,7 +38,7 @@ use crate::data::{
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::textures::{
-    load_all_icons, load_all_portraits, load_and_init_font_symbols, IconId, PortraitId,
+    load_all_icons, load_all_portraits, load_and_init_static, IconId, PortraitId,
 };
 use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
@@ -69,7 +69,7 @@ pub async fn run_editor() {
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
 
-    load_and_init_font_symbols().await;
+    load_and_init_static().await;
 
     let portraits = load_all_portraits().await;
 
@@ -784,7 +784,7 @@ pub async fn run_skill_tree_scene() {
                             tooltip.error,
                             &tooltip.content_lines(true),
                             &tooltip.keywords,
-                            false,
+                            None,
                         );
                     }
                 }
@@ -808,7 +808,7 @@ pub async fn run_skill_tree_scene() {
                         None,
                         &[description.to_string()],
                         &[],
-                        false,
+                        None,
                     );
                     if claimable.contains(&id) {
                         text = Some("Click to allocate attribute point");

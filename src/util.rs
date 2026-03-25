@@ -80,8 +80,6 @@ pub fn oscillate(cycle_duration: f32, from: f32, to: f32) -> f32 {
     let game_time = get_time();
     let t = ((game_time as f32) / cycle_duration).fract();
 
-    
-
     if t < 0.5 {
         from + (to - from) * t / 0.5
     } else {

@@ -107,6 +107,7 @@ pub enum StatusId {
     Dead,
 }
 
+// TODO: Remove this; instead use STATUS_ICONS_TEXTURE
 pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
     load_and_init_textures(vec![
         (
@@ -196,6 +197,7 @@ pub enum IconId {
     Reaper,
 }
 
+// TODO: Remove this; instead use icon.png
 pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
     load_and_init_textures(vec![
         (IconId::Fireball, "fireball_icon.png"),
@@ -706,7 +708,7 @@ pub async fn load_and_init_texture(path: &str) -> Texture2D {
     texture
 }
 
-pub async fn load_and_init_tiny_font() {
+async fn load_and_init_tiny_font() {
     let texture = load_and_init_texture("tiny_font.png").await;
     replace_color(&texture, [0, 0, 0, 255], [100, 200, 100, 255]);
     TINY_FONT_GREEN_TEXTURE.get_or_init(|| texture);
@@ -777,7 +779,62 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
     }
 }
 
-pub async fn load_and_init_font_symbols() {
+pub async fn load_and_init_static() {
+    load_and_init_tiny_font().await;
+    load_and_init_font_symbols().await;
+    load_and_init_ui_textures().await;
+
+    let status_icon_atlas = load_and_init_texture("status.png").await;
+    STATUS_ICONS_TEXTURE.get_or_init(|| status_icon_atlas);
+}
+
+pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
+    let x = x.floor();
+    let y = y.floor();
+    let texture = STATUS_ICONS_TEXTURE.get().unwrap();
+    let (col, row) = match status {
+        StatusId::PlaceholderNegative => (0, 0),
+        StatusId::PlaceholderPositive => (1, 0),
+        StatusId::Burning => (0, 2),
+        StatusId::Protected => (3, 0),
+        StatusId::Dazed => (1, 2),
+        StatusId::Bleeding => (2, 2),
+        StatusId::Healing => (3, 2),
+        StatusId::Blinded => (0, 3),
+        StatusId::Hindered => (1, 3),
+        StatusId::Exposed => (2, 0),
+        StatusId::Slowed => (4, 0),
+        StatusId::Hastened => (0, 1),
+        StatusId::Inspired => (1, 1),
+        StatusId::CriticalCharge => (3, 1),
+        StatusId::ReaperApCooldown => (4, 1),
+        StatusId::Rage => (2, 1),
+        StatusId::NearDeath => (4, 2),
+        StatusId::Dead => (2, 3),
+    };
+    let icon_w = 10.0;
+    let dest_size = dest_size
+        .map(|s| s.into())
+        .unwrap_or((icon_w, icon_w).into());
+    draw_texture_ex(
+        texture,
+        x,
+        y,
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(dest_size),
+            source: Some(Rect::new(
+                col as f32 * icon_w,
+                row as f32 * icon_w,
+                icon_w,
+                icon_w,
+            )),
+            ..Default::default()
+        },
+    );
+}
+
+async fn load_and_init_font_symbols() {
     let symbol_atlas = load_and_init_texture("font.png").await;
     let img = symbol_atlas.get_texture_data();
 
@@ -806,7 +863,7 @@ pub async fn load_and_init_font_symbols() {
     BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
 }
 
-pub async fn load_and_init_ui_textures() {
+async fn load_and_init_ui_textures() {
     let texture = load_and_init_texture("user_interface.png").await;
     UI_TEXTURE.get_or_init(|| texture);
 
@@ -831,6 +888,8 @@ pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+
+pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

@@ -13,19 +13,14 @@ use macroquad::{
     texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
 
-use crate::tooltip::{
-    draw_tooltip, TooltipPositionPreference,
-};
+use crate::tooltip::{draw_tooltip, Keyword, TooltipPositionPreference};
 use crate::{
     base_ui::{
         draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
         Rectangle, Style, TextLine,
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
-    drawing::{
-        draw_cross,
-        draw_rounded_rectangle_lines,
-    },
+    drawing::{draw_cross, draw_rounded_rectangle_lines},
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
@@ -498,7 +493,7 @@ impl PlayerPortraits {
                     None,
                     &[info.populated_description()],
                     &[],
-                    true,
+                    Some(Keyword::Cond(info.condition)),
                 );
             }
         }

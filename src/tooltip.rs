@@ -1,4 +1,3 @@
-
 use macroquad::{
     color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
@@ -8,12 +7,10 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{
-        draw_text_with_font_tags, measure_text_with_font_tags,
-    },
+    base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
     core::Condition,
+    textures::{draw_status_icon, StatusId},
 };
-
 
 #[derive(Debug, Copy, Clone)]
 pub enum Keyword {
@@ -77,7 +74,7 @@ pub fn draw_regular_tooltip(
         error,
         content_lines,
         &[],
-        false,
+        None,
     )
 }
 
@@ -87,10 +84,10 @@ pub fn draw_tooltip(
     header: &str,
     error: Option<&'static str>,
     content_lines: &[String],
-    keywords: &[Keyword],
-    is_keyword_tooltip: bool,
+    has_keywords: &[Keyword],
+    is_keyword: Option<Keyword>,
 ) -> Rect {
-    let header_font_size = if is_keyword_tooltip { 16 } else { 24 };
+    let header_font_size = if is_keyword.is_some() { 16 } else { 24 };
     let font_size = 16;
     let mut max_line_w = 0.0;
     let text_margin = 8.0;
@@ -109,7 +106,7 @@ pub fn draw_tooltip(
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
     // the width of the tooltip window.
-    let line_width_limit = if is_keyword_tooltip { 25 } else { 40 };
+    let line_width_limit = if is_keyword.is_some() { 25 } else { 40 };
     let mut physical_content_lines = vec![];
     for line in content_lines {
         let mut line = &line[..];
@@ -210,33 +207,53 @@ pub fn draw_tooltip(
 
     let mut line_y = tooltip_rect.y + text_margin * 2.0 + 5.0;
 
-    let mut draw_line = |line: &str, color: Option<Color>, is_header: bool| {
-        let text_x = tooltip_rect.x + text_margin;
-        let mut params = text_params.clone();
-        if let Some(c) = color {
-            params.color = c;
-        }
-        if is_header {
-            params.font_size = header_font_size;
-        }
-        if line.is_empty() {
-            line_y += empty_line_h;
-        } else {
-            draw_text_with_font_tags(line, text_x, line_y, params, true);
-            line_y += line_h;
-        }
-    };
+    let mut draw_line =
+        |line: &str, color: Option<Color>, is_header: bool, status_icon: Option<StatusId>| {
+            let text_x = tooltip_rect.x + text_margin;
+            let mut params = text_params.clone();
+            if let Some(c) = color {
+                params.color = c;
+            }
+            if is_header {
+                params.font_size = header_font_size;
+            }
+            if line.is_empty() {
+                line_y += empty_line_h;
+                0.0
+            } else {
+                let w = draw_text_with_font_tags(line, text_x, line_y, params, true);
 
-    let header_color = if is_keyword_tooltip { ORANGE } else { YELLOW };
+                if let Some(status) = status_icon {
+                    let status_w = 20.0;
+                    draw_status_icon(
+                        status,
+                        text_x + w + 8.0,
+                        line_y - status_w + 5.0,
+                        Some((status_w, status_w)),
+                    );
+                }
 
-    draw_line(header, Some(header_color), true);
+                line_y += line_h;
+                w
+            }
+        };
+
+    let header_color = if is_keyword.is_some() { ORANGE } else { YELLOW };
+
+    let header_status_icon = is_keyword.and_then(|keyword| match keyword {
+        Keyword::Cond(condition) => Some(condition.status_icon()),
+        _ => None,
+    });
+
+    draw_line(header, Some(header_color), true, header_status_icon);
+
     if let Some(error) = error {
-        draw_line(error, Some(RED), false)
+        draw_line(error, Some(RED), false, None);
     }
     for line in physical_content_lines {
-        draw_line(line, None, false)
+        draw_line(line, None, false, None);
     }
-    draw_keyword_tooltips_relative_to_rect(font, keywords, tooltip_rect);
+    draw_keyword_tooltips_relative_to_rect(font, has_keywords, tooltip_rect);
 
     tooltip_rect
 }
@@ -255,7 +272,7 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
             None,
             &[keyword.description().to_string()],
             &[],
-            true,
+            Some(*keyword),
         );
         //y += rect.h;
     }
@@ -270,7 +287,7 @@ pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f
             None,
             &[keyword.description().to_string()],
             &[],
-            true,
+            Some(*keyword),
         );
         y += rect.h;
     }

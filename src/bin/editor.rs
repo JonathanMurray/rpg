@@ -30,8 +30,7 @@ use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_and_init_font_symbols, load_and_init_tiny_font, load_and_init_ui_textures,
-    terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
+    load_and_init_static, terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
 };
 
 const DEFAULT_FILENAME: &str = "ogre_room.json";
@@ -50,9 +49,7 @@ async fn main() {
 
     let resources = GameResources::load().await;
     let ui_resources = UiResources::load().await;
-    load_and_init_font_symbols().await;
-    load_and_init_ui_textures().await;
-    load_and_init_tiny_font().await;
+    load_and_init_static().await;
 
     let mut map_data = MapData::load_from_file(&filepath);
 

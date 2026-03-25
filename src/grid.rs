@@ -52,8 +52,7 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
     pathfind::{
-        build_path_from_chart, ChartNode, Occupation, PathfindGrid, TerrainType,
-        CELLS_PER_ENTITY,
+        build_path_from_chart, ChartNode, Occupation, PathfindGrid, TerrainType, CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
     textures::{

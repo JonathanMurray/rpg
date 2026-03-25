@@ -1,15 +1,10 @@
-use std::{
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{collections::HashMap, rc::Rc};
 
 use indexmap::IndexMap;
 use rand::distr::Distribution;
 
 use crate::{
-    core::{
-        Character, CharacterId, Position,
-    },
+    core::{Character, CharacterId, Position},
     map_data::{create_character, CharacterType, MapData},
     pathfind::{Occupation, PathfindGrid},
     textures::TerrainId,

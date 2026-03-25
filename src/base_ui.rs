@@ -424,7 +424,7 @@ impl Drawable for TextLine {
                     None,
                     lines,
                     &[],
-                    false,
+                    None,
                 );
             }
         }
@@ -512,18 +512,19 @@ pub fn measure_text_with_font_tags(
 
 pub fn draw_text_with_font_tags(
     line: &str,
-    mut x: f32,
+    x: f32,
     y: f32,
     params: TextParams<'_>,
     render_tags: bool,
-) {
+) -> f32 {
+    let mut x0 = x;
     let parts = line.split("|");
     for mut part in parts {
         if let Some((symbol_w, texture)) = TAGS.get(part) {
             if render_tags {
-                draw_texture(texture.get().unwrap(), x, y - 13.0, WHITE);
+                draw_texture(texture.get().unwrap(), x0, y - 13.0, WHITE);
             }
-            x += symbol_w;
+            x0 += symbol_w;
         } else if ["Bob", "Alice", "Clara"].contains(&part) {
             let mut params = params.clone();
             if render_tags {
@@ -534,8 +535,8 @@ pub fn draw_text_with_font_tags(
                     _ => unreachable!(),
                 };
             }
-            let part_dimensions = draw_text_rounded(part, x, y, params);
-            x += part_dimensions.width;
+            let part_dimensions = draw_text_rounded(part, x0, y, params);
+            x0 += part_dimensions.width;
         } else {
             let mut params = params.clone();
             let mut strikethrough = false;
@@ -565,16 +566,17 @@ pub fn draw_text_with_font_tags(
                 strikethrough = true;
             }
 
-            let part_dimensions = draw_text_rounded(part, x, y, params);
+            let part_dimensions = draw_text_rounded(part, x0, y, params);
 
             if strikethrough && render_tags {
                 let y0 = y - part_dimensions.offset_y + part_dimensions.height / 2.0;
-                draw_line(x, y0, x + part_dimensions.width, y0, 2.0, WHITE);
+                draw_line(x0, y0, x0 + part_dimensions.width, y0, 2.0, WHITE);
             }
 
-            x += part_dimensions.width;
+            x0 += part_dimensions.width;
         }
     }
+    x0 - x
 }
 
 pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> TextDimensions {
@@ -856,7 +858,7 @@ impl Container {
                     None,
                     lines,
                     &[],
-                    false,
+                    None,
                 );
             }
         }

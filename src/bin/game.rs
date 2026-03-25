@@ -18,17 +18,15 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{BaseAction, Character, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, CRIPPLING_SHOT, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE,
-    PIERCING_SHOT, SWEEP_ATTACK,
+    PassiveSkill, CRIPPLING_SHOT, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE, PIERCING_SHOT,
+    SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
-use rpg::textures::{
-    load_and_init_font_symbols, load_and_init_tiny_font, load_and_init_ui_textures,
-};
+use rpg::textures::load_and_init_static;
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
 
 #[macroquad::main(window_conf)]
@@ -59,9 +57,7 @@ async fn main() {
 
     let resources = GameResources::load().await;
     let ui_resources = UiResources::load().await;
-    load_and_init_font_symbols().await;
-    load_and_init_tiny_font().await;
-    load_and_init_ui_textures().await;
+    load_and_init_static().await;
 
     let sound_player = SoundPlayer::new().await;
 
@@ -140,10 +136,8 @@ async fn run_demo(
 ) {
     loop {
         let (party, player_characters) = make_low_level_party();
-        let mut player_characters: Vec<Rc<Character>> = player_characters
-            .into_iter()
-            .map(Rc::new)
-            .collect();
+        let mut player_characters: Vec<Rc<Character>> =
+            player_characters.into_iter().map(Rc::new).collect();
 
         let mut demo_sequence = [
             (
@@ -223,8 +217,7 @@ async fn run_demo(
                 .await;
                 break;
             } else if demo_sequence.peek().is_none() {
-                run_game_over_scene(resources, ui_resources, "You have completed the demo!")
-                    .await;
+                run_game_over_scene(resources, ui_resources, "You have completed the demo!").await;
                 break;
             }
 
@@ -280,14 +273,7 @@ async fn grow_players(
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let player_growths = build_player_growths(player_characters, growths, party);
-    run_transition_loop(
-        player_growths,
-        resources,
-        ui_resources,
-        party,
-        sound_player,
-    )
-    .await
+    run_transition_loop(player_growths, resources, ui_resources, party, sound_player).await
 }
 
 async fn run_fight_loop(

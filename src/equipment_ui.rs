@@ -1006,7 +1006,7 @@ impl Drawable for EquipmentSlot {
                     None,
                     &content.tooltip.technical_description,
                     &content.tooltip.keywords,
-                    false,
+                    None,
                 );
             }
         } else if let Some((_texture, tooltip_lines)) = &self.placeholder {

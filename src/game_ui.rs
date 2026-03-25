@@ -15,9 +15,7 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
-use crate::tooltip::{
-    draw_tooltip, Side, TooltipPositionPreference,
-};
+use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
@@ -29,13 +27,12 @@ use crate::{
     character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
-        predict_ability, predict_attack, Ability, AbilityAreaOutcome,
-        AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
-        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
-        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource,
-        GameEvent, HandType, HitType, MovementType, OnAttackedReaction, OnHitReaction,
-        Position, TargetPrediction,
+        predict_ability, predict_attack, Ability, AbilityAreaOutcome, AbilityEnhancement,
+        AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome,
+        Action, ActionReach, ActionTarget, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
+        AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
+        Characters, Condition, CoreGame, DamageSource, GameEvent, HandType, HitType, MovementType,
+        OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -476,7 +473,7 @@ impl CharacterUi {
                 None,
                 &content,
                 &[],
-                false,
+                None,
             );
         }
     }

@@ -1,4 +1,3 @@
-
 use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
 
 use crate::{

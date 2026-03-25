@@ -7,9 +7,8 @@ use rand::{random_bool, random_range, Rng};
 use crate::{
     core::{
         distance_between, sq_distance_between, Ability, AbilityId, AbilityTarget, Action,
-        ActionReach, ActionTarget, Character, CharacterId,
-        Condition, CoreGame, HandType, OnAttackedReaction, OnHitReaction, Position, Range,
-        CENTER_MELEE_RANGE_SQUARED,
+        ActionReach, ActionTarget, Character, CharacterId, Condition, CoreGame, HandType,
+        OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
     },
     data::{HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS},
     pathfind::{Path, PathfindGrid},

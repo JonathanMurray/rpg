@@ -15,8 +15,8 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_debug, draw_text_rounded,
-        Align, Circle, Container, Drawable, Element, LayoutDirection, Style, TextLine,
+        draw_debug, draw_text_rounded, Align, Circle, Container, Drawable, Element,
+        LayoutDirection, Style, TextLine,
     },
     core::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
@@ -1415,6 +1415,6 @@ pub fn draw_button_tooltip(
         tooltip.error,
         &tooltip.content_lines(detailed),
         &tooltip.keywords,
-        false,
+        None,
     );
 }

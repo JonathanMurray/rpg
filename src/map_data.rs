@@ -7,13 +7,13 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind,
-        EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
+        HandType, Party, PlayerId, Position, Shield, Weapon,
     },
     data::{
-        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL, ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE,
-        ENSLAVED_RAPIER, ENSLAVED_SWORD, HULDRA_HEAL, HULDRA_INFLICT_HORRORS,
-        HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD,
+        BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
+        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
+        HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Occupation, PathfindGrid},

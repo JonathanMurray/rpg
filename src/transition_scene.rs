@@ -1,8 +1,4 @@
-use std::{
-    cell::RefCell,
-    collections::HashMap,
-    rc::Rc,
-};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use macroquad::{
     color::{DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
@@ -20,9 +16,7 @@ use crate::{
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
-    core::{
-        BaseAction, Character, Party, PlayerId,
-    },
+    core::{BaseAction, Character, Party, PlayerId},
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
     resources::{GameResources, UiResources},

@@ -1,4 +1,3 @@
-
 use macroquad::{
     color::{GRAY, LIGHTGRAY, WHITE, YELLOW},
     input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},

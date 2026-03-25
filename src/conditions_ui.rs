@@ -6,13 +6,13 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::{Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
+    texture::Texture2D,
 };
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
-    textures::StatusId,
+    textures::{draw_status_icon, StatusId},
     tooltip::{draw_regular_tooltip, Side, TooltipPositionPreference},
 };
 
@@ -95,9 +95,16 @@ impl ConditionsList {
             let y0 = y + y_offset;
             let x0 = x + status_w + 2.0;
 
-            let texture = &self.status_textures[&info.condition.status_icon()];
+            //let texture = &self.status_textures[&info.condition.status_icon()];
             let status_y = y0 + 5.0 - status_w;
             draw_rectangle(x, status_y, status_w, status_w, BLACK);
+            draw_status_icon(
+                info.condition.status_icon(),
+                x,
+                status_y,
+                Some((status_w, status_w)),
+            );
+            /*
             draw_texture_ex(
                 texture,
                 x,
@@ -108,6 +115,7 @@ impl ConditionsList {
                     ..Default::default()
                 },
             );
+             */
 
             let dimensions = draw_text_rounded(&format!("{}", info), x0, y0, text_params.clone());
 
