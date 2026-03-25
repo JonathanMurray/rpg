@@ -260,6 +260,7 @@ pub struct GameGrid {
     ability_character_animation: Option<ParticleGroup>,
     target_damage_previews: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
+    anticipating_character: Option<CharacterId>,
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
 
@@ -324,6 +325,7 @@ impl GameGrid {
             ability_character_animation: Default::default(),
             target_damage_previews: Default::default(),
             character_animations: Default::default(),
+            anticipating_character: None,
             big_font,
             simple_font,
             tiny_font,
@@ -475,6 +477,10 @@ impl GameGrid {
 
     pub fn clear_target_damage_previews(&mut self) {
         self.target_damage_previews.clear();
+    }
+
+    pub fn set_character_anticipation(&mut self, anticipating_character: Option<u32>) {
+        self.anticipating_character = anticipating_character;
     }
 
     pub fn set_character_motion(
@@ -1455,10 +1461,23 @@ impl GameGrid {
             }
         }
 
+        if self.anticipating_character == Some(character.id()) {
+            let dx = oscillate(0.5, -1.0, 1.0);
+            x += dx;
+            shadow_x += dx;
+            y -= oscillate(0.25, 0.0, 2.0)
+        }
+
         if !dying {
             y -= self.cell_w * 0.2;
             shadow_y -= self.cell_w * 0.2;
         }
+
+        x = x.floor();
+        y = y.floor();
+        shadow_x = shadow_x.floor();
+        shadow_y = shadow_y.floor();
+
         draw_texture_ex(
             &self.sprites[&SpriteId::CharacterShadow],
             shadow_x,

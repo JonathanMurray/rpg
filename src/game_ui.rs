@@ -1258,12 +1258,14 @@ impl UserInterface {
 
         let mut is_reacting = None;
         let mut is_reacting_to_attack = false;
+        let mut is_configuring_action = false;
 
         self.sound_player.stop(SoundId::FireCrackle);
         self.sound_player.stop(SoundId::MechanicNoise);
 
         match &mut *self.state.borrow_mut() {
             UiState::ConfiguringAction(ref mut configured_action) => {
+                is_configuring_action = true;
                 self.set_allowed_to_use_action_buttons(true);
 
                 if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
@@ -1357,6 +1359,14 @@ impl UserInterface {
                 self.refresh_reaction_state();
             }
         }
+
+        let anticipating_character = if is_configuring_action {
+            Some(self.active_character_id)
+        } else {
+            None
+        };
+        self.game_grid
+            .set_character_anticipation(anticipating_character);
 
         self.player_portraits.set_reacting_character(is_reacting);
 

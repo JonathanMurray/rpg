@@ -13,7 +13,7 @@ use crate::{
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
     textures::{draw_status_icon, StatusId},
-    tooltip::{draw_regular_tooltip, Side, TooltipPositionPreference},
+    tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
 };
 
 pub struct ConditionsList {
@@ -50,12 +50,14 @@ impl Drawable for ConditionsList {
 
     fn draw_tooltips(&self, _x: f32, _y: f32) {
         if let Some((rect, condition_info)) = self.hovered_tooltip.get() {
-            draw_regular_tooltip(
+            draw_tooltip(
                 &self.font,
                 TooltipPositionPreference::RelativeToRect(rect, Side::Right),
                 condition_info.name,
                 None,
                 &[condition_info.populated_description()],
+                &[],
+                Some(Keyword::Cond(condition_info.condition)),
             );
         }
     }
