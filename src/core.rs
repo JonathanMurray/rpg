@@ -411,7 +411,7 @@ impl CoreGame {
             } => {
                 //let attacker = self.active_character();
                 let attacker = self.characters.get_rc(self.active_character_id);
-                let defender = self.characters.get(target);
+                let defender = self.characters.get_rc(target);
 
                 assert!(
                     attacker
@@ -710,7 +710,7 @@ impl CoreGame {
         mut positions: Vec<Position>,
         movement_type: MovementType,
     ) -> Result<(), QuitEvent> {
-        let character = self.characters.get(character_id);
+        let character = self.characters.get_rc(character_id);
         //dbg!(("perform movement: {:?}", &positions));
         let start_position = positions.remove(0);
         assert!(start_position == character.pos());
@@ -1136,7 +1136,7 @@ impl CoreGame {
                         }
                     }
 
-                    let target = mode.characters().get(*target_id);
+                    let target = mode.characters().get_rc(*target_id);
 
                     if let Some(game) = real_game {
                         assert!(caster.reaches_with_ability(
@@ -1718,7 +1718,7 @@ impl CoreGame {
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
         enemy_effect: AbilityNegativeEffect,
-        target: &Character,
+        target: &Rc<Character>,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
@@ -1765,7 +1765,7 @@ impl CoreGame {
         ability_roll: &AbilityRoll,
         enhancements: &[AbilityEnhancement],
         spell_enemy_effect: SpellNegativeEffect,
-        target: &Character,
+        target: &Rc<Character>,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
@@ -1957,13 +1957,7 @@ impl CoreGame {
                 }
 
                 if are_entities_within_melee(caster.pos(), target.pos()) {
-                    if let Some(previously_engaged) = caster.engagement_target.take() {
-                        game.characters
-                            .get(previously_engaged)
-                            .set_not_engaged_by(caster.id());
-                    }
-                    target.set_engaged_by(Rc::clone(caster));
-                    caster.engagement_target.set(Some(target.id()));
+                    game.perform_engagement(caster, target);
                 }
             }
         }
@@ -1980,6 +1974,26 @@ impl CoreGame {
             applied_effects,
             actual_health_lost,
         }
+    }
+
+    fn perform_engagement(&self, actor: &Rc<Character>, target: &Rc<Character>) {
+        if let Some(previously_engaged) = actor.engagement_target.take() {
+            self.characters
+                .get(previously_engaged)
+                .set_not_engaged_by(actor.id());
+        }
+        target.set_engaged_by(Rc::clone(actor));
+        actor.engagement_target.set(Some(target.id()));
+
+        // Counter engagement happens automatically if the target was "idle"
+        println!("--------------");
+        dbg!(target.engagement_target.get());
+        if target.engagement_target.get().is_none() {
+            target.engagement_target.set(Some(actor.id()));
+            actor.set_engaged_by(Rc::clone(target));
+        }
+        dbg!(target.engagement_target.get());
+        println!("--------------");
     }
 
     fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
@@ -2002,7 +2016,7 @@ impl CoreGame {
         attacker: &Rc<Character>,
         hand_type: HandType,
         enhancements: &[(&'static str, AttackEnhancementEffect)],
-        defender: &Character,
+        defender: &Rc<Character>,
         maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
         ability_roll_modifier: i32,
         mode: ActionPerformanceMode,
@@ -2422,13 +2436,7 @@ impl CoreGame {
             }
 
             if weapon.is_melee() {
-                if let Some(previously_engaged) = attacker.engagement_target.take() {
-                    game.characters
-                        .get(previously_engaged)
-                        .set_not_engaged_by(attacker.id());
-                }
-                defender.set_engaged_by(Rc::clone(attacker));
-                attacker.engagement_target.set(Some(defender.id()));
+                game.perform_engagement(attacker, defender);
             }
         }
 
@@ -2836,7 +2844,7 @@ pub fn predict_attack(
     attacker: &Rc<Character>,
     hand_type: HandType,
     enhancements: &[(&'static str, AttackEnhancementEffect)],
-    defender: &Character,
+    defender: &Rc<Character>,
     reaction: Option<(CharacterId, OnAttackedReaction)>,
     ability_roll_modifier: i32,
 ) -> AttackPrediction {
@@ -4638,7 +4646,7 @@ pub struct Character {
     pub known_passive_skills: RefCell<Vec<PassiveSkill>>,
 
     pub is_engaged_by: RefCell<HashMap<CharacterId, Rc<Character>>>,
-    engagement_target: Cell<Option<CharacterId>>,
+    pub engagement_target: Cell<Option<CharacterId>>,
 
     changed_equipment_listeners: RefCell<Vec<Weak<Cell<bool>>>>,
 
@@ -4893,10 +4901,6 @@ impl Character {
         if self.engagement_target.get() == Some(target) {
             self.engagement_target.set(None);
         }
-    }
-
-    fn is_engaging(&self, target: CharacterId) -> bool {
-        self.engagement_target.get() == Some(target)
     }
 
     pub fn move_speed(&self) -> f32 {

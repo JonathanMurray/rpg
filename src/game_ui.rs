@@ -907,6 +907,7 @@ impl UserInterface {
                 }
             }
 
+            self.refresh_actor_direction();
             self.refresh_target_state();
         }
 
@@ -931,24 +932,58 @@ impl UserInterface {
         player_chose
     }
 
-    fn refresh_movement_state(&mut self) {
-        if let UiState::ConfiguringAction(ConfiguredAction::Move {
-            selected_movement_path,
-            ..
-        }) = &*self.state.borrow()
-        {
-            self.activity_popup.on_new_movement_ap_cost();
-
-            /*
-            if !selected_movement_path.is_empty() {
-                self.target_ui.clear_action();
-            } else {
-                self.target_ui
-                    .set_action("Select a destination".to_string(), vec![], false);
+    fn refresh_actor_direction(&self) {
+        let mut target_pos = None;
+        if let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() {
+            if configured_action.has_target() {
+                target_pos = match configured_action {
+                    ConfiguredAction::Attack {
+                        target: Some(character_id),
+                        ..
+                    } => Some(self.characters.get(*character_id).pos()),
+                    ConfiguredAction::UseAbility { target, .. } => match target {
+                        ActionTarget::Character(character_id, _) => {
+                            Some(self.characters.get(*character_id).pos())
+                        }
+                        ActionTarget::Position(pos) => Some(*pos),
+                        ActionTarget::None => None,
+                    },
+                    _ => None,
+                };
             }
-             */
+        }
 
-            //self.activity_popup.refresh_enabled_state();
+        let character = self.active_character();
+
+        target_pos = target_pos.or_else(|| {
+            character
+                .engagement_target
+                .get()
+                .map(|target_id| self.characters.get(target_id).pos())
+        });
+
+        if let Some(pos) = target_pos {
+            if pos.0 > character.pos().0 {
+                println!("SETTING FACING EAST = true");
+                character.is_facing_east.set(true);
+            } else if pos.0 < character.pos().0 {
+                println!("SETTING FACING EAST = false");
+                character.is_facing_east.set(false);
+            }
+        }
+
+        for engager in character.is_engaged_by.borrow().values() {
+            if engager.pos().0 > character.pos().0 {
+                engager.is_facing_east.set(false);
+            } else if engager.pos().0 < character.pos().0 {
+                engager.is_facing_east.set(true);
+            }
+        }
+    }
+
+    fn refresh_movement_state(&mut self) {
+        if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = &*self.state.borrow() {
+            self.activity_popup.on_new_movement_ap_cost();
         }
     }
 
@@ -986,7 +1021,7 @@ impl UserInterface {
 
         match target {
             Some(target_id) => {
-                let target_char = self.characters.get(*target_id);
+                let target_char = self.characters.get_rc(*target_id);
 
                 let (_range, reach) = self.active_character().reaches_with_attack(
                     attack.hand,
@@ -1375,6 +1410,7 @@ impl UserInterface {
 
         self.maybe_refresh_equipment_state();
 
+        self.refresh_actor_direction();
         self.refresh_target_state();
         self.refresh_movement_state();
 
@@ -1397,7 +1433,7 @@ impl UserInterface {
             unreachable!()
         };
         let attacker = self.characters.get_rc(*attacker);
-        let defender = self.characters.get(*defender);
+        let defender = self.characters.get_rc(*defender);
 
         //dbg!(&selected);
         let prediction = predict_attack(
@@ -2517,7 +2553,7 @@ impl UserInterface {
                     } => {
                         let dst = selected_movement_path.last().unwrap();
                         let total_distance = dst.0;
-                        let positions = selected_movement_path
+                        let positions: Vec<(i32, i32)> = selected_movement_path
                             .iter()
                             .map(|(_dist_from_start, pos)| *pos)
                             .collect();
