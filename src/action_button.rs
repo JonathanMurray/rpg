@@ -1,6 +1,6 @@
 use std::{
     cell::{Cell, Ref, RefCell},
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     rc::Rc,
 };
 
@@ -10,7 +10,6 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, Font, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
@@ -27,7 +26,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
-    textures::IconId,
+    textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::COL_RED,
 };
@@ -705,8 +704,7 @@ pub struct ActionButton {
     pub enabled: Cell<bool>,
     pub selected: Cell<ButtonSelected>,
     pub event_sender: Option<EventSender>,
-    icon: Texture2D,
-    dynamic_icons: HashMap<IconId, Texture2D>,
+    icon: IconId,
     tooltip: RefCell<Tooltip>,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
@@ -727,7 +725,6 @@ impl ActionButton {
         action: ButtonAction,
         event_queue: Option<Rc<RefCell<Vec<InternalUiEvent>>>>,
         id: u32,
-        icons: &HashMap<IconId, Texture2D>,
         character: Option<Rc<Character>>,
         font: &Font,
     ) -> Self {
@@ -803,15 +800,6 @@ impl ActionButton {
             None
         };
 
-        let mut dynamic_icons: HashMap<IconId, Texture2D> = Default::default();
-        if matches!(action, ButtonAction::Action(BaseAction::Attack(..))) {
-            for icon_id in [IconId::MeleeAttack, IconId::RangedAttack] {
-                dynamic_icons.insert(icon_id, icons[&icon_id].clone());
-            }
-            dynamic_icons.insert(IconId::RangedAttack, icons[&IconId::RangedAttack].clone());
-        }
-
-        let icon = icons[&icon].clone();
         Self {
             id,
             action,
@@ -828,7 +816,6 @@ impl ActionButton {
             selected: Cell::new(ButtonSelected::No),
             event_sender: event_queue.map(|queue| EventSender { queue }),
             icon,
-            dynamic_icons,
             tooltip: RefCell::new(tooltip),
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
@@ -1040,13 +1027,8 @@ impl Drawable for ActionButton {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.5));
         }
 
-        let params = DrawTextureParams {
-            dest_size: Some(self.texture_draw_size.into()),
-            ..Default::default()
-        };
-
-        let icon = if matches!(self.action, ButtonAction::Action(BaseAction::Attack(..))) {
-            let icon_id = if self
+        let icon: IconId = if matches!(self.action, ButtonAction::Action(BaseAction::Attack(..))) {
+            if self
                 .character
                 .as_ref()
                 .unwrap()
@@ -1055,13 +1037,12 @@ impl Drawable for ActionButton {
                 IconId::RangedAttack
             } else {
                 IconId::MeleeAttack
-            };
-            &self.dynamic_icons[&icon_id]
+            }
         } else {
-            &self.icon
+            self.icon
         };
 
-        draw_texture_ex(icon, x + 2.0, y + 2.0, WHITE, params);
+        draw_icon(icon, x + 2.0, y + 2.0, Some(self.texture_draw_size));
 
         if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
             let text = hotkey_string(keycode);

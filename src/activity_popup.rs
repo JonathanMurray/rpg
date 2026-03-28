@@ -1,6 +1,5 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
     rc::Rc,
 };
 
@@ -11,7 +10,6 @@ use macroquad::{
     math::Rect,
     shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
-    texture::Texture2D,
 };
 
 use crate::{
@@ -25,7 +23,6 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
-    textures::IconId,
     util::COL_GREEN_0,
 };
 
@@ -36,7 +33,6 @@ const BG_COLOR: Color = BLACK;
 pub struct ActivityPopup {
     characters: Characters,
     relevant_character_id: CharacterId,
-    icons: HashMap<IconId, Texture2D>,
 
     ui_state: Rc<RefCell<UiState>>,
 
@@ -65,7 +61,6 @@ impl ActivityPopup {
     pub fn new(
         font: Font,
         state: Rc<RefCell<UiState>>,
-        icons: HashMap<IconId, Texture2D>,
         characters: Characters,
         active_character_id: CharacterId,
         sound_player: SoundPlayer,
@@ -78,7 +73,6 @@ impl ActivityPopup {
             ButtonAction::Proceed,
             Some(Rc::clone(&proceed_button_events)),
             next_button_id,
-            &icons,
             None,
             &font,
         );
@@ -88,7 +82,6 @@ impl ActivityPopup {
         Self {
             characters,
             relevant_character_id: active_character_id,
-            icons,
             ui_state: state,
             font,
             base_lines: vec![],
@@ -670,7 +663,6 @@ impl ActivityPopup {
             btn_action,
             Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
-            &self.icons,
             None,
             &self.font,
         );
@@ -689,7 +681,6 @@ impl ActivityPopup {
             btn_action,
             Some(Rc::clone(&self.choice_button_events)),
             self.next_button_id.get(),
-            &self.icons,
             Some(character),
             font,
         );

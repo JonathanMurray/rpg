@@ -35,7 +35,7 @@ use crate::{
     },
     non_combat_ui::{NonCombatCharacterUi, PortraitRow},
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId},
+    textures::{EquipmentIconId, PortraitId},
     util::select_n_random,
 };
 
@@ -89,7 +89,6 @@ impl RewardSelectionUi {
         character: Rc<Character>,
         font: Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-        icons: HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         rewards: Vec<(ButtonAction, Option<&'static str>)>,
         next_button_id: &mut u32,
@@ -99,7 +98,6 @@ impl RewardSelectionUi {
             character.clone(),
             &font,
             equipment_icons,
-            &icons,
             portrait_textures,
             sound_player,
         );
@@ -116,7 +114,6 @@ impl RewardSelectionUi {
                         action,
                         Some(Rc::clone(&event_queue)),
                         id,
-                        &icons,
                         Some(Rc::clone(&character)),
                         &font,
                     ),
@@ -388,7 +385,6 @@ pub async fn run_victory_loop(
     player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
 ) -> Vec<Rc<Character>> {
@@ -497,7 +493,6 @@ pub async fn run_victory_loop(
                     Rc::clone(char),
                     font.clone(),
                     equipment_icons,
-                    icons.clone(),
                     portrait_textures,
                     rewards.clone(),
                     &mut next_button_id,

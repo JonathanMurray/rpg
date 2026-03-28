@@ -25,7 +25,7 @@ use crate::{
     equipment_ui::equipment_tooltip,
     non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId},
+    textures::{EquipmentIconId, PortraitId},
     util::select_n_random,
 };
 
@@ -33,7 +33,6 @@ pub async fn run_shop_loop(
     player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     party: &Party,
     entries: &mut Vec<ShopEntry>,
@@ -50,7 +49,6 @@ pub async fn run_shop_loop(
             &characters[..],
             font.clone(),
             equipment_icons,
-            icons.clone(),
             portrait_textures,
             sound_player,
         );

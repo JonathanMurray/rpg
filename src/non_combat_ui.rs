@@ -25,7 +25,7 @@ use crate::{
     game_ui::ResourceBars,
     sounds::SoundPlayer,
     stats_ui::build_character_stats_table,
-    textures::{EquipmentIconId, IconId, PortraitId},
+    textures::{EquipmentIconId, PortraitId},
 };
 
 pub struct PortraitRow {
@@ -93,7 +93,6 @@ impl NonCombatPartyUi {
         characters: &[Rc<Character>],
         font: Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-        icons: HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -105,7 +104,6 @@ impl NonCombatPartyUi {
                     character.clone(),
                     &font,
                     equipment_icons,
-                    &icons,
                     portrait_textures,
                     sound_player.clone(),
                 )
@@ -168,7 +166,6 @@ impl NonCombatCharacterUi {
         character: Rc<Character>,
         font: &Font,
         equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-        icons: &HashMap<IconId, Texture2D>,
         portrait_textures: &HashMap<PortraitId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -185,7 +182,6 @@ impl NonCombatCharacterUi {
                 btn_action,
                 Some(Rc::clone(&event_queue)),
                 next_button_id,
-                icons,
                 character,
                 font,
             );

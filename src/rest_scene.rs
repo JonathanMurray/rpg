@@ -17,14 +17,13 @@ use crate::{
     core::Character,
     non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId},
+    textures::{EquipmentIconId, PortraitId},
 };
 
 pub async fn run_rest_loop(
     mut player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
 ) -> Vec<Rc<Character>> {
     for character in &mut player_characters {
@@ -43,7 +42,6 @@ pub async fn run_rest_loop(
             &characters[..],
             font.clone(),
             equipment_icons,
-            icons.clone(),
             portrait_textures,
             sound_player,
         );

@@ -12,9 +12,8 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::SoundPlayer,
     textures::{
-        load_all_effects, load_all_equipment_icons, load_all_icons, load_all_portraits,
-        load_all_sprites, load_and_init_texture, EffectId, EquipmentIconId, IconId, PortraitId,
-        SpriteId,
+        load_all_effects, load_all_equipment_icons, load_all_portraits, load_all_sprites,
+        load_and_init_texture, EffectId, EquipmentIconId, PortraitId, SpriteId,
     },
 };
 
@@ -65,19 +64,16 @@ impl GameResources {
 #[derive(Clone)]
 pub struct UiResources {
     pub equipment_icons: HashMap<EquipmentIconId, Texture2D>,
-    pub icons: HashMap<IconId, Texture2D>,
     pub portrait_textures: HashMap<PortraitId, Texture2D>,
 }
 
 impl UiResources {
     pub async fn load() -> Self {
         let equipment_icons = load_all_equipment_icons().await;
-        let icons = load_all_icons().await;
         let portrait_textures = load_all_portraits().await;
 
         Self {
             equipment_icons,
-            icons,
             portrait_textures,
         }
     }

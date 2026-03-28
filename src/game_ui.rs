@@ -49,7 +49,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, UI_TEXTURE},
+    textures::{EquipmentIconId, UI_TEXTURE},
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
@@ -523,7 +523,6 @@ impl UserInterface {
 
         let character_uis = build_character_uis(
             &ui_resources.equipment_icons,
-            &ui_resources.icons,
             &event_queue,
             &resources.simple_font,
             characters.iter(),
@@ -578,14 +577,12 @@ impl UserInterface {
         let target_ui = TargetUi::new(
             resources.big_font.clone(),
             resources.simple_font.clone(),
-            ui_resources.icons.clone(),
             ui_resources.portrait_textures.clone(),
         );
 
         let activity_popup = ActivityPopup::new(
             resources.simple_font.clone(),
             ui_state.clone(),
-            ui_resources.icons,
             characters.clone(),
             active_character_id,
             sound_player.clone(),
@@ -2603,7 +2600,6 @@ impl UserInterface {
 
 fn build_character_uis<'a>(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: &HashMap<IconId, Texture2D>,
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
@@ -2622,7 +2618,6 @@ fn build_character_uis<'a>(
 
         let character_ui = build_character_ui(
             equipment_icons,
-            icons,
             event_queue,
             simple_font,
             character,
@@ -2638,7 +2633,6 @@ fn build_character_uis<'a>(
 
 fn build_character_ui(
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: &HashMap<IconId, Texture2D>,
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     character: &Rc<Character>,
@@ -2653,7 +2647,6 @@ fn build_character_ui(
                 btn_action,
                 event_queue,
                 *next_button_id,
-                icons,
                 character,
                 simple_font,
             );

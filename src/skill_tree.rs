@@ -37,9 +37,7 @@ use crate::data::{
     QUICK, RAGE, SCREAM, SEARING_LIGHT, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
-use crate::textures::{
-    load_all_icons, load_all_portraits, load_and_init_static, IconId, PortraitId,
-};
+use crate::textures::{draw_icon, load_all_portraits, load_and_init_static, PortraitId};
 use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
 
@@ -73,8 +71,6 @@ pub async fn run_editor() {
 
     let portraits = load_all_portraits().await;
 
-    let icons = load_all_icons().await;
-
     let (screen_w, screen_h) = screen_size();
 
     let mut nodes: Vec<Rc<RefCell<Node>>> = Default::default();
@@ -102,7 +98,6 @@ pub async fn run_editor() {
                 skill_to_btn_action(*skill),
                 Some(Rc::clone(&grid_events)),
                 n.id,
-                &icons,
                 None,
                 &font,
             );
@@ -220,7 +215,6 @@ pub async fn run_editor() {
             btn_action,
             Some(Rc::clone(&ui_events)),
             btn_id,
-            &icons,
             None,
             &font,
         )))
@@ -450,18 +444,8 @@ pub async fn run_editor() {
             text = Some(format!("PLACING: {:?}", attribute));
         } else if let State::PlacingSkill(skill) = state {
             let btn_action = skill_to_btn_action(skill);
-            let texture = &icons[&btn_action.icon(None)];
             let size = (32.0, 32.0);
-            draw_texture_ex(
-                texture,
-                mouse_x,
-                mouse_y,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(size.into()),
-                    ..Default::default()
-                },
-            );
+            draw_icon(btn_action.icon(None), mouse_x, mouse_y, Some(size));
             draw_dashed_rectangle_lines(mouse_x, mouse_y, size.0, size.1, 1.0, WHITE, 5.0);
 
             text = Some(format!("PLACING: {}", btn_action.name()));
@@ -559,8 +543,6 @@ pub async fn run_skill_tree_scene() {
     let font = load_font(font_path).await;
 
     let portraits = load_all_portraits().await;
-
-    let icons = load_all_icons().await;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -747,7 +729,6 @@ pub async fn run_skill_tree_scene() {
                 }
                 NodeContent::Skill(skill) => {
                     draw_skill_node(
-                        &icons,
                         &grid_events,
                         skill_to_btn_action,
                         icon_w,
@@ -850,7 +831,6 @@ fn draw_skill_node2(icon_w: f32, x: f32, y: f32, btn: &mut ActionButton) {
 }
 
 fn draw_skill_node(
-    icons: &HashMap<IconId, Texture2D>,
     grid_events: &Rc<RefCell<Vec<InternalUiEvent>>>,
     skill_to_btn_action: impl Fn(Skill) -> ButtonAction,
     icon_w: f32,
@@ -863,7 +843,6 @@ fn draw_skill_node(
         skill_to_btn_action(skill),
         Some(Rc::clone(grid_events)),
         0,
-        icons,
         None,
         font,
     );

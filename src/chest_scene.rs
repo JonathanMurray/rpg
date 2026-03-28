@@ -23,7 +23,7 @@ use crate::{
     equipment_ui::equipment_tooltip,
     non_combat_ui::NonCombatPartyUi,
     sounds::SoundPlayer,
-    textures::{EquipmentIconId, IconId, PortraitId},
+    textures::{EquipmentIconId, PortraitId},
     tooltip::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
 };
 
@@ -31,7 +31,6 @@ pub async fn run_chest_loop(
     player_characters: Vec<Rc<Character>>,
     font: Font,
     equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-    icons: HashMap<IconId, Texture2D>,
     portrait_textures: &HashMap<PortraitId, Texture2D>,
     items: &mut Vec<ChestEntry>,
 ) -> Vec<Rc<Character>> {
@@ -47,7 +46,6 @@ pub async fn run_chest_loop(
             &characters[..],
             font.clone(),
             equipment_icons,
-            icons.clone(),
             portrait_textures,
             sound_player,
         );

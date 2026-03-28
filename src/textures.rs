@@ -137,10 +137,6 @@ pub enum IconId {
     Plus,
     PlusPlus,
     Go,
-    EndTurn,
-    X1point5,
-    X2,
-    X3,
     Extend,
     Radius,
     Precision,
@@ -164,66 +160,6 @@ pub enum IconId {
     WeaponProficiency,
     CriticalCharge,
     Reaper,
-}
-
-// TODO: Remove this; instead use icon.png
-pub async fn load_all_icons() -> HashMap<IconId, Texture2D> {
-    load_and_init_textures(vec![
-        (IconId::Fireball, "fireball_icon.png"),
-        (IconId::SearingLight, "searing_light_icon.png"),
-        (IconId::MeleeAttack, "attack_icon.png"),
-        (IconId::RangedAttack, "ranged_attack_icon.png"),
-        (IconId::PiercingShot, "piercing_shot_icon.png"),
-        (IconId::Block, "block_icon.png"),
-        (IconId::Brace, "brace_icon.png"),
-        (IconId::Move, "move_icon.png"),
-        (IconId::Scream, "scream_icon.png"),
-        (IconId::Mindblast, "mindblast_icon.png"),
-        (IconId::NecroticInfluence, "necrotic_influence_icon.png"),
-        (IconId::Go, "go_icon.png"),
-        (IconId::EndTurn, "endturn_icon.png"),
-        (IconId::Parry, "parry_icon.png"),
-        (IconId::Sidestep, "sidestep_icon.png"),
-        (IconId::Tackle, "shove_icon.png"),
-        (IconId::ShieldBash, "shieldbash_icon.png"),
-        (IconId::Rage, "rage_icon.png"),
-        (IconId::CrushingStrike, "crushing_strike_icon.png"),
-        (IconId::Banshee, "banshee_icon.png"),
-        (IconId::Dualcast, "dualcast_icon.png"),
-        (IconId::AllIn, "all_in_icon.png"),
-        (IconId::CarefulAim, "careful_aim_icon.png"),
-        (IconId::CripplingShot, "crippling_shot_icon.png"),
-        (IconId::TrueStrike, "true_strike_icon.png"),
-        (IconId::SpellAdvantage, "spell_adv_icon.png"),
-        (IconId::Plus, "plus_icon.png"),
-        (IconId::PlusPlus, "plus_plus_icon.png"),
-        (IconId::Smite, "smite_icon.png"),
-        (IconId::X1point5, "x1_5.png"),
-        (IconId::X2, "x2.png"),
-        (IconId::X3, "x3.png"),
-        (IconId::Extend, "extend.png"),
-        (IconId::Radius, "radius.png"),
-        (IconId::Precision, "precision_icon.png"),
-        (IconId::Equip, "equip.png"),
-        (IconId::UseConsumable, "use_consumable_icon.png"),
-        (IconId::ShackledMind, "shackled_mind.png"),
-        (IconId::Haste, "haste_icon.png"),
-        (IconId::QuickStrike, "quick_strike_icon.png"),
-        (IconId::Heal, "heal_icon.png"),
-        (IconId::SweepAttack, "sweep_attack_icon.png"),
-        (IconId::LungeAttack, "lunge_attack_icon.png"),
-        (IconId::Slashing, "slashing_icon.png"),
-        (IconId::Stabbing, "stabbing_icon.png"),
-        (IconId::Feint, "deceptive_icon.png"),
-        (IconId::Inferno, "inferno_icon.png"),
-        (IconId::Energize, "energize_icon.png"),
-        (IconId::HardenedSkin, "hardened_skin_icon.png"),
-        (IconId::WeaponProficiency, "weapon_proficiency_icon.png"),
-        (IconId::CriticalCharge, "critical_charge_icon.png"),
-        (IconId::Reaper, "reaper_icon.png"),
-        (IconId::Inspire, "inspire_icon.png"),
-    ])
-    .await
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -755,6 +691,87 @@ pub async fn load_and_init_static() {
 
     let status_icon_atlas = load_and_init_texture("status.png").await;
     STATUS_ICONS_TEXTURE.get_or_init(|| status_icon_atlas);
+
+    let icon_atlas = load_and_init_texture("icon.png").await;
+    ICONS_TEXTURE.get_or_init(|| icon_atlas);
+}
+
+pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
+    let x = x.floor();
+    let y = y.floor();
+    let texture = ICONS_TEXTURE.get().unwrap();
+    let (col, row): (i32, i32) = match icon {
+        IconId::Fireball => (0, 1),
+        IconId::SearingLight => (2, 1),
+        IconId::MeleeAttack => (6, 8),
+        IconId::RangedAttack => (6, 7),
+        IconId::PiercingShot => (7, 7),
+        IconId::Block => (8, 7),
+        IconId::Brace => (5, 2),
+        IconId::Move => (0, 4),
+        IconId::Scream => (6, 1),
+        IconId::Mindblast => (7, 1),
+        IconId::NecroticInfluence => (1, 1),
+        IconId::Parry => (9, 7),
+        IconId::Sidestep => (2, 7),
+        IconId::Tackle => (3, 7),
+        IconId::ShieldBash => (5, 7),
+        IconId::Rage => (2, 6),
+        IconId::CrushingStrike => (4, 7),
+        IconId::CarefulAim => (8, 8),
+        IconId::CripplingShot => (7, 8),
+        IconId::TrueStrike => (5, 6),
+        IconId::SpellAdvantage => (3, 1),
+        IconId::Banshee => (0, 2),
+        IconId::Dualcast => (1, 2),
+        IconId::AllIn => (4, 7),
+        IconId::Plus => (4, 9),
+        IconId::PlusPlus => (5, 9),
+        IconId::Go => (3, 4),
+        IconId::Extend => (0, 6),
+        IconId::Radius => (3, 6),
+        IconId::Precision => (4, 6),
+        IconId::Equip => (1, 4),
+        IconId::UseConsumable => (2, 4),
+        IconId::ShackledMind => (9, 1),
+        IconId::Haste => (2, 2),
+        IconId::Smite => (2, 8),
+        IconId::QuickStrike => (3, 8),
+        IconId::SweepAttack => (4, 8),
+        IconId::LungeAttack => (5, 8),
+        IconId::Slashing => (0, 8),
+        IconId::Stabbing => (1, 8),
+        IconId::Feint => (0, 7),
+        IconId::Heal => (6, 1),
+        IconId::Inferno => (3, 2),
+        IconId::Energize => (4, 1),
+        IconId::Inspire => (4, 2),
+        IconId::HardenedSkin => (3, 0),
+        IconId::WeaponProficiency => (2, 0),
+        IconId::CriticalCharge => (1, 0),
+        IconId::Reaper => (0, 0),
+    };
+    let icon_w = 30.0;
+    let icon_h = 24.0;
+    let dest_size = dest_size
+        .map(|s| s.into())
+        .unwrap_or((icon_w, icon_h).into());
+    draw_texture_ex(
+        texture,
+        x,
+        y,
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(dest_size),
+            source: Some(Rect::new(
+                col as f32 * icon_w,
+                row as f32 * icon_h,
+                icon_w,
+                icon_h,
+            )),
+            ..Default::default()
+        },
+    );
 }
 
 pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -859,6 +876,7 @@ pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

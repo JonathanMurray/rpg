@@ -23,7 +23,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{IconId, PortraitId},
+    textures::PortraitId,
     util::COL_RED,
 };
 
@@ -37,7 +37,6 @@ pub struct TargetUi {
     container: Container,
 
     //action: Option<(String, Vec<(&'static str, Goodness)>, bool)>,
-    icons: HashMap<IconId, Texture2D>,
     button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
@@ -49,7 +48,6 @@ impl TargetUi {
     pub fn new(
         big_font: Font,
         simple_font: Font,
-        icons: HashMap<IconId, Texture2D>,
         portrait_textures: HashMap<PortraitId, Texture2D>,
     ) -> Self {
         Self {
@@ -58,7 +56,6 @@ impl TargetUi {
             simple_font,
             container: Container::default(),
             //action: None,
-            icons,
             button_events: Default::default(),
             hovered_btn: Default::default(),
             buttons: Default::default(),
@@ -238,7 +235,6 @@ impl TargetUi {
                         action,
                         Some(Rc::clone(&self.button_events)),
                         next_btn_id,
-                        &self.icons,
                         Some(Rc::clone(char)),
                         &self.simple_font,
                     );

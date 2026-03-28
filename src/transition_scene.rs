@@ -170,7 +170,6 @@ pub async fn run_transition_loop(
                         *action,
                         Some(Rc::clone(&event_queue)),
                         next_btn_id,
-                        &ui_resources.icons,
                         Some(Rc::clone(char)),
                         simple_font,
                     );
