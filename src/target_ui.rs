@@ -23,7 +23,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::{IconId, PortraitId, StatusId},
+    textures::{IconId, PortraitId},
     util::COL_RED,
 };
 
@@ -41,7 +41,6 @@ pub struct TargetUi {
     button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
-    status_textures: HashMap<StatusId, Texture2D>,
     portrait_textures: HashMap<PortraitId, Texture2D>,
     pub last_drawn_rectangle: Cell<Rect>,
 }
@@ -51,7 +50,6 @@ impl TargetUi {
         big_font: Font,
         simple_font: Font,
         icons: HashMap<IconId, Texture2D>,
-        status_textures: HashMap<StatusId, Texture2D>,
         portrait_textures: HashMap<PortraitId, Texture2D>,
     ) -> Self {
         Self {
@@ -64,7 +62,6 @@ impl TargetUi {
             button_events: Default::default(),
             hovered_btn: Default::default(),
             buttons: Default::default(),
-            status_textures,
             portrait_textures,
             last_drawn_rectangle: Default::default(),
         }
@@ -378,11 +375,8 @@ impl TargetUi {
             }
 
             if !char.condition_infos().is_empty() {
-                let conditions_list = ConditionsList::new(
-                    self.simple_font.clone(),
-                    char.condition_infos(),
-                    self.status_textures.clone(),
-                );
+                let conditions_list =
+                    ConditionsList::new(self.simple_font.clone(), char.condition_infos());
 
                 rows.push(Element::Box(Box::new(conditions_list)));
             }

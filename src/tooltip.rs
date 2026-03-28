@@ -1,15 +1,15 @@
 use macroquad::{
-    color::{Color, GRAY, GREEN, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
     miniquad::window::screen_size,
-    shapes::{draw_rectangle, draw_rectangle_lines},
+    shapes::draw_rectangle,
     text::{Font, TextParams},
 };
 
 use crate::{
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
     core::{Condition, Goodness},
-    drawing::{draw_cornered_rectangle_lines, draw_rounded_rectangle_lines},
+    drawing::draw_rounded_rectangle_lines,
     textures::{draw_status_icon, StatusId},
 };
 

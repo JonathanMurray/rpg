@@ -20,8 +20,9 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
-        SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
+        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL,
+        MANA_SMALL_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL,
+        SWORD_SYMBOL, WARNING_SYMBOL,
     },
     tooltip::{draw_tooltip, Side, TooltipPositionPreference},
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
@@ -588,7 +589,7 @@ pub fn draw_text_rounded(text: &str, x: f32, y: f32, params: TextParams) -> Text
 pub struct Rectangle {
     pub size: (f32, f32),
     pub style: Style,
-    pub texture: Option<Texture2D>,
+    pub texture: Option<StatusId>,
     pub has_been_hovered: Cell<bool>,
 }
 
@@ -596,16 +597,7 @@ impl Drawable for Rectangle {
     fn draw(&self, x: f32, y: f32) {
         self.style.draw(x, y, self.size);
         if let Some(texture) = &self.texture {
-            draw_texture_ex(
-                texture,
-                x,
-                y,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(self.size.into()),
-                    ..Default::default()
-                },
-            );
+            draw_status_icon(*texture, x, y, Some(self.size));
         }
         if Rect::new(x, y, self.size.0, self.size.1).contains(mouse_position().into()) {
             self.has_been_hovered.set(true);

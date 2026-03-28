@@ -49,7 +49,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, IconId, StatusId, UI_TEXTURE},
+    textures::{EquipmentIconId, IconId, UI_TEXTURE},
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 
@@ -503,7 +503,6 @@ pub struct UserInterface {
     target_ui: TargetUi,
     log: Log,
     sound_player: SoundPlayer,
-    status_textures: HashMap<StatusId, Texture2D>,
 
     faster_movement: Rc<Cell<bool>>,
     settings: Container,
@@ -528,7 +527,6 @@ impl UserInterface {
             &event_queue,
             &resources.simple_font,
             characters.iter(),
-            resources.status_textures.clone(),
             sound_player.clone(),
         );
 
@@ -552,7 +550,6 @@ impl UserInterface {
             init_state.background,
             init_state.terrain_objects,
             init_state.decorations,
-            resources.status_textures.clone(),
             resources.effect_textures.clone(),
             sound_player.clone(),
         );
@@ -564,7 +561,6 @@ impl UserInterface {
             active_character_id,
             resources.simple_font.clone(),
             ui_resources.portrait_textures.clone(),
-            resources.status_textures.clone(),
             sound_player.clone(),
         );
 
@@ -583,7 +579,6 @@ impl UserInterface {
             resources.big_font.clone(),
             resources.simple_font.clone(),
             ui_resources.icons.clone(),
-            resources.status_textures.clone(),
             ui_resources.portrait_textures.clone(),
         );
 
@@ -632,7 +627,6 @@ impl UserInterface {
             target_ui,
             state: ui_state,
             sound_player,
-            status_textures: resources.status_textures,
             faster_movement,
             settings,
         }
@@ -1880,16 +1874,12 @@ impl UserInterface {
                 condition,
             } => {
                 let character = self.characters.get(character);
-                let texture = self
-                    .status_textures
-                    .get(&condition.status_icon())
-                    .unwrap()
-                    .clone();
+
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
                     2.0,
-                    Some(texture),
+                    Some(condition.status_icon()),
                     condition.name().to_string(),
                     TextEffectStyle::HostileEffect,
                 );
@@ -2150,12 +2140,7 @@ impl UserInterface {
             let mut texture = None;
             for apply_effect in applied_effects {
                 if let ApplyEffect::Condition(condition) = apply_effect {
-                    texture = Some(
-                        self.status_textures
-                            .get(&condition.condition.status_icon())
-                            .unwrap()
-                            .clone(),
-                    );
+                    texture = Some(condition.condition.status_icon());
                 }
                 s.push_str(&format!("{} ", apply_effect));
             }
@@ -2223,12 +2208,7 @@ impl UserInterface {
                         let mut s = String::new();
                         let mut texture = None;
                         if let ApplyEffect::Condition(condition) = *apply_effect {
-                            texture = Some(
-                                self.status_textures
-                                    .get(&condition.condition.status_icon())
-                                    .unwrap()
-                                    .clone(),
-                            );
+                            texture = Some(condition.condition.status_icon());
                         }
                         s.push_str(&format!("{} ", apply_effect));
                         effects.push((texture, s, TextEffectStyle::HostileEffect, 2.0));
@@ -2244,12 +2224,7 @@ impl UserInterface {
                     let mut s = String::new();
                     let mut texture = None;
                     if let ApplyEffect::Condition(condition) = *apply_effect {
-                        texture = Some(
-                            self.status_textures
-                                .get(&condition.condition.status_icon())
-                                .unwrap()
-                                .clone(),
-                        );
+                        texture = Some(condition.condition.status_icon());
                     }
                     s.push_str(&format!("{} ", apply_effect));
                     let style = if matches!(apply_effect, ApplyEffect::GainHealth(..)) {
@@ -2632,7 +2607,6 @@ fn build_character_uis<'a>(
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
-    status_textures: HashMap<StatusId, Texture2D>,
     sound_player: SoundPlayer,
 ) -> HashMap<u32, CharacterUi> {
     let mut next_button_id = 1;
@@ -2653,7 +2627,6 @@ fn build_character_uis<'a>(
             simple_font,
             character,
             &mut next_button_id,
-            status_textures.clone(),
             Rc::clone(&character_sheet_screen_pos),
             sound_player.clone(),
         );
@@ -2670,7 +2643,6 @@ fn build_character_ui(
     simple_font: &Font,
     character: &Rc<Character>,
     next_button_id: &mut u32,
-    status_textures: HashMap<StatusId, Texture2D>,
     character_sheet_screen_pos: Rc<RefCell<(f32, f32)>>,
     sound_player: SoundPlayer,
 ) -> CharacterUi {
@@ -2820,7 +2792,7 @@ fn build_character_ui(
         attack_enhancement_buttons_for_character_sheet,
         ability_buttons_for_character_sheet,
         passive_buttons_for_character_sheet,
-        ConditionsList::new(simple_font.clone(), vec![], status_textures.clone()),
+        ConditionsList::new(simple_font.clone(), vec![]),
         character_sheet_screen_pos,
         sound_player,
     );

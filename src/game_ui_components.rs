@@ -22,7 +22,7 @@ use crate::{
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     sounds::{SoundId, SoundPlayer},
-    textures::{PortraitId, StatusId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
+    textures::{PortraitId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
 };
 use indexmap::IndexMap;
@@ -365,7 +365,6 @@ impl PlayerPortraits {
         active_id: CharacterId,
         font: Font,
         portrait_textures: HashMap<PortraitId, Texture2D>,
-        status_textures: HashMap<StatusId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
@@ -381,7 +380,6 @@ impl PlayerPortraits {
                         character,
                         font.clone(),
                         texture,
-                        status_textures.clone(),
                         sound_player.clone(),
                     ))),
                 );
@@ -562,7 +560,6 @@ pub struct PlayerCharacterPortrait {
     texture: Texture2D,
     status_column: Element,
     status_rects: Vec<Rc<RefCell<Rectangle>>>,
-    status_textures: HashMap<StatusId, Texture2D>,
     done_text: TextLine,
     end_turn_text: TextLine,
     pub has_clicked_end_turn: Cell<bool>,
@@ -580,7 +577,6 @@ impl PlayerCharacterPortrait {
         character: &Rc<Character>,
         font: Font,
         texture: Texture2D,
-        status_textures: HashMap<StatusId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let mut text = TextLine::new(character.name, 20, WHITE, Some(font.clone()));
@@ -627,7 +623,6 @@ impl PlayerCharacterPortrait {
             texture,
             status_column,
             status_rects,
-            status_textures,
             done_text,
             end_turn_text,
             has_clicked_end_turn: Cell::new(false),
@@ -651,8 +646,7 @@ impl PlayerCharacterPortrait {
             match statuses.get(i) {
                 Some(info) => {
                     status_rect.borrow_mut().style.background_color = Some(BLACK);
-                    status_rect.borrow_mut().texture =
-                        Some(self.status_textures[&info.condition.status_icon()].clone());
+                    status_rect.borrow_mut().texture = Some(info.condition.status_icon());
                     if status_rect.borrow().has_been_hovered.take() {
                         self.hovered_status_rect.set(Some((i, *info)));
                     }

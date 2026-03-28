@@ -56,8 +56,8 @@ use crate::{
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
-        character_sprite_height, draw_terrain, draw_tiny_font, measure_tiny_font, EffectId,
-        SpriteId, StatusId, TerrainId, TinyFontColor,
+        character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
+        EffectId, SpriteId, StatusId, TerrainId, TinyFontColor,
     },
     util::{line_visitor, oscillate, rgb, COL_RED},
 };
@@ -277,7 +277,6 @@ pub struct GameGrid {
     locked_inspection_target: Option<CharacterId>,
     hovered_character: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
-    status_textures: HashMap<StatusId, Texture2D>,
     effect_textures: HashMap<EffectId, Texture2D>,
 
     sound_player: SoundPlayer,
@@ -296,7 +295,6 @@ impl GameGrid {
         background: IndexMap<Position, TerrainId>,
         terrain_objects: IndexMap<Position, TerrainId>,
         decorations: IndexMap<Position, TerrainId>,
-        status_textures: HashMap<StatusId, Texture2D>,
         effect_textures: HashMap<EffectId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -333,7 +331,6 @@ impl GameGrid {
             background,
             terrain_objects,
             decorations,
-            status_textures,
             effect_textures,
             sound_player,
         };
@@ -966,7 +963,7 @@ impl GameGrid {
         position: Position,
         start_time: f32,
         duration: f32,
-        status_texture: Option<Texture2D>,
+        status_texture: Option<StatusId>,
         text: impl Into<String>,
         style: TextEffectStyle,
     ) {
@@ -3003,18 +3000,9 @@ impl GameGrid {
             let mut status_x =
                 box_x + box_w / 2.0 - (condition_infos.len() as f32 * status_w) / 2.0;
             for info in condition_infos {
-                let texture = &self.status_textures[&info.condition.status_icon()];
+                let texture = info.condition.status_icon();
                 draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
-                draw_texture_ex(
-                    texture,
-                    status_x,
-                    status_y,
-                    WHITE,
-                    DrawTextureParams {
-                        dest_size: Some((status_w, status_w).into()),
-                        ..Default::default()
-                    },
-                );
+                draw_status_icon(texture, status_x, status_y, Some((status_w, status_w)));
                 draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 /*
                 if let Some(stacks) = info.stacks {
@@ -3754,7 +3742,7 @@ pub enum EffectGraphics {
 
 #[derive(Debug)]
 struct TextEffect {
-    status_texture: Option<Texture2D>,
+    status_texture: Option<StatusId>,
     text: String,
     font: Font,
     font_size: u16,
@@ -3881,16 +3869,7 @@ impl EffectGraphics {
                     let status_x = x0 - status_w - 3.0;
                     let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
                     draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
-                    draw_texture_ex(
-                        texture,
-                        status_x,
-                        status_y,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some((status_w, status_w).into()),
-                            ..Default::default()
-                        },
-                    );
+                    draw_status_icon(*texture, status_x, status_y, Some((status_w, status_w)));
                     draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 }
 

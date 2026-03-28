@@ -13,8 +13,8 @@ use crate::{
     sounds::SoundPlayer,
     textures::{
         load_all_effects, load_all_equipment_icons, load_all_icons, load_all_portraits,
-        load_all_sprites, load_all_status_textures, load_and_init_texture, EffectId,
-        EquipmentIconId, IconId, PortraitId, SpriteId, StatusId,
+        load_all_sprites, load_and_init_texture, EffectId, EquipmentIconId, IconId, PortraitId,
+        SpriteId,
     },
 };
 
@@ -26,7 +26,6 @@ pub struct GameResources {
     pub decorative_font: Font,
     pub tiny_font: Font,
     pub terrain_atlas: Texture2D,
-    pub status_textures: HashMap<StatusId, Texture2D>,
     pub effect_textures: HashMap<EffectId, Texture2D>,
 }
 
@@ -49,7 +48,6 @@ impl GameResources {
         //let tiny_font = load_font("tiny5/Tiny5-SolidRegular.ttf").await;
 
         let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
-        let status_textures = load_all_status_textures().await;
         let effect_textures = load_all_effects().await;
 
         Self {
@@ -59,7 +57,6 @@ impl GameResources {
             decorative_font,
             tiny_font,
             terrain_atlas,
-            status_textures,
             effect_textures,
         }
     }

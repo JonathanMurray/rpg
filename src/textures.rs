@@ -107,37 +107,6 @@ pub enum StatusId {
     Dead,
 }
 
-// TODO: Remove this; instead use STATUS_ICONS_TEXTURE
-pub async fn load_all_status_textures() -> HashMap<StatusId, Texture2D> {
-    load_and_init_textures(vec![
-        (
-            StatusId::PlaceholderNegative,
-            "status_placeholder_negative.png",
-        ),
-        (
-            StatusId::PlaceholderPositive,
-            "status_placeholder_positive.png",
-        ),
-        (StatusId::Burning, "status_burning.png"),
-        (StatusId::Protected, "status_protected.png"),
-        (StatusId::Dazed, "status_dazed.png"),
-        (StatusId::Bleeding, "status_bleeding.png"),
-        (StatusId::Healing, "status_healing.png"),
-        (StatusId::Blinded, "status_blinded.png"),
-        (StatusId::Hindered, "status_hindered.png"),
-        (StatusId::Exposed, "status_exposed.png"),
-        (StatusId::Slowed, "status_slowed.png"),
-        (StatusId::Hastened, "status_hastened.png"),
-        (StatusId::Inspired, "status_inspired.png"),
-        (StatusId::CriticalCharge, "status_arcane_surge.png"),
-        (StatusId::ReaperApCooldown, "status_reaper_cooldown.png"),
-        (StatusId::Rage, "status_rage.png"),
-        (StatusId::NearDeath, "status_near_death.png"),
-        (StatusId::Dead, "status_dead.png"),
-    ])
-    .await
-}
-
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
     Fireball,

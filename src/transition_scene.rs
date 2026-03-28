@@ -120,7 +120,6 @@ pub async fn run_transition_loop(
     let characters: Vec<(Rc<Character>, CharacterGrowth)> = player_characters;
 
     let portrait_textures = &ui_resources.portrait_textures;
-    let status_textures = &resources.status_textures;
     let simple_font = &resources.simple_font;
     let big_font = &resources.big_font;
     let event_queue = Rc::new(RefCell::new(vec![]));
@@ -137,7 +136,6 @@ pub async fn run_transition_loop(
                 char,
                 simple_font.clone(),
                 texture,
-                status_textures.clone(),
                 sound_player.clone(),
             );
             let name = Element::Text(TextLine::new(char.name, 18, WHITE, Some(big_font.clone())));

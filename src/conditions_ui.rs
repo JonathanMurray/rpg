@@ -1,4 +1,4 @@
-use std::{cell::Cell, collections::HashMap};
+use std::cell::Cell;
 
 use macroquad::{
     color::{BLACK, WHITE},
@@ -6,37 +6,30 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::{Font, TextParams},
-    texture::Texture2D,
 };
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable},
     core::ConditionInfo,
-    textures::{draw_status_icon, StatusId},
-    tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
+    textures::draw_status_icon,
+    tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
 };
 
 pub struct ConditionsList {
     pub font: Font,
     pub infos: Vec<ConditionInfo>,
     size: Cell<(f32, f32)>,
-    status_textures: HashMap<StatusId, Texture2D>,
     hovered_tooltip: Cell<Option<(Rect, ConditionInfo)>>,
 }
 
 impl ConditionsList {
-    pub fn new(
-        font: Font,
-        infos: Vec<ConditionInfo>,
-        status_textures: HashMap<StatusId, Texture2D>,
-    ) -> Self {
+    pub fn new(font: Font, infos: Vec<ConditionInfo>) -> Self {
         // We need to start out with an accurate height, to prevent the parent container from "flickering" the first time it renders
         let approx_size = (1.0, infos.len() as f32 * CONDITIONS_LIST_LINE_H);
         Self {
             font,
             infos,
             size: Cell::new(approx_size),
-            status_textures,
             hovered_tooltip: Default::default(),
         }
     }
@@ -97,7 +90,6 @@ impl ConditionsList {
             let y0 = y + y_offset;
             let x0 = x + status_w + 2.0;
 
-            //let texture = &self.status_textures[&info.condition.status_icon()];
             let status_y = y0 + 5.0 - status_w;
             draw_rectangle(x, status_y, status_w, status_w, BLACK);
             draw_status_icon(
