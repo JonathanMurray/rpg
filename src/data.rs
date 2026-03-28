@@ -117,7 +117,7 @@ pub const DAGGER: Weapon = Weapon {
 };
 
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
-    name: "Slashing",
+    name: "Slashing 4",
     description: "Inflict |<keyword>Bleeding|",
     icon: IconId::Slashing,
     stamina_cost: 2,
@@ -163,7 +163,7 @@ pub const BAD_SWORD: Weapon = Weapon {
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
@@ -178,7 +178,7 @@ pub const ENSLAVED_SWORD: Weapon = Weapon {
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
@@ -193,7 +193,7 @@ pub const ENSLAVED_RAPIER: Weapon = Weapon {
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
@@ -208,7 +208,7 @@ pub const SWORD: Weapon = Weapon {
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
@@ -223,7 +223,7 @@ pub const ZERO_SWORD: Weapon = Weapon {
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(SLASHING),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Sword),
     icon: EquipmentIconId::Sword,
@@ -269,7 +269,7 @@ pub const BAD_RAPIER: Weapon = Weapon {
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(FEINT),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
@@ -284,7 +284,7 @@ pub const RAPIER: Weapon = Weapon {
     grip: WeaponGrip::MainHand,
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(FEINT),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Rapier),
     icon: EquipmentIconId::Rapier,
@@ -312,7 +312,7 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
@@ -328,7 +328,7 @@ pub const WAR_HAMMER: Weapon = Weapon {
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: None,
     sprite: Some(SpriteId::Warhammer),
     icon: EquipmentIconId::Warhammer,
@@ -344,7 +344,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
-    on_attacked_reaction: Some(PARRY),
+    on_attacked_reaction: Some(PARRY_2),
     on_true_hit: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
         ApplyCondition {
             condition: Condition::Dazed,
@@ -483,7 +483,7 @@ pub const BAD_SMALL_SHIELD: Shield = Shield {
 pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::ShieldBash,
     name: "Knockback",
-    description: "|<keyword>Push| the target away in a straight line",
+    description: "|<keyword>Push| the target",
     // TODO: unique icon
     icon: IconId::Extend,
     stamina_cost: 1,
@@ -601,7 +601,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 0,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(BLOCK),
+    on_attacked_reaction: Some(BLOCK_3),
     weight: 2,
 };
 
@@ -612,7 +612,7 @@ pub const MEDIUM_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 1,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(BLOCK),
+    on_attacked_reaction: Some(BLOCK_3),
     weight: 3,
 };
 
@@ -716,32 +716,34 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
     ..AttackEnhancement::default()
 };
 
-pub const PARRY: OnAttackedReaction = OnAttackedReaction {
+pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Parry,
-    name: "Parry",
-    description: "Protect against melee attack (1 per round)",
+    name: "Parry 2",
+    description: "Protect yourself (1 melee attack per round)",
     icon: IconId::Parry,
     action_point_cost: 0,
     stamina_cost: 2,
     effect: OnAttackedReactionEffect {
-        bonus_evasion: 7,
+        bonus_evasion: 0,
         bonus_armor: 0,
+        damage_prevention: 2,
     },
     required_attack_type: Some(AttackType::Melee),
     used_hand: Some(HandType::MainHand),
     target: OnAttackedReactionTarget::OnlySelf,
 };
 
-pub const BLOCK: OnAttackedReaction = OnAttackedReaction {
+pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
-    name: "Block",
+    name: "Block 3",
     description: "Protect yourself or adjacent ally (1 attack per round)",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect {
         bonus_evasion: 0,
-        bonus_armor: 3,
+        bonus_armor: 0,
+        damage_prevention: 3,
     },
     required_attack_type: None,
     used_hand: Some(HandType::OffHand),
@@ -758,6 +760,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     effect: OnAttackedReactionEffect {
         bonus_evasion: 10,
         bonus_armor: 0,
+        damage_prevention: 0,
     },
     required_attack_type: None,
     used_hand: None,

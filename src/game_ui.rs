@@ -1840,7 +1840,7 @@ impl UserInterface {
             } => {
                 let character = self.characters.get(character);
                 self.log.add(format!(
-                    "|{}| took {} damage from {}",
+                    "|{}| took |<value>{}| damage from {}",
                     character.name,
                     amount,
                     source.name()

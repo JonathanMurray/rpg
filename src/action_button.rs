@@ -141,6 +141,12 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     if reaction.effect.bonus_armor > 0 {
         technical_description.push(format!("|<value>+{}| armor", reaction.effect.bonus_armor));
     }
+    if reaction.effect.damage_prevention > 0 {
+        technical_description.push(format!(
+            "Reduces damage by |<value>{}|",
+            reaction.effect.damage_prevention
+        ));
+    }
 
     Tooltip {
         header: format!(

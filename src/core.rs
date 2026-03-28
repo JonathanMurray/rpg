@@ -2050,6 +2050,7 @@ impl CoreGame {
         let mut detail_lines = vec![];
 
         let mut armor_value = defender.protection_from_armor();
+        let mut damage_prevention = None;
 
         if let Some((reactor, reaction)) = maybe_reaction {
             if let Some(game) = game {
@@ -2090,6 +2091,10 @@ impl CoreGame {
                     ));
                 }
                 armor_value += bonus_armor;
+            }
+
+            if reaction.effect.damage_prevention > 0 {
+                damage_prevention = Some((reaction.name, reaction.effect.damage_prevention));
             }
 
             /*
@@ -2272,6 +2277,11 @@ impl CoreGame {
                     on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
                 }
+            }
+
+            if let Some((name, amount)) = damage_prevention {
+                dmg_str.push_str(&format!("- {} |<faded>({})|", amount, name));
+                dmg_calculation -= amount as i32;
             }
 
             if defender.conditions.borrow().has(&Condition::Protected) {
@@ -3512,6 +3522,7 @@ pub enum OnAttackedReactionId {
 pub struct OnAttackedReactionEffect {
     pub bonus_evasion: u32,
     pub bonus_armor: u32,
+    pub damage_prevention: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

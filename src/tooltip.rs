@@ -38,7 +38,7 @@ impl Keyword {
             Keyword::Cond(condition) => condition.description(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result",
             Keyword::Pushed => {
-                "Moves up to |<value>x| steps. On collision: |<value>1| damage per remaining distance"
+                "Distance: |<value>x|. On collision: take |<value>1| damage per remaining distance"
             }
             Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
             Keyword::Crit => "|<value>+50%| effect. Triggers on |<dice>| roll is 16 or higher",
