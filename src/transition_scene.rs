@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use macroquad::{
     color::{DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
@@ -16,7 +16,8 @@ use crate::{
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
-    core::{BaseAction, Character, Party, PlayerId},
+    core::{BaseAction, Character, EquipmentEntry, EquipmentSlotRole, HandType, Party, PlayerId},
+    equipment_ui::EquipmentSlot,
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
     resources::{GameResources, UiResources},
@@ -25,13 +26,15 @@ use crate::{
 
 pub struct CharacterGrowth {
     new_skills: Vec<ButtonAction>,
+    new_equipment: Vec<EquipmentEntry>,
     pub is_new_joiner: bool,
 }
 
 impl CharacterGrowth {
-    pub fn just_new_skills(new_skills: Vec<ButtonAction>) -> Self {
+    pub fn of(new_skills: Vec<ButtonAction>, new_equipment: Vec<EquipmentEntry>) -> Self {
         Self {
             new_skills,
+            new_equipment,
             is_new_joiner: false,
         }
     }
@@ -40,6 +43,7 @@ impl CharacterGrowth {
         Self {
             new_skills: vec![],
             is_new_joiner: false,
+            new_equipment: vec![],
         }
     }
 
@@ -47,6 +51,7 @@ impl CharacterGrowth {
         Self {
             new_skills: vec![],
             is_new_joiner: true,
+            new_equipment: vec![],
         }
     }
 }
@@ -85,6 +90,20 @@ pub async fn run_transition_loop(
                         char.learn_passive(*passive);
                     }
                     other => todo!("handle growth: {:?}", other),
+                }
+            }
+
+            for new_eq in &growth.new_equipment {
+                match *new_eq {
+                    EquipmentEntry::Weapon(weapon) => char.set_weapon(HandType::MainHand, weapon),
+                    EquipmentEntry::Shield(shield) => char.set_shield(shield),
+                    EquipmentEntry::Armor(armor_piece) => char.armor_piece.set(Some(armor_piece)),
+                    _ => {
+                        let gained = char.try_gain_equipment(*new_eq);
+                        if !gained {
+                            println!("WARN: {} couldn't gain equipment: {:?}", char.name, new_eq)
+                        }
+                    }
                 }
             }
 
@@ -159,6 +178,7 @@ pub async fn run_transition_loop(
                 align: Align::Center,
                 margin: 10.0,
                 children: portrait_rows,
+                min_width: Some(200.0),
                 ..Default::default()
             };
             let mut char_sections = vec![Element::Container(portrait_section)];
@@ -195,14 +215,47 @@ pub async fn run_transition_loop(
                         Element::Text(TextLine::new(header, 18, WHITE, Some(big_font.clone()))),
                         Element::Container(buttons_row),
                     ],
+                    min_width: Some(200.0),
                     ..Default::default()
                 };
                 char_sections.push(Element::Container(skills_section));
             }
 
+            if !growth.new_equipment.is_empty() {
+                let mut slots: Vec<Element> = vec![];
+                for eq_entry in &growth.new_equipment {
+                    let texture = ui_resources.equipment_icons[&eq_entry.icon()].clone();
+                    let slot = EquipmentSlot::new(
+                        simple_font.clone(),
+                        Some((texture, *eq_entry)),
+                        EquipmentSlotRole::Inventory(0),
+                        None,
+                    );
+                    slots.push(Element::boxed(slot));
+                }
+                let slots_row = Container {
+                    layout_dir: LayoutDirection::Horizontal,
+                    margin: 5.0,
+                    children: slots,
+                    ..Default::default()
+                };
+                let header = "New equipment";
+                let eq_section = Container {
+                    layout_dir: LayoutDirection::Vertical,
+                    margin: 15.0,
+                    align: Align::Center,
+                    children: vec![
+                        Element::Text(TextLine::new(header, 18, WHITE, Some(big_font.clone()))),
+                        Element::Container(slots_row),
+                    ],
+                    ..Default::default()
+                };
+                char_sections.push(Element::Container(eq_section));
+            }
+
             let char_row = Container {
                 layout_dir: LayoutDirection::Horizontal,
-                margin: 70.0,
+                margin: 10.0,
                 children: char_sections,
                 ..Default::default()
             };
@@ -251,10 +304,10 @@ pub async fn run_transition_loop(
         let mid_y = screen_height() / 2.0;
         let mut hovered_btn = None;
         loop {
-            container.draw(
-                mid_x - container_size.0 / 2.0,
-                mid_y - container_size.1 / 2.0,
-            );
+            let x = mid_x - container_size.0 / 2.0;
+            let y = mid_y - container_size.1 / 2.0;
+            container.draw(x, y);
+            container.draw_tooltips(x, y);
 
             for event in event_queue.borrow_mut().drain(..) {
                 if let InternalUiEvent::ButtonHovered(hover_event) = event {

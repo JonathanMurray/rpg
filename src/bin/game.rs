@@ -15,11 +15,11 @@ use macroquad::{
 };
 
 use rpg::action_button::ButtonAction;
-use rpg::core::{BaseAction, Character, Party, PlayerId};
+use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, CRIPPLING_SHOT, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE, PIERCING_SHOT,
-    SWEEP_ATTACK,
+    PassiveSkill, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE,
+    HEAL, HEALTH_POTION, HEAL_ENERGIZE, LEATHER_ARMOR, MANA_POTION, PIERCING_SHOT, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -74,22 +74,59 @@ async fn run_demo(
         let mut player_characters: Vec<Rc<Character>> =
             player_characters.into_iter().map(Rc::new).collect();
 
+        //player_characters.push(Rc::new(make_medium_clara(&party)));
+
+        // TODO
+        /*
+           player_characters = grow_players(
+               player_characters,
+               vec![
+                   (
+                       PlayerId::Alice,
+                       CharacterGrowth::of(
+                           vec![ButtonAction::Action(BaseAction::UseAbility(PIERCING_SHOT))],
+                           vec![],
+                       ),
+                   ),
+                   (
+                       PlayerId::Bob,
+                       CharacterGrowth::of(
+                           vec![ButtonAction::Passive(PassiveSkill::Reaper)],
+                           vec![EquipmentEntry::Armor(LEATHER_ARMOR)],
+                       ),
+                   ),
+               ]
+               .into_iter()
+               .collect(),
+               resources,
+               ui_resources,
+               &party,
+               sound_player.clone(),
+           )
+           .await;
+        */
+        // -------------------------
+
         let mut demo_sequence = [
             (
                 FightId::EasyCluster,
                 vec![
                     (
                         PlayerId::Bob,
-                        CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
-                            BaseAction::UseAbility(SWEEP_ATTACK),
-                        )]),
+                        CharacterGrowth::of(
+                            vec![ButtonAction::Action(BaseAction::UseAbility(SWEEP_ATTACK))],
+                            vec![EquipmentEntry::Consumable(ENERGY_POTION)],
+                        ),
                     ),
                     (
                         PlayerId::Alice,
-                        CharacterGrowth::just_new_skills(vec![
-                            ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                            ButtonAction::Action(BaseAction::UseAbility(HEAL)),
-                        ]),
+                        CharacterGrowth::of(
+                            vec![
+                                ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
+                                ButtonAction::Action(BaseAction::UseAbility(HEAL)),
+                            ],
+                            vec![],
+                        ),
                     ),
                 ],
             ),
@@ -97,10 +134,15 @@ async fn run_demo(
                 FightId::Medium,
                 vec![
                     (
+                        PlayerId::Bob,
+                        CharacterGrowth::of(vec![], vec![EquipmentEntry::Armor(LEATHER_ARMOR)]),
+                    ),
+                    (
                         PlayerId::Alice,
-                        CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
-                            HEAL_ENERGIZE,
-                        )]),
+                        CharacterGrowth::of(
+                            vec![ButtonAction::AbilityEnhancement(HEAL_ENERGIZE)],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
+                        ),
                     ),
                     (PlayerId::Clara, CharacterGrowth::new_joiner()),
                 ],
@@ -110,21 +152,24 @@ async fn run_demo(
                 vec![
                     (
                         PlayerId::Alice,
-                        CharacterGrowth::just_new_skills(vec![ButtonAction::Action(
-                            BaseAction::UseAbility(PIERCING_SHOT),
-                        )]),
+                        CharacterGrowth::of(
+                            vec![ButtonAction::Action(BaseAction::UseAbility(PIERCING_SHOT))],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
+                        ),
                     ),
                     (
                         PlayerId::Clara,
-                        CharacterGrowth::just_new_skills(vec![ButtonAction::AbilityEnhancement(
-                            FIREBALL_MASSIVE,
-                        )]),
+                        CharacterGrowth::of(
+                            vec![ButtonAction::AbilityEnhancement(FIREBALL_MASSIVE)],
+                            vec![],
+                        ),
                     ),
                     (
                         PlayerId::Bob,
-                        CharacterGrowth::just_new_skills(vec![ButtonAction::Passive(
-                            PassiveSkill::Reaper,
-                        )]),
+                        CharacterGrowth::of(
+                            vec![ButtonAction::Passive(PassiveSkill::Reaper)],
+                            vec![EquipmentEntry::Consumable(HEALTH_POTION)],
+                        ),
                     ),
                 ],
             ),

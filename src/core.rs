@@ -3645,7 +3645,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|, |<keyword>Disadvantage| on attacks.",
-            Blinded => "|<keyword>Disadvantage|, always Flanked when attacked.",
+            Blinded => "|<keyword>Disadvantage|, always |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn, |<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn, |<value>+25%| movement",
@@ -3665,7 +3665,7 @@ impl Condition {
             NearDeath => "|<value>-1| AP regen, |<keyword>Disadvantage| on actions, enemies have |<keyword>Advantage|. (Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
-            BloodRage => "|<value>+5| |<dice>| |<stat>Attack| (passive skill).",
+            BloodRage => "|<value>+3| |<dice>| |<stat>Attack| (passive skill).",
             CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
