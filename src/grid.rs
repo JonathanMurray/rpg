@@ -352,12 +352,27 @@ impl GameGrid {
         }
     }
 
+    /// Should only be called from editor; not from in-game!
     pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
             if terrain_id.is_new_water() {
-                self.pathfind_grid.set_water(pos);
+                self.pathfind_grid.set_water(pos, true);
             }
+            self.auto_tile();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
+        if let Some(terrain_id) = self.decorations.get(&pos) {
+            if terrain_id.is_new_water() {
+                self.pathfind_grid.set_water(pos, false);
+            }
+            self.decorations.swap_remove(&pos);
             self.auto_tile();
             true
         } else {
@@ -385,43 +400,7 @@ impl GameGrid {
     pub fn auto_tile_terrain(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
         for (pos, mut terrain_id) in self.terrain_objects.iter() {
-            if terrain_id.is_new_water() {
-                let mut neighbors = vec![];
-                let neighbor_positions = &[
-                    // west
-                    (pos.0 - 3, pos.1),
-                    // east
-                    (pos.0 + 3, pos.1),
-                    // north
-                    (pos.0, pos.1 - 3),
-                    // south
-                    (pos.0, pos.1 + 3),
-                ];
-                for neighbor_pos in neighbor_positions {
-                    let is_neighbor_new_water = self
-                        .terrain_objects
-                        .get(neighbor_pos)
-                        .map(|n| n.is_new_water())
-                        .unwrap_or(false);
-                    neighbors.push(is_neighbor_new_water);
-                }
-                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
-                    (true, true, true, true) => &TerrainId::NewWater,
-                    (false, true, true, true) => &TerrainId::NewWaterWest,
-                    (false, true, false, true) => &TerrainId::NewWaterNorthWest,
-                    (true, true, false, true) => &TerrainId::NewWaterNorth,
-                    (true, false, false, true) => &TerrainId::NewWaterNorthEast,
-                    (true, false, true, true) => &TerrainId::NewWaterEast,
-                    (true, false, true, false) => &TerrainId::NewWaterSouthEast,
-                    (true, true, true, false) => &TerrainId::NewWaterSouth,
-                    (false, true, true, false) => &TerrainId::NewWaterSouthWest,
-
-                    neighbors => {
-                        println!("WARN: No water tile fits neighbors: {:?}", neighbors);
-                        &TerrainId::NewWaterSouth
-                    }
-                };
-            } else if terrain_id.is_stone_wall() {
+            if terrain_id.is_stone_wall() {
                 let mut neighbors = vec![];
                 let neighbor_positions = &[
                     // west
@@ -504,7 +483,12 @@ impl GameGrid {
                         .get(neighbor_pos)
                         .map(|n| n.is_new_water())
                         .unwrap_or(false);
-                    neighbors.push(is_neighbor_new_water);
+                    let is_neighbor_wall = self
+                        .terrain_objects
+                        .get(neighbor_pos)
+                        .map(|t| t.is_stone_wall())
+                        .unwrap_or(false);
+                    neighbors.push(is_neighbor_new_water || is_neighbor_wall);
                 }
                 terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
                     (true, true, true, true) => &TerrainId::NewWater,
@@ -516,6 +500,12 @@ impl GameGrid {
                     (true, false, true, false) => &TerrainId::NewWaterSouthEast,
                     (true, true, true, false) => &TerrainId::NewWaterSouth,
                     (false, true, true, false) => &TerrainId::NewWaterSouthWest,
+                    (false, true, false, false) => &TerrainId::NewWaterThinWest,
+                    (true, false, false, false) => &TerrainId::NewWaterThinEast,
+                    (false, false, true, false) => &TerrainId::NewWaterThinSouth,
+                    (false, false, false, true) => &TerrainId::NewWaterThinNorth,
+                    (true, true, false, false) => &TerrainId::NewWaterThinHor,
+                    (false, false, true, true) => &TerrainId::NewWaterThinVert,
 
                     neighbors => {
                         println!("WARN: No water tile fits neighbors: {:?}", neighbors);

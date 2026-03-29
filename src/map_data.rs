@@ -52,7 +52,7 @@ pub fn create_game_grid(
     }
     for (pos, terrain_id) in &map_data.decorations {
         if terrain_id.is_new_water() {
-            pathfind_grid.set_water(*pos);
+            pathfind_grid.set_water(*pos, true);
         }
     }
 

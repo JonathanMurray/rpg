@@ -93,23 +93,31 @@ impl PathfindGrid {
         self.occupied.borrow()
     }
 
-    pub fn set_water(&self, pos: Position) {
+    pub fn set_water(&self, pos: Position, value: bool) {
         let mut water = self.water.borrow_mut();
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
-                assert!(
-                    !water.contains(&(x, y)),
-                    "Cannot mark {:?} as water. Already marked",
-                    pos
-                );
-                water.insert((x, y));
+                if value {
+                    if water.contains(&(x, y)) {
+                        println!("WARN: {:?} is already marked as water", pos);
+                    }
+                    water.insert((x, y));
+                } else {
+                    assert!(
+                        water.contains(&(x, y)),
+                        "Cannot unmark {:?} as water. It's not marked",
+                        pos
+                    );
+                    water.remove(&(x, y));
+                }
             }
         }
     }
 
     pub fn is_character_in_water(&self, pos: Position) -> bool {
         for x in pos.0 - 1..=pos.0 + 1 {
-            for y in pos.1 - 1..=pos.1 + 1 {
+            // The top row of cells doesn't need to be on water cells for the char to be visibly in water
+            for y in pos.1..=pos.1 + 1 {
                 if !self.water.borrow().contains(&(x, y)) {
                     return false;
                 }

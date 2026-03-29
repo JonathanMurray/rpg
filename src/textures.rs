@@ -318,15 +318,111 @@ pub enum TerrainId {
     SuitOfArmor,
     AnimalHead,
 
+    /*
+       +----
+       |XXXX
+       |XXXX
+    */
     NewWaterNorthWest,
+
+    /*
+       ---
+       XXX
+       XXX
+    */
     NewWaterNorth,
+
+    /*
+        ---+
+        XXX|
+        XXX|
+    */
     NewWaterNorthEast,
+
+    /*
+       |XXX
+       |XXX
+    */
     NewWaterWest,
+
+    /*
+       XXX
+       XXX
+    */
     NewWater,
+
+    /*
+       XXX|
+       XXX|
+    */
     NewWaterEast,
+
+    /*
+       |XXX
+       |XXX
+       +---
+    */
     NewWaterSouthWest,
+
+    /*
+       XXX
+       XXX
+       ---
+    */
     NewWaterSouth,
+
+    /*
+       XXX|
+       XXX|
+       ---+
+    */
     NewWaterSouthEast,
+
+    /*
+       +---
+       |XXX
+       |XXX
+       +---
+    */
+    NewWaterThinWest,
+
+    /*
+       ---+
+       XXX|
+       XXX|
+       ---+
+    */
+    NewWaterThinEast,
+
+    /*
+       +---+
+       |XXX|
+       |XXX|
+
+    */
+    NewWaterThinNorth,
+
+    /*
+
+       |XXX|
+       |XXX|
+       +---+
+    */
+    NewWaterThinSouth,
+
+    /*
+       ---
+       XXX
+       XXX
+       ---
+    */
+    NewWaterThinHor,
+
+    /*
+       |XXX|
+       |XXX|
+    */
+    NewWaterThinVert,
 
     Water,
     WaterBeachNorth,
@@ -357,6 +453,13 @@ impl TerrainId {
             TerrainId::NewWaterSouthWest => true,
             TerrainId::NewWaterSouth => true,
             TerrainId::NewWaterSouthEast => true,
+            TerrainId::NewWaterThinWest => true,
+            TerrainId::NewWaterThinEast => true,
+            TerrainId::NewWaterThinNorth => true,
+            TerrainId::NewWaterThinSouth => true,
+            TerrainId::NewWaterThinHor => true,
+            TerrainId::NewWaterThinVert => true,
+
             _ => false,
         }
     }
@@ -462,6 +565,24 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
             rotation = PI;
             (5, 9)
         }
+        TerrainId::NewWaterThinWest => (6, 11),
+        TerrainId::NewWaterThinEast => {
+            rotation = PI;
+            (6, 11)
+        }
+        TerrainId::NewWaterThinNorth => {
+            rotation = 0.5 * PI;
+            (6, 11)
+        }
+        TerrainId::NewWaterThinSouth => {
+            rotation = 1.5 * PI;
+            (6, 11)
+        }
+        TerrainId::NewWaterThinHor => (7, 9),
+        TerrainId::NewWaterThinVert => {
+            rotation = 0.5 * PI;
+            (7, 9)
+        }
 
         TerrainId::StoneWall => (1, 7),
         TerrainId::StoneWallConcaveNorthWest => (0, 12),
@@ -544,6 +665,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
             (col, row) = (5, 11);
         } else if (col, row) == (5, 9) {
             (col, row) = (6, 9);
+        } else if (col, row) == (6, 11) {
+            (col, row) = (7, 11);
+        } else if (col, row) == (7, 9) {
+            (col, row) = (7, 10);
         }
     }
 

@@ -339,10 +339,7 @@ async fn main() {
                             }
                         }
                         EditorAction::EraseDecoration => {
-                            if game_grid.decorations.contains_key(&pos) {
-                                game_grid.decorations.swap_remove(&pos);
-                                game_grid.auto_tile();
-
+                            if game_grid.editor_remove_decoration(pos) {
                                 map_data.decorations.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
