@@ -352,6 +352,19 @@ impl GameGrid {
         }
     }
 
+    pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
+        if !self.decorations.contains_key(&pos) {
+            self.decorations.insert(pos, terrain_id);
+            if terrain_id.is_new_water() {
+                self.pathfind_grid.set_water(pos);
+            }
+            self.auto_tile();
+            true
+        } else {
+            false
+        }
+    }
+
     /// Should only be called from editor; not from in-game!
     pub fn editor_add_character(&mut self, character_id: CharacterId, character: Rc<Character>) {
         self.characters.insert(character_id, character);
@@ -2552,7 +2565,6 @@ impl GameGrid {
             ActionTarget::Position(target_pos) => {
                 let cannot_reach =
                     matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
-                println!("draw pos crosshair (player target, based on reach)");
                 self.draw_target_crosshair(
                     active_char_pos,
                     target_pos,

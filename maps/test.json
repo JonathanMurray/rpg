@@ -47,11 +47,7 @@
     "(4, 37)": "StoneWallConvexNorthEast",
     "(7, 37)": "StoneWallConvexNorthEast",
     "(14, 9)": "Cauldron2",
-    "(18, 7)": "Cauldron2",
-    "(20, 24)": "NewWaterNorthEast",
-    "(23, 24)": "NewWaterNorthEast",
-    "(20, 27)": "NewWaterNorthEast",
-    "(23, 27)": "NewWaterNorthEast"
+    "(18, 7)": "Cauldron2"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -236,7 +232,16 @@
     "(1, 16)": "WallOpeningWest",
     "(28, 16)": "WallOpeningEast",
     "(28, 26)": "WallOpeningEast",
-    "(1, 26)": "WallOpeningWest"
+    "(1, 26)": "WallOpeningWest",
+    "(10, 22)": "NewWaterNorthEast",
+    "(13, 22)": "NewWaterNorthEast",
+    "(16, 22)": "NewWaterNorthEast",
+    "(19, 22)": "NewWaterNorthEast",
+    "(16, 25)": "NewWaterNorthEast",
+    "(19, 25)": "NewWaterNorthEast",
+    "(13, 25)": "NewWaterNorthEast",
+    "(10, 25)": "NewWaterNorthEast",
+    "(28, 28)": "NewWaterNorthEast"
   },
   "characters": [
     {

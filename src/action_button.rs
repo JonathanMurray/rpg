@@ -21,7 +21,7 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, DefenseType, HandType,
+        AttackEnhancementOnHitEffect, BaseAction, Character, DamageType, DefenseType, HandType,
         OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
     },
     data::PassiveSkill,
@@ -642,12 +642,17 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             };
 
             match effect.damage {
-                Some(AbilityDamage::Static(n)) => t
-                    .technical_description
-                    .push(format!("  |<sword>| |<value>{}|", n)),
-                Some(AbilityDamage::AtLeast(n)) => t
-                    .technical_description
-                    .push(format!("  |<sword>| |<value>{}|", n)),
+                Some(ability_dmg) => {
+                    let (value, dmg_type) = match ability_dmg {
+                        AbilityDamage::Static(n, dmg_type) => (n, dmg_type),
+                        AbilityDamage::AtLeast(n, dmg_type) => (n, dmg_type),
+                    };
+                    let mut line = format!("  |<sword>| |<value>{}|", value);
+                    if matches!(dmg_type, DamageType::Fire) {
+                        line.push_str(" (fire)");
+                    }
+                    t.technical_description.push(line);
+                }
                 None => {}
             }
 

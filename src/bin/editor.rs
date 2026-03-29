@@ -301,8 +301,7 @@ async fn main() {
                             }
                         }
                         EditorAction::PlaceDecoration(terrain_id) => {
-                            if !game_grid.decorations.contains_key(&pos) {
-                                game_grid.decorations.insert(pos, *terrain_id);
+                            if game_grid.editor_add_decoration(pos, *terrain_id) {
                                 map_data.decorations.insert(pos, *terrain_id);
                                 has_unsaved_changes = true;
                             }
@@ -323,24 +322,27 @@ async fn main() {
                             }
                         }
                         EditorAction::EraseBackground => {
-                            if game_grid.background.contains_key(&mouse_grid_pos) {
-                                game_grid.background.swap_remove(&mouse_grid_pos);
+                            if game_grid.background.contains_key(&pos) {
+                                game_grid.background.swap_remove(&pos);
                                 map_data.background.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
                         }
                         EditorAction::EraseTerrain => {
-                            if game_grid.terrain_objects.contains_key(&mouse_grid_pos) {
+                            if game_grid.terrain_objects.contains_key(&pos) {
                                 game_grid.pathfind_grid.set_occupied(pos, None);
-                                game_grid.terrain_objects.swap_remove(&mouse_grid_pos);
+                                game_grid.terrain_objects.swap_remove(&pos);
                                 game_grid.auto_tile();
+
                                 map_data.terrain_objects.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
                         }
                         EditorAction::EraseDecoration => {
-                            if game_grid.decorations.contains_key(&mouse_grid_pos) {
-                                game_grid.decorations.swap_remove(&mouse_grid_pos);
+                            if game_grid.decorations.contains_key(&pos) {
+                                game_grid.decorations.swap_remove(&pos);
+                                game_grid.auto_tile();
+
                                 map_data.decorations.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
@@ -474,7 +476,6 @@ impl Sidebar {
             TerrainId::Boulder2,
             TerrainId::TreeStump,
             TerrainId::Table,
-            TerrainId::NewWaterNorthEast,
             TerrainId::StoneWallConvexNorthEast,
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
@@ -497,6 +498,7 @@ impl Sidebar {
             TerrainId::Mat,
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
+            TerrainId::NewWaterNorthEast,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()

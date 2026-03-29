@@ -105,6 +105,7 @@ pub enum StatusId {
     Rage,
     NearDeath,
     Dead,
+    Wet,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -797,6 +798,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::Rage => (2, 1),
         StatusId::NearDeath => (4, 2),
         StatusId::Dead => (2, 3),
+        StatusId::Wet => (3, 3),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

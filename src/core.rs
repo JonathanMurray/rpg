@@ -833,10 +833,19 @@ impl CoreGame {
 
             character.set_position(new_position);
 
+            if self.pathfind_grid.is_character_in_water(new_position) {
+                self.perform_receive_condition(
+                    ApplyCondition {
+                        condition: Condition::Wet,
+                        stacks: None,
+                        duration_rounds: Some(1),
+                    },
+                    character,
+                );
+            }
+
             step_idx += 1;
         }
-
-        dbg!(character.pos());
 
         self.on_character_positions_changed();
 
@@ -1804,16 +1813,18 @@ impl CoreGame {
             let mut dmg_calculation;
             let mut increased_by_good_roll = true;
             let mut dmg_str = "  Damage: ".to_string();
+            let is_fire_dmg;
 
             match ability_damage {
-                AbilityDamage::Static(n) => {
+                AbilityDamage::Static(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     increased_by_good_roll = false;
-
+                    is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
-                AbilityDamage::AtLeast(n) => {
+                AbilityDamage::AtLeast(n, dmg_type) => {
                     dmg_calculation = n as i32;
+                    is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
             };
@@ -1837,6 +1848,11 @@ impl CoreGame {
             } else if increased_by_good_roll && hit_type == HitType::Critical {
                 dmg_str.push_str(" +50% |<faded>(Crit)|");
                 dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+            }
+
+            if target.has_condition(&Condition::Wet) && is_fire_dmg {
+                dmg_str.push_str(" -25% |<faded>(Wet)|");
+                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
             }
 
             if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
@@ -3605,6 +3621,7 @@ pub enum Condition {
     ArcaneSurge,
     HealthPotionRecovering,
     Ferocity,
+    Wet,
 }
 
 impl Condition {
@@ -3638,6 +3655,7 @@ impl Condition {
             ArcaneSurge => "Arcane surge",
             HealthPotionRecovering => "Recovering",
             Ferocity => "Ferocity",
+            Wet => "Wet",
         }
     }
 
@@ -3653,7 +3671,6 @@ impl Condition {
             Exposed => "|<value>-3| to all |<shield>|, |<value>-50%| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes no more than |<value>1| damage from the next attack.",
-            //Bleeding => "Deals |<value>x| damage over time. (50% of remaining at the end of each turn)",
             Bleeding => "End of turn: lose |<value>x| health. Halved every turn.",
             Burning => "End of turn: deals |<value>x| damage. 50% spreads to adjacent.",
             Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
@@ -3671,7 +3688,8 @@ impl Condition {
             Adrenalin => "|<value>+1| AP per turn.",
             ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|. Decays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
-            Ferocity => "|<value>+x| attack damage"
+            Ferocity => "|<value>+x| attack damage",
+            Wet => "Takes |<value>-25%| fire damage",
         }
     }
 
@@ -3705,6 +3723,7 @@ impl Condition {
             ArcaneSurge => true,
             HealthPotionRecovering => true,
             Ferocity => true,
+            Wet => true,
         }
     }
 
@@ -3738,6 +3757,7 @@ impl Condition {
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
             Ferocity => StatusId::Rage,
+            Wet => StatusId::Wet,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -4192,9 +4212,15 @@ impl AbilityAttackEffect {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
+pub enum DamageType {
+    Regular,
+    Fire,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityDamage {
-    Static(u32),
-    AtLeast(u32),
+    Static(u32, DamageType),
+    AtLeast(u32, DamageType),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
