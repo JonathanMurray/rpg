@@ -51,9 +51,7 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{
-        build_path_from_chart, ChartNode, Occupation, PathfindGrid, TerrainType, CELLS_PER_ENTITY,
-    },
+    pathfind::{ChartNode, Occupation, PathNode, PathfindGrid, TerrainType, CELLS_PER_ENTITY},
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
@@ -347,7 +345,7 @@ impl GameGrid {
             self.pathfind_grid
                 .set_occupied(pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
             self.terrain_objects.insert(pos, terrain_id);
-            self.auto_tile_terrain_objects();
+            self.auto_tile();
             true
         } else {
             false
@@ -366,7 +364,12 @@ impl GameGrid {
         self.on_removed_character(character_id);
     }
 
-    pub fn auto_tile_terrain_objects(&mut self) {
+    pub fn auto_tile(&mut self) {
+        self.auto_tile_terrain();
+        self.auto_tile_decorations();
+    }
+
+    pub fn auto_tile_terrain(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
         for (pos, mut terrain_id) in self.terrain_objects.iter() {
             if terrain_id.is_new_water() {
@@ -465,6 +468,51 @@ impl GameGrid {
             new_map.insert(*pos, *terrain_id);
         }
         self.terrain_objects = new_map;
+    }
+
+    pub fn auto_tile_decorations(&mut self) {
+        let mut new_map: IndexMap<Position, TerrainId> = Default::default();
+        for (pos, mut terrain_id) in self.decorations.iter() {
+            if terrain_id.is_new_water() {
+                let mut neighbors = vec![];
+                let neighbor_positions = &[
+                    // west
+                    (pos.0 - 3, pos.1),
+                    // east
+                    (pos.0 + 3, pos.1),
+                    // north
+                    (pos.0, pos.1 - 3),
+                    // south
+                    (pos.0, pos.1 + 3),
+                ];
+                for neighbor_pos in neighbor_positions {
+                    let is_neighbor_new_water = self
+                        .decorations
+                        .get(neighbor_pos)
+                        .map(|n| n.is_new_water())
+                        .unwrap_or(false);
+                    neighbors.push(is_neighbor_new_water);
+                }
+                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                    (true, true, true, true) => &TerrainId::NewWater,
+                    (false, true, true, true) => &TerrainId::NewWaterWest,
+                    (false, true, false, true) => &TerrainId::NewWaterNorthWest,
+                    (true, true, false, true) => &TerrainId::NewWaterNorth,
+                    (true, false, false, true) => &TerrainId::NewWaterNorthEast,
+                    (true, false, true, true) => &TerrainId::NewWaterEast,
+                    (true, false, true, false) => &TerrainId::NewWaterSouthEast,
+                    (true, true, true, false) => &TerrainId::NewWaterSouth,
+                    (false, true, true, false) => &TerrainId::NewWaterSouthWest,
+
+                    neighbors => {
+                        println!("WARN: No water tile fits neighbors: {:?}", neighbors);
+                        &TerrainId::NewWaterSouth
+                    }
+                };
+            }
+            new_map.insert(*pos, *terrain_id);
+        }
+        self.decorations = new_map;
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
@@ -1466,8 +1514,20 @@ impl GameGrid {
         }
 
         if !dying {
-            y -= self.cell_w * 0.2;
-            shadow_y -= self.cell_w * 0.2;
+            y -= self.cell_w * 0.5;
+            shadow_y -= self.cell_w * 0.5;
+        }
+
+        let standing_in_water = self.pathfind_grid.is_character_in_water(character.pos());
+
+        let mut character_params = params.clone();
+        if standing_in_water {
+            let water_depth_factor = 0.125;
+            character_params.source =
+                Some(Rect::new(0.0, 0.0, 32.0, 32.0 * (1.0 - water_depth_factor)));
+            character_params.dest_size.as_mut().unwrap().y *= 1.0 - water_depth_factor;
+            y += water_depth_factor * self.cell_w * 3.0;
+            shadow_y += water_depth_factor * self.cell_w * 1.0;
         }
 
         x = x.floor();
@@ -1475,30 +1535,33 @@ impl GameGrid {
         shadow_x = shadow_x.floor();
         shadow_y = shadow_y.floor();
 
-        draw_texture_ex(
-            &self.sprites[&SpriteId::CharacterShadow],
-            shadow_x,
-            shadow_y,
-            WHITE,
-            DrawTextureParams {
-                dest_size: Some(
-                    (
-                        self.cell_w * CELLS_PER_ENTITY as f32,
-                        self.cell_w * CELLS_PER_ENTITY as f32,
-                    )
-                        .into(),
-                ),
-                flip_x: character.is_facing_east.get(),
-                ..Default::default()
-            },
-        );
+        if true {
+            // !standing_in_water {
+            draw_texture_ex(
+                &self.sprites[&SpriteId::CharacterShadow],
+                shadow_x,
+                shadow_y,
+                WHITE,
+                DrawTextureParams {
+                    dest_size: Some(
+                        (
+                            self.cell_w * CELLS_PER_ENTITY as f32,
+                            self.cell_w * CELLS_PER_ENTITY as f32,
+                        )
+                            .into(),
+                    ),
+                    flip_x: character.is_facing_east.get(),
+                    ..Default::default()
+                },
+            );
+        }
         if show_sprite {
             draw_texture_ex(
                 &self.sprites[&character.sprite],
                 x,
                 y,
                 WHITE,
-                params.clone(),
+                character_params,
             );
             if let Some(weapon) = character.weapon(HandType::MainHand) {
                 if let Some(texture) = weapon.sprite {
@@ -1975,8 +2038,22 @@ impl GameGrid {
                 let target = &self.characters[target];
                 let reactor = &self.characters[reactor];
 
-                let path = [movement.0, movement.1];
-                self.draw_movement_path_arrow(path.iter().copied(), RED, 7.0, true);
+                self.draw_movement_path_arrow(
+                    [
+                        MovementPathNode {
+                            pos: movement.0,
+                            difficult_terrain: false,
+                        },
+                        MovementPathNode {
+                            pos: movement.1,
+                            difficult_terrain: false,
+                        },
+                    ]
+                    .into_iter(),
+                    RED,
+                    7.0,
+                    true,
+                );
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
                     ACTIVE_CHARACTER_COLOR,
@@ -2219,12 +2296,12 @@ impl GameGrid {
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
                 if self.dragging_camera_from.is_none() && !player_has_action_char_target {
                     //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
-                    let path = build_path_from_chart(
+                    let path = self.pathfind_grid.build_path_from_chart(
                         &self.routes(self.active_character_id),
                         active_char_pos,
                         *hovered_route_dst,
                     );
-                    self.draw_movement_path(&path.positions, true);
+                    self.draw_movement_path(&path.nodes);
 
                     let remaining_movement = self.active_char_remaining_movement();
 
@@ -2239,7 +2316,7 @@ impl GameGrid {
                         );
                         *ui_state = UiState::ConfiguringAction(ConfiguredAction::Move {
                             cost,
-                            selected_movement_path: path.positions,
+                            selected_movement_path: path.nodes,
                         });
                         outcome.switched_state = Some(NewState::Move { commit_movement });
                     } else {
@@ -2678,7 +2755,15 @@ impl GameGrid {
     ) {
         if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
-            self.draw_movement_path_arrow(invalid_path.iter().copied(), RED, 7.0, false);
+            self.draw_movement_path_arrow(
+                invalid_path.into_iter().map(|pos| MovementPathNode {
+                    pos,
+                    difficult_terrain: false,
+                }),
+                RED,
+                7.0,
+                false,
+            );
         } else {
             self.draw_target_crosshair(
                 *movement_to_target.last().unwrap(),
@@ -2688,7 +2773,10 @@ impl GameGrid {
                 true,
             );
             self.draw_movement_path_arrow(
-                movement_to_target.iter().copied(),
+                movement_to_target.into_iter().map(|pos| MovementPathNode {
+                    pos,
+                    difficult_terrain: false,
+                }),
                 MOVEMENT_ARROW_COLOR,
                 7.0,
                 false,
@@ -2712,7 +2800,7 @@ impl GameGrid {
 
         if let Some(path) = maybe_path {
             //path.positions.iter().rev().map(|(_dist, pos)| *pos).collect()
-            path.positions.iter().map(|(_dist, pos)| *pos).collect()
+            path.nodes.iter().map(|node| node.position).collect()
         } else {
             vec![]
         }
@@ -3403,25 +3491,19 @@ impl GameGrid {
             && (0..self.grid_dimensions.1 as i32).contains(&pos.1)
     }
 
-    fn draw_movement_path(&self, path: &[(f32, Position)], hover: bool) {
-        if hover {
-            self.draw_movement_path_arrow(
-                path.iter().map(|(_dist, pos)| *pos),
-                HOVER_MOVEMENT_ARROW_COLOR,
-                3.0,
-                false,
-            );
-        } else {
-            self.draw_movement_path_arrow(
-                path.iter().map(|(_dist, pos)| *pos),
-                MOVEMENT_ARROW_COLOR,
-                7.0,
-                false,
-            );
-        };
+    fn draw_movement_path(&self, path: &[PathNode]) {
+        self.draw_movement_path_arrow(
+            path.iter().map(|node| MovementPathNode {
+                pos: node.position,
+                difficult_terrain: node.difficult_terrain,
+            }),
+            HOVER_MOVEMENT_ARROW_COLOR,
+            3.0,
+            false,
+        );
 
-        let distance = path.last().unwrap().0;
-        let destination = path.last().unwrap().1;
+        let distance = path.last().unwrap().distance_from_start;
+        let destination = path.last().unwrap().position;
         let (x, y) = (
             self.grid_x_to_screen(destination.0),
             self.grid_y_to_screen(destination.1),
@@ -3431,12 +3513,8 @@ impl GameGrid {
 
         //self.draw_cell_outline(destination, MAGENTA, 5.0, 2.0);
 
-        let text_color = if hover { LIGHTGRAY } else { WHITE };
-        let bg_color = if hover {
-            Color::new(0.0, 0.0, 0.0, 0.5)
-        } else {
-            Color::new(0.0, 0.0, 0.0, 0.7)
-        };
+        let text_color = LIGHTGRAY;
+        let bg_color = Color::new(0.0, 0.0, 0.0, 0.5);
 
         let text = if distance.round() == distance {
             distance.to_string()
@@ -3454,7 +3532,7 @@ impl GameGrid {
 
     fn draw_movement_path_arrow(
         &self,
-        mut path: impl ExactSizeIterator<Item = Position>,
+        mut path: impl ExactSizeIterator<Item = MovementPathNode>,
         color: Color,
         thickness: f32,
         animated: bool,
@@ -3481,11 +3559,17 @@ impl GameGrid {
             );
              */
 
+            let color = if a.difficult_terrain {
+                Color::new(1.0, 0.4, 0.4, 0.8)
+            } else {
+                Color::new(1.0, 1.0, 1.0, 0.5)
+            };
+
             draw_circle(
-                self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
-                self.grid_y_to_screen(a.1) + self.cell_w / 2.0,
+                self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0,
+                self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0,
                 3.0,
-                Color::new(1.0, 1.0, 1.0, 0.5),
+                color,
             );
 
             if let Some(next) = path.next() {
@@ -3496,14 +3580,14 @@ impl GameGrid {
             }
         }
 
-        let last_direction = (b.0 - a.0, b.1 - a.1);
+        let last_direction = (b.pos.0 - a.pos.0, b.pos.1 - a.pos.1);
         assert!(last_direction != (0, 0));
 
         let end = b;
         draw_arrow(
             (
-                self.grid_x_to_screen(end.0) + 2.0,
-                self.grid_y_to_screen(end.1) + 2.0,
+                self.grid_x_to_screen(end.pos.0) + 2.0,
+                self.grid_y_to_screen(end.pos.1) + 2.0,
             ),
             self.cell_w,
             last_direction,
@@ -3511,7 +3595,10 @@ impl GameGrid {
             4.0,
         );
         draw_arrow(
-            (self.grid_x_to_screen(end.0), self.grid_y_to_screen(end.1)),
+            (
+                self.grid_x_to_screen(end.pos.0),
+                self.grid_y_to_screen(end.pos.1),
+            ),
             self.cell_w,
             last_direction,
             color,
@@ -3656,6 +3743,11 @@ impl GameGrid {
             .1
             .set(new_y.max(-max_space).min(max_y).round());
     }
+}
+
+struct MovementPathNode {
+    pos: Position,
+    difficult_terrain: bool,
 }
 
 fn chance_to_perc_str(chance: f32) -> String {

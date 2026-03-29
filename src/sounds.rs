@@ -88,7 +88,6 @@ impl SoundPlayer {
         if !self.enabled.get() {
             return;
         }
-        dbg!(sound_id);
         let sounds = &self.sounds[&sound_id];
         let sound = if sounds.len() == 1 {
             &sounds[0]

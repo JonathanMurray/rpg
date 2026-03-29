@@ -15,7 +15,6 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
-use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use crate::{
     action_button::{
         draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
@@ -32,7 +31,7 @@ use crate::{
         Action, ActionReach, ActionTarget, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
         Characters, Condition, CoreGame, DamageSource, GameEvent, HandType, HitType, MovementType,
-        OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
+        OnAttackedReaction, OnHitReaction, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -51,6 +50,10 @@ use crate::{
     target_ui::TargetUi,
     textures::{EquipmentIconId, UI_TEXTURE},
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
+};
+use crate::{
+    pathfind::PathNode,
+    tooltip::{draw_tooltip, Side, TooltipPositionPreference},
 };
 
 #[derive(Debug, Clone, PartialEq)]
@@ -148,8 +151,8 @@ pub enum ConfiguredAction {
         target: ActionTarget,
     },
     Move {
-        // Including the actor's current location, going all the way to the destination. Each pos is annotated with "total dist from start"
-        selected_movement_path: Vec<(f32, Position)>,
+        // Including the actor's current location, going all the way to the destination.
+        selected_movement_path: Vec<PathNode>,
         cost: u32,
     },
     ChangeEquipment {
@@ -552,7 +555,7 @@ impl UserInterface {
             resources.effect_textures.clone(),
             sound_player.clone(),
         );
-        game_grid.auto_tile_terrain_objects();
+        game_grid.auto_tile();
 
         let player_portraits = PlayerPortraits::new(
             &characters,
@@ -874,11 +877,10 @@ impl UserInterface {
                     else {
                         unreachable!()
                     };
-                    let dst = selected_movement_path.last().unwrap();
-                    let total_distance = dst.0;
+                    let total_distance = selected_movement_path.last().unwrap().distance_from_start;
                     let positions = selected_movement_path
                         .iter()
-                        .map(|(_dist_from_start, pos)| *pos)
+                        .map(|node| node.position)
                         .collect();
 
                     player_chose = Some(PlayerChose::Action(Some(Action::Move {
@@ -2523,11 +2525,11 @@ impl UserInterface {
                         cost,
                         selected_movement_path,
                     } => {
-                        let dst = selected_movement_path.last().unwrap();
-                        let total_distance = dst.0;
+                        let total_distance =
+                            selected_movement_path.last().unwrap().distance_from_start;
                         let positions: Vec<(i32, i32)> = selected_movement_path
                             .iter()
-                            .map(|(_dist_from_start, pos)| *pos)
+                            .map(|node| node.position)
                             .collect();
 
                         Some(Action::Move {

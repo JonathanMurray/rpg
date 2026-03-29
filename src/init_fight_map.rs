@@ -58,6 +58,12 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         player_chars_by_name.keys()
     );
 
+    for (pos, terrain_id) in &map_data.decorations {
+        if terrain_id.is_new_water() {
+            pathfind_grid.set_water(*pos);
+        }
+    }
+
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
@@ -80,18 +86,6 @@ pub struct GameInitState {
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
-}
-
-impl GameInitState {
-    pub fn try_remove_terrain_object(&mut self, pos: &Position) -> bool {
-        if self.pathfind_grid.occupied().get(pos).is_some() {
-            self.pathfind_grid.set_occupied(*pos, None);
-            self.terrain_objects.remove(pos);
-            true
-        } else {
-            false
-        }
-    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

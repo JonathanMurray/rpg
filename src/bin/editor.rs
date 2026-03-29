@@ -333,7 +333,7 @@ async fn main() {
                             if game_grid.terrain_objects.contains_key(&mouse_grid_pos) {
                                 game_grid.pathfind_grid.set_occupied(pos, None);
                                 game_grid.terrain_objects.swap_remove(&mouse_grid_pos);
-                                game_grid.auto_tile_terrain_objects();
+                                game_grid.auto_tile();
                                 map_data.terrain_objects.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }

@@ -644,10 +644,10 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     //let max_sprint_usage = character.stamina.current();
     let mut positions = vec![];
     let mut total_distance = 0.0;
-    for (dist, pos) in path.positions.iter().copied() {
-        if dist <= remaining_free_movement {
-            positions.push(pos);
-            total_distance = dist;
+    for node in path.nodes.iter() {
+        if node.distance_from_start <= remaining_free_movement {
+            positions.push(node.position);
+            total_distance = node.distance_from_start;
         }
     }
 

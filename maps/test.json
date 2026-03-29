@@ -47,7 +47,11 @@
     "(4, 37)": "StoneWallConvexNorthEast",
     "(7, 37)": "StoneWallConvexNorthEast",
     "(14, 9)": "Cauldron2",
-    "(18, 7)": "Cauldron2"
+    "(18, 7)": "Cauldron2",
+    "(20, 24)": "NewWaterNorthEast",
+    "(23, 24)": "NewWaterNorthEast",
+    "(20, 27)": "NewWaterNorthEast",
+    "(23, 27)": "NewWaterNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",

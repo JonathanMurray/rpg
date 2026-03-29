@@ -45,6 +45,7 @@ pub struct Target {
 pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
+    water: RefCell<HashSet<Position>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
     cached_unexplored: RefCell<Vec<ChartNode>>,
@@ -62,8 +63,14 @@ pub struct Path {
     // total distance (walking, not flying) from start to end
     pub total_distance: f32,
 
-    // the positions including the start all the way to the destination, each with a "total distance from start" marker
-    pub positions: Vec<(f32, Position)>,
+    pub nodes: Vec<PathNode>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct PathNode {
+    pub distance_from_start: f32,
+    pub position: Position,
+    pub difficult_terrain: bool,
 }
 
 impl PathfindGrid {
@@ -71,6 +78,7 @@ impl PathfindGrid {
         Self {
             dimensions,
             occupied: Default::default(),
+            water: Default::default(),
             cache_key: Default::default(),
             cached_exploration_chart: Default::default(),
             cached_unexplored: Default::default(),
@@ -83,6 +91,31 @@ impl PathfindGrid {
 
     pub fn occupied(&self) -> Ref<HashMap<(i32, i32), Occupation>> {
         self.occupied.borrow()
+    }
+
+    pub fn set_water(&self, pos: Position) {
+        let mut water = self.water.borrow_mut();
+        for x in pos.0 - 1..=pos.0 + 1 {
+            for y in pos.1 - 1..=pos.1 + 1 {
+                assert!(
+                    !water.contains(&(x, y)),
+                    "Cannot mark {:?} as water. Already marked",
+                    pos
+                );
+                water.insert((x, y));
+            }
+        }
+    }
+
+    pub fn is_character_in_water(&self, pos: Position) -> bool {
+        for x in pos.0 - 1..=pos.0 + 1 {
+            for y in pos.1 - 1..=pos.1 + 1 {
+                if !self.water.borrow().contains(&(x, y)) {
+                    return false;
+                }
+            }
+        }
+        true
     }
 
     pub fn set_occupied(&self, pos: Position, occupation: Option<Occupation>) {
@@ -186,7 +219,7 @@ impl PathfindGrid {
             if sq_distance <= proximity_squared && !self.obstructed_line_of_sight(*pos, target) {
                 //if distance_between(*pos, target) <= proximity {
                 //println!("Build path from chart... start={:?}, pos={:?}", start, pos);
-                let path = build_path_from_chart(&chart, start, *pos);
+                let path = self.build_path_from_chart(&chart, start, *pos);
 
                 //dbg!(&path);
 
@@ -199,11 +232,11 @@ impl PathfindGrid {
                 }
             } else if let Some((closest_sq_dist, _)) = closest_fallback_path {
                 if sq_distance < closest_sq_dist {
-                    let path = build_path_from_chart(&chart, start, *pos);
+                    let path = self.build_path_from_chart(&chart, start, *pos);
                     closest_fallback_path = Some((sq_distance, path));
                 }
             } else {
-                let path = build_path_from_chart(&chart, start, *pos);
+                let path = self.build_path_from_chart(&chart, start, *pos);
                 closest_fallback_path = Some((sq_distance, path));
             }
         }
@@ -327,16 +360,23 @@ impl PathfindGrid {
 
             let dist = chart_node.distance_from_start;
             let diagonal: f32 = 2f32.sqrt();
-            let mut neighbors = [
-                ((x - 1, y - 1), dist + diagonal),
-                ((x - 1, y), dist + 1.0),
-                ((x - 1, y + 1), dist + diagonal),
-                ((x, y - 1), dist + 1.0),
-                ((x, y + 1), dist + 1.0),
-                ((x + 1, y - 1), dist + diagonal),
-                ((x + 1, y), dist + 1.0),
-                ((x + 1, y + 1), dist + diagonal),
-            ];
+
+            let mut neighbors = vec![];
+            for x0 in x - 1..=x + 1 {
+                for y0 in y - 1..=y + 1 {
+                    if (x0, y0) != (x, y) {
+                        let mut local_cost = if (x0 - x).abs() == 1 && (y0 - y).abs() == 1 {
+                            diagonal
+                        } else {
+                            1.0
+                        };
+                        if self.water.borrow().contains(&(x0, y0)) {
+                            local_cost *= 2.0;
+                        }
+                        neighbors.push(((x0, y0), dist + local_cost));
+                    }
+                }
+            }
 
             if let Some(Target {
                 pos: target_pos, ..
@@ -520,6 +560,62 @@ impl PathfindGrid {
             None
         }
     }
+
+    pub fn build_path_from_chart(
+        &self,
+        chart: &Ref<IndexMap<Position, ChartNode>>,
+        start: Position,
+        destination: Position,
+    ) -> Path {
+        let dst_node = chart
+            .get(&destination)
+            .unwrap_or_else(|| panic!("chart dest={:?}", destination));
+        let mut dist = dst_node.distance_from_start;
+
+        let mut positions = vec![(dist, destination)];
+
+        // If we seeked to a location that's adjacent to the start position, the path will just consist of the start position
+        if dst_node.came_from != destination {
+            let mut pos = dst_node.came_from;
+
+            loop {
+                let node = chart.get(&pos).unwrap();
+                dist = node.distance_from_start;
+                positions.insert(0, (dist, pos));
+                //path.push((dist, pos));
+                if pos == start {
+                    break;
+                }
+                assert!(
+                    node.came_from != pos,
+                    "Node came from itself: {pos:?} -> {node:?}"
+                );
+                pos = node.came_from;
+            }
+            assert!(positions.len() > 1);
+            assert!(positions[0] != positions[1]);
+        }
+
+        let total_distance = positions.last().unwrap().0;
+        //let positions = path.iter().rev.copied().collect();
+
+        let positions = positions
+            .into_iter()
+            .map(|(dist, pos)| {
+                let difficult_terrain = self.water.borrow().contains(&pos);
+                PathNode {
+                    distance_from_start: dist,
+                    position: pos,
+                    difficult_terrain,
+                }
+            })
+            .collect();
+
+        Path {
+            total_distance,
+            nodes: positions,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -542,48 +638,5 @@ impl Eq for ChartNode {}
 impl PartialOrd for ChartNode {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-pub fn build_path_from_chart(
-    chart: &Ref<IndexMap<Position, ChartNode>>,
-    start: Position,
-    destination: Position,
-) -> Path {
-    let dst_node = chart
-        .get(&destination)
-        .unwrap_or_else(|| panic!("chart dest={:?}", destination));
-    let mut dist = dst_node.distance_from_start;
-
-    let mut positions = vec![(dist, destination)];
-
-    // If we seeked to a location that's adjacent to the start position, the path will just consist of the start position
-    if dst_node.came_from != destination {
-        let mut pos = dst_node.came_from;
-
-        loop {
-            let node = chart.get(&pos).unwrap();
-            dist = node.distance_from_start;
-            positions.insert(0, (dist, pos));
-            //path.push((dist, pos));
-            if pos == start {
-                break;
-            }
-            assert!(
-                node.came_from != pos,
-                "Node came from itself: {pos:?} -> {node:?}"
-            );
-            pos = node.came_from;
-        }
-        assert!(positions.len() > 1);
-        assert!(positions[0] != positions[1]);
-    }
-
-    let total_distance = positions.last().unwrap().0;
-    //let positions = path.iter().rev.copied().collect();
-
-    Path {
-        total_distance,
-        positions,
     }
 }

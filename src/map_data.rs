@@ -50,6 +50,11 @@ pub fn create_game_grid(
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
+    for (pos, terrain_id) in &map_data.decorations {
+        if terrain_id.is_new_water() {
+            pathfind_grid.set_water(*pos);
+        }
+    }
 
     let characters_map: HashMap<CharacterId, Rc<Character>> = characters
         .iter()
@@ -71,7 +76,7 @@ pub fn create_game_grid(
         sound_player,
     );
 
-    game_grid.auto_tile_terrain_objects();
+    game_grid.auto_tile();
 
     game_grid
 }
@@ -103,13 +108,21 @@ impl MapData {
 
     pub fn load_from_file(filepath: &str) -> Self {
         let json = fs::read_to_string(filepath).unwrap();
-        let map_data = match serde_json::from_str::<SerializableMapData>(&json) {
+        let mut map_data = match serde_json::from_str::<SerializableMapData>(&json) {
             Ok(map_data) => map_data,
             Err(e) => {
                 println!("File contents: {}", json);
                 panic!("Failed to read from file: {:?}", e);
             }
         };
+
+        for (pos, terrain_id) in &map_data.terrain_objects {
+            if terrain_id.is_new_water() {
+                map_data.decorations.insert(pos.clone(), *terrain_id);
+            }
+        }
+        map_data.terrain_objects.retain(|_pos, t| !t.is_new_water());
+
         Self {
             grid_dimensions: map_data.grid_dimensions,
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),

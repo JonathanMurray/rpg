@@ -19,7 +19,7 @@ use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, Player
 
 use rpg::data::{
     PassiveSkill, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE,
-    HEAL, HEALTH_POTION, HEAL_ENERGIZE, LEATHER_ARMOR, MANA_POTION, PIERCING_SHOT, SWEEP_ATTACK,
+    HEAL, HEALTH_POTION, HEAL_ENERGIZE, LEATHER_ARMOR, PIERCING_SHOT, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};

@@ -1953,7 +1953,7 @@ impl CoreGame {
             if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                 if target.lose_protected() {
-                    detail_lines.push(format!("{} lost Protected", target.name));
+                    detail_lines.push(format!("{} lost |<keyword>Protected|", target.name));
                 }
 
                 if are_entities_within_melee(caster.pos(), target.pos()) {
@@ -3572,7 +3572,7 @@ impl Display for AttackHitEffect {
 }
 
 fn apply_protected_bonus_against_attack(dmg_str: &mut String, dmg_calculation: &mut i32) {
-    dmg_str.push_str(" max 1 (Protected)");
+    dmg_str.push_str(" max 1 |<faded>(Protected)|");
     *dmg_calculation = *dmg_calculation.min(&mut 1);
 }
 
