@@ -7,10 +7,11 @@ use crate::{
         AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
         AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
         AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
-        Condition, Consumable, DamageType, DefenseType, EquipEffect, EquipmentRequirement,
-        Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect, OnAttackedReactionId,
-        OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range, Shield,
-        SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange, WeaponType,
+        Condition, Consumable, DamageType, DefenseType, EnvironmentEffect, EquipEffect,
+        EquipmentRequirement, Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect,
+        OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange,
+        WeaponType,
     },
     grid::ParticleShape,
     sounds::SoundId,
@@ -520,6 +521,7 @@ pub const SHIELD_BASH: Ability = Ability {
             ]),
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: GRAY,
     initiate_sound: None,
@@ -554,6 +556,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
             ]),
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: GRAY,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
@@ -586,6 +589,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
             ..AbilityAttackEffect::default()
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: GRAY,
 
@@ -811,6 +815,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
             )),
         }),
         self_effect: None,
+        environment_effect: None,
     },
     animation_color: BLACK,
     initiate_sound: None,
@@ -874,6 +879,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
         reach: AbilityReach::MoveIntoMelee(Range::Float(10.0)),
         effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect::default()),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: GRAY,
     initiate_sound: None,
@@ -909,6 +915,7 @@ pub const ENEMY_BRACE: Ability = Ability {
                 None,
             ]),
         }),
+        environment_effect: None,
     },
     animation_color: GRAY,
     initiate_sound: None,
@@ -940,6 +947,7 @@ pub const BRACE: Ability = Ability {
                 None,
             ]),
         }),
+        environment_effect: None,
     },
     animation_color: GRAY,
     initiate_sound: None,
@@ -992,6 +1000,7 @@ pub const SCREAM: Ability = Ability {
             })),
         }),
         self_effect: None,
+        environment_effect: None,
     },
     possible_enhancements: [Some(SCREAM_SHRIEK), None, None],
 
@@ -1034,6 +1043,7 @@ pub const SHACKLED_MIND: Ability = Ability {
             ]),
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     possible_enhancements: [
         Some(AbilityEnhancement {
@@ -1110,6 +1120,7 @@ pub const MIND_BLAST: Ability = Ability {
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1178,8 +1189,8 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 };
 
 pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
-    id: AbilityId::MagiInflictWounds,
-    name: "Inflict wounds",
+    id: AbilityId::HuldraInflictWounds,
+    name: "Infect",
     description: "",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
@@ -1192,18 +1203,19 @@ pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
     target: AbilityTarget::Enemy {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: None,
+            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Bleeding,
-                    stacks: Some(4),
-                    duration_rounds: None,
+                    condition: Condition::Poisoned,
+                    stacks: None,
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),
         }),
         impact_circle: None,
-        reach: AbilityReach::Range(Range::Melee),
+        environment_effect: Some(EnvironmentEffect::PoisonWater),
+        reach: AbilityReach::Range(Range::Float(15.5)),
     },
     animation_color: BROWN,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1212,7 +1224,7 @@ pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
 };
 
 pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
-    id: AbilityId::MagiInflictHorrors,
+    id: AbilityId::HuldraInflictHorrors,
     name: "Curse",
     description: "",
     icon: IconId::Mindblast,
@@ -1238,6 +1250,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
             ]),
         }),
         impact_circle: None,
+        environment_effect: Some(EnvironmentEffect::PoisonWater),
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1246,7 +1259,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
 };
 
 pub static HULDRA_HEAL: Ability = Ability {
-    id: AbilityId::MagiHeal,
+    id: AbilityId::HuldraHeal,
     name: "Bless",
     description: "",
     icon: IconId::Heal,
@@ -1257,7 +1270,7 @@ pub static HULDRA_HEAL: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Ally {
-        range: Range::Ranged(15),
+        range: Range::Float(15.5),
         effect: AbilityPositiveEffect {
             healing: 8,
             apply: Some([
@@ -1407,6 +1420,7 @@ pub const INSPIRE: Ability = Ability {
             }),
         }),
         self_effect: None,
+        environment_effect: None,
     },
     animation_color: GREEN,
     initiate_sound: None,
@@ -1446,6 +1460,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
             }),
         }),
         self_effect: None,
+        environment_effect: None,
     },
     animation_color: GREEN,
     initiate_sound: None,
@@ -1475,6 +1490,7 @@ pub const HEALING_NOVA: Ability = Ability {
             }),
         }),
         self_effect: None,
+        environment_effect: None,
     },
     animation_color: GREEN,
     initiate_sound: None,
@@ -1510,6 +1526,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
                 None,
             ]),
         }),
+        environment_effect: None,
     },
     animation_color: GREEN,
     initiate_sound: None,
@@ -1542,6 +1559,7 @@ pub const SELF_HEAL: Ability = Ability {
                 None,
             ]),
         }),
+        environment_effect: None,
     },
     animation_color: GREEN,
     initiate_sound: None,
@@ -1687,6 +1705,7 @@ pub const FIREBALL: Ability = Ability {
                 on_hit: None,
             }),
         )),
+        environment_effect: None,
     },
     possible_enhancements: [
         Some(FIREBALL_REACH),
@@ -1726,6 +1745,33 @@ pub const KILL: Ability = Ability {
             })),
         }),
         self_effect: None,
+        environment_effect: None,
+    },
+    animation_color: BLACK,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
+};
+
+pub const POISONTEST: Ability = Ability {
+    id: AbilityId::PoisonTest,
+    name: "Poison",
+    description: "Create poison",
+    icon: IconId::Fireball,
+    action_point_cost: 1,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: None,
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: None,
+        environment_effect: Some(EnvironmentEffect::PoisonWater),
     },
     animation_color: BLACK,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1782,6 +1828,7 @@ pub const SEARING_LIGHT: Ability = Ability {
             ]),
         }),
         impact_circle: None,
+        environment_effect: None,
     },
     animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1850,6 +1897,7 @@ pub enum PassiveSkill {
     Honorless,
     Vigilant,
     UnbridledRage,
+    SwampDweller,
 }
 
 impl PassiveSkill {
@@ -1865,6 +1913,7 @@ impl PassiveSkill {
             Honorless => "Honorless",
             Vigilant => "Vigilant",
             UnbridledRage => "Unbridled rage",
+            SwampDweller => "Swamp dweller",
         }
     }
 
@@ -1885,6 +1934,8 @@ impl PassiveSkill {
             Vigilant => IconId::MeleeAttack,
             // TODO: unique icon
             UnbridledRage => IconId::Rage,
+            // TODO: unique icon
+            SwampDweller => IconId::NecroticInfluence,
         }
     }
 
@@ -1900,6 +1951,7 @@ impl PassiveSkill {
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
             UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
+            SwampDweller => "Immune to |<keyword>Poisoned|. When stepping into water, it becomes |<keyword>Poisonous|."
         }
     }
 
@@ -1908,6 +1960,7 @@ impl PassiveSkill {
         match self {
             BloodRage => &[Keyword::Cond(Condition::NearDeath)],
             UnbridledRage => &[Keyword::Cond(Condition::Ferocity)],
+            SwampDweller => &[Keyword::Cond(Condition::Poisoned)],
             _ => &[],
         }
     }

@@ -106,6 +106,7 @@ pub enum StatusId {
     NearDeath,
     Dead,
     Wet,
+    Poisoned,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -275,6 +276,145 @@ pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum WaterOrientation {
+    /*
+       +XX
+       XXX
+    */
+    NorthWestInverted,
+
+    /*
+       XX+
+       XXX
+    */
+    NorthEastInverted,
+
+    /*
+       XXX
+       +XX
+    */
+    SouthWestInverted,
+
+    /*
+       XXX
+       XX+
+    */
+    SouthEastInverted,
+
+    /*
+       +----
+       |XXX
+       |XXX
+    */
+    NorthWest,
+
+    /*
+       ---
+       XXX
+       XXX
+    */
+    North,
+
+    /*
+        ---+
+        XXX|
+        XXX|
+    */
+    NorthEast,
+
+    /*
+       |XXX
+       |XXX
+    */
+    West,
+
+    /*
+       XXX
+       XXX
+    */
+    Center,
+
+    /*
+       XXX|
+       XXX|
+    */
+    East,
+
+    /*
+       |XXX
+       |XXX
+       +---
+    */
+    SouthWest,
+
+    /*
+       XXX
+       XXX
+       ---
+    */
+    South,
+
+    /*
+       XXX|
+       XXX|
+       ---+
+    */
+    SouthEast,
+
+    /*
+       +---
+       |XXX
+       |XXX
+       +---
+    */
+    ThinWest,
+
+    /*
+       ---+
+       XXX|
+       XXX|
+       ---+
+    */
+    ThinEast,
+
+    /*
+       +---+
+       |XXX|
+       |XXX|
+
+    */
+    ThinNorth,
+
+    /*
+
+       |XXX|
+       |XXX|
+       +---+
+    */
+    ThinSouth,
+
+    /*
+       ---
+       XXX
+       XXX
+       ---
+    */
+    ThinHor,
+
+    /*
+       |XXX|
+       |XXX|
+    */
+    ThinVert,
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
+pub enum WaterType {
+    Water,
+    Poison,
+}
+
+#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum TerrainId {
     Grass,
     Grass2,
@@ -318,111 +458,7 @@ pub enum TerrainId {
     SuitOfArmor,
     AnimalHead,
 
-    /*
-       +----
-       |XXXX
-       |XXXX
-    */
-    NewWaterNorthWest,
-
-    /*
-       ---
-       XXX
-       XXX
-    */
-    NewWaterNorth,
-
-    /*
-        ---+
-        XXX|
-        XXX|
-    */
-    NewWaterNorthEast,
-
-    /*
-       |XXX
-       |XXX
-    */
-    NewWaterWest,
-
-    /*
-       XXX
-       XXX
-    */
-    NewWater,
-
-    /*
-       XXX|
-       XXX|
-    */
-    NewWaterEast,
-
-    /*
-       |XXX
-       |XXX
-       +---
-    */
-    NewWaterSouthWest,
-
-    /*
-       XXX
-       XXX
-       ---
-    */
-    NewWaterSouth,
-
-    /*
-       XXX|
-       XXX|
-       ---+
-    */
-    NewWaterSouthEast,
-
-    /*
-       +---
-       |XXX
-       |XXX
-       +---
-    */
-    NewWaterThinWest,
-
-    /*
-       ---+
-       XXX|
-       XXX|
-       ---+
-    */
-    NewWaterThinEast,
-
-    /*
-       +---+
-       |XXX|
-       |XXX|
-
-    */
-    NewWaterThinNorth,
-
-    /*
-
-       |XXX|
-       |XXX|
-       +---+
-    */
-    NewWaterThinSouth,
-
-    /*
-       ---
-       XXX
-       XXX
-       ---
-    */
-    NewWaterThinHor,
-
-    /*
-       |XXX|
-       |XXX|
-    */
-    NewWaterThinVert,
+    NewWater(WaterOrientation, WaterType),
 
     Water,
     WaterBeachNorth,
@@ -444,22 +480,7 @@ pub enum TerrainId {
 impl TerrainId {
     pub fn is_new_water(&self) -> bool {
         match self {
-            TerrainId::NewWaterNorthWest => true,
-            TerrainId::NewWaterNorth => true,
-            TerrainId::NewWaterNorthEast => true,
-            TerrainId::NewWaterWest => true,
-            TerrainId::NewWater => true,
-            TerrainId::NewWaterEast => true,
-            TerrainId::NewWaterSouthWest => true,
-            TerrainId::NewWaterSouth => true,
-            TerrainId::NewWaterSouthEast => true,
-            TerrainId::NewWaterThinWest => true,
-            TerrainId::NewWaterThinEast => true,
-            TerrainId::NewWaterThinNorth => true,
-            TerrainId::NewWaterThinSouth => true,
-            TerrainId::NewWaterThinHor => true,
-            TerrainId::NewWaterThinVert => true,
-
+            TerrainId::NewWater(..) => true,
             _ => false,
         }
     }
@@ -528,6 +549,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     let mut bot_margin = false;
     let mut left_margin = false;
     let mut rotation = 0.0;
+    let mut is_poison = false;
     let (mut col, mut row) = match terrain_id {
         TerrainId::Grass => (0, 8),
         TerrainId::Grass2 => (1, 8),
@@ -538,50 +560,68 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Floor2 => (0, 10),
         TerrainId::Floor3 => (0, 11),
         TerrainId::Floor4 => (1, 9),
-        TerrainId::NewWaterNorthWest => (5, 9),
-        TerrainId::NewWaterNorth => {
-            rotation = 0.5 * PI;
-            (5, 10)
-        }
-        TerrainId::NewWaterNorthEast => {
-            rotation = 0.5 * PI;
-            (5, 9)
-        }
-        TerrainId::NewWaterWest => (5, 10),
-        TerrainId::NewWater => (6, 10),
-        TerrainId::NewWaterEast => {
-            rotation = PI;
-            (5, 10)
-        }
-        TerrainId::NewWaterSouthWest => {
-            rotation = 1.5 * PI;
-            (5, 9)
-        }
-        TerrainId::NewWaterSouth => {
-            rotation = 1.5 * PI;
-            (5, 10)
-        }
-        TerrainId::NewWaterSouthEast => {
-            rotation = PI;
-            (5, 9)
-        }
-        TerrainId::NewWaterThinWest => (6, 11),
-        TerrainId::NewWaterThinEast => {
-            rotation = PI;
-            (6, 11)
-        }
-        TerrainId::NewWaterThinNorth => {
-            rotation = 0.5 * PI;
-            (6, 11)
-        }
-        TerrainId::NewWaterThinSouth => {
-            rotation = 1.5 * PI;
-            (6, 11)
-        }
-        TerrainId::NewWaterThinHor => (7, 9),
-        TerrainId::NewWaterThinVert => {
-            rotation = 0.5 * PI;
-            (7, 9)
+        TerrainId::NewWater(orientation, type_) => {
+            is_poison = type_ == WaterType::Poison;
+            match orientation {
+                WaterOrientation::NorthWestInverted => (9, 9),
+                WaterOrientation::NorthEastInverted => {
+                    rotation = 0.5 * PI;
+                    (9, 9)
+                }
+                WaterOrientation::SouthWestInverted => {
+                    rotation = 1.5 * PI;
+                    (9, 9)
+                }
+                WaterOrientation::SouthEastInverted => {
+                    rotation = 1.0 * PI;
+                    (9, 9)
+                }
+                WaterOrientation::NorthWest => (6, 9),
+                WaterOrientation::North => {
+                    rotation = 0.5 * PI;
+                    (6, 10)
+                }
+                WaterOrientation::NorthEast => {
+                    rotation = 0.5 * PI;
+                    (6, 9)
+                }
+                WaterOrientation::West => (6, 10),
+                WaterOrientation::Center => (7, 10),
+                WaterOrientation::East => {
+                    rotation = PI;
+                    (6, 10)
+                }
+                WaterOrientation::SouthWest => {
+                    rotation = 1.5 * PI;
+                    (6, 9)
+                }
+                WaterOrientation::South => {
+                    rotation = 1.5 * PI;
+                    (6, 10)
+                }
+                WaterOrientation::SouthEast => {
+                    rotation = PI;
+                    (6, 9)
+                }
+                WaterOrientation::ThinWest => (7, 11),
+                WaterOrientation::ThinEast => {
+                    rotation = PI;
+                    (7, 11)
+                }
+                WaterOrientation::ThinNorth => {
+                    rotation = 0.5 * PI;
+                    (7, 11)
+                }
+                WaterOrientation::ThinSouth => {
+                    rotation = 1.5 * PI;
+                    (7, 11)
+                }
+                WaterOrientation::ThinHor => (8, 9),
+                WaterOrientation::ThinVert => {
+                    rotation = 0.5 * PI;
+                    (8, 9)
+                }
+            }
         }
 
         TerrainId::StoneWall => (1, 7),
@@ -661,15 +701,21 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     let t = get_time();
     // animate water
     if ((t * 0.5) % (t * 0.5).floor()) < 0.5 {
-        if (col, row) == (5, 10) {
-            (col, row) = (5, 11);
-        } else if (col, row) == (5, 9) {
-            (col, row) = (6, 9);
-        } else if (col, row) == (6, 11) {
-            (col, row) = (7, 11);
-        } else if (col, row) == (7, 9) {
-            (col, row) = (7, 10);
+        if (col, row) == (6, 10) {
+            (col, row) = (6, 11);
+        } else if (col, row) == (6, 9) {
+            (col, row) = (7, 9);
+        } else if (col, row) == (7, 11) {
+            (col, row) = (8, 11);
+        } else if (col, row) == (8, 9) {
+            (col, row) = (8, 10);
+        } else if (col, row) == (9, 9) {
+            (col, row) = (9, 10);
         }
+    }
+
+    if is_poison {
+        col -= 4;
     }
 
     // animate table candle
@@ -924,6 +970,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::NearDeath => (4, 2),
         StatusId::Dead => (2, 3),
         StatusId::Wet => (3, 3),
+        StatusId::Poisoned => (4, 3),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

@@ -38,7 +38,6 @@
     "(22, 28)": "StoneWallConvexNorthEast",
     "(25, 28)": "StoneWallConvexNorthEast",
     "(16, 4)": "StoneWallConvexNorthEast",
-    "(13, 16)": "NewWaterNorthEast",
     "(4, 28)": "StoneWallConvexNorthEast",
     "(10, 25)": "StoneWallConvexNorthEast",
     "(4, 22)": "StoneWallConvexNorthEast",
@@ -53,11 +52,8 @@
     "(7, 25)": "StoneWallConvexNorthEast",
     "(1, 28)": "StoneWallConvexNorthEast",
     "(22, 25)": "StoneWallConvexNorthEast",
-    "(16, 13)": "NewWaterNorthEast",
-    "(13, 13)": "NewWaterNorthEast",
     "(19, 25)": "StoneWallConvexNorthEast",
     "(16, 28)": "StoneWallConvexNorthEast",
-    "(16, 16)": "NewWaterNorthEast",
     "(16, 7)": "StoneWallConvexNorthEast",
     "(13, 7)": "StoneWallConvexNorthEast",
     "(19, 28)": "StoneWallConvexNorthEast",
@@ -229,7 +225,31 @@
     "(19, 1)": "WallWindow",
     "(28, 10)": "WallOpeningEast",
     "(28, 4)": "WallOpeningEast",
-    "(22, 1)": "AnimalHead"
+    "(22, 1)": "AnimalHead",
+    "(13, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
   },
   "characters": [
     {

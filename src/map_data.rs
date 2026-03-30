@@ -13,10 +13,10 @@ use crate::{
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
-        HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, SMALL_SHIELD,
+        HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, POISONTEST, SMALL_SHIELD,
     },
     grid::GameGrid,
-    pathfind::{Occupation, PathfindGrid},
+    pathfind::{Liquid, Occupation, PathfindGrid},
     resources::GameResources,
     sounds::SoundPlayer,
     textures::{PortraitId, SpriteId, TerrainId},
@@ -52,7 +52,7 @@ pub fn create_game_grid(
     }
     for (pos, terrain_id) in &map_data.decorations {
         if terrain_id.is_new_water() {
-            pathfind_grid.set_water(*pos, true);
+            pathfind_grid.set_liquid(*pos, Some(Liquid::Water));
         }
     }
 
@@ -361,7 +361,7 @@ pub fn create_character(
             );
             huldra.learn_ability(HULDRA_HEAL);
             huldra.learn_ability(HULDRA_INFLICT_WOUNDS);
-            huldra.learn_ability(HULDRA_INFLICT_HORRORS);
+            huldra.learn_passive(PassiveSkill::SwampDweller);
             huldra.armor_piece.set(Some(SHIRT));
             //huldra.set_weapon(HandType::MainHand, BAD_SWORD);
             huldra.health.change_max_value_to(40);
@@ -380,6 +380,7 @@ pub fn create_character(
             enslaved.armor_piece.set(Some(CHAIN_MAIL));
             enslaved.set_weapon(HandType::MainHand, ENSLAVED_SWORD);
             enslaved.learn_passive(PassiveSkill::UnbridledRage);
+            enslaved.learn_passive(PassiveSkill::SwampDweller);
             enslaved
         }
     };
@@ -479,7 +480,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
 }
 
 pub fn make_high_bob(party: &Rc<Party>) -> Character {
-    let char = Character::new(
+    let bob = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
         "Bob",
         PortraitId::Bob,
@@ -487,22 +488,24 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 3, 3),
         (2, 10),
     );
-    char.set_weapon(HandType::MainHand, SWORD);
-    char.set_shield(MEDIUM_SHIELD);
-    char.armor_piece.set(Some(LEATHER_ARMOR));
-    char.learn_passive(PassiveSkill::Reaper);
-    char.learn_ability(SWEEP_ATTACK);
-    char.learn_ability(SHIELD_BASH);
-    char.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
-    char.learn_ability(INSPIRE);
-    char.learn_attack_enhancement(SMITE);
+    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_shield(MEDIUM_SHIELD);
+    bob.armor_piece.set(Some(LEATHER_ARMOR));
+    bob.learn_passive(PassiveSkill::Reaper);
+    bob.learn_ability(SWEEP_ATTACK);
+    bob.learn_ability(SHIELD_BASH);
+    bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability(INSPIRE);
+    bob.learn_attack_enhancement(SMITE);
+    // TODO
+    bob.learn_ability(KILL);
     //bob.learn_attack_enhancement(EMPOWER);
-    char.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    char
+    bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    bob
 }
 
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
-    let char = Character::new(
+    let alice = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Alice",
         PortraitId::Alice,
@@ -510,15 +513,15 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    char.set_weapon(HandType::MainHand, BOW);
-    char.armor_piece.set(Some(SHIRT));
-    char.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    char.learn_ability(HEAL);
-    char.learn_ability_enhancement(HEAL_ENERGIZE);
-    char.learn_attack_enhancement(CRIPPLING_SHOT);
-    char.learn_passive(PassiveSkill::WeaponProficiency);
-    char.learn_ability(PIERCING_SHOT);
-    char
+    alice.set_weapon(HandType::MainHand, BOW);
+    alice.armor_piece.set(Some(SHIRT));
+    alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
+    alice.learn_ability(HEAL);
+    alice.learn_ability_enhancement(HEAL_ENERGIZE);
+    alice.learn_attack_enhancement(CRIPPLING_SHOT);
+    alice.learn_passive(PassiveSkill::WeaponProficiency);
+    alice.learn_ability(PIERCING_SHOT);
+    alice
 }
 
 pub fn make_high_level_party() -> (Rc<Party>, Vec<Character>) {

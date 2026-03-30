@@ -21,8 +21,9 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, DamageType, DefenseType, HandType,
-        OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range, Shield, Weapon,
+        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DamageType, DefenseType,
+        EnvironmentEffect, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range,
+        Shield, Weapon,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -116,6 +117,14 @@ pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
         }
     }
     tooltip.keywords.extend(additional_keywords);
+
+    // Remove duplicate keywords, while preserving insertion order
+    let mut keywords = HashSet::new();
+    tooltip.keywords.retain(|k| {
+        let duplicate = keywords.contains(k);
+        keywords.insert(*k);
+        !duplicate
+    });
 
     tooltip
 }
@@ -498,6 +507,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             effect,
             impact_circle: area,
             reach,
+            environment_effect,
         } => {
             match reach {
                 AbilityReach::Range(range) => {
@@ -524,6 +534,10 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                 ));
                 describe_ability_negative_effect(effect, &mut t);
             }
+
+            if let Some(env_effect) = environment_effect {
+                describe_environment_effect(env_effect, &mut t);
+            }
         }
 
         AbilityTarget::Ally { range, effect } => {
@@ -535,6 +549,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
         AbilityTarget::None {
             self_area,
             self_effect,
+            environment_effect,
         } => {
             if let Some(effect) = self_effect {
                 t.technical_description.push("|<faded>Self|".to_string());
@@ -571,6 +586,10 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                     }
                 }
             }
+
+            if let Some(env_effect) = environment_effect {
+                describe_environment_effect(env_effect, &mut t);
+            }
         }
 
         AbilityTarget::Area { range, area_effect } => {
@@ -579,6 +598,16 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
     };
 
     t
+}
+
+fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
+    match env_effect {
+        EnvironmentEffect::PoisonWater => {
+            t.technical_description
+                .push("  Surrounding water becomes |<keyword>Poisonous|".to_string());
+            t.keywords.push(Keyword::Cond(Condition::Poisoned));
+        }
+    }
 }
 
 pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &mut Tooltip) {
@@ -641,19 +670,16 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
                     .push(defense_str(defense_type).to_string())
             };
 
-            match effect.damage {
-                Some(ability_dmg) => {
-                    let (value, dmg_type) = match ability_dmg {
-                        AbilityDamage::Static(n, dmg_type) => (n, dmg_type),
-                        AbilityDamage::AtLeast(n, dmg_type) => (n, dmg_type),
-                    };
-                    let mut line = format!("  |<sword>| |<value>{}|", value);
-                    if matches!(dmg_type, DamageType::Fire) {
-                        line.push_str(" (fire)");
-                    }
-                    t.technical_description.push(line);
+            if let Some(ability_dmg) = effect.damage {
+                let (value, dmg_type) = match ability_dmg {
+                    AbilityDamage::Static(n, dmg_type) => (n, dmg_type),
+                    AbilityDamage::AtLeast(n, dmg_type) => (n, dmg_type),
+                };
+                let mut line = format!("  |<sword>| |<value>{}|", value);
+                if matches!(dmg_type, DamageType::Fire) {
+                    line.push_str(" (fire)");
                 }
-                None => {}
+                t.technical_description.push(line);
             }
 
             for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {

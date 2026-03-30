@@ -40,11 +40,9 @@ impl HuldraBehaviour {
             .enemies()
             .any(|char| char.health.current() < char.health.max() - 5);
 
-        let are_all_players_bleeding = game.player_characters().all(|ch| ch.is_bleeding());
-
         let heal = BotAction::SingleFriendlyTarget(HULDRA_HEAL);
         let inflict_wounds = BotAction::SingleEnemyTarget(HULDRA_INFLICT_WOUNDS);
-        let inflict_horrors = BotAction::SingleEnemyTarget(HULDRA_INFLICT_HORRORS);
+        //let inflict_horrors = BotAction::SingleEnemyTarget(HULDRA_INFLICT_HORRORS);
 
         if let Some((saved_action, saved_target)) = self.saved_goal.get() {
             action = (
@@ -52,7 +50,7 @@ impl HuldraBehaviour {
                 saved_target.map(|id| Rc::clone(game.characters.get_rc(id))),
             );
             self.saved_goal.set(None);
-        } else if self.last_action.get() != Some(AbilityId::MagiHeal)
+        } else if self.last_action.get() != Some(AbilityId::HuldraHeal)
             && is_healing_warranted
             && rng.random_bool(0.7)
         {
@@ -63,42 +61,33 @@ impl HuldraBehaviour {
 
             action = (heal, Some(Rc::clone(target)));
             dbg!("NEW Huldra HEAL GOAL: {:?}", target.id());
-        } else if self.last_action.get() != Some(AbilityId::MagiInflictWounds)
-            && !are_all_players_bleeding
-            && rng.random_bool(0.8)
-        {
-            let mut non_bleeding_player_chars: Vec<&Rc<Character>> = game
-                .player_characters()
-                .filter(|ch| !ch.is_bleeding())
-                .collect();
+        } else {
+            let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
 
-            non_bleeding_player_chars.sort_by_key(|ch| {
+            player_chars.sort_by_key(|ch| {
                 let range = HULDRA_INFLICT_WOUNDS.target.range(&[]).unwrap();
                 let distance_to = find_path(game, bot, ch, range)
                     .map(|p| p.total_distance)
                     .unwrap_or(f32::MAX);
 
-                // convert from f32 to make it sortable
-                (distance_to * 10.0) as u32
+                let mut cost = (distance_to * 10.0) as u32;
+                if ch.has_condition(&Condition::Poisoned) {
+                    // down-prioritize if already poisoned
+                    cost += 100;
+                }
+                cost
             });
 
-            let target = non_bleeding_player_chars[0];
+            let target = player_chars[0];
 
             dbg!("NEW Huldra WOUND GOAL: {:?}", target.id());
 
             action = (inflict_wounds, Some(Rc::clone(target)));
-        } else {
-            let player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
-            let target = player_chars[rng.random_range(0..player_chars.len())];
-
-            dbg!("NEW Huldra HORROR GOAL: {:?}", target.id());
-
-            action = (inflict_horrors, Some(Rc::clone(target)));
         }
 
         let goal = BotGoal {
             action,
-            fallback_actions: vec![inflict_horrors, inflict_wounds, heal],
+            fallback_actions: vec![inflict_wounds, heal],
         };
 
         let chosen_action = pursue_goal(game, goal.clone());
@@ -675,10 +664,10 @@ fn may_use(bot: &Character, ability: Ability, target: Option<&Character>) -> boo
     match ability.id {
         AbilityId::Brace => !bot.conditions.borrow().has(&Condition::Protected),
         AbilityId::Inspire => !bot.conditions.borrow().has(&Condition::Inspired),
-        AbilityId::MagiInflictHorrors => {
+        AbilityId::HuldraInflictHorrors => {
             !target.unwrap().conditions.borrow().has(&Condition::Slowed)
         }
-        AbilityId::MagiInflictWounds => !target
+        AbilityId::HuldraInflictWounds => !target
             .unwrap()
             .conditions
             .borrow()

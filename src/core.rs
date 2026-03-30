@@ -16,7 +16,7 @@ use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
 use crate::grid::ParticleShape;
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::{Collision, Occupation, PathfindGrid};
+use crate::pathfind::{Collision, Liquid, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
@@ -66,6 +66,15 @@ impl CoreGame {
 
         for character in self.characters.iter() {
             character.on_battle_start();
+            // The condition's duration is set relative to the character's turn index, so that it affects each character
+            // equally long, after they move out of a liquid.
+            let char_game_time = if character.player_controlled() {
+                0
+            } else {
+                character.index_in_round.get().unwrap()
+            };
+            self.handle_character_standing_in_liquid(character, char_game_time)
+                .await;
         }
         for player_char in self.player_characters() {
             player_char.is_part_of_active_group.set(true);
@@ -93,6 +102,9 @@ impl CoreGame {
                 self.ui_handle_event(GameEvent::GameOver("Defeat")).await;
                 return Ok(());
             }
+
+            self.handle_character_standing_in_liquid(self.active_character(), self.current_time())
+                .await;
 
             let action_or_character_change = self.user_interface.select_action(&self).await?;
 
@@ -280,6 +292,9 @@ impl CoreGame {
                 }
 
                 let game_time = self.current_time();
+                println!("UPDATING GAME TIME:");
+                dbg!(game_time);
+                println!("-----------------------------------");
 
                 for character in self.characters.iter() {
                     character.set_current_game_time(game_time);
@@ -833,16 +848,20 @@ impl CoreGame {
 
             character.set_position(new_position);
 
-            if self.pathfind_grid.is_character_in_water(new_position) {
-                self.perform_receive_condition(
-                    ApplyCondition {
-                        condition: Condition::Wet,
-                        stacks: None,
-                        duration_rounds: Some(1),
-                    },
-                    character,
-                );
+            if character.knows_passive(PassiveSkill::SwampDweller) {
+                if self.pathfind_grid.is_character_in_liquid(character.pos()) == Some(Liquid::Water)
+                {
+                    self.perform_environment_effect(
+                        EnvironmentEffect::PoisonWater,
+                        character.pos(),
+                        &mut vec![],
+                    )
+                    .await;
+                }
             }
+
+            self.handle_character_standing_in_liquid(character, self.current_time())
+                .await;
 
             step_idx += 1;
         }
@@ -850,6 +869,43 @@ impl CoreGame {
         self.on_character_positions_changed();
 
         Ok(())
+    }
+
+    async fn handle_character_standing_in_liquid(&self, character: &Character, game_time: u32) {
+        println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
+        if let Some(liquid) = self.pathfind_grid.is_character_in_liquid(character.pos()) {
+            if !character.has_condition(&Condition::Wet) {
+                character.receive_condition(
+                    Condition::Wet,
+                    None,
+                    Some(game_time + self.round_length),
+                );
+                self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+                    character: character.id(),
+                    condition: Condition::Wet,
+                })
+                .await;
+            }
+            match liquid {
+                Liquid::Water => {}
+                Liquid::Poison => {
+                    if !character.has_condition(&Condition::Poisoned)
+                        && !character.knows_passive(PassiveSkill::SwampDweller)
+                    {
+                        character.receive_condition(
+                            Condition::Poisoned,
+                            None,
+                            Some(game_time + self.round_length),
+                        );
+                        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+                            character: character.id(),
+                            condition: Condition::Poisoned,
+                        })
+                        .await;
+                    }
+                }
+            }
+        }
     }
 
     fn on_character_positions_changed(&self) {
@@ -968,7 +1024,15 @@ impl CoreGame {
     }
 
     fn current_time(&self) -> u32 {
-        self.round_index * self.round_length + self.active_character().index_in_round.get().unwrap()
+        dbg!(self.active_character().name);
+        let char = self.active_character();
+        let t_in_round = if char.player_controlled() {
+            // Treat player turns as simultaneous
+            0
+        } else {
+            char.index_in_round.get().unwrap()
+        };
+        self.round_index * self.round_length + t_in_round
     }
 
     fn perform_receive_condition(
@@ -1128,6 +1192,7 @@ impl CoreGame {
                 AbilityTarget::Enemy {
                     effect,
                     impact_circle,
+                    environment_effect,
                     ..
                 } => {
                     let ActionTarget::Character(target_id, movement) = &selected_target else {
@@ -1193,6 +1258,17 @@ impl CoreGame {
                                 *result - def_value as i32
                             );
                             detail_lines.push(def_line);
+                        }
+                    }
+
+                    if let Some(env_effect) = environment_effect {
+                        if let Some(game) = real_game {
+                            game.perform_environment_effect(
+                                env_effect,
+                                target.pos(),
+                                &mut detail_lines,
+                            )
+                            .await;
                         }
                     }
 
@@ -1325,6 +1401,7 @@ impl CoreGame {
                 AbilityTarget::None {
                     self_area,
                     self_effect,
+                    environment_effect,
                 } => {
                     if let Some(game) = real_game {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
@@ -1386,6 +1463,17 @@ impl CoreGame {
                             shape: area_effect.shape,
                         });
                     }
+
+                    if let Some(env_effect) = environment_effect {
+                        if let Some(game) = real_game {
+                            game.perform_environment_effect(
+                                env_effect,
+                                caster.pos(),
+                                &mut detail_lines,
+                            )
+                            .await;
+                        }
+                    }
                 }
             };
 
@@ -1426,6 +1514,33 @@ impl CoreGame {
         }
 
         resolve_events
+    }
+
+    async fn perform_environment_effect(
+        &self,
+        env_effect: EnvironmentEffect,
+        position: Position,
+        detail_lines: &mut Vec<String>,
+    ) {
+        match env_effect {
+            EnvironmentEffect::PoisonWater => {
+                let mut water_positions = vec![];
+                self.pathfind_grid
+                    .convert_water_to_poison(position, |x, y| {
+                        water_positions.push((x, y));
+                    });
+                if !water_positions.is_empty() {
+                    detail_lines.push("  Water was turned to |<keyword>Poison|".to_string());
+                    self.ui_handle_event(GameEvent::WaterTurnedToPoison(water_positions))
+                        .await;
+
+                    for char in self.characters.iter() {
+                        self.handle_character_standing_in_liquid(char, self.current_time())
+                            .await;
+                    }
+                }
+            }
+        }
     }
 
     fn perform_ability_area_effect(
@@ -2569,6 +2684,17 @@ impl CoreGame {
         let name = character.name;
         let conditions = &character.conditions;
 
+        if conditions.borrow().has(&Condition::Poisoned) {
+            let amount = (character.health.max() as f32 / 10.0).ceil() as u32;
+            let damage = self.perform_losing_health(character, amount);
+            self.ui_handle_event(GameEvent::CharacterTookDamage {
+                character: character.id(),
+                amount: damage,
+                source: DamageSource::Condition(Condition::Poisoned),
+            })
+            .await;
+        }
+
         let bleed_stacks = conditions.borrow().get_stacks(&Condition::Bleeding);
         if bleed_stacks > 0 {
             //let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
@@ -2995,6 +3121,7 @@ pub trait GameEventHandler {
 pub enum GameEvent {
     LogLine(String),
     GameOver(&'static str),
+    WaterTurnedToPoison(Vec<Position>),
     Moved {
         character: CharacterId,
         from: Position,
@@ -3369,10 +3496,9 @@ impl Characters {
         // TODO: it should be sorted by caller
         characters.sort_by(
             |a, b| match (a.player_controlled(), b.player_controlled()) {
-                (true, true) => Ordering::Equal,
-                (false, false) => Ordering::Equal,
                 (true, false) => Ordering::Less,
                 (false, true) => Ordering::Greater,
+                _ => Ordering::Equal,
             },
         );
         Self(
@@ -3622,6 +3748,7 @@ pub enum Condition {
     HealthPotionRecovering,
     Ferocity,
     Wet,
+    Poisoned,
 }
 
 impl Condition {
@@ -3656,6 +3783,7 @@ impl Condition {
             HealthPotionRecovering => "Recovering",
             Ferocity => "Ferocity",
             Wet => "Wet",
+            Poisoned => "Poisoned",
         }
     }
 
@@ -3690,6 +3818,7 @@ impl Condition {
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage",
+            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|. End of turn: lose |<value>10%| health"
         }
     }
 
@@ -3724,6 +3853,7 @@ impl Condition {
             HealthPotionRecovering => true,
             Ferocity => true,
             Wet => true,
+            Poisoned => false,
         }
     }
 
@@ -3758,6 +3888,7 @@ impl Condition {
             Raging => StatusId::Rage,
             Ferocity => StatusId::Rage,
             Wet => StatusId::Wet,
+            Poisoned => StatusId::Poisoned,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -3782,6 +3913,7 @@ const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 5;
+const POISONED_TOUGHNESS_PENALTY: u32 = 5;
 const EXPOSED_DEFENSE_PENALTY: u32 = 3;
 const INSPIRED_WILL_BONUS: u32 = 3;
 const SLOWED_AP_PENALTY: u32 = 2;
@@ -4137,11 +4269,12 @@ pub enum AbilityId {
     Fireball,
     SearingLight,
     Kill,
+    PoisonTest,
 
     EnemySlashingAttack,
-    MagiHeal,
-    MagiInflictWounds,
-    MagiInflictHorrors,
+    HuldraHeal,
+    HuldraInflictWounds,
+    HuldraInflictHorrors,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -4235,6 +4368,7 @@ pub enum AbilityTarget {
         reach: AbilityReach,
         effect: AbilityNegativeEffect,
         impact_circle: Option<(Range, AreaTargetAcquisition, AbilityNegativeEffect)>,
+        environment_effect: Option<EnvironmentEffect>,
     },
 
     Ally {
@@ -4250,7 +4384,13 @@ pub enum AbilityTarget {
     None {
         self_area: Option<AreaEffect>,
         self_effect: Option<AbilityPositiveEffect>,
+        environment_effect: Option<EnvironmentEffect>,
     },
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum EnvironmentEffect {
+    PoisonWater,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5820,11 +5960,6 @@ impl Character {
         res
     }
 
-    fn is_dazed(&self) -> bool {
-        self.conditions.borrow().get(&Condition::Dazed).is_some()
-        //self.conditions.borrow().dazed > 0
-    }
-
     pub fn evasion(&self) -> u32 {
         let mut res = 0;
         res += self.evasion_from_agility();
@@ -5839,7 +5974,7 @@ impl Character {
         if conditions.has(&Condition::Distracted) {
             res = res.saturating_sub(DISTRACTED_DEFENSE_PENALTY);
         }
-        if self.is_dazed() {
+        if self.has_condition(&Condition::Dazed) {
             res = res.saturating_sub(DAZED_EVASION_PENALTY);
         }
 
@@ -5898,6 +6033,9 @@ impl Character {
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Exposed) {
             res = res.saturating_sub(EXPOSED_DEFENSE_PENALTY);
+        }
+        if self.has_condition(&Condition::Poisoned) {
+            res = res.saturating_sub(POISONED_TOUGHNESS_PENALTY);
         }
         res = res.saturating_sub(conditions.get_stacks(&Condition::Weakened));
 
@@ -6070,7 +6208,7 @@ impl Character {
                 RollBonusContributor::FlatAmount(-exertion_penalty),
             ));
         }
-        if self.is_dazed() {
+        if self.has_condition(&Condition::Dazed) {
             bonuses.push(("Dazed", RollBonusContributor::Advantage(-1)));
         }
         let conditions = self.conditions.borrow();
@@ -6200,7 +6338,7 @@ impl Character {
         reaction: Option<OnAttackedReaction>,
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let mut terms = vec![];
-        if self.is_dazed() {
+        if self.has_condition(&Condition::Dazed) {
             terms.push(("Dazed", RollBonusContributor::OtherPositive));
         }
         let conditions = self.conditions.borrow();
@@ -6229,6 +6367,7 @@ impl Character {
         terms
     }
 
+    // TODO: Poisoned should count, but only for abilities that target Toughness!
     pub fn incoming_ability_bonuses(&self) -> Vec<(&'static str, RollBonusContributor)> {
         let mut terms = vec![];
         let conditions = self.conditions.borrow();
@@ -6302,7 +6441,7 @@ impl Character {
         Some(prev_stacks)
     }
 
-    fn has_condition(&self, condition: &Condition) -> bool {
+    pub fn has_condition(&self, condition: &Condition) -> bool {
         self.conditions.borrow().has(condition)
     }
 }

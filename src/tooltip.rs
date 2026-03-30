@@ -115,16 +115,28 @@ pub fn draw_tooltip(
         Goodness::Neutral
     };
 
-    let mut measure_width = |line, size| {
+    let header_status_icon = header_keyword.and_then(|keyword| match keyword {
+        Keyword::Cond(condition) => Some(condition.status_icon()),
+        _ => None,
+    });
+
+    let status_icon_w = 20.0;
+    let status_icon_margin = 8.0;
+
+    let mut measure_width = |line, size, status_icon: Option<StatusId>| {
         let dimensions = measure_text_with_font_tags(line, Some(font), size, 1.0);
-        if dimensions.width > max_line_w {
-            max_line_w = dimensions.width;
+        let mut w = dimensions.width;
+        if status_icon.is_some() {
+            w += status_icon_w + status_icon_margin;
+        }
+        if w > max_line_w {
+            max_line_w = w;
         }
     };
 
-    measure_width(header, header_font_size);
+    measure_width(header, header_font_size, header_status_icon);
     if let Some(error) = error.as_ref() {
-        measure_width(error, font_size)
+        measure_width(error, font_size, None)
     }
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
@@ -147,7 +159,7 @@ pub fn draw_tooltip(
     }
 
     for line in &physical_content_lines {
-        measure_width(line, font_size);
+        measure_width(line, font_size, None);
     }
 
     let tooltip_w = max_line_w + text_margin * 2.0;
@@ -254,12 +266,11 @@ pub fn draw_tooltip(
                 let w = draw_text_with_font_tags(line, text_x, line_y, params, true);
 
                 if let Some(status) = status_icon {
-                    let status_w = 20.0;
                     draw_status_icon(
                         status,
-                        text_x + w + 8.0,
-                        line_y - status_w + 5.0,
-                        Some((status_w, status_w)),
+                        text_x + w + status_icon_margin,
+                        line_y - status_icon_w + 5.0,
+                        Some((status_icon_w, status_icon_w)),
                     );
                 }
 
@@ -273,11 +284,6 @@ pub fn draw_tooltip(
     } else {
         YELLOW
     };
-
-    let header_status_icon = header_keyword.and_then(|keyword| match keyword {
-        Keyword::Cond(condition) => Some(condition.status_icon()),
-        _ => None,
-    });
 
     draw_line(header, Some(header_color), true, header_status_icon);
 

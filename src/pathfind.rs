@@ -1,7 +1,7 @@
 use std::{
     cell::{Cell, Ref, RefCell},
     cmp::Ordering,
-    collections::{BinaryHeap, HashMap, HashSet},
+    collections::{BinaryHeap, HashMap, HashSet, VecDeque},
     time::Instant,
 };
 
@@ -42,10 +42,16 @@ pub struct Target {
     proximity_squared: f32,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Liquid {
+    Water,
+    Poison,
+}
+
 pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
-    water: RefCell<HashSet<Position>>,
+    liquids: RefCell<HashMap<Position, Liquid>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
     cached_unexplored: RefCell<Vec<ChartNode>>,
@@ -78,10 +84,38 @@ impl PathfindGrid {
         Self {
             dimensions,
             occupied: Default::default(),
-            water: Default::default(),
+            liquids: Default::default(),
             cache_key: Default::default(),
             cached_exploration_chart: Default::default(),
             cached_unexplored: Default::default(),
+        }
+    }
+
+    fn is_water_at_pos(&self, pos: Position) -> bool {
+        self.liquids.borrow().get(&pos) == Some(&Liquid::Water)
+    }
+
+    pub fn convert_water_to_poison(&self, start_pos: Position, mut visitor: impl FnMut(i32, i32)) {
+        if !self.is_water_at_pos(start_pos) {
+            return;
+        }
+
+        let mut next = VecDeque::new();
+        let mut seen = HashSet::new();
+        next.push_back(start_pos);
+
+        while let Some(pos) = next.pop_front() {
+            visitor(pos.0, pos.1);
+            self.liquids.borrow_mut().insert(pos, Liquid::Poison);
+            seen.insert(pos);
+            for x in [pos.0 - 1, pos.0, pos.0 + 1] {
+                for y in [pos.1 - 1, pos.1, pos.1 + 1] {
+                    if (x, y) != pos && !seen.contains(&(x, y)) && self.is_water_at_pos((x, y)) {
+                        seen.insert((x, y));
+                        next.push_back((x, y));
+                    }
+                }
+            }
         }
     }
 
@@ -93,37 +127,39 @@ impl PathfindGrid {
         self.occupied.borrow()
     }
 
-    pub fn set_water(&self, pos: Position, value: bool) {
-        let mut water = self.water.borrow_mut();
+    pub fn set_liquid(&self, pos: Position, value: Option<Liquid>) {
+        let mut liquids = self.liquids.borrow_mut();
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
-                if value {
-                    if water.contains(&(x, y)) {
-                        println!("WARN: {:?} is already marked as water", pos);
+                if let Some(liquid) = value {
+                    if liquids.get(&(x, y)) == Some(&liquid) {
+                        println!("WARN: {:?} is already marked as {:?}", pos, liquid);
                     }
-                    water.insert((x, y));
+                    liquids.insert((x, y), liquid);
                 } else {
-                    assert!(
-                        water.contains(&(x, y)),
-                        "Cannot unmark {:?} as water. It's not marked",
-                        pos
-                    );
-                    water.remove(&(x, y));
+                    if liquids.get(&(x, y)) != Some(&Liquid::Water) {
+                        println!("WARN: Cannot unmark {:?} as water. It's not marked", pos);
+                    }
+
+                    liquids.remove(&(x, y));
                 }
             }
         }
     }
 
-    pub fn is_character_in_water(&self, pos: Position) -> bool {
+    pub fn is_character_in_liquid(&self, pos: Position) -> Option<Liquid> {
+        let mut liquid = None;
         for x in pos.0 - 1..=pos.0 + 1 {
             // The top row of cells doesn't need to be on water cells for the char to be visibly in water
             for y in pos.1..=pos.1 + 1 {
-                if !self.water.borrow().contains(&(x, y)) {
-                    return false;
+                if let Some(l) = self.liquids.borrow().get(&(x, y)) {
+                    liquid = Some(*l);
+                } else {
+                    return None;
                 }
             }
         }
-        true
+        liquid
     }
 
     pub fn set_occupied(&self, pos: Position, occupation: Option<Occupation>) {
@@ -378,7 +414,7 @@ impl PathfindGrid {
                         } else {
                             1.0
                         };
-                        if self.water.borrow().contains(&(x0, y0)) {
+                        if self.liquids.borrow().contains_key(&(x0, y0)) {
                             local_cost *= 2.0;
                         }
                         neighbors.push(((x0, y0), dist + local_cost));
@@ -610,7 +646,7 @@ impl PathfindGrid {
         let positions = positions
             .into_iter()
             .map(|(dist, pos)| {
-                let difficult_terrain = self.water.borrow().contains(&pos);
+                let difficult_terrain = self.liquids.borrow().contains_key(&pos);
                 PathNode {
                     distance_from_start: dist,
                     position: pos,

@@ -46,7 +46,15 @@
     "(1, 37)": "StoneWallConvexNorthEast",
     "(4, 37)": "StoneWallConvexNorthEast",
     "(7, 37)": "StoneWallConvexNorthEast",
-    "(14, 9)": "Cauldron2"
+    "(14, 7)": "Cauldron2",
+    "(4, 31)": "StoneWallConvexNorthEast",
+    "(7, 31)": "StoneWallConvexNorthEast",
+    "(7, 34)": "StoneWallConvexNorthEast",
+    "(4, 34)": "StoneWallConvexNorthEast",
+    "(25, 34)": "StoneWallConvexNorthEast",
+    "(25, 31)": "StoneWallConvexNorthEast",
+    "(22, 34)": "StoneWallConvexNorthEast",
+    "(22, 31)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -109,17 +117,17 @@
     "(1, 19)": "Floor",
     "(1, 22)": "Floor",
     "(1, 25)": "Floor",
-    "(10, 28)": "Floor2",
+    "(10, 28)": "Floor",
     "(1, 31)": "Floor",
     "(1, 40)": "Floor",
-    "(13, 28)": "Floor2",
-    "(1, 28)": "Floor2",
+    "(13, 28)": "Floor",
+    "(1, 28)": "Floor",
     "(4, 7)": "Floor2",
     "(7, 7)": "Floor",
     "(10, 7)": "Floor2",
-    "(19, 28)": "Floor2",
-    "(22, 28)": "Floor2",
-    "(25, 28)": "Floor2",
+    "(19, 28)": "Floor",
+    "(22, 28)": "Floor",
+    "(25, 28)": "Floor",
     "(28, 28)": "Floor",
     "(31, 28)": "Floor",
     "(34, 28)": "Floor",
@@ -143,44 +151,44 @@
     "(13, 1)": "Floor",
     "(4, 4)": "Floor",
     "(7, 4)": "Floor",
-    "(10, 4)": "Floor2",
+    "(10, 4)": "Floor3",
     "(13, 4)": "Floor",
     "(16, 4)": "Floor",
-    "(19, 4)": "Floor",
+    "(19, 4)": "Floor3",
     "(22, 4)": "Floor",
     "(25, 4)": "Floor",
     "(25, 7)": "Floor",
     "(25, 10)": "Floor",
     "(25, 13)": "Floor2",
     "(25, 16)": "Floor2",
-    "(25, 19)": "Floor3",
+    "(25, 19)": "Floor2",
     "(25, 22)": "Floor2",
-    "(25, 25)": "Floor2",
-    "(22, 25)": "Floor3",
+    "(25, 25)": "Floor",
+    "(22, 25)": "Floor",
     "(19, 25)": "Floor",
     "(19, 7)": "Floor",
     "(16, 7)": "Floor",
     "(13, 7)": "Floor2",
-    "(7, 25)": "Floor3",
+    "(7, 25)": "Floor",
     "(4, 25)": "Floor",
     "(4, 22)": "Floor2",
-    "(7, 22)": "Floor2",
+    "(7, 22)": "Floor3",
     "(10, 22)": "Floor2",
     "(13, 22)": "Floor2",
     "(16, 22)": "Floor2",
     "(19, 22)": "Floor2",
-    "(22, 22)": "Floor2",
-    "(22, 19)": "Floor",
-    "(19, 19)": "Floor",
-    "(16, 19)": "Floor",
-    "(13, 19)": "Floor",
-    "(10, 19)": "Floor3",
-    "(7, 19)": "Floor",
+    "(22, 22)": "Floor3",
+    "(22, 19)": "Floor2",
+    "(19, 19)": "Floor2",
+    "(16, 19)": "Floor2",
+    "(13, 19)": "Floor2",
+    "(10, 19)": "Floor2",
+    "(7, 19)": "Floor2",
     "(4, 19)": "Floor2",
     "(4, 16)": "Floor2",
     "(7, 16)": "Floor2",
     "(10, 16)": "Floor2",
-    "(13, 16)": "Floor2",
+    "(13, 16)": "Floor3",
     "(16, 16)": "Floor2",
     "(19, 16)": "Floor2",
     "(22, 16)": "Floor2",
@@ -192,90 +200,375 @@
     "(7, 13)": "Floor",
     "(4, 13)": "Floor",
     "(7, 10)": "Floor2",
-    "(10, 10)": "Floor2",
+    "(10, 10)": "Floor3",
     "(13, 10)": "Floor2",
     "(16, 10)": "Floor2",
-    "(19, 10)": "Floor",
+    "(19, 10)": "Floor3",
     "(22, 10)": "Floor",
     "(22, 7)": "Floor",
     "(10, 25)": "Floor",
     "(13, 25)": "Floor",
     "(16, 25)": "Floor",
-    "(16, 28)": "Floor2",
-    "(4, 28)": "Floor2",
-    "(7, 28)": "Floor2",
+    "(16, 28)": "Floor",
+    "(4, 28)": "Floor",
+    "(7, 28)": "Floor",
     "(4, 31)": "Floor",
     "(7, 31)": "Floor",
-    "(10, 31)": "Floor2",
-    "(13, 31)": "Floor2",
-    "(16, 31)": "Floor2",
-    "(19, 31)": "Floor2",
+    "(10, 31)": "Floor",
+    "(13, 31)": "Floor",
+    "(16, 31)": "Floor",
+    "(19, 31)": "Floor",
     "(22, 31)": "Floor",
     "(25, 31)": "Floor",
     "(25, 34)": "Floor",
     "(22, 34)": "Floor",
-    "(19, 34)": "Floor2",
-    "(16, 34)": "Floor2",
-    "(13, 34)": "Floor2",
-    "(10, 34)": "Floor2",
+    "(19, 34)": "Floor",
+    "(16, 34)": "Floor",
+    "(13, 34)": "Floor",
+    "(10, 34)": "Floor",
     "(7, 34)": "Floor",
     "(4, 34)": "Floor"
   },
   "decorations": {
-    "(16, 13)": "NewWaterNorthEast",
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(16, 1)": "WallOpeningNorth",
-    "(22, 7)": "NewWaterNorthEast",
+    "(22, 7)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(25, 1)": "WallWindow",
     "(19, 1)": "AnimalHead",
-    "(25, 4)": "NewWaterNorthEast",
-    "(19, 13)": "NewWaterNorthEast",
-    "(10, 13)": "NewWaterNorthEast",
-    "(28, 28)": "WallOpeningEast",
-    "(1, 28)": "WallOpeningWest",
+    "(25, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(13, 1)": "WallOpeningNorth",
-    "(25, 7)": "NewWaterNorthEast",
-    "(7, 4)": "NewWaterNorthEast",
-    "(4, 4)": "NewWaterNorthEast",
-    "(7, 7)": "NewWaterNorthEast",
-    "(4, 7)": "NewWaterNorthEast",
+    "(25, 7)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 7)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 7)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(4, 1)": "WallWindow",
     "(7, 1)": "WallWindow",
     "(10, 1)": "AnimalHead",
-    "(4, 19)": "NewWaterNorthEast",
-    "(25, 13)": "NewWaterNorthEast",
-    "(22, 13)": "NewWaterNorthEast",
-    "(4, 31)": "NewWaterNorthEast",
-    "(7, 31)": "NewWaterNorthEast",
-    "(7, 34)": "NewWaterNorthEast",
-    "(4, 34)": "NewWaterNorthEast",
-    "(25, 34)": "NewWaterNorthEast",
-    "(25, 31)": "NewWaterNorthEast",
-    "(22, 31)": "NewWaterNorthEast",
-    "(22, 34)": "NewWaterNorthEast",
+    "(7, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 10)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(22, 1)": "WallWindow",
-    "(22, 4)": "NewWaterNorthEast",
-    "(4, 25)": "NewWaterNorthEast",
-    "(7, 13)": "NewWaterNorthEast",
-    "(10, 25)": "NewWaterNorthEast",
-    "(13, 25)": "NewWaterNorthEast",
-    "(16, 25)": "NewWaterNorthEast",
-    "(19, 25)": "NewWaterNorthEast",
-    "(4, 13)": "NewWaterNorthEast",
-    "(25, 25)": "NewWaterNorthEast",
-    "(7, 19)": "NewWaterNorthEast",
-    "(22, 19)": "NewWaterNorthEast",
-    "(19, 19)": "NewWaterNorthEast",
-    "(16, 19)": "NewWaterNorthEast",
-    "(13, 19)": "NewWaterNorthEast",
-    "(1, 10)": "WallOpeningWest",
-    "(28, 10)": "WallOpeningEast"
+    "(22, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 4)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 28)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(4, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(25, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 22)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 25)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 19)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
   },
   "characters": [
     {
       "type_": "Bob",
       "pos": [
-        16,
-        31
+        14,
+        30
       ],
       "health": null,
       "main_hand": null,
@@ -284,8 +577,8 @@
     {
       "type_": "Alice",
       "pos": [
-        19,
-        33
+        13,
+        34
       ],
       "health": null,
       "main_hand": null,
@@ -294,8 +587,8 @@
     {
       "type_": "Huldra",
       "pos": [
-        14,
-        5
+        16,
+        4
       ],
       "health": null,
       "main_hand": null,
@@ -324,8 +617,8 @@
     {
       "type_": "Clara",
       "pos": [
-        21,
-        30
+        19,
+        31
       ],
       "health": null,
       "main_hand": null,

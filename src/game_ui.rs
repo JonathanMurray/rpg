@@ -1882,74 +1882,17 @@ impl UserInterface {
                     condition.name().to_string(),
                     TextEffectStyle::HostileEffect,
                 );
+                // Don't make this too long, as it can happen during walking
+                //self.animation_stopwatch.set_to_at_least(0.2);
             }
             GameEvent::GameOver(text) => {
                 self.banner.set(text, 1.5);
                 self.animation_stopwatch.set_to_at_least(1.5);
             }
+            GameEvent::WaterTurnedToPoison(positions) => {
+                self.game_grid.convert_water_to_poison(positions);
+            }
         }
-    }
-
-    fn add_circle_projectile_effect(
-        &mut self,
-        start_time: f32,
-        duration: f32,
-        animation_color: Color,
-        caster_pos: (i32, i32),
-        target_pos: (i32, i32),
-    ) {
-        self.game_grid.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 10.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
-
-        self.game_grid.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time: start_time + 0.025,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 8.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
-        self.game_grid.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time: start_time + 0.05,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 6.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
     }
 
     fn animate_character_damage(&mut self, character_id: CharacterId, actual_health_lost: u32) {

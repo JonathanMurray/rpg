@@ -7,7 +7,7 @@ use std::{
     rc::Rc,
 };
 
-use indexmap::IndexMap;
+use indexmap::{map::Entry, IndexMap};
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
@@ -51,11 +51,13 @@ use crate::{
     },
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
-    pathfind::{ChartNode, Occupation, PathNode, PathfindGrid, TerrainType, CELLS_PER_ENTITY},
+    pathfind::{
+        ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, CELLS_PER_ENTITY,
+    },
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
-        EffectId, SpriteId, StatusId, TerrainId, TinyFontColor,
+        EffectId, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation, WaterType,
     },
     util::{line_visitor, oscillate, rgb, COL_RED},
 };
@@ -357,7 +359,7 @@ impl GameGrid {
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
             if terrain_id.is_new_water() {
-                self.pathfind_grid.set_water(pos, true);
+                self.pathfind_grid.set_liquid(pos, Some(Liquid::Water));
             }
             self.auto_tile();
             true
@@ -370,7 +372,7 @@ impl GameGrid {
     pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
         if let Some(terrain_id) = self.decorations.get(&pos) {
             if terrain_id.is_new_water() {
-                self.pathfind_grid.set_water(pos, false);
+                self.pathfind_grid.set_liquid(pos, None);
             }
             self.decorations.swap_remove(&pos);
             self.auto_tile();
@@ -390,6 +392,27 @@ impl GameGrid {
         let ch = self.characters.remove(&character_id).unwrap();
         self.pathfind_grid.set_occupied(ch.pos(), None);
         self.on_removed_character(character_id);
+    }
+
+    pub fn convert_water_to_poison(&mut self, positions: Vec<Position>) {
+        for pos in positions {
+            match self.decorations.entry(pos) {
+                Entry::Occupied(mut e) => {
+                    let terrain_id = e.get();
+                    match terrain_id {
+                        TerrainId::NewWater(orientation, WaterType::Water) => {
+                            e.insert(TerrainId::NewWater(*orientation, WaterType::Poison));
+                        }
+                        _ => {
+                            println!("WARN: is not water, pos: {:?}", pos);
+                        }
+                    }
+                }
+                Entry::Vacant(..) => {
+                    println!("Can't convert nothing to poison, pos: {:?}", pos);
+                }
+            }
+        }
     }
 
     pub fn auto_tile(&mut self) {
@@ -462,9 +485,28 @@ impl GameGrid {
         self.terrain_objects = new_map;
     }
 
+    fn is_water(&self, pos: Position) -> bool {
+        self.decorations
+            .get(&pos)
+            .map(|n| n.is_new_water())
+            .unwrap_or(false)
+    }
+
+    fn is_wall(&self, pos: Position) -> bool {
+        self.terrain_objects
+            .get(&pos)
+            .map(|t| t.is_stone_wall())
+            .unwrap_or(false)
+    }
+
+    fn is_water_or_wall(&self, pos: Position) -> bool {
+        self.is_water(pos) || self.is_wall(pos)
+    }
+
     pub fn auto_tile_decorations(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
-        for (pos, mut terrain_id) in self.decorations.iter() {
+        for (pos, terrain_id) in self.decorations.iter() {
+            let mut terrain_id = *terrain_id;
             if terrain_id.is_new_water() {
                 let mut neighbors = vec![];
                 let neighbor_positions = &[
@@ -478,42 +520,46 @@ impl GameGrid {
                     (pos.0, pos.1 + 3),
                 ];
                 for neighbor_pos in neighbor_positions {
-                    let is_neighbor_new_water = self
-                        .decorations
-                        .get(neighbor_pos)
-                        .map(|n| n.is_new_water())
-                        .unwrap_or(false);
-                    let is_neighbor_wall = self
-                        .terrain_objects
-                        .get(neighbor_pos)
-                        .map(|t| t.is_stone_wall())
-                        .unwrap_or(false);
-                    neighbors.push(is_neighbor_new_water || is_neighbor_wall);
+                    neighbors.push(self.is_water_or_wall(*neighbor_pos));
                 }
-                terrain_id = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
-                    (true, true, true, true) => &TerrainId::NewWater,
-                    (false, true, true, true) => &TerrainId::NewWaterWest,
-                    (false, true, false, true) => &TerrainId::NewWaterNorthWest,
-                    (true, true, false, true) => &TerrainId::NewWaterNorth,
-                    (true, false, false, true) => &TerrainId::NewWaterNorthEast,
-                    (true, false, true, true) => &TerrainId::NewWaterEast,
-                    (true, false, true, false) => &TerrainId::NewWaterSouthEast,
-                    (true, true, true, false) => &TerrainId::NewWaterSouth,
-                    (false, true, true, false) => &TerrainId::NewWaterSouthWest,
-                    (false, true, false, false) => &TerrainId::NewWaterThinWest,
-                    (true, false, false, false) => &TerrainId::NewWaterThinEast,
-                    (false, false, true, false) => &TerrainId::NewWaterThinSouth,
-                    (false, false, false, true) => &TerrainId::NewWaterThinNorth,
-                    (true, true, false, false) => &TerrainId::NewWaterThinHor,
-                    (false, false, true, true) => &TerrainId::NewWaterThinVert,
+                let orientation = match (neighbors[0], neighbors[1], neighbors[2], neighbors[3]) {
+                    (true, true, true, true) => {
+                        let nw = self.is_water_or_wall((pos.0 - 3, pos.1 - 3));
+                        let ne = self.is_water_or_wall((pos.0 + 3, pos.1 - 3));
+                        let sw = self.is_water_or_wall((pos.0 - 3, pos.1 + 3));
+                        let se = self.is_water_or_wall((pos.0 + 3, pos.1 + 3));
+                        match (nw, ne, sw, se) {
+                            (false, true, true, true) => WaterOrientation::NorthWestInverted,
+                            (true, false, true, true) => WaterOrientation::NorthEastInverted,
+                            (true, true, false, true) => WaterOrientation::SouthWestInverted,
+                            (true, true, true, false) => WaterOrientation::SouthEastInverted,
+                            _ => WaterOrientation::Center,
+                        }
+                    }
+                    (false, true, true, true) => WaterOrientation::West,
+                    (false, true, false, true) => WaterOrientation::NorthWest,
+                    (true, true, false, true) => WaterOrientation::North,
+                    (true, false, false, true) => WaterOrientation::NorthEast,
+                    (true, false, true, true) => WaterOrientation::East,
+                    (true, false, true, false) => WaterOrientation::SouthEast,
+                    (true, true, true, false) => WaterOrientation::South,
+                    (false, true, true, false) => WaterOrientation::SouthWest,
+                    (false, true, false, false) => WaterOrientation::ThinWest,
+                    (true, false, false, false) => WaterOrientation::ThinEast,
+                    (false, false, true, false) => WaterOrientation::ThinSouth,
+                    (false, false, false, true) => WaterOrientation::ThinNorth,
+                    (true, true, false, false) => WaterOrientation::ThinHor,
+                    (false, false, true, true) => WaterOrientation::ThinVert,
 
                     neighbors => {
                         println!("WARN: No water tile fits neighbors: {:?}", neighbors);
-                        &TerrainId::NewWaterSouth
+                        WaterOrientation::South
                     }
                 };
+
+                terrain_id = TerrainId::NewWater(orientation, WaterType::Water);
             }
-            new_map.insert(*pos, *terrain_id);
+            new_map.insert(*pos, terrain_id);
         }
         self.decorations = new_map;
     }
@@ -1521,7 +1567,10 @@ impl GameGrid {
             shadow_y -= self.cell_w * 0.5;
         }
 
-        let standing_in_water = self.pathfind_grid.is_character_in_water(character.pos());
+        let standing_in_water = self
+            .pathfind_grid
+            .is_character_in_liquid(character.pos())
+            .is_some();
 
         let mut character_params = params.clone();
         if standing_in_water {

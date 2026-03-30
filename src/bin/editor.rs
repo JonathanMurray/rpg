@@ -31,6 +31,7 @@ use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_and_init_static, terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
+    WaterOrientation, WaterType,
 };
 
 const DEFAULT_FILENAME: &str = "ogre_room.json";
@@ -495,7 +496,7 @@ impl Sidebar {
             TerrainId::Mat,
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
-            TerrainId::NewWaterNorthEast,
+            TerrainId::NewWater(WaterOrientation::NorthEast, WaterType::Water),
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()

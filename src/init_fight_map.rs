@@ -6,7 +6,7 @@ use rand::distr::Distribution;
 use crate::{
     core::{Character, CharacterId, Position},
     map_data::{create_character, CharacterType, MapData},
-    pathfind::{Occupation, PathfindGrid},
+    pathfind::{Liquid, Occupation, PathfindGrid},
     textures::TerrainId,
 };
 
@@ -60,7 +60,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
 
     for (pos, terrain_id) in &map_data.decorations {
         if terrain_id.is_new_water() {
-            pathfind_grid.set_water(*pos, true);
+            pathfind_grid.set_liquid(*pos, Some(Liquid::Water));
         }
     }
 
