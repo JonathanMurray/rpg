@@ -58,8 +58,9 @@ use crate::{
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
         EffectId, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation, WaterType,
+        LIGHTNING_BOLT_FX,
     },
-    util::{line_visitor, oscillate, rgb, COL_RED},
+    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED},
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -647,6 +648,7 @@ impl GameGrid {
             let animation_color = ability.animation_color;
             let caster_pos = actor.pos();
             let mut duration = 0.0;
+
             if let Some(target) = &target {
                 let target_pos = target_pos.unwrap();
 
@@ -672,20 +674,34 @@ impl GameGrid {
                         );
                     }
                     AreaShape::Line => {
-                        self.add_effect(
-                            caster_pos,
-                            area_pos,
-                            Effect {
-                                start_time: casting_duration,
-                                end_time: casting_duration + duration,
-                                variant: EffectVariant::Line {
-                                    color: animation_color,
-                                    thickness: 10.0,
-                                    end_thickness: None,
-                                    extend_gradually: true,
+                        if ability.id == AbilityId::LightningBolt {
+                            duration = 0.03 * distance_between(caster_pos, area_pos);
+                            let texture = LIGHTNING_BOLT_FX.get().unwrap();
+                            self.add_effect(
+                                caster_pos,
+                                area_pos,
+                                Effect {
+                                    start_time: casting_duration,
+                                    end_time: casting_duration + duration,
+                                    variant: EffectVariant::Fx { texture },
                                 },
-                            },
-                        );
+                            );
+                        } else {
+                            self.add_effect(
+                                caster_pos,
+                                area_pos,
+                                Effect {
+                                    start_time: casting_duration,
+                                    end_time: casting_duration + duration,
+                                    variant: EffectVariant::Line {
+                                        color: animation_color,
+                                        thickness: 10.0,
+                                        end_thickness: None,
+                                        extend_gradually: true,
+                                    },
+                                },
+                            );
+                        }
                     }
                 }
             }
@@ -3390,6 +3406,83 @@ impl GameGrid {
                     };
                     draw_dashed_line(from, to, thickness, *color, 5.0, None, false);
                 }
+                EffectVariant::Fx { texture } => {
+                    let from = (
+                        self.grid_x_f32_to_screen(effect.source_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_pos.1 + 0.5),
+                    );
+                    let final_to = (
+                        self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_pos.1 + 0.5),
+                    );
+                    let texture_size = texture.size();
+                    let texture_draw_size = self.entity_draw_size();
+
+                    let total_dist = Vec2::from(final_to).distance(Vec2::from(from)); //+ texture_draw_size.0;
+                    let total_num_textures = (total_dist / texture_draw_size.0 + 0.5);
+                    let total_num_textures_trunc = (total_num_textures).trunc() as usize;
+                    let total_last_partial_texture_w = total_num_textures.fract();
+
+                    let to = (
+                        from.0 + (final_to.0 - from.0) * t,
+                        from.1 + (final_to.1 - from.1) * t,
+                    );
+
+                    let dist = Vec2::from(to).distance(Vec2::from(from)); //  + texture_draw_size.0 ;
+                    let num_textures = dist / texture_draw_size.0 + 0.5;
+                    let num_textures_trunc = (num_textures).floor() as usize;
+                    let last_partial_texture_w = num_textures.fract();
+
+                    // dbg!(total_num_textures_trunc, last_partial_texture_w, num_textures_trunc);
+
+                    let rotation = -(to.0 - from.0).atan2(to.1 - from.1) + 0.5 * PI;
+
+                    let params = DrawTextureParams {
+                        dest_size: Some(texture_draw_size.into()),
+                        rotation,
+                        ..Default::default()
+                    };
+
+                    let osc_offset = oscillate_square(0.1, 0.0, self.cell_w * 1.5);
+                    for i in 1..=num_textures_trunc {
+                        let mut pos = Vec2::from(from).move_towards(
+                            Vec2::from(final_to),
+                            texture_draw_size.0 * i as f32 + osc_offset,
+                        );
+                        //dbg!(i, from, to, texture_draw_size.0, pos, final_to);
+                        //println!("--");
+                        let mut params = params.clone();
+                        if i == num_textures_trunc {
+                            params.source = Some(Rect::new(
+                                0.0,
+                                0.0,
+                                texture_size.x * last_partial_texture_w,
+                                texture_size.y,
+                            ));
+
+                            params.dest_size = Some(Vec2::new(
+                                texture_draw_size.0 * last_partial_texture_w,
+                                texture_draw_size.1,
+                            ));
+                            pos = pos.move_towards(
+                                Vec2::from(from),
+                                texture_draw_size.0 / 2.0
+                                    - (texture_draw_size.0 * last_partial_texture_w) / 2.0,
+                            );
+                        }
+                        let dest_size = params.dest_size.unwrap();
+                        draw_texture_ex(
+                            texture,
+                            pos.x - dest_size.x / 2.0,
+                            pos.y - dest_size.y / 2.0,
+                            WHITE,
+                            params,
+                        );
+                        //draw_circle(pos.x, pos.y, 5.0, MAGENTA);
+                    }
+
+                    //draw_texture_ex(texture, to.0, to.1, WHITE, params);
+                }
             }
         }
     }
@@ -3854,6 +3947,9 @@ pub enum EffectVariant {
         thickness: f32,
         end_thickness: Option<f32>,
         extend_gradually: bool,
+    },
+    Fx {
+        texture: &'static Texture2D,
     },
 }
 #[derive(Debug)]

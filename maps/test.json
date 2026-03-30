@@ -415,36 +415,8 @@
     }
   },
   "characters": [
-    {
-      "type_": "Bob",
-      "pos": [
-        20,
-        30
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Huldra",
-      "pos": [
-        14,
-        5
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Alice",
-      "pos": [
-        15,
-        30
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
+
+    
     {
       "type_": "Clara",
       "pos": [
@@ -455,6 +427,18 @@
       "main_hand": null,
       "shield": null
     },
+
+    {
+      "type_": "Huldra",
+      "pos": [
+        14,
+        5
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+
     {
       "type_": "Enslaved",
       "pos": [

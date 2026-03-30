@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -60,6 +61,25 @@ async fn main() {
     load_and_init_static().await;
 
     let sound_player = SoundPlayer::new().await;
+
+    // TODO
+    /*
+       let party = Rc::new(Party {
+           money: Cell::new(8),
+           stash: Default::default(),
+       });
+       let clara = Rc::new(make_medium_clara(&party));
+       let player_characters = vec![clara];
+       run_fight_loop(
+           resources.clone(),
+           &player_characters,
+           FightId::Test,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
+    // TODO
 
     run_demo(&resources, &ui_resources, sound_player).await;
 }

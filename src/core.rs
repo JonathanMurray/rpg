@@ -1929,17 +1929,20 @@ impl CoreGame {
             let mut increased_by_good_roll = true;
             let mut dmg_str = "  Damage: ".to_string();
             let is_fire_dmg;
+            let is_lightning_dmg;
 
             match ability_damage {
                 AbilityDamage::Static(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     increased_by_good_roll = false;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
+                    is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
                 AbilityDamage::AtLeast(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
+                    is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
             };
@@ -1957,18 +1960,26 @@ impl CoreGame {
                 }
             }
 
+            // Multipliers (like Crit/Wet) do not stack.
+            let mut multiplicative_bonus_dmg = 0;
             if hit_type == HitType::Graze {
                 dmg_str.push_str(" -50% |<faded>(Graze)|");
-                dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
+                multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.5).ceil() as i32;
             } else if increased_by_good_roll && hit_type == HitType::Critical {
                 dmg_str.push_str(" +50% |<faded>(Crit)|");
-                dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
             }
-
-            if target.has_condition(&Condition::Wet) && is_fire_dmg {
-                dmg_str.push_str(" -25% |<faded>(Wet)|");
-                dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+            if target.has_condition(&Condition::Wet) {
+                if is_fire_dmg {
+                    dmg_str.push_str(" -25% |<faded>(Wet)|");
+                    multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                }
+                if is_lightning_dmg {
+                    dmg_str.push_str(" +50% |<faded>(Wet)|");
+                    multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                }
             }
+            dmg_calculation += multiplicative_bonus_dmg;
 
             if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
@@ -3817,7 +3828,7 @@ impl Condition {
             ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|. Decays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
-            Wet => "Takes |<value>-25%| fire damage",
+            Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|. End of turn: lose |<value>10%| health"
         }
     }
@@ -4267,6 +4278,7 @@ pub enum AbilityId {
     Inspire,
     Haste,
     Fireball,
+    LightningBolt,
     SearingLight,
     Kill,
     PoisonTest,
@@ -4348,6 +4360,7 @@ impl AbilityAttackEffect {
 pub enum DamageType {
     Regular,
     Fire,
+    Lightning,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -6564,7 +6577,14 @@ pub fn is_target_within_shape(
             //let margin = 1.42; // Just large enough to encompass the corner cells occupied by the character
             target_within_range_squared((f32::from(radius)).powf(2.0), area_pos, target.pos())
         }
-        AreaShape::Line => line_visitor(caster_pos, area_pos, |x, y| target.occupies_cell((x, y))),
+        AreaShape::Line => {
+            if target.pos() == caster_pos {
+                // A caster is never hit by a line that they cast, even though they're technically in it
+                false
+            } else {
+                line_visitor(caster_pos, area_pos, |x, y| target.occupies_cell((x, y)))
+            }
+        }
     }
 }
 

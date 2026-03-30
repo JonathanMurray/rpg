@@ -1323,7 +1323,7 @@ pub const HEAL: Ability = Ability {
                     condition: Condition::Bleeding,
                 }),
                 Some(ApplyEffect::ConsumeCondition {
-                    condition: Condition::Burning,
+                    condition: Condition::Poisoned,
                 }),
             ]),
         },
@@ -1714,6 +1714,41 @@ pub const FIREBALL: Ability = Ability {
     ],
 
     animation_color: RED,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::FireballHit),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::FireCrackle,
+    }),
+};
+
+pub const LIGHTNING_BOLT: Ability = Ability {
+    id: AbilityId::LightningBolt,
+    name: "Lightning bolt",
+    description: "Deal lightning damage in a line",
+    icon: IconId::LightningBolt,
+    action_point_cost: 3,
+    mana_cost: 2,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    target: AbilityTarget::Area {
+        range: Range::Float(18.0),
+        area_effect: AreaEffect {
+            shape: AreaShape::Line,
+            acquisition: AreaTargetAcquisition::Everyone,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: Some(DefenseType::Toughness),
+                damage: Some(AbilityDamage::AtLeast(6, DamageType::Lightning)),
+                on_hit: None,
+            })),
+        },
+    },
+    possible_enhancements: [None; 3],
+
+    // TODO: unique animation/sound
+    animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::FireballHit),
     charge_fx: Some(AbilityChargeFx {

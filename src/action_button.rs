@@ -676,8 +676,10 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
                     AbilityDamage::AtLeast(n, dmg_type) => (n, dmg_type),
                 };
                 let mut line = format!("  |<sword>| |<value>{}|", value);
-                if matches!(dmg_type, DamageType::Fire) {
-                    line.push_str(" (fire)");
+                match dmg_type {
+                    DamageType::Fire => line.push_str(" (fire)"),
+                    DamageType::Lightning => line.push_str(" (lightning)"),
+                    DamageType::Regular => {}
                 }
                 t.technical_description.push(line);
             }

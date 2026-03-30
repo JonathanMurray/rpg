@@ -157,11 +157,16 @@ pub enum IconId {
     Inferno,
     Energize,
     Inspire,
+    LightningBolt,
 
     HardenedSkin,
     WeaponProficiency,
     CriticalCharge,
     Reaper,
+}
+
+enum GraphicsFxId {
+    LightningBolt,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -866,6 +871,9 @@ pub async fn load_and_init_static() {
 
     let icon_atlas = load_and_init_texture("icon.png").await;
     ICONS_TEXTURE.get_or_init(|| icon_atlas);
+
+    let lightning_bolt_fx = load_and_init_texture("fx_lightning_bolt.png").await;
+    LIGHTNING_BOLT_FX.get_or_init(|| lightning_bolt_fx);
 }
 
 pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -880,6 +888,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::PiercingShot => (7, 7),
         IconId::Block => (8, 7),
         IconId::Brace => (5, 2),
+        IconId::LightningBolt => (6, 2),
         IconId::Move => (0, 4),
         IconId::Scream => (6, 1),
         IconId::Mindblast => (7, 1),
@@ -1055,3 +1064,5 @@ pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_ENEMY_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+
+pub static LIGHTNING_BOLT_FX: OnceLock<Texture2D> = OnceLock::new();
