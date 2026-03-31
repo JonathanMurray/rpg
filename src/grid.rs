@@ -275,7 +275,7 @@ pub struct GameGrid {
 
     movement_range: MovementRange,
 
-    locked_inspection_target: Option<CharacterId>,
+    //locked_inspection_target: Option<CharacterId>,
     hovered_character: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
     effect_textures: HashMap<EffectId, Texture2D>,
@@ -314,7 +314,7 @@ impl GameGrid {
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
             movement_range: MovementRange::default(),
-            locked_inspection_target: None,
+            //locked_inspection_target: None,
             hovered_character: None,
             enemys_target: None,
             zoom_index,
@@ -947,9 +947,11 @@ impl GameGrid {
     }
 
     fn on_removed_character(&mut self, id: CharacterId) {
+        /*
         if self.locked_inspection_target == Some(id) {
             self.locked_inspection_target = None;
         }
+         */
         if self.hovered_character == Some(id) {
             self.hovered_character = None;
         }
@@ -1682,7 +1684,12 @@ impl GameGrid {
 
         let prev_hovered = self.hovered_character;
 
-        let prev_inspect_target = self.hovered_character.or(self.locked_inspection_target);
+        let prev_inspect_target = match ui_state.players_action_target() {
+            ActionTarget::Character(char_id, _) => Some(char_id),
+            ActionTarget::Position(..) => None,
+            ActionTarget::None => self.hovered_character,
+        };
+        //let prev_inspect_target = self.hovered_character; //.or(self.locked_inspection_target);
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 
@@ -2258,7 +2265,7 @@ impl GameGrid {
                     _ => {}
                 }
 
-                self.locked_inspection_target = None;
+                //self.locked_inspection_target = None;
             }
 
             if pressed_left_mouse
@@ -2429,11 +2436,11 @@ impl GameGrid {
                             if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;
-                                self.locked_inspection_target = Some(hovered_id);
+                                //self.locked_inspection_target = Some(hovered_id);
                             } else if mouse_state == MouseState::RequiresAllyTarget {
                                 ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                 outcome.switched_players_action_target = true;
-                                self.locked_inspection_target = Some(hovered_id);
+                                //self.locked_inspection_target = Some(hovered_id);
                             } else {
                                 // Click self => abort the action
                                 *ui_state = UiState::ChoosingAction;
@@ -2443,7 +2450,7 @@ impl GameGrid {
                         } else if mouse_state == MouseState::RequiresAllyTarget {
                             ui_state.set_target(ActionTarget::Character(hovered_id, None));
                             outcome.switched_players_action_target = true;
-                            self.locked_inspection_target = Some(hovered_id);
+                            //self.locked_inspection_target = Some(hovered_id);
                         } else {
                             outcome.tried_switching_selected_player_char = Some(hovered_id);
                         }
@@ -2547,7 +2554,7 @@ impl GameGrid {
                             }
 
                             outcome.switched_players_action_target = true;
-                            self.locked_inspection_target = Some(hovered_id);
+                            //self.locked_inspection_target = Some(hovered_id);
                         } else if let MouseState::RequiresEnemyTarget {
                             move_into_melee, ..
                         } = mouse_state
@@ -2568,9 +2575,9 @@ impl GameGrid {
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
 
-                            self.locked_inspection_target = Some(hovered_id);
+                            //self.locked_inspection_target = Some(hovered_id);
                         } else if !matches!(mouse_state, MouseState::RequiresAllyTarget) {
-                            self.locked_inspection_target = Some(hovered_id);
+                            //self.locked_inspection_target = Some(hovered_id);
                         }
                     }
                 }
@@ -2587,6 +2594,7 @@ impl GameGrid {
             }
         }
 
+        /*
         if let Some(target) = self.locked_inspection_target {
             self.draw_cornered_outline(
                 self.character_screen_pos(&self.characters[&target]),
@@ -2596,6 +2604,7 @@ impl GameGrid {
                 false,
             );
         }
+         */
 
         match ui_state.players_action_target() {
             ActionTarget::Character(target, movement) => {
@@ -2674,9 +2683,16 @@ impl GameGrid {
 
         self.draw_effects();
 
-        let inspect_target = self.hovered_character.or(self.locked_inspection_target);
+        let inspect_target = match ui_state.players_action_target() {
+            ActionTarget::Character(char_id, _) => Some(char_id),
+            ActionTarget::Position(..) => None,
+            ActionTarget::None => self.hovered_character,
+        };
+
+        //let inspect_target = self.hovered_character; //.or(self.locked_inspection_target);
         if inspect_target != prev_inspect_target {
             outcome.switched_inspect_target = Some(inspect_target);
+            println!("SWITCHED INSPECT TARGET {:?}", inspect_target);
         }
 
         outcome
