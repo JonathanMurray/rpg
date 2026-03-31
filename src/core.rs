@@ -956,7 +956,7 @@ impl CoreGame {
             ApplyEffect::GainHealth(n) => {
                 let gained = receiver.health.gain(n);
                 actual_effect = Some(ApplyEffect::GainHealth(gained));
-                format!("  {} gained {} health", receiver.name, gained)
+                format!("  |{}| gained {} health", receiver.name, gained)
             }
             e @ ApplyEffect::Condition(apply_condition) => {
                 actual_effect = Some(e);
@@ -977,7 +977,7 @@ impl CoreGame {
                 let healing_amount = damage_dealt * caster_healing_percentage / 100;
                 self.perform_gain_health(giver.unwrap(), healing_amount);
                 format!(
-                    "  {} lost {} health. {} was healed for {}",
+                    "  |{}| lost {} health. |{}| was healed for {}",
                     receiver.name,
                     damage_dealt,
                     giver.unwrap().name,
@@ -985,14 +985,19 @@ impl CoreGame {
                 )
             }
             e @ ApplyEffect::ConsumeCondition { condition } => {
-                let stacks_cleared = receiver.clear_condition(condition);
+                let prev_stacks = receiver.conditions.borrow().get_stacks(&condition);
+                let did_clear = receiver.clear_condition(condition);
                 let mut line = "".to_string();
-                if let Some(stacks) = stacks_cleared {
-                    line.push_str(&format!("  {} lost {}", receiver.name, condition.name()));
-                    if stacks > 0 {
-                        line.push_str(&format!(" ({})", stacks));
-                        actual_effect = Some(e);
+                if did_clear {
+                    line.push_str(&format!(
+                        "  |{}| lost |<keyword>{}|",
+                        receiver.name,
+                        condition.name()
+                    ));
+                    if prev_stacks > 0 {
+                        line.push_str(&format!(" ({})", prev_stacks));
                     }
+                    actual_effect = Some(e);
                 }
                 line
             }
@@ -1668,7 +1673,7 @@ impl CoreGame {
             if let Some(game) = real_game {
                 let health_gained = game.perform_gain_health(target, healing);
                 detail_lines.push(format!(
-                    "  {} was healed for {}",
+                    "  |{}| was healed for {}",
                     target.name, health_gained
                 ));
                 applied_effects.push(ApplyEffect::GainHealth(health_gained));
@@ -2694,7 +2699,7 @@ impl CoreGame {
         let conditions = &character.conditions;
 
         if conditions.borrow().has(&Condition::Poisoned) {
-            let amount = (character.health.max() as f32 / 10.0).ceil() as u32;
+            let amount = (character.health.current() as f32 / 10.0).ceil() as u32;
             let damage = self.perform_losing_health(character, amount);
             self.ui_handle_event(GameEvent::CharacterTookDamage {
                 character: character.id(),
@@ -3825,7 +3830,7 @@ impl Condition {
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
-            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| health"
+            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health"
         }
     }
 
@@ -4035,7 +4040,8 @@ impl Conditions {
     pub fn get_stacks(&self, condition: &Condition) -> u32 {
         self.map
             .get(condition)
-            .map(|state| state.stacks.unwrap())
+            .map(|state| state.stacks)
+            .flatten()
             .unwrap_or(0)
     }
 
@@ -6436,18 +6442,10 @@ impl Character {
         }
     }
 
-    fn clear_condition(&self, condition: Condition) -> Option<u32> {
+    fn clear_condition(&self, condition: Condition) -> bool {
         let mut conditions = self.conditions.borrow_mut();
 
-        if !conditions.has(&condition) {
-            return None;
-        }
-
-        let prev_stacks = conditions.get_stacks(&condition);
-
-        conditions.remove(&condition);
-
-        Some(prev_stacks)
+        conditions.remove(&condition)
     }
 
     pub fn has_condition(&self, condition: &Condition) -> bool {

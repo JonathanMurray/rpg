@@ -1743,6 +1743,20 @@ pub const FIREBALL: Ability = Ability {
     }),
 };
 
+pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::LightningBolt,
+    name: "Reach",
+    description: "",
+    icon: IconId::Extend,
+    action_point_cost: 1,
+    mana_cost: 1,
+    spell_effect: Some(SpellEnhancementEffect {
+        increased_range_tenths: 80,
+        ..SpellEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
+};
+
 pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
@@ -1766,7 +1780,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
             })),
         },
     },
-    possible_enhancements: [None; 3],
+    possible_enhancements: [Some(LIGHTNING_BOLT_REACH), None, None],
 
     // TODO: unique animation/sound
     animation_color: YELLOW,

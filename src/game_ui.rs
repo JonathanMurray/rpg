@@ -190,24 +190,29 @@ impl ConfiguredAction {
             } => match target {
                 Some(target_id) => {
                     let target_char = characters.get(*target_id);
-                    let (_range, reach) = relevant_character.reaches_with_attack(
-                        attack.hand,
-                        target_char.pos(),
-                        selected_enhancements.iter().map(|e| e.effect),
-                    );
-                    if matches!(
-                        reach,
-                        ActionReach::Yes | ActionReach::YesButDisadvantage(..)
-                    ) {
-                        if pathfind_grid
-                            .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
-                        {
-                            Some(NO_LINE_OF_SIGHT)
+                    if relevant_character.can_attack(*attack) {
+                        let (_range, reach) = relevant_character.reaches_with_attack(
+                            attack.hand,
+                            target_char.pos(),
+                            selected_enhancements.iter().map(|e| e.effect),
+                        );
+                        if matches!(
+                            reach,
+                            ActionReach::Yes | ActionReach::YesButDisadvantage(..)
+                        ) {
+                            if pathfind_grid.obstructed_line_of_sight(
+                                relevant_character.pos(),
+                                target_char.pos(),
+                            ) {
+                                Some(NO_LINE_OF_SIGHT)
+                            } else {
+                                None
+                            }
                         } else {
-                            None
+                            Some(OUT_OF_REACH)
                         }
                     } else {
-                        Some(OUT_OF_REACH)
+                        Some("Not enough AP")
                     }
                 }
                 None => Some("Select an enemy"),
@@ -845,6 +850,10 @@ impl UserInterface {
         let mut player_chose = None;
         self.top_character_portraits
             .set_grid_hovered_character_id(outcome.hovered_character_id);
+
+        if outcome.committed_action {
+            player_chose = Some(self.commit_player_action());
+        }
 
         if let Some(new_inspect_target) = outcome.switched_inspect_target {
             let target = new_inspect_target.map(|id| self.characters.get_rc(id));
@@ -2241,15 +2250,25 @@ impl UserInterface {
             Some(selected_char.id())
         };
 
-        self.game_grid
-            .update(self.active_character_id, selected_in_grid, elapsed);
+        let usability_problem = self.state.borrow().action_usability_problem(
+            self.active_character(),
+            &self.characters,
+            &self.game_grid.pathfind_grid,
+        );
+
+        self.game_grid.update(
+            self.active_character_id,
+            selected_in_grid,
+            usability_problem,
+            elapsed,
+        );
 
         let popup_outcome = self.activity_popup.update();
 
         let mut player_choice = None;
         match popup_outcome {
             Some(ActivityPopupOutcome::ClickedProceed) => {
-                player_choice = Some(self.handle_popup_proceed());
+                player_choice = Some(self.commit_player_action());
             }
             Some(ActivityPopupOutcome::ChangedAbilityEnhancements) => {
                 // TODO update hit chance?
@@ -2331,6 +2350,7 @@ impl UserInterface {
                     } else {
                         invalid_action = true;
                     }
+                    btn.on_clicked();
                 }
             }
         }
@@ -2432,7 +2452,7 @@ impl UserInterface {
         );
     }
 
-    fn handle_popup_proceed(&mut self) -> PlayerChose {
+    fn commit_player_action(&mut self) -> PlayerChose {
         // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
         // TODO shouldn't we rather change the state, and rely on refresh_selected_action_button to clear this?
         self.set_selected_action(None);

@@ -20,9 +20,10 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, HEART_SYMBOL,
-        HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL,
-        STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
+        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CONFIRM_SYMBOL,
+        HEART_SYMBOL, HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, RED_DICE_SYMBOL,
+        SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL,
+        WEIGHT_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
@@ -454,6 +455,7 @@ lazy_static! {
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
             ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
             ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
+            ("<confirm>", (symbol_w, &CONFIRM_SYMBOL)),
             ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
             ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
             ("<mana>", (12.0, &MANA_SYMBOL)),
@@ -478,7 +480,7 @@ pub fn measure_text_with_font_tags(
             w += symbol_w;
             h = h.max(SYMBOL_H);
             if offset_y.is_none() {
-                offset_y = Some(13.0);
+                offset_y = Some(16.0);
             }
         } else {
             let font_size = font_size;

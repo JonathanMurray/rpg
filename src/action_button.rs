@@ -8,8 +8,9 @@ use macroquad::{
     color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
-    shapes::draw_rectangle,
+    shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, Font, TextParams},
+    time::get_time,
 };
 
 use crate::{
@@ -29,7 +30,7 @@ use crate::{
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::COL_RED,
+    util::{oscillate, COL_RED},
 };
 
 pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
@@ -754,6 +755,7 @@ pub struct ActionButton {
     pub enabled: Cell<bool>,
     pub selected: Cell<ButtonSelected>,
     pub event_sender: Option<EventSender>,
+    clicked_effect_until: Cell<Option<f64>>,
     icon: IconId,
     tooltip: RefCell<Tooltip>,
     character: Option<Rc<Character>>,
@@ -873,6 +875,7 @@ impl ActionButton {
             enabled: Cell::new(true),
             selected: Cell::new(ButtonSelected::No),
             event_sender: event_queue.map(|queue| EventSender { queue }),
+            clicked_effect_until: Default::default(),
             icon,
             tooltip: RefCell::new(tooltip),
             character,
@@ -1016,6 +1019,10 @@ impl ActionButton {
         self.selected.set(ButtonSelected::No);
     }
 
+    pub fn on_clicked(&self) {
+        self.clicked_effect_until.set(Some(get_time() + 0.1));
+    }
+
     pub fn notify_hidden(&self) {
         if self.hovered.get() {
             if let Some(event_sender) = &self.event_sender {
@@ -1106,34 +1113,21 @@ impl Drawable for ActionButton {
             self.icon
         };
 
-        draw_icon(icon, x + 2.0, y + 2.0, Some(self.texture_draw_size));
-
-        if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
-            let text = hotkey_string(keycode);
-            let margin = 3.0;
-            let font_size = 16;
-            let text_dim = measure_text(text, Some(font), font_size, 1.0);
-            let x0 = x + margin;
-            let y0 = y + margin;
-            let padding = 3.0;
-            draw_rectangle(
-                x0,
-                y0,
-                text_dim.width + padding * 2.0,
-                text_dim.height + padding * 2.0,
-                Color::new(0.0, 0.0, 0.0, 0.8),
+        if let Some(effect_expiration) = self.clicked_effect_until.get() {
+            draw_icon(
+                icon,
+                x + 3.3,
+                y + 3.3,
+                Some((
+                    self.texture_draw_size.0 - 2.0,
+                    self.texture_draw_size.1 - 2.0,
+                )),
             );
-            draw_text_rounded(
-                text,
-                x0 + padding,
-                y0 + padding + text_dim.offset_y,
-                TextParams {
-                    font: Some(font),
-                    font_size,
-                    color: WHITE,
-                    ..Default::default()
-                },
-            );
+            if get_time() > effect_expiration {
+                self.clicked_effect_until.set(None);
+            }
+        } else {
+            draw_icon(icon, x + 2.0, y + 2.0, Some(self.texture_draw_size));
         }
 
         // When viewed in the skill tree (editor), we can be so zoomed out that the bottom row doesn't fit well. In that case, don't show it.
@@ -1172,12 +1166,13 @@ impl Drawable for ActionButton {
                     }
                 }
                 //draw_rectangle(x, y, w, h, Color::new(1.0, 1.0, 1.0, 0.15));
+                let thickness = oscillate(1.0, 5.0, 8.0);
                 draw_rounded_rectangle_lines(
                     x - margin,
                     y - margin,
                     w + margin * 2.0,
                     h + margin * 2.0,
-                    7.0,
+                    thickness,
                     GREEN,
                     7.0,
                     outer,
@@ -1212,6 +1207,7 @@ impl Drawable for ActionButton {
                             context: self.context,
                         });
                     }
+                    self.on_clicked();
                 }
             }
             if self.enabled.get() {
@@ -1235,6 +1231,29 @@ impl Drawable for ActionButton {
                     outer,
                 );
             }
+        }
+
+        if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
+            let text = hotkey_string(keycode);
+            let font_size = 16;
+            let text_dim = measure_text(text, Some(font), font_size, 1.0);
+            let rect_w = 16.0;
+            let rect_h = 16.0;
+            let x0 = x + w / 2.0 - rect_w / 2.0;
+            let y0 = y - rect_h * 0.7;
+            draw_rectangle(x0, y0, rect_w, rect_h, BLACK);
+            draw_rectangle_lines(x0, y0, rect_w, rect_h, 1.0, LIGHTGRAY);
+            draw_text_rounded(
+                text,
+                x0 + rect_w / 2.0 - text_dim.width / 2.0,
+                y0 + rect_h - text_dim.height + text_dim.offset_y - 2.0,
+                TextParams {
+                    font: Some(font),
+                    font_size,
+                    color: WHITE,
+                    ..Default::default()
+                },
+            );
         }
 
         draw_debug(x, y, w, h);

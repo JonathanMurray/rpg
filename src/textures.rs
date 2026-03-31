@@ -1033,6 +1033,7 @@ async fn load_and_init_font_symbols() {
     BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
     HELMET_SYMBOL.get_or_init(|| symbol(2, 3));
     WEIGHT_SYMBOL.get_or_init(|| symbol(3, 3));
+    CONFIRM_SYMBOL.get_or_init(|| symbol(3, 1));
 }
 
 async fn load_and_init_ui_textures() {
@@ -1060,6 +1061,7 @@ pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HELMET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WEIGHT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static CONFIRM_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

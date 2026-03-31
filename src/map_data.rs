@@ -14,7 +14,7 @@ use crate::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
         HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, LIGHTNING_BOLT,
-        POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
+        LIGHTNING_BOLT_REACH, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -476,8 +476,9 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_ability(FIREBALL);
-    clara.learn_ability(LIGHTNING_BOLT);
     clara.learn_ability_enhancement(FIREBALL_REACH);
+    clara.learn_ability(LIGHTNING_BOLT);
+    clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
     clara.learn_ability(SHACKLED_MIND);
 
     clara
@@ -566,6 +567,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     clara.learn_ability(INFLICT_WOUNDS);
     clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
     clara.learn_ability(LIGHTNING_BOLT);
+    clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
     //clara.learn_ability(MIND_BLAST);
 
     // TODO

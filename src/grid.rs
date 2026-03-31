@@ -100,6 +100,9 @@ const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
 
+const CURSOR_ERROR_COLOR: Color = Color::new(1.0, 0.8, 0.8, 1.0);
+const CURSOR_INFO_COLOR: Color = WHITE;
+
 #[derive(Debug, Clone)]
 pub struct TargetEffectPreview {
     pub character_id: CharacterId,
@@ -272,6 +275,7 @@ pub struct GameGrid {
     effects: Vec<ConcreteEffect>,
     selected_player_character_id: Option<CharacterId>,
     active_character_id: CharacterId,
+    action_usability_problem: Option<&'static str>,
 
     movement_range: MovementRange,
 
@@ -317,6 +321,7 @@ impl GameGrid {
             //locked_inspection_target: None,
             hovered_character: None,
             enemys_target: None,
+            action_usability_problem: None,
             zoom_index,
             cell_w,
             grid_dimensions,
@@ -987,10 +992,11 @@ impl GameGrid {
         &mut self,
         active_character_id: CharacterId,
         selected_player_character_id: Option<CharacterId>,
+        action_usability_problem: Option<&'static str>,
         elapsed: f32,
     ) {
         self.active_character_id = active_character_id;
-
+        self.action_usability_problem = action_usability_problem;
         self.selected_player_character_id = selected_player_character_id;
 
         //let pos: (i32, i32) = &self.characters[&self.active_character_id].pos();
@@ -2250,62 +2256,55 @@ impl GameGrid {
             labelled_char_ids.insert(self.active_character_id);
         }
 
+        let mut front_cursor_text = None;
+
         if is_mouse_within_grid && receptive_to_input {
-            let pressed_terrain = pressed_left_mouse && self.hovered_character.is_none();
-
-            if pressed_terrain {
-                match mouse_state {
-                    MouseState::RequiresAllyTarget
-                    | MouseState::RequiresEnemyTarget { .. }
-                    | MouseState::ImplicitTarget => {
-                        *ui_state = UiState::ChoosingAction;
-                        outcome.switched_state = Some(NewState::ChoosingAction);
-                        outcome.switched_players_action_target = true;
-                    }
-                    _ => {}
-                }
-
-                //self.locked_inspection_target = None;
-            }
-
-            if pressed_left_mouse
-                && matches!(mouse_state, MouseState::RequiresPositionTarget { .. })
-            {
-                if ui_state.players_action_target() == ActionTarget::None {
-                    let target_pos = snapped_position_target.unwrap_or(mouse_grid_pos);
-                    ui_state.set_target(ActionTarget::Position(target_pos));
-                    outcome.switched_players_action_target = true;
-                } else {
-                    *ui_state = UiState::ChoosingAction;
-                    outcome.switched_state = Some(NewState::ChoosingAction);
-                }
-            }
-
-            let player_has_action_char_target = matches!(
-                ui_state.players_action_target(),
-                ActionTarget::Character { .. }
-            );
+            let player_action_char_target = match ui_state.players_action_target() {
+                ActionTarget::Character(char_id, _) => Some(char_id),
+                _ => None,
+            };
+            let committable_action_name = match ui_state {
+                UiState::ConfiguringAction(configured_action) => match configured_action {
+                    ConfiguredAction::Attack { .. } => Some("Attack"),
+                    ConfiguredAction::UseAbility { ability, .. } => Some(ability.name),
+                    _ => None,
+                },
+                _ => None,
+            };
 
             let mut hovered_move_route = None;
 
+            let mut may_commit_action_with_left_click = false;
+
             match mouse_state {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
-                    if !player_has_action_char_target && self.hovered_character.is_none() {
+                    if player_action_char_target.is_none() && self.hovered_character.is_none() {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((char_id, range, indicator)) = range_indicator {
+                        if let Some((_char_id, _range, indicator)) = range_indicator {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range =
                                 matches!(indicator, RangeIndicator::CannotReach);
                         }
 
-                        let text = if is_mouse_pos_out_of_range {
-                            "Out of reach"
+                        if is_mouse_pos_out_of_range {
+                            self.draw_cursor_text(
+                                "Out of reach",
+                                Some(mouse_grid_pos),
+                                CURSOR_ERROR_COLOR,
+                            );
                         } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
-                            "Select enemy"
+                            self.draw_cursor_text(
+                                "Select enemy",
+                                Some(mouse_grid_pos),
+                                CURSOR_INFO_COLOR,
+                            );
                         } else {
-                            "Select ally"
-                        };
-                        self.draw_cursor_text(text, mouse_grid_pos);
+                            self.draw_cursor_text(
+                                "Select ally",
+                                Some(mouse_grid_pos),
+                                CURSOR_INFO_COLOR,
+                            );
+                        }
 
                         if is_mouse_pos_out_of_range {
                             self.draw_invalid_target_marker(mouse_grid_pos);
@@ -2318,13 +2317,23 @@ impl GameGrid {
                                 true,
                             );
                         }
+                    } else if let Some(target) = player_action_char_target {
+                        let hovers_other = self
+                            .hovered_character
+                            .map(|hovered| hovered != target)
+                            .unwrap_or(false);
+                        if !hovers_other {
+                            may_commit_action_with_left_click = true;
+                        }
                     }
                 }
                 MouseState::RequiresPositionTarget { shape, .. } => {
-                    if !matches!(
+                    if matches!(
                         ui_state.players_action_target(),
                         ActionTarget::Position { .. }
                     ) {
+                        may_commit_action_with_left_click = true;
+                    } else {
                         let mut is_mouse_pos_out_of_range = false;
                         if let Some((char_id, range, _indicator)) = range_indicator {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
@@ -2337,12 +2346,19 @@ impl GameGrid {
 
                         match shape {
                             AreaShape::Circle(..) => {
-                                let text = if is_mouse_pos_out_of_range {
-                                    "Out of reach"
+                                if is_mouse_pos_out_of_range {
+                                    self.draw_cursor_text(
+                                        "Out of reach",
+                                        Some(mouse_grid_pos),
+                                        CURSOR_ERROR_COLOR,
+                                    );
                                 } else {
-                                    "Select area"
-                                };
-                                self.draw_cursor_text(text, mouse_grid_pos);
+                                    self.draw_cursor_text(
+                                        "Select area",
+                                        Some(mouse_grid_pos),
+                                        CURSOR_INFO_COLOR,
+                                    );
+                                }
                             }
                             // The line graphics should be self-explanatory
                             AreaShape::Line => {}
@@ -2368,14 +2384,68 @@ impl GameGrid {
 
                     if hovered_move_route.is_none() {
                         self.draw_invalid_target_marker(mouse_grid_pos);
-                        self.draw_cursor_text("Out of reach", mouse_grid_pos);
+                        self.draw_cursor_text(
+                            "Out of reach",
+                            Some(mouse_grid_pos),
+                            CURSOR_ERROR_COLOR,
+                        );
                     }
+                }
+                MouseState::ImplicitTarget => {
+                    may_commit_action_with_left_click = true;
                 }
                 _ => {}
             }
 
+            if may_commit_action_with_left_click {
+                if let Some(problem) = self.action_usability_problem {
+                    let problem = format!("|<warning>| {}", problem);
+                    front_cursor_text = Some((problem, CURSOR_ERROR_COLOR));
+                    //self.draw_cursor_text(problem, None, CURSOR_ERROR_COLOR);
+                } else {
+                    let text = format!("|<confirm>|{}", committable_action_name.unwrap());
+                    front_cursor_text = Some((text, CURSOR_INFO_COLOR));
+                    //self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
+
+                    if pressed_left_mouse {
+                        outcome.committed_action = true;
+                    }
+                }
+            }
+
+            let pressed_terrain = pressed_left_mouse && self.hovered_character.is_none();
+
+            if pressed_terrain && !outcome.committed_action {
+                match mouse_state {
+                    MouseState::RequiresAllyTarget
+                    | MouseState::RequiresEnemyTarget { .. }
+                    | MouseState::ImplicitTarget => {
+                        *ui_state = UiState::ChoosingAction;
+                        outcome.switched_state = Some(NewState::ChoosingAction);
+                        outcome.switched_players_action_target = true;
+                    }
+                    _ => {}
+                }
+
+                //self.locked_inspection_target = None;
+            }
+
+            if pressed_left_mouse
+                && matches!(mouse_state, MouseState::RequiresPositionTarget { .. })
+                && !outcome.committed_action
+            {
+                if ui_state.players_action_target() == ActionTarget::None {
+                    let target_pos = snapped_position_target.unwrap_or(mouse_grid_pos);
+                    ui_state.set_target(ActionTarget::Position(target_pos));
+                    outcome.switched_players_action_target = true;
+                } else {
+                    *ui_state = UiState::ChoosingAction;
+                    outcome.switched_state = Some(NewState::ChoosingAction);
+                }
+            }
+
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
-                if self.dragging_camera_from.is_none() && !player_has_action_char_target {
+                if self.dragging_camera_from.is_none() && player_action_char_target.is_none() {
                     //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
                     let path = self.pathfind_grid.build_path_from_chart(
                         &self.routes(self.active_character_id),
@@ -2390,7 +2460,7 @@ impl GameGrid {
                         .movement_range
                         .cost(hovered_route_node.distance_from_start, remaining_movement);
 
-                    if pressed_left_mouse {
+                    if pressed_left_mouse && !outcome.committed_action {
                         let commit_movement = matches!(
                             ui_state,
                             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
@@ -2431,7 +2501,7 @@ impl GameGrid {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                     }
 
-                    if pressed_left_mouse {
+                    if pressed_left_mouse && !outcome.committed_action {
                         if self.active_character_id == hovered_id {
                             if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
@@ -2508,7 +2578,7 @@ impl GameGrid {
                         self.draw_invalid_target_marker(mouse_grid_pos);
                     }
 
-                    if pressed_left_mouse {
+                    if pressed_left_mouse && !outcome.committed_action {
                         let mut may_acquire_attack_target = matches!(
                             ui_state,
                             UiState::ChoosingAction
@@ -2517,7 +2587,7 @@ impl GameGrid {
                                 )
                         );
 
-                        if player_has_action_char_target
+                        if player_action_char_target.is_some()
                             && matches!(mouse_state, MouseState::RequiresAllyTarget)
                         {
                             may_acquire_attack_target = true; // i.e. change action to attack
@@ -2683,6 +2753,10 @@ impl GameGrid {
 
         self.draw_effects();
 
+        if let Some((text, color)) = front_cursor_text {
+            self.draw_cursor_text(text, None, color);
+        }
+
         let inspect_target = match ui_state.players_action_target() {
             ActionTarget::Character(char_id, _) => Some(char_id),
             ActionTarget::Position(..) => None,
@@ -2692,26 +2766,55 @@ impl GameGrid {
         //let inspect_target = self.hovered_character; //.or(self.locked_inspection_target);
         if inspect_target != prev_inspect_target {
             outcome.switched_inspect_target = Some(inspect_target);
-            println!("SWITCHED INSPECT TARGET {:?}", inspect_target);
         }
 
         outcome
     }
 
-    fn draw_cursor_text(&self, text: &str, mouse_grid_pos: (i32, i32)) {
-        let snapped_mouse_pos = self.grid_pos_to_screen(mouse_grid_pos);
+    fn draw_cursor_text(
+        &self,
+        text: impl AsRef<str>,
+        mouse_grid_pos: Option<(i32, i32)>,
+        color: Color,
+    ) {
+        let font_scale = 1.0; //oscillate(1.0, 0.9, 1.1);
+        let font_size = 16;
+        let font = Some(&self.simple_font);
+        let text_dim = measure_text_with_font_tags(text.as_ref(), font, font_size, font_scale);
+        let (x, y) = if let Some(pos) = mouse_grid_pos {
+            let snapped_mouse_pos = self.grid_pos_to_screen(pos);
+            (
+                snapped_mouse_pos.0 + self.cell_w / 2.0 - text_dim.width / 2.0,
+                snapped_mouse_pos.1,
+            )
+        } else {
+            let mouse_pos = mouse_position();
+            (mouse_pos.0 - text_dim.width / 2.0, mouse_pos.1 - 3.0)
+        };
 
-        let text_dim = measure_text(text, Some(&self.simple_font), 16, 1.0);
-        draw_text_ex(
-            text,
-            snapped_mouse_pos.0 + self.cell_w / 2.0 - text_dim.width / 2.0,
-            snapped_mouse_pos.1,
+        if mouse_grid_pos.is_none() {
+            let pad = 3.0;
+            draw_rectangle(
+                x - pad,
+                y - text_dim.offset_y - pad,
+                text_dim.width + pad * 2.0,
+                text_dim.height + pad * 2.0,
+                Color::new(0.0, 0.0, 0.0, 0.5),
+            );
+        }
+
+        draw_text_with_font_tags(
+            text.as_ref(),
+            x,
+            y,
             TextParams {
-                font: Some(&self.simple_font),
-                font_size: 16,
-                color: WHITE,
+                font,
+                font_size,
+                font_scale,
+                color,
                 ..Default::default()
             },
+            true,
         );
     }
 
@@ -3928,6 +4031,7 @@ fn chance_to_perc_str(chance: f32) -> String {
 
 #[derive(Debug, Default)]
 pub struct GridOutcome {
+    pub committed_action: bool,
     pub switched_state: Option<NewState>,
     pub hovered_character_id: Option<CharacterId>,
     pub switched_inspect_target: Option<Option<CharacterId>>,
