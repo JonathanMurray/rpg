@@ -268,7 +268,7 @@
         6,
         12
       ],
-      "health": 10,
+      "health": 9,
       "main_hand": null,
       "shield": null
     },
@@ -278,7 +278,7 @@
         4,
         16
       ],
-      "health": 9,
+      "health": 8,
       "main_hand": "BadDagger",
       "shield": null
     },

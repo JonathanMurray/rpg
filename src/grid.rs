@@ -1673,7 +1673,7 @@ impl GameGrid {
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
         obstructed: bool,
-        hovered_action: Option<(CharacterId, BaseAction)>,
+        mut hovered_action: Option<(CharacterId, BaseAction)>,
         active_char_reserved_and_hovered_ap: (i32, i32),
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
@@ -1775,6 +1775,12 @@ impl GameGrid {
                     let id = character.id();
                     outcome.hovered_character_id = Some(id);
                     self.hovered_character = Some(id);
+
+                    // This lets you quickly hover enemies and see their movement range
+                    if hovered_action.is_none() && matches!(ui_state, UiState::ChoosingAction) {
+                        hovered_action = Some((id, BaseAction::Move));
+                    }
+                    break;
                 }
             }
         }

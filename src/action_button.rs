@@ -246,16 +246,6 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
             .push(format!("+ {} range", effect.range_bonus));
     }
 
-    if effect.improved_graze {
-        t.technical_description
-            .push("|<value>-25%| |<keyword>Graze| damage (instead of |<value>-50%|)".to_string());
-        t.keywords.push(Keyword::Graze);
-    }
-    if effect.improved_crit {
-        t.technical_description
-            .push("|<keyword>Crit| bonus damage increased by |<value>25%|".to_string());
-        t.keywords.push(Keyword::Crit);
-    }
     if effect.roll_advantage > 0 {
         t.technical_description.push(format!(
             "|<value>+{}| |<keyword>Advantage|",
@@ -268,6 +258,16 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
             -effect.roll_advantage
         ));
         t.keywords.push(Keyword::Advantage);
+    }
+    if effect.improved_graze {
+        t.technical_description
+            .push("|<value>-25%| |<keyword>Graze| damage (instead of |<value>-50%|)".to_string());
+        t.keywords.push(Keyword::Graze);
+    }
+    if effect.improved_crit {
+        t.technical_description
+            .push("|<keyword>Crit| bonus damage increased by |<value>25%|".to_string());
+        t.keywords.push(Keyword::Crit);
     }
     if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
         t.technical_description.push(format!(

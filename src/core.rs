@@ -872,7 +872,7 @@ impl CoreGame {
     }
 
     async fn handle_character_standing_in_liquid(&self, character: &Character, game_time: u32) {
-        println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
+        //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
         if let Some(liquid) = self.pathfind_grid.is_character_in_liquid(character.pos()) {
             if !character.has_condition(&Condition::Wet) {
                 character.receive_condition(
@@ -1024,7 +1024,7 @@ impl CoreGame {
     }
 
     fn current_time(&self) -> u32 {
-        dbg!(self.active_character().name);
+        //dbg!(self.active_character().name);
         let char = self.active_character();
         let t_in_round = if char.player_controlled() {
             // Treat player turns as simultaneous
