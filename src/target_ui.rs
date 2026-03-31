@@ -27,7 +27,7 @@ use crate::{
     util::COL_RED,
 };
 
-const BG_COLOR: Color = Color::new(0.4, 0.3, 0.2, 1.0);
+const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.85);
 
 pub struct TargetUi {
     target: Option<Rc<Character>>,
@@ -97,13 +97,6 @@ impl TargetUi {
                 TextLine::new(char.name, 18, WHITE, Some(self.big_font.clone()));
             name_text_line.set_depth(BLACK, 2.0);
             name_text_line.set_min_height(20.0);
-
-            let armor_text_line = TextLine::new(
-                format!("Armor: {}", char.armor_str()),
-                22,
-                WHITE,
-                Some(self.simple_font.clone()),
-            );
 
             let def_table = table(
                 vec![
@@ -176,7 +169,7 @@ impl TargetUi {
                 },
                 children: vec![Element::Texture(
                     self.portrait_textures[&char.portrait].clone(),
-                    None,
+                    None, //Some((64.0, 80.0)),
                 )],
                 ..Default::default()
             });
@@ -200,28 +193,6 @@ impl TargetUi {
                 children: vec![defense_header],
                 ..Default::default()
             });
-
-            let centered_list = Container {
-                layout_dir: LayoutDirection::Vertical,
-                align: Align::Center,
-                children: vec![
-                    Element::Text(name_text_line),
-                    portrait,
-                    Element::Empty(1.0, 4.0),
-                    Element::Container(resource_row),
-                    Element::Empty(1.0, 4.0),
-                    Element::Box(Box::new(action_points_row)),
-                    Element::Empty(1.0, 4.0),
-                    defense_header_row,
-                    Element::Container(def_table),
-                    Element::Empty(1.0, 4.0),
-                    Element::Text(armor_text_line),
-                    Element::Empty(1.0, 4.0),
-                ],
-                margin: 3.0,
-
-                ..Default::default()
-            };
 
             let mut action_rows = vec![];
             let mut passives_row = None;
@@ -285,9 +256,11 @@ impl TargetUi {
                     self.buttons.insert(id, btn);
                 }
 
+                let btn_margin = 4.0;
                 while buttons.len() > 3 {
                     action_rows.push(Element::Container(Container {
                         layout_dir: LayoutDirection::Horizontal,
+                        margin: btn_margin,
                         children: buttons.drain(0..3).collect(),
                         ..Default::default()
                     }));
@@ -295,6 +268,7 @@ impl TargetUi {
                 if !buttons.is_empty() {
                     action_rows.push(Element::Container(Container {
                         layout_dir: LayoutDirection::Horizontal,
+                        margin: btn_margin,
                         children: buttons,
                         ..Default::default()
                     }));
@@ -303,65 +277,63 @@ impl TargetUi {
                 if !passive_children.is_empty() {
                     passives_row = Some(Element::Container(Container {
                         layout_dir: LayoutDirection::Horizontal,
+                        margin: btn_margin,
                         children: passive_children,
                         ..Default::default()
                     }));
                 }
             }
 
-            let mut rows = vec![Element::Container(centered_list)];
+            let mut centered_items = vec![
+                Element::Text(name_text_line),
+                portrait,
+                Element::Empty(1.0, 4.0),
+                Element::Container(resource_row),
+                Element::Empty(1.0, 4.0),
+                Element::Box(Box::new(action_points_row)),
+                Element::Empty(1.0, 12.0),
+                defense_header_row,
+                Element::Empty(1.0, 3.0),
+                Element::Container(def_table),
+                Element::Empty(1.0, 4.0),
+            ];
 
             if !char.player_controlled() {
-                let movement_text_line = TextLine::new(
-                    format!("|<boot>| Move: {:.1}", char.move_speed()),
-                    16,
-                    LIGHTGRAY,
-                    Some(self.simple_font.clone()),
-                );
-                let mut detailed_stats_lines = vec![Element::Text(movement_text_line)];
+                let mut stats_text = format!("|<boot>| {:.1}", char.move_speed());
                 if char.weapon(HandType::MainHand).is_some() {
-                    detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!(
-                            "|<sword>| Damage: {}",
-                            char.weapon_damage_str(HandType::MainHand)
-                        ),
-                        16,
-                        LIGHTGRAY,
-                        Some(self.simple_font.clone()),
-                    )));
-                    detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!(
-                            "|<dice>| Attack: +{}",
-                            char.attack_modifier(HandType::MainHand)
-                        ),
-                        16,
-                        LIGHTGRAY,
-                        Some(self.simple_font.clone()),
-                    )));
+                    stats_text.push_str(&format!(
+                        "   |<sword>| {}   |<red_dice>| +{}   |<helmet>| {}",
+                        char.weapon_damage_str(HandType::MainHand),
+                        char.attack_modifier(HandType::MainHand),
+                        char.armor_str()
+                    ));
                 }
 
                 if bot_using_spells {
-                    detailed_stats_lines.push(Element::Text(TextLine::new(
-                        format!("|<dice>| Spell: +{}", char.spell_modifier()),
-                        16,
-                        LIGHTGRAY,
-                        Some(self.simple_font.clone()),
-                    )));
+                    stats_text.push_str(&format!("   |<dice>| +{}", char.spell_modifier()));
                 }
 
-                let detailed_stats = Container {
-                    layout_dir: LayoutDirection::Vertical,
-                    children: detailed_stats_lines,
-                    margin: 13.0,
-                    style: Style {
-                        padding: 5.0,
-                        ..Default::default()
-                    },
-                    ..Default::default()
-                };
-
-                rows.push(Element::Container(detailed_stats));
+                let stats_line = Element::Text(TextLine::new(
+                    stats_text,
+                    16,
+                    WHITE,
+                    Some(self.simple_font.clone()),
+                ));
+                centered_items.push(Element::Empty(1.0, 12.0));
+                centered_items.push(stats_line);
+                centered_items.push(Element::Empty(1.0, 12.0));
             }
+
+            let centered_section = Container {
+                layout_dir: LayoutDirection::Vertical,
+                align: Align::Center,
+                children: centered_items,
+                margin: 3.0,
+
+                ..Default::default()
+            };
+
+            let mut rows = vec![Element::Container(centered_section)];
 
             for row in action_rows {
                 rows.push(row);

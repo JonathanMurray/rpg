@@ -43,12 +43,14 @@ impl Drawable for ConditionsList {
 
     fn draw_tooltips(&self, _x: f32, _y: f32) {
         if let Some((rect, condition_info)) = self.hovered_tooltip.get() {
+            let populated_description = condition_info.populated_description();
+            let content_lines: Vec<&str> = populated_description.split("\n").collect();
             draw_tooltip(
                 &self.font,
                 TooltipPositionPreference::RelativeToRect(rect, Side::Right),
                 condition_info.name,
                 None,
-                &[condition_info.populated_description()],
+                &content_lines,
                 &[],
                 Some(Keyword::Cond(condition_info.condition)),
             );

@@ -88,8 +88,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     }
     //lines.push("<Right-click to use>".to_string());
     if consumable.weight > 0 {
-        t.technical_description
-            .push(format!("|<faded>Weight: {}|", consumable.weight));
+        t.technical_description.push(weight_str(consumable.weight));
     }
 
     t
@@ -110,7 +109,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description
             .push(format!("Range: {}", weapon.range));
     }
-    if let Some(effect) = weapon.on_true_hit {
+    if let Some(effect) = weapon.on_hit {
         t.technical_description.push(format!("[true hit] {effect}"));
         if let AttackHitEffect::Apply(apply_effect) = effect {
             match apply_effect {
@@ -132,8 +131,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description
             .push(format!("Unlocks: |<keyword>{}|", enhancement.name));
     }
-    t.technical_description
-        .push(format!("|<faded>Weight: {}|", weapon.weight));
+    t.technical_description.push(weight_str(weapon.weight));
 
     t
 }
@@ -146,7 +144,7 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
     ));
     if shield.armor > 0 {
         t.technical_description
-            .push(format!("|<value>+{}| armor", shield.armor));
+            .push(format!("|<value>+{}| |<helmet>| armor", shield.armor));
     }
 
     if let Some(reaction) = shield.on_attacked_reaction {
@@ -157,15 +155,14 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
         t.technical_description
             .push(format!("Unlocks: |<keyword>{}|", reaction.name));
     }
-    t.technical_description
-        .push(format!("|<faded>Weight: {}|", shield.weight));
+    t.technical_description.push(weight_str(shield.weight));
     t
 }
 
 fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
     let mut t = Tooltip::new(armor.name);
     t.technical_description
-        .push(format!("|<value>{}| armor", armor.protection));
+        .push(format!("|<helmet>| |<value>{}|", armor.protection));
     if let Some(limit) = armor.limit_evasion_from_agi {
         t.technical_description
             .push(format!("Max {} evasion from agi", limit));
@@ -174,9 +171,12 @@ fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
         t.technical_description
             .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
     }
-    t.technical_description
-        .push(format!("|<faded>Weight: {}|", armor.weight));
+    t.technical_description.push(weight_str(armor.weight));
     t
+}
+
+fn weight_str(weight: u32) -> String {
+    format!("|<weight>| |<faded>{}|", weight)
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -782,15 +782,18 @@ impl EquipmentStatsTable {
         for hand in [HandType::MainHand, HandType::OffHand] {
             if let Some(weapon) = character.weapon(hand) {
                 has_weapon = true;
-                cells.push(TableCell::from("|<sword>| Damage").with_tooltip(
-                    "Attack damage",
+                cells.push(TableCell::from("|<sword>|").with_tooltip(
+                    "Attack damage |<sword>|",
                     vec!["The unmodified base damage of one attack".to_string()],
+                    vec![],
                 ));
                 cells.push(character.weapon_damage_str(hand).to_string().into());
 
-                cells.push(TableCell::from("|<dice>| Attack").with_tooltip(
+                cells.push(TableCell::from("|<red_dice>|").with_tooltip(
                     "Attack modifier",
-                    vec!["Added to your |<dice>| |<stat>Attack| rolls".to_string()],
+                    vec!["Added to your |<red_dice>| |<stat>Attack| rolls.".to_string(), 
+                    "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
+                    vec![Keyword::Crit, Keyword::Graze]
                 ));
                 // Use the "base" value; don't include buffs, since we don't take care to rebuild
                 // this when buffs change, so it just gets confusing.
@@ -798,10 +801,10 @@ impl EquipmentStatsTable {
             }
         }
         if !has_weapon {
-            cells.push("|<sword>| Damage".into());
+            cells.push("|<sword>|".into());
             cells.push("-".into());
 
-            cells.push("|<dice>| Attack".into());
+            cells.push("|<red_dice>|".into());
             cells.push("-".into());
         }
 
@@ -811,17 +814,19 @@ impl EquipmentStatsTable {
             cells.push(format!("{}", shield.evasion).into());
         }
          */
-        cells.push(TableCell::from("Armor").with_tooltip(
-            "Physical armor",
+        cells.push(TableCell::from("|<helmet>|").with_tooltip(
+            "Armor |<helmet>|",
             vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
+            vec![],
         ));
         // Use the "base" value; don't include buffs, since we don't take care to rebuild
         // this when buffs change, so it just gets confusing.
         cells.push(format!("{}", character.base_armor()).into());
 
-        cells.push(TableCell::from("Weight").with_tooltip(
-            "Carrying capacity",
-            vec!["Going over your capacity makes you Encumbered.".to_string()],
+        cells.push(TableCell::from("|<weight>|").with_tooltip(
+            "Capacity |<weight>|",
+            vec!["Carrying or equipping more than your capacity makes you |<keyword>Encumbered|.".to_string()],
+            vec![]
         ));
 
         let text = format!(
@@ -845,7 +850,7 @@ impl EquipmentStatsTable {
             TableStyle {
                 background_color: Some(SKYBLUE),
                 default_text_color: BLACK,
-                min_width: Some(170.0),
+                min_width: Some(90.0),
                 ..Default::default()
             },
         )

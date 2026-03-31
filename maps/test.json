@@ -415,8 +415,6 @@
     }
   },
   "characters": [
-
-    
     {
       "type_": "Clara",
       "pos": [
@@ -427,23 +425,11 @@
       "main_hand": null,
       "shield": null
     },
-
     {
-      "type_": "Huldra",
+      "type_": "Skeleton",
       "pos": [
         14,
-        5
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-
-    {
-      "type_": "Enslaved",
-      "pos": [
-        13,
-        23
+        30
       ],
       "health": null,
       "main_hand": null,

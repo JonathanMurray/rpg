@@ -481,6 +481,8 @@ impl PlayerPortraits {
                 } else {
                     info.condition.name().to_string()
                 };
+                let populated_description = info.populated_description();
+                let content_lines: Vec<&str> = populated_description.split("\n").collect();
                 draw_tooltip(
                     &self.font,
                     TooltipPositionPreference::At((
@@ -489,7 +491,7 @@ impl PlayerPortraits {
                     )),
                     &name,
                     None,
-                    &[info.populated_description()],
+                    &content_lines,
                     &[],
                     Some(Keyword::Cond(info.condition)),
                 );

@@ -20,11 +20,11 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BOOT_SYMBOL, DICE_SYMBOL, HEART_SYMBOL,
-        MANA_SMALL_SYMBOL, MANA_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL,
-        SWORD_SYMBOL, WARNING_SYMBOL,
+        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, HEART_SYMBOL,
+        HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL,
+        STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
-    tooltip::{draw_tooltip, Side, TooltipPositionPreference},
+    tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
 };
 
@@ -239,7 +239,7 @@ pub struct TextLine {
     depth: Option<(Color, f32)>,
 
     pub has_been_hovered: Cell<Option<(f32, f32)>>,
-    pub tooltip: Option<(Font, String, Vec<String>)>,
+    pub tooltip: Option<(Font, String, Vec<String>, Vec<Keyword>)>,
 }
 
 impl TextLine {
@@ -322,8 +322,9 @@ impl TextLine {
         font: Font,
         header: impl Into<String>,
         lines: Vec<String>,
+        keywords: Vec<Keyword>,
     ) -> Self {
-        self.tooltip = Some((font, header.into(), lines));
+        self.tooltip = Some((font, header.into(), lines, keywords));
         self
     }
 
@@ -364,7 +365,7 @@ impl Drawable for TextLine {
 
         let x0 = if self.right_align {
             let text_dimensions =
-                measure_text(&self.string, self.font.as_ref(), self.font_size, 1.0);
+                measure_text_with_font_tags(&self.string, self.font.as_ref(), self.font_size, 1.0);
             x + self.size.0 - text_dimensions.width - self.hor_padding
         } else {
             x + self.hor_padding
@@ -414,7 +415,7 @@ impl Drawable for TextLine {
     }
 
     fn draw_tooltips(&self, x: f32, y: f32) {
-        if let Some((font, header, lines)) = self.tooltip.as_ref() {
+        if let Some((font, header, lines, keywords)) = self.tooltip.as_ref() {
             let (w, h) = self.size();
             let rect = Rect::new(x, y, w, h);
             if rect.contains(mouse_position().into()) {
@@ -424,7 +425,7 @@ impl Drawable for TextLine {
                     header,
                     None,
                     lines,
-                    &[],
+                    &keywords,
                     None,
                 );
             }
@@ -444,12 +445,15 @@ lazy_static! {
     static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
         let symbol_w = 16.0;
         HashMap::from([
-            ("<dice>", (symbol_w, &DICE_SYMBOL)),
+            ("<dice>", (symbol_w, &BLUE_DICE_SYMBOL)),
+            ("<red_dice>", (symbol_w, &RED_DICE_SYMBOL)),
             ("<shield>", (symbol_w, &SHIELD_SYMBOL)),
             ("<alt_key>", (symbol_w, &ALT_KEY_SYMBOL)),
             ("<warning>", (symbol_w, &WARNING_SYMBOL)),
             ("<heart>", (symbol_w, &HEART_SYMBOL)),
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
+            ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
+            ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
             ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
             ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
             ("<mana>", (12.0, &MANA_SYMBOL)),
@@ -1079,7 +1083,7 @@ pub struct TableCell {
     text: String,
     color_override: Option<Color>,
     depth: Option<Color>,
-    tooltip: Option<(String, Vec<String>)>,
+    tooltip: Option<(String, Vec<String>, Vec<Keyword>)>,
 }
 
 impl TableCell {
@@ -1092,8 +1096,13 @@ impl TableCell {
         }
     }
 
-    pub fn with_tooltip(mut self, header: impl Into<String>, lines: Vec<String>) -> Self {
-        self.tooltip = Some((header.into(), lines));
+    pub fn with_tooltip(
+        mut self,
+        header: impl Into<String>,
+        lines: Vec<String>,
+        keywords: Vec<Keyword>,
+    ) -> Self {
+        self.tooltip = Some((header.into(), lines, keywords));
         self
     }
 }
@@ -1141,8 +1150,8 @@ pub fn table(
             Some(font.clone()),
         );
 
-        if let Some((header, lines)) = cell.tooltip {
-            text.tooltip = Some((font.clone(), header, lines));
+        if let Some((header, lines, keywords)) = cell.tooltip {
+            text.tooltip = Some((font.clone(), header, lines, keywords));
         }
 
         if let Some(depth) = cell.depth {

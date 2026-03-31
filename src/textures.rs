@@ -1019,7 +1019,8 @@ async fn load_and_init_font_symbols() {
         texture
     };
 
-    DICE_SYMBOL.get_or_init(|| symbol(0, 0));
+    BLUE_DICE_SYMBOL.get_or_init(|| symbol(0, 0));
+    RED_DICE_SYMBOL.get_or_init(|| symbol(3, 2));
     SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
     ALT_KEY_SYMBOL.get_or_init(|| symbol(2, 0));
     WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
@@ -1030,6 +1031,8 @@ async fn load_and_init_font_symbols() {
     MANA_SMALL_SYMBOL.get_or_init(|| symbol(0, 3));
     SWORD_SYMBOL.get_or_init(|| symbol(0, 2));
     BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
+    HELMET_SYMBOL.get_or_init(|| symbol(2, 3));
+    WEIGHT_SYMBOL.get_or_init(|| symbol(3, 3));
 }
 
 async fn load_and_init_ui_textures() {
@@ -1043,7 +1046,8 @@ async fn load_and_init_ui_textures() {
     PORTRAIT_ENEMY_BG_TEXTURE.get_or_init(|| texture);
 }
 
-pub static DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static BLUE_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static RED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
@@ -1054,6 +1058,8 @@ pub static MANA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MANA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static HELMET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static WEIGHT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

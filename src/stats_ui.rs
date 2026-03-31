@@ -8,6 +8,7 @@ use macroquad::{
 use crate::{
     base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style, TextLine},
     core::Character,
+    tooltip::Keyword,
 };
 
 type AttributeCell = (&'static str, u32);
@@ -49,10 +50,11 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             "Strength",
             &[
                 "Each point grants:",
-                "|<heart>| 2 health",
-                "|<stamina>| 1 stamina",
-                "|<dice>| +1 on melee attacks",
-                "|<shield>| 2 Toughness",
+                "|<heart>| 2",
+                "|<stamina>| 1",
+                "|<red_dice>| +1 |<faded>(melee attack)|",
+                "|<shield>||<stat>Toughness| 2",
+                "|<weight>| 2 |<faded>(capacity)|",
             ][..],
         ),
         (
@@ -61,10 +63,10 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             "Agility",
             &[
                 "Each point grants:",
-                "|<stamina>| 1 stamina",
-                "+ 0.5 movement",
-                "|<dice>| +1 on ranged attacks",
-                "|<shield>| 1 Evasion",
+                "|<stamina>| 1",
+                "|<boot>| 0.5",
+                "|<red_dice>| +1 |<faded>(ranged attack)|",
+                "|<shield>||<stat>Evasion| 1",
             ],
         ),
         (
@@ -73,8 +75,9 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             "Intellect",
             &[
                 "Each point grants:",
-                "|<dice>| +1 on spells & attacks",
-                "|<shield>| 2 Will, 0.5 Evasion",
+                "|<dice>| +1 |<faded>(spell & attack)|",
+                "|<shield>||<stat>Will| 2",
+                "|<shield>||<stat>Evasion| 0.5",
             ],
         ),
         (
@@ -83,8 +86,8 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             "Spirit",
             &[
                 "Each point grants:",
-                "|<mana>| 2 mana",
-                "|<dice>| +1 on spells",
+                "|<mana>| 2",
+                "|<dice>| +1 |<faded>(spell)|",
             ],
         ),
     ] {
@@ -117,7 +120,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
 
     let movement_row = Element::Text(
         TextLine::new(
-            format!("|<boot>| Move: {}", character.base_move_speed.get()),
+            format!("|<boot>| : {}", character.base_move_speed.get()),
             16,
             WHITE,
             Some(font.clone()),
@@ -125,14 +128,15 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         .with_padding(0.0, 7.0)
         .with_tooltip(
             font.clone(),
-            "Free movement",
+            "Movement |<boot>|",
             vec!["Move this far every turn without spending stamina |<stamina>|.".to_string()],
+            vec![],
         ),
     );
 
     let spell_mod_row = Element::Text(
         TextLine::new(
-            format!("|<dice>| Spell: +{}", character.spell_modifier()),
+            format!("|<dice>| : +{}", character.spell_modifier()),
             16,
             WHITE,
             Some(font.clone()),
@@ -141,7 +145,9 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         .with_tooltip(
             font.clone(),
             "Spell modifier",
-            vec!["Added to your |<dice>| |<stat>Spell| rolls".to_string()],
+            vec!["Added to your |<dice>| |<stat>Spell| rolls".to_string(), 
+            "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
+            vec![Keyword::Crit, Keyword::Graze]
         ),
     );
 
@@ -194,7 +200,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some((
                 font.clone(),
-                label.to_string(),
+                format!("{} |<shield>|", label),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
             )),
             ..Default::default()

@@ -38,10 +38,14 @@ impl Keyword {
             Keyword::Cond(condition) => condition.description(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result",
             Keyword::Pushed => {
-                "Distance: |<value>x|. On collision: take |<value>1| damage per remaining distance"
+                "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance"
             }
-            Keyword::Graze => "|<value>-50%| effect. Triggers when |<dice>| roll is 5 or lower",
-            Keyword::Crit => "|<value>+50%| effect. Triggers when |<dice>| roll is 16 or higher",
+            Keyword::Graze => {
+                "|<value>-50%| effect.\nTriggers when |<dice>| roll is |<value>5| or lower"
+            }
+            Keyword::Crit => {
+                "|<value>+50%| effect.\nTriggers when |<dice>| roll is |<value>16| or higher"
+            }
         }
     }
 
@@ -100,7 +104,7 @@ pub fn draw_tooltip(
     pos_preference: TooltipPositionPreference,
     header: &str,
     error: Option<&'static str>,
-    content_lines: &[String],
+    content_lines: &[impl AsRef<str>],
     has_keywords: &[Keyword],
     header_keyword: Option<Keyword>,
 ) -> Rect {
@@ -141,13 +145,43 @@ pub fn draw_tooltip(
 
     // The lines provided by the caller can be longer than desired, so we introduce line breaks here to limit
     // the width of the tooltip window.
-    let line_width_limit = if header_keyword.is_some() { 25 } else { 40 };
+    let line_len_limit = if header_keyword.is_some() { 25 } else { 40 };
     let mut physical_content_lines = vec![];
+    // "|<example>hello|  |<hey>| yo"
     for line in content_lines {
-        let mut line = &line[..];
-        while line.len() > line_width_limit {
-            if let Some(whitespace_i) = line[line_width_limit..].find(" ") {
-                let (left, right) = line.split_at(line_width_limit + whitespace_i);
+        let mut line = &line.as_ref()[..];
+        let mut keep_splitting = true;
+        while keep_splitting {
+            let mut inside_tagged_part = false;
+            let mut inside_tag = false;
+            let mut line_len = 0;
+            keep_splitting = false;
+            for (i, ch) in line.chars().enumerate() {
+                if ch == '<' {
+                    inside_tag = true;
+                } else if ch == '>' {
+                    inside_tag = false;
+                    inside_tagged_part = true;
+                } else if ch == '|' {
+                    inside_tagged_part = false;
+                } else if !inside_tag {
+                    line_len += 1;
+                    if line_len >= line_len_limit && !inside_tagged_part {
+                        if let Some(whitespace_i) = line[i..].find(" ") {
+                            let (left, right) = line.split_at(i + whitespace_i);
+                            physical_content_lines.push(left);
+                            line = &right[1..];
+                            keep_splitting = true;
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        /*
+        while line.len() > line_len_limit {
+            if let Some(whitespace_i) = line[line_len_limit..].find(" ") {
+                let (left, right) = line.split_at(line_len_limit + whitespace_i);
                 physical_content_lines.push(left);
                 line = &right[1..];
             } else {
@@ -155,6 +189,7 @@ pub fn draw_tooltip(
                 break;
             }
         }
+         */
         physical_content_lines.push(line);
     }
 
@@ -218,7 +253,7 @@ pub fn draw_tooltip(
 
     let tooltip_rect = Rect::new(x, y, tooltip_w, tooltip_h);
     let bg_color = match goodness {
-        Goodness::Good => Color::new(0.0, 0.2, 0.0, 0.8),
+        Goodness::Good => Color::new(0.0, 0.2, 0.0, 0.9),
         Goodness::Neutral => Color::new(0.0, 0.0, 0.0, 0.8),
         Goodness::Bad => Color::new(0.2, 0.0, 0.0, 0.9),
     };
@@ -305,12 +340,13 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
         } else {
             TooltipPositionPreference::At((rect.x, rect.y + rect.h))
         };
+        let content_lines: Vec<&str> = keyword.description().split("\n").collect();
         rect = draw_tooltip(
             font,
             pos_preference,
             keyword.name(),
             None,
-            &[keyword.description().to_string()],
+            &content_lines,
             &[],
             Some(*keyword),
         );
@@ -321,12 +357,13 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
 
 pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f32) {
     for keyword in keywords {
+        let content_lines: Vec<&str> = keyword.description().split("\n").collect();
         let rect = draw_tooltip(
             font,
             TooltipPositionPreference::At((x, y)),
             keyword.name(),
             None,
-            &[keyword.description().to_string()],
+            &content_lines,
             &[],
             Some(*keyword),
         );

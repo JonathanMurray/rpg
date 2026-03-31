@@ -14,7 +14,7 @@ use crate::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
         HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, LIGHTNING_BOLT,
-        POISONTEST, SMALL_SHIELD,
+        POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -280,12 +280,13 @@ pub fn create_character(
             );
             skeleton.health.change_max_value_to(35);
             skeleton.armor_piece.set(Some(SHIRT));
-            skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
+            skeleton.set_weapon(HandType::MainHand, SLASHING_RAPIER);
             skeleton.set_shield(SMALL_SHIELD);
 
             //skeleton.learn_ability(ENEMY_BRACE);
             //skeleton.learn_ability(ENEMY_SLASHING_ATTACK);
-            skeleton.learn_attack_enhancement(ENEMY_SLASHING);
+            //skeleton.learn_attack_enhancement(ENEMY_SLASHING);
+            skeleton.learn_passive(PassiveSkill::Slasher);
 
             skeleton
         }
@@ -453,6 +454,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
     bob.learn_ability(KILL);
+    bob.learn_passive(PassiveSkill::HardenedSkin);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
     //bob.learn_ability(SWEEP_ATTACK);
 

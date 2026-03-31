@@ -21,9 +21,9 @@ use crate::{
         Ability, AbilityDamage, AbilityEffect, AbilityEnhancement, AbilityNegativeEffect,
         AbilityPositiveEffect, AbilityReach, AbilityRollType, AbilityTarget, ApplyEffect,
         AreaEffect, AreaShape, AreaTargetAcquisition, AttackEnhancement, AttackEnhancementEffect,
-        AttackEnhancementOnHitEffect, BaseAction, Character, Condition, DamageType, DefenseType,
-        EnvironmentEffect, HandType, OnAttackedReaction, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, Weapon,
+        AttackEnhancementOnHitEffect, AttackHitEffect, BaseAction, Character, Condition,
+        DamageType, DefenseType, EnvironmentEffect, HandType, OnAttackedReaction, OnHitReaction,
+        OnHitReactionEffect, Range, Shield, Weapon,
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
@@ -148,7 +148,10 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
         ));
     }
     if reaction.effect.bonus_armor > 0 {
-        technical_description.push(format!("|<value>+{}| armor", reaction.effect.bonus_armor));
+        technical_description.push(format!(
+            "|<value>+{}| |<helmet>| armor",
+            reaction.effect.bonus_armor
+        ));
     }
     if reaction.effect.damage_prevention > 0 {
         technical_description.push(format!(
@@ -174,7 +177,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     let mut technical_description = vec![];
 
     if reaction.effect == OnHitReactionEffect::ShieldBash {
-        technical_description.push("|<dice>| Attack".to_string());
+        technical_description.push("|<red_dice>| Attack".to_string());
         technical_description.push("Targets the attacker".to_string());
         technical_description.push("  |<shield>| = toughness".to_string());
         technical_description.push("  Dazed (2+)".to_string());
@@ -211,6 +214,12 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
     describe_attack_enhancement_effect(&enhancement.effect, &mut t);
 
     t
+}
+
+fn describe_attack_hit_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
+    match effect {
+        AttackHitEffect::Apply(apply_effect) => describe_apply_effect(*apply_effect, t),
+    }
 }
 
 fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut Tooltip) {
@@ -486,14 +495,16 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
             AbilityRollType::Spell => "|<dice>| |<stat>Spell|".to_string(),
-            AbilityRollType::RollAbilityWithAttackModifier => "|<dice>| |<stat>Attack|".to_string(),
+            AbilityRollType::RollAbilityWithAttackModifier => {
+                "|<red_dice>| |<stat>Attack|".to_string()
+            }
             AbilityRollType::RollDuringAttack(bonus) => {
                 if bonus < 0 {
-                    format!("|<dice>| |<stat>Attack (-{})|", -bonus)
+                    format!("|<red_dice>| |<stat>Attack (-{})|", -bonus)
                 } else if bonus > 0 {
-                    format!("|<dice>| |<stat>Attack (+{})|", bonus)
+                    format!("|<red_dice>| |<stat>Attack (+{})|", bonus)
                 } else {
-                    "|<dice>| |<stat>Attack|".to_string()
+                    "|<red_dice>| |<stat>Attack|".to_string()
                 }
             }
         };
@@ -784,10 +795,18 @@ impl ActionButton {
             border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
-        if !matches!(action, ButtonAction::Action(..)) {
-            style.border_inner_rounding = Some(5.0);
-            style.border_outer_rounding = Some((BLACK, 4.0));
+        match action {
+            ButtonAction::Action(..) => {}
+            ButtonAction::Passive(..) => {
+                style.border_inner_rounding = Some(8.0);
+                style.border_outer_rounding = Some((BLACK, 7.0));
+            }
+            _ => {
+                style.border_inner_rounding = Some(5.0);
+                style.border_outer_rounding = Some((BLACK, 4.0));
+            }
         }
+
         let hover_border_color = YELLOW;
 
         let r = 2.5;
@@ -933,7 +952,7 @@ impl ActionButton {
             if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
-                    let mut technical_description = vec!["|<dice>| |<stat>Attack|".to_string()];
+                    let mut technical_description = vec!["|<red_dice>| |<stat>Attack|".to_string()];
                     let range = if weapon.is_melee() {
                         "melee".to_string()
                     } else {
@@ -943,12 +962,18 @@ impl ActionButton {
                     technical_description.push(format!("|<faded>Target ({})|", range));
                     technical_description.push(EVASION_STR.to_string());
                     technical_description.push(format!("  |<sword>| |<value>{}|", weapon.damage));
-                    Tooltip {
-                        header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
 
+                    let mut t = Tooltip {
+                        header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),
                         technical_description,
                         ..Default::default()
+                    };
+
+                    if let Some(effect) = weapon.on_hit {
+                        describe_attack_hit_effect(&effect, &mut t);
                     }
+
+                    t
                 } else {
                     Tooltip {
                         header: "No weapon equipped".to_string(),
@@ -1192,9 +1217,11 @@ impl Drawable for ActionButton {
             if self.enabled.get() {
                 let margin = -1.0;
                 let mut outer = None;
-                if !matches!(self.action, ButtonAction::Action(..)) {
-                    if let Some(color) = self.parent_bg_color {
-                        outer = Some((color, 3.0));
+                let mut inner = 5.0;
+                if let Some(color) = self.parent_bg_color {
+                    if let Some((.., rounding)) = self.style.border_outer_rounding {
+                        outer = Some((color, rounding - 1.0));
+                        inner = rounding + 1.0;
                     }
                 }
                 draw_rounded_rectangle_lines(
@@ -1204,7 +1231,7 @@ impl Drawable for ActionButton {
                     h + margin * 2.0,
                     2.0,
                     self.hover_border_color,
-                    5.0,
+                    inner,
                     outer,
                 );
             }

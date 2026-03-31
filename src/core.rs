@@ -1045,7 +1045,7 @@ impl CoreGame {
             .map(|rounds| self.current_time() + (rounds * self.round_length));
         receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
         let mut line = format!(
-            "  {} received |<keyword>{}|",
+            "  |{}| received |<keyword>{}|",
             receiver.name,
             apply_condition.condition.name()
         );
@@ -1157,7 +1157,7 @@ impl CoreGame {
                         let modifier = caster.attack_modifier(HandType::MainHand) as i32;
                         roll_calculation += modifier;
                         dice_roll_line
-                            .push_str(&format!(" +{} (|<dice>| |<stat>Attack|)", modifier));
+                            .push_str(&format!(" +{} (|<red_dice>| |<stat>Attack|)", modifier));
 
                         for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
@@ -2185,7 +2185,6 @@ impl CoreGame {
         let mut evasion_from_sidestep = 0;
         let mut evasion_from_block = 0;
         */
-        let mut skip_attack_exertion = false;
 
         let attack_modifier = attacker.attack_modifier(hand_type);
 
@@ -2307,7 +2306,7 @@ impl CoreGame {
                 "".to_string()
             };
             detail_lines.push(format!(
-                "Rolled: {} +{} (|<dice>|<stat>Attack|)| {}= |<value>{}|",
+                "Rolled: {} +{} (|<red_dice>|<stat>Attack|)| {}= |<value>{}|",
                 unmodified_roll, attack_modifier, attack_bonus_str, roll_result,
             ));
             detail_lines.push(format!(
@@ -2318,7 +2317,6 @@ impl CoreGame {
 
         let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = {
-            let mut on_true_hit_effect = None;
             let dmg_override = ability_attack_effect.and_then(|e| e.override_damage);
             let mut dmg_str = "  Damage: ".to_string();
             let mut dmg_calculation;
@@ -2405,7 +2403,6 @@ impl CoreGame {
                     detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
                 }
                 HitType::Regular => {
-                    on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
                 HitType::Critical => {
@@ -2416,13 +2413,12 @@ impl CoreGame {
                         dmg_str.push_str(" +50% |<faded>(crit)|");
                         dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    on_true_hit_effect = weapon.on_true_hit;
                     detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
                 }
             }
 
             if let Some((name, amount)) = damage_prevention {
-                dmg_str.push_str(&format!("- {} |<faded>({})|", amount, name));
+                dmg_str.push_str(&format!(" -{} |<faded>({})|", amount, name));
                 dmg_calculation -= amount as i32;
             }
 
@@ -2443,7 +2439,7 @@ impl CoreGame {
             let mut applied_effects = vec![];
 
             if let Some(game) = game {
-                if let Some(effect) = on_true_hit_effect {
+                if let Some(effect) = weapon.on_hit {
                     match effect {
                         AttackHitEffect::Apply(effect) => {
                             let (applied, log_line, _damage) = game.perform_effect_application(
@@ -2452,9 +2448,11 @@ impl CoreGame {
                                 None,
                                 defender,
                             );
-                            detail_lines.push(format!("{} |<faded>(true hit)|", log_line))
+                            if let Some(applied) = applied {
+                                applied_effects.push(applied);
+                            }
+                            detail_lines.push(format!("{} |<faded>({})|", log_line, weapon.name))
                         }
-                        AttackHitEffect::SkipExertion => skip_attack_exertion = true,
                     }
                 }
 
@@ -3710,7 +3708,6 @@ pub enum OnHitReactionEffect {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AttackHitEffect {
     Apply(ApplyEffect),
-    SkipExertion,
 }
 
 impl Display for AttackHitEffect {
@@ -3719,7 +3716,6 @@ impl Display for AttackHitEffect {
             AttackHitEffect::Apply(apply_effect) => {
                 f.write_fmt(format_args!("Target: {}", apply_effect))
             }
-            AttackHitEffect::SkipExertion => f.write_fmt(format_args!("No exertion")),
         }
     }
 }
@@ -3801,35 +3797,35 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|, |<keyword>Disadvantage| on attacks.",
-            Blinded => "|<keyword>Disadvantage|, always |<keyword>Flanked| when attacked.",
+            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<keyword>Disadvantage| on attacks.",
+            Blinded => "|<keyword>Disadvantage|.\nAlways |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
-            Slowed => "|<value>-2| AP per turn, |<value>-25%| movement",
-            Hastened => "|<value>+1| AP per turn, |<value>+25%| movement",
-            Inspired => "|<value>+3| |<shield>|<stat>Will|, |<value>+3| |<dice>| |<stat>Attack/Spell|",
-            Exposed => "|<value>-3| to all |<shield>|, |<value>-50%| armor.",
+            Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
+            Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
+            Inspired => "|<value>+3| |<shield>|<stat>Will|.\n|<value>+3| |<dice>| |<stat>Attack/Spell|",
+            Exposed => "|<value>-3| to all |<shield>| defenses.\n|<value>-50%| |<helmet>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes no more than |<value>1| damage from the next attack.",
-            Bleeding => "End of turn: lose |<value>x| health. Halved every turn.",
-            Burning => "End of turn: deals |<value>x| damage. 50% spreads to adjacent.",
+            Bleeding => "End of turn: lose |<value>x| health.\nHalved every turn.",
+            Burning => "End of turn: deals |<value>x| damage.\n50% spreads to adjacent.",
             Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
             Distracted => "|<value>-6| |<shield>|<stat>Evasion| against the next attack.",
             Weakened => "|<value>-x| to all |<shield>| and |dice>.",
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
-            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|, |<value>-x| on |<dice>|.",
-            NearDeath => "|<value>-1| AP regen, |<keyword>Disadvantage| on actions, enemies have |<keyword>Advantage|. (Triggers on < 20% health)",
+            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|.\n|<value>-x| on |<dice>|.",
+            NearDeath => "|<value>-1| AP regen.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
-            BloodRage => "|<value>+3| |<dice>| |<stat>Attack| (passive skill).",
+            BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
             CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
-            ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|. Decays 1 at end of turn.",
+            ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
-            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|. End of turn: lose |<value>10%| health"
+            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| health"
         }
     }
 
@@ -5286,7 +5282,7 @@ impl Character {
         let weapon = self.weapon(hand).unwrap();
         let ferocity = self.conditions.borrow().get_stacks(&Condition::Ferocity);
         if ferocity > 0 {
-            format!("{} + {} (|<keyword>Ferocity|)", weapon.damage, ferocity)
+            format!("{} |<keyword>+{}|", weapon.damage, ferocity)
         } else {
             weapon.damage.to_string()
         }
@@ -6085,7 +6081,7 @@ impl Character {
 
         if self.has_condition(&Condition::Exposed) {
             let reduction = protection - protection / 2;
-            format!("{} - {} (|<keyword>Exposed|)", protection, reduction)
+            format!("{} |<keyword>-{}|", protection, reduction)
         } else {
             protection.to_string()
         }
@@ -6740,8 +6736,7 @@ pub struct Weapon {
     pub attack_attribute: AttackAttribute,
     pub attack_enhancement: Option<AttackEnhancement>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
-    // TODO: Not used?
-    pub on_true_hit: Option<AttackHitEffect>,
+    pub on_hit: Option<AttackHitEffect>,
     pub weight: u32,
 }
 
