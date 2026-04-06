@@ -109,7 +109,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description
             .push(format!("Range: {}", weapon.range));
     }
-    if let Some(effect) = weapon.on_hit {
+    if let Some(effect) = weapon.on_damage {
         t.technical_description.push(format!("[true hit] {effect}"));
         if let AttackHitEffect::Apply(apply_effect) = effect {
             match apply_effect {

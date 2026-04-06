@@ -217,7 +217,9 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
     t
 }
 
-fn describe_attack_hit_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
+fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
+    t.technical_description
+        .push("|<faded>On damage:|".to_string());
     match effect {
         AttackHitEffect::Apply(apply_effect) => describe_apply_effect(*apply_effect, t),
     }
@@ -495,7 +497,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
     if let Some(ability_roll) = ability.roll {
         let s = match ability_roll {
-            AbilityRollType::Spell => "|<dice>| |<stat>Spell|".to_string(),
+            AbilityRollType::Spell => "|<blue_dice>| |<stat>Spell|".to_string(),
             AbilityRollType::RollAbilityWithAttackModifier => {
                 "|<red_dice>| |<stat>Attack|".to_string()
             }
@@ -972,8 +974,8 @@ impl ActionButton {
                         ..Default::default()
                     };
 
-                    if let Some(effect) = weapon.on_hit {
-                        describe_attack_hit_effect(&effect, &mut t);
+                    if let Some(effect) = weapon.on_damage {
+                        describe_attack_on_damage_effect(&effect, &mut t);
                     }
 
                     t

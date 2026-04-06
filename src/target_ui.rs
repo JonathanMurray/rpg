@@ -310,7 +310,7 @@ impl TargetUi {
                 }
 
                 if bot_using_spells {
-                    stats_text.push_str(&format!("   |<dice>| +{}", char.spell_modifier()));
+                    stats_text.push_str(&format!("   |<blue_dice>| +{}", char.spell_modifier()));
                 }
 
                 let stats_line = Element::Text(TextLine::new(

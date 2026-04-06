@@ -1136,7 +1136,7 @@ impl CoreGame {
                         let modifier = caster.spell_modifier() as i32;
                         roll_calculation += modifier;
                         dice_roll_line
-                            .push_str(&format!(" +{} (|<dice>| |<stat>Spell|)", modifier));
+                            .push_str(&format!(" +{} (|<blue_dice>| |<stat>Spell|)", modifier));
 
                         for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
@@ -2444,19 +2444,22 @@ impl CoreGame {
             let mut applied_effects = vec![];
 
             if let Some(game) = game {
-                if let Some(effect) = weapon.on_hit {
-                    match effect {
-                        AttackHitEffect::Apply(effect) => {
-                            let (applied, log_line, _damage) = game.perform_effect_application(
-                                effect,
-                                Some(attacker),
-                                None,
-                                defender,
-                            );
-                            if let Some(applied) = applied {
-                                applied_effects.push(applied);
+                if damage > 0 {
+                    if let Some(effect) = weapon.on_damage {
+                        match effect {
+                            AttackHitEffect::Apply(effect) => {
+                                let (applied, log_line, _damage) = game.perform_effect_application(
+                                    effect,
+                                    Some(attacker),
+                                    None,
+                                    defender,
+                                );
+                                if let Some(applied) = applied {
+                                    applied_effects.push(applied);
+                                }
+                                detail_lines
+                                    .push(format!("{} |<faded>({})|", log_line, weapon.name))
                             }
-                            detail_lines.push(format!("{} |<faded>({})|", log_line, weapon.name))
                         }
                     }
                 }
@@ -3807,7 +3810,7 @@ impl Condition {
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
-            Inspired => "|<value>+3| |<shield>|<stat>Will|.\n|<value>+3| |<dice>| |<stat>Attack/Spell|",
+            Inspired => "|<value>+3| |<shield>|<stat>Will|.\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all |<shield>| defenses.\n|<value>-50%| |<helmet>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes no more than |<value>1| damage from the next attack.",
@@ -3818,15 +3821,15 @@ impl Condition {
             Weakened => "|<value>-x| to all |<shield>| and |dice>.",
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
-            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|.\n|<value>-x| on |<dice>|.",
+            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
             NearDeath => "|<value>-1| AP regen.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
-            CriticalCharge => "|<value>+5| |<dice>| |<stat>Spell| (passive skill).",
-            ThrillOfBattle => "|<value>+5| |<dice>| |<stat>Attack/Spell| (passive skill).",
+            CriticalCharge => "|<value>+5| |<blue_dice>| |<stat>Spell| (passive skill).",
+            ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
-            ArcaneSurge => "|<value>+x| |<dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
+            ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
@@ -6734,7 +6737,7 @@ pub struct Weapon {
     pub attack_attribute: AttackAttribute,
     pub attack_enhancement: Option<AttackEnhancement>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
-    pub on_hit: Option<AttackHitEffect>,
+    pub on_damage: Option<AttackHitEffect>,
     pub weight: u32,
 }
 

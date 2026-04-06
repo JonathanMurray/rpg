@@ -75,7 +75,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             "Intellect",
             &[
                 "Each point grants:",
-                "|<dice>| +1 |<faded>(spell & attack)|",
+                "|<mixed_dice>| +1 |<faded>(spell & attack)|",
                 "|<shield>||<stat>Will| 2",
                 "|<shield>||<stat>Evasion| 0.5",
             ],
@@ -87,7 +87,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             &[
                 "Each point grants:",
                 "|<mana>| 2",
-                "|<dice>| +1 |<faded>(spell)|",
+                "|<blue_dice>| +1 |<faded>(spell)|",
             ],
         ),
     ] {
@@ -136,7 +136,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
 
     let spell_mod_row = Element::Text(
         TextLine::new(
-            format!("|<dice>| : +{}", character.spell_modifier()),
+            format!("|<blue_dice>| : +{}", character.spell_modifier()),
             16,
             WHITE,
             Some(font.clone()),
@@ -145,7 +145,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         .with_tooltip(
             font.clone(),
             "Spell modifier",
-            vec!["Added to your |<dice>| |<stat>Spell| rolls".to_string(), 
+            vec!["Added to your |<blue_dice>| |<stat>Spell| rolls".to_string(), 
             "A higher value means: more likely to |<keyword>Crit| and less likely to |<keyword>Graze|.".to_string()],
             vec![Keyword::Crit, Keyword::Graze]
         ),

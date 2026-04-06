@@ -1524,7 +1524,9 @@ impl UserInterface {
             }
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
-                self.log.add("Opportunity attack:".to_string());
+
+                self.log
+                    .add(format!("{} makes an opportunity attack:", reactor.name));
                 let duration = 0.5;
                 self.game_grid.add_text_effect(
                     reactor.pos(),

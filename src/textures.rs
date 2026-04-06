@@ -1021,6 +1021,7 @@ async fn load_and_init_font_symbols() {
 
     BLUE_DICE_SYMBOL.get_or_init(|| symbol(0, 0));
     RED_DICE_SYMBOL.get_or_init(|| symbol(3, 2));
+    MIXED_DICE_SYMBOL.get_or_init(|| symbol(5, 2));
     SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
     ALT_KEY_SYMBOL.get_or_init(|| symbol(2, 0));
     WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
@@ -1049,6 +1050,7 @@ async fn load_and_init_ui_textures() {
 
 pub static BLUE_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static RED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static MIXED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
