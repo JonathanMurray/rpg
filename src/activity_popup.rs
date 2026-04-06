@@ -783,7 +783,10 @@ impl ActivityPopup {
                 let attacker = self.characters.get_rc(*attacker_id);
                 let defender = self.characters.get(*defender_id);
                 lines.push("Reaction?".to_string());
-                lines.push(format!("{} attacks |{}|!", attacker.name, defender.name));
+                lines.push(format!(
+                    "|<name>{}| attacks |<name>{}|!",
+                    attacker.name, defender.name
+                ));
                 lines.push(format!(
                     "|<red_dice>| |<stat>Attack| +{} vs |<shield>|<stat>Evasion| {}",
                     attacker.attack_modifier(*hand),
@@ -812,7 +815,7 @@ impl ActivityPopup {
                 let victim = self.characters.get(*victim_id);
                 lines.push("React (on hit)".to_string());
                 lines.push(format!(
-                    "{} attacked {} for {} damage",
+                    "|<name>{}| attacked |<name>{}| for {} damage",
                     self.characters.get(*attacker_id).name,
                     victim.name,
                     damage,
@@ -830,7 +833,7 @@ impl ActivityPopup {
                 self.relevant_character_id = *reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(
-                    "{} has an attack opportunity",
+                    "|<name>{}| has an attack opportunity",
                     self.characters.get(*reactor).name
                 ));
 
@@ -846,7 +849,7 @@ impl ActivityPopup {
                 self.relevant_character_id = *reactor;
                 lines.push("React (opportunity attack)".to_string());
                 lines.push(format!(
-                    "{} has an attack opportunity",
+                    "|<name>{}| has an attack opportunity",
                     self.characters.get(*reactor).name
                 ));
 

@@ -181,14 +181,18 @@ impl CoreGame {
                                 (_, 0) => format!("{sta} stamina"),
                                 _ => format!("{sta} stamina, {ap} AP"),
                             };
-                            self.log(format!("{} gained {} (Reaper)", character.name, gain_str))
-                                .await;
+                            self.log(format!(
+                                "|{}| gained {} (Reaper)",
+                                character.name_tag(),
+                                gain_str
+                            ))
+                            .await;
                         }
                     }
                 }
             } else {
-                let name = self.active_character().name;
-                self.log(format!("|{}| ended their turn", name)).await;
+                let name_tag = self.active_character().name_tag();
+                self.log(format!("|{}| ended their turn", name_tag)).await;
 
                 self.perform_end_of_turn_character().await;
                 //let prev_index_in_round = self.active_character().index_in_round.unwrap();
@@ -946,17 +950,17 @@ impl CoreGame {
             ApplyEffect::RemoveActionPoints(n) => {
                 let lost = receiver.action_points.lose(n);
                 actual_effect = Some(ApplyEffect::RemoveActionPoints(lost));
-                format!("  {} lost {} AP", receiver.name, n)
+                format!("  |{}| lost {} AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainStamina(n) => {
                 let gained = receiver.stamina.gain(n);
                 actual_effect = Some(ApplyEffect::GainStamina(gained));
-                format!("  {} gained {} stamina", receiver.name, gained)
+                format!("  |{}| gained {} stamina", receiver.name_tag(), gained)
             }
             ApplyEffect::GainHealth(n) => {
                 let gained = receiver.health.gain(n);
                 actual_effect = Some(ApplyEffect::GainHealth(gained));
-                format!("  |{}| gained {} health", receiver.name, gained)
+                format!("  |{}| gained {} health", receiver.name_tag(), gained)
             }
             e @ ApplyEffect::Condition(apply_condition) => {
                 actual_effect = Some(e);
@@ -978,9 +982,9 @@ impl CoreGame {
                 self.perform_gain_health(giver.unwrap(), healing_amount);
                 format!(
                     "  |{}| lost {} health. |{}| was healed for {}",
-                    receiver.name,
+                    receiver.name_tag(),
                     damage_dealt,
-                    giver.unwrap().name,
+                    giver.unwrap().name_tag(),
                     healing_amount
                 )
             }
@@ -991,7 +995,7 @@ impl CoreGame {
                 if did_clear {
                     line.push_str(&format!(
                         "  |{}| lost |<keyword>{}|",
-                        receiver.name,
+                        receiver.name_tag(),
                         condition.name()
                     ));
                     if prev_stacks > 0 {
@@ -1021,7 +1025,7 @@ impl CoreGame {
                 };
                 receiver.is_being_pushed_in_direction.set(Some(vector));
                 actual_effect = Some(e);
-                format!("  {} was knocked back ({})", receiver.name, amount)
+                format!("  |{}| was knocked back ({})", receiver.name_tag(), amount)
             }
         };
 
@@ -1051,7 +1055,7 @@ impl CoreGame {
         receiver.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
         let mut line = format!(
             "  |{}| received |<keyword>{}|",
-            receiver.name,
+            receiver.name_tag(),
             apply_condition.condition.name()
         );
 
@@ -1483,7 +1487,7 @@ impl CoreGame {
             };
 
             if i < cast_n_times - 1 {
-                detail_lines.push(format!("{} cast again!", caster.name))
+                detail_lines.push(format!("|{}| cast again!", caster.name_tag()))
             }
 
             if let Some((target_id, outcome)) = &target_outcome {
@@ -1626,7 +1630,7 @@ impl CoreGame {
             }
 
             if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
-                detail_lines.push(other_char.name.to_string());
+                detail_lines.push(format!("|{}|", other_char.name_tag()));
 
                 let outcome = Self::perform_ability_ally_effect(
                     name,
@@ -1674,7 +1678,8 @@ impl CoreGame {
                 let health_gained = game.perform_gain_health(target, healing);
                 detail_lines.push(format!(
                     "  |{}| was healed for {}",
-                    target.name, health_gained
+                    target.name_tag(),
+                    health_gained
                 ));
                 applied_effects.push(ApplyEffect::GainHealth(health_gained));
             } else {
@@ -1761,7 +1766,7 @@ impl CoreGame {
             }
 
             if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
-                let mut line = format!("|{}|", other_char.name);
+                let mut line = format!("|{}|", other_char.name_tag());
                 match effect {
                     AbilityNegativeEffect::Spell(spell_enemy_effect) => {
                         if let Some(contest) = spell_enemy_effect.defense_type {
@@ -2100,7 +2105,7 @@ impl CoreGame {
             if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                 if target.lose_protected() {
-                    detail_lines.push(format!("{} lost |<keyword>Protected|", target.name));
+                    detail_lines.push(format!("|{}| lost |<keyword>Protected|", target.name_tag()));
                 }
 
                 if are_entities_within_melee(caster.pos(), target.pos()) {
@@ -2202,7 +2207,11 @@ impl CoreGame {
             if let Some(game) = game {
                 let reactor = game.characters.get(reactor);
                 reactor.on_use_on_attacked_reaction(reaction);
-                detail_lines.push(format!("{} reacted with {}", reactor.name, reaction.name));
+                detail_lines.push(format!(
+                    "|{}| reacted with {}",
+                    reactor.name_tag(),
+                    reaction.name
+                ));
             }
 
             let bonus_evasion = reaction.effect.bonus_evasion;
@@ -2476,7 +2485,7 @@ impl CoreGame {
                             let log_line = match effect {
                                 AttackEnhancementOnHitEffect::RegainActionPoint => {
                                     attacker.action_points.gain(1);
-                                    format!("{} regained 1 AP", attacker.name)
+                                    format!("|{}| regained 1 AP", attacker.name_tag())
                                 }
                                 AttackEnhancementOnHitEffect::Target(
                                     defense_type,
@@ -2545,7 +2554,7 @@ impl CoreGame {
                 }
 
                 if defender.lose_protected() {
-                    detail_lines.push(format!("{} lost Protected", defender.name));
+                    detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
                 }
             }
 
@@ -2560,7 +2569,7 @@ impl CoreGame {
         let mut area_outcomes = None;
         if let Some(game) = game {
             if defender.lose_distracted() {
-                detail_lines.push(format!("{} lost Distracted", defender.name));
+                detail_lines.push(format!("|{}| lost Distracted", defender.name_tag()));
             }
 
             for (name, effect) in enhancements {
@@ -2611,14 +2620,14 @@ impl CoreGame {
         let reactor = self.characters.get(reactor_id);
         reactor.action_points.spend(reaction.action_point_cost);
         reactor.stamina.spend(reaction.stamina_cost);
-        let reactor_name = reactor.name;
+        let reactor_name_tag = reactor.name_tag();
 
         match reaction.effect {
             OnHitReactionEffect::Rage => {
                 let raging = Condition::Raging;
 
                 self.ui_handle_event(GameEvent::CharacterReactedToHit {
-                    main_line: format!("{} reacted with Rage", reactor_name),
+                    main_line: format!("{} reacted with Rage", reactor_name_tag),
                     detail_lines: vec![],
                     reactor: reactor_id,
                     outcome: HitReactionOutcome {
@@ -2682,7 +2691,7 @@ impl CoreGame {
                 };
 
                 self.ui_handle_event(GameEvent::CharacterReactedToHit {
-                    main_line: format!("{} reacted with Shield bash", reactor_name),
+                    main_line: format!("{} reacted with Shield bash", reactor_name_tag),
                     detail_lines: lines,
                     reactor: reactor_id,
                     outcome: HitReactionOutcome {
@@ -2698,7 +2707,7 @@ impl CoreGame {
     async fn perform_end_of_turn_character(&mut self) {
         let character = self.active_character();
         character.has_taken_a_turn_this_round.set(true);
-        let name = character.name;
+        let name_tag = character.name_tag();
         let conditions = &character.conditions;
 
         if conditions.borrow().has(&Condition::Poisoned) {
@@ -2727,7 +2736,7 @@ impl CoreGame {
                 .borrow_mut()
                 .lose_stacks(&Condition::Bleeding, decay)
             {
-                self.log(format!("{} stopped Bleeding", name)).await;
+                self.log(format!("|{}| stopped Bleeding", name_tag)).await;
             }
         }
 
@@ -2792,24 +2801,26 @@ impl CoreGame {
             let health_gained = self.perform_gain_health(character, 2);
             // TODO Make this show on grid
             self.log(format!(
-                "  {} gained {} health (healing potion)",
-                character.name, health_gained
+                "  |{}| gained {} health (healing potion)",
+                character.name_tag(),
+                health_gained
             ))
             .await;
         }
 
         if conditions.borrow_mut().remove(&Condition::Weakened) {
-            self.log(format!("{} is no longer Weakened", name)).await;
+            self.log(format!("|{}| is no longer Weakened", name_tag))
+                .await;
         }
         if conditions.borrow_mut().remove(&Condition::Raging) {
-            self.log(format!("{} stopped Raging", name)).await;
+            self.log(format!("|{}| stopped Raging", name_tag)).await;
         }
         if conditions.borrow().has(&Condition::ArcaneSurge)
             && conditions
                 .borrow_mut()
                 .lose_stacks(&Condition::ArcaneSurge, 1)
         {
-            self.log(format!("{} lost Arcane surge", name)).await;
+            self.log(format!("|{}| lost Arcane surge", name_tag)).await;
         }
 
         if character.knows_passive(PassiveSkill::UnbridledRage) {
@@ -4920,6 +4931,10 @@ impl Character {
             is_facing_east: Cell::new(false),
             is_being_pushed_in_direction: Cell::new(None),
         }
+    }
+
+    pub fn name_tag(&self) -> String {
+        format!("<name>{}", self.name)
     }
 
     pub fn end_of_turn_ap_gain(&self) -> u32 {

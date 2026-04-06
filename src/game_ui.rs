@@ -1525,8 +1525,10 @@ impl UserInterface {
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
 
-                self.log
-                    .add(format!("{} makes an opportunity attack:", reactor.name));
+                self.log.add(format!(
+                    "|{}| makes an opportunity attack:",
+                    reactor.name_tag()
+                ));
                 let duration = 0.5;
                 self.game_grid.add_text_effect(
                     reactor.pos(),
@@ -1621,16 +1623,16 @@ impl UserInterface {
                     self.sound_player.stop(sound_id);
                 }
 
-                let actor_name = self.characters.get(actor).name;
+                let actor_name_tag = self.characters.get(actor).name;
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
                 } else {
                     "used"
                 };
-                let mut line = format!("|{}| {} {}", actor_name, verb, ability.name);
+                let mut line = format!("|{}| {} {}", actor_name_tag, verb, ability.name);
                 if let Some((target_id, _outcome)) = &target_outcome {
-                    let target_name = self.characters.get(*target_id).name;
-                    line.push_str(&format!(" on |{}|", target_name));
+                    let target_name_tag = self.characters.get(*target_id).name_tag();
+                    line.push_str(&format!(" on |{}|", target_name_tag));
                 }
 
                 let mut attacks = vec![];
@@ -1738,7 +1740,7 @@ impl UserInterface {
                 self.log.add_with_details(
                     format!(
                         "|{}| used {}",
-                        self.characters.get(user).name,
+                        self.characters.get(user).name_tag(),
                         consumable.name
                     ),
                     &detail_lines,
@@ -1757,8 +1759,10 @@ impl UserInterface {
                 new_active,
             } => {
                 for char_id in characters {
-                    self.log
-                        .add(format!("|{}| died", self.characters.get(char_id).name));
+                    self.log.add(format!(
+                        "|{}| died",
+                        self.characters.get(char_id).name_tag()
+                    ));
                 }
 
                 self.target_ui.clear_character_if_dead();
@@ -1854,7 +1858,7 @@ impl UserInterface {
                 let character = self.characters.get(character);
                 self.log.add(format!(
                     "|{}| took |<value>{}| damage from {}",
-                    character.name,
+                    character.name_tag(),
                     amount,
                     source.name()
                 ));
@@ -2034,9 +2038,9 @@ impl UserInterface {
 
         let mut line = format!(
             "|{}| {} |{}|",
-            self.characters.get(attacker).name,
+            self.characters.get(attacker).name_tag(),
             verb,
-            self.characters.get(target).name
+            self.characters.get(target).name_tag()
         );
 
         let mut damage_was_dealt = false;

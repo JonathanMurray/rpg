@@ -26,7 +26,7 @@ use crate::{
         WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{COL_ALICE, COL_BOB, COL_CLARA, COL_LIGHT_BLUE},
+    util::{COL_ALICE, COL_BOB, COL_CLARA, COL_ENEMY, COL_LIGHT_BLUE},
 };
 
 pub trait Drawable {
@@ -494,6 +494,8 @@ pub fn measure_text_with_font_tags(
                 part = &part["<faded>".len()..];
             } else if part.starts_with("<stat>") {
                 part = &part["<stat>".len()..];
+            } else if part.starts_with("<name>") {
+                part = &part["<name>".len()..];
             } else if part.starts_with("<strikethrough>") {
                 part = &part["<strikethrough>".len()..];
             }
@@ -533,18 +535,6 @@ pub fn draw_text_with_font_tags(
                 draw_texture(texture.get().unwrap(), x0, y - 13.0, WHITE);
             }
             x0 += symbol_w;
-        } else if ["Bob", "Alice", "Clara"].contains(&part) {
-            let mut params = params.clone();
-            if render_tags {
-                params.color = match part {
-                    "Bob" => COL_BOB,
-                    "Alice" => COL_ALICE,
-                    "Clara" => COL_CLARA,
-                    _ => unreachable!(),
-                };
-            }
-            let part_dimensions = draw_text_rounded(part, x0, y, params);
-            x0 += part_dimensions.width;
         } else {
             let mut params = params.clone();
             let mut strikethrough = false;
@@ -568,6 +558,17 @@ pub fn draw_text_with_font_tags(
                 part = &part["<stat>".len()..];
                 if render_tags {
                     params.color = COL_LIGHT_BLUE;
+                }
+            } else if part.starts_with("<name>") {
+                part = &part["<name>".len()..];
+
+                if render_tags {
+                    params.color = match part {
+                        "Bob" => COL_BOB,
+                        "Alice" => COL_ALICE,
+                        "Clara" => COL_CLARA,
+                        _ => COL_ENEMY,
+                    };
                 }
             } else if part.starts_with("<strikethrough>") {
                 part = &part["<strikethrough>".len()..];
