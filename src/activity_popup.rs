@@ -18,7 +18,7 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
-    core::{Character, CharacterId, Characters, HandType, MOVE_DISTANCE_PER_STAMINA},
+    core::{Character, CharacterId, Characters, HandType, MOVE_DISTANCE_PER_RESOURCE},
     drawing::draw_dashed_line,
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
@@ -45,7 +45,7 @@ pub struct ActivityPopup {
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
     proceed_button_error: Option<String>,
-    movement_cost_slider: Option<MovementStaminaSlider>,
+    movement_cost_slider: Option<MovementCostSlider>,
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -205,17 +205,27 @@ impl ActivityPopup {
             width += margin_between_choices_and_proceed;
         }
 
-        let sprint_stamina_text = "Stamina cost:";
-        let sprint_stamina_margin = 15.0;
+        let enabled_quick_actions = self
+            .characters
+            .get(self.relevant_character_id)
+            .enabled_quick_actions
+            .get();
+
+        let sprint_text = if enabled_quick_actions {
+            "Stamina cost:"
+        } else {
+            "AP cost:"
+        };
+        let sprint_margin = 15.0;
         if let Some(slider) = &self.movement_cost_slider {
             let text_dimensions = measure_text(
-                sprint_stamina_text,
+                sprint_text,
                 base_text_params.font,
                 base_text_params.font_size,
                 1.0,
             );
             let move_config_w = slider.size().0.max(text_dimensions.width);
-            width += move_config_w + sprint_stamina_margin;
+            width += move_config_w + sprint_margin;
         }
 
         width += hor_pad * 2.0;
@@ -268,34 +278,17 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = &*self.ui_state.borrow()
-        {
-            let cost = self.movement_cost_slider.as_ref().unwrap().selected();
-            let character = self.characters.get(self.relevant_character_id);
-            let movement =
-                character.remaining_movement.get() + (cost * MOVE_DISTANCE_PER_STAMINA) as f32;
-            //let dim = draw_text_rounded(&format!("Move:"), x0, y0, base_text_params.clone());
-            //y0 += dim.offset_y + line_margin;
-            /*
-            draw_text_rounded(
-                &format!("{:.1}", movement),
-                x0 + 3.0,
-                y0,
-                base_text_params.clone(),
-            );
-             */
-        }
-
         if let Some(slider) = &mut self.movement_cost_slider {
             let text_dimensions = draw_text_rounded(
-                sprint_stamina_text,
+                sprint_text,
                 x_btn,
                 y - height + 20.0,
                 base_text_params.clone(),
             );
-            slider.draw(x_btn, y - slider.size().1 - 5.0);
+
+            slider.draw(x_btn, y - slider.size().1 - 5.0, enabled_quick_actions);
             let movement_config_w = slider.size().0.max(text_dimensions.width);
-            x_btn += movement_config_w + sprint_stamina_margin;
+            x_btn += movement_config_w + sprint_margin;
         }
 
         let y_btn = y - height / 2.0 - 32.0;
@@ -461,7 +454,6 @@ impl ActivityPopup {
         }
 
         if changed_on_attacked_reaction {
-            self.refresh_on_attacked_state();
             return Some(ActivityPopupOutcome::ChangedReaction);
         }
         if changed_ability_enhancements {
@@ -497,7 +489,10 @@ impl ActivityPopup {
 
         if let Some(slider) = self.movement_cost_slider.as_mut() {
             let character = self.characters.get(self.relevant_character_id);
-            let max_cost = character.stamina.current();
+            let max_cost = character
+                .stamina
+                .current()
+                .max(character.action_points.current());
             slider.set_max_allowed(max_cost);
 
             assert!(cost <= max_cost);
@@ -510,7 +505,11 @@ impl ActivityPopup {
         // TODO: bug: this unwrap panicked, when clicking on an enemy on the grid?
         let slider = self.movement_cost_slider.as_mut().unwrap();
         let character = self.characters.get(self.relevant_character_id);
-        let max_cost = character.stamina.current();
+        let max_cost = if character.enabled_quick_actions.get() {
+            character.stamina.current()
+        } else {
+            character.action_points.current()
+        };
         slider.set_max_allowed(max_cost);
 
         assert!(cost <= max_cost);
@@ -526,12 +525,15 @@ impl ActivityPopup {
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (i32, i32) {
-        /*
-        let movement_cost = self.movement_cost();
-        if movement_cost > 0 {
-            return (movement_cost as i32, 0);
+        let enabled_quick_actions = self
+            .characters
+            .get(self.relevant_character_id)
+            .enabled_quick_actions
+            .get();
+
+        if !enabled_quick_actions && self.movement_cost() > 0 {
+            return (self.movement_cost() as i32, 0);
         }
-         */
 
         let borrowed_state = self.ui_state.borrow();
         let base_action = match &*borrowed_state {
@@ -539,20 +541,33 @@ impl ActivityPopup {
             _ => None,
         };
 
-        let reserved_from_action = base_action
+        let mut reserved_from_action = base_action
             .as_ref()
             .map(|action| action.base_action_point_cost())
             .unwrap_or(0);
+
+        if !enabled_quick_actions {
+            reserved_from_action += base_action
+                .as_ref()
+                .map(|action| action.base_action().quick_point_cost() as i32)
+                .unwrap_or(0);
+        }
+
         let mut reserved_from_choices: i32 = 0;
+
         for action in self.selected_choices() {
             reserved_from_choices += action.action_point_cost();
             reserved_from_choices -= action.action_point_discount() as i32;
+
+            if !enabled_quick_actions {
+                reserved_from_choices += action.quick_point_cost() as i32;
+            }
         }
         let mut additional_hovered_from_choices = 0;
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                additional_hovered_from_choices +=
-                    self.choice_buttons[&id].action.action_point_cost();
+                let action_point_cost = self.choice_buttons[&id].action.action_point_cost();
+                additional_hovered_from_choices += action_point_cost;
 
                 if self.are_choice_buttons_mutually_exclusive() {
                     reserved_from_choices = 0;
@@ -591,7 +606,13 @@ impl ActivityPopup {
     }
 
     pub fn stamina_points(&self) -> u32 {
-        if self.movement_cost() > 0 {
+        let enabled_quick_actions = self
+            .characters
+            .get(self.relevant_character_id)
+            .enabled_quick_actions
+            .get();
+
+        if enabled_quick_actions && self.movement_cost() > 0 {
             return self.movement_cost();
         }
 
@@ -605,6 +626,14 @@ impl ActivityPopup {
             .as_ref()
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
+
+        if enabled_quick_actions {
+            sta += base_action
+                .as_ref()
+                .map(|action| action.base_action().quick_point_cost())
+                .unwrap_or(0);
+        }
+
         for action in self.selected_choices() {
             sta += action.stamina_cost();
         }
@@ -614,48 +643,6 @@ impl ActivityPopup {
             }
         }
         sta
-    }
-
-    pub fn refresh_on_attacked_state(&mut self) {
-        println!("popup::refresh_on_attacked_state()...");
-        let UiState::ReactingToAttack {
-            hand,
-            attacker,
-            defender,
-            reactor,
-            is_within_melee: _,
-            selected,
-        } = &*self.ui_state.borrow()
-        else {
-            unreachable!()
-        };
-
-        /*
-        let reaction = *selected;
-
-        let attacker = self.characters.get_rc(*attacker);
-        let defender = self.characters.get(*defender);
-
-        let attack_enhancements = &[];
-
-
-        let mut explanation = String::new();
-
-
-        for (term, _bonus) in attacker.outgoing_attack_bonuses(*hand, attack_enhancements, defender)
-        {
-            explanation.push_str(term);
-            explanation.push(' ');
-        }
-        for (term, _bonus) in defender.incoming_attack_bonuses(reaction) {
-            explanation.push_str(term);
-            explanation.push(' ');
-        }
-
-        if !explanation.is_empty() {
-            self.additional_line = Some(explanation);
-        }
-        */
     }
 
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
@@ -699,7 +686,7 @@ impl ActivityPopup {
         let mut lines = vec![];
         let mut popup_buttons = vec![];
 
-        let mut stamina_slider = None;
+        let mut movement_cost_slider = None;
         self.selected_choice_button_ids.clear();
 
         println!("on_new_state");
@@ -753,17 +740,10 @@ impl ActivityPopup {
                     }
 
                     ConfiguredAction::Move { .. } => {
-                        let active_char = self.characters.get(active_character_id);
-                        //let speed = active_char.move_speed();
-                        //lines.push(format!("Speed: {:.1}", speed));
-                        let stamina = &active_char.stamina;
-                        if stamina.max() > 0 {
-                            let max_stamina_spend = stamina.current();
-                            stamina_slider = Some(MovementStaminaSlider::new(
-                                max_stamina_spend,
-                                self.font.clone(),
-                            ));
-                        }
+                        let char = self.characters.get(active_character_id);
+                        let max_spend = char.stamina.current().max(char.action_points.current());
+                        movement_cost_slider =
+                            Some(MovementCostSlider::new(max_spend, self.font.clone()));
                     }
 
                     ConfiguredAction::ChangeEquipment { .. } => {}
@@ -872,7 +852,7 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
-        self.movement_cost_slider = stamina_slider;
+        self.movement_cost_slider = movement_cost_slider;
 
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
@@ -923,7 +903,7 @@ pub enum ActivityPopupOutcome {
     ChangedReaction,
 }
 
-struct MovementStaminaSlider {
+struct MovementCostSlider {
     max: u32,
     max_allowed: u32,
     selected_i: u32,
@@ -934,7 +914,7 @@ struct MovementStaminaSlider {
     font: Font,
 }
 
-impl MovementStaminaSlider {
+impl MovementCostSlider {
     fn new(max: u32, font: Font) -> Self {
         Self {
             max,
@@ -962,13 +942,19 @@ impl MovementStaminaSlider {
         self.selected_i
     }
 
-    fn draw(&mut self, x: f32, y: f32) {
+    fn draw(&mut self, x: f32, y: f32, spend_stamina: bool) {
         let (w, h) = (self.cell_w, self.cell_h);
 
         let pad = 2.0;
         for i in 0..self.selected_i + 1 {
             let x0 = x + w * i as f32;
-            let color = if i == 0 { DARKGRAY } else { COL_GREEN_0 };
+            let color = if i == 0 {
+                DARKGRAY
+            } else if spend_stamina {
+                COL_GREEN_0
+            } else {
+                ORANGE
+            };
             draw_rectangle(x0 + pad, y + pad, w - pad * 2.0, h - pad * 2.0, color);
         }
         for i in 0..self.max_allowed + 1 {

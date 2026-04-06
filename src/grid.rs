@@ -43,7 +43,7 @@ use crate::{
         distance_between, target_within_range_squared, within_range_squared, Ability, AbilityId,
         AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaEffect, AreaShape,
         AttackAction, BaseAction, Character, Goodness, MovementType, Position, TargetPrediction,
-        MOVE_DISTANCE_PER_STAMINA,
+        MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -189,7 +189,7 @@ impl MovementRange {
         if additional_range <= 0.0 {
             0
         } else {
-            (additional_range / MOVE_DISTANCE_PER_STAMINA as f32).ceil() as u32
+            (additional_range / MOVE_DISTANCE_PER_RESOURCE as f32).ceil() as u32
         }
     }
 }
@@ -1168,8 +1168,13 @@ impl GameGrid {
         let active_char = &self.characters[&active_char_id];
 
         let speed = active_char.move_speed();
-        let max_range = active_char.remaining_movement.get()
-            + (active_char.stamina.current() * MOVE_DISTANCE_PER_STAMINA) as f32;
+        let resource = if active_char.enabled_quick_actions.get() {
+            active_char.stamina.current()
+        } else {
+            active_char.action_points.current()
+        };
+        let max_range =
+            active_char.remaining_movement.get() + (resource * MOVE_DISTANCE_PER_RESOURCE) as f32;
 
         self.movement_range.set(speed, max_range);
     }

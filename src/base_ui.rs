@@ -20,10 +20,10 @@ use crate::{
     drawing::draw_rounded_rectangle_lines,
     sounds::{SoundId, SoundPlayer},
     textures::{
-        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CONFIRM_SYMBOL,
-        HEART_SYMBOL, HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL,
-        RED_DICE_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL,
-        WARNING_SYMBOL, WEIGHT_SYMBOL,
+        draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CHECKED_SYMBOL,
+        CONFIRM_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
+        MIXED_DICE_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL,
+        SWORD_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{COL_ALICE, COL_BOB, COL_CLARA, COL_ENEMY, COL_LIGHT_BLUE},
@@ -446,6 +446,8 @@ lazy_static! {
     static ref TAGS: HashMap<&'static str, (f32, &'static OnceLock<Texture2D>)> = {
         let symbol_w = 16.0;
         HashMap::from([
+            ("<unchecked>", (symbol_w, &UNCHECKED_SYMBOL)),
+            ("<checked>", (symbol_w, &CHECKED_SYMBOL)),
             ("<blue_dice>", (symbol_w, &BLUE_DICE_SYMBOL)),
             ("<red_dice>", (symbol_w, &RED_DICE_SYMBOL)),
             ("<mixed_dice>", (symbol_w, &MIXED_DICE_SYMBOL)),

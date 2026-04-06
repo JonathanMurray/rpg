@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, WHITE, YELLOW},
+    color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
@@ -30,7 +30,7 @@ use crate::{
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, COL_RED},
+    util::{oscillate, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_RED},
 };
 
 pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
@@ -413,9 +413,9 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
-                "Move a limited distance for free every turn. Spend stamina |<stamina>| to move further.",
+                "Move a limited distance for free every turn. Spend X stamina |<stamina>| or AP to move further.",
             ),
-            technical_description: vec!["|<boot>||<stat>Move| + 4 / |<stamina>|".to_string()],
+            technical_description: vec!["|<boot>||<stat>Move| + 4X".to_string()],
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {
@@ -426,6 +426,11 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         BaseAction::UseConsumable => Tooltip {
             header: "Use consumable".to_string(),
             description: Some("Use a consumable from your inventory (e.g. a potion)."),
+            ..Default::default()
+        },
+        BaseAction::ToggleQuickActions => Tooltip {
+            header: "Quick actions".to_string(),
+            description: Some("Spend stamina |<stamina>| on movement and inventory management, instead of AP."),
             ..Default::default()
         },
     }
@@ -754,8 +759,16 @@ pub struct ActionButton {
     pub hover_border_color: Color,
     ap_row: Container,
     hovered: Cell<bool>,
+
+    // Enabled = can be used
     pub enabled: Cell<bool>,
+
+    // Selected = the player has the button selected; the action is being configured
     pub selected: Cell<ButtonSelected>,
+
+    // Activated = the button represents a state that can be toggled on and off
+    pub activated: Cell<Option<bool>>,
+
     pub event_sender: Option<EventSender>,
     clicked_effect_until: Cell<Option<f64>>,
     icon: IconId,
@@ -763,6 +776,7 @@ pub struct ActionButton {
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
     tooltip_is_based_on_equipped_shield: Cell<Option<Shield>>,
+    tooltip_is_based_on_quick_actions: Cell<Option<bool>>,
     pub hotkey: RefCell<Option<(KeyCode, Font)>>,
     pub context: Option<ButtonContext>,
     ap_color: Rc<Cell<Color>>,
@@ -785,6 +799,7 @@ impl ActionButton {
         let mana_points = action.mana_cost();
         let stamina_points = action.stamina_cost();
         let action_points = action.action_point_cost();
+        let quick_points = action.quick_point_cost();
         let icon: IconId = action.icon(character.as_deref());
         let tooltip = button_action_tooltip(&action);
 
@@ -825,6 +840,13 @@ impl ActionButton {
             }))
         }
 
+        for _ in 0..quick_points {
+            ap_circles.push(Element::Circle(Circle {
+                r,
+                color: Rc::new(Cell::new(COL_GREEN_2)),
+            }))
+        }
+
         let mut bottom_resource_text = "".to_string();
 
         if mana_points > 0 {
@@ -862,6 +884,12 @@ impl ActionButton {
             None
         };
 
+        let activated = if matches!(action, ButtonAction::Action(BaseAction::ToggleQuickActions)) {
+            Some(character.as_ref().unwrap().enabled_quick_actions.get())
+        } else {
+            None
+        };
+
         Self {
             id,
             action,
@@ -876,6 +904,7 @@ impl ActionButton {
             hovered: Cell::new(false),
             enabled: Cell::new(true),
             selected: Cell::new(ButtonSelected::No),
+            activated: Cell::new(activated),
             event_sender: event_queue.map(|queue| EventSender { queue }),
             clicked_effect_until: Default::default(),
             icon,
@@ -883,6 +912,7 @@ impl ActionButton {
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
             tooltip_is_based_on_equipped_shield: Default::default(),
+            tooltip_is_based_on_quick_actions: Default::default(),
             hotkey: RefCell::new(None),
             context: None,
             ap_color,
@@ -1006,6 +1036,19 @@ impl ActionButton {
             }
         }
 
+        if let ButtonAction::Action(BaseAction::ToggleQuickActions) = self.action {
+            let quick_actions = Some(self.character.as_ref().unwrap().enabled_quick_actions.get());
+            if self.tooltip_is_based_on_quick_actions.get() != quick_actions {
+                let technical_descr = if quick_actions.unwrap() {
+                    vec!["|<checked>|".to_string()]
+                } else {
+                    vec!["|<unchecked>|".to_string()]
+                };
+                self.tooltip.borrow_mut().technical_description = technical_descr;
+                self.tooltip_is_based_on_quick_actions.set(quick_actions);
+            }
+        }
+
         self.tooltip.borrow()
     }
 
@@ -1023,6 +1066,9 @@ impl ActionButton {
 
     pub fn on_clicked(&self) {
         self.clicked_effect_until.set(Some(get_time() + 0.1));
+        if let Some(activated) = self.activated.get() {
+            self.activated.set(Some(!activated));
+        }
     }
 
     pub fn notify_hidden(&self) {
@@ -1091,6 +1137,8 @@ impl Drawable for ActionButton {
         }
 
         if matches!(self.selected.get(), ButtonSelected::Yes) {
+            draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR_SELECTED);
+        } else if self.activated.get().unwrap_or(false) {
             draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR_SELECTED);
         } else {
             draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR);
@@ -1193,6 +1241,10 @@ impl Drawable for ActionButton {
                 );
             }
             ButtonSelected::No => {}
+        }
+
+        if self.activated.get().unwrap_or(false) {
+            draw_dashed_rectangle_lines(x, y, w, h, 4.0, ORANGE, 6.4);
         }
 
         if hovered {
@@ -1303,6 +1355,7 @@ impl ButtonAction {
                 BaseAction::Move => "Move",
                 BaseAction::ChangeEquipment => "Change equipment",
                 BaseAction::UseConsumable => "Use consumable",
+                BaseAction::ToggleQuickActions => "Quick actions",
             },
             ButtonAction::OnAttackedReaction(reaction) => reaction.name,
             ButtonAction::OnHitReaction(reaction) => reaction.name,
@@ -1338,6 +1391,7 @@ impl ButtonAction {
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
                 BaseAction::UseConsumable => IconId::UseConsumable,
+                BaseAction::ToggleQuickActions => IconId::QuickActions,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::AbilityEnhancement(enhancement) => enhancement.icon,
@@ -1358,6 +1412,19 @@ impl ButtonAction {
             ButtonAction::AbilityEnhancement(enhancement) => enhancement.action_point_cost as i32,
             ButtonAction::Proceed => 0,
             ButtonAction::OpportunityAttack => 1,
+            ButtonAction::Passive(..) => 0,
+        }
+    }
+
+    pub fn quick_point_cost(&self) -> u32 {
+        match self {
+            ButtonAction::Action(base_action) => base_action.quick_point_cost(),
+            ButtonAction::OnAttackedReaction(..) => 0,
+            ButtonAction::OnHitReaction(..) => 0,
+            ButtonAction::AttackEnhancement(..) => 0,
+            ButtonAction::AbilityEnhancement(..) => 0,
+            ButtonAction::Proceed => 0,
+            ButtonAction::OpportunityAttack => 0,
             ButtonAction::Passive(..) => 0,
         }
     }

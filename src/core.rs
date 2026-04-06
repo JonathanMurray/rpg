@@ -27,7 +27,7 @@ pub type Position = (i32, i32);
 pub const MAX_ACTION_POINTS: u32 = 6;
 pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
-pub const MOVE_DISTANCE_PER_STAMINA: u32 = 4;
+pub const MOVE_DISTANCE_PER_RESOURCE: u32 = 4;
 
 #[derive(Debug)]
 enum ActionOutcome {
@@ -657,8 +657,12 @@ impl CoreGame {
             } => {
                 let character = self.active_character();
                 //character.action_points.spend(extra_cost);
-                character.stamina.spend(extra_cost);
-                let paid_distance = (extra_cost * MOVE_DISTANCE_PER_STAMINA) as f32;
+                if character.enabled_quick_actions.get() {
+                    character.stamina.spend(extra_cost);
+                } else {
+                    character.action_points.spend(extra_cost);
+                }
+                let paid_distance = (extra_cost * MOVE_DISTANCE_PER_RESOURCE) as f32;
                 if total_distance > paid_distance {
                     character.spend_movement(total_distance - paid_distance);
                 } else if total_distance < paid_distance {
@@ -672,7 +676,11 @@ impl CoreGame {
 
             Action::ChangeEquipment { from, to } => {
                 let character = self.active_character();
-                character.action_points.spend(1);
+                if character.enabled_quick_actions.get() {
+                    character.stamina.spend(1);
+                } else {
+                    character.action_points.spend(1);
+                }
                 character.swap_equipment_slots(from, to);
                 Ok(ActionOutcome::Default)
             }
@@ -681,7 +689,11 @@ impl CoreGame {
                 inventory_equipment_index,
             } => {
                 let character = self.active_character();
-                character.action_points.spend(1);
+                if character.enabled_quick_actions.get() {
+                    character.stamina.spend(1);
+                } else {
+                    character.action_points.spend(1);
+                }
                 let slot_role = EquipmentSlotRole::Inventory(inventory_equipment_index);
                 let consumable = match character.equipment(slot_role).unwrap() {
                     EquipmentEntry::Consumable(consumable) => consumable,
@@ -4155,8 +4167,7 @@ pub enum BaseAction {
     Move,
     ChangeEquipment,
     UseConsumable,
-    // TODO add "DelayTurn" action that lets you put yourself one step later in the
-    // turn order
+    ToggleQuickActions,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -4171,8 +4182,20 @@ impl BaseAction {
             BaseAction::Attack(attack) => attack.action_point_cost as i32,
             BaseAction::UseAbility(ability) => ability.action_point_cost as i32,
             BaseAction::Move => 0,
+            BaseAction::ChangeEquipment => 0,
+            BaseAction::UseConsumable => 0,
+            BaseAction::ToggleQuickActions => 0,
+        }
+    }
+
+    pub fn quick_point_cost(&self) -> u32 {
+        match self {
+            BaseAction::Attack(..) => 0,
+            BaseAction::UseAbility(..) => 0,
+            BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
             BaseAction::UseConsumable => 1,
+            BaseAction::ToggleQuickActions => 0,
         }
     }
 
@@ -4183,6 +4206,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
+            BaseAction::ToggleQuickActions => 0,
         }
     }
 
@@ -4193,6 +4217,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
+            BaseAction::ToggleQuickActions => 0,
         }
     }
 }
@@ -4829,6 +4854,7 @@ pub struct Character {
     pub base_attributes: Attributes,
     pub health: NumberedResource,
     pub mana: NumberedResource,
+    pub enabled_quick_actions: Cell<bool>,
 
     // How many cells you can move per AP
     pub base_move_speed: Cell<f32>,
@@ -4898,6 +4924,7 @@ impl Character {
             base_attributes,
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
+            enabled_quick_actions: Cell::new(false),
             base_move_speed: Cell::new(move_speed),
             remaining_movement: Cell::new(0.0),
             capacity: Cell::new(capacity),
@@ -4918,6 +4945,7 @@ impl Character {
                     // the action point cost is populated (later) by the equipped weapon
                     action_point_cost: 0,
                 }),
+                BaseAction::ToggleQuickActions,
                 BaseAction::ChangeEquipment,
                 BaseAction::UseConsumable,
             ]),
@@ -4931,6 +4959,12 @@ impl Character {
             is_facing_east: Cell::new(false),
             is_being_pushed_in_direction: Cell::new(None),
         }
+    }
+
+    pub fn toggle_quick_actions(&self) {
+        let quick = self.enabled_quick_actions.get();
+        self.enabled_quick_actions.set(!quick);
+        dbg!(self.enabled_quick_actions.get());
     }
 
     pub fn name_tag(&self) -> String {
@@ -5648,21 +5682,28 @@ impl Character {
     }
 
     pub fn can_use_action(&self, action: BaseAction) -> bool {
-        let sta = self.stamina.current();
-        let ap = self.action_points.current();
+        let sta = self.stamina.current() as i32;
+        let ap = self.action_points.current() as i32;
+        let quick_actions = self.enabled_quick_actions.get();
         match action {
             BaseAction::Attack(attack) => {
-                matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
+                matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost as i32)
             }
             BaseAction::UseAbility(ability) => self.can_use_ability(ability),
-            BaseAction::Move => self.remaining_movement.get() > 1.0 || sta > 0,
+            BaseAction::Move => {
+                self.remaining_movement.get() > 1.0
+                    || (quick_actions && sta > 0)
+                    || (!quick_actions && ap > 0)
+            }
             BaseAction::ChangeEquipment => {
-                ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
+                let cost = BaseAction::ChangeEquipment.quick_point_cost() as i32;
+                self.enabled_quick_actions.get() && sta > cost || ap > cost
             }
             BaseAction::UseConsumable => {
                 self.has_any_consumable_in_inventory()
-                    && ap as i32 >= BaseAction::UseConsumable.action_point_cost()
+                    && ap >= BaseAction::UseConsumable.action_point_cost()
             }
+            BaseAction::ToggleQuickActions => true,
         }
     }
 
@@ -5691,6 +5732,7 @@ impl Character {
                 ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
             }
             BaseAction::UseConsumable => ap as i32 >= BaseAction::UseConsumable.action_point_cost(),
+            BaseAction::ToggleQuickActions => true,
         }
     }
 

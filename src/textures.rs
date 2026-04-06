@@ -138,6 +138,7 @@ pub enum IconId {
     AllIn,
     Plus,
     PlusPlus,
+    QuickActions,
     Go,
     Extend,
     Radius,
@@ -908,6 +909,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::AllIn => (4, 7),
         IconId::Plus => (4, 9),
         IconId::PlusPlus => (5, 9),
+        IconId::QuickActions => (8, 9),
         IconId::Go => (3, 4),
         IconId::Extend => (0, 6),
         IconId::Radius => (3, 6),
@@ -1019,6 +1021,8 @@ async fn load_and_init_font_symbols() {
         texture
     };
 
+    UNCHECKED_SYMBOL.get_or_init(|| symbol(4, 0));
+    CHECKED_SYMBOL.get_or_init(|| symbol(5, 0));
     BLUE_DICE_SYMBOL.get_or_init(|| symbol(0, 0));
     RED_DICE_SYMBOL.get_or_init(|| symbol(3, 2));
     MIXED_DICE_SYMBOL.get_or_init(|| symbol(5, 2));
@@ -1048,6 +1052,8 @@ async fn load_and_init_ui_textures() {
     PORTRAIT_ENEMY_BG_TEXTURE.get_or_init(|| texture);
 }
 
+pub static UNCHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static CHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BLUE_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static RED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MIXED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
