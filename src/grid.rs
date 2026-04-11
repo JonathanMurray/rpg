@@ -1749,9 +1749,10 @@ impl GameGrid {
 
         if is_mouse_within_grid && receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
-                if is_mouse_button_down(MouseButton::Right)
-                    || is_mouse_button_down(MouseButton::Middle)
-                {
+                if
+                /*is_mouse_button_down(MouseButton::Right)
+                ||*/
+                is_mouse_button_down(MouseButton::Middle) {
                     let (dx, dy) = (
                         mouse_relative.0 - dragging_from.0,
                         mouse_relative.1 - dragging_from.1,
@@ -1763,9 +1764,10 @@ impl GameGrid {
                 }
             }
 
-            if is_mouse_button_pressed(MouseButton::Right)
-                || is_mouse_button_pressed(MouseButton::Middle)
-            {
+            if
+            /*is_mouse_button_pressed(MouseButton::Right)
+            ||*/
+            is_mouse_button_pressed(MouseButton::Middle) {
                 self.dragging_camera_from = Some(mouse_relative);
             }
 
@@ -1795,7 +1797,10 @@ impl GameGrid {
                     self.hovered_character = Some(id);
 
                     // This lets you quickly hover enemies and see their movement range
-                    if hovered_action.is_none() && matches!(ui_state, UiState::ChoosingAction) {
+                    if is_mouse_button_down(MouseButton::Right)
+                        && hovered_action.is_none()
+                        && matches!(ui_state, UiState::ChoosingAction)
+                    {
                         hovered_action = Some((id, BaseAction::Move));
                     }
                     break;
