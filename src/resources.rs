@@ -13,13 +13,13 @@ use crate::{
     sounds::SoundPlayer,
     textures::{
         load_all_effects, load_all_equipment_icons, load_all_portraits, load_all_sprites,
-        load_and_init_texture, EffectId, EquipmentIconId, PortraitId, SpriteId,
+        load_and_init_texture, EffectId, EquipmentIconId, PortraitId, Sprite, SpriteId,
     },
 };
 
 #[derive(Clone)]
 pub struct GameResources {
-    pub sprites: HashMap<SpriteId, Texture2D>,
+    pub sprites: HashMap<SpriteId, Sprite>,
     pub simple_font: Font,
     pub big_font: Font,
     pub decorative_font: Font,

@@ -33,8 +33,15 @@ pub enum SpriteId {
     CharacterShadow,
 }
 
-pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
-    load_sprites(vec![
+#[derive(Clone)]
+pub struct Sprite {
+    pub regular: Texture2D,
+    pub white_highlight: Texture2D,
+    pub red_highlight: Texture2D,
+}
+
+pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
+    let sprites = load_sprites(vec![
         (SpriteId::PinkMan, "character.png"),
         (SpriteId::AlsoWeirdOrangeMan, "character2.png"),
         (SpriteId::WeirdOrangeMan, "character3.png"),
@@ -55,7 +62,31 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Texture2D> {
         (SpriteId::Shield, "shield.png"),
         (SpriteId::CharacterShadow, "character_shadow.png"),
     ])
-    .await
+    .await;
+
+    sprites
+        .into_iter()
+        .map(|(id, texture)| {
+            let highlight_color = [201, 226, 118, 255];
+
+            let white = Texture2D::from_image(&texture.get_texture_data());
+            white.set_filter(FilterMode::Nearest);
+            replace_color(&white, highlight_color, [255, 255, 255, 255]);
+
+            let red = Texture2D::from_image(&texture.get_texture_data());
+            red.set_filter(FilterMode::Nearest);
+            replace_color(&red, highlight_color, [255, 100, 100, 255]);
+
+            (
+                id,
+                Sprite {
+                    regular: texture,
+                    white_highlight: white,
+                    red_highlight: red,
+                },
+            )
+        })
+        .collect()
 }
 
 pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {

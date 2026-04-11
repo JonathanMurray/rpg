@@ -57,8 +57,8 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
-        EffectId, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation, WaterType,
-        LIGHTNING_BOLT_FX,
+        EffectId, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation,
+        WaterType, LIGHTNING_BOLT_FX,
     },
     util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED},
 };
@@ -257,7 +257,7 @@ pub struct GameGrid {
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
-    sprites: HashMap<SpriteId, Texture2D>,
+    sprites: HashMap<SpriteId, Sprite>,
     pub pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
     pub characters: HashMap<CharacterId, Rc<Character>>,
@@ -294,7 +294,7 @@ impl GameGrid {
     pub fn new(
         selected_character_id: CharacterId,
         characters: HashMap<CharacterId, Rc<Character>>,
-        sprites: HashMap<SpriteId, Texture2D>,
+        sprites: HashMap<SpriteId, Sprite>,
         big_font: Font,
         simple_font: Font,
         tiny_font: Font,
@@ -1623,7 +1623,7 @@ impl GameGrid {
         if true {
             // !standing_in_water {
             draw_texture_ex(
-                &self.sprites[&SpriteId::CharacterShadow],
+                &self.sprites[&SpriteId::CharacterShadow].regular,
                 shadow_x,
                 shadow_y,
                 WHITE,
@@ -1641,27 +1641,32 @@ impl GameGrid {
             );
         }
         if show_sprite {
-            draw_texture_ex(
-                &self.sprites[&character.sprite],
-                x,
-                y,
-                WHITE,
-                character_params,
-            );
+            let sprite = &self.sprites[&character.sprite];
+            let texture = if self.target_damage_previews.contains_key(&character.id()) {
+                &sprite.red_highlight
+            } else if self.hovered_character.or(self.hovered_character_portrait)
+                == Some(character.id())
+            {
+                &sprite.white_highlight
+            } else {
+                &sprite.regular
+            };
+
+            draw_texture_ex(texture, x, y, WHITE, character_params);
             if let Some(weapon) = character.weapon(HandType::MainHand) {
                 if let Some(texture) = weapon.sprite {
                     let weapon_params = DrawTextureParams {
                         rotation: params.rotation + weapon_rotation_modifier,
                         ..params
                     };
-                    draw_texture_ex(&self.sprites[&texture], x, y, WHITE, weapon_params);
+                    draw_texture_ex(&self.sprites[&texture].regular, x, y, WHITE, weapon_params);
                 }
             }
 
             if let Some(shield) = character.shield() {
                 if let Some(texture) = shield.sprite {
                     draw_texture_ex(
-                        &self.sprites[&texture],
+                        &self.sprites[&texture].regular,
                         x + shield_offset.0,
                         y + shield_offset.1,
                         WHITE,
@@ -2461,7 +2466,6 @@ impl GameGrid {
             }
 
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
-                dbg!("hover move route");
                 if self.dragging_camera_from.is_none() && player_action_char_target.is_none() {
                     //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
                     let path = self.pathfind_grid.build_path_from_chart(
