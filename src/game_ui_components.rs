@@ -38,7 +38,7 @@ pub struct TopCharacterPortraits {
     row: Container,
     active_id: CharacterId,
     selected_id: CharacterId,
-    grid_hovered_id: Option<CharacterId>,
+    grid_hovered_id: Cell<Option<CharacterId>>,
     portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>>,
 }
 
@@ -87,7 +87,7 @@ impl TopCharacterPortraits {
             row,
             active_id,
             selected_id: active_id,
-            grid_hovered_id: None,
+            grid_hovered_id: Cell::new(None),
             portraits,
         };
 
@@ -119,15 +119,15 @@ impl TopCharacterPortraits {
         }
     }
 
-    pub fn set_grid_hovered_character_id(&mut self, id: Option<CharacterId>) {
-        if let Some(previous_id) = self.grid_hovered_id {
+    pub fn set_grid_hovered_character_id(&self, id: Option<CharacterId>) {
+        if let Some(previous_id) = self.grid_hovered_id.get() {
             if let Some(portrait) = self.portraits.get(&previous_id) {
                 // The entry may have been removed if the character died recently
                 portrait.borrow_mut().weak_highlight = false;
             }
         }
-        self.grid_hovered_id = id;
-        if let Some(id) = self.grid_hovered_id {
+        self.grid_hovered_id.set(id);
+        if let Some(id) = self.grid_hovered_id.get() {
             self.portraits[&id].borrow_mut().weak_highlight = true;
         }
     }
@@ -135,15 +135,15 @@ impl TopCharacterPortraits {
     pub fn draw(&self, x: f32, y: f32) -> Option<CharacterId> {
         self.row.draw(x, y);
 
-        let mut clicked_character_id = None;
+        let mut hovered_character_id = None;
 
         for (ch_id, portrait) in &self.portraits {
-            if portrait.borrow().has_been_clicked.take() {
-                clicked_character_id = Some(ch_id);
+            if portrait.borrow().is_hovered.get() {
+                hovered_character_id = Some(*ch_id);
             }
         }
 
-        clicked_character_id.copied()
+        hovered_character_id
     }
 
     pub fn remove_dead(&mut self) {
@@ -160,7 +160,7 @@ struct TopCharacterPortrait {
     container: Container,
     character: Rc<Character>,
     texture_size: Rc<RefCell<(f32, f32)>>,
-    has_been_clicked: Cell<bool>,
+    is_hovered: Cell<bool>,
 }
 
 impl TopCharacterPortrait {
@@ -179,7 +179,7 @@ impl TopCharacterPortrait {
             container,
             character: character.clone(),
             texture_size,
-            has_been_clicked: Cell::new(false),
+            is_hovered: Cell::new(false),
         }
     }
 }
@@ -208,6 +208,9 @@ impl Drawable for TopCharacterPortrait {
 
         let x0 = x + (w - portrait_w) / 2.0;
 
+        let (mouse_x, mouse_y) = mouse_position();
+        let hovered = (x..x + w).contains(&mouse_x) && (y..y + h).contains(&mouse_y);
+
         if self.strong_highlight {
             let margin = 1.0;
 
@@ -222,7 +225,7 @@ impl Drawable for TopCharacterPortrait {
                 None,
             );
         }
-        if self.weak_highlight {
+        if self.weak_highlight || hovered {
             draw_rectangle_lines(
                 x0 + 1.0,
                 y + 1.0,
@@ -250,14 +253,7 @@ impl Drawable for TopCharacterPortrait {
             );
         }
 
-        let (mouse_x, mouse_y) = mouse_position();
-
-        if is_mouse_button_pressed(MouseButton::Left)
-            && (x..x + w).contains(&mouse_x)
-            && (y..y + h).contains(&mouse_y)
-        {
-            self.has_been_clicked.set(true);
-        }
+        self.is_hovered.set(hovered);
     }
 
     fn size(&self) -> (f32, f32) {

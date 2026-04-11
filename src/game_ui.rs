@@ -7,7 +7,9 @@ use std::{
 use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, WHITE},
-    input::{is_key_down, is_key_pressed, mouse_position, KeyCode},
+    input::{
+        is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
+    },
     math::Rect,
     shapes::draw_rectangle,
     text::Font,
@@ -724,9 +726,12 @@ impl UserInterface {
             screen_height() - 35.0,
         );
 
-        let clicked_character_id = self.top_character_portraits.draw(0.0, 0.0);
-        if let Some(id) = clicked_character_id {
-            if self.characters.get(id).player_controlled() {
+        let hovered_character_id = self.top_character_portraits.draw(0.0, 0.0);
+        self.game_grid.set_hovered_portrait(hovered_character_id);
+        if let Some(id) = hovered_character_id {
+            if self.characters.get(id).player_controlled()
+                && is_mouse_button_pressed(MouseButton::Left)
+            {
                 self.sound_player.play(SoundId::ClickButton);
                 self.player_portraits.set_selected_id(id);
                 changed_character = true;

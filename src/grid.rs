@@ -81,6 +81,7 @@ const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 const HOVER_INVALID_TARGET_COLOR: Color = ORANGE;
 const HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR: Color = LIGHTGRAY;
 
+const HOVER_NEUTRAL_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
 const HOVER_ENEMY_COLOR: Color = Color::new(0.8, 0.2, 0.2, 1.0);
 const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
 const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
@@ -279,8 +280,10 @@ pub struct GameGrid {
 
     movement_range: MovementRange,
 
-    //locked_inspection_target: Option<CharacterId>,
     hovered_character: Option<CharacterId>,
+    prev_hovered_character: Option<CharacterId>,
+    hovered_character_portrait: Option<CharacterId>,
+    prev_inspect_target: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
     effect_textures: HashMap<EffectId, Texture2D>,
 
@@ -318,8 +321,10 @@ impl GameGrid {
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
             movement_range: MovementRange::default(),
-            //locked_inspection_target: None,
             hovered_character: None,
+            prev_hovered_character: None,
+            hovered_character_portrait: None,
+            prev_inspect_target: None,
             enemys_target: None,
             action_usability_problem: None,
             zoom_index,
@@ -600,6 +605,10 @@ impl GameGrid {
                 movement_type,
             },
         ));
+    }
+
+    pub fn set_hovered_portrait(&mut self, character_id: Option<CharacterId>) {
+        self.hovered_character_portrait = character_id;
     }
 
     pub fn animate_death(&mut self, character_id: CharacterId, duration: f32) {
@@ -952,11 +961,6 @@ impl GameGrid {
     }
 
     fn on_removed_character(&mut self, id: CharacterId) {
-        /*
-        if self.locked_inspection_target == Some(id) {
-            self.locked_inspection_target = None;
-        }
-         */
         if self.hovered_character == Some(id) {
             self.hovered_character = None;
         }
@@ -1693,14 +1697,13 @@ impl GameGrid {
         // TODO
         let receptive_to_input = !obstructed;
 
-        let prev_hovered = self.hovered_character;
-
+        /*
         let prev_inspect_target = match ui_state.players_action_target() {
             ActionTarget::Character(char_id, _) => Some(char_id),
             ActionTarget::Position(..) => None,
-            ActionTarget::None => self.hovered_character,
+            ActionTarget::None => self.hovered_character.or(self.hovered_character_portrait),
         };
-        //let prev_inspect_target = self.hovered_character; //.or(self.locked_inspection_target);
+         */
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 
@@ -1986,22 +1989,22 @@ impl GameGrid {
 
             self.draw_character(character);
 
-            if let Some(group) = &self.ability_character_animation {
-                for particle in &group.particles {
-                    let x = self.grid_x_f32_to_screen(particle.x);
-                    let y = self.grid_y_f32_to_screen(particle.y);
-                    let mut color = group.color;
-                    color.a = particle.alpha;
-                    let r = particle.radius;
-                    match group.shape {
-                        ParticleShape::Circle => draw_circle(x, y, r, color),
-                        ParticleShape::Rect => draw_rectangle(x - r, y - r, r, r, color),
-                    }
-                }
-            }
-
             if is_key_down(KeyCode::LeftAlt) {
                 labelled_char_ids.insert(character.id());
+            }
+        }
+
+        if let Some(group) = &self.ability_character_animation {
+            for particle in &group.particles {
+                let x = self.grid_x_f32_to_screen(particle.x);
+                let y = self.grid_y_f32_to_screen(particle.y);
+                let mut color = group.color;
+                color.a = particle.alpha;
+                let r = particle.radius;
+                match group.shape {
+                    ParticleShape::Circle => draw_circle(x, y, r, color),
+                    ParticleShape::Rect => draw_rectangle(x - r, y - r, r, r, color),
+                }
             }
         }
 
@@ -2268,7 +2271,9 @@ impl GameGrid {
 
         let mut front_cursor_text = None;
 
-        if is_mouse_within_grid && receptive_to_input {
+        if
+        /*is_mouse_within_grid && */
+        receptive_to_input {
             let player_action_char_target = match ui_state.players_action_target() {
                 ActionTarget::Character(char_id, _) => Some(char_id),
                 _ => None,
@@ -2332,7 +2337,7 @@ impl GameGrid {
                             .hovered_character
                             .map(|hovered| hovered != target)
                             .unwrap_or(false);
-                        if !hovers_other {
+                        if !hovers_other && is_mouse_within_grid {
                             may_commit_action_with_left_click = true;
                         }
                     }
@@ -2341,7 +2346,8 @@ impl GameGrid {
                     if matches!(
                         ui_state.players_action_target(),
                         ActionTarget::Position { .. }
-                    ) {
+                    ) && is_mouse_within_grid
+                    {
                         may_commit_action_with_left_click = true;
                     } else {
                         let mut is_mouse_pos_out_of_range = false;
@@ -2402,7 +2408,9 @@ impl GameGrid {
                     }
                 }
                 MouseState::ImplicitTarget => {
-                    may_commit_action_with_left_click = true;
+                    if is_mouse_within_grid {
+                        may_commit_action_with_left_click = true;
+                    }
                 }
                 _ => {}
             }
@@ -2436,8 +2444,6 @@ impl GameGrid {
                     }
                     _ => {}
                 }
-
-                //self.locked_inspection_target = None;
             }
 
             if pressed_left_mouse
@@ -2455,6 +2461,7 @@ impl GameGrid {
             }
 
             if let Some((hovered_route_dst, hovered_route_node)) = &hovered_move_route {
+                dbg!("hover move route");
                 if self.dragging_camera_from.is_none() && player_action_char_target.is_none() {
                     //                    dbg!((mouse_grid_pos, hovered_route_dst, hovered_route_node));
                     let path = self.pathfind_grid.build_path_from_chart(
@@ -2484,11 +2491,13 @@ impl GameGrid {
                         outcome.hovered_move_path_cost = Some(cost);
                     }
                 }
-            } else if let Some(hovered_id) = self.hovered_character {
+            } else if let Some(hovered_id) =
+                self.hovered_character.or(self.hovered_character_portrait)
+            {
                 let hovered_char = &self.characters[&hovered_id];
                 if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
-                        if prev_hovered != Some(hovered_id) {
+                        if self.prev_hovered_character != Some(hovered_id) {
                             self.sound_player.play(SoundId::HoverTarget);
                         }
                         self.draw_cornered_outline(
@@ -2509,6 +2518,14 @@ impl GameGrid {
                         );
                     } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
+                    } else {
+                        self.draw_cornered_outline(
+                            self.grid_pos_to_screen(hovered_char.pos()),
+                            HOVER_NEUTRAL_COLOR,
+                            2.0,
+                            1.0,
+                            false,
+                        );
                     }
 
                     if pressed_left_mouse && !outcome.committed_action {
@@ -2516,11 +2533,9 @@ impl GameGrid {
                             if matches!(mouse_state, MouseState::RequiresPositionTarget { .. }) {
                                 ui_state.set_target(ActionTarget::Position(mouse_grid_pos));
                                 outcome.switched_players_action_target = true;
-                                //self.locked_inspection_target = Some(hovered_id);
                             } else if mouse_state == MouseState::RequiresAllyTarget {
                                 ui_state.set_target(ActionTarget::Character(hovered_id, None));
                                 outcome.switched_players_action_target = true;
-                                //self.locked_inspection_target = Some(hovered_id);
                             } else {
                                 // Click self => abort the action
                                 *ui_state = UiState::ChoosingAction;
@@ -2530,7 +2545,6 @@ impl GameGrid {
                         } else if mouse_state == MouseState::RequiresAllyTarget {
                             ui_state.set_target(ActionTarget::Character(hovered_id, None));
                             outcome.switched_players_action_target = true;
-                            //self.locked_inspection_target = Some(hovered_id);
                         } else {
                             outcome.tried_switching_selected_player_char = Some(hovered_id);
                         }
@@ -2562,7 +2576,7 @@ impl GameGrid {
                                 positions,
                             );
                         } else {
-                            if prev_hovered != Some(hovered_id) {
+                            if self.prev_hovered_character != Some(hovered_id) {
                                 self.sound_player.play(SoundId::HoverTarget);
                             }
                             self.draw_cornered_outline(
@@ -2586,6 +2600,14 @@ impl GameGrid {
                         }
                     } else if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         self.draw_invalid_target_marker(mouse_grid_pos);
+                    } else {
+                        self.draw_cornered_outline(
+                            self.grid_pos_to_screen(hovered_char.pos()),
+                            HOVER_NEUTRAL_COLOR,
+                            2.0,
+                            1.0,
+                            false,
+                        );
                     }
 
                     if pressed_left_mouse && !outcome.committed_action {
@@ -2634,7 +2656,6 @@ impl GameGrid {
                             }
 
                             outcome.switched_players_action_target = true;
-                            //self.locked_inspection_target = Some(hovered_id);
                         } else if let MouseState::RequiresEnemyTarget {
                             move_into_melee, ..
                         } = mouse_state
@@ -2654,10 +2675,7 @@ impl GameGrid {
 
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
-
-                            //self.locked_inspection_target = Some(hovered_id);
                         } else if !matches!(mouse_state, MouseState::RequiresAllyTarget) {
-                            //self.locked_inspection_target = Some(hovered_id);
                         }
                     }
                 }
@@ -2673,18 +2691,6 @@ impl GameGrid {
                 self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0, animated);
             }
         }
-
-        /*
-        if let Some(target) = self.locked_inspection_target {
-            self.draw_cornered_outline(
-                self.character_screen_pos(&self.characters[&target]),
-                INSPECTING_TARGET_COLOR,
-                4.0,
-                2.0,
-                false,
-            );
-        }
-         */
 
         match ui_state.players_action_target() {
             ActionTarget::Character(target, movement) => {
@@ -2770,13 +2776,16 @@ impl GameGrid {
         let inspect_target = match ui_state.players_action_target() {
             ActionTarget::Character(char_id, _) => Some(char_id),
             ActionTarget::Position(..) => None,
-            ActionTarget::None => self.hovered_character,
+            ActionTarget::None => self.hovered_character.or(self.hovered_character_portrait),
         };
 
-        //let inspect_target = self.hovered_character; //.or(self.locked_inspection_target);
-        if inspect_target != prev_inspect_target {
+        if inspect_target != self.prev_inspect_target {
             outcome.switched_inspect_target = Some(inspect_target);
+            dbg!("NEW INSPECT TARGET: {:?}", inspect_target);
+            self.prev_inspect_target = inspect_target;
         }
+
+        self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
         outcome
     }
