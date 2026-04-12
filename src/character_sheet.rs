@@ -50,7 +50,6 @@ impl CharacterSheet {
     pub fn new(
         font: &Font,
         character: Rc<Character>,
-        equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
         attack_button: Option<Rc<ActionButton>>,
         reaction_buttons: Vec<Rc<ActionButton>>,
         attack_enhancement_buttons: Vec<Rc<ActionButton>>,
@@ -89,7 +88,6 @@ impl CharacterSheet {
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
             font,
             &character,
-            equipment_icons.clone(),
             false,
             sound_player,
         )));

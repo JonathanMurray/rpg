@@ -267,51 +267,6 @@ pub enum EquipmentIconId {
     PlaceholderArrows,
 }
 
-pub async fn load_all_equipment_icons() -> HashMap<EquipmentIconId, Texture2D> {
-    load_and_init_textures(vec![
-        (EquipmentIconId::Rapier, "eq_rapier.png"),
-        (EquipmentIconId::Warhammer, "eq_warhammer.png"),
-        (EquipmentIconId::Bow, "eq_bow.png"),
-        (EquipmentIconId::Dagger, "eq_dagger.png"),
-        (EquipmentIconId::Sword, "eq_sword.png"),
-        (EquipmentIconId::SmallShield, "eq_small_shield.png"),
-        (EquipmentIconId::MediumShield, "eq_medium_shield.png"),
-        (EquipmentIconId::LeatherArmor, "eq_leather_armor.png"),
-        (EquipmentIconId::ChainMail, "eq_chain_mail.png"),
-        (EquipmentIconId::Shirt, "eq_shirt.png"),
-        (EquipmentIconId::Robe, "eq_robe.png"),
-        (
-            EquipmentIconId::PenetratingArrow,
-            "eq_penetrating_arrow.png",
-        ),
-        (EquipmentIconId::BarbedArrow, "eq_barbed_arrow.png"),
-        (EquipmentIconId::ColdArrow, "eq_cold_arrow.png"),
-        (EquipmentIconId::ExplodingArrow, "eq_exploding_arrow.png"),
-        (EquipmentIconId::HealthPotion, "eq_health_potion.png"),
-        (EquipmentIconId::ManaPotion, "eq_mana_potion.png"),
-        (EquipmentIconId::AdrenalinPotion, "eq_adrenaline_potion.png"),
-        (EquipmentIconId::EnergyPotion, "eq_energy_potion.png"),
-        (EquipmentIconId::ArcanePotion, "eq_arcane_potion.png"),
-        (
-            EquipmentIconId::PlaceholderOffhand,
-            "eq_placeholder_offhand.png",
-        ),
-        (
-            EquipmentIconId::PlaceholderMainhand,
-            "eq_placeholder_mainhand.png",
-        ),
-        (
-            EquipmentIconId::PlaceholderArmor,
-            "eq_placeholder_armor.png",
-        ),
-        (
-            EquipmentIconId::PlaceholderArrows,
-            "eq_placeholder_arrows.png",
-        ),
-    ])
-    .await
-}
-
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum WaterOrientation {
     /*
@@ -913,8 +868,65 @@ pub async fn load_and_init_static() {
     let icon_atlas = load_and_init_texture("icon.png").await;
     ICONS_TEXTURE.get_or_init(|| icon_atlas);
 
+    let eq_icon_atlas = load_and_init_texture("equipment_icons.png").await;
+    EQUIPMENT_ICONS_TEXTURE.get_or_init(|| eq_icon_atlas);
+
     let lightning_bolt_fx = load_and_init_texture("fx_lightning_bolt.png").await;
     LIGHTNING_BOLT_FX.get_or_init(|| lightning_bolt_fx);
+}
+
+pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
+    let x = x.floor();
+    let y = y.floor();
+    let texture = EQUIPMENT_ICONS_TEXTURE.get().unwrap();
+    let (col, row): (i32, i32) = match icon {
+        EquipmentIconId::Undefined => (4, 4),
+        EquipmentIconId::Rapier => (4, 0),
+        EquipmentIconId::Warhammer => (2, 1),
+        EquipmentIconId::Bow => (3, 1),
+        EquipmentIconId::Dagger => (1, 1),
+        EquipmentIconId::Sword => (0, 1),
+        EquipmentIconId::SmallShield => (4, 1),
+        EquipmentIconId::MediumShield => (0, 2),
+        EquipmentIconId::LeatherArmor => (2, 2),
+        EquipmentIconId::ChainMail => (1, 2),
+        EquipmentIconId::Shirt => (3, 2),
+        EquipmentIconId::Robe => (3, 3),
+        EquipmentIconId::PenetratingArrow => (0, 0),
+        EquipmentIconId::BarbedArrow => (1, 0),
+        EquipmentIconId::ColdArrow => (3, 0),
+        EquipmentIconId::ExplodingArrow => (2, 0),
+        EquipmentIconId::HealthPotion => (4, 3),
+        EquipmentIconId::ManaPotion => (0, 4),
+        EquipmentIconId::AdrenalinPotion => (1, 4),
+        EquipmentIconId::EnergyPotion => (2, 4),
+        EquipmentIconId::ArcanePotion => (3, 4),
+        EquipmentIconId::PlaceholderOffhand => (4, 2),
+        EquipmentIconId::PlaceholderMainhand => (1, 3),
+        EquipmentIconId::PlaceholderArmor => (2, 3),
+        EquipmentIconId::PlaceholderArrows => (0, 3),
+    };
+    let icon_w = 20.0;
+    let icon_h = 20.0;
+    let dest_size = dest_size
+        .map(|s| s.into())
+        .unwrap_or((icon_w, icon_h).into());
+    draw_texture_ex(
+        texture,
+        x,
+        y,
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(dest_size),
+            source: Some(Rect::new(
+                col as f32 * icon_w,
+                row as f32 * icon_h,
+                icon_w,
+                icon_h,
+            )),
+            ..Default::default()
+        },
+    );
 }
 
 pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -1118,6 +1130,7 @@ pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

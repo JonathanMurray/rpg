@@ -278,7 +278,6 @@ impl NonCombatCharacterUi {
         let equipment_section = Rc::new(RefCell::new(EquipmentSection::new(
             font,
             &character,
-            equipment_icons.clone(),
             true,
             sound_player,
         )));

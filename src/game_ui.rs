@@ -539,7 +539,6 @@ impl UserInterface {
         let event_queue = Rc::new(RefCell::new(vec![]));
 
         let character_uis = build_character_uis(
-            &ui_resources.equipment_icons,
             &event_queue,
             &resources.simple_font,
             characters.iter(),
@@ -2613,7 +2612,6 @@ impl UserInterface {
 }
 
 fn build_character_uis<'a>(
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
@@ -2631,7 +2629,6 @@ fn build_character_uis<'a>(
         }
 
         let character_ui = build_character_ui(
-            equipment_icons,
             event_queue,
             simple_font,
             character,
@@ -2646,7 +2643,6 @@ fn build_character_uis<'a>(
 }
 
 fn build_character_ui(
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
     character: &Rc<Character>,
@@ -2797,7 +2793,6 @@ fn build_character_ui(
     let character_sheet = CharacterSheet::new(
         simple_font,
         Rc::clone(character),
-        equipment_icons,
         attack_button_for_character_sheet,
         reaction_buttons_for_character_sheet,
         attack_enhancement_buttons_for_character_sheet,

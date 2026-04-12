@@ -224,10 +224,9 @@ pub async fn run_transition_loop(
             if !growth.new_equipment.is_empty() {
                 let mut slots: Vec<Element> = vec![];
                 for eq_entry in &growth.new_equipment {
-                    let texture = ui_resources.equipment_icons[&eq_entry.icon()].clone();
                     let slot = EquipmentSlot::new(
                         simple_font.clone(),
-                        Some((texture, *eq_entry)),
+                        Some(*eq_entry),
                         EquipmentSlotRole::Inventory(0),
                         None,
                     );

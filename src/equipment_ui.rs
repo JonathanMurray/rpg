@@ -33,7 +33,7 @@ use crate::{
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     sounds::{SoundId, SoundPlayer},
-    textures::EquipmentIconId,
+    textures::{draw_eq_icon, EquipmentIconId},
     tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
 };
 
@@ -197,7 +197,6 @@ pub struct EquipmentSection {
     equipment_stats_table: Rc<RefCell<EquipmentStatsTable>>,
     font: Font,
     character: Rc<Character>,
-    equipment_icons: HashMap<EquipmentIconId, Texture2D>,
     include_stash: bool,
     sound_player: SoundPlayer,
 }
@@ -206,28 +205,19 @@ impl EquipmentSection {
     pub fn new(
         font: &Font,
         character: &Rc<Character>,
-        equipment_icons: HashMap<EquipmentIconId, Texture2D>,
         include_stash: bool,
         sound_player: SoundPlayer,
     ) -> Self {
-        let (inventory_section, mut equipment_slots) = build_inventory_section(
-            font,
-            &equipment_icons,
-            &character.inventory,
-            InventoryType::Personal,
-        );
+        let (inventory_section, mut equipment_slots) =
+            build_inventory_section(font, &character.inventory, InventoryType::Personal);
 
         let (equipped_section, equipped_slots, equipment_stats_table) =
-            build_equipped_section(font, character, &equipment_icons);
+            build_equipped_section(font, character);
         equipment_slots.extend_from_slice(&equipped_slots);
 
         let stash_column = if include_stash {
-            let (stash_section, stash_slots) = build_inventory_section(
-                font,
-                &equipment_icons,
-                character.party_stash(),
-                InventoryType::PartyStash,
-            );
+            let (stash_section, stash_slots) =
+                build_inventory_section(font, character.party_stash(), InventoryType::PartyStash);
             equipment_slots.extend_from_slice(&stash_slots);
 
             Some(Element::Container(Container {
@@ -314,7 +304,6 @@ impl EquipmentSection {
             equipment_stats_table,
             font: font.clone(),
             character: Rc::clone(character),
-            equipment_icons,
             include_stash,
             sound_player,
         }
@@ -326,10 +315,9 @@ impl EquipmentSection {
             .rebuild(&self.character, &self.font);
 
         for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
-            self.equipment_slots[i].borrow_mut().content = maybe_entry.get().map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
+            self.equipment_slots[i].borrow_mut().content = maybe_entry
+                .get()
+                .map(|entry| EquipmentSlotContent::new(entry));
         }
 
         let roles = [
@@ -341,20 +329,19 @@ impl EquipmentSection {
         for (i, role) in roles.iter().enumerate() {
             self.equipment_slots[INVENTORY_SIZE + i]
                 .borrow_mut()
-                .content = self.character.equipment(*role).map(|entry| {
-                let texture = self.equipment_icons[&entry.icon()].clone();
-                EquipmentSlotContent::new(texture, entry)
-            });
+                .content = self
+                .character
+                .equipment(*role)
+                .map(|entry| EquipmentSlotContent::new(entry));
         }
 
         if self.include_stash {
             for (i, maybe_entry) in self.character.party_stash().iter().enumerate() {
                 self.equipment_slots[INVENTORY_SIZE + EQUIPPED_SIZE + i]
                     .borrow_mut()
-                    .content = maybe_entry.get().map(|entry| {
-                    let texture = self.equipment_icons[&entry.icon()].clone();
-                    EquipmentSlotContent::new(texture, entry)
-                });
+                    .content = maybe_entry
+                    .get()
+                    .map(|entry| EquipmentSlotContent::new(entry));
             }
         }
     }
@@ -542,12 +529,9 @@ impl EquipmentSection {
                     if is_mouse_button_down(MouseButton::Left) {
                         let slot = self.equipment_slots[from_idx].borrow();
                         // TODO: this can crash if trying to drag equipment on a character who's not active (which should not be allowed in the first place)
-                        let texture = &slot.content.as_ref().unwrap().texture;
-                        let params = DrawTextureParams {
-                            dest_size: Some((40.0, 40.0).into()),
-                            ..Default::default()
-                        };
-                        draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
+                        let texture = &slot.content.as_ref().unwrap().icon;
+                        draw_eq_icon(*texture, mouse_pos.0, mouse_pos.1, Some((40.0, 40.0)));
+                        //draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
                     } else {
                         println!("NOT DRAGGING ANYMORE");
                         drag = None;
@@ -595,7 +579,6 @@ enum InventoryType {
 
 fn build_inventory_section(
     font: &Font,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
     inventory: &[Cell<Option<EquipmentEntry>>; 6],
     inventory_type: InventoryType,
 ) -> (Element, Vec<Rc<RefCell<EquipmentSlot>>>) {
@@ -603,16 +586,11 @@ fn build_inventory_section(
         .iter()
         .enumerate()
         .map(|(i, maybe_entry)| {
-            let content = maybe_entry
-                .get()
-                .map(|entry| Some((equipment_icons[&entry.icon()].clone(), entry)))
-                .unwrap_or(None);
-
             let role = match inventory_type {
                 InventoryType::Personal => EquipmentSlotRole::Inventory(i),
                 InventoryType::PartyStash => EquipmentSlotRole::PartyStash(i),
             };
-            EquipmentSlot::new(font.clone(), content, role, None)
+            EquipmentSlot::new(font.clone(), maybe_entry.get(), role, None)
         })
         .map(|slot| Rc::new(RefCell::new(slot)))
         .collect();
@@ -649,7 +627,6 @@ fn build_inventory_section(
 pub fn build_equipped_section(
     font: &Font,
     character: &Character,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
 ) -> (
     Element,
     Vec<Rc<RefCell<EquipmentSlot>>>,
@@ -662,7 +639,8 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::MainHand,
             Some((
-                equipment_icons[&EquipmentIconId::PlaceholderMainhand].clone(),
+                //equipment_icons[&EquipmentIconId::PlaceholderMainhand].clone(),
+                EquipmentIconId::PlaceholderMainhand,
                 vec!["(Main-hand)".to_string(), placeholder_text.to_string()],
             )),
         ),
@@ -671,7 +649,8 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::Armor,
             Some((
-                equipment_icons[&EquipmentIconId::PlaceholderArmor].clone(),
+                //equipment_icons[&EquipmentIconId::PlaceholderArmor].clone(),
+                EquipmentIconId::PlaceholderArmor,
                 vec!["(Armor)".to_string(), placeholder_text.to_string()],
             )),
         ),
@@ -680,7 +659,8 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::OffHand,
             Some((
-                equipment_icons[&EquipmentIconId::PlaceholderOffhand].clone(),
+                //equipment_icons[&EquipmentIconId::PlaceholderOffhand].clone(),
+                EquipmentIconId::PlaceholderOffhand,
                 vec!["(Off-hand)".to_string(), placeholder_text.to_string()],
             )),
         ),
@@ -689,7 +669,8 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::Arrows,
             Some((
-                equipment_icons[&EquipmentIconId::PlaceholderArrows].clone(),
+                //equipment_icons[&EquipmentIconId::PlaceholderArrows].clone(),
+                EquipmentIconId::PlaceholderArrows,
                 vec!["(Arrows)".to_string(), placeholder_text.to_string()],
             )),
         ),
@@ -700,33 +681,25 @@ pub fn build_equipped_section(
 
     for hand in [HandType::MainHand, HandType::OffHand] {
         if let Some(weapon) = character.weapon(hand) {
-            let texture = equipment_icons[&weapon.icon].clone();
-            slots[0].borrow_mut().content = Some(EquipmentSlotContent::new(
-                texture,
-                EquipmentEntry::Weapon(weapon),
-            ));
+            //let texture = equipment_icons[&weapon.icon].clone();
+            slots[0].borrow_mut().content =
+                Some(EquipmentSlotContent::new(EquipmentEntry::Weapon(weapon)));
         }
     }
     if let Some(shield) = character.shield() {
-        let texture = equipment_icons[&shield.icon].clone();
-        slots[2].borrow_mut().content = Some(EquipmentSlotContent::new(
-            texture,
-            EquipmentEntry::Shield(shield),
-        ));
+        //let texture = equipment_icons[&shield.icon].clone();
+        slots[2].borrow_mut().content =
+            Some(EquipmentSlotContent::new(EquipmentEntry::Shield(shield)));
     }
     if let Some(armor) = character.armor_piece.get() {
-        let texture = equipment_icons[&armor.icon].clone();
-        slots[1].borrow_mut().content = Some(EquipmentSlotContent::new(
-            texture,
-            EquipmentEntry::Armor(armor),
-        ));
+        //let texture = equipment_icons[&armor.icon].clone();
+        slots[1].borrow_mut().content =
+            Some(EquipmentSlotContent::new(EquipmentEntry::Armor(armor)));
     }
     if let Some(stack) = character.arrows.get() {
-        let texture = equipment_icons[&stack.arrow.icon].clone();
-        slots[3].borrow_mut().content = Some(EquipmentSlotContent::new(
-            texture,
-            EquipmentEntry::Arrows(stack),
-        ));
+        //let texture = equipment_icons[&stack.arrow.icon].clone();
+        slots[3].borrow_mut().content =
+            Some(EquipmentSlotContent::new(EquipmentEntry::Arrows(stack)));
     }
 
     let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
@@ -879,20 +852,20 @@ pub struct EquipmentSlot {
     pub content: Option<EquipmentSlotContent>,
     last_drawn_rect: Cell<Rect>,
     role: EquipmentSlotRole,
-    placeholder: Option<(Texture2D, Vec<String>)>,
+    placeholder: Option<(EquipmentIconId, Vec<String>)>,
 }
 
 #[derive(Debug)]
 pub struct EquipmentSlotContent {
     pub equipment: EquipmentEntry,
-    pub texture: Texture2D,
+    pub icon: EquipmentIconId,
     tooltip: Tooltip,
 }
 
 impl EquipmentSlotContent {
-    pub fn new(texture: Texture2D, equipment: EquipmentEntry) -> Self {
+    pub fn new(equipment: EquipmentEntry) -> Self {
         Self {
-            texture,
+            icon: equipment.icon(),
             tooltip: equipment_tooltip(&equipment),
             equipment,
         }
@@ -908,9 +881,9 @@ pub enum SlotMouseEvent {
 impl EquipmentSlot {
     pub fn new(
         font: Font,
-        content: Option<(Texture2D, EquipmentEntry)>,
+        content: Option<EquipmentEntry>,
         role: EquipmentSlotRole,
-        placeholder: Option<(Texture2D, Vec<String>)>,
+        placeholder: Option<(EquipmentIconId, Vec<String>)>,
     ) -> Self {
         Self {
             font,
@@ -921,8 +894,7 @@ impl EquipmentSlot {
                 ..Default::default()
             },
             size: (40.0, 40.0),
-            content: content
-                .map(|(texture, equipment)| EquipmentSlotContent::new(texture, equipment)),
+            content: content.map(|equipment| EquipmentSlotContent::new(equipment)),
             last_drawn_rect: Default::default(),
             role,
             placeholder,
@@ -943,12 +915,9 @@ impl Drawable for EquipmentSlot {
         let x = x.floor();
         let y = y.floor();
         self.style.draw(x, y, self.size);
-        let params = DrawTextureParams {
-            dest_size: Some(self.size.into()),
-            ..Default::default()
-        };
         if let Some(content) = &self.content {
-            draw_texture_ex(&content.texture, x, y, WHITE, params);
+            draw_eq_icon(content.icon, x, y, Some(self.size.into()));
+            //draw_texture_ex(&content.icon, x, y, WHITE, params);
 
             let quantity = match content.equipment {
                 EquipmentEntry::Arrows(arrow_stack) => Some(arrow_stack.quantity),
@@ -982,7 +951,7 @@ impl Drawable for EquipmentSlot {
                     },
                 );
             }
-        } else if let Some((texture, _tooltip)) = &self.placeholder {
+        } else if let Some((icon, _tooltip)) = &self.placeholder {
             draw_rectangle(
                 x,
                 y,
@@ -990,7 +959,8 @@ impl Drawable for EquipmentSlot {
                 self.size.1,
                 Color::new(0.0, 0.0, 0.0, 0.4),
             );
-            draw_texture_ex(texture, x, y, WHITE, params);
+            draw_eq_icon(*icon, x, y, Some(self.size.into()));
+            //draw_texture_ex(icon, x, y, WHITE, params);
         }
 
         self.last_drawn_rect

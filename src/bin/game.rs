@@ -65,16 +65,18 @@ async fn main() {
     let sound_player = SoundPlayer::new().await;
 
     // TODO
-    let (party, chars) = make_high_level_party();
-    let player_characters: Vec<Rc<Character>> = chars.into_iter().map(|ch| Rc::new(ch)).collect();
-    run_fight_loop(
-        resources.clone(),
-        &player_characters,
-        FightId::EliteHuldra,
-        ui_resources.clone(),
-        sound_player.clone(),
-    )
-    .await;
+    /*
+       let (party, chars) = make_high_level_party();
+       let player_characters: Vec<Rc<Character>> = chars.into_iter().map(|ch| Rc::new(ch)).collect();
+       run_fight_loop(
+           resources.clone(),
+           &player_characters,
+           FightId::EliteHuldra,
+           ui_resources.clone(),
+           sound_player.clone(),
+       )
+       .await;
+    */
     // TODO
 
     run_demo(&resources, &ui_resources, sound_player).await;
