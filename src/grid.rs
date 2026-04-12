@@ -100,7 +100,7 @@ const RANGE_INDICATOR_BAD_COLOR: Color = RED;
 
 const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
-const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = MAGENTA;
+const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = RED;
 
 const CURSOR_ERROR_COLOR: Color = Color::new(1.0, 0.8, 0.8, 1.0);
 const CURSOR_INFO_COLOR: Color = WHITE;
@@ -151,6 +151,9 @@ enum AnimationDetails {
     ReactingToAttacked {
         toward: Position,
         with_shield: bool,
+    },
+    TargetPreview {
+        target_pos: Position,
     },
     CastingSpell {},
     MeleeAttack {
@@ -265,7 +268,7 @@ pub struct GameGrid {
     pub characters: HashMap<CharacterId, Rc<Character>>,
 
     ability_character_animation: Option<ParticleGroup>,
-    target_damage_previews: HashMap<CharacterId, TargetEffectPreview>,
+    target_effect_preview: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
     anticipating_character: Option<CharacterId>,
     pub grid_dimensions: (u32, u32),
@@ -334,7 +337,7 @@ impl GameGrid {
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
             ability_character_animation: Default::default(),
-            target_damage_previews: Default::default(),
+            target_effect_preview: Default::default(),
             character_animations: Default::default(),
             anticipating_character: None,
             big_font,
@@ -592,12 +595,12 @@ impl GameGrid {
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
-        self.target_damage_previews
+        self.target_effect_preview
             .insert(preview.character_id, preview);
     }
 
-    pub fn clear_target_damage_previews(&mut self) {
-        self.target_damage_previews.clear();
+    pub fn clear_target_effect_previews(&mut self) {
+        self.target_effect_preview.clear();
     }
 
     pub fn set_character_anticipation(&mut self, anticipating_character: Option<u32>) {
@@ -823,12 +826,25 @@ impl GameGrid {
         ranged: bool,
         target_reaction: Option<(CharacterId, bool)>,
     ) -> f32 {
-        let attacker_pos = self.characters.get(&attacker).unwrap().pos();
-        let target_pos = self.characters.get(&target).unwrap().pos();
+        let attacker = &self.characters[&attacker];
+        let target = &self.characters[&target];
+        let target_pos = target.pos();
+        // Don't show preview for player attack; they issued it and it should feel snappy.
+        if !attacker.player_controlled() {
+            let duration = 0.3;
+            self.character_animations.push(CharacterAnimation::new(
+                attacker.id(),
+                duration,
+                AnimationDetails::TargetPreview { target_pos },
+            ));
+        }
+
+        let attacker_pos = attacker.pos();
+
         if ranged {
             let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
             self.character_animations.push(CharacterAnimation::new(
-                attacker,
+                attacker.id(),
                 1.0,
                 AnimationDetails::RangedAttack { toward: target_pos },
             ));
@@ -879,10 +895,10 @@ impl GameGrid {
             );
             projectile_duration
         } else {
-            let attacker_pos = self.characters.get(&attacker).unwrap().pos();
+            let attacker_pos = attacker.pos();
             let duration = 0.4;
             self.character_animations.push(CharacterAnimation::new(
-                attacker,
+                attacker.id(),
                 duration,
                 AnimationDetails::MeleeAttack {
                     toward: target_pos,
@@ -1287,10 +1303,6 @@ impl GameGrid {
         )
     }
 
-    pub fn set_enemys_target(&mut self, target_character_id: CharacterId) {
-        self.enemys_target = Some(target_character_id);
-    }
-
     fn draw_background(&mut self) {
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
@@ -1464,6 +1476,15 @@ impl GameGrid {
                 AnimationDetails::Death => {
                     params.rotation = PI * 0.5;
                     dying = true;
+                }
+                AnimationDetails::TargetPreview { target_pos } => {
+                    self.draw_target_crosshair(
+                        character.pos(),
+                        *target_pos,
+                        ENEMYS_TARGET_CROSSHAIR_COLOR,
+                        7.0,
+                        false,
+                    );
                 }
                 AnimationDetails::RangedAttack { toward } => {
                     // t goes from 0 to 1
@@ -1693,7 +1714,7 @@ impl GameGrid {
         }
         if show_sprite {
             let sprite = &self.sprites[&character.sprite];
-            let texture = if self.target_damage_previews.contains_key(&character.id()) {
+            let texture = if self.target_effect_preview.contains_key(&character.id()) {
                 &sprite.red_highlight
             } else if self.hovered_character.or(self.hovered_character_portrait)
                 == Some(character.id())
@@ -2035,7 +2056,7 @@ impl GameGrid {
                 );
             }
 
-            if self.target_damage_previews.contains_key(&character.id()) {
+            if self.target_effect_preview.contains_key(&character.id()) {
                 self.draw_circular_character_highlight(
                     character.id(),
                     CHARACTER_DAMAGE_PREVIEW_COLOR,
@@ -3391,7 +3412,7 @@ impl GameGrid {
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, current_health_w, health_h, COL_RED);
 
-        if let Some(preview) = self.target_damage_previews.get(&character.id()) {
+        if let Some(preview) = self.target_effect_preview.get(&character.id()) {
             let damage = preview.prediction.damage;
             let effective_min = damage.min.min(character.health.current());
             let effective_max = damage.max.min(character.health.current());

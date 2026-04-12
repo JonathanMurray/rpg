@@ -1083,7 +1083,7 @@ impl UserInterface {
                 );
                  */
 
-                self.game_grid.clear_target_damage_previews();
+                self.game_grid.clear_target_effect_previews();
                 self.game_grid
                     .set_target_effect_preview(TargetEffectPreview {
                         character_id: *target_id,
@@ -1094,7 +1094,7 @@ impl UserInterface {
             }
 
             None => {
-                self.game_grid.clear_target_damage_previews();
+                self.game_grid.clear_target_effect_previews();
                 //self.target_ui
                 //.set_action("Select an enemy".to_string(), vec![], false);
             }
@@ -1170,7 +1170,7 @@ impl UserInterface {
         }
          */
 
-        self.game_grid.clear_target_damage_previews();
+        self.game_grid.clear_target_effect_previews();
 
         let usability_problem = configured_action.usability_problem(
             self.active_character(),
@@ -1300,7 +1300,7 @@ impl UserInterface {
 
         self.activity_popup.additional_line = None;
 
-        self.game_grid.clear_target_damage_previews();
+        self.game_grid.clear_target_effect_previews();
 
         let mut relevant_action_button = None;
 
@@ -2150,7 +2150,14 @@ impl UserInterface {
             self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, None, outcomes);
         }
 
-        self.animation_stopwatch.set_to_at_least(0.3);
+        let duration = if self.characters.get(attacker).player_controlled() {
+            // player behaviour should be snappy
+            0.3
+        } else {
+            // enemy behaviour should be readable
+            0.6
+        };
+        self.animation_stopwatch.set_to_at_least(duration);
     }
 
     fn add_effect_for_ability_target_outcome(
