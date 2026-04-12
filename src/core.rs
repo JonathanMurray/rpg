@@ -4899,7 +4899,9 @@ impl Character {
         let max_mana = base_attributes.max_mana();
 
         let move_speed = if let CharacterKind::Bot(bot) = &kind {
-            bot.base_movement
+            //bot.base_movement
+            // TODO
+            0.0
         } else {
             base_attributes.move_speed()
         };

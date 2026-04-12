@@ -982,6 +982,7 @@ impl GameGrid {
             self.movement_range.max()
         } else {
             character.remaining_movement.get()
+                + (character.action_points.current() * MOVE_DISTANCE_PER_RESOURCE) as f32
         };
         let routes = self
             .pathfind_grid
@@ -1170,6 +1171,7 @@ impl GameGrid {
 
     pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
         let active_char = &self.characters[&active_char_id];
+        println!("update_move_speed({})", active_char.name);
 
         let speed = active_char.move_speed();
         let resource = if active_char.enabled_quick_actions.get() {
@@ -3218,8 +3220,10 @@ impl GameGrid {
         discrete_healthbar: bool,
         active_char_reserved_and_hovered_ap: (i32, i32),
     ) {
-        let draw_action_points =
-            character.player_controlled() && !character.has_taken_a_turn_this_round.get();
+        let draw_action_points = (character.player_controlled()
+            && !character.has_taken_a_turn_this_round.get())
+            || self.active_character_id == character.id()
+            || self.hovered_character.or(self.hovered_character_portrait) == Some(character.id());
 
         let (x, y) = self.character_screen_pos(character);
         let sprite_h = character_sprite_height(character.sprite);
@@ -3738,24 +3742,13 @@ impl GameGrid {
     fn draw_movement_path_background(&self, character_id: CharacterId) {
         let character = &self.characters[&character_id];
 
-        /*
-        if character.player_controlled() {
-            // This part only makes sense for player characters, that can choose to move further by paying stamina
-            for (pos, chart_node) in self.routes(character_id).iter() {
-                let margin = 0.0; //self.cell_w / 20.0;
-                if chart_node.distance_from_start <= character.remaining_movement.get() {
-                    self.fill_cell(*pos, MOVEMENT_PREVIEW_GRID_COLOR, margin);
-                } else if chart_node.distance_from_start <= self.movement_range.max() {
-                    self.fill_cell(*pos, Color::new(0.9, 0.7, 0.3, 0.15), margin);
-                }
-            }
-        }
-         */
-
         let extended_range = if character.player_controlled() {
             Some(self.movement_range.max())
         } else {
-            None
+            Some(
+                character.remaining_movement.get()
+                    + (character.action_points.current() * MOVE_DISTANCE_PER_RESOURCE) as f32,
+            )
         };
 
         self.draw_filled_occupied_cells();
