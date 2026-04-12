@@ -217,6 +217,21 @@ pub const SWORD: Weapon = Weapon {
     weight: 2,
 };
 
+pub const MAGIC_SWORD: Weapon = Weapon {
+    name: "Magic sword",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 6,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: None,
+    on_attacked_reaction: Some(PARRY_2),
+    on_damage: Some(AttackHitEffect::ApplySelf(ApplyEffect::GainMana(1))),
+    sprite: Some(SpriteId::MagicSword),
+    icon: EquipmentIconId::MagicSword,
+    weight: 2,
+};
+
 pub const ZERO_SWORD: Weapon = Weapon {
     name: "Useless sword",
     range: WeaponRange::Melee,
@@ -287,7 +302,7 @@ pub const SLASHING_RAPIER: Weapon = Weapon {
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(FEINT),
     on_attacked_reaction: Some(PARRY_2),
-    on_damage: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
+    on_damage: Some(AttackHitEffect::ApplyTarget(ApplyEffect::Condition(
         ApplyCondition {
             condition: Condition::Bleeding,
             stacks: Some(2),
@@ -368,7 +383,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
     attack_attribute: AttackAttribute::Strength,
     attack_enhancement: Some(ALL_IN),
     on_attacked_reaction: Some(PARRY_2),
-    on_damage: Some(AttackHitEffect::Apply(ApplyEffect::Condition(
+    on_damage: Some(AttackHitEffect::ApplyTarget(ApplyEffect::Condition(
         ApplyCondition {
             condition: Condition::Dazed,
             stacks: None,
@@ -1816,6 +1831,35 @@ pub const KILL: Ability = Ability {
             })),
         }),
         self_effect: None,
+        environment_effect: None,
+    },
+    animation_color: BLACK,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
+};
+
+pub const MANATEST: Ability = Ability {
+    id: AbilityId::ManaTest,
+    name: "Gain mana",
+    description: "Gain mana",
+    icon: IconId::Fireball,
+    action_point_cost: 1,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: Some(AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([Some(ApplyEffect::GainMana(1)), None]),
+        }),
         environment_effect: None,
     },
     animation_color: BLACK,

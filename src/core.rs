@@ -1011,6 +1011,11 @@ impl CoreGame {
                 actual_effect = Some(ApplyEffect::GainStamina(gained));
                 format!("  |{}| gained {} stamina", receiver.name_tag(), gained)
             }
+            ApplyEffect::GainMana(n) => {
+                let gained = receiver.mana.gain(n);
+                actual_effect = Some(ApplyEffect::GainMana(gained));
+                format!("  |{}| gained {} mana", receiver.name_tag(), gained)
+            }
             ApplyEffect::GainHealth(n) => {
                 let gained = receiver.health.gain(n);
                 actual_effect = Some(ApplyEffect::GainHealth(gained));
@@ -1752,6 +1757,7 @@ impl CoreGame {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::GainMana(ref mut n) => *n += degree_of_success,
                     ApplyEffect::Condition(ref apply_condition) => {
                         /*
                         if let Some(stacks) = condition.stacks() {
@@ -2103,6 +2109,9 @@ impl CoreGame {
                         apply_hit_type(n, hit_type, &mut reduced_to_nothing);
                     }
                     ApplyEffect::GainStamina(ref mut n) => {
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
+                    }
+                    ApplyEffect::GainMana(ref mut n) => {
                         apply_hit_type(n, hit_type, &mut reduced_to_nothing)
                     }
                     ApplyEffect::GainHealth(ref mut n) => {
@@ -2508,13 +2517,14 @@ impl CoreGame {
                 actual_health_lost = game.perform_losing_health(defender, damage);
             }
 
-            let mut applied_effects = vec![];
+            let mut applied_to_target = vec![];
+            let mut applied_to_self = vec![];
 
             if let Some(game) = game {
                 if damage > 0 {
                     if let Some(effect) = weapon.on_damage {
                         match effect {
-                            AttackHitEffect::Apply(effect) => {
+                            AttackHitEffect::ApplyTarget(effect) => {
                                 let (applied, log_line, _damage) = game.perform_effect_application(
                                     effect,
                                     Some(attacker),
@@ -2522,7 +2532,20 @@ impl CoreGame {
                                     defender,
                                 );
                                 if let Some(applied) = applied {
-                                    applied_effects.push(applied);
+                                    applied_to_target.push(applied);
+                                }
+                                detail_lines
+                                    .push(format!("{} |<faded>({})|", log_line, weapon.name))
+                            }
+                            AttackHitEffect::ApplySelf(effect) => {
+                                let (applied, log_line, _damage) = game.perform_effect_application(
+                                    effect,
+                                    Some(attacker),
+                                    None,
+                                    attacker,
+                                );
+                                if let Some(applied) = applied {
+                                    applied_to_self.push(applied);
                                 }
                                 detail_lines
                                     .push(format!("{} |<faded>({})|", log_line, weapon.name))
@@ -2573,7 +2596,7 @@ impl CoreGame {
                                                 defender,
                                             );
                                         if let Some(apply_effect) = applied {
-                                            applied_effects.push(apply_effect);
+                                            applied_to_target.push(apply_effect);
                                         }
                                         log_line
                                     }
@@ -2620,7 +2643,8 @@ impl CoreGame {
                 damage,
                 actual_health_lost,
                 hit_type,
-                applied_effects,
+                applied_to_target,
+                applied_to_self,
             }
         };
 
@@ -3383,13 +3407,8 @@ pub struct AttackOutcome {
     pub damage: u32,
     pub actual_health_lost: u32,
     pub hit_type: HitType,
-    pub applied_effects: Vec<ApplyEffect>,
-    /*
-    Dodge,
-    Block,
-    Parry,
-    Miss,
-     */
+    pub applied_to_target: Vec<ApplyEffect>,
+    pub applied_to_self: Vec<ApplyEffect>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -3672,8 +3691,10 @@ impl Characters {
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
     Condition(ApplyCondition),
+
     GainHealth(u32),
     GainStamina(u32),
+    GainMana(u32),
     PerBleeding {
         damage: u32,
         caster_healing_percentage: u32,
@@ -3698,6 +3719,7 @@ impl ApplyEffect {
             }
             ApplyEffect::GainHealth(n) => *n *= factor,
             ApplyEffect::GainStamina(n) => *n *= factor,
+            ApplyEffect::GainMana(n) => *n *= factor,
             ApplyEffect::PerBleeding {
                 damage,
                 caster_healing_percentage,
@@ -3712,7 +3734,8 @@ impl Display for ApplyEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
-            ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("+{n} stamina")),
+            ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
+            ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
             ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
@@ -3792,14 +3815,18 @@ pub enum OnHitReactionEffect {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum AttackHitEffect {
-    Apply(ApplyEffect),
+    ApplyTarget(ApplyEffect),
+    ApplySelf(ApplyEffect),
 }
 
 impl Display for AttackHitEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            AttackHitEffect::Apply(apply_effect) => {
-                f.write_fmt(format_args!("Target: {}", apply_effect))
+            AttackHitEffect::ApplyTarget(apply_effect) => {
+                f.write_fmt(format_args!("(target) {}", apply_effect))
+            }
+            AttackHitEffect::ApplySelf(apply_effect) => {
+                f.write_fmt(format_args!("(self) {}", apply_effect))
             }
         }
     }
@@ -4376,6 +4403,7 @@ pub enum AbilityId {
     LightningBolt,
     SearingLight,
     Kill,
+    ManaTest,
     PoisonTest,
 
     EnemySlashingAttack,

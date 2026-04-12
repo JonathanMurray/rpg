@@ -4296,14 +4296,16 @@ impl EffectGraphics {
                 }
 
                 if *background {
+                    let margin = 3.0;
+                    //dbg!(text);
                     let text_dim =
                         measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
                     draw_rectangle(
-                        x0,
-                        y0 - text_dim.offset_y,
-                        text_dim.width,
-                        text_dim.height,
-                        Color::new(0.0, 0.0, 0.0, alpha.min(0.6)),
+                        x0 - margin,
+                        y0 - text_dim.offset_y - margin,
+                        text_dim.width + margin * 2.0,
+                        text_dim.height + margin * 2.0,
+                        Color::new(0.0, 0.0, 0.0, alpha.min(0.7)),
                     );
                 }
 

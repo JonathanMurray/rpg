@@ -14,7 +14,7 @@ use crate::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
         HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT,
-        LIGHTNING_BOLT_REACH, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
+        LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -438,6 +438,10 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(INSPIRE);
 
+    // TODO
+    alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
+    alice.learn_ability(MANATEST);
+
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
         "Bob",
@@ -453,8 +457,10 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
 
     // TODO
+
     bob.learn_ability(KILL);
     bob.learn_passive(PassiveSkill::HardenedSkin);
+    bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
     //bob.learn_ability(SWEEP_ATTACK);
 

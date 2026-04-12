@@ -478,13 +478,15 @@ pub fn measure_text_with_font_tags(
     let parts = line.split("|");
     let mut w = 0.0;
     let mut h: f32 = 0.0;
-    let mut offset_y = None;
+    let mut offset_y: Option<f32> = None;
     for mut part in parts {
         if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
             h = h.max(SYMBOL_H);
-            if offset_y.is_none() {
-                offset_y = Some(16.0);
+            if let Some(prev_offset_y) = offset_y {
+                offset_y = Some(prev_offset_y.max(13.0));
+            } else {
+                offset_y = Some(13.0);
             }
         } else {
             let font_size = font_size;
@@ -505,7 +507,12 @@ pub fn measure_text_with_font_tags(
 
             if !part.is_empty() {
                 let dim = measure_text(part, font, font_size, font_scale);
-                offset_y = Some(dim.offset_y);
+
+                if let Some(prev_offset_y) = offset_y {
+                    offset_y = Some(dim.offset_y.max(prev_offset_y))
+                } else {
+                    offset_y = Some(dim.offset_y);
+                }
 
                 w += dim.width;
                 if dim.height > h {
@@ -516,11 +523,13 @@ pub fn measure_text_with_font_tags(
         }
     }
 
-    TextDimensions {
+    let dim = TextDimensions {
         width: w,
         height: h,
         offset_y: offset_y.unwrap_or(0.0),
-    }
+    };
+
+    dim
 }
 
 pub fn draw_text_with_font_tags(

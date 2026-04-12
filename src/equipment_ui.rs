@@ -88,6 +88,7 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     }
     //lines.push("<Right-click to use>".to_string());
     if consumable.weight > 0 {
+        t.technical_description.push("".to_string());
         t.technical_description.push(weight_str(consumable.weight));
     }
 
@@ -110,8 +111,8 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             .push(format!("Range: {}", weapon.range));
     }
     if let Some(effect) = weapon.on_damage {
-        t.technical_description.push(format!("[true hit] {effect}"));
-        if let AttackHitEffect::Apply(apply_effect) = effect {
+        t.technical_description.push(format!("On damage: {effect}"));
+        if let AttackHitEffect::ApplyTarget(apply_effect) = effect {
             match apply_effect {
                 ApplyEffect::Condition(apply_condition) => {
                     t.keywords.push(Keyword::Cond(apply_condition.condition))
@@ -125,12 +126,13 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description
-            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
+            .push(format!("Skill: |<keyword>{}|", reaction.name));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
         t.technical_description
-            .push(format!("Unlocks: |<keyword>{}|", enhancement.name));
+            .push(format!("Skill: |<keyword>{}|", enhancement.name));
     }
+    t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(weapon.weight));
 
     t
@@ -149,12 +151,13 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
 
     if let Some(reaction) = shield.on_attacked_reaction {
         t.technical_description
-            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
+            .push(format!("Skill: |<keyword>{}|", reaction.name));
     }
     if let Some(reaction) = shield.on_hit_reaction {
         t.technical_description
-            .push(format!("Unlocks: |<keyword>{}|", reaction.name));
+            .push(format!("Skill: |<keyword>{}|", reaction.name));
     }
+    t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(shield.weight));
     t
 }
@@ -171,6 +174,7 @@ fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
         t.technical_description
             .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
     }
+    t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(armor.weight));
     t
 }

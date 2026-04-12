@@ -219,10 +219,17 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
 }
 
 fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
-    t.technical_description
-        .push("|<faded>On damage:|".to_string());
     match effect {
-        AttackHitEffect::Apply(apply_effect) => describe_apply_effect(*apply_effect, t),
+        AttackHitEffect::ApplyTarget(apply_effect) => {
+            t.technical_description
+                .push("|<faded>On damage: (target)| ".to_string());
+            describe_apply_effect(*apply_effect, t)
+        }
+        AttackHitEffect::ApplySelf(apply_effect) => {
+            t.technical_description
+                .push("|<faded>On damage: (self)| ".to_string());
+            describe_apply_effect(*apply_effect, t)
+        }
     }
 }
 
@@ -445,6 +452,9 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         ApplyEffect::GainStamina(n) => t
             .technical_description
             .push(format!("  |<stamina>| |<value>{}| stamina", n)),
+        ApplyEffect::GainMana(n) => t
+            .technical_description
+            .push(format!("  |<mana>| |<value>{}| mana", n)),
         ApplyEffect::GainHealth(n) => t
             .technical_description
             .push(format!("  |<heart>| |<value>{}| healing", n)),

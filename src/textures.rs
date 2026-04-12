@@ -27,6 +27,7 @@ pub enum SpriteId {
     Warhammer,
     Bow,
     Sword,
+    MagicSword,
     Rapier,
     Dagger,
     Shield,
@@ -57,6 +58,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Warhammer, "warhammer.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
+        (SpriteId::MagicSword, "magic_sword.png"),
         (SpriteId::Rapier, "rapier.png"),
         (SpriteId::Dagger, "dagger.png"),
         (SpriteId::Shield, "shield.png"),
@@ -112,6 +114,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Dagger => panic!(),
         SpriteId::Shield => panic!(),
         SpriteId::CharacterShadow => panic!(),
+        SpriteId::MagicSword => panic!(),
     }
 }
 
@@ -244,6 +247,7 @@ pub enum EquipmentIconId {
     Bow,
     Dagger,
     Sword,
+    MagicSword,
     SmallShield,
     MediumShield,
     LeatherArmor,
@@ -886,6 +890,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::Bow => (3, 1),
         EquipmentIconId::Dagger => (1, 1),
         EquipmentIconId::Sword => (0, 1),
+        EquipmentIconId::MagicSword => (5, 0),
         EquipmentIconId::SmallShield => (4, 1),
         EquipmentIconId::MediumShield => (0, 2),
         EquipmentIconId::LeatherArmor => (2, 2),

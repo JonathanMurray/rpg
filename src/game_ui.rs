@@ -2034,34 +2034,25 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        let mut applied_effects = vec![];
-
         let verb;
-        match &event.outcome {
-            AttackOutcome {
-                hit_type,
-                damage,
-                applied_effects: effects,
-                ..
-            } => {
-                if *damage == 0 {
-                    self.sound_player.play(SoundId::ArmorAbsorbed);
-                } else {
-                    if self.characters.get(attacker).has_equipped_ranged_weapon() {
-                        self.sound_player.play(SoundId::HitArrow);
-                    } else {
-                        self.sound_player.play(SoundId::MeleeAttack);
-                    }
-                    self.sound_player.play(SoundId::Damage);
-                }
-                verb = match hit_type {
-                    HitType::Regular => "hit",
-                    HitType::Graze => "grazed",
-                    HitType::Critical => "crit",
-                };
-                applied_effects = effects.clone();
+
+        if event.outcome.damage == 0 {
+            self.sound_player.play(SoundId::ArmorAbsorbed);
+        } else {
+            if self.characters.get(attacker).has_equipped_ranged_weapon() {
+                self.sound_player.play(SoundId::HitArrow);
+            } else {
+                self.sound_player.play(SoundId::MeleeAttack);
             }
+            self.sound_player.play(SoundId::Damage);
+        }
+        verb = match event.outcome.hit_type {
+            HitType::Regular => "hit",
+            HitType::Graze => "grazed",
+            HitType::Critical => "crit",
         };
+        let applied_to_target = &event.outcome.applied_to_target;
+        let applied_to_self = &event.outcome.applied_to_self;
 
         let mut line = format!(
             "|{}| {} |{}|",
@@ -2091,6 +2082,7 @@ impl UserInterface {
         self.log.add_with_details(line, detail_lines);
 
         let target_pos = self.characters.get(target).pos();
+        let attacker_pos = self.characters.get(attacker).pos();
 
         let (impact_text, text_style) = match event.outcome {
             AttackOutcome {
@@ -2108,21 +2100,15 @@ impl UserInterface {
                 hit_type: HitType::Critical,
                 ..
             } => (format!("{}!", damage), TextEffectStyle::HostileCrit),
-            /*
-            AttackOutcome::Dodge => ("Dodge".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Parry => ("Parry".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Miss => ("Miss".to_string(), TextEffectStyle::Miss),
-            AttackOutcome::Block => ("Block".to_string(), TextEffectStyle::Miss),
-             */
         };
 
         self.game_grid
             .add_text_effect(target_pos, 0.0, 1.0, None, impact_text, text_style);
 
-        if !applied_effects.is_empty() {
+        if !applied_to_target.is_empty() {
             let mut s = String::new();
             let mut texture = None;
-            for apply_effect in applied_effects {
+            for apply_effect in applied_to_target {
                 if let ApplyEffect::Condition(condition) = apply_effect {
                     texture = Some(condition.condition.status_icon());
                 }
@@ -2135,6 +2121,24 @@ impl UserInterface {
                 texture,
                 s,
                 TextEffectStyle::HostileEffect,
+            );
+        };
+        if !applied_to_self.is_empty() {
+            let mut s = String::new();
+            let mut texture = None;
+            for apply_effect in applied_to_self {
+                if let ApplyEffect::Condition(condition) = apply_effect {
+                    texture = Some(condition.condition.status_icon());
+                }
+                s.push_str(&format!("{} ", apply_effect));
+            }
+            self.game_grid.add_text_effect(
+                attacker_pos,
+                0.0,
+                2.0,
+                texture,
+                s,
+                TextEffectStyle::FriendlyEffect,
             );
         };
 
@@ -2195,7 +2199,12 @@ impl UserInterface {
                             texture = Some(condition.condition.status_icon());
                         }
                         s.push_str(&format!("{} ", apply_effect));
-                        effects.push((texture, s, TextEffectStyle::HostileEffect, 2.0));
+                        effects.push((
+                            texture,
+                            s.trim().into(),
+                            TextEffectStyle::HostileEffect,
+                            2.0,
+                        ));
                     }
                 };
             }
@@ -2216,7 +2225,7 @@ impl UserInterface {
                     } else {
                         TextEffectStyle::FriendlyEffect
                     };
-                    effects.push((texture, s, style, 2.0))
+                    effects.push((texture, s.trim().into(), style, 2.0))
                 }
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
