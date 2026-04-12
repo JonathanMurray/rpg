@@ -24,7 +24,9 @@ use rpg::data::{
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
+use rpg::map_data::{
+    make_high_alice, make_high_bob, make_high_level_party, make_low_level_party, make_medium_clara,
+};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::load_and_init_static;
@@ -63,22 +65,16 @@ async fn main() {
     let sound_player = SoundPlayer::new().await;
 
     // TODO
-    /*
-       let party = Rc::new(Party {
-           money: Cell::new(8),
-           stash: Default::default(),
-       });
-       let clara = Rc::new(make_medium_clara(&party));
-       let player_characters = vec![clara];
-       run_fight_loop(
-           resources.clone(),
-           &player_characters,
-           FightId::Test,
-           ui_resources.clone(),
-           sound_player.clone(),
-       )
-       .await;
-    */
+    let (party, chars) = make_high_level_party();
+    let player_characters: Vec<Rc<Character>> = chars.into_iter().map(|ch| Rc::new(ch)).collect();
+    run_fight_loop(
+        resources.clone(),
+        &player_characters,
+        FightId::EliteHuldra,
+        ui_resources.clone(),
+        sound_player.clone(),
+    )
+    .await;
     // TODO
 
     run_demo(&resources, &ui_resources, sound_player).await;

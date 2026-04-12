@@ -28,6 +28,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
+    pathfind::Liquid,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{oscillate, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_RED},
@@ -621,10 +622,15 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
 fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
     match env_effect {
-        EnvironmentEffect::PoisonWater => {
+        EnvironmentEffect::ConvertLiquid(from, to) => {
             t.technical_description
-                .push("  Surrounding water becomes |<keyword>Poisonous|".to_string());
-            t.keywords.push(Keyword::Cond(Condition::Poisoned));
+                .push(format!("  Surrounding {} becomes {}", from, to));
+            if [from, to].contains(&Liquid::Poison) {
+                t.keywords.push(Keyword::Cond(Condition::Poisoned));
+            }
+            if [from, to].contains(&Liquid::Water) {
+                t.keywords.push(Keyword::Cond(Condition::Wet));
+            }
         }
     }
 }

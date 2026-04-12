@@ -233,6 +233,9 @@ impl CoreGame {
                         ch.pos()
                     );
                     self.pathfind_grid.set_occupied(ch.pos(), None);
+                    if ch.is_swamp_dweller() {
+                        self.handle_swamp_dweller_left_poison(ch).await;
+                    }
                 }
             }
             let dead_character_ids = self.characters.remove_dead();
@@ -868,13 +871,21 @@ impl CoreGame {
             })
             .await;
 
+            if character.is_swamp_dweller() {
+                let prev_liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
+                let new_liquid = self.pathfind_grid.is_character_in_liquid(new_position);
+                if new_liquid == None && prev_liquid == Some(Liquid::Poison) {
+                    self.handle_swamp_dweller_left_poison(character).await;
+                }
+            }
+
             character.set_position(new_position);
 
-            if character.knows_passive(PassiveSkill::SwampDweller) {
-                if self.pathfind_grid.is_character_in_liquid(character.pos()) == Some(Liquid::Water)
-                {
+            if character.is_swamp_dweller() {
+                let liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
+                if liquid == Some(Liquid::Water) {
                     self.perform_environment_effect(
-                        EnvironmentEffect::PoisonWater,
+                        EnvironmentEffect::ConvertLiquid(Liquid::Water, Liquid::Poison),
                         character.pos(),
                         &mut vec![],
                     )
@@ -891,6 +902,31 @@ impl CoreGame {
         self.on_character_positions_changed();
 
         Ok(())
+    }
+
+    async fn handle_swamp_dweller_left_poison(&self, character: &Rc<Character>) {
+        let mut liquid_area = vec![];
+        self.pathfind_grid
+            .traverse_liquid_cells(character.pos(), Liquid::Poison, None, |x, y| {
+                liquid_area.push((x, y));
+            });
+
+        let still_poisonous = self.characters.iter().any(|other| {
+            other.id() != character.id()
+                && other.is_swamp_dweller()
+                && liquid_area.contains(&other.pos())
+        });
+
+        dbg!(still_poisonous);
+
+        if !still_poisonous {
+            self.perform_environment_effect(
+                EnvironmentEffect::ConvertLiquid(Liquid::Poison, Liquid::Water),
+                character.pos(),
+                &mut vec![],
+            )
+            .await;
+        }
     }
 
     async fn handle_character_standing_in_liquid(&self, character: &Character, game_time: u32) {
@@ -912,7 +948,7 @@ impl CoreGame {
                 Liquid::Water => {}
                 Liquid::Poison => {
                     if !character.has_condition(&Condition::Poisoned)
-                        && !character.knows_passive(PassiveSkill::SwampDweller)
+                        && !character.is_swamp_dweller()
                     {
                         character.receive_condition(
                             Condition::Poisoned,
@@ -1550,16 +1586,20 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
     ) {
         match env_effect {
-            EnvironmentEffect::PoisonWater => {
-                let mut water_positions = vec![];
+            EnvironmentEffect::ConvertLiquid(from, to) => {
+                let mut positions = vec![];
                 self.pathfind_grid
-                    .convert_water_to_poison(position, |x, y| {
-                        water_positions.push((x, y));
+                    .traverse_liquid_cells(position, from, Some(to), |x, y| {
+                        positions.push((x, y));
                     });
-                if !water_positions.is_empty() {
-                    detail_lines.push("  Water was turned to |<keyword>Poison|".to_string());
-                    self.ui_handle_event(GameEvent::WaterTurnedToPoison(water_positions))
-                        .await;
+                if !positions.is_empty() {
+                    detail_lines.push(format!("  {} was turned to {}", from, to));
+                    self.ui_handle_event(GameEvent::LiquidWasConverted {
+                        positions: positions,
+                        from,
+                        to,
+                    })
+                    .await;
 
                     for char in self.characters.iter() {
                         self.handle_character_standing_in_liquid(char, self.current_time())
@@ -3167,7 +3207,11 @@ pub trait GameEventHandler {
 pub enum GameEvent {
     LogLine(String),
     GameOver(&'static str),
-    WaterTurnedToPoison(Vec<Position>),
+    LiquidWasConverted {
+        positions: Vec<Position>,
+        from: Liquid,
+        to: Liquid,
+    },
     MovementWasInitiated {
         character: CharacterId,
         positions: Vec<Position>,
@@ -3846,7 +3890,7 @@ impl Condition {
             Inspired => "|<value>+3| |<shield>|<stat>Will|.\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all |<shield>| defenses.\n|<value>-50%| |<helmet>| armor.",
             Hindered => "|<value>-50%| movement.",
-            Protected => "Takes no more than |<value>1| damage from the next attack.",
+            Protected => "Takes at most |<value>1| damage from the next attack.",
             Bleeding => "End of turn: lose |<value>x| health.\nHalved every turn.",
             Burning => "End of turn: deals |<value>x| damage.\n50% spreads to adjacent.",
             Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
@@ -4336,7 +4380,7 @@ pub enum AbilityId {
 
     EnemySlashingAttack,
     HuldraHeal,
-    HuldraInflictWounds,
+    HuldraInfect,
     HuldraInflictHorrors,
 }
 
@@ -4454,7 +4498,7 @@ pub enum AbilityTarget {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EnvironmentEffect {
-    PoisonWater,
+    ConvertLiquid(Liquid, Liquid),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5078,7 +5122,7 @@ impl Character {
         } else {
             self.conditions.borrow_mut().remove(&Condition::BloodRage);
         }
-        if !has_blood_rage_passive && health_ratio < 0.20 {
+        if !has_blood_rage_passive && health_ratio < 0.2 {
             self.conditions.borrow_mut().add(Condition::NearDeath);
         } else {
             self.conditions.borrow_mut().remove(&Condition::NearDeath);
@@ -5980,6 +6024,10 @@ impl Character {
 
     pub fn knows_passive(&self, passive: PassiveSkill) -> bool {
         self.known_passive_skills.borrow().contains(&passive)
+    }
+
+    fn is_swamp_dweller(&self) -> bool {
+        self.knows_passive(PassiveSkill::SwampDweller)
     }
 
     pub fn known_abilities(&self) -> Vec<Ability> {

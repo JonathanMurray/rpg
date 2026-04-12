@@ -51,6 +51,7 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
     textures::{EquipmentIconId, UI_TEXTURE},
+    tooltip::Keyword,
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 use crate::{
@@ -448,27 +449,32 @@ impl CharacterUi {
             Some((
                 "Action Points (AP)",
                 vec!["Used for actions.".to_string(), "".to_string(), "|<value>4| AP is restored after ending your turn, although this amount can be changed by certain conditions.".to_string()],
+                vec![]
             ))
         } else if self.health_bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>10%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string()],
+                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>10%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string(),
+                "Being |<heart>| < 20% causes |<keyword>Near-death|.".to_string()],
+                vec![Keyword::Cond(Condition::NearDeath)]
             ))
         } else if self.stamina_bar.borrow().hovered.get() {
             Some((
                 "Stamina |<stamina>|",
-                vec!["Used for movement and certain actions.".to_string(), "".to_string(), "|<value>25%| |<stamina>| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)".to_string()]
+                vec!["Used for movement and certain actions.".to_string(), "".to_string(), "|<value>25%| |<stamina>| is restored after ending your turn. (Max |<stamina>| is affected by |<stat>Strength| and |<stat>Agility|.)".to_string()],
+                vec![]
             ))
         } else if self.mana_bar.borrow().hovered.get() {
             Some((
                 "Mana |<mana>|",
                 vec!["Used for spells.".to_string(), "".to_string(), "|<value>25%| |<mana>| is restored after combat. (Max |<mana>| is affected by |<stat>Spirit|.)".to_string()],
+                vec![]
             ))
         } else {
             None
         };
 
-        if let Some((header, content)) = tooltip {
+        if let Some((header, content, keywords)) = tooltip {
             draw_tooltip(
                 &self.font,
                 TooltipPositionPreference::RelativeToRect(
@@ -483,7 +489,7 @@ impl CharacterUi {
                 header,
                 None,
                 &content,
-                &[],
+                &keywords,
                 None,
             );
         }
@@ -1922,8 +1928,12 @@ impl UserInterface {
                 self.banner.set(text, 1.5);
                 self.animation_stopwatch.set_to_at_least(1.5);
             }
-            GameEvent::WaterTurnedToPoison(positions) => {
-                self.game_grid.convert_water_to_poison(positions);
+            GameEvent::LiquidWasConverted {
+                positions,
+                from,
+                to,
+            } => {
+                self.game_grid.convert_liquid(positions, from, to);
             }
         }
     }

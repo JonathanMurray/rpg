@@ -11,7 +11,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
         MOVE_DISTANCE_PER_RESOURCE,
     },
-    data::{HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS},
+    data::{HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
     pathfind::{Path, PathfindGrid},
     util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
@@ -41,7 +41,7 @@ impl HuldraBehaviour {
             .any(|char| char.health.current() < char.health.max() - 5);
 
         let heal = BotAction::SingleFriendlyTarget(HULDRA_HEAL);
-        let inflict_wounds = BotAction::SingleEnemyTarget(HULDRA_INFLICT_WOUNDS);
+        let inflict_wounds = BotAction::SingleEnemyTarget(HULDRA_INFECT);
         //let inflict_horrors = BotAction::SingleEnemyTarget(HULDRA_INFLICT_HORRORS);
 
         if let Some((saved_action, saved_target)) = self.saved_goal.get() {
@@ -65,7 +65,7 @@ impl HuldraBehaviour {
             let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
 
             player_chars.sort_by_key(|ch| {
-                let range = HULDRA_INFLICT_WOUNDS.target.range(&[]).unwrap();
+                let range = HULDRA_INFECT.target.range(&[]).unwrap();
                 let distance_to = find_path(game, bot, ch, range)
                     .map(|p| p.total_distance)
                     .unwrap_or(f32::MAX);
@@ -679,11 +679,14 @@ fn may_use(bot: &Character, ability: Ability, target: Option<&Character>) -> boo
         AbilityId::HuldraInflictHorrors => {
             !target.unwrap().conditions.borrow().has(&Condition::Slowed)
         }
-        AbilityId::HuldraInflictWounds => !target
+        AbilityId::HuldraHeal => !target.unwrap().health.is_at_max(),
+        /*
+        AbilityId::HuldraInfect => !target
             .unwrap()
             .conditions
             .borrow()
             .has(&Condition::Bleeding),
+             */
         _ => true,
     }
 }

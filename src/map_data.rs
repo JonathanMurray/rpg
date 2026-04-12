@@ -13,7 +13,7 @@ use crate::{
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
-        HULDRA_HEAL, HULDRA_INFLICT_HORRORS, HULDRA_INFLICT_WOUNDS, KILL, LIGHTNING_BOLT,
+        HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT,
         LIGHTNING_BOLT_REACH, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
@@ -362,7 +362,7 @@ pub fn create_character(
                 pos,
             );
             huldra.learn_ability(HULDRA_HEAL);
-            huldra.learn_ability(HULDRA_INFLICT_WOUNDS);
+            huldra.learn_ability(HULDRA_INFECT);
             huldra.learn_passive(PassiveSkill::SwampDweller);
             huldra.armor_piece.set(Some(SHIRT));
             //huldra.set_weapon(HandType::MainHand, BAD_SWORD);

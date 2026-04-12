@@ -30,7 +30,7 @@ use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_and_init_static, terrain_atlas_area, EquipmentIconId, SpriteId, TerrainId,
+    load_and_init_static, terrain_atlas_area, EquipmentIconId, Sprite, SpriteId, TerrainId,
     WaterOrientation, WaterType,
 };
 
@@ -433,7 +433,7 @@ async fn main() {
 
 struct Sidebar {
     terrain_atlas: Texture2D,
-    sprites: HashMap<SpriteId, Texture2D>,
+    sprites: HashMap<SpriteId, Sprite>,
     selected_section_idx: usize,
     selected_action_idx: Option<usize>,
     hovered: bool,
@@ -455,7 +455,7 @@ enum EditorAction {
 }
 
 impl Sidebar {
-    fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Texture2D>) -> Self {
+    fn new(terrain_atlas: Texture2D, sprites: HashMap<SpriteId, Sprite>) -> Self {
         let backgrounds = [
             TerrainId::Floor,
             TerrainId::Floor2,
@@ -604,7 +604,7 @@ impl Sidebar {
                     }
                     EditorAction::PlaceCharacter(char_type) => {
                         draw_texture_ex(
-                            &self.sprites[&char_type.sprite_id()],
+                            &self.sprites[&char_type.sprite_id()].regular,
                             x,
                             y,
                             WHITE,

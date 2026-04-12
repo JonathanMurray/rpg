@@ -14,6 +14,7 @@ use crate::{
         WeaponType,
     },
     grid::ParticleShape,
+    pathfind::Liquid,
     sounds::SoundId,
     textures::{EquipmentIconId, IconId, SpriteId},
     tooltip::Keyword,
@@ -1209,8 +1210,8 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     }),
 };
 
-pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
-    id: AbilityId::HuldraInflictWounds,
+pub const HULDRA_INFECT: Ability = Ability {
+    id: AbilityId::HuldraInfect,
     name: "Infect",
     description: "",
     icon: IconId::NecroticInfluence,
@@ -1235,7 +1236,7 @@ pub const HULDRA_INFLICT_WOUNDS: Ability = Ability {
             ]),
         }),
         impact_circle: None,
-        environment_effect: Some(EnvironmentEffect::PoisonWater),
+        environment_effect: None,
         reach: AbilityReach::Range(Range::Float(15.5)),
     },
     animation_color: BROWN,
@@ -1271,7 +1272,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
             ]),
         }),
         impact_circle: None,
-        environment_effect: Some(EnvironmentEffect::PoisonWater),
+        environment_effect: None,
     },
     animation_color: PURPLE,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -1841,7 +1842,10 @@ pub const POISONTEST: Ability = Ability {
     target: AbilityTarget::None {
         self_area: None,
         self_effect: None,
-        environment_effect: Some(EnvironmentEffect::PoisonWater),
+        environment_effect: Some(EnvironmentEffect::ConvertLiquid(
+            Liquid::Water,
+            Liquid::Poison,
+        )),
     },
     animation_color: BLACK,
     initiate_sound: Some(SoundId::ShootSpell),
@@ -2025,7 +2029,7 @@ impl PassiveSkill {
             Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
             UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
-            SwampDweller => "Immune to |<keyword>Poisoned|. When stepping into water, it becomes |<keyword>Poisonous|.",
+            SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
             Slasher => "When dealing damage with an attack, it also inflicts |<keyword>Bleeding|."
         }
     }

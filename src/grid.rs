@@ -407,22 +407,36 @@ impl GameGrid {
         self.on_removed_character(character_id);
     }
 
-    pub fn convert_water_to_poison(&mut self, positions: Vec<Position>) {
+    pub fn convert_liquid(
+        &mut self,
+        positions: Vec<Position>,
+        from_liquid: Liquid,
+        to_liquid: Liquid,
+    ) {
         for pos in positions {
             match self.decorations.entry(pos) {
                 Entry::Occupied(mut e) => {
                     let terrain_id = e.get();
-                    match terrain_id {
-                        TerrainId::NewWater(orientation, WaterType::Water) => {
-                            e.insert(TerrainId::NewWater(*orientation, WaterType::Poison));
+                    match (terrain_id, from_liquid) {
+                        (TerrainId::NewWater(orientation, WaterType::Water), Liquid::Water) => {
+                            e.insert(TerrainId::NewWater(
+                                *orientation,
+                                WaterType::from(to_liquid),
+                            ));
+                        }
+                        (TerrainId::NewWater(orientation, WaterType::Poison), Liquid::Poison) => {
+                            e.insert(TerrainId::NewWater(
+                                *orientation,
+                                WaterType::from(to_liquid),
+                            ));
                         }
                         _ => {
-                            println!("WARN: is not water, pos: {:?}", pos);
+                            println!("WARN: is not {:?}, pos: {:?}", from_liquid, pos);
                         }
                     }
                 }
                 Entry::Vacant(..) => {
-                    println!("Can't convert nothing to poison, pos: {:?}", pos);
+                    println!("Can't convert nothing to {:?}, pos: {:?}", to_liquid, pos);
                 }
             }
         }
@@ -1633,17 +1647,17 @@ impl GameGrid {
         }
 
         if !dying {
-            y -= self.cell_w * 0.5;
-            shadow_y -= self.cell_w * 0.5;
+            y -= self.cell_w * 1.2;
+            shadow_y -= self.cell_w * 1.2;
         }
 
-        let standing_in_water = self
+        let standing_in_liquid = self
             .pathfind_grid
             .is_character_in_liquid(character.pos())
             .is_some();
 
         let mut character_params = params.clone();
-        if standing_in_water {
+        if standing_in_liquid {
             let water_depth_factor = 0.125;
             character_params.source =
                 Some(Rect::new(0.0, 0.0, 32.0, 32.0 * (1.0 - water_depth_factor)));
@@ -3260,7 +3274,7 @@ impl GameGrid {
         let sprite_h = character_sprite_height(character.sprite);
         let texture_h = 32.0;
 
-        let y = y - self.cell_w * 1.3;
+        let y = y - self.cell_w * 2.0;
         let y = y + (texture_h - sprite_h as f32) / texture_h * self.cell_w;
 
         let margin = 2.0;
@@ -3797,7 +3811,7 @@ impl GameGrid {
                 Occupation::Terrain { .. } => false,
             };
             if draw_occupation {
-                self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 0.0);
+                self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 1.0);
             }
         }
     }

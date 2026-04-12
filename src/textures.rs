@@ -8,7 +8,7 @@ use macroquad::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::pathfind::{TerrainType, CELLS_PER_ENTITY};
+use crate::pathfind::{Liquid, TerrainType, CELLS_PER_ENTITY};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
@@ -449,6 +449,15 @@ pub enum WaterOrientation {
 pub enum WaterType {
     Water,
     Poison,
+}
+
+impl From<Liquid> for WaterType {
+    fn from(liquid: Liquid) -> Self {
+        match liquid {
+            Liquid::Water => Self::Water,
+            Liquid::Poison => Self::Poison,
+        }
+    }
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]

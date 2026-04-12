@@ -2,6 +2,7 @@ use std::{
     cell::{Cell, Ref, RefCell},
     cmp::Ordering,
     collections::{BinaryHeap, HashMap, HashSet, VecDeque},
+    fmt::Display,
     time::Instant,
 };
 
@@ -48,6 +49,15 @@ pub enum Liquid {
     Poison,
 }
 
+impl Display for Liquid {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Liquid::Water => f.write_str("water"),
+            Liquid::Poison => f.write_str("poison"),
+        }
+    }
+}
+
 pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
@@ -91,12 +101,14 @@ impl PathfindGrid {
         }
     }
 
-    fn is_water_at_pos(&self, pos: Position) -> bool {
-        self.liquids.borrow().get(&pos) == Some(&Liquid::Water)
-    }
-
-    pub fn convert_water_to_poison(&self, start_pos: Position, mut visitor: impl FnMut(i32, i32)) {
-        if !self.is_water_at_pos(start_pos) {
+    pub fn traverse_liquid_cells(
+        &self,
+        start_pos: Position,
+        liquid_type: Liquid,
+        convert_to: Option<Liquid>,
+        mut visitor: impl FnMut(i32, i32),
+    ) {
+        if self.liquids.borrow().get(&start_pos) != Some(&liquid_type) {
             return;
         }
 
@@ -106,11 +118,16 @@ impl PathfindGrid {
 
         while let Some(pos) = next.pop_front() {
             visitor(pos.0, pos.1);
-            self.liquids.borrow_mut().insert(pos, Liquid::Poison);
+            if let Some(convert_to) = convert_to {
+                self.liquids.borrow_mut().insert(pos, convert_to);
+            }
             seen.insert(pos);
             for x in [pos.0 - 1, pos.0, pos.0 + 1] {
                 for y in [pos.1 - 1, pos.1, pos.1 + 1] {
-                    if (x, y) != pos && !seen.contains(&(x, y)) && self.is_water_at_pos((x, y)) {
+                    if (x, y) != pos
+                        && !seen.contains(&(x, y))
+                        && self.liquids.borrow().get(&(x, y)) == Some(&liquid_type)
+                    {
                         seen.insert((x, y));
                         next.push_back((x, y));
                     }
@@ -148,10 +165,14 @@ impl PathfindGrid {
     }
 
     pub fn is_character_in_liquid(&self, pos: Position) -> Option<Liquid> {
+        // TODO
+        return self.liquids.borrow().get(&pos).copied();
+
         let mut liquid = None;
         for x in pos.0 - 1..=pos.0 + 1 {
+            // TODO
             // The top row of cells doesn't need to be on water cells for the char to be visibly in water
-            for y in pos.1..=pos.1 + 1 {
+            for y in pos.1 - 1..=pos.1 + 1 {
                 if let Some(l) = self.liquids.borrow().get(&(x, y)) {
                     liquid = Some(*l);
                 } else {
