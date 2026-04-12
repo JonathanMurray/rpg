@@ -5000,7 +5000,7 @@ impl Character {
         gain_ap
     }
 
-    fn set_facing_toward(&self, position: Position) {
+    pub fn set_facing_toward(&self, position: Position) {
         let dx = position.0 - self.position.get().0;
         if dx > 0 {
             self.is_facing_east.set(true);

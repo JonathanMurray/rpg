@@ -2508,7 +2508,9 @@ impl GameGrid {
                         active_char_pos,
                         *hovered_route_dst,
                     );
-                    self.draw_movement_path(&path.nodes);
+                    self.draw_player_movement_path(&path.nodes);
+                    self.characters[&self.active_character_id]
+                        .set_facing_toward(*hovered_route_dst);
 
                     let remaining_movement = self.active_char_remaining_movement();
 
@@ -3805,7 +3807,7 @@ impl GameGrid {
             && (0..self.grid_dimensions.1 as i32).contains(&pos.1)
     }
 
-    fn draw_movement_path(&self, path: &[PathNode]) {
+    fn draw_player_movement_path(&self, path: &[PathNode]) {
         self.draw_movement_path_with_arrow(
             path.iter().map(|node| MovementPathNode {
                 pos: node.position,
