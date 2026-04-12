@@ -116,7 +116,6 @@ struct CharacterAnimation {
     duration: f32,
     remaining_duration: f32,
     kind: AnimationDetails,
-    custom_toggle: Cell<bool>,
 }
 
 impl CharacterAnimation {
@@ -126,7 +125,6 @@ impl CharacterAnimation {
             duration,
             remaining_duration: duration,
             kind,
-            custom_toggle: Cell::new(false),
         }
     }
 
@@ -135,12 +133,15 @@ impl CharacterAnimation {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 enum AnimationDetails {
     Motion {
         from: Position,
         to: Position,
         movement_type: MovementType,
+    },
+    MotionPreview {
+        positions: Vec<Position>,
     },
     Shake {
         random_time_offset: f32,
@@ -586,6 +587,20 @@ impl GameGrid {
 
     pub fn set_character_anticipation(&mut self, anticipating_character: Option<u32>) {
         self.anticipating_character = anticipating_character;
+    }
+
+    pub fn set_character_motion_preview(
+        &mut self,
+        character_id: CharacterId,
+        positions: Vec<Position>,
+        duration: f32,
+    ) {
+        println!("MOVEMENT WAS INITIATED: {}, {:?}", character_id, positions);
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            duration,
+            AnimationDetails::MotionPreview { positions },
+        ));
     }
 
     pub fn set_character_motion(
@@ -1377,14 +1392,33 @@ impl GameGrid {
             .filter(|a| a.character_id == character.id())
         {
             let remaining = animation.remaining_duration;
-            match animation.kind {
+            match &animation.kind {
+                AnimationDetails::MotionPreview { positions } => {
+                    let dst = positions.last().unwrap();
+                    let color = Color::new(1.0, 1.0, 1.0, 0.5);
+                    self.draw_cornered_outline(
+                        self.grid_pos_to_screen(*dst),
+                        color,
+                        1.0,
+                        3.0,
+                        false,
+                    );
+                    let path: Vec<MovementPathNode> = positions
+                        .into_iter()
+                        .map(|pos| MovementPathNode {
+                            pos: *pos,
+                            difficult_terrain: false,
+                        })
+                        .collect();
+                    self.draw_movement_path_with_arrow(path.into_iter(), color);
+                }
                 AnimationDetails::Motion {
                     movement_type,
                     from,
                     to,
                 } => {
                     let cycle_time = ((game_time * 1.5) % (game_time * 1.5).floor()) as f32;
-                    if movement_type == MovementType::KnockedBack {
+                    if *movement_type == MovementType::KnockedBack {
                         let amount = PI * 0.1;
                         if from.0 < to.0 {
                             params.rotation = amount;
@@ -1524,7 +1558,7 @@ impl GameGrid {
                     };
 
                     if t > 0.05 && t < 0.85 {
-                        if with_shield {
+                        if *with_shield {
                             let x_mult = if character.is_facing_east.get() {
                                 1.0
                             } else {
@@ -1567,7 +1601,7 @@ impl GameGrid {
                         0.05
                     };
 
-                    if with_shield {
+                    if *with_shield {
                         let x_mult = if character.is_facing_east.get() {
                             1.0
                         } else {
@@ -2145,7 +2179,7 @@ impl GameGrid {
                 let target = &self.characters[target];
                 let reactor = &self.characters[reactor];
 
-                self.draw_movement_path_arrow(
+                self.draw_movement_path_with_arrow(
                     [
                         MovementPathNode {
                             pos: movement.0,
@@ -2158,8 +2192,6 @@ impl GameGrid {
                     ]
                     .into_iter(),
                     RED,
-                    7.0,
-                    true,
                 );
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
@@ -2972,14 +3004,12 @@ impl GameGrid {
     ) {
         if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
-            self.draw_movement_path_arrow(
+            self.draw_movement_path_with_arrow(
                 invalid_path.into_iter().map(|pos| MovementPathNode {
                     pos,
                     difficult_terrain: false,
                 }),
                 RED,
-                7.0,
-                false,
             );
         } else {
             self.draw_target_crosshair(
@@ -2989,14 +3019,12 @@ impl GameGrid {
                 7.0,
                 true,
             );
-            self.draw_movement_path_arrow(
+            self.draw_movement_path_with_arrow(
                 movement_to_target.into_iter().map(|pos| MovementPathNode {
                     pos,
                     difficult_terrain: false,
                 }),
                 MOVEMENT_ARROW_COLOR,
-                7.0,
-                false,
             );
         }
     }
@@ -3777,14 +3805,12 @@ impl GameGrid {
     }
 
     fn draw_movement_path(&self, path: &[PathNode]) {
-        self.draw_movement_path_arrow(
+        self.draw_movement_path_with_arrow(
             path.iter().map(|node| MovementPathNode {
                 pos: node.position,
                 difficult_terrain: node.difficult_terrain,
             }),
             HOVER_MOVEMENT_ARROW_COLOR,
-            3.0,
-            false,
         );
 
         let distance = path.last().unwrap().distance_from_start;
@@ -3815,36 +3841,16 @@ impl GameGrid {
             .get()
     }
 
-    fn draw_movement_path_arrow(
+    fn draw_movement_path_with_arrow(
         &self,
         mut path: impl ExactSizeIterator<Item = MovementPathNode>,
-        color: Color,
-        thickness: f32,
-        animated: bool,
+        arrow_color: Color,
     ) {
         let mut a = path.next().expect("First cell in path");
         let mut b = path.next().expect("Second cell in path");
 
         loop {
-            /*
-            draw_dashed_line(
-                (
-                    self.grid_x_to_screen(a.0) + self.cell_w / 2.0,
-                    self.grid_y_to_screen(a.1) + self.cell_w / 2.0,
-                ),
-                (
-                    self.grid_x_to_screen(b.0) + self.cell_w / 2.0,
-                    self.grid_y_to_screen(b.1) + self.cell_w / 2.0,
-                ),
-                thickness,
-                color,
-                5.0,
-                Some((Color::new(0.0, 0.0, 0.0, 0.5), 2.0)),
-                animated,
-            );
-             */
-
-            let color = if a.difficult_terrain {
+            let circle_color = if a.difficult_terrain {
                 Color::new(1.0, 0.4, 0.4, 0.8)
             } else {
                 Color::new(1.0, 1.0, 1.0, 0.5)
@@ -3854,7 +3860,7 @@ impl GameGrid {
                 self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0,
                 self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0,
                 3.0,
-                color,
+                circle_color,
             );
 
             if let Some(next) = path.next() {
@@ -3886,7 +3892,7 @@ impl GameGrid {
             ),
             self.cell_w,
             last_direction,
-            color,
+            arrow_color,
             4.0,
         );
     }

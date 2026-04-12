@@ -90,7 +90,7 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
 pub const BAD_DAGGER: Weapon = Weapon {
     name: "Bad dagger",
     range: WeaponRange::Melee,
-    action_point_cost: 4,
+    action_point_cost: 3,
     damage: 3,
     grip: WeaponGrip::Light,
     attack_attribute: AttackAttribute::Finesse,
@@ -159,7 +159,7 @@ pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
 pub const BAD_SWORD: Weapon = Weapon {
     name: "Bad Sword",
     range: WeaponRange::Melee,
-    action_point_cost: 4,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::Versatile,
     attack_attribute: AttackAttribute::Finesse,
@@ -329,7 +329,7 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
 pub const BAD_WAR_HAMMER: Weapon = Weapon {
     name: "Bad war hammer",
     range: WeaponRange::Melee,
-    action_point_cost: 4,
+    action_point_cost: 3,
     damage: 6,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
@@ -382,7 +382,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
     range: WeaponRange::Ranged(15.5),
-    action_point_cost: 4,
+    action_point_cost: 3,
     damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,

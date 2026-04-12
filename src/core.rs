@@ -669,6 +669,12 @@ impl CoreGame {
                     character.gain_movement(paid_distance - total_distance);
                 }
 
+                self.ui_handle_event(GameEvent::MovementWasInitiated {
+                    character: self.active_character_id,
+                    positions: positions.clone(),
+                })
+                .await;
+
                 self.perform_movement(self.active_character_id, positions, MovementType::Regular)
                     .await?;
                 Ok(ActionOutcome::Default)
@@ -3162,6 +3168,10 @@ pub enum GameEvent {
     LogLine(String),
     GameOver(&'static str),
     WaterTurnedToPoison(Vec<Position>),
+    MovementWasInitiated {
+        character: CharacterId,
+        positions: Vec<Position>,
+    },
     Moved {
         character: CharacterId,
         from: Position,

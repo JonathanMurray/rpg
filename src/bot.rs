@@ -18,7 +18,6 @@ use crate::{
 
 #[derive(Debug, Clone)]
 pub enum BotBehaviour {
-    Normal,
     Huldra(HuldraBehaviour),
     Fighter(FighterBehaviour),
 }
@@ -230,7 +229,6 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     dbg!("BOT CHOOSING ACTION ...");
 
     let result = match character.kind.unwrap_bot_behaviour() {
-        BotBehaviour::Normal => run_normal_behaviour(game),
         BotBehaviour::Huldra(huldra) => huldra.run(game),
         BotBehaviour::Fighter(fighter) => pursue_goal(game, fighter.get_goal(game)),
     };
@@ -286,7 +284,8 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
         }
         (BotAction::SingleEnemyTarget(ability), goal_target) => {
             let goal_target = goal_target.as_ref().unwrap();
-            if bot.can_use_ability(ability)
+            if may_use(bot, ability, Some(goal_target))
+                && bot.can_use_ability(ability)
                 && bot.reaches_with_ability(ability, &[], goal_target.pos())
             {
                 println!("bot uses ability on player");
@@ -305,7 +304,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
             path_to_goal = find_path(game, bot, &goal_target, range);
         }
         (BotAction::NonTarget(ability), _) => {
-            if bot.can_use_ability(ability) {
+            if may_use(bot, ability, None) && bot.can_use_ability(ability) {
                 return Some(Action::UseAbility {
                     ability,
                     enhancements: vec![],
@@ -316,7 +315,8 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
         }
         (BotAction::SingleFriendlyTarget(ability), goal_target) => {
             let goal_target = goal_target.as_ref().unwrap();
-            if bot.can_use_ability(ability)
+            if may_use(bot, ability, Some(goal_target))
+                && bot.can_use_ability(ability)
                 && bot.reaches_with_ability(ability, &[], goal_target.pos())
             {
                 println!("bot uses ability on some bot");
@@ -668,6 +668,11 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
 }
 
 fn may_use(bot: &Character, ability: Ability, target: Option<&Character>) -> bool {
+    //TODO
+    println!(
+        "bot may use? {}, {} ({:?})",
+        bot.name, ability.name, ability.id
+    );
     match ability.id {
         AbilityId::Brace => !bot.conditions.borrow().has(&Condition::Protected),
         AbilityId::Inspire => !bot.conditions.borrow().has(&Condition::Inspired),

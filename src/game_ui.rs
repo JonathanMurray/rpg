@@ -1830,6 +1830,19 @@ impl UserInterface {
                     TextEffectStyle::FriendlyEffect,
                 );
             }
+            GameEvent::MovementWasInitiated {
+                character,
+                positions,
+            } => {
+                // Don't show preview for player movement; they issued it and it should feel snappy.
+                if !self.characters.get(character).player_controlled() {
+                    let duration = 0.3;
+                    self.game_grid
+                        .set_character_motion_preview(character, positions, duration);
+
+                    self.animation_stopwatch.set_to_at_least(duration);
+                }
+            }
             GameEvent::Moved {
                 character,
                 from,
