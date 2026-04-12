@@ -1759,6 +1759,46 @@ pub const FIREBALL: Ability = Ability {
     }),
 };
 
+pub const ENEMY_EXPLODING_ARROW: Ability = Ability {
+    id: AbilityId::EnemyExplodingArrow,
+    name: "Exploding arrow",
+    description: "Deal fire damage to an enemy and its surroundings",
+    icon: IconId::Fireball,
+    action_point_cost: 4,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Float(12.5)),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Evasion),
+            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            on_hit: None,
+        }),
+        impact_circle: Some((
+            Range::Float(3.5),
+            AreaTargetAcquisition::Everyone,
+            AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: Some(DefenseType::Toughness),
+                damage: Some(AbilityDamage::AtLeast(2, DamageType::Fire)),
+                on_hit: None,
+            }),
+        )),
+        environment_effect: None,
+    },
+    possible_enhancements: [None; 3],
+
+    animation_color: RED,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::FireballHit),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::FireCrackle,
+    }),
+};
+
 pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::LightningBolt,
     name: "Reach",

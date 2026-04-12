@@ -12,9 +12,10 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        ENEMY_BRACE, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD,
-        HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT,
-        LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
+        ENEMY_BRACE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL,
+        LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER,
+        SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -319,6 +320,7 @@ pub fn create_character(
             );
             ghoul.health.change_max_value_to(9);
             ghoul.set_weapon(HandType::MainHand, BAD_BOW);
+            ghoul.learn_ability(ENEMY_EXPLODING_ARROW);
             ghoul
         }
         CharacterType::Ghoul2 => {
@@ -439,8 +441,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.learn_ability(INSPIRE);
 
     // TODO
-    alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
-    alice.learn_ability(MANATEST);
+    //alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
+    //alice.learn_ability(ENEMY_EXPLODING_ARROW);
 
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),

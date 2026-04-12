@@ -286,7 +286,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
             let goal_target = goal_target.as_ref().unwrap();
             if may_use(bot, ability, Some(goal_target))
                 && bot.can_use_ability(ability)
-                && bot.reaches_with_ability(ability, &[], goal_target.pos())
+                && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
             {
                 println!("bot uses ability on player");
                 return Some(simple_targetted_ability_action(ability, goal_target));
@@ -317,7 +317,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
             let goal_target = goal_target.as_ref().unwrap();
             if may_use(bot, ability, Some(goal_target))
                 && bot.can_use_ability(ability)
-                && bot.reaches_with_ability(ability, &[], goal_target.pos())
+                && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
             {
                 println!("bot uses ability on some bot");
                 return Some(simple_targetted_ability_action(ability, goal_target));
@@ -365,7 +365,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 if bot.can_use_ability(ability) {
                     for player_char in &player_chars {
                         if may_use(bot, ability, Some(player_char))
-                            && bot.reaches_with_ability(ability, &[], player_char.pos())
+                            && ability_reaches(bot, player_char, ability, &game.pathfind_grid)
                         {
                             println!("bot uses ability on some player before moving to target");
                             return Some(simple_targetted_ability_action(ability, player_char));
@@ -387,7 +387,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 if bot.can_use_ability(ability) {
                     for bot_char in &bot_chars {
                         if may_use(bot, ability, Some(bot_char))
-                            && bot.reaches_with_ability(ability, &[], bot_char.pos())
+                            && ability_reaches(bot, bot_char, ability, &game.pathfind_grid)
                         {
                             println!("bot uses ability on some bot before moving to target");
                             return Some(simple_targetted_ability_action(ability, bot_char));
@@ -528,6 +528,17 @@ fn attack_reaches(bot: &Character, target: &Character, pathfind_grid: &PathfindG
     }
 
     !pathfind_grid.obstructed_line_of_sight(bot.pos(), target.pos())
+}
+
+fn ability_reaches(
+    bot: &Character,
+    target: &Character,
+    ability: Ability,
+    pathfind_grid: &PathfindGrid,
+) -> bool {
+    println!("bot::ability_reaches()...");
+    bot.reaches_with_ability(ability, &[], target.pos())
+        && !pathfind_grid.obstructed_line_of_sight(bot.pos(), target.pos())
 }
 
 fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {

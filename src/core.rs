@@ -1281,11 +1281,10 @@ impl CoreGame {
                     let target = mode.characters().get_rc(*target_id);
 
                     if let Some(game) = real_game {
-                        assert!(caster.reaches_with_ability(
-                            ability,
-                            enhancements,
-                            target.position.get()
-                        ));
+                        assert!(caster.reaches_with_ability(ability, enhancements, target.pos()));
+                        assert!(!game
+                            .pathfind_grid
+                            .obstructed_line_of_sight(caster.pos(), target.pos()));
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
@@ -1396,11 +1395,10 @@ impl CoreGame {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
                     if let Some(game) = real_game {
-                        assert!(caster.reaches_with_ability(
-                            ability,
-                            enhancements,
-                            target.position.get()
-                        ));
+                        assert!(caster.reaches_with_ability(ability, enhancements, target.pos()));
+                        assert!(!game
+                            .pathfind_grid
+                            .obstructed_line_of_sight(caster.pos(), target.pos()));
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
@@ -1432,6 +1430,9 @@ impl CoreGame {
 
                     if let Some(game) = real_game {
                         assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(!game
+                            .pathfind_grid
+                            .obstructed_line_of_sight(caster.pos(), target_pos));
                         caster.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
@@ -4406,6 +4407,7 @@ pub enum AbilityId {
     ManaTest,
     PoisonTest,
 
+    EnemyExplodingArrow,
     EnemySlashingAttack,
     HuldraHeal,
     HuldraInfect,

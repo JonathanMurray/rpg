@@ -1633,7 +1633,7 @@ impl UserInterface {
                     self.sound_player.stop(sound_id);
                 }
 
-                let actor_name_tag = self.characters.get(actor).name;
+                let actor_name_tag = self.characters.get(actor).name_tag();
                 let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                     "cast"
                 } else {
