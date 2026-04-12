@@ -2341,6 +2341,13 @@ impl GameGrid {
                 _ => None,
             };
 
+            if let Some(liquid) = self.pathfind_grid.liquid(mouse_grid_pos) {
+                if mouse_state == MouseState::None && self.hovered_character.is_none() {
+                    self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
+                    self.draw_cursor_text(format!("|<info>| {}", liquid), None, CURSOR_INFO_COLOR);
+                }
+            }
+
             let mut hovered_move_route = None;
 
             let mut may_commit_action_with_left_click = false;

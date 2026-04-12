@@ -164,6 +164,10 @@ impl PathfindGrid {
         }
     }
 
+    pub fn liquid(&self, pos: Position) -> Option<Liquid> {
+        self.liquids.borrow().get(&pos).copied()
+    }
+
     pub fn is_character_in_liquid(&self, pos: Position) -> Option<Liquid> {
         // TODO
         return self.liquids.borrow().get(&pos).copied();

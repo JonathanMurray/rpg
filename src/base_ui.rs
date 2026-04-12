@@ -21,7 +21,7 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     textures::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CHECKED_SYMBOL,
-        CONFIRM_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
+        CONFIRM_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
         MIXED_DICE_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL,
         SWORD_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
@@ -454,6 +454,7 @@ lazy_static! {
             ("<shield>", (symbol_w, &SHIELD_SYMBOL)),
             ("<alt_key>", (symbol_w, &ALT_KEY_SYMBOL)),
             ("<warning>", (symbol_w, &WARNING_SYMBOL)),
+            ("<info>", (symbol_w, &INFO_SYMBOL)),
             ("<heart>", (symbol_w, &HEART_SYMBOL)),
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
             ("<helmet>", (symbol_w, &HELMET_SYMBOL)),

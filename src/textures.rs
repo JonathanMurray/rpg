@@ -1069,6 +1069,7 @@ async fn load_and_init_font_symbols() {
     SHIELD_SYMBOL.get_or_init(|| symbol(1, 0));
     ALT_KEY_SYMBOL.get_or_init(|| symbol(2, 0));
     WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
+    INFO_SYMBOL.get_or_init(|| symbol(4, 1));
     HEART_SYMBOL.get_or_init(|| symbol(0, 1));
     STAMINA_SYMBOL.get_or_init(|| symbol(1, 1));
     STAMINA_SMALL_SYMBOL.get_or_init(|| symbol(1, 3));
@@ -1100,6 +1101,7 @@ pub static MIXED_DICE_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static INFO_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HEART_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
