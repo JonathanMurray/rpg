@@ -91,6 +91,7 @@ const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
 const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
+const MOVE_RANGE_EXTENDED_COLOR: Color = Color::new(0.8, 0.2, 0.2, 0.8);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
 const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
@@ -3944,6 +3945,17 @@ impl GameGrid {
                     );
                 } else if extended_range.is_some() && within_outer(x, y) {
                     self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
+                    //self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
+                    self.draw_dashed_borders(
+                        x,
+                        y,
+                        !within_outer(x - 1, y),
+                        !within_outer(x + 1, y),
+                        !within_outer(x, y - 1),
+                        !within_outer(x, y + 1),
+                        thickness,
+                        MOVE_RANGE_EXTENDED_COLOR,
+                    );
                 }
             }
         }
