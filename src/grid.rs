@@ -87,7 +87,7 @@ const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
 const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
 const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
-const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.4);
+const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.25);
 const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
 const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
@@ -120,17 +120,27 @@ struct CharacterAnimation {
 }
 
 impl CharacterAnimation {
-    fn new(character_id: CharacterId, duration: f32, kind: AnimationDetails) -> CharacterAnimation {
+    fn new(
+        character_id: CharacterId,
+        start_after_delay: f32,
+        duration: f32,
+        kind: AnimationDetails,
+    ) -> CharacterAnimation {
         Self {
             character_id,
             duration,
-            remaining_duration: duration,
+            remaining_duration: duration + start_after_delay,
             kind,
         }
     }
 
     fn remaining_duration_ratio(&self) -> f32 {
-        self.remaining_duration / self.duration
+        // Report 1.0 until the animation starts, and then gradually lower until 0.0 when it ends
+        (self.remaining_duration / self.duration).min(1.0)
+    }
+
+    fn has_started(&self) -> bool {
+        self.remaining_duration <= self.duration
     }
 }
 
@@ -152,7 +162,7 @@ enum AnimationDetails {
         toward: Position,
         with_shield: bool,
     },
-    TargetPreview {
+    AttackCrosshairPreview {
         target_pos: Position,
     },
     CastingSpell {},
@@ -616,6 +626,7 @@ impl GameGrid {
         println!("MOVEMENT WAS INITIATED: {}, {:?}", character_id, positions);
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::MotionPreview { positions },
         ));
@@ -631,6 +642,7 @@ impl GameGrid {
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::Motion {
                 from,
@@ -647,6 +659,7 @@ impl GameGrid {
     pub fn animate_death(&mut self, character_id: CharacterId, duration: f32) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::Death,
         ));
@@ -665,17 +678,34 @@ impl GameGrid {
             .map(|char_id| self.characters.get(&char_id).unwrap().pos())
             .or(area_at.map(|(_shape, pos)| pos));
 
+        let mut delay = 0.0;
+
+        if let Some(target_pos) = target_pos {
+            // Don't show preview for player ability; they issued it and it should feel snappy.
+            if !actor.player_controlled() {
+                delay = 0.3;
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    0.0,
+                    delay,
+                    AnimationDetails::AttackCrosshairPreview { target_pos },
+                ));
+            }
+        }
+
         if ability.id == AbilityId::SweepAttack {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
+                delay,
                 0.4,
                 AnimationDetails::Spinning,
             ));
             // The ability should resolve in the middle of the character's animation
-            0.2
+            delay + 0.2
         } else if ability.id == AbilityId::ShieldBash {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
+                delay,
                 0.4,
                 AnimationDetails::MeleeAttack {
                     toward: target_pos.unwrap(),
@@ -683,11 +713,12 @@ impl GameGrid {
                 },
             ));
             // The ability should resolve in the middle of the character's animation, before they retract from the target
-            0.1
+            delay + 0.1
         } else {
             let casting_duration = 0.4;
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
+                delay,
                 casting_duration,
                 AnimationDetails::CastingSpell {},
             ));
@@ -702,7 +733,7 @@ impl GameGrid {
                 duration = 0.04 * distance_between(caster_pos, target_pos);
 
                 self.add_circle_projectile_effect(
-                    casting_duration,
+                    delay + casting_duration,
                     duration,
                     animation_color,
                     caster_pos,
@@ -713,7 +744,7 @@ impl GameGrid {
                 match shape {
                     AreaShape::Circle(range) => {
                         self.add_circle_projectile_effect(
-                            casting_duration,
+                            delay + casting_duration,
                             duration,
                             animation_color,
                             caster_pos,
@@ -728,8 +759,8 @@ impl GameGrid {
                                 caster_pos,
                                 area_pos,
                                 Effect {
-                                    start_time: casting_duration,
-                                    end_time: casting_duration + duration,
+                                    start_time: delay + casting_duration,
+                                    end_time: delay + casting_duration + duration,
                                     variant: EffectVariant::Fx { texture },
                                 },
                             );
@@ -738,8 +769,8 @@ impl GameGrid {
                                 caster_pos,
                                 area_pos,
                                 Effect {
-                                    start_time: casting_duration,
-                                    end_time: casting_duration + duration,
+                                    start_time: delay + casting_duration,
+                                    end_time: delay + casting_duration + duration,
                                     variant: EffectVariant::Line {
                                         color: animation_color,
                                         thickness: 10.0,
@@ -753,7 +784,7 @@ impl GameGrid {
                 }
             }
 
-            casting_duration + duration
+            delay + casting_duration + duration
         }
     }
 
@@ -829,22 +860,27 @@ impl GameGrid {
         let attacker = &self.characters[&attacker];
         let target = &self.characters[&target];
         let target_pos = target.pos();
+
+        let mut delay = 0.0;
+
         // Don't show preview for player attack; they issued it and it should feel snappy.
         if !attacker.player_controlled() {
-            let duration = 0.3;
+            delay = 0.3;
             self.character_animations.push(CharacterAnimation::new(
                 attacker.id(),
-                duration,
-                AnimationDetails::TargetPreview { target_pos },
+                0.0,
+                delay,
+                AnimationDetails::AttackCrosshairPreview { target_pos },
             ));
         }
 
         let attacker_pos = attacker.pos();
 
-        if ranged {
+        let duration = if ranged {
             let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
             self.character_animations.push(CharacterAnimation::new(
                 attacker.id(),
+                delay,
                 1.0,
                 AnimationDetails::RangedAttack { toward: target_pos },
             ));
@@ -852,6 +888,7 @@ impl GameGrid {
             if let Some((reactor_id, with_shield)) = target_reaction {
                 self.character_animations.push(CharacterAnimation::new(
                     reactor_id,
+                    delay,
                     // keep the animation going slightly after the projectil hits
                     projectile_duration + 0.1,
                     AnimationDetails::ReactingToAttacked {
@@ -865,8 +902,8 @@ impl GameGrid {
                 attacker_pos,
                 target_pos,
                 Effect {
-                    start_time: 0.0,
-                    end_time: projectile_duration,
+                    start_time: delay,
+                    end_time: delay + projectile_duration,
                     variant: EffectVariant::Line {
                         thickness: 1.0,
                         end_thickness: Some(4.0),
@@ -880,8 +917,8 @@ impl GameGrid {
                 attacker_pos,
                 target_pos,
                 Effect {
-                    start_time: projectile_duration,
-                    end_time: projectile_duration + 0.2,
+                    start_time: delay + projectile_duration,
+                    end_time: delay + projectile_duration + 0.2,
                     variant: EffectVariant::At(
                         EffectPosition::Destination,
                         EffectGraphics::Circle {
@@ -899,6 +936,7 @@ impl GameGrid {
             let duration = 0.4;
             self.character_animations.push(CharacterAnimation::new(
                 attacker.id(),
+                delay,
                 duration,
                 AnimationDetails::MeleeAttack {
                     toward: target_pos,
@@ -908,6 +946,7 @@ impl GameGrid {
             if let Some((reactor, with_shield)) = target_reaction {
                 self.character_animations.push(CharacterAnimation::new(
                     reactor,
+                    delay,
                     duration + 0.1,
                     AnimationDetails::ReactingToAttacked {
                         toward: attacker_pos,
@@ -920,8 +959,8 @@ impl GameGrid {
                 attacker_pos,
                 target_pos,
                 Effect {
-                    start_time: 0.1,
-                    end_time: 0.4,
+                    start_time: delay + 0.1,
+                    end_time: delay + 0.4,
                     variant: EffectVariant::At(
                         EffectPosition::Destination,
                         EffectGraphics::Circle {
@@ -934,7 +973,9 @@ impl GameGrid {
                 },
             );
             0.1
-        }
+        };
+
+        delay + duration
     }
 
     pub fn animate_character_health_change(
@@ -945,6 +986,7 @@ impl GameGrid {
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::HealthLost {
                 previous: previous_health,
@@ -957,6 +999,7 @@ impl GameGrid {
 
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::Shake { random_time_offset },
         ));
@@ -986,6 +1029,7 @@ impl GameGrid {
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
+            0.0,
             duration,
             AnimationDetails::SpeechBubble { text },
         ));
@@ -1170,7 +1214,11 @@ impl GameGrid {
                 //Color::new(1.0, 0.8, 0.8, 1.0)
             }
             TextEffectStyle::Miss => WHITE,
-            TextEffectStyle::ReactionExclamation => ORANGE,
+            TextEffectStyle::ReactionExclamation => {
+                rise_indefinitely = false;
+                background = true;
+                ORANGE
+            }
             TextEffectStyle::HostileGraze => LIGHTGRAY,
             TextEffectStyle::HostileHit => ORANGE,
             TextEffectStyle::HostileCrit => RED,
@@ -1416,7 +1464,7 @@ impl GameGrid {
         for animation in self
             .character_animations
             .iter()
-            .filter(|a| a.character_id == character.id())
+            .filter(|a| a.character_id == character.id() && a.has_started())
         {
             let remaining = animation.remaining_duration;
             match &animation.kind {
@@ -1477,14 +1525,8 @@ impl GameGrid {
                     params.rotation = PI * 0.5;
                     dying = true;
                 }
-                AnimationDetails::TargetPreview { target_pos } => {
-                    self.draw_target_crosshair(
-                        character.pos(),
-                        *target_pos,
-                        ENEMYS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
-                        false,
-                    );
+                AnimationDetails::AttackCrosshairPreview { .. } => {
+                    // This is drawn separately, after all the characters
                 }
                 AnimationDetails::RangedAttack { toward } => {
                     // t goes from 0 to 1
@@ -2242,7 +2284,7 @@ impl GameGrid {
                         reactor.pos(),
                         target.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        4.0,
+                        7.0,
                         true,
                     );
                 }
@@ -2278,7 +2320,7 @@ impl GameGrid {
                         reactor.pos(),
                         attacker.pos(),
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        4.0,
+                        7.0,
                         true,
                     );
                 }
@@ -2310,7 +2352,7 @@ impl GameGrid {
                     attacker.pos(),
                     defender.pos(),
                     Color::new(0.90, 0.16, 0.22, 0.8),
-                    4.0,
+                    7.0,
                     true,
                 );
                 labelled_char_ids.insert(attacker.id());
@@ -2794,7 +2836,7 @@ impl GameGrid {
                         active_char_pos,
                         target_pos,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        5.0,
+                        7.0,
                         valid,
                     );
                 }
@@ -2847,6 +2889,16 @@ impl GameGrid {
         for char_animation in &self.character_animations {
             if let AnimationDetails::SpeechBubble { text } = char_animation.kind {
                 self.draw_speech_bubble(text, char_animation.character_id);
+            } else if let AnimationDetails::AttackCrosshairPreview { target_pos } =
+                char_animation.kind
+            {
+                self.draw_target_crosshair(
+                    self.characters[&char_animation.character_id].pos(),
+                    target_pos,
+                    ENEMYS_TARGET_CROSSHAIR_COLOR,
+                    7.0,
+                    false,
+                );
             }
         }
 
@@ -3418,11 +3470,12 @@ impl GameGrid {
             let effective_max = damage.max.min(character.health.current());
             let guaranteed_damage_w =
                 (health_w) * (effective_min as f32 / character.health.max() as f32);
+            let extra_h = 2.0;
             draw_rectangle(
                 health_x + current_health_w - guaranteed_damage_w,
-                health_y,
+                health_y - extra_h / 2.0,
                 guaranteed_damage_w,
-                health_h,
+                health_h + extra_h,
                 GRAY,
             );
             let potential_damage_w =
@@ -3431,10 +3484,18 @@ impl GameGrid {
             potential_color.a = oscillate(1.3, 0.5, 1.0);
             draw_rectangle(
                 health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
-                health_y,
+                health_y - extra_h / 2.0,
                 potential_damage_w,
-                health_h,
+                health_h + extra_h,
                 potential_color,
+            );
+            draw_rectangle_lines(
+                health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
+                health_y - extra_h / 2.0,
+                potential_damage_w + guaranteed_damage_w,
+                health_h + extra_h,
+                1.0,
+                WHITE,
             );
 
             let header = if damage.max > 0 {
@@ -3751,9 +3812,9 @@ impl GameGrid {
         animated: bool,
     ) {
         let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
-        let actor_y = self.grid_y_to_screen(actor_pos.1) + self.cell_w / 2.0;
+        let actor_y = self.grid_y_to_screen(actor_pos.1);
         let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0;
-        let target_y = self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0;
+        let target_y = self.grid_y_to_screen(target_pos.1);
         let depth = 2.0;
 
         draw_dashed_line_ex(
@@ -3973,7 +4034,7 @@ impl GameGrid {
             for y in (origin.1 - range_floor).max(0)
                 ..=(origin.1 + range_floor).min(self.grid_dimensions.1 as i32 - 1)
             {
-                let thickness = 2.0;
+                let thickness = 3.0;
 
                 if within_inner(x, y) {
                     self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);

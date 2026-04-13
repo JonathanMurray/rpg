@@ -1525,7 +1525,7 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     reactor_pos,
                     0.0,
-                    0.5,
+                    1.0,
                     None,
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
@@ -1539,17 +1539,16 @@ impl UserInterface {
                     "|{}| makes an opportunity attack:",
                     reactor.name_tag()
                 ));
-                let duration = 0.5;
                 self.game_grid.add_text_effect(
                     reactor.pos(),
                     0.0,
-                    duration,
+                    1.0,
                     None,
                     "!".to_string(),
                     TextEffectStyle::ReactionExclamation,
                 );
 
-                self.animation_stopwatch.set_to_at_least(duration);
+                self.animation_stopwatch.set_to_at_least(0.5);
             }
             GameEvent::CharacterReactedToHit {
                 main_line,
@@ -1841,11 +1840,10 @@ impl UserInterface {
             } => {
                 // Don't show preview for player movement; they issued it and it should feel snappy.
                 if !self.characters.get(character).player_controlled() {
-                    let duration = 0.3;
                     self.game_grid
-                        .set_character_motion_preview(character, positions, duration);
+                        .set_character_motion_preview(character, positions, 0.4);
 
-                    self.animation_stopwatch.set_to_at_least(duration);
+                    self.animation_stopwatch.set_to_at_least(0.3);
                 }
             }
             GameEvent::Moved {

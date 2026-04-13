@@ -1354,6 +1354,7 @@ impl CoreGame {
                     target_outcome = Some((*target_id, outcome));
 
                     if let Some((radius, acquisition, area_effect)) = impact_circle {
+                        detail_lines.push("".to_string());
                         detail_lines.push("|<faded>Area of effect:|".to_string());
 
                         let area_target_outcomes = Self::perform_ability_area_enemy_effect(

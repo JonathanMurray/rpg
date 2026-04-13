@@ -358,14 +358,14 @@ pub fn draw_rounded_rectangle_lines(
 pub fn draw_crosshair((x, y): (f32, f32), r: f32, color: Color) {
     let x = x.floor();
     let y = y.floor();
-    draw_circle_lines(x, y, r, 3.0, color);
+    draw_circle_lines(x, y, r, 4.0, color);
     let len = r * 1.7;
     let space = 4.0;
-    draw_line(x - len, y, x - space, y, 2.0, color);
-    draw_line(x + space, y, x + len, y, 2.0, color);
-
-    draw_line(x, y - len, x, y - space, 2.0, color);
-    draw_line(x, y + space, x, y + len, 2.0, color);
+    let thickness = 3.0;
+    draw_line(x - len, y, x - space, y, thickness, color);
+    draw_line(x + space, y, x + len, y, thickness, color);
+    draw_line(x, y - len, x, y - space, thickness, color);
+    draw_line(x, y + space, x, y + len, thickness, color);
 
     draw_rectangle(x - 1.0, y - 1.0, 3.0, 3.0, color);
 }
