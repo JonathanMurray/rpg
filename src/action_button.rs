@@ -448,7 +448,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     match effect {
         ApplyEffect::RemoveActionPoints(n) => t
             .technical_description
-            .push(format!("  Loses |<value>{}| AP", n)),
+            .push(format!("  Lose |<value>{}| AP", n)),
+        ApplyEffect::GainActionPoints(n) => t
+            .technical_description
+            .push(format!("  Gain |<value>{}| AP", n)),
         ApplyEffect::GainStamina(n) => t
             .technical_description
             .push(format!("  |<stamina>| |<value>{}| stamina", n)),
@@ -734,6 +737,11 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             t.technical_description
                 .push(format!("  |<sword>| |<value>{dmg_str}|"));
             if let Some(apply_effect) = ability_attack_effect.on_hit {
+                describe_apply_effect(apply_effect, t);
+            }
+            if let Some(apply_effect) = ability_attack_effect.on_kill_apply_self {
+                t.technical_description
+                    .push(format!("|<faded>On kill: (self)|"));
                 describe_apply_effect(apply_effect, t);
             }
         }

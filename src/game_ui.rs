@@ -1704,10 +1704,14 @@ impl UserInterface {
                     // dice roll is effectively ignored since the ability instead proceeded to perform an attack (which uses
                     // its own dice roll)
                     detail_lines.clear();
-                    if attacks.len() == 1 {
-                        line.push_str(" (1 target)");
-                    } else {
-                        line.push_str(&format!(" ({} targets)", attacks.len()));
+
+                    // For AoE ability - show how many targets were hit
+                    if !ability.targets_single_enemy() {
+                        if attacks.len() == 1 {
+                            line.push_str(" (1 target)");
+                        } else {
+                            line.push_str(&format!(" ({} targets)", attacks.len()));
+                        }
                     }
                 }
 

@@ -13,9 +13,9 @@ use crate::{
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
         ENEMY_BRACE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE, ENEMY_SLASHING, ENEMY_TACKLE,
-        ENSLAVED_RAPIER, ENSLAVED_SWORD, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL,
-        LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER,
-        SMALL_SHIELD,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, HULDRA_HEAL, HULDRA_INFECT,
+        HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST,
+        POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -460,7 +460,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
 
-    bob.learn_ability(KILL);
+    bob.learn_ability(EXECUTE);
     bob.learn_passive(PassiveSkill::HardenedSkin);
     bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);

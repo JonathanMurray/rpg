@@ -182,7 +182,7 @@ impl CoreGame {
                                 _ => format!("{sta} stamina, {ap} AP"),
                             };
                             self.log(format!(
-                                "|{}| gained {} (Reaper)",
+                                "|{}| gained {} |<faded>(Reaper)|",
                                 character.name_tag(),
                                 gain_str
                             ))
@@ -1006,6 +1006,11 @@ impl CoreGame {
                 actual_effect = Some(ApplyEffect::RemoveActionPoints(lost));
                 format!("  |{}| lost {} AP", receiver.name_tag(), n)
             }
+            ApplyEffect::GainActionPoints(n) => {
+                let gained = receiver.action_points.gain(n);
+                actual_effect = Some(ApplyEffect::GainActionPoints(gained));
+                format!("  |{}| gained {} AP", receiver.name_tag(), n)
+            }
             ApplyEffect::GainStamina(n) => {
                 let gained = receiver.stamina.gain(n);
                 actual_effect = Some(ApplyEffect::GainStamina(gained));
@@ -1757,6 +1762,7 @@ impl CoreGame {
             for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::GainActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainMana(ref mut n) => *n += degree_of_success,
@@ -2108,6 +2114,9 @@ impl CoreGame {
                 let mut reduced_to_nothing = false;
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => {
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing);
+                    }
+                    ApplyEffect::GainActionPoints(ref mut n) => {
                         apply_hit_type(n, hit_type, &mut reduced_to_nothing);
                     }
                     ApplyEffect::GainStamina(ref mut n) => {
@@ -2513,14 +2522,25 @@ impl CoreGame {
 
             let mut actual_health_lost = 0;
 
+            let mut applied_to_target = vec![];
+            let mut applied_to_self = vec![];
+
             if let Some(game) = game {
                 dmg_str.push_str(&format!(" = |<value>{damage}|"));
                 detail_lines.push(dmg_str);
                 actual_health_lost = game.perform_losing_health(defender, damage);
-            }
 
-            let mut applied_to_target = vec![];
-            let mut applied_to_self = vec![];
+                if defender.is_dead() {
+                    if let Some(effect) = ability_attack_effect.and_then(|e| e.on_kill_apply_self) {
+                        let (applied, log_line, _damage) =
+                            game.perform_effect_application(effect, Some(attacker), None, attacker);
+                        if let Some(applied) = applied {
+                            applied_to_self.push(applied);
+                        }
+                        detail_lines.push(log_line);
+                    }
+                }
+            }
 
             if let Some(game) = game {
                 if damage > 0 {
@@ -3347,6 +3367,9 @@ impl AbilityResolvedEvent {
             if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
                 result.push(*target_id);
             }
+            if matches!(outcome, AbilityTargetOutcome::AttackedEnemy { .. }) {
+                result.push(*target_id);
+            }
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
             for (target_id, outcome) in targets {
@@ -3692,6 +3715,7 @@ impl Characters {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
+    GainActionPoints(u32),
     Condition(ApplyCondition),
 
     GainHealth(u32),
@@ -3711,6 +3735,7 @@ impl ApplyEffect {
     fn multiply(&mut self, factor: u32) {
         match self {
             ApplyEffect::RemoveActionPoints(n) => *n *= factor,
+            ApplyEffect::GainActionPoints(n) => *n *= factor,
             ApplyEffect::Condition(apply_condition) => {
                 if let Some(rounds) = &mut apply_condition.duration_rounds {
                     *rounds *= factor;
@@ -3736,6 +3761,7 @@ impl Display for ApplyEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
+            ApplyEffect::GainActionPoints(n) => f.write_fmt(format_args!("+{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
             ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
             ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
@@ -4404,6 +4430,8 @@ pub enum AbilityId {
     Fireball,
     LightningBolt,
     SearingLight,
+    Execute,
+
     Kill,
     ManaTest,
     PoisonTest,
@@ -4471,6 +4499,7 @@ impl AbilityNegativeEffect {
 pub struct AbilityAttackEffect {
     pub override_damage: Option<u32>,
     pub on_hit: Option<ApplyEffect>,
+    pub on_kill_apply_self: Option<ApplyEffect>,
 }
 
 impl AbilityAttackEffect {
@@ -4478,6 +4507,7 @@ impl AbilityAttackEffect {
         Self {
             override_damage: None,
             on_hit: None,
+            on_kill_apply_self: None,
         }
     }
 }
@@ -5204,7 +5234,9 @@ impl Character {
     }
 
     fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
+        println!("MAYBE GAIN FROM REAPER");
         if self.knows_passive(PassiveSkill::Reaper) {
+            println!("YES GAIN FROM REAPER");
             let sta = self.stamina.gain(num_killed);
             let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 0

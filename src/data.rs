@@ -534,7 +534,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
-    description: "Deal minor damage and inflict |<keyword>Dazed|",
+    description: "Deal |<value>3| damage and inflict |<keyword>Dazed|",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
     stamina_cost: 1,
@@ -915,6 +915,35 @@ pub const LUNGE_ATTACK: Ability = Ability {
     target: AbilityTarget::Enemy {
         reach: AbilityReach::MoveIntoMelee(Range::Float(10.0)),
         effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect::default()),
+        impact_circle: None,
+        environment_effect: None,
+    },
+    animation_color: GRAY,
+    initiate_sound: None,
+    resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
+};
+
+pub const EXECUTE: Ability = Ability {
+    id: AbilityId::Execute,
+    name: "Execute",
+    description: "Attack with penalty, and regain |<value>2| AP if it kills",
+    icon: IconId::Execute,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 1,
+    requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
+    roll: Some(AbilityRollType::RollDuringAttack(-5)),
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect {
+            on_kill_apply_self: Some(ApplyEffect::GainActionPoints(2)),
+            ..AbilityAttackEffect::default()
+        }),
         impact_circle: None,
         environment_effect: None,
     },

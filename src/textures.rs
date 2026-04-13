@@ -193,6 +193,7 @@ pub enum IconId {
     Energize,
     Inspire,
     LightningBolt,
+    Execute,
 
     HardenedSkin,
     WeaponProficiency,
@@ -958,6 +959,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::Rage => (2, 6),
         IconId::CrushingStrike => (4, 7),
         IconId::CarefulAim => (8, 8),
+        IconId::Execute => (9, 8),
         IconId::CripplingShot => (7, 8),
         IconId::TrueStrike => (5, 6),
         IconId::SpellAdvantage => (3, 1),
@@ -979,6 +981,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::QuickStrike => (3, 8),
         IconId::SweepAttack => (4, 8),
         IconId::LungeAttack => (5, 8),
+
         IconId::Slashing => (0, 8),
         IconId::Stabbing => (1, 8),
         IconId::Feint => (0, 7),
