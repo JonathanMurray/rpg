@@ -41,6 +41,18 @@ pub const ROBE: ArmorPiece = ArmorPiece {
     },
 };
 
+pub const DRUID_COAT: ArmorPiece = ArmorPiece {
+    name: "Druid coat",
+    protection: 1,
+    limit_evasion_from_agi: None,
+    icon: EquipmentIconId::DruidCoat,
+    weight: 1,
+    equip: EquipEffect {
+        thorns: 1,
+        ..EquipEffect::default()
+    },
+};
+
 pub const LEATHER_ARMOR: ArmorPiece = ArmorPiece {
     name: "Leather armor",
     protection: 2,

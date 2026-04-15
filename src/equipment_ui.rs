@@ -174,6 +174,12 @@ fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
         t.technical_description
             .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
     }
+    if armor.equip.thorns > 0 {
+        t.technical_description.push(format!(
+            "Deal |<value>{}| damage back to melee attackers",
+            armor.equip.thorns
+        ));
+    }
     t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(armor.weight));
     t

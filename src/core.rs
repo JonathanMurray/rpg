@@ -1021,6 +1021,11 @@ impl CoreGame {
                 actual_effect = Some(ApplyEffect::GainMana(gained));
                 format!("  |{}| gained {} mana", receiver.name_tag(), gained)
             }
+            ApplyEffect::LoseHealth(n) => {
+                let lost = receiver.health.lose(n);
+                actual_effect = Some(ApplyEffect::GainHealth(lost));
+                format!("  |{}| lost {} health", receiver.name_tag(), lost)
+            }
             ApplyEffect::GainHealth(n) => {
                 let gained = receiver.health.gain(n);
                 actual_effect = Some(ApplyEffect::GainHealth(gained));
@@ -1763,6 +1768,7 @@ impl CoreGame {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::LoseHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainStamina(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainMana(ref mut n) => *n += degree_of_success,
@@ -2123,6 +2129,9 @@ impl CoreGame {
                         apply_hit_type(n, hit_type, &mut reduced_to_nothing)
                     }
                     ApplyEffect::GainMana(ref mut n) => {
+                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
+                    }
+                    ApplyEffect::LoseHealth(ref mut n) => {
                         apply_hit_type(n, hit_type, &mut reduced_to_nothing)
                     }
                     ApplyEffect::GainHealth(ref mut n) => {
@@ -2529,6 +2538,23 @@ impl CoreGame {
                 dmg_str.push_str(&format!(" = |<value>{damage}|"));
                 detail_lines.push(dmg_str);
                 actual_health_lost = game.perform_losing_health(defender, damage);
+
+                if weapon.is_melee() {
+                    let defender_thorns = defender.thorns();
+                    if defender_thorns > 0 {
+                        // TODO: How is this shown to player?
+                        let health_lost_to_thorns =
+                            game.perform_losing_health(attacker, defender_thorns);
+                        if health_lost_to_thorns > 0 {
+                            detail_lines.push(format!(
+                                "|{}| lost {} health |<faded>(thorns)|",
+                                attacker.name_tag(),
+                                health_lost_to_thorns
+                            ));
+                            applied_to_self.push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                        }
+                    }
+                }
 
                 if defender.is_dead() {
                     if let Some(effect) = ability_attack_effect.and_then(|e| e.on_kill_apply_self) {
@@ -3732,6 +3758,7 @@ pub enum ApplyEffect {
     GainActionPoints(u32),
     Condition(ApplyCondition),
 
+    LoseHealth(u32),
     GainHealth(u32),
     GainStamina(u32),
     GainMana(u32),
@@ -3758,6 +3785,7 @@ impl ApplyEffect {
                     *stacks *= factor;
                 }
             }
+            ApplyEffect::LoseHealth(n) => *n *= factor,
             ApplyEffect::GainHealth(n) => *n *= factor,
             ApplyEffect::GainStamina(n) => *n *= factor,
             ApplyEffect::GainMana(n) => *n *= factor,
@@ -3778,6 +3806,7 @@ impl Display for ApplyEffect {
             ApplyEffect::GainActionPoints(n) => f.write_fmt(format_args!("+{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
             ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
+            ApplyEffect::LoseHealth(n) => f.write_fmt(format_args!("-{n}")),
             ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
@@ -5122,6 +5151,13 @@ impl Character {
             is_facing_east: Cell::new(false),
             is_being_pushed_in_direction: Cell::new(None),
         }
+    }
+
+    fn thorns(&self) -> u32 {
+        self.armor_piece
+            .get()
+            .map(|armor| armor.equip.thorns)
+            .unwrap_or(0)
     }
 
     pub fn toggle_quick_actions(&self) {
@@ -6941,12 +6977,14 @@ pub struct ArmorPiece {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EquipEffect {
     pub bonus_spell_modifier: u32,
+    pub thorns: u32,
 }
 
 impl EquipEffect {
     pub const fn default() -> Self {
         Self {
             bonus_spell_modifier: 0,
+            thorns: 0,
         }
     }
 }

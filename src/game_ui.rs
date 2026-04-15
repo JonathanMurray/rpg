@@ -2141,7 +2141,18 @@ impl UserInterface {
                 if let ApplyEffect::Condition(condition) = apply_effect {
                     texture = Some(condition.condition.status_icon());
                 }
-                s.push_str(&format!("{} ", apply_effect));
+                if let ApplyEffect::LoseHealth(amount) = *apply_effect {
+                    self.game_grid.add_text_effect(
+                        attacker_pos,
+                        0.0,
+                        1.0,
+                        texture,
+                        format!("{}", amount),
+                        TextEffectStyle::HostileHit,
+                    );
+                } else {
+                    s.push_str(&format!("{} ", apply_effect));
+                }
             }
             self.game_grid.add_text_effect(
                 attacker_pos,

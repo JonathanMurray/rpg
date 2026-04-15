@@ -464,6 +464,9 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         ApplyEffect::GainMana(n) => t
             .technical_description
             .push(format!("  |<mana>| |<value>{}| mana", n)),
+        ApplyEffect::LoseHealth(n) => t
+            .technical_description
+            .push(format!("  Lose |<value>{}| |<heart>| health", n)),
         ApplyEffect::GainHealth(n) => t
             .technical_description
             .push(format!("  |<heart>| |<value>{}| healing", n)),
