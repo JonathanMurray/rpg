@@ -714,6 +714,18 @@ impl GameGrid {
             ));
             // The ability should resolve in the middle of the character's animation, before they retract from the target
             delay + 0.1
+        } else if ability.id == AbilityId::Execute {
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                delay,
+                0.4,
+                AnimationDetails::MeleeAttack {
+                    toward: target_pos.unwrap(),
+                    with_shield: false,
+                },
+            ));
+            // The ability should resolve in the middle of the character's animation, before they retract from the target
+            delay + 0.1
         } else {
             let casting_duration = 0.4;
             self.character_animations.push(CharacterAnimation::new(

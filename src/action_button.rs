@@ -816,7 +816,7 @@ pub struct ActionButton {
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
 pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
-pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.5, 0.4, 0.3, 1.0);
+pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.6, 0.5, 0.4, 1.0);
 
 impl ActionButton {
     pub fn new(
