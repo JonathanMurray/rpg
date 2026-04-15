@@ -927,6 +927,23 @@ pub const LUNGE_ATTACK: Ability = Ability {
     }),
 };
 
+pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Execute,
+    name: "Bloodlust",
+    description: "Also gain |<keyword>Ferocity| if it kills",
+    icon: IconId::Rage,
+    stamina_cost: 1,
+    attack_effect: Some(AttackEnhancementEffect {
+        on_kill_apply_self: Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::Ferocity,
+            stacks: Some(1),
+            duration_rounds: None,
+        })),
+        ..AttackEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
+};
+
 pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
@@ -937,7 +954,7 @@ pub const EXECUTE: Ability = Ability {
     stamina_cost: 1,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
     roll: Some(AbilityRollType::RollDuringAttack(-5)),
-    possible_enhancements: [None; 3],
+    possible_enhancements: [Some(EXECUTE_BLOODLUST), None, None],
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::PerformAttack(AbilityAttackEffect {

@@ -2539,6 +2539,20 @@ impl CoreGame {
                         }
                         detail_lines.push(log_line);
                     }
+                    for (name, enhancement) in enhancements {
+                        if let Some(effect) = enhancement.on_kill_apply_self {
+                            let (applied, log_line, _damage) = game.perform_effect_application(
+                                effect,
+                                Some(attacker),
+                                None,
+                                attacker,
+                            );
+                            if let Some(applied) = applied {
+                                applied_to_self.push(applied);
+                            }
+                            detail_lines.push(format!("{} |<faded>({})|", log_line, name));
+                        }
+                    }
                 }
             }
 
@@ -4751,6 +4765,8 @@ pub struct AttackEnhancementEffect {
     // Gets applied on the target regardless if the attack hits
     pub on_target: Option<ApplyEffect>,
 
+    pub on_kill_apply_self: Option<ApplyEffect>,
+
     pub consume_equipped_arrow: bool,
 
     pub improved_graze: bool,
@@ -4771,6 +4787,7 @@ impl AttackEnhancementEffect {
             range_bonus: 0,
             on_self: None,
             on_target: None,
+            on_kill_apply_self: None,
             consume_equipped_arrow: false,
             improved_graze: false,
             improved_crit: false,

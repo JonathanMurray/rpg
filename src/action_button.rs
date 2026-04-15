@@ -306,6 +306,12 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         describe_apply_effect(effect, t);
     }
 
+    if let Some(effect) = effect.on_kill_apply_self {
+        t.technical_description
+            .push(format!("|<faded>On kill: (self)|"));
+        describe_apply_effect(effect, t);
+    }
+
     if let Some(effect) = effect.on_damage_effect {
         t.technical_description
             .push("|<faded>On damage:|".to_string());
