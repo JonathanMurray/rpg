@@ -1283,6 +1283,41 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     }),
 };
 
+pub const DRAUG_ATTACK: Ability = Ability {
+    id: AbilityId::DraugAttack,
+    name: "Attack",
+    description: "Deal |<value>2| damage and inflict |<keyword>Dazed|",
+    icon: IconId::DraugAttack,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Will),
+            damage: Some(AbilityDamage::AtLeast(2, DamageType::Regular)),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Dazed,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })),
+                None,
+            ]),
+        }),
+        impact_circle: None,
+        environment_effect: None,
+    },
+    animation_color: PURPLE,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Debuff),
+    charge_fx: None,
+};
+
 pub const HULDRA_INFECT: Ability = Ability {
     id: AbilityId::HuldraInfect,
     name: "Infect",

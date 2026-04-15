@@ -21,6 +21,7 @@ pub enum SpriteId {
     Huldra,
     Skeleton,
     Skeleton2,
+    Draug,
     Ghoul,
     Ogre,
     Magi,
@@ -52,6 +53,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Huldra, "huldra.png"),
         (SpriteId::Skeleton, "skeleton.png"),
         (SpriteId::Skeleton2, "skeleton2.png"),
+        (SpriteId::Draug, "draug.png"),
         (SpriteId::Ghoul, "ghoul.png"),
         (SpriteId::Ogre, "ogre.png"),
         (SpriteId::Magi, "magi.png"),
@@ -102,6 +104,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Ogre => 26,
         SpriteId::Magi => 25,
         SpriteId::Ghoul => 24,
+        SpriteId::Draug => 26,
 
         // TODO:
         SpriteId::PinkMan => 25,
@@ -195,6 +198,8 @@ pub enum IconId {
     LightningBolt,
     Execute,
 
+    DraugAttack,
+
     HardenedSkin,
     WeaponProficiency,
     CriticalCharge,
@@ -220,6 +225,7 @@ pub enum PortraitId {
     Bob,
     Clara,
     Skeleton,
+    Draug,
     Magi,
     Huldra,
     Ghoul,
@@ -233,6 +239,7 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
         (PortraitId::Clara, "portrait_clara.png"),
         (PortraitId::Skeleton, "portrait_skeleton.png"),
         (PortraitId::Magi, "portrait_magi.png"),
+        (PortraitId::Draug, "portrait_draug.png"),
         (PortraitId::Huldra, "portrait_huldra.png"),
         (PortraitId::Ghoul, "portrait_ghoul.png"),
         (PortraitId::Ogre, "portrait_ogre.png"),
@@ -950,6 +957,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::Block => (8, 7),
         IconId::Brace => (5, 2),
         IconId::LightningBolt => (6, 2),
+        IconId::DraugAttack => (7, 2),
         IconId::Move => (0, 4),
         IconId::Scream => (6, 1),
         IconId::Mindblast => (7, 1),

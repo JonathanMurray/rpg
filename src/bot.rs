@@ -11,7 +11,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
         MOVE_DISTANCE_PER_RESOURCE,
     },
-    data::{HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
+    data::{DRAUG_ATTACK, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
     pathfind::{Path, PathfindGrid},
     util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
@@ -19,7 +19,41 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum BotBehaviour {
     Huldra(HuldraBehaviour),
+    Draug(DraugBehaviour),
     Fighter(FighterBehaviour),
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct DraugBehaviour {
+    target_selection: EnemyTargetSelection,
+}
+
+impl DraugBehaviour {
+    fn get_goal(&self, game: &CoreGame) -> BotGoal {
+        let bot = game.characters.get_rc(game.active_character_id);
+
+        let range = DRAUG_ATTACK.target.range(&[]).unwrap();
+
+        let (player_chars, target_id) = self.target_selection.run(game, range);
+        let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
+        let target = Rc::clone(target);
+
+        let candidates = candidate_actions(bot);
+
+        let action = candidates[0];
+        let action = match action {
+            BotAction::Attack => (action, Some(target)),
+            BotAction::SingleEnemyTarget(..) => (action, Some(target)),
+            // TODO should not only target self
+            BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
+            BotAction::NonTarget(..) => (action, None),
+        };
+
+        BotGoal {
+            action,
+            fallback_actions: candidates,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -122,8 +156,11 @@ pub struct FighterBehaviour {
 
 impl FighterBehaviour {
     fn get_goal(&self, game: &CoreGame) -> BotGoal {
-        let (player_chars, target_id) = self.target_selection.run(game);
         let bot = game.characters.get_rc(game.active_character_id);
+        let attack = bot.attack_action().unwrap();
+        let weapon_range = bot.weapon(attack.hand).unwrap().range.into_range();
+
+        let (player_chars, target_id) = self.target_selection.run(game, weapon_range);
         let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
         let target = Rc::clone(target);
 
@@ -152,7 +189,11 @@ pub struct EnemyTargetSelection {
 }
 
 impl EnemyTargetSelection {
-    fn run<'a>(&self, game: &'a CoreGame) -> (Vec<&'a Rc<Character>>, CharacterId) {
+    fn run<'a>(
+        &self,
+        game: &'a CoreGame,
+        action_range: Range,
+    ) -> (Vec<&'a Rc<Character>>, CharacterId) {
         let bot = game.active_character();
 
         let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
@@ -167,7 +208,7 @@ impl EnemyTargetSelection {
         if random_bool(0.5) {
             println!("Sort player chars by proximity");
             player_chars.sort_by_key(|ch| {
-                let distance_to = find_path_to_attack_target(game, bot, ch)
+                let distance_to = find_path(game, bot, ch, action_range)
                     .map(|p| p.total_distance)
                     .unwrap_or(f32::MAX);
 
@@ -206,7 +247,7 @@ impl EnemyTargetSelection {
             if let Some(new_target) = player_chars.iter().find(|ch| ch.id() != target_id) {
                 println!("switching to new target?: {}", new_target.id());
 
-                if find_path_to_attack_target(game, bot, new_target).is_some() {
+                if find_path(game, bot, new_target, action_range).is_some() {
                     println!("Yes, there's a path to it ");
                     self.current_target.set(Some(new_target.id()));
                     target_id = new_target.id();
@@ -231,6 +272,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
     let result = match character.kind.unwrap_bot_behaviour() {
         BotBehaviour::Huldra(huldra) => huldra.run(game),
         BotBehaviour::Fighter(fighter) => pursue_goal(game, fighter.get_goal(game)),
+        BotBehaviour::Draug(draug) => pursue_goal(game, draug.get_goal(game)),
     };
     println!("Bot chose: {:?}", result);
 
@@ -411,7 +453,10 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
 }
 
 fn candidate_actions(bot: &Character) -> Vec<BotAction> {
-    let mut candidates = vec![BotAction::Attack];
+    let mut candidates = vec![];
+    if bot.weapon(HandType::MainHand).is_some() {
+        candidates.push(BotAction::Attack);
+    }
     dbg!(bot.name);
     //for a in bot.usable_abilities() {
     for a in bot.known_abilities() {
@@ -428,17 +473,6 @@ fn candidate_actions(bot: &Character) -> Vec<BotAction> {
     }
     CustomShuffle::shuffle(&mut candidates);
     candidates
-}
-
-fn find_path_to_attack_target(
-    game: &CoreGame,
-    bot: &Character,
-    target: &&Rc<Character>,
-) -> Option<Path> {
-    let attack = bot.attack_action().unwrap();
-    let weapon_range = bot.weapon(attack.hand).unwrap().range;
-
-    find_path(game, bot, target, weapon_range.into_range())
 }
 
 fn find_path(

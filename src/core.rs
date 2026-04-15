@@ -4513,6 +4513,7 @@ pub enum AbilityId {
     HuldraHeal,
     HuldraInfect,
     HuldraInflictHorrors,
+    DraugAttack,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

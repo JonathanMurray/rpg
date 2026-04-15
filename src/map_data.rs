@@ -12,10 +12,10 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRUID_COAT, ENEMY_BRACE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE, ENEMY_SLASHING,
-        ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HULDRA_HEAL,
-        HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH,
-        MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
+        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE,
+        ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
+        HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT,
+        LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::GameGrid,
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -171,6 +171,7 @@ pub enum CharacterType {
     Clara,
     Skeleton,
     SkeletonLeader,
+    Draug,
     Ogre,
     Huldra,
     Enslaved,
@@ -186,6 +187,7 @@ impl CharacterType {
             CharacterType::Clara => SpriteId::Clara,
             CharacterType::Skeleton => SpriteId::Skeleton,
             CharacterType::SkeletonLeader => SpriteId::Skeleton,
+            CharacterType::Draug => SpriteId::Draug,
             CharacterType::Ogre => SpriteId::Ogre,
             CharacterType::Huldra => SpriteId::Huldra,
             CharacterType::Enslaved => SpriteId::Skeleton2,
@@ -307,6 +309,20 @@ pub fn create_character(
             skeleton.learn_ability(ENEMY_BRACE);
             skeleton.learn_ability(ENEMY_INSPIRE);
             skeleton
+        }
+        CharacterType::Draug => {
+            let draug = Character::new(
+                bot(BotBehaviour::Draug(Default::default()), 10.0),
+                "Draug",
+                PortraitId::Draug,
+                char_data.type_.sprite_id(),
+                Attributes::new(4, 4, 4, 1),
+                pos,
+            );
+            //slime.set_weapon(HandType::MainHand, BAD_RAPIER);
+            draug.learn_ability(DRAUG_ATTACK);
+            draug.health.change_max_value_to(20);
+            draug
         }
         CharacterType::Ghoul1 => {
             // TODO these should have archer behaviour, i.e. run away from melee

@@ -104,7 +104,6 @@ async fn main() {
                     &resources.big_font,
                     &resources.simple_font,
                     char,
-                    &ui_resources.equipment_icons,
                 ));
             } else {
                 character_editor = None;
@@ -518,6 +517,7 @@ impl Sidebar {
             EditorAction::PlaceCharacter(CharacterType::Clara),
             EditorAction::PlaceCharacter(CharacterType::SkeletonLeader),
             EditorAction::PlaceCharacter(CharacterType::Skeleton),
+            EditorAction::PlaceCharacter(CharacterType::Draug),
             EditorAction::PlaceCharacter(CharacterType::Ghoul1),
             EditorAction::PlaceCharacter(CharacterType::Ghoul2),
             EditorAction::PlaceCharacter(CharacterType::Ogre),
@@ -692,12 +692,7 @@ impl Sidebar {
     }
 }
 
-fn build_character_editor(
-    big_font: &Font,
-    simple_font: &Font,
-    char: &Character,
-    equipment_icons: &HashMap<EquipmentIconId, Texture2D>,
-) -> Container {
+fn build_character_editor(big_font: &Font, simple_font: &Font, char: &Character) -> Container {
     let weapon = char.weapon(HandType::MainHand);
     let main_hand_element = if let Some(weapon) = weapon {
         Element::Text(TextLine::new(
