@@ -83,7 +83,15 @@ async fn main() {
 
     loop {
         next_frame().await;
-        let grid_outcome = game_grid.draw(true, &mut UiState::Idle, false, None, (0, 0));
+        let grid_outcome = game_grid.draw(
+            true,
+            &mut UiState::Idle {
+                recently_committed_action: None,
+            },
+            false,
+            None,
+            (0, 0),
+        );
         if show_grid.get() {
             game_grid.draw_debug_cells();
         }

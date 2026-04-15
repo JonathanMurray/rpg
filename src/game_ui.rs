@@ -90,7 +90,9 @@ pub enum UiState {
         victim: CharacterId,
         selected: bool,
     },
-    Idle,
+    Idle {
+        recently_committed_action: Option<PlayerChose>,
+    },
 }
 
 impl UiState {
@@ -545,7 +547,9 @@ impl UserInterface {
             sound_player.clone(),
         );
 
-        let ui_state = Rc::new(RefCell::new(UiState::Idle));
+        let ui_state = Rc::new(RefCell::new(UiState::Idle {
+            recently_committed_action: None,
+        }));
 
         let first_player_character_id = characters
             .iter()
@@ -1238,6 +1242,11 @@ impl UserInterface {
                 ButtonAction::Action(configured_action.base_action()),
                 fully_selected,
             )));
+        } else if let UiState::Idle {
+            recently_committed_action: Some(PlayerChose::Action(Some(action))),
+        } = &*self.state.borrow()
+        {
+            self.set_selected_action(Some((ButtonAction::Action(action.base_action()), true)));
         } else {
             self.set_selected_action(None);
         }
@@ -1388,7 +1397,7 @@ impl UserInterface {
                 self.set_allowed_to_use_action_buttons(true);
             }
 
-            UiState::Idle => {
+            UiState::Idle { .. } => {
                 //self.target_ui.clear_action();
                 self.set_allowed_to_use_action_buttons(false);
             }
@@ -2521,7 +2530,7 @@ impl UserInterface {
     fn commit_player_action(&mut self) -> PlayerChose {
         // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
         // TODO shouldn't we rather change the state, and rely on refresh_selected_action_button to clear this?
-        self.set_selected_action(None);
+        //self.set_selected_action(None);
 
         match &*self.state.borrow() {
             UiState::ConfiguringAction(configured_action) => {
@@ -2595,7 +2604,7 @@ impl UserInterface {
                 PlayerChose::OpportunityAttack(*selected)
             }
 
-            UiState::ChoosingAction | UiState::Idle => unreachable!(),
+            UiState::ChoosingAction | UiState::Idle { .. } => unreachable!(),
         }
     }
 
@@ -2977,7 +2986,7 @@ fn buttons_row(buttons: Vec<Element>) -> Element {
     })
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum PlayerChose {
     AttackedReaction(Option<OnAttackedReaction>),
     HitReaction(Option<OnHitReaction>),

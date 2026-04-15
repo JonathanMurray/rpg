@@ -4232,7 +4232,7 @@ impl Conditions {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Action {
     Attack {
         hand: HandType,
@@ -4257,6 +4257,35 @@ pub enum Action {
     UseConsumable {
         inventory_equipment_index: usize,
     },
+}
+
+impl Action {
+    pub fn base_action(&self) -> BaseAction {
+        match self {
+            Action::Attack {
+                hand,
+                enhancements,
+                target,
+            } => BaseAction::Attack(AttackAction {
+                hand: *hand,
+                action_point_cost: 3,
+            }),
+            Action::UseAbility {
+                ability,
+                enhancements,
+                target,
+            } => BaseAction::UseAbility(*ability),
+            Action::Move {
+                total_distance,
+                positions,
+                extra_cost,
+            } => BaseAction::Move,
+            Action::ChangeEquipment { from, to } => BaseAction::ChangeEquipment,
+            Action::UseConsumable {
+                inventory_equipment_index,
+            } => BaseAction::UseConsumable,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]

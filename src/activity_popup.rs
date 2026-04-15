@@ -104,7 +104,7 @@ impl ActivityPopup {
     pub fn draw(&mut self, x: f32, y: f32) {
         if matches!(
             &*self.ui_state.borrow(),
-            UiState::Idle | UiState::ChoosingAction
+            UiState::Idle { .. } | UiState::ChoosingAction
         ) {
             self.last_drawn_rectangle = Rect {
                 x,
@@ -430,7 +430,7 @@ impl ActivityPopup {
                             // It's a binary choice of 'use opportunity attack or not'
                             *selected = !selected_button_actions.is_empty();
                         }
-                        UiState::ChoosingAction | UiState::Idle => unreachable!(),
+                        UiState::ChoosingAction | UiState::Idle { .. } => unreachable!(),
                     }
 
                     self.selected_choice_button_ids.clear();
@@ -841,7 +841,7 @@ impl ActivityPopup {
                 popup_buttons.push(btn);
             }
 
-            UiState::ChoosingAction | UiState::Idle => {}
+            UiState::ChoosingAction | UiState::Idle { .. } => {}
         }
 
         let mut choice_buttons = IndexMap::new();

@@ -376,7 +376,9 @@ impl _GameUserInterfaceConnection {
             }
 
             if let Some(player_choice) = player_choice {
-                user_interface.set_state(UiState::Idle);
+                user_interface.set_state(UiState::Idle {
+                    recently_committed_action: Some(player_choice.clone()),
+                });
                 // Need to call next_frame here, to make sure UI events aren't lingering when
                 // PlayerChose::SwitchTo leads us back into selecting the action for the newly
                 // selected character (?)

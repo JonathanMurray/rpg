@@ -2810,7 +2810,7 @@ impl GameGrid {
         }
 
         if let Some(id) = self.selected_player_character_id {
-            if !matches!(ui_state, UiState::Idle) {
+            if !matches!(ui_state, UiState::Idle { .. }) {
                 let pos = self.character_screen_pos(&self.characters[&id]);
                 let animated = self.active_character_id == id && mouse_state == MouseState::None;
                 self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0, animated);
