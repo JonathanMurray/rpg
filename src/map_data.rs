@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use crate::{
     bot::BotBehaviour,
     core::{
-        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, EquipmentEntry,
-        HandType, Party, PlayerId, Position, Shield, Weapon,
+        ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
+        EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
@@ -172,6 +172,7 @@ pub enum CharacterType {
     Skeleton,
     SkeletonLeader,
     Draug,
+    Lootgoblin,
     Ogre,
     Huldra,
     Enslaved,
@@ -188,6 +189,7 @@ impl CharacterType {
             CharacterType::Skeleton => SpriteId::Skeleton,
             CharacterType::SkeletonLeader => SpriteId::Skeleton,
             CharacterType::Draug => SpriteId::Draug,
+            CharacterType::Lootgoblin => SpriteId::Lootgoblin,
             CharacterType::Ogre => SpriteId::Ogre,
             CharacterType::Huldra => SpriteId::Huldra,
             CharacterType::Enslaved => SpriteId::Skeleton2,
@@ -319,10 +321,23 @@ pub fn create_character(
                 Attributes::new(4, 4, 4, 1),
                 pos,
             );
-            //slime.set_weapon(HandType::MainHand, BAD_RAPIER);
             draug.learn_ability(DRAUG_ATTACK);
             draug.health.change_max_value_to(20);
             draug
+        }
+        CharacterType::Lootgoblin => {
+            let goblin = Character::new(
+                bot(BotBehaviour::Draug(Default::default()), 10.0),
+                "Loot goblin",
+                PortraitId::Ghoul,
+                char_data.type_.sprite_id(),
+                Attributes::new(4, 4, 4, 1),
+                pos,
+            );
+            goblin.learn_ability(DRAUG_ATTACK);
+            goblin.health.change_max_value_to(20);
+            goblin.receive_condition(Condition::Treasure, Some(3), None);
+            goblin
         }
         CharacterType::Ghoul1 => {
             // TODO these should have archer behaviour, i.e. run away from melee

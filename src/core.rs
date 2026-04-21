@@ -1022,7 +1022,8 @@ impl CoreGame {
                 format!("  |{}| gained {} mana", receiver.name_tag(), gained)
             }
             ApplyEffect::LoseHealth(n) => {
-                let lost = receiver.health.lose(n);
+                //let lost = receiver.health.lose(n);
+                let lost = self.perform_losing_health(receiver, n);
                 actual_effect = Some(ApplyEffect::GainHealth(lost));
                 format!("  |{}| lost {} health", receiver.name_tag(), lost)
             }
@@ -2237,6 +2238,18 @@ impl CoreGame {
 
     fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
+
+        if character.has_condition(&Condition::Treasure) {
+            if let Some(ch) = self.player_characters().next() {
+                ch.kind.unwrap_party().gain_money(1);
+                println!("PLAYER GAINED MONEY");
+                character
+                    .conditions
+                    .borrow_mut()
+                    .lose_stacks(&Condition::Treasure, 1);
+            }
+        }
+
         character.on_health_changed();
         amount_lost
     }
@@ -3939,6 +3952,7 @@ pub enum Condition {
     Ferocity,
     Wet,
     Poisoned,
+    Treasure,
 }
 
 impl Condition {
@@ -3974,6 +3988,7 @@ impl Condition {
             Ferocity => "Ferocity",
             Wet => "Wet",
             Poisoned => "Poisoned",
+            Treasure => "Treasure",
         }
     }
 
@@ -4008,7 +4023,8 @@ impl Condition {
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
-            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health"
+            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
+            Treasure => "Carries treasure",
         }
     }
 
@@ -4044,6 +4060,7 @@ impl Condition {
             Ferocity => true,
             Wet => true,
             Poisoned => false,
+            Treasure => true,
         }
     }
 
@@ -5004,6 +5021,13 @@ impl CharacterKind {
         match self {
             CharacterKind::Player(..) => panic!(),
             CharacterKind::Bot(bot) => &bot.behaviour,
+        }
+    }
+
+    pub fn unwrap_party(&self) -> &Party {
+        match self {
+            CharacterKind::Player(party, _player_id) => party,
+            CharacterKind::Bot(..) => panic!(),
         }
     }
 }

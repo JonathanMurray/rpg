@@ -22,6 +22,7 @@ pub enum SpriteId {
     Skeleton,
     Skeleton2,
     Draug,
+    Lootgoblin,
     Ghoul,
     Ogre,
     Magi,
@@ -54,6 +55,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Skeleton, "skeleton.png"),
         (SpriteId::Skeleton2, "skeleton2.png"),
         (SpriteId::Draug, "draug.png"),
+        (SpriteId::Lootgoblin, "lootgoblin.png"),
         (SpriteId::Ghoul, "ghoul.png"),
         (SpriteId::Ogre, "ogre.png"),
         (SpriteId::Magi, "magi.png"),
@@ -105,6 +107,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Magi => 25,
         SpriteId::Ghoul => 24,
         SpriteId::Draug => 26,
+        SpriteId::Lootgoblin => 24,
 
         // TODO:
         SpriteId::PinkMan => 25,

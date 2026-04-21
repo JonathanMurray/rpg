@@ -518,6 +518,7 @@ impl Sidebar {
             EditorAction::PlaceCharacter(CharacterType::SkeletonLeader),
             EditorAction::PlaceCharacter(CharacterType::Skeleton),
             EditorAction::PlaceCharacter(CharacterType::Draug),
+            EditorAction::PlaceCharacter(CharacterType::Lootgoblin),
             EditorAction::PlaceCharacter(CharacterType::Ghoul1),
             EditorAction::PlaceCharacter(CharacterType::Ghoul2),
             EditorAction::PlaceCharacter(CharacterType::Ogre),

@@ -2207,7 +2207,7 @@ impl PassiveSkill {
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
             UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
-            Slasher => "When dealing damage with an attack, it also inflicts |<keyword>Bleeding|."
+            Slasher => "When dealing damage with an attack, it also inflicts |<keyword>Bleeding|.",
         }
     }
 
