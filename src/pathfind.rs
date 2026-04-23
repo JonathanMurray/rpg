@@ -176,22 +176,7 @@ impl PathfindGrid {
     }
 
     pub fn is_character_in_liquid(&self, pos: Position) -> Option<Liquid> {
-        // TODO
         return self.liquids.borrow().get(&pos).copied();
-
-        let mut liquid = None;
-        for x in pos.0 - 1..=pos.0 + 1 {
-            // TODO
-            // The top row of cells doesn't need to be on water cells for the char to be visibly in water
-            for y in pos.1 - 1..=pos.1 + 1 {
-                if let Some(l) = self.liquids.borrow().get(&(x, y)) {
-                    liquid = Some(*l);
-                } else {
-                    return None;
-                }
-            }
-        }
-        liquid
     }
 
     pub fn set_occupied(&self, pos: Position, occupation: Option<Occupation>) {

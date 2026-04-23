@@ -731,7 +731,10 @@ impl ActivityPopup {
                                     self.new_button(ButtonAction::AbilityEnhancement(enhancement));
 
                                 btn.enabled.set(
-                                    character.can_use_ability_enhancement(*ability, enhancement),
+                                    character.can_use_ability_enhancement(
+                                        *ability.as_ref(),
+                                        enhancement,
+                                    ),
                                 );
 
                                 popup_buttons.push(btn);

@@ -13,7 +13,7 @@ use crate::{
     },
     data::{DRAUG_ATTACK, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
     pathfind::{Path, PathfindGrid},
-    util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
+    util::CustomShuffle,
 };
 
 #[derive(Debug, Clone)]
@@ -616,6 +616,7 @@ fn ability_reaches(
         && !pathfind_grid.obstructed_line_of_sight(bot.pos(), target.pos())
 }
 
+/*
 fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     let bot = game.active_character();
     assert!(!bot.player_controlled());
@@ -713,6 +714,7 @@ fn run_normal_behaviour(game: &CoreGame) -> Option<Action> {
     // If a character starts its turn with 0 AP, it can't take any actions, so None is a valid case here
     None
 }
+*/
 
 pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<Action> {
     let remaining_free_movement = character.remaining_movement.get();

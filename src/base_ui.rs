@@ -523,8 +523,6 @@ pub fn measure_text_with_font_tags(
         }
     }
 
-    
-
     TextDimensions {
         width: w,
         height: h,

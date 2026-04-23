@@ -322,9 +322,8 @@ impl EquipmentSection {
             .rebuild(&self.character, &self.font);
 
         for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
-            self.equipment_slots[i].borrow_mut().content = maybe_entry
-                .get()
-                .map(EquipmentSlotContent::new);
+            self.equipment_slots[i].borrow_mut().content =
+                maybe_entry.get().map(EquipmentSlotContent::new);
         }
 
         let roles = [
@@ -346,9 +345,7 @@ impl EquipmentSection {
             for (i, maybe_entry) in self.character.party_stash().iter().enumerate() {
                 self.equipment_slots[INVENTORY_SIZE + EQUIPPED_SIZE + i]
                     .borrow_mut()
-                    .content = maybe_entry
-                    .get()
-                    .map(EquipmentSlotContent::new);
+                    .content = maybe_entry.get().map(EquipmentSlotContent::new);
             }
         }
     }

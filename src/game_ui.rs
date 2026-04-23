@@ -151,7 +151,7 @@ pub enum ConfiguredAction {
         target: Option<CharacterId>,
     },
     UseAbility {
-        ability: Ability,
+        ability: Box<Ability>,
         selected_enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
     },
@@ -238,7 +238,7 @@ impl ConfiguredAction {
                     let target_char = characters.get(*target_id);
 
                     if relevant_character.reaches_with_ability(
-                        *ability,
+                        *ability.as_ref(),
                         selected_enhancements,
                         target_char.position.get(),
                     ) {
@@ -257,7 +257,7 @@ impl ConfiguredAction {
                 ActionTarget::Position(target_pos) => {
                     assert!(matches!(ability.target, AbilityTarget::Area { .. }));
                     if relevant_character.reaches_with_ability(
-                        *ability,
+                        *ability.as_ref(),
                         selected_enhancements,
                         *target_pos,
                     ) {
@@ -318,7 +318,7 @@ impl ConfiguredAction {
                 target: None,
             }),
             BaseAction::UseAbility(ability) => Some(Self::UseAbility {
-                ability,
+                ability: Box::new(ability),
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
             }),
@@ -337,7 +337,9 @@ impl ConfiguredAction {
     pub fn base_action(&self) -> BaseAction {
         match self {
             ConfiguredAction::Attack { attack, .. } => BaseAction::Attack(*attack),
-            ConfiguredAction::UseAbility { ability, .. } => BaseAction::UseAbility(*ability),
+            ConfiguredAction::UseAbility { ability, .. } => {
+                BaseAction::UseAbility(*ability.as_ref())
+            }
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
             ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
@@ -909,11 +911,11 @@ impl UserInterface {
                         .map(|node| node.position)
                         .collect();
 
-                    player_chose = Some(PlayerChose::Action(Some(Action::Move {
+                    player_chose = Some(PlayerChose::Action(Some(Box::new(Action::Move {
                         total_distance,
                         positions,
                         extra_cost: *cost,
-                    })));
+                    }))));
                 }
                 self.activity_popup.on_new_movement_ap_cost();
             }
@@ -1123,7 +1125,7 @@ impl UserInterface {
             panic!()
         };
 
-        let ability = *ability;
+        let ability = *ability.as_ref();
 
         println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
 
@@ -2060,8 +2062,6 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        
-
         if event.outcome.damage == 0 {
             self.sound_player.play(SoundId::ArmorAbsorbed);
         } else {
@@ -2581,7 +2581,7 @@ impl UserInterface {
                         selected_enhancements,
                         target,
                     } => Some(Action::UseAbility {
-                        ability: *ability,
+                        ability: *ability.as_ref(),
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
                     }),
@@ -2618,7 +2618,7 @@ impl UserInterface {
                         inventory_equipment_index: consumption.unwrap().equipment_idx,
                     }),
                 };
-                PlayerChose::Action(action)
+                PlayerChose::Action(action.map(Box::new))
             }
 
             UiState::ReactingToAttack { selected, .. } => PlayerChose::AttackedReaction(*selected),
@@ -3017,6 +3017,6 @@ pub enum PlayerChose {
     AttackedReaction(Option<OnAttackedReaction>),
     HitReaction(Option<OnHitReaction>),
     OpportunityAttack(bool),
-    Action(Option<Action>),
+    Action(Option<Box<Action>>),
     SwitchTo(CharacterId),
 }

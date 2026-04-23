@@ -30,7 +30,7 @@ use macroquad::input::is_key_down;
 use macroquad::miniquad::KeyCode;
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
-    color::{GREEN, RED, WHITE, YELLOW},
+    color::{GREEN, RED, WHITE},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
     shapes::{draw_circle, draw_circle_lines, draw_rectangle, draw_rectangle_lines},
     text::measure_text,
@@ -69,24 +69,24 @@ use crate::{
 };
 
 const BACKGROUND_COLOR: Color = rgb(12, 64, 59); // COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
-const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
+                                                 //const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.2);
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
-const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
+//const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
 const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
-const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
-const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
+//const HOVER_VALID_MOVEMENT_COLOR: Color = YELLOW;
+//const HOVER_INVALID_MOVEMENT_COLOR: Color = RED;
 
-const HOVER_INVALID_TARGET_COLOR: Color = ORANGE;
+//const HOVER_INVALID_TARGET_COLOR: Color = ORANGE;
 const HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR: Color = LIGHTGRAY;
 
 const HOVER_NEUTRAL_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
 const HOVER_ENEMY_COLOR: Color = Color::new(0.8, 0.2, 0.2, 1.0);
-const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
+//const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
 const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
-const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
+//const INSPECTING_TARGET_COLOR: Color = LIGHTGRAY;
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.25);
 const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
@@ -95,7 +95,7 @@ const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
 const MOVE_RANGE_EXTENDED_COLOR: Color = Color::new(0.8, 0.2, 0.2, 0.8);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
-const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
+//const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
 const RANGE_INDICATOR_SEMI_BAD_COLOR: Color = ORANGE;
 const RANGE_INDICATOR_BAD_COLOR: Color = RED;
 
@@ -1447,7 +1447,7 @@ impl GameGrid {
     }
 
     pub fn draw_terrain(&mut self, terrain_id: TerrainId, x: f32, y: f32) {
-        draw_terrain(&mut self.terrain_atlas, terrain_id, self.cell_w, x, y);
+        draw_terrain(&self.terrain_atlas, terrain_id, self.cell_w, x, y);
     }
 
     pub fn draw_debug_cells(&self) {
@@ -3112,36 +3112,6 @@ impl GameGrid {
         );
     }
 
-    fn draw_small_info_speech_bubble(&self, text: &str, character_id: CharacterId) {
-        let font_size = 16;
-        let text_dim = measure_text(text, Some(&self.simple_font), font_size, 1.0);
-        let padding = 2.0;
-        let bubble_h = text_dim.height + padding * 2.0;
-        let bubble_w = (text_dim.width + padding * 2.0).max(self.cell_w * 1.5);
-        let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        let x0 = x + self.cell_w * 2.0;
-        let y0 = y - self.cell_w;
-        let bg_color = Color::new(0.0, 0.0, 0.0, 0.7);
-        draw_rectangle(
-            x0,
-            y0 - self.cell_w - bubble_h,
-            bubble_w,
-            bubble_h,
-            bg_color,
-        );
-        draw_text_rounded(
-            text,
-            x0 + bubble_w / 2.0 - text_dim.width / 2.0,
-            y0 - self.cell_w - padding,
-            TextParams {
-                font: Some(&self.simple_font),
-                font_size,
-                color: WHITE,
-                ..Default::default()
-            },
-        );
-    }
-
     fn draw_movement_to_target(
         &self,
         actor_pos: (i32, i32),
@@ -3312,7 +3282,7 @@ impl GameGrid {
 
                     if let Some(target_pos) = target_pos {
                         let indicator = if active_char.reaches_with_ability(
-                            *ability,
+                            *ability.as_ref(),
                             selected_enhancements,
                             target_pos,
                         ) {
@@ -4294,7 +4264,7 @@ pub enum EffectGraphics {
 }
 
 #[derive(Debug)]
-struct TextEffect {
+pub struct TextEffect {
     status_texture: Option<StatusId>,
     text: String,
     font: Font,
@@ -4480,10 +4450,13 @@ enum MouseState {
 
 fn has_non_empty_movement_path(ui_state: &UiState) -> bool {
     match ui_state {
-        UiState::ConfiguringAction(ConfiguredAction::Move {
-            selected_movement_path,
-            ..
-        }) => !selected_movement_path.is_empty(),
+        UiState::ConfiguringAction(configured_action) => match configured_action {
+            ConfiguredAction::Move {
+                selected_movement_path,
+                ..
+            } => !selected_movement_path.is_empty(),
+            _ => false,
+        },
         _ => false,
     }
 }

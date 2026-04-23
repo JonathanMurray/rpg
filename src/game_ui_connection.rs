@@ -27,7 +27,7 @@ pub static QUIT_WITH_ESCAPE: AtomicBool = AtomicBool::new(false);
 
 #[derive(Debug)]
 enum UiOutcome {
-    ChoseAction(Option<Action>),
+    ChoseAction(Option<Box<Action>>),
     ChoseOnHitReaction(Option<OnHitReaction>),
     ChoseOnAttackedReaction(Option<OnAttackedReaction>),
     ChoseOpportunityAttack(bool),
@@ -68,7 +68,7 @@ enum MessageFromGame {
 }
 
 pub enum ActionOrSwitchTo {
-    Action(Option<Action>),
+    Action(Option<Box<Action>>),
     SwitchTo(CharacterId),
 }
 
@@ -248,7 +248,7 @@ impl _GameUserInterfaceConnection {
                     user_interface.set_state(UiState::ChoosingAction);
                 } else {
                     let action = bot_choose_action(game);
-                    return Ok(UiOutcome::ChoseAction(action));
+                    return Ok(UiOutcome::ChoseAction(action.map(Box::new)));
                 }
             }
             MessageFromGame::AwaitingChooseOnAttackedReaction {
@@ -381,6 +381,7 @@ impl _GameUserInterfaceConnection {
                 user_interface.set_state(UiState::Idle {
                     recently_committed_action: Some(player_choice.clone()),
                 });
+                drop(user_interface);
                 // Need to call next_frame here, to make sure UI events aren't lingering when
                 // PlayerChose::SwitchTo leads us back into selecting the action for the newly
                 // selected character (?)

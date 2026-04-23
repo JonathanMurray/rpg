@@ -201,7 +201,7 @@ impl RewardSelectionUi {
     fn draw(&mut self) {
         self.bottom_panel.draw_and_handle_input();
 
-        let (screen_w, screen_h) = screen_size();
+        let (screen_w, _screen_h) = screen_size();
         let x_mid = screen_w / 2.0;
 
         let mut y = 300.0;

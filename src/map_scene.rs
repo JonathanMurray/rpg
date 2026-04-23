@@ -5,7 +5,7 @@ use macroquad::{
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     miniquad::window::screen_size,
     shapes::{
-        draw_circle, draw_circle_lines, draw_line, draw_rectangle_ex, draw_rectangle_lines,
+        draw_circle, draw_circle_lines, draw_rectangle_ex, draw_rectangle_lines,
         DrawRectangleParams,
     },
     text::{measure_text, Font, TextParams},
@@ -334,7 +334,7 @@ impl MapScene {
             if let Some(countdown) = &mut transition_countdown {
                 *countdown -= elapsed;
 
-                if *countdown < 0.0 && *countdown < -TRANSITION_PAUSE_DURATION {
+                if *countdown < -TRANSITION_PAUSE_DURATION {
                     let params = DrawRectangleParams {
                         offset: Default::default(),
                         rotation: 0.0,
@@ -384,24 +384,4 @@ impl MapScene {
         }
         draw_rectangle_lines(x, y, total_w, portrait_h, 2.0, BLACK);
     }
-}
-
-fn draw_cross(pos: (f32, f32), w: f32) {
-    let cross_thickness = 3.0;
-    draw_line(
-        pos.0 - w,
-        pos.1 - w,
-        pos.0 + w,
-        pos.1 + w,
-        cross_thickness,
-        RED,
-    );
-    draw_line(
-        pos.0 - w,
-        pos.1 + w,
-        pos.0 + w,
-        pos.1 - w,
-        cross_thickness,
-        RED,
-    );
 }

@@ -17,9 +17,7 @@ use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::window::{next_frame, screen_height};
 use macroquad::window::{screen_width, Conf};
 
-use rpg::base_ui::{
-    Align, Checkbox, Container, Drawable, Element, LayoutDirection, Style, TextLine,
-};
+use rpg::base_ui::{Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine};
 use rpg::core::{Character, CharacterId, HandType, Party};
 
 use rpg::game_ui::UiState;
@@ -31,8 +29,8 @@ use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_and_init_static, terrain_atlas_area, Sprite, SpriteId, TerrainId,
-    WaterOrientation, WaterType,
+    load_and_init_static, terrain_atlas_area, Sprite, SpriteId, TerrainId, WaterOrientation,
+    WaterType,
 };
 
 const DEFAULT_FILENAME: &str = "ogre_room.json";

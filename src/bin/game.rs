@@ -23,9 +23,7 @@ use rpg::data::{
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
-use rpg::map_data::{
-    make_high_alice, make_high_bob, make_low_level_party, make_medium_clara,
-};
+use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::load_and_init_static;

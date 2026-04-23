@@ -131,7 +131,7 @@ impl CoreGame {
 
             if let Some(action) = action {
                 let mut killed_by_action = HashSet::new();
-                let action_outcome = self.perform_action(action).await?;
+                let action_outcome = self.perform_action(*action).await?;
 
                 if let ActionOutcome::AttackHit { victim_id, damage } = action_outcome {
                     let victim = self.characters.get(victim_id);
@@ -312,12 +312,6 @@ impl CoreGame {
                 }
             }
         }
-    }
-
-    fn some_alive_player_chars(&self) -> bool {
-        self.characters
-            .iter()
-            .any(|character| character.player_controlled() && !character.is_dead())
     }
 
     async fn perform_character_pushed(
@@ -753,6 +747,7 @@ impl CoreGame {
         self.user_interface.handle_event(self, event).await
     }
 
+    /*
     async fn ui_handle_queued_events(&self) {
         //TODO
         println!("ui handle queued events");
@@ -786,6 +781,7 @@ impl CoreGame {
 
         println!("drained event queue");
     }
+     */
 
     fn queue_up_ui_event(&self, event: GameEvent) {
         println!("ui queue up event ({:?}) ...", event);
@@ -1334,12 +1330,16 @@ impl CoreGame {
 
                     if let Some(game) = real_game {
                         if let Some(positions) = movement {
-                            game.perform_movement(
-                                caster.id(),
-                                positions.clone(),
-                                MovementType::AbilityEngage,
-                            )
-                            .await;
+                            if let Err(e) = game
+                                .perform_movement(
+                                    caster.id(),
+                                    positions.clone(),
+                                    MovementType::AbilityEngage,
+                                )
+                                .await
+                            {
+                                dbg!(e);
+                            }
                         }
                     }
 
@@ -1442,7 +1442,7 @@ impl CoreGame {
                         });
                     }
 
-                    dbg!(before.elapsed());
+                    dbg!(before.elapsed().unwrap());
                 }
 
                 AbilityTarget::Ally { range: _, effect } => {
@@ -4178,7 +4178,6 @@ impl Condition {
     }
 }
 
-const PROTECTED_ARMOR_BONUS: u32 = 1;
 const BRACED_DEFENSE_BONUS: u32 = 3;
 const DISTRACTED_DEFENSE_PENALTY: u32 = 6;
 const DAZED_EVASION_PENALTY: u32 = 5;

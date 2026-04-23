@@ -209,10 +209,6 @@ pub enum IconId {
     Reaper,
 }
 
-enum GraphicsFxId {
-    LightningBolt,
-}
-
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum EffectId {
     Pow,

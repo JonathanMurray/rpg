@@ -548,12 +548,10 @@ impl PlayerPortraits {
 }
 
 pub struct PlayerCharacterPortrait {
-    text: TextLine,
     character: Rc<Character>,
     is_character_shown: Cell<bool>,
     is_character_active: Cell<bool>,
     is_character_reacting: Cell<bool>,
-    padding: f32,
     has_been_clicked: Cell<bool>,
     texture: Texture2D,
     status_column: Element,
@@ -612,11 +610,9 @@ impl PlayerCharacterPortrait {
 
         let mut self_ = Self {
             character: Rc::clone(character),
-            text,
             is_character_shown: Cell::new(false),
             is_character_active: Cell::new(false),
             is_character_reacting: Cell::new(false),
-            padding: 10.0,
             has_been_clicked: Cell::new(false),
             texture,
             status_column,

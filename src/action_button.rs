@@ -503,7 +503,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
         }
         ApplyEffect::Escape => {
             t.technical_description
-                .push("  Escapes from battle".to_string());
+                .push("  Escapes through an exit".to_string());
         }
     }
 }

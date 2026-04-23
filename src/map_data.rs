@@ -12,9 +12,9 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
-        HULDRA_HEAL, HULDRA_INFECT, KILL, LIGHTNING_BOLT,
-        LIGHTNING_BOLT_REACH, SLASHING_RAPIER, SMALL_SHIELD,
+        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE,
+        ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HULDRA_HEAL,
+        HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, SLASHING_RAPIER, SMALL_SHIELD,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -233,7 +233,7 @@ impl CharacterData {
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-enum WeaponId {
+pub enum WeaponId {
     Sword,
     BadSword,
     BadDagger,
@@ -243,7 +243,7 @@ enum WeaponId {
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
-enum ShieldId {
+pub enum ShieldId {
     BadSmallShield,
 }
 
