@@ -1,6 +1,5 @@
 use std::{
     cell::{Cell, RefCell},
-    collections::HashMap,
     rc::Rc,
 };
 
@@ -10,14 +9,12 @@ use macroquad::{
     math::Rect,
     shapes::{draw_rectangle, draw_rectangle_lines},
     text::{measure_text, TextParams},
-    texture::{draw_texture_ex, DrawTextureParams},
 };
 
 use macroquad::{
     color::{GRAY, WHITE},
     input::mouse_position,
     text::Font,
-    texture::Texture2D,
 };
 
 use crate::{
@@ -327,7 +324,7 @@ impl EquipmentSection {
         for (i, maybe_entry) in self.character.inventory.iter().enumerate() {
             self.equipment_slots[i].borrow_mut().content = maybe_entry
                 .get()
-                .map(|entry| EquipmentSlotContent::new(entry));
+                .map(EquipmentSlotContent::new);
         }
 
         let roles = [
@@ -342,7 +339,7 @@ impl EquipmentSection {
                 .content = self
                 .character
                 .equipment(*role)
-                .map(|entry| EquipmentSlotContent::new(entry));
+                .map(EquipmentSlotContent::new);
         }
 
         if self.include_stash {
@@ -351,7 +348,7 @@ impl EquipmentSection {
                     .borrow_mut()
                     .content = maybe_entry
                     .get()
-                    .map(|entry| EquipmentSlotContent::new(entry));
+                    .map(EquipmentSlotContent::new);
             }
         }
     }
@@ -904,7 +901,7 @@ impl EquipmentSlot {
                 ..Default::default()
             },
             size: (40.0, 40.0),
-            content: content.map(|equipment| EquipmentSlotContent::new(equipment)),
+            content: content.map(EquipmentSlotContent::new),
             last_drawn_rect: Default::default(),
             role,
             placeholder,
@@ -926,7 +923,7 @@ impl Drawable for EquipmentSlot {
         let y = y.floor();
         self.style.draw(x, y, self.size);
         if let Some(content) = &self.content {
-            draw_eq_icon(content.icon, x, y, Some(self.size.into()));
+            draw_eq_icon(content.icon, x, y, Some(self.size));
             //draw_texture_ex(&content.icon, x, y, WHITE, params);
 
             let quantity = match content.equipment {
@@ -969,7 +966,7 @@ impl Drawable for EquipmentSlot {
                 self.size.1,
                 Color::new(0.0, 0.0, 0.0, 0.4),
             );
-            draw_eq_icon(*icon, x, y, Some(self.size.into()));
+            draw_eq_icon(*icon, x, y, Some(self.size));
             //draw_texture_ex(icon, x, y, WHITE, params);
         }
 

@@ -31,7 +31,7 @@ use crate::{
     pathfind::Liquid,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_RED},
+    util::{oscillate, COL_GREEN_2, COL_RED},
 };
 
 pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
@@ -308,7 +308,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if let Some(effect) = effect.on_kill_apply_self {
         t.technical_description
-            .push(format!("|<faded>On kill: (self)|"));
+            .push("|<faded>On kill: (self)|".to_string());
         describe_apply_effect(effect, t);
     }
 
@@ -754,7 +754,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             }
             if let Some(apply_effect) = ability_attack_effect.on_kill_apply_self {
                 t.technical_description
-                    .push(format!("|<faded>On kill: (self)|"));
+                    .push("|<faded>On kill: (self)|".to_string());
                 describe_apply_effect(apply_effect, t);
             }
         }

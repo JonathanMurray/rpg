@@ -15,7 +15,7 @@ use macroquad::{
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
-    text::{draw_text_ex, Font, TextParams},
+    text::{Font, TextParams},
     texture::draw_texture,
     time::get_time,
     window::{screen_height, screen_width},
@@ -1523,7 +1523,7 @@ impl GameGrid {
                         false,
                     );
                     let path: Vec<MovementPathNode> = positions
-                        .into_iter()
+                        .iter()
                         .map(|pos| MovementPathNode {
                             pos: *pos,
                             difficult_terrain: false,
@@ -3754,7 +3754,7 @@ impl GameGrid {
                     let texture_draw_size = self.entity_draw_size();
 
                     let total_dist = Vec2::from(final_to).distance(Vec2::from(from)); //+ texture_draw_size.0;
-                    let total_num_textures = (total_dist / texture_draw_size.0 + 0.5);
+                    let total_num_textures = total_dist / texture_draw_size.0 + 0.5;
                     let total_num_textures_trunc = (total_num_textures).trunc() as usize;
                     let total_last_partial_texture_w = total_num_textures.fract();
 

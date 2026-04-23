@@ -12,8 +12,7 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::SoundPlayer,
     textures::{
-        load_all_effects, load_all_portraits, load_all_sprites, load_and_init_texture, EffectId,
-        EquipmentIconId, PortraitId, Sprite, SpriteId,
+        load_all_effects, load_all_portraits, load_all_sprites, load_and_init_texture, EffectId, PortraitId, Sprite, SpriteId,
     },
 };
 

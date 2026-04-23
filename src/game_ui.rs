@@ -13,7 +13,7 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::Font,
-    texture::{draw_texture, Texture2D},
+    texture::draw_texture,
     window::{screen_height, screen_width},
 };
 
@@ -50,7 +50,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EquipmentIconId, UI_TEXTURE},
+    textures::UI_TEXTURE,
     tooltip::Keyword,
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
@@ -2060,7 +2060,7 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        let verb;
+        
 
         if event.outcome.damage == 0 {
             self.sound_player.play(SoundId::ArmorAbsorbed);
@@ -2072,7 +2072,7 @@ impl UserInterface {
             }
             self.sound_player.play(SoundId::Damage);
         }
-        verb = match event.outcome.hit_type {
+        let verb = match event.outcome.hit_type {
             HitType::Regular => "hit",
             HitType::Graze => "grazed",
             HitType::Critical => "crit",

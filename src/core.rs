@@ -922,7 +922,7 @@ impl CoreGame {
             if character.is_swamp_dweller() {
                 let prev_liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
                 let new_liquid = self.pathfind_grid.is_character_in_liquid(new_position);
-                if new_liquid == None && prev_liquid == Some(Liquid::Poison) {
+                if new_liquid.is_none() && prev_liquid == Some(Liquid::Poison) {
                     self.handle_swamp_dweller_left_poison(character).await;
                 }
             }
@@ -1667,7 +1667,7 @@ impl CoreGame {
                 if !positions.is_empty() {
                     detail_lines.push(format!("  {} was turned to {}", from, to));
                     self.ui_handle_event(GameEvent::LiquidWasConverted {
-                        positions: positions,
+                        positions,
                         from,
                         to,
                     })
@@ -4297,8 +4297,7 @@ impl Conditions {
     pub fn get_stacks(&self, condition: &Condition) -> u32 {
         self.map
             .get(condition)
-            .map(|state| state.stacks)
-            .flatten()
+            .and_then(|state| state.stacks)
             .unwrap_or(0)
     }
 

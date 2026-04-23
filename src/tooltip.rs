@@ -149,7 +149,7 @@ pub fn draw_tooltip(
     let mut physical_content_lines = vec![];
     // "|<example>hello|  |<hey>| yo"
     for line in content_lines {
-        let mut line = &line.as_ref()[..];
+        let mut line = line.as_ref();
         let mut keep_splitting = true;
         while keep_splitting {
             let mut inside_tagged_part = false;

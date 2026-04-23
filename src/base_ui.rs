@@ -426,7 +426,7 @@ impl Drawable for TextLine {
                     header,
                     None,
                     lines,
-                    &keywords,
+                    keywords,
                     None,
                 );
             }
@@ -523,13 +523,13 @@ pub fn measure_text_with_font_tags(
         }
     }
 
-    let dim = TextDimensions {
+    
+
+    TextDimensions {
         width: w,
         height: h,
         offset_y: offset_y.unwrap_or(0.0),
-    };
-
-    dim
+    }
 }
 
 pub fn draw_text_with_font_tags(

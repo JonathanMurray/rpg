@@ -18,7 +18,7 @@ use crate::{
         InternalUiEvent,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
-    core::{Character, CharacterId, Characters, HandType, MOVE_DISTANCE_PER_RESOURCE},
+    core::{Character, CharacterId, Characters, HandType},
     drawing::draw_dashed_line,
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,

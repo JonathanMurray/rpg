@@ -1,5 +1,5 @@
 use std::cell::{Cell, RefCell};
-use std::{collections::HashMap, rc::Rc};
+use std::rc::Rc;
 
 use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 
@@ -12,7 +12,6 @@ use macroquad::window::{screen_height, screen_width};
 use macroquad::{
     color::{Color, BLACK, LIGHTGRAY, WHITE},
     text::Font,
-    texture::Texture2D,
 };
 
 use crate::base_ui::{draw_text_rounded, Drawable};
@@ -27,7 +26,6 @@ use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
     core::Character,
-    textures::EquipmentIconId,
 };
 
 pub struct CharacterSheet {

@@ -31,7 +31,7 @@ use rpg::pathfind::Occupation;
 use rpg::resources::{init_core_game, GameResources, UiResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
-    load_and_init_static, terrain_atlas_area, EquipmentIconId, Sprite, SpriteId, TerrainId,
+    load_and_init_static, terrain_atlas_area, Sprite, SpriteId, TerrainId,
     WaterOrientation, WaterType,
 };
 

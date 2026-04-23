@@ -11,7 +11,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
         MOVE_DISTANCE_PER_RESOURCE,
     },
-    data::{DRAUG_ATTACK, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
+    data::{DRAUG_ATTACK, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
     pathfind::{Path, PathfindGrid},
     util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
