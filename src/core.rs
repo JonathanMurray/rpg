@@ -39,7 +39,7 @@ enum ActionOutcome {
 pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
-    //ui_event_queue: RefCell<Vec<GameEvent>>,
+    ui_event_queue: RefCell<Vec<GameEvent>>,
     user_interface: GameUserInterfaceConnection,
     pub pathfind_grid: Rc<PathfindGrid>,
     round_index: u32,
@@ -54,7 +54,7 @@ impl CoreGame {
         Self {
             characters,
             active_character_id: init_state.active_character_id,
-            //ui_event_queue: Default::default(),
+            ui_event_queue: Default::default(),
             user_interface,
             pathfind_grid: init_state.pathfind_grid.clone(),
             round_index: 0,
@@ -89,7 +89,7 @@ impl CoreGame {
                 self.active_character().name
             );
 
-            //self.ui_handle_queued_events().await;
+            self.ui_handle_queued_events().await;
 
             let enemy_count = self
                 .characters
@@ -629,7 +629,7 @@ impl CoreGame {
                 let caster = self.characters.get_rc(self.active_character_id);
                 let ability_resolved_events = Self::perform_ability(
                     caster,
-                    ability,
+                    *ability.as_ref(),
                     &enhancements,
                     &target,
                     ActionPerformanceMode::Real(self),
@@ -741,19 +741,18 @@ impl CoreGame {
     async fn ui_handle_event(&self, event: GameEvent) {
         println!("ui handle event ({:?}) ...", event);
 
-        //self.ui_handle_queued_events().await;
+        self.ui_handle_queued_events().await;
 
         println!("now will actually handle the event ...");
         self.user_interface.handle_event(self, event).await
     }
 
-    /*
     async fn ui_handle_queued_events(&self) {
         //TODO
         println!("ui handle queued events");
 
         // TODO  causes stack overflow for some reason
-        /*
+
         loop {
             let popped = {
                 let mut queue_ref = self.ui_event_queue.borrow_mut();
@@ -767,7 +766,6 @@ impl CoreGame {
                 break;
             }
         }
-         */
 
         /*
         for _ in 0..2 {
@@ -781,11 +779,10 @@ impl CoreGame {
 
         println!("drained event queue");
     }
-     */
 
     fn queue_up_ui_event(&self, event: GameEvent) {
         println!("ui queue up event ({:?}) ...", event);
-        //self.ui_event_queue.borrow_mut().push(event);
+        self.ui_event_queue.borrow_mut().push(event);
     }
 
     async fn perform_movement(
@@ -2299,8 +2296,7 @@ impl CoreGame {
             if let Some(ch) = self.player_characters().next() {
                 ch.kind.unwrap_party().gain_money(1);
                 // TODO
-                self.queue_up_ui_event(GameEvent::LogLine("HELLO".to_string()));
-                println!("PLAYER GAINED MONEY");
+                self.queue_up_ui_event(GameEvent::PlayerGainedMoney { amount: 1 });
                 character
                     .conditions
                     .borrow_mut()
@@ -3364,6 +3360,9 @@ pub trait GameEventHandler {
 pub enum GameEvent {
     LogLine(String),
     GameOver(&'static str),
+    PlayerGainedMoney {
+        amount: u32,
+    },
     LiquidWasConverted {
         positions: Vec<Position>,
         from: Liquid,
@@ -4346,7 +4345,7 @@ pub enum Action {
         target: CharacterId,
     },
     UseAbility {
-        ability: Ability,
+        ability: Box<Ability>,
         enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
     },
@@ -4380,7 +4379,7 @@ impl Action {
                 ability,
                 enhancements,
                 target,
-            } => BaseAction::UseAbility(*ability),
+            } => BaseAction::UseAbility(*ability.as_ref()),
             Action::Move {
                 total_distance,
                 positions,
@@ -5068,7 +5067,7 @@ pub enum PlayerId {
 #[derive(Debug, Clone)]
 pub enum CharacterKind {
     Player(Rc<Party>, PlayerId),
-    Bot(Bot),
+    Bot(Box<Bot>),
 }
 
 #[derive(Debug, Clone)]

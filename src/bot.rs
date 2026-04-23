@@ -375,7 +375,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
         (BotAction::NonTarget(ability), _) => {
             if may_use(bot, ability, None) && bot.can_use_ability(ability) {
                 return Some(Action::UseAbility {
-                    ability,
+                    ability: Box::new(ability),
                     enhancements: vec![],
                     target: ActionTarget::None,
                 });
@@ -455,7 +455,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 if may_use(bot, ability, None) && bot.can_use_ability(ability) {
                     println!("bot uses nontargeted ability before moving to target");
                     return Some(Action::UseAbility {
-                        ability,
+                        ability: Box::new(ability),
                         enhancements: vec![],
                         target: ActionTarget::None,
                     });
@@ -587,7 +587,7 @@ fn attack_action(bot: &Character, target: &Character) -> Action {
 
 fn simple_targetted_ability_action(ability: Ability, target: &Character) -> Action {
     Action::UseAbility {
-        ability,
+        ability: Box::new(ability),
         enhancements: vec![],
         target: ActionTarget::Character(target.id(), None),
     }

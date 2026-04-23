@@ -448,10 +448,10 @@ pub fn create_character(
 }
 
 fn bot(behaviour: BotBehaviour, move_speed: f32) -> CharacterKind {
-    CharacterKind::Bot(Bot {
+    CharacterKind::Bot(Box::new(Bot {
         behaviour,
         base_movement: move_speed,
-    })
+    }))
 }
 
 pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {

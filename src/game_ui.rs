@@ -1816,6 +1816,12 @@ impl UserInterface {
                     self.set_new_active_character_id(new_active);
                 }
             }
+            GameEvent::PlayerGainedMoney { amount } => {
+                self.log
+                    .add(format!("Player gained money: |<value>{}|", amount));
+                // TODO play "kaching" sound
+                // TODO show visual effect?
+            }
             GameEvent::PlayerCharacterEndedTheirTurn {
                 gained_ap,
                 gained_stamina: _,
@@ -2581,7 +2587,7 @@ impl UserInterface {
                         selected_enhancements,
                         target,
                     } => Some(Action::UseAbility {
-                        ability: *ability.as_ref(),
+                        ability: Box::new(*ability.as_ref()),
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
                     }),
