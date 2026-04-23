@@ -320,8 +320,8 @@ pub fn create_character(
             skeleton.armor_piece.set(Some(LEATHER_ARMOR));
             skeleton.set_weapon(HandType::MainHand, BAD_RAPIER);
             skeleton.set_shield(SMALL_SHIELD);
-            skeleton.learn_ability(ENEMY_BRACE);
-            skeleton.learn_ability(ENEMY_INSPIRE);
+            skeleton.learn_ability(&ENEMY_BRACE);
+            skeleton.learn_ability(&ENEMY_INSPIRE);
             skeleton
         }
         CharacterType::Draug => {
@@ -333,7 +333,7 @@ pub fn create_character(
                 Attributes::new(4, 4, 4, 1),
                 pos,
             );
-            draug.learn_ability(DRAUG_ATTACK);
+            draug.learn_ability(&DRAUG_ATTACK);
             draug.health.change_max_value_to(20);
             draug
         }
@@ -346,7 +346,7 @@ pub fn create_character(
                 Attributes::new(4, 4, 4, 1),
                 pos,
             );
-            goblin.learn_ability(ENEMY_ESCAPE);
+            goblin.learn_ability(&ENEMY_ESCAPE);
             goblin.health.change_max_value_to(20);
             goblin.receive_condition(Condition::Treasure, Some(3), None);
             goblin
@@ -363,7 +363,7 @@ pub fn create_character(
             );
             ghoul.health.change_max_value_to(9);
             ghoul.set_weapon(HandType::MainHand, BAD_BOW);
-            ghoul.learn_ability(ENEMY_EXPLODING_ARROW);
+            ghoul.learn_ability(&ENEMY_EXPLODING_ARROW);
             ghoul
         }
         CharacterType::Ghoul2 => {
@@ -392,7 +392,7 @@ pub fn create_character(
             ogre.health.change_max_value_to(43);
             ogre.armor_piece.set(Some(CHAIN_MAIL));
             ogre.set_weapon(HandType::MainHand, BAD_WAR_HAMMER);
-            ogre.learn_ability(ENEMY_TACKLE);
+            ogre.learn_ability(&ENEMY_TACKLE);
             ogre.learn_passive(PassiveSkill::BloodRage);
             ogre
         }
@@ -406,8 +406,8 @@ pub fn create_character(
                 Attributes::new(2, 5, 9, 5),
                 pos,
             );
-            huldra.learn_ability(HULDRA_HEAL);
-            huldra.learn_ability(HULDRA_INFECT);
+            huldra.learn_ability(&HULDRA_HEAL);
+            huldra.learn_ability(&HULDRA_INFECT);
             huldra.learn_passive(PassiveSkill::SwampDweller);
             huldra.armor_piece.set(Some(SHIRT));
             //huldra.set_weapon(HandType::MainHand, BAD_SWORD);
@@ -440,7 +440,7 @@ pub fn create_character(
     }
     if let Some(shield_id) = char_data.shield {
         char.set_shield(create_shield(shield_id));
-        char.learn_ability(ENEMY_BRACE);
+        char.learn_ability(&ENEMY_BRACE);
     }
 
     char.set_id(id);
@@ -477,15 +477,15 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.mana.change_max_value_to(20);
 
     alice.set_weapon(HandType::MainHand, CHEAT_BOW);
-    alice.learn_ability(KILL);
+    alice.learn_ability(&KILL);
      */
 
     alice.armor_piece.set(Some(SHIRT));
-    alice.learn_ability(INSPIRE);
+    alice.learn_ability(&INSPIRE);
 
     // TODO
     //alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
-    //alice.learn_ability(ENEMY_EXPLODING_ARROW);
+    //alice.learn_ability(&ENEMY_EXPLODING_ARROW);
 
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
@@ -498,17 +498,17 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(DRUID_COAT));
-    bob.learn_ability(SHIELD_BASH);
+    bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
 
     // TODO
 
-    bob.learn_ability(EXECUTE);
+    bob.learn_ability(&EXECUTE);
     bob.learn_ability_enhancement(EXECUTE_BLOODLUST);
     bob.learn_passive(PassiveSkill::HardenedSkin);
     bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
-    //bob.learn_ability(SWEEP_ATTACK);
+    //bob.learn_ability(&SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];
 
@@ -527,11 +527,11 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     clara.set_weapon(HandType::MainHand, DAGGER);
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
-    clara.learn_ability(FIREBALL);
+    clara.learn_ability(&FIREBALL);
     clara.learn_ability_enhancement(FIREBALL_REACH);
-    clara.learn_ability(LIGHTNING_BOLT);
+    clara.learn_ability(&LIGHTNING_BOLT);
     clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
-    clara.learn_ability(SHACKLED_MIND);
+    clara.learn_ability(&SHACKLED_MIND);
 
     clara
 }
@@ -549,13 +549,13 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.set_shield(MEDIUM_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
-    bob.learn_ability(SWEEP_ATTACK);
-    bob.learn_ability(SHIELD_BASH);
+    bob.learn_ability(&SWEEP_ATTACK);
+    bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(INSPIRE);
+    bob.learn_ability(&INSPIRE);
     bob.learn_attack_enhancement(SMITE);
     // TODO
-    bob.learn_ability(KILL);
+    bob.learn_ability(&KILL);
     //bob.learn_attack_enhancement(EMPOWER);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     bob
@@ -573,11 +573,11 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
-    alice.learn_ability(HEAL);
+    alice.learn_ability(&HEAL);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_passive(PassiveSkill::WeaponProficiency);
-    alice.learn_ability(PIERCING_SHOT);
+    alice.learn_ability(&PIERCING_SHOT);
     alice
 }
 
@@ -611,19 +611,19 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_passive(PassiveSkill::CriticalCharge);
-    clara.learn_ability(FIREBALL);
+    clara.learn_ability(&FIREBALL);
     clara.learn_ability_enhancement(FIREBALL_INFERNO);
     clara.learn_ability_enhancement(FIREBALL_REACH);
     clara.learn_ability_enhancement(FIREBALL_MASSIVE);
-    clara.learn_ability(SHACKLED_MIND);
-    clara.learn_ability(INFLICT_WOUNDS);
+    clara.learn_ability(&SHACKLED_MIND);
+    clara.learn_ability(&INFLICT_WOUNDS);
     clara.learn_ability_enhancement(INFLICT_WOUNDS_NECROTIC_INFLUENCE);
-    clara.learn_ability(LIGHTNING_BOLT);
+    clara.learn_ability(&LIGHTNING_BOLT);
     clara.learn_ability_enhancement(LIGHTNING_BOLT_REACH);
     //clara.learn_ability(MIND_BLAST);
 
     // TODO
-    clara.learn_ability(HULDRA_HEAL);
+    clara.learn_ability(&HULDRA_HEAL);
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));

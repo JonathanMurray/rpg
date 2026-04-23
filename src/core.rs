@@ -629,7 +629,7 @@ impl CoreGame {
                 let caster = self.characters.get_rc(self.active_character_id);
                 let ability_resolved_events = Self::perform_ability(
                     caster,
-                    *ability.as_ref(),
+                    ability,
                     &enhancements,
                     &target,
                     ActionPerformanceMode::Real(self),
@@ -1188,7 +1188,7 @@ impl CoreGame {
 
     async fn perform_ability(
         caster: &Rc<Character>,
-        ability: Ability,
+        ability: &'static Ability,
         enhancements: &[AbilityEnhancement],
         selected_target: &ActionTarget,
         mode: ActionPerformanceMode<'_>,
@@ -1350,7 +1350,7 @@ impl CoreGame {
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
-                            ability,
+                            ability: ability.clone(),
                             target: Some(*target_id),
                             area_at: None,
                         })
@@ -1465,7 +1465,7 @@ impl CoreGame {
                         caster.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
-                            ability,
+                            ability: ability.clone(),
                             target: Some(*target_id),
                             area_at: None,
                         })
@@ -1499,7 +1499,7 @@ impl CoreGame {
                         caster.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
-                            ability,
+                            ability: ability.clone(),
                             target: None,
                             area_at: Some((area_effect.shape, target_pos)),
                         })
@@ -1538,7 +1538,7 @@ impl CoreGame {
                     if let Some(game) = real_game {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: caster_id,
-                            ability,
+                            ability: ability.clone(),
                             target: None,
                             area_at: None,
                         })
@@ -3160,7 +3160,7 @@ pub struct DamageInterval {
 pub fn predict_ability(
     characters: &Characters,
     caster: &Rc<Character>,
-    ability: Ability,
+    ability: &'static Ability,
     enhancements: &[AbilityEnhancement],
     selected_target: &ActionTarget,
 ) -> AbilityPrediction {
@@ -3460,7 +3460,7 @@ pub struct AbilityResolvedEvent {
     pub actor: CharacterId,
     pub target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
     pub area_outcome: Option<AbilityAreaOutcome>,
-    pub ability: Ability,
+    pub ability: &'static Ability,
     pub detail_lines: Vec<String>,
 }
 
@@ -4345,7 +4345,7 @@ pub enum Action {
         target: CharacterId,
     },
     UseAbility {
-        ability: Box<Ability>,
+        ability: &'static Ability,
         enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
     },
@@ -4379,7 +4379,7 @@ impl Action {
                 ability,
                 enhancements,
                 target,
-            } => BaseAction::UseAbility(*ability.as_ref()),
+            } => BaseAction::UseAbility(ability),
             Action::Move {
                 total_distance,
                 positions,
@@ -4420,7 +4420,7 @@ impl ActionTarget {
 
 pub enum BaseAction {
     Attack(AttackAction),
-    UseAbility(Ability),
+    UseAbility(&'static Ability),
     Move,
     ChangeEquipment,
     UseConsumable,
@@ -4491,7 +4491,7 @@ pub struct AbilityChargeFx {
     pub(crate) sound: SoundId,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Ability {
     pub id: AbilityId,
     pub name: &'static str,
@@ -5287,7 +5287,7 @@ impl Character {
         self.position.set(new_pos);
     }
 
-    pub fn learn_ability(&self, ability: Ability) {
+    pub fn learn_ability(&self, ability: &'static Ability) {
         self.known_actions
             .borrow_mut()
             .push(BaseAction::UseAbility(ability));
@@ -5901,7 +5901,7 @@ impl Character {
 
     pub fn reaches_with_ability(
         &self,
-        ability: Ability,
+        ability: &Ability,
         enhancements: &[AbilityEnhancement],
         target_pos: Position,
     ) -> bool {
@@ -5995,7 +5995,7 @@ impl Character {
         }
     }
 
-    pub fn can_use_ability(&self, ability: Ability) -> bool {
+    pub fn can_use_ability(&self, ability: &Ability) -> bool {
         let ap = self.action_points.current();
         if ability.requires_shield() && self.shield().is_none() {
             return false;
@@ -6024,7 +6024,7 @@ impl Character {
         }
     }
 
-    pub fn usable_abilities(&self) -> Vec<Ability> {
+    pub fn usable_abilities(&self) -> Vec<&'static Ability> {
         return self
             .known_actions
             .borrow()
@@ -6037,7 +6037,7 @@ impl Character {
             .collect();
     }
 
-    pub fn usable_single_enemy_target_abilities(&self) -> Vec<Ability> {
+    pub fn usable_single_enemy_target_abilities(&self) -> Vec<&'static Ability> {
         return self
             .known_actions
             .borrow()
@@ -6262,7 +6262,7 @@ impl Character {
         self.knows_passive(PassiveSkill::SwampDweller)
     }
 
-    pub fn known_abilities(&self) -> Vec<Ability> {
+    pub fn known_abilities(&self) -> Vec<&'static Ability> {
         self.known_actions
             .borrow()
             .iter()
@@ -6281,7 +6281,7 @@ impl Character {
 
     pub fn can_use_ability_enhancement(
         &self,
-        ability: Ability,
+        ability: &Ability,
         enhancement: AbilityEnhancement,
     ) -> bool {
         self.action_points.current() >= ability.action_point_cost + enhancement.action_point_cost

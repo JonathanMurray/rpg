@@ -1510,9 +1510,9 @@ impl ButtonAction {
         }
     }
 
-    pub fn unwrap_ability(&self) -> Ability {
+    pub fn unwrap_ability(&self) -> &Ability {
         match self {
-            ButtonAction::Action(BaseAction::UseAbility(ability)) => *ability,
+            ButtonAction::Action(BaseAction::UseAbility(ability)) => ability,
             _ => panic!(),
         }
     }

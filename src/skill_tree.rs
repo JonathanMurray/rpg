@@ -158,16 +158,16 @@ pub async fn run_editor() {
     }
 
     let mut abilities = vec![
-        SWEEP_ATTACK,
-        LUNGE_ATTACK,
-        BRACE,
-        SCREAM,
-        SHACKLED_MIND,
-        MIND_BLAST,
-        INFLICT_WOUNDS,
-        HEAL,
-        SEARING_LIGHT,
-        FIREBALL,
+        &SWEEP_ATTACK,
+        &LUNGE_ATTACK,
+        &BRACE,
+        &SCREAM,
+        &SHACKLED_MIND,
+        &MIND_BLAST,
+        &INFLICT_WOUNDS,
+        &HEAL,
+        &SEARING_LIGHT,
+        &FIREBALL,
     ];
 
     let btn_action_to_skill = |btn_action| {
@@ -902,16 +902,16 @@ fn skills_mapping() -> Vec<(Skill, ButtonAction)> {
         let atk_hit = |r| ButtonAction::OnHitReaction(r);
         use PassiveSkill::*;
         [
-            (Skill::SweepAttack, ability(SWEEP_ATTACK)),
-            (Skill::LungeAttack, ability(LUNGE_ATTACK)),
-            (Skill::Brace, ability(BRACE)),
-            (Skill::Scream, ability(SCREAM)),
-            (Skill::ShackledMind, ability(SHACKLED_MIND)),
-            (Skill::MindBlast, ability(MIND_BLAST)),
-            (Skill::InflictWounds, ability(INFLICT_WOUNDS)),
-            (Skill::Heal, ability(HEAL)),
-            (Skill::SearingLight, ability(SEARING_LIGHT)),
-            (Skill::Fireball, ability(FIREBALL)),
+            (Skill::SweepAttack, ability(&SWEEP_ATTACK)),
+            (Skill::LungeAttack, ability(&LUNGE_ATTACK)),
+            (Skill::Brace, ability(&BRACE)),
+            (Skill::Scream, ability(&SCREAM)),
+            (Skill::ShackledMind, ability(&SHACKLED_MIND)),
+            (Skill::MindBlast, ability(&MIND_BLAST)),
+            (Skill::InflictWounds, ability(&INFLICT_WOUNDS)),
+            (Skill::Heal, ability(&HEAL)),
+            (Skill::SearingLight, ability(&SEARING_LIGHT)),
+            (Skill::Fireball, ability(&FIREBALL)),
             (Skill::Quick, atk_enhancement(QUICK)),
             (Skill::Smite, atk_enhancement(SMITE)),
             (Skill::CripplingShot, atk_enhancement(CRIPPLING_SHOT)),

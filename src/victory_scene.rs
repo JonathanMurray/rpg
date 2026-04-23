@@ -41,7 +41,7 @@ use crate::{
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Learning {
-    Ability(Ability),
+    Ability(&'static Ability),
     OnAttackedReaction(OnAttackedReaction),
     OnHitReaction(OnHitReaction),
     AttackEnhancement(AttackEnhancement),
@@ -414,16 +414,16 @@ pub async fn run_victory_loop(
             candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some(label)));
         }
         for ability in vec![
-            FIREBALL,
-            SWEEP_ATTACK,
-            LUNGE_ATTACK,
-            BRACE,
-            SCREAM,
-            SHACKLED_MIND,
-            MIND_BLAST,
-            HEAL,
-            HEALING_NOVA,
-            HEALING_RAIN,
+            &FIREBALL,
+            &SWEEP_ATTACK,
+            &LUNGE_ATTACK,
+            &BRACE,
+            &SCREAM,
+            &SHACKLED_MIND,
+            &MIND_BLAST,
+            &HEAL,
+            &HEALING_NOVA,
+            &HEALING_RAIN,
         ] {
             candidate_rewards.push((ButtonAction::Action(BaseAction::UseAbility(ability)), None));
         }

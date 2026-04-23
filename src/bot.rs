@@ -35,7 +35,7 @@ impl LootgoblinBehaviour {
         let bot = game.characters.get_rc(game.active_character_id);
 
         let action = if bot.pos() == *pos {
-            BotAction::NonTarget(ENEMY_ESCAPE)
+            BotAction::NonTarget(&ENEMY_ESCAPE)
         } else {
             BotAction::MoveTo(*pos)
         };
@@ -99,8 +99,8 @@ impl HuldraBehaviour {
             .enemies()
             .any(|char| char.health.current() < char.health.max() - 5);
 
-        let heal = BotAction::SingleFriendlyTarget(HULDRA_HEAL);
-        let inflict_wounds = BotAction::SingleEnemyTarget(HULDRA_INFECT);
+        let heal = BotAction::SingleFriendlyTarget(&HULDRA_HEAL);
+        let inflict_wounds = BotAction::SingleEnemyTarget(&HULDRA_INFECT);
         //let inflict_horrors = BotAction::SingleEnemyTarget(HULDRA_INFLICT_HORRORS);
 
         if let Some((saved_action, saved_target)) = self.saved_goal.get() {
@@ -375,7 +375,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
         (BotAction::NonTarget(ability), _) => {
             if may_use(bot, ability, None) && bot.can_use_ability(ability) {
                 return Some(Action::UseAbility {
-                    ability: Box::new(ability),
+                    ability,
                     enhancements: vec![],
                     target: ActionTarget::None,
                 });
@@ -455,7 +455,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 if may_use(bot, ability, None) && bot.can_use_ability(ability) {
                     println!("bot uses nontargeted ability before moving to target");
                     return Some(Action::UseAbility {
-                        ability: Box::new(ability),
+                        ability,
                         enhancements: vec![],
                         target: ActionTarget::None,
                     });
@@ -545,9 +545,9 @@ fn find_path(
 #[derive(Copy, Clone, PartialEq)]
 enum BotAction {
     Attack,
-    SingleEnemyTarget(Ability),
-    SingleFriendlyTarget(Ability),
-    NonTarget(Ability),
+    SingleEnemyTarget(&'static Ability),
+    SingleFriendlyTarget(&'static Ability),
+    NonTarget(&'static Ability),
     MoveTo(Position),
 }
 
@@ -585,9 +585,9 @@ fn attack_action(bot: &Character, target: &Character) -> Action {
     }
 }
 
-fn simple_targetted_ability_action(ability: Ability, target: &Character) -> Action {
+fn simple_targetted_ability_action(ability: &'static Ability, target: &Character) -> Action {
     Action::UseAbility {
-        ability: Box::new(ability),
+        ability,
         enhancements: vec![],
         target: ActionTarget::Character(target.id(), None),
     }
@@ -608,7 +608,7 @@ fn attack_reaches(bot: &Character, target: &Character, pathfind_grid: &PathfindG
 fn ability_reaches(
     bot: &Character,
     target: &Character,
-    ability: Ability,
+    ability: &Ability,
     pathfind_grid: &PathfindGrid,
 ) -> bool {
     println!("bot::ability_reaches()...");
@@ -755,7 +755,7 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     }
 }
 
-fn may_use(bot: &Character, ability: Ability, target: Option<&Character>) -> bool {
+fn may_use(bot: &Character, ability: &Ability, target: Option<&Character>) -> bool {
     //TODO
     println!(
         "bot may use? {}, {} ({:?})",

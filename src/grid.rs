@@ -3282,7 +3282,7 @@ impl GameGrid {
 
                     if let Some(target_pos) = target_pos {
                         let indicator = if active_char.reaches_with_ability(
-                            *ability.as_ref(),
+                            ability,
                             selected_enhancements,
                             target_pos,
                         ) {

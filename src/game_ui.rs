@@ -151,7 +151,7 @@ pub enum ConfiguredAction {
         target: Option<CharacterId>,
     },
     UseAbility {
-        ability: Box<Ability>,
+        ability: &'static Ability,
         selected_enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
     },
@@ -238,7 +238,7 @@ impl ConfiguredAction {
                     let target_char = characters.get(*target_id);
 
                     if relevant_character.reaches_with_ability(
-                        *ability.as_ref(),
+                        ability,
                         selected_enhancements,
                         target_char.position.get(),
                     ) {
@@ -257,7 +257,7 @@ impl ConfiguredAction {
                 ActionTarget::Position(target_pos) => {
                     assert!(matches!(ability.target, AbilityTarget::Area { .. }));
                     if relevant_character.reaches_with_ability(
-                        *ability.as_ref(),
+                        ability,
                         selected_enhancements,
                         *target_pos,
                     ) {
@@ -318,7 +318,7 @@ impl ConfiguredAction {
                 target: None,
             }),
             BaseAction::UseAbility(ability) => Some(Self::UseAbility {
-                ability: Box::new(ability),
+                ability,
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
             }),
@@ -337,9 +337,7 @@ impl ConfiguredAction {
     pub fn base_action(&self) -> BaseAction {
         match self {
             ConfiguredAction::Attack { attack, .. } => BaseAction::Attack(*attack),
-            ConfiguredAction::UseAbility { ability, .. } => {
-                BaseAction::UseAbility(*ability.as_ref())
-            }
+            ConfiguredAction::UseAbility { ability, .. } => BaseAction::UseAbility(ability),
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
             ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
@@ -1124,8 +1122,6 @@ impl UserInterface {
         else {
             panic!()
         };
-
-        let ability = *ability.as_ref();
 
         println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
 
@@ -2587,7 +2583,7 @@ impl UserInterface {
                         selected_enhancements,
                         target,
                     } => Some(Action::UseAbility {
-                        ability: Box::new(*ability.as_ref()),
+                        ability: ability,
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
                     }),

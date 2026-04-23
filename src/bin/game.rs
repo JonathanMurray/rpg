@@ -129,7 +129,7 @@ async fn run_demo(
                     (
                         PlayerId::Bob,
                         CharacterGrowth::of(
-                            vec![ButtonAction::Action(BaseAction::UseAbility(SWEEP_ATTACK))],
+                            vec![ButtonAction::Action(BaseAction::UseAbility(&SWEEP_ATTACK))],
                             vec![EquipmentEntry::Consumable(ENERGY_POTION)],
                         ),
                     ),
@@ -138,7 +138,7 @@ async fn run_demo(
                         CharacterGrowth::of(
                             vec![
                                 ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
-                                ButtonAction::Action(BaseAction::UseAbility(HEAL)),
+                                ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
                             ],
                             vec![],
                         ),
@@ -168,7 +168,7 @@ async fn run_demo(
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![ButtonAction::Action(BaseAction::UseAbility(PIERCING_SHOT))],
+                            vec![ButtonAction::Action(BaseAction::UseAbility(&PIERCING_SHOT))],
                             vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
                         ),
                     ),
