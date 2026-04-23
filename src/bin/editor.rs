@@ -24,6 +24,7 @@ use rpg::core::{Character, CharacterId, HandType, Party};
 
 use rpg::game_ui::UiState;
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
+use rpg::grid::ControlPoint;
 use rpg::init_fight_map::GameInitState;
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::Occupation;
@@ -91,6 +92,7 @@ async fn main() {
             false,
             None,
             (0, 0),
+            true,
         );
         if show_grid.get() {
             game_grid.draw_debug_cells();
@@ -221,6 +223,24 @@ async fn main() {
                             WHITE,
                         );
                     }
+                    EditorAction::PlaceControlPoint(control_point) => {
+                        draw_rectangle_lines(
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            game_grid.cell_w,
+                            game_grid.cell_w,
+                            3.0,
+                            YELLOW,
+                        );
+                        draw_text(
+                            &format!("{:?}", control_point),
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+
                     EditorAction::EraseTerrain => {
                         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
@@ -243,6 +263,23 @@ async fn main() {
                     }
                     EditorAction::EraseDecoration => {
                         draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            "Erase",
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+                    EditorAction::EraseControlPoint => {
+                        draw_rectangle_lines(
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            game_grid.cell_w,
+                            game_grid.cell_w,
+                            3.0,
+                            YELLOW,
+                        );
                         draw_text(
                             "Erase",
                             snapped_mouse_screen_pos.0,
@@ -329,6 +366,18 @@ async fn main() {
                                 has_unsaved_changes = true;
                             }
                         }
+                        EditorAction::PlaceControlPoint(control_point) => {
+                            // TODO: encapsulate some of this
+                            map_data.control_points.insert(pos, *control_point);
+                            game_grid.control_points.insert(pos, *control_point);
+                            // TODO: Add control point to pathfind grid
+                            game_grid
+                                .pathfind_grid
+                                .control_points
+                                .borrow_mut()
+                                .insert(pos, *control_point);
+                            has_unsaved_changes = true;
+                        }
                         EditorAction::EraseBackground => {
                             if game_grid.background.contains_key(&pos) {
                                 game_grid.background.swap_remove(&pos);
@@ -351,6 +400,17 @@ async fn main() {
                                 map_data.decorations.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
+                        }
+                        EditorAction::EraseControlPoint => {
+                            // TODO
+                            game_grid.control_points.swap_remove(&pos);
+                            map_data.control_points.swap_remove(&pos);
+                            game_grid
+                                .pathfind_grid
+                                .control_points
+                                .borrow_mut()
+                                .remove(&pos);
+                            has_unsaved_changes = true;
                         }
                         EditorAction::EditCharacter => {
                             // It's taken care of by tracking the game grid's inspect target
@@ -415,6 +475,7 @@ async fn main() {
                 background: game_grid.background.clone(),
                 terrain_objects: game_grid.terrain_objects.clone(),
                 decorations: game_grid.decorations.clone(),
+                control_points: game_grid.control_points.clone(),
             };
             let core_game = init_core_game(
                 resources.clone(),
@@ -453,9 +514,11 @@ enum EditorAction {
     PlaceTerrain(TerrainId),
     PlaceDecoration(TerrainId),
     PlaceCharacter(CharacterType),
+    PlaceControlPoint(ControlPoint),
     EraseBackground,
     EraseTerrain,
     EraseDecoration,
+    EraseControlPoint,
     EditCharacter,
     MoveCharacter(Cell<Option<CharacterId>>),
     RemoveCharacter,
@@ -529,11 +592,17 @@ impl Sidebar {
             EditorAction::RemoveCharacter,
         ];
 
+        let control_actions = vec![
+            EditorAction::PlaceControlPoint(ControlPoint::Exit),
+            EditorAction::EraseControlPoint,
+        ];
+
         let sections = vec![
             background_actions,
             terrain_actions,
             decoration_actions,
             character_actions,
+            control_actions,
         ];
 
         Self {
@@ -560,7 +629,7 @@ impl Sidebar {
                 }
             }
 
-            let cols = 3;
+            let cols = 5;
             let rows = 1 + actions.len() / cols;
             let margin = 4.0;
             let pad = 10.0;
@@ -640,6 +709,25 @@ impl Sidebar {
                             BLACK,
                         );
                     }
+                    EditorAction::PlaceControlPoint(control_point) => {
+                        let text = format!("{:?}", control_point);
+                        let font_size = 16;
+                        let text_dim = measure_text(&text, None, font_size, 1.0);
+                        draw_rectangle(
+                            x + icon_w / 2.0 - text_dim.width / 2.0,
+                            y + icon_w / 2.0 - text_dim.offset_y,
+                            text_dim.width,
+                            text_dim.height,
+                            WHITE,
+                        );
+                        draw_text(
+                            &text,
+                            x + icon_w / 2.0 - text_dim.width / 2.0,
+                            y + icon_w / 2.0,
+                            font_size as f32,
+                            BLACK,
+                        );
+                    }
                     EditorAction::EraseBackground => {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
@@ -647,6 +735,9 @@ impl Sidebar {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::EraseDecoration => {
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::EraseControlPoint => {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::EditCharacter => {

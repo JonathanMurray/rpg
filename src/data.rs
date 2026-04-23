@@ -1318,6 +1318,33 @@ pub const DRAUG_ATTACK: Ability = Ability {
     charge_fx: None,
 };
 
+pub const ENEMY_ESCAPE: Ability = Ability {
+    id: AbilityId::EnemyEscape,
+    name: "Escape",
+    description: "",
+    // TODO: unique icon
+    icon: IconId::Move,
+    action_point_cost: 1,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: None,
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: Some(AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([Some(ApplyEffect::Escape), None]),
+        }),
+        environment_effect: None,
+    },
+    animation_color: BROWN,
+    initiate_sound: None,
+    resolve_sound: None,
+    charge_fx: None,
+};
+
 pub const HULDRA_INFECT: Ability = Ability {
     id: AbilityId::HuldraInfect,
     name: "Infect",

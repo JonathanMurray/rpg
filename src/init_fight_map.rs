@@ -5,6 +5,7 @@ use rand::distr::Distribution;
 
 use crate::{
     core::{Character, CharacterId, Position},
+    grid::ControlPoint,
     map_data::{create_character, CharacterType, MapData},
     pathfind::{Liquid, Occupation, PathfindGrid},
     textures::TerrainId,
@@ -75,6 +76,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         background: map_data.background,
         terrain_objects: map_data.terrain_objects,
         decorations: map_data.decorations,
+        control_points: map_data.control_points,
     }
 }
 
@@ -86,6 +88,7 @@ pub struct GameInitState {
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
+    pub control_points: IndexMap<Position, ControlPoint>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

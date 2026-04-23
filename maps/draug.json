@@ -547,6 +547,9 @@
     "(67, 17)": "WallOpeningEast",
     "(67, 5)": "WallOpeningEast"
   },
+  "control_points": {
+    "(64, 5)": "Exit"
+  },
   "characters": [
     {
       "type_": "Bob",
@@ -569,29 +572,9 @@
       "shield": null
     },
     {
-      "type_": "Draug",
-      "pos": [
-        26,
-        18
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Draug",
-      "pos": [
-        43,
-        4
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
       "type_": "Lootgoblin",
       "pos": [
-        23,
+        25,
         14
       ],
       "health": null,

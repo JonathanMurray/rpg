@@ -1,5 +1,5 @@
 use core::f32;
-use std::{cell::Cell, collections::HashMap, fs, rc::Rc};
+use std::{cell::Cell, collections::HashMap, default, fs, rc::Rc};
 
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
@@ -12,12 +12,12 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE,
+        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE,
         ENEMY_SLASHING, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
         HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS, KILL, LIGHTNING_BOLT,
         LIGHTNING_BOLT_REACH, MAGIC_SWORD, MANATEST, POISONTEST, SLASHING_RAPIER, SMALL_SHIELD,
     },
-    grid::GameGrid,
+    grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
     resources::GameResources,
     sounds::SoundPlayer,
@@ -57,6 +57,12 @@ pub fn create_game_grid(
             pathfind_grid.set_liquid(*pos, Some(Liquid::Water));
         }
     }
+    for (pos, control_point) in &map_data.control_points {
+        pathfind_grid
+            .control_points
+            .borrow_mut()
+            .insert(*pos, *control_point);
+    }
 
     let characters_map: HashMap<CharacterId, Rc<Character>> = characters
         .iter()
@@ -74,6 +80,7 @@ pub fn create_game_grid(
         map_data.background.clone(),
         map_data.terrain_objects.clone(),
         map_data.decorations.clone(),
+        map_data.control_points.clone(),
         resources.effect_textures.clone(),
         sound_player,
     );
@@ -88,6 +95,7 @@ pub struct MapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
+    pub control_points: IndexMap<Position, ControlPoint>,
     pub background: IndexMap<Position, TerrainId>,
     pub characters: Vec<CharacterData>,
 }
@@ -97,11 +105,13 @@ impl MapData {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
         let background = keys_pos_to_str(&self.background);
         let decorations = keys_pos_to_str(&self.decorations);
+        let control_points = keys_pos_to_str(&self.control_points);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
             terrain_objects,
             background,
             decorations,
+            control_points,
             characters: self.characters.clone(),
         };
         let json_str = serde_json::to_string_pretty(&map_data).unwrap();
@@ -130,6 +140,7 @@ impl MapData {
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),
             background: keys_str_to_pos(&map_data.background),
             decorations: keys_str_to_pos(&map_data.decorations),
+            control_points: keys_str_to_pos(&map_data.control_points),
             characters: map_data.characters,
         }
     }
@@ -161,6 +172,8 @@ struct SerializableMapData {
     pub terrain_objects: IndexMap<String, TerrainId>,
     pub background: IndexMap<String, TerrainId>,
     pub decorations: IndexMap<String, TerrainId>,
+    #[serde(default)]
+    pub control_points: IndexMap<String, ControlPoint>,
     pub characters: Vec<CharacterData>,
 }
 
@@ -327,14 +340,14 @@ pub fn create_character(
         }
         CharacterType::Lootgoblin => {
             let goblin = Character::new(
-                bot(BotBehaviour::Draug(Default::default()), 10.0),
+                bot(BotBehaviour::LootGoblin(Default::default()), 10.0),
                 "Loot goblin",
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
                 pos,
             );
-            goblin.learn_ability(DRAUG_ATTACK);
+            goblin.learn_ability(ENEMY_ESCAPE);
             goblin.health.change_max_value_to(20);
             goblin.receive_condition(Condition::Treasure, Some(3), None);
             goblin

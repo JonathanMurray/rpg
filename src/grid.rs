@@ -21,6 +21,7 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 use rand::{random_range, Rng};
+use serde::{Deserialize, Serialize};
 
 use std::cell::Cell;
 
@@ -263,6 +264,11 @@ pub enum ParticleShape {
     Rect,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize)]
+pub enum ControlPoint {
+    Exit,
+}
+
 pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
@@ -272,6 +278,7 @@ pub struct GameGrid {
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
+    pub control_points: IndexMap<Position, ControlPoint>,
     sprites: HashMap<SpriteId, Sprite>,
     pub pathfind_grid: Rc<PathfindGrid>,
     //routes: IndexMap<Position, ChartNode>,
@@ -318,6 +325,7 @@ impl GameGrid {
         background: IndexMap<Position, TerrainId>,
         terrain_objects: IndexMap<Position, TerrainId>,
         decorations: IndexMap<Position, TerrainId>,
+        control_points: IndexMap<Position, ControlPoint>,
         effect_textures: HashMap<EffectId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -357,6 +365,7 @@ impl GameGrid {
             background,
             terrain_objects,
             decorations,
+            control_points,
             effect_textures,
             sound_player,
         };
@@ -1363,6 +1372,29 @@ impl GameGrid {
         )
     }
 
+    fn draw_control_points(&self) {
+        for col in 0..self.grid_dimensions.0 as i32 + 1 {
+            let x0 = self.grid_x_to_screen(col);
+
+            for row in 0..self.grid_dimensions.1 as i32 + 1 {
+                let y0 = self.grid_y_to_screen(row);
+
+                if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
+                    if let Some(control_point) = self.control_points.get(&(col, row)) {
+                        draw_rectangle(
+                            x0,
+                            y0,
+                            self.cell_w,
+                            self.cell_w,
+                            Color::new(1.0, 1.0, 1.0, 0.5),
+                        );
+                        //self.fill_cell((col, row), Color::new(1.0, 1.0, 1.0, 0.5)  , 1.0);
+                    }
+                }
+            }
+        }
+    }
+
     fn draw_background(&mut self) {
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
@@ -1823,6 +1855,7 @@ impl GameGrid {
         obstructed: bool,
         mut hovered_action: Option<(CharacterId, BaseAction)>,
         active_char_reserved_and_hovered_ap: (i32, i32),
+        draw_control_points: bool,
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
         // TODO
@@ -1916,6 +1949,10 @@ impl GameGrid {
         draw_rectangle(x, y, screen_width(), screen_height(), BACKGROUND_COLOR);
 
         self.draw_background();
+
+        if draw_control_points {
+            self.draw_control_points();
+        }
 
         let active_char_pos = self.characters[&self.active_character_id].pos();
 

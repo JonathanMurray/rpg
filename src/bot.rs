@@ -1,5 +1,5 @@
 use core::f32;
-use std::{cell::Cell, iter, rc::Rc};
+use std::{cell::Cell, fmt::Write, iter, rc::Rc};
 
 use macroquad::rand::ChooseRandom;
 use rand::{random_bool, random_range, Rng};
@@ -11,7 +11,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
         MOVE_DISTANCE_PER_RESOURCE,
     },
-    data::{DRAUG_ATTACK, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
+    data::{DRAUG_ATTACK, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT, HULDRA_INFLICT_HORRORS},
     pathfind::{Path, PathfindGrid},
     util::{adjacent_cells, are_entities_within_melee, CustomShuffle},
 };
@@ -21,6 +21,30 @@ pub enum BotBehaviour {
     Huldra(HuldraBehaviour),
     Draug(DraugBehaviour),
     Fighter(FighterBehaviour),
+    LootGoblin(LootgoblinBehaviour),
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct LootgoblinBehaviour {}
+
+impl LootgoblinBehaviour {
+    fn get_goal(&self, game: &CoreGame) -> BotGoal {
+        let control_points = game.pathfind_grid.control_points();
+        let (pos, _control_point) = control_points.iter().next().unwrap();
+
+        let bot = game.characters.get_rc(game.active_character_id);
+
+        let action = if bot.pos() == *pos {
+            BotAction::NonTarget(ENEMY_ESCAPE)
+        } else {
+            BotAction::MoveTo(*pos)
+        };
+
+        BotGoal {
+            action: (action, None),
+            fallback_actions: vec![],
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
@@ -47,6 +71,7 @@ impl DraugBehaviour {
             // TODO should not only target self
             BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
             BotAction::NonTarget(..) => (action, None),
+            BotAction::MoveTo(..) => (action, None),
         };
 
         BotGoal {
@@ -173,6 +198,7 @@ impl FighterBehaviour {
             // TODO should not only target self
             BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
             BotAction::NonTarget(..) => (action, None),
+            BotAction::MoveTo(..) => (action, None),
         };
 
         BotGoal {
@@ -273,6 +299,7 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
         BotBehaviour::Huldra(huldra) => huldra.run(game),
         BotBehaviour::Fighter(fighter) => pursue_goal(game, fighter.get_goal(game)),
         BotBehaviour::Draug(draug) => pursue_goal(game, draug.get_goal(game)),
+        BotBehaviour::LootGoblin(goblin) => pursue_goal(game, goblin.get_goal(game)),
     };
     println!("Bot chose: {:?}", result);
 
@@ -367,6 +394,15 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
             let range = ability.target.range(&[]).unwrap();
             path_to_goal = find_path(game, bot, &goal_target, range);
         }
+        (BotAction::MoveTo(pos), _) => {
+            path_to_goal = game.pathfind_grid.find_shortest_path_to_proximity(
+                bot.id(),
+                bot.pos(),
+                pos,
+                0.0,
+                EXPLORATION_RANGE,
+            )
+        }
     }
 
     if let Some(path) = path_to_goal {
@@ -436,6 +472,9 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                         }
                     }
                 }
+            }
+            BotAction::MoveTo(pos) => {
+                panic!("MoveTo shouldn't be used as a fallback action");
             }
         }
     }
@@ -509,6 +548,7 @@ enum BotAction {
     SingleEnemyTarget(Ability),
     SingleFriendlyTarget(Ability),
     NonTarget(Ability),
+    MoveTo(Position),
 }
 
 impl std::fmt::Debug for BotAction {
@@ -524,6 +564,7 @@ impl std::fmt::Debug for BotAction {
                 .field(&ability.name)
                 .finish(),
             Self::NonTarget(ability) => f.debug_tuple("NonTarget").field(&ability.name).finish(),
+            Self::MoveTo(pos) => f.write_fmt(format_args!("MoveTo({:?})", pos)),
         }
     }
 }

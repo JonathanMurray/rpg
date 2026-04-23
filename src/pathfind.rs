@@ -13,6 +13,7 @@ use crate::{
         distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
         CENTER_MELEE_RANGE_SQUARED,
     },
+    grid::ControlPoint,
     util::line_visitor,
 };
 
@@ -62,6 +63,7 @@ pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
     liquids: RefCell<HashMap<Position, Liquid>>,
+    pub control_points: RefCell<HashMap<Position, ControlPoint>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
     cached_unexplored: RefCell<Vec<ChartNode>>,
@@ -95,6 +97,7 @@ impl PathfindGrid {
             dimensions,
             occupied: Default::default(),
             liquids: Default::default(),
+            control_points: Default::default(),
             cache_key: Default::default(),
             cached_exploration_chart: Default::default(),
             cached_unexplored: Default::default(),
@@ -140,8 +143,12 @@ impl PathfindGrid {
         self.occupied.borrow().keys().copied().collect()
     }
 
-    pub fn occupied(&self) -> Ref<HashMap<(i32, i32), Occupation>> {
+    pub fn occupied(&self) -> Ref<HashMap<Position, Occupation>> {
         self.occupied.borrow()
+    }
+
+    pub fn control_points(&self) -> Ref<HashMap<Position, ControlPoint>> {
+        self.control_points.borrow()
     }
 
     pub fn set_liquid(&self, pos: Position, value: Option<Liquid>) {

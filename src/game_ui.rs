@@ -569,6 +569,7 @@ impl UserInterface {
             init_state.background,
             init_state.terrain_objects,
             init_state.decorations,
+            init_state.control_points,
             resources.effect_textures.clone(),
             sound_player.clone(),
         );
@@ -701,6 +702,7 @@ impl UserInterface {
             is_grid_obstructed,
             hovered_action,
             character_ui.action_points_row.reserved_and_hovered_ap,
+            false,
         );
 
         let mut player_chose = self.handle_grid_outcome(grid_outcome);
@@ -1642,16 +1644,21 @@ impl UserInterface {
                 }
 
                 let actor_name_tag = self.characters.get(actor).name_tag();
-                let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
-                    "cast"
+                let mut line = if ability.id == AbilityId::EnemyEscape {
+                    format!("|{}| escaped.", actor_name_tag)
                 } else {
-                    "used"
+                    let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
+                        "cast"
+                    } else {
+                        "used"
+                    };
+                    let mut line = format!("|{}| {} {}", actor_name_tag, verb, ability.name);
+                    if let Some((target_id, _outcome)) = &target_outcome {
+                        let target_name_tag = self.characters.get(*target_id).name_tag();
+                        line.push_str(&format!(" on |{}|", target_name_tag));
+                    }
+                    line
                 };
-                let mut line = format!("|{}| {} {}", actor_name_tag, verb, ability.name);
-                if let Some((target_id, _outcome)) = &target_outcome {
-                    let target_name_tag = self.characters.get(*target_id).name_tag();
-                    line.push_str(&format!(" on |{}|", target_name_tag));
-                }
 
                 let mut attacks = vec![];
 
@@ -1770,10 +1777,18 @@ impl UserInterface {
             }
             GameEvent::CharactersDying { characters } => {
                 let duration = 0.5;
-                self.sound_player.play(SoundId::Death);
+
+                let mut someone_died = false;
                 for char_id in characters {
-                    self.game_grid.animate_death(char_id, duration);
-                    self.animation_stopwatch.set_to_at_least(duration);
+                    let char = self.characters.get(char_id);
+                    if !char.has_escaped_from_battle.get() {
+                        self.game_grid.animate_death(char_id, duration);
+                        self.animation_stopwatch.set_to_at_least(duration);
+                        someone_died = true;
+                    }
+                }
+                if someone_died {
+                    self.sound_player.play(SoundId::Death);
                 }
             }
             GameEvent::CharactersDied {
@@ -1781,10 +1796,10 @@ impl UserInterface {
                 new_active,
             } => {
                 for char_id in characters {
-                    self.log.add(format!(
-                        "|{}| died",
-                        self.characters.get(char_id).name_tag()
-                    ));
+                    let char = self.characters.get(char_id);
+                    if !char.has_escaped_from_battle.get() {
+                        self.log.add(format!("|{}| died", char.name_tag()));
+                    }
                 }
 
                 self.target_ui.clear_character_if_dead();

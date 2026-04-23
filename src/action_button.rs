@@ -501,6 +501,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 .push(format!("  |<keyword>Pushed| ({})", amount));
             t.keywords.push(Keyword::Pushed);
         }
+        ApplyEffect::Escape => {
+            t.technical_description
+                .push("  Escapes from battle".to_string());
+        }
     }
 }
 

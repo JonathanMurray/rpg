@@ -39,6 +39,7 @@ enum ActionOutcome {
 pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
+    //ui_event_queue: RefCell<Vec<GameEvent>>,
     user_interface: GameUserInterfaceConnection,
     pub pathfind_grid: Rc<PathfindGrid>,
     round_index: u32,
@@ -53,6 +54,7 @@ impl CoreGame {
         Self {
             characters,
             active_character_id: init_state.active_character_id,
+            //ui_event_queue: Default::default(),
             user_interface,
             pathfind_grid: init_state.pathfind_grid.clone(),
             round_index: 0,
@@ -86,6 +88,8 @@ impl CoreGame {
                 "UI SELECT ACTION ... (active char = {})",
                 self.active_character().name
             );
+
+            //self.ui_handle_queued_events().await;
 
             let enemy_count = self
                 .characters
@@ -741,7 +745,51 @@ impl CoreGame {
     }
 
     async fn ui_handle_event(&self, event: GameEvent) {
+        println!("ui handle event ({:?}) ...", event);
+
+        //self.ui_handle_queued_events().await;
+
+        println!("now will actually handle the event ...");
         self.user_interface.handle_event(self, event).await
+    }
+
+    async fn ui_handle_queued_events(&self) {
+        //TODO
+        println!("ui handle queued events");
+
+        // TODO  causes stack overflow for some reason
+        /*
+        loop {
+            let popped = {
+                let mut queue_ref = self.ui_event_queue.borrow_mut();
+                queue_ref.pop()
+            };
+            if let Some(event) = popped {
+                println!("queued evnt: {:?}", event);
+                self.user_interface.handle_event(self, event).await
+            } else {
+                println!("no queued event, breaking");
+                break;
+            }
+        }
+         */
+
+        /*
+        for _ in 0..2 {
+            let mut queue_ref = self.ui_event_queue.borrow_mut();
+            let popped = queue_ref.pop();
+            drop(queue_ref);
+            //drop(popped);
+            self.user_interface.handle_event(self, GameEvent::LogLine("hello".to_string())).await
+        }
+          */
+
+        println!("drained event queue");
+    }
+
+    fn queue_up_ui_event(&self, event: GameEvent) {
+        println!("ui queue up event ({:?}) ...", event);
+        //self.ui_event_queue.borrow_mut().push(event);
     }
 
     async fn perform_movement(
@@ -1096,6 +1144,12 @@ impl CoreGame {
                 receiver.is_being_pushed_in_direction.set(Some(vector));
                 actual_effect = Some(e);
                 format!("  |{}| was knocked back ({})", receiver.name_tag(), amount)
+            }
+            ApplyEffect::Escape => {
+                receiver.has_escaped_from_battle.set(true);
+                // "Dead" is not quite true, but a simple hack to remove the character from the game
+                receiver.receive_condition(Condition::Dead, None, None);
+                format!("  |{}| escaped from battle.", receiver.name_tag())
             }
         };
 
@@ -1783,6 +1837,7 @@ impl CoreGame {
                     ApplyEffect::PerBleeding { .. } => {}
                     ApplyEffect::ConsumeCondition { .. } => {}
                     ApplyEffect::Pushed { .. } => {}
+                    ApplyEffect::Escape => {}
                 }
 
                 let (applied, log_line, _damage) =
@@ -2151,6 +2206,7 @@ impl CoreGame {
                     ApplyEffect::Pushed(ref mut distance) => {
                         apply_hit_type(distance, hit_type, &mut reduced_to_nothing);
                     }
+                    ApplyEffect::Escape => {}
                 }
 
                 if reduced_to_nothing {
@@ -2242,6 +2298,8 @@ impl CoreGame {
         if character.has_condition(&Condition::Treasure) {
             if let Some(ch) = self.player_characters().next() {
                 ch.kind.unwrap_party().gain_money(1);
+                // TODO
+                self.queue_up_ui_event(GameEvent::LogLine("HELLO".to_string()));
                 println!("PLAYER GAINED MONEY");
                 character
                     .conditions
@@ -3783,6 +3841,8 @@ pub enum ApplyEffect {
         condition: Condition,
     },
     Pushed(u32),
+
+    Escape,
 }
 
 impl ApplyEffect {
@@ -3808,6 +3868,7 @@ impl ApplyEffect {
             } => todo!(),
             ApplyEffect::ConsumeCondition { condition } => todo!(),
             ApplyEffect::Pushed(n) => *n *= factor,
+            ApplyEffect::Escape => {}
         }
     }
 }
@@ -3836,6 +3897,7 @@ impl Display for ApplyEffect {
                 f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
             ApplyEffect::Pushed(..) => f.write_str("Pushed"),
+            ApplyEffect::Escape => f.write_str("Escaped"),
         }
     }
 }
@@ -4527,6 +4589,7 @@ pub enum AbilityId {
 
     EnemyExplodingArrow,
     EnemySlashingAttack,
+    EnemyEscape,
     HuldraHeal,
     HuldraInfect,
     HuldraInflictHorrors,
@@ -5099,6 +5162,7 @@ pub struct Character {
 
     pub is_facing_east: Cell<bool>,
     is_being_pushed_in_direction: Cell<Option<(i32, i32)>>,
+    pub has_escaped_from_battle: Cell<bool>,
 }
 
 impl Character {
@@ -5175,6 +5239,7 @@ impl Character {
             changed_equipment_listeners: Default::default(),
             is_facing_east: Cell::new(false),
             is_being_pushed_in_direction: Cell::new(None),
+            has_escaped_from_battle: Cell::new(false),
         }
     }
 

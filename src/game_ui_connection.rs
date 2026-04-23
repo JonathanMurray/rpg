@@ -212,6 +212,7 @@ impl GameUserInterfaceConnection {
     }
 
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
+        println!("ui handle_event({:?}", event);
         let msg = MessageFromGame::Event(Box::new(event));
 
         match self.run_ui(game, msg).await {
@@ -234,6 +235,7 @@ impl _GameUserInterfaceConnection {
         game: &CoreGame,
         msg_from_game: MessageFromGame,
     ) -> Result<UiOutcome, QuitEvent> {
+        println!("run_ui ...");
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();
