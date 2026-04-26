@@ -48,9 +48,7 @@ impl Keyword {
             Keyword::Crit => {
                 "|<value>+50%| effect.\nTriggers when |<mixed_dice>| roll is |<value>16| or higher."
             }
-            Keyword::Flanked => {
-                "|<value>30%| chance that the attack automatically |<keyword>Crits|."
-            }
+            Keyword::Flanked => "|<value>30%| chance to |<keyword>Crit|.",
         }
     }
 

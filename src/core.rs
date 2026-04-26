@@ -4057,7 +4057,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
-            Blinded => "|<value>30%| chance to miss target.\nAlways |<keyword>Flanked| when attacked.",
+            Blinded => "|<value>30%| chance to miss.\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",

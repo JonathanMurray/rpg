@@ -61,7 +61,7 @@ use crate::{
         EffectId, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation,
         WaterType, LIGHTNING_BOLT_FX,
     },
-    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED},
+    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED, COL_RED_BRIGHT},
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -3482,6 +3482,15 @@ impl GameGrid {
         let current_health_w =
             (health_w) * (character.health.current() as f32 / character.health.max() as f32);
         draw_rectangle(health_x, health_y, current_health_w, health_h, COL_RED);
+        if !discrete_healthbar {
+            draw_rectangle(
+                health_x + 2.0,
+                health_y + 2.0,
+                current_health_w - 4.0,
+                health_h * 0.2,
+                COL_RED_BRIGHT,
+            );
+        }
 
         if let Some(preview) = self.target_effect_preview.get(&character.id()) {
             let damage = preview.prediction.damage;
@@ -3591,10 +3600,23 @@ impl GameGrid {
             let health_text_font_size = 16;
             let health_text_font = Some(&self.simple_font);
             let text_dim = measure_text(&health_text, health_text_font, health_text_font_size, 1.0);
+            let text_x = health_x + health_w / 2.0 - text_dim.width / 2.0;
+            let text_y = health_y + health_h / 2.0 - text_dim.height / 2.0 + text_dim.offset_y;
             draw_text_rounded(
                 &health_text,
-                health_x + health_w / 2.0 - text_dim.width / 2.0,
-                health_y + health_h / 2.0 - text_dim.height / 2.0 + text_dim.offset_y,
+                text_x + 1.0,
+                text_y + 1.0,
+                TextParams {
+                    font: health_text_font,
+                    font_size: health_text_font_size,
+                    color: BLACK,
+                    ..Default::default()
+                },
+            );
+            draw_text_rounded(
+                &health_text,
+                text_x,
+                text_y,
                 TextParams {
                     font: health_text_font,
                     font_size: health_text_font_size,
