@@ -413,8 +413,7 @@ pub async fn run_victory_loop(
             };
             candidate_rewards.push((ButtonAction::AttackEnhancement(enhancement), Some(label)));
         }
-        for ability in vec![
-            &FIREBALL,
+        for ability in [&FIREBALL,
             &SWEEP_ATTACK,
             &LUNGE_ATTACK,
             &BRACE,
@@ -423,8 +422,7 @@ pub async fn run_victory_loop(
             &MIND_BLAST,
             &HEAL,
             &HEALING_NOVA,
-            &HEALING_RAIN,
-        ] {
+            &HEALING_RAIN] {
             candidate_rewards.push((ButtonAction::Action(BaseAction::UseAbility(ability)), None));
         }
         for character in &characters {

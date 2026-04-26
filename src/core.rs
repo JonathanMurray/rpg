@@ -1428,10 +1428,8 @@ impl CoreGame {
                     let before = SystemTime::now();
 
                     let mut miss = false;
-                    if mode.real_game().is_some() {
-                        if caster.has_condition(&Condition::Blinded) {
-                            miss = roll_miss_chance();
-                        }
+                    if mode.real_game().is_some() && caster.has_condition(&Condition::Blinded) {
+                        miss = roll_miss_chance();
                     }
 
                     if miss {
@@ -2567,10 +2565,8 @@ impl CoreGame {
             // Don't apply miss chance in damage prediction (since the prediction assumes that a high roll
             // cannot deal less damage than a low roll).
             // deal less damage than high attack rolls).
-            if game.is_some() {
-                if attacker.has_condition(&Condition::Blinded) {
-                    miss = roll_miss_chance();
-                }
+            if game.is_some() && attacker.has_condition(&Condition::Blinded) {
+                miss = roll_miss_chance();
             }
 
             //  <=5: graze

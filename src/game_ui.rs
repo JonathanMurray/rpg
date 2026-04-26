@@ -2604,7 +2604,7 @@ impl UserInterface {
                         selected_enhancements,
                         target,
                     } => Some(Action::UseAbility {
-                        ability: ability,
+                        ability,
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
                     }),

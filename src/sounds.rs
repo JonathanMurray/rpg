@@ -1,7 +1,7 @@
 use std::{cell::Cell, collections::HashMap, rc::Rc};
 
 use macroquad::{
-    audio::{load_sound, play_sound, play_sound_once, stop_sound, PlaySoundParams, Sound},
+    audio::{load_sound, play_sound, stop_sound, PlaySoundParams, Sound},
     rand::ChooseRandom,
 };
 

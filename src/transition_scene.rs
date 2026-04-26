@@ -76,7 +76,7 @@ pub async fn run_transition_loop(
                 match new_skill {
                     ButtonAction::Action(base_action) => match base_action {
                         BaseAction::UseAbility(ability) => {
-                            char.learn_ability(*ability);
+                            char.learn_ability(ability);
                         }
                         other => panic!("{:?}", other),
                     },
