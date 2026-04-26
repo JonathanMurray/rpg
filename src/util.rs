@@ -20,6 +20,14 @@ pub fn adjacent_cells((x, y): Position) -> Vec<Position> {
     ]
 }
 
+pub fn plus_minus(value: i32) -> String {
+    if value < 0 {
+        format!("-{}", -value)
+    } else {
+        format!("+{}", value)
+    }
+}
+
 pub fn select_n_random<T: Copy>(mut from: Vec<T>, n: usize) -> Vec<T> {
     let mut selected = vec![];
     let mut rng = rand::rng();

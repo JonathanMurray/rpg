@@ -23,7 +23,7 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
-    util::COL_GREEN_0,
+    util::{plus_minus, COL_GREEN_0},
 };
 
 use crate::action_button::ActionButton;
@@ -768,8 +768,8 @@ impl ActivityPopup {
                     attacker.name, defender.name
                 ));
                 lines.push(format!(
-                    "|<red_dice>| |<stat>Attack| +{} vs |<shield>|<stat>Evasion| {}",
-                    attacker.attack_modifier(*hand),
+                    "|<red_dice>| |<stat>Attack| {} vs |<shield>|<stat>Evasion| {}",
+                    plus_minus(attacker.attack_modifier(*hand)),
                     defender.evasion()
                 ));
 

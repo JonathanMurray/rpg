@@ -21,7 +21,7 @@ use crate::pathfind::{Collision, Liquid, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
-use crate::util::{are_entities_within_melee, line_visitor, CustomShuffle};
+use crate::util::{are_entities_within_melee, line_visitor, plus_minus, CustomShuffle};
 
 pub type Position = (i32, i32);
 
@@ -1280,8 +1280,10 @@ impl CoreGame {
                     AbilityRollType::Spell => {
                         let modifier = caster.spell_modifier() as i32;
                         roll_calculation += modifier;
-                        dice_roll_line
-                            .push_str(&format!(" +{} (|<blue_dice>| |<stat>Spell|)", modifier));
+                        dice_roll_line.push_str(&format!(
+                            " {} (|<blue_dice>| |<stat>Spell|)",
+                            plus_minus(modifier)
+                        ));
 
                         for enhancement in enhancements {
                             if let Some(e) = enhancement.spell_effect {
@@ -2438,10 +2440,10 @@ impl CoreGame {
             }
         }
 
-        let unmodified_roll = mode
-            .simulated_roll()
-            .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
-        let roll_result = (unmodified_roll + attack_modifier) as i32 + attack_bonus.flat_amount;
+        let unmodified_roll =
+            mode.simulated_roll()
+                .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage)) as i32;
+        let roll_result = (unmodified_roll + attack_modifier) + attack_bonus.flat_amount;
         let final_result = roll_result - evasion as i32;
 
         if game.is_some() {
@@ -2489,16 +2491,17 @@ impl CoreGame {
 
         if game.is_some() {
             // TODO: Include details here about where this attack bonus comes from
-            let attack_bonus_str = if attack_bonus.flat_amount > 0 {
-                format!("(+{}) ", attack_bonus.flat_amount)
-            } else if attack_bonus.flat_amount < 0 {
-                format!("(-{}) ", -attack_bonus.flat_amount)
+            let attack_bonus_str = if attack_bonus.flat_amount != 0 {
+                format!("({})", plus_minus(attack_bonus.flat_amount))
             } else {
                 "".to_string()
             };
             detail_lines.push(format!(
-                "Rolled: {} +{} (|<red_dice>|<stat>Attack|)| {}= |<value>{}|",
-                unmodified_roll, attack_modifier, attack_bonus_str, roll_result,
+                "Rolled: {} {} (|<red_dice>|<stat>Attack|)| {}= |<value>{}|",
+                unmodified_roll,
+                plus_minus(attack_modifier),
+                attack_bonus_str,
+                roll_result,
             ));
             detail_lines.push(format!(
                 "{} - {} (|<shield>|<stat>Evasion|) = |<value>{}|",
@@ -2913,8 +2916,8 @@ impl CoreGame {
                 let outcome = {
                     let attacker = self.characters.get(self.active_character_id);
                     let reactor = self.characters.get(reactor_id);
-                    let toughness = attacker.toughness();
-                    let roll = roll_d20_with_advantage(0);
+                    let toughness = attacker.toughness() as i32;
+                    let roll = roll_d20_with_advantage(0) as i32;
                     let attack_mod = reactor.attack_modifier(HandType::MainHand);
                     let res = roll + attack_mod;
                     lines.push(format!(
@@ -2922,7 +2925,7 @@ impl CoreGame {
                         roll, attack_mod, res, toughness,
                     ));
                     let condition = if res >= toughness {
-                        let degree_of_success = (res - toughness) / 5;
+                        let degree_of_success = ((res - toughness) / 5) as u32;
                         let (label, bonus) = match degree_of_success {
                             0 => ("Hit".to_string(), 0),
                             1 => ("Critical hit".to_string(), 1),
@@ -3719,78 +3722,6 @@ pub fn attack_roll_bonus(
     bonus
 }
 
-pub fn prob_attack_hit(
-    attacker: &Character,
-    hand: HandType,
-    defender: &Character,
-    enhancements: &[(&'static str, AttackEnhancementEffect)],
-    reaction: Option<OnAttackedReaction>,
-) -> f32 {
-    let bonus = attack_roll_bonus(attacker, hand, defender, enhancements, reaction);
-    let mut evasion = defender.evasion();
-
-    if let Some(reaction) = reaction {
-        evasion += reaction.effect.bonus_evasion;
-    }
-
-    let dice_target = evasion
-        .saturating_sub(attacker.attack_modifier(hand))
-        .max(1);
-    probability_of_d20_reaching(dice_target, bonus)
-}
-
-pub fn prob_attack_penetrating_hit(
-    attacker: &Character,
-    hand: HandType,
-    defender: &Character,
-    enhancements: &[(&'static str, AttackEnhancementEffect)],
-    reaction: Option<OnAttackedReaction>,
-) -> f32 {
-    let bonus = attack_roll_bonus(attacker, hand, defender, enhancements, reaction);
-    let mut evasion = defender.evasion();
-
-    if let Some(reaction) = reaction {
-        evasion += reaction.effect.bonus_evasion;
-    }
-
-    let mut armor = defender.protection_from_armor();
-    for (_name, effect) in enhancements {
-        armor = armor.saturating_sub(effect.armor_penetration);
-    }
-
-    let armored_defense = evasion + armor;
-
-    let dice_target = armored_defense
-        .saturating_sub(attacker.attack_modifier(hand))
-        .max(1);
-    probability_of_d20_reaching(dice_target, bonus)
-}
-
-pub fn prob_ability_hit(
-    caster: &Character,
-    defense_type: DefenseType,
-    defender: &Character,
-    enhancements: &[AbilityEnhancement],
-    modifier: AbilityRollType,
-) -> f32 {
-    let bonus = ability_roll_bonus(caster, defender, enhancements, modifier);
-
-    let def = defender.defense(defense_type);
-
-    let modifier_value = match modifier {
-        AbilityRollType::Spell => caster.spell_modifier() as i32,
-        AbilityRollType::RollAbilityWithAttackModifier => {
-            caster.attack_modifier(HandType::MainHand) as i32
-        }
-        AbilityRollType::RollDuringAttack(bonus) => {
-            caster.attack_modifier(HandType::MainHand) as i32 + bonus
-        }
-    };
-
-    let target = (def as i32 - modifier_value).max(1) as u32;
-    probability_of_d20_reaching(target, bonus)
-}
-
 #[derive(Clone)]
 pub struct Characters(Vec<Rc<Character>>);
 
@@ -4125,7 +4056,7 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<keyword>Disadvantage| on attacks.",
+            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
             Blinded => "|<value>30%| chance to miss target.\nAlways |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
@@ -4240,7 +4171,6 @@ impl Condition {
     pub const fn related_keywords(&self) -> [Option<Keyword>; 2] {
         use Condition::*;
         match self {
-            Dazed => [Some(Keyword::Advantage), None],
             Blinded => [Some(Keyword::Flanked), None],
             NearDeath => [Some(Keyword::Advantage), None],
             _ => [None, None],
@@ -6534,8 +6464,8 @@ impl Character {
         physical_attr + self.intellect()
     }
 
-    pub fn attack_modifier(&self, hand: HandType) -> u32 {
-        let mut res = self.base_attack_modifier(hand);
+    pub fn attack_modifier(&self, hand: HandType) -> i32 {
+        let mut res = self.base_attack_modifier(hand) as i32;
 
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Inspired) {
@@ -6543,6 +6473,9 @@ impl Character {
         }
         if conditions.has(&Condition::BloodRage) {
             res += 3;
+        }
+        if conditions.has(&Condition::Dazed) {
+            res -= 5;
         }
         if conditions.has(&Condition::ThrillOfBattle) {
             res += 3;
@@ -6648,7 +6581,8 @@ impl Character {
             ));
         }
         if self.has_condition(&Condition::Dazed) {
-            bonuses.push(("Dazed", RollBonusContributor::Advantage(-1)));
+            // applied from attack_modifer()
+            bonuses.push(("Dazed", RollBonusContributor::OtherPositive));
         }
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Raging)
