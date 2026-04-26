@@ -505,7 +505,6 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
 
-    bob.receive_condition(Condition::Blinded, Some(1), None);
     bob.learn_ability(&EXECUTE);
     bob.learn_ability_enhancement(EXECUTE_BLOODLUST);
     bob.learn_passive(PassiveSkill::HardenedSkin);

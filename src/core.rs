@@ -1429,11 +1429,11 @@ impl CoreGame {
 
                     let mut miss = false;
                     if mode.real_game().is_some() && caster.has_condition(&Condition::Blinded) {
-                        miss = roll_miss_chance();
+                        miss = roll_blinded_miss_chance();
                     }
 
                     if miss {
-                        detail_lines.push("Miss! |<faded>(Blinded 30%)|".to_string());
+                        detail_lines.push("Miss! |<faded>(Blinded: 30% miss chance)|".to_string());
                         target_outcome = Some((*target_id, AbilityTargetOutcome::Missed));
                     } else {
                         let outcome = Self::perform_ability_enemy_effect(
@@ -2536,9 +2536,11 @@ impl CoreGame {
                 }
             }
 
+            let flanking = is_target_flanked(attacker.pos(), defender);
+
             if attacker.knows_passive(PassiveSkill::Honorless) {
                 let bonus_dmg = 1;
-                if is_target_flanked(attacker.pos(), defender) {
+                if flanking {
                     dmg_str.push_str(&format!(" +{} |<faded>(Honorless)|", bonus_dmg));
                     dmg_calculation += bonus_dmg;
                 }
@@ -2561,19 +2563,27 @@ impl CoreGame {
                 dmg_calculation -= armor_value as i32;
             }
 
-            let mut miss = false;
-            // Don't apply miss chance in damage prediction (since the prediction assumes that a high roll
+            let mut miss_from_blinded = false;
+            let mut crit_from_flanking = false;
+            // Don't apply miss/crit chance in damage prediction (since the prediction assumes that a high roll
             // cannot deal less damage than a low roll).
             // deal less damage than high attack rolls).
-            if game.is_some() && attacker.has_condition(&Condition::Blinded) {
-                miss = roll_miss_chance();
+            if game.is_some() {
+                if attacker.has_condition(&Condition::Blinded) {
+                    miss_from_blinded = roll_blinded_miss_chance();
+                }
+                if flanking {
+                    crit_from_flanking = roll_flanked_crit_chance();
+                }
             }
 
             //  <=5: graze
             // 6-15: hit
             // >=16: crit
-            let hit_type = if miss {
+            let hit_type = if miss_from_blinded {
                 HitType::Miss
+            } else if crit_from_flanking {
+                HitType::Critical
             } else if final_result <= 5 {
                 HitType::Graze
             } else if final_result <= 15 {
@@ -2584,7 +2594,7 @@ impl CoreGame {
 
             match hit_type {
                 HitType::Miss => {
-                    detail_lines.push("Miss! |<faded>(Blinded 30%)|".to_string());
+                    detail_lines.push("Miss! |<faded>(Blinded: 30% miss chance)|".to_string());
                 }
                 HitType::Graze => {
                     if let Some(source) = graze_improvement {
@@ -2607,7 +2617,12 @@ impl CoreGame {
                         dmg_str.push_str(" +50% |<faded>(crit)|");
                         dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
+                    if crit_from_flanking {
+                        detail_lines
+                            .push("  Critical Hit |<faded>(Flanked: 30% crit chance)|".to_string());
+                    } else {
+                        detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
+                    }
                 }
             }
 
@@ -3106,7 +3121,12 @@ impl CoreGame {
     }
 }
 
-fn roll_miss_chance() -> bool {
+fn roll_blinded_miss_chance() -> bool {
+    let mut rng = rand::rng();
+    rng.random_range(1..=10) <= 3
+}
+
+fn roll_flanked_crit_chance() -> bool {
     let mut rng = rand::rng();
     rng.random_range(1..=10) <= 3
 }
@@ -6597,7 +6617,7 @@ impl Character {
         let mut bonuses = vec![];
 
         if is_target_flanked(self.pos(), target) {
-            bonuses.push(("Flanked", RollBonusContributor::FlatAmount(5)));
+            bonuses.push(("Flanked", RollBonusContributor::OtherPositive));
         }
 
         let (_range, reach) = self.reaches_with_attack(
