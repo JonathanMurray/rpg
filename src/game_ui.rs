@@ -1660,7 +1660,7 @@ impl UserInterface {
 
                 let mut attacks = vec![];
 
-                let mut resist = false;
+                let mut missed = false;
                 if let Some((target, outcome)) = &target_outcome {
                     match outcome {
                         AbilityTargetOutcome::HitEnemy {
@@ -1673,6 +1673,7 @@ impl UserInterface {
                                 line.push_str(&format!(" (|<value>{}| damage)", dmg))
                             } else if applied_effects.is_empty() {
                                 let suffix = match hit_type {
+                                    HitType::Miss => " (miss)",
                                     HitType::Regular => " (hit)",
                                     HitType::Graze => " (graze)",
                                     HitType::Critical => " (crit)",
@@ -1682,8 +1683,8 @@ impl UserInterface {
                                 line.push_str(&format!("  ({})", applied_effects[0]));
                             }
                         }
-                        AbilityTargetOutcome::Resisted => {
-                            resist = true;
+                        AbilityTargetOutcome::Missed => {
+                            missed = true;
                             line.push_str(" (miss)");
                         }
                         AbilityTargetOutcome::AffectedAlly { applied_effects } => {
@@ -1698,8 +1699,8 @@ impl UserInterface {
                 }
 
                 if let Some(sound_id) = ability.resolve_sound {
-                    if resist {
-                        self.sound_player.play(SoundId::Resist);
+                    if missed {
+                        self.sound_player.play(SoundId::AttackMiss);
                     } else {
                         self.sound_player.play(sound_id);
                     }
@@ -2075,7 +2076,9 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        if event.outcome.damage == 0 {
+        if event.outcome.hit_type == HitType::Miss {
+            self.sound_player.play(SoundId::AttackMiss);
+        } else if event.outcome.damage == 0 {
             self.sound_player.play(SoundId::ArmorAbsorbed);
         } else {
             if self.characters.get(attacker).has_equipped_ranged_weapon() {
@@ -2086,6 +2089,7 @@ impl UserInterface {
             self.sound_player.play(SoundId::Damage);
         }
         let verb = match event.outcome.hit_type {
+            HitType::Miss => "missed",
             HitType::Regular => "hit",
             HitType::Graze => "grazed",
             HitType::Critical => "crit",
@@ -2105,17 +2109,15 @@ impl UserInterface {
             AttackOutcome {
                 damage,
                 actual_health_lost,
+                hit_type,
                 ..
             } => {
-                self.animate_character_damage(target, actual_health_lost);
-                damage_was_dealt = damage > 0;
-                line.push_str(&format!(" (|<value>{}| damage)", damage))
-            } /*
-              AttackOutcome::Dodge => line.push_str(" (dodge)"),
-              AttackOutcome::Parry => line.push_str(" (parry)"),
-              AttackOutcome::Block => line.push_str(" (block)"),
-              AttackOutcome::Miss => {}
-               */
+                if hit_type != HitType::Miss {
+                    self.animate_character_damage(target, actual_health_lost);
+                    damage_was_dealt = damage > 0;
+                    line.push_str(&format!(" (|<value>{}| damage)", damage))
+                }
+            }
         }
 
         self.log.add_with_details(line, detail_lines);
@@ -2124,6 +2126,11 @@ impl UserInterface {
         let attacker_pos = self.characters.get(attacker).pos();
 
         let (impact_text, text_style) = match event.outcome {
+            AttackOutcome {
+                damage,
+                hit_type: HitType::Miss,
+                ..
+            } => ("Miss!".to_string(), TextEffectStyle::HostileGraze),
             AttackOutcome {
                 damage,
                 hit_type: HitType::Regular,
@@ -2232,6 +2239,9 @@ impl UserInterface {
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
+                        HitType::Miss => {
+                            (None, "Miss".to_string(), TextEffectStyle::HostileGraze, 1.0)
+                        }
                         HitType::Regular => {
                             (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
                         }
@@ -2265,8 +2275,8 @@ impl UserInterface {
                     }
                 };
             }
-            AbilityTargetOutcome::Resisted => {
-                effects.push((None, "Resist".to_string(), TextEffectStyle::Miss, 1.0))
+            AbilityTargetOutcome::Missed => {
+                effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0))
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                 dbg!(applied_effects);

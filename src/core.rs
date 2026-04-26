@@ -8,6 +8,7 @@ use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
+use rand::Rng;
 
 use crate::bot::BotBehaviour;
 use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollBonus};
@@ -1425,18 +1426,31 @@ impl CoreGame {
                     }
 
                     let before = SystemTime::now();
-                    let outcome = Self::perform_ability_enemy_effect(
-                        caster,
-                        ability.name,
-                        &ability_roll,
-                        enhancements,
-                        effect,
-                        target,
-                        &mut detail_lines,
-                        None,
-                        mode,
-                    );
-                    target_outcome = Some((*target_id, outcome));
+
+                    let mut miss = false;
+                    if mode.real_game().is_some() {
+                        if caster.has_condition(&Condition::Blinded) {
+                            miss = roll_miss_chance();
+                        }
+                    }
+
+                    if miss {
+                        detail_lines.push("Miss! |<faded>(Blinded 30%)|".to_string());
+                        target_outcome = Some((*target_id, AbilityTargetOutcome::Missed));
+                    } else {
+                        let outcome = Self::perform_ability_enemy_effect(
+                            caster,
+                            ability.name,
+                            &ability_roll,
+                            enhancements,
+                            effect,
+                            target,
+                            &mut detail_lines,
+                            None,
+                            mode,
+                        );
+                        target_outcome = Some((*target_id, outcome));
+                    }
 
                     if let Some((radius, acquisition, area_effect)) = impact_circle {
                         detail_lines.push("".to_string());
@@ -2374,12 +2388,6 @@ impl CoreGame {
 
         let mut evasion = defender.evasion();
 
-        /*
-        let mut evasion_from_parry = 0;
-        let mut evasion_from_sidestep = 0;
-        let mut evasion_from_block = 0;
-        */
-
         let attack_modifier = attacker.attack_modifier(hand_type);
 
         let mut detail_lines = vec![];
@@ -2410,11 +2418,6 @@ impl CoreGame {
                         reaction.name,
                         evasion
                     ));
-                    /*
-                    let p_hit =
-                        probability_of_d20_reaching(evasion - attack_modifier, attack_bonus);
-                    detail_lines.push(format!("  Chance to hit: {:.1}%", p_hit * 100f32));
-                     */
                 }
             }
 
@@ -2435,14 +2438,6 @@ impl CoreGame {
             if reaction.effect.damage_prevention > 0 {
                 damage_prevention = Some((reaction.name, reaction.effect.damage_prevention));
             }
-
-            /*
-            match reaction.id {
-                OnAttackedReactionId::Parry => evasion_from_parry = bonus_evasion,
-                OnAttackedReactionId::SideStep => evasion_from_sidestep = bonus_evasion,
-                OnAttackedReactionId::Block => evasion_from_block = bonus_evasion,
-            }
-             */
         }
 
         let unmodified_roll = mode
@@ -2524,16 +2519,6 @@ impl CoreGame {
             } else {
                 dmg_calculation = weapon.damage as i32;
                 dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, weapon.name));
-                /*
-                // Versatile is confusing; especially as it's not reflected graphically
-                if matches!(weapon.grip, WeaponGrip::Versatile)
-                    && attacker.off_hand.get().is_empty()
-                {
-                    let bonus_dmg = 1;
-                    dmg_str.push_str(&format!(" +{} |<faded>(two-handed)|", bonus_dmg));
-                    dmg_calculation += bonus_dmg;
-                }
-                 */
             }
 
             let mut graze_improvement = None;
@@ -2578,10 +2563,22 @@ impl CoreGame {
                 dmg_calculation -= armor_value as i32;
             }
 
+            let mut miss = false;
+            // Don't apply miss chance in damage prediction (since the prediction assumes that a high roll
+            // cannot deal less damage than a low roll).
+            // deal less damage than high attack rolls).
+            if game.is_some() {
+                if attacker.has_condition(&Condition::Blinded) {
+                    miss = roll_miss_chance();
+                }
+            }
+
             //  <=5: graze
             // 6-15: hit
             // >=16: crit
-            let hit_type = if final_result <= 5 {
+            let hit_type = if miss {
+                HitType::Miss
+            } else if final_result <= 5 {
                 HitType::Graze
             } else if final_result <= 15 {
                 HitType::Regular
@@ -2590,6 +2587,9 @@ impl CoreGame {
             };
 
             match hit_type {
+                HitType::Miss => {
+                    detail_lines.push("Miss! |<faded>(Blinded 30%)|".to_string());
+                }
                 HitType::Graze => {
                     if let Some(source) = graze_improvement {
                         dmg_str.push_str(&format!(" -25% |<faded>(graze, {})|", source));
@@ -2615,55 +2615,58 @@ impl CoreGame {
                 }
             }
 
-            if let Some((name, amount)) = damage_prevention {
-                dmg_str.push_str(&format!(" -{} |<faded>({})|", amount, name));
-                dmg_calculation -= amount as i32;
-            }
-
-            if defender.conditions.borrow().has(&Condition::Protected) {
-                apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
-            }
-
-            let damage = dmg_calculation.max(0) as u32;
-
-            let mut actual_health_lost = 0;
-
-            let mut applied_to_target = vec![];
-            let mut applied_to_self = vec![];
-
-            if let Some(game) = game {
-                dmg_str.push_str(&format!(" = |<value>{damage}|"));
-                detail_lines.push(dmg_str);
-                actual_health_lost = game.perform_losing_health(defender, damage);
-
-                if weapon.is_melee() {
-                    let defender_thorns = defender.thorns();
-                    if defender_thorns > 0 {
-                        // TODO: How is this shown to player?
-                        let health_lost_to_thorns =
-                            game.perform_losing_health(attacker, defender_thorns);
-                        if health_lost_to_thorns > 0 {
-                            detail_lines.push(format!(
-                                "|{}| lost {} health |<faded>(thorns)|",
-                                attacker.name_tag(),
-                                health_lost_to_thorns
-                            ));
-                            applied_to_self.push(ApplyEffect::LoseHealth(health_lost_to_thorns));
-                        }
-                    }
+            if hit_type == HitType::Miss {
+                AttackOutcome {
+                    damage: 0,
+                    actual_health_lost: 0,
+                    hit_type,
+                    applied_to_target: vec![],
+                    applied_to_self: vec![],
+                }
+            } else {
+                if let Some((name, amount)) = damage_prevention {
+                    dmg_str.push_str(&format!(" -{} |<faded>({})|", amount, name));
+                    dmg_calculation -= amount as i32;
                 }
 
-                if defender.is_dead() {
-                    if let Some(effect) = ability_attack_effect.and_then(|e| e.on_kill_apply_self) {
-                        let (applied, log_line, _damage) =
-                            game.perform_effect_application(effect, Some(attacker), None, attacker);
-                        if let Some(applied) = applied {
-                            applied_to_self.push(applied);
+                if defender.conditions.borrow().has(&Condition::Protected) {
+                    apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                }
+
+                let damage = dmg_calculation.max(0) as u32;
+
+                let mut actual_health_lost = 0;
+
+                let mut applied_to_target = vec![];
+                let mut applied_to_self = vec![];
+
+                if let Some(game) = game {
+                    dmg_str.push_str(&format!(" = |<value>{damage}|"));
+                    detail_lines.push(dmg_str);
+                    actual_health_lost = game.perform_losing_health(defender, damage);
+
+                    if weapon.is_melee() {
+                        let defender_thorns = defender.thorns();
+                        if defender_thorns > 0 {
+                            // TODO: How is this shown to player?
+                            let health_lost_to_thorns =
+                                game.perform_losing_health(attacker, defender_thorns);
+                            if health_lost_to_thorns > 0 {
+                                detail_lines.push(format!(
+                                    "|{}| lost {} health |<faded>(thorns)|",
+                                    attacker.name_tag(),
+                                    health_lost_to_thorns
+                                ));
+                                applied_to_self
+                                    .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
+                            }
                         }
-                        detail_lines.push(log_line);
                     }
-                    for (name, enhancement) in enhancements {
-                        if let Some(effect) = enhancement.on_kill_apply_self {
+
+                    if defender.is_dead() {
+                        if let Some(effect) =
+                            ability_attack_effect.and_then(|e| e.on_kill_apply_self)
+                        {
                             let (applied, log_line, _damage) = game.perform_effect_application(
                                 effect,
                                 Some(attacker),
@@ -2673,30 +2676,10 @@ impl CoreGame {
                             if let Some(applied) = applied {
                                 applied_to_self.push(applied);
                             }
-                            detail_lines.push(format!("{} |<faded>({})|", log_line, name));
+                            detail_lines.push(log_line);
                         }
-                    }
-                }
-            }
-
-            if let Some(game) = game {
-                if damage > 0 {
-                    if let Some(effect) = weapon.on_damage {
-                        match effect {
-                            AttackHitEffect::ApplyTarget(effect) => {
-                                let (applied, log_line, _damage) = game.perform_effect_application(
-                                    effect,
-                                    Some(attacker),
-                                    None,
-                                    defender,
-                                );
-                                if let Some(applied) = applied {
-                                    applied_to_target.push(applied);
-                                }
-                                detail_lines
-                                    .push(format!("{} |<faded>({})|", log_line, weapon.name))
-                            }
-                            AttackHitEffect::ApplySelf(effect) => {
+                        for (name, enhancement) in enhancements {
+                            if let Some(effect) = enhancement.on_kill_apply_self {
                                 let (applied, log_line, _damage) = game.perform_effect_application(
                                     effect,
                                     Some(attacker),
@@ -2706,104 +2689,136 @@ impl CoreGame {
                                 if let Some(applied) = applied {
                                     applied_to_self.push(applied);
                                 }
-                                detail_lines
-                                    .push(format!("{} |<faded>({})|", log_line, weapon.name))
+                                detail_lines.push(format!("{} |<faded>({})|", log_line, name));
                             }
                         }
                     }
-                }
 
-                if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
-                    let (applied, log_line, _damage) =
-                        game.perform_effect_application(effect, Some(attacker), None, defender);
-                    detail_lines.push(log_line);
-                }
+                    if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
+                        let (applied, log_line, _damage) =
+                            game.perform_effect_application(effect, Some(attacker), None, defender);
+                        detail_lines.push(log_line);
+                    }
 
-                if damage > 0 {
-                    for (name, effect) in enhancements {
-                        if let Some(effect) = effect.on_damage_effect {
-                            let log_line = match effect {
-                                AttackEnhancementOnHitEffect::RegainActionPoint => {
-                                    attacker.action_points.gain(1);
-                                    format!("|{}| regained 1 AP", attacker.name_tag())
+                    if damage > 0 {
+                        if let Some(effect) = weapon.on_damage {
+                            match effect {
+                                AttackHitEffect::ApplyTarget(effect) => {
+                                    let (applied, log_line, _damage) = game
+                                        .perform_effect_application(
+                                            effect,
+                                            Some(attacker),
+                                            None,
+                                            defender,
+                                        );
+                                    if let Some(applied) = applied {
+                                        applied_to_target.push(applied);
+                                    }
+                                    detail_lines
+                                        .push(format!("{} |<faded>({})|", log_line, weapon.name))
                                 }
-                                AttackEnhancementOnHitEffect::Target(
-                                    defense_type,
+                                AttackHitEffect::ApplySelf(effect) => {
+                                    let (applied, log_line, _damage) = game
+                                        .perform_effect_application(
+                                            effect,
+                                            Some(attacker),
+                                            None,
+                                            attacker,
+                                        );
+                                    if let Some(applied) = applied {
+                                        applied_to_self.push(applied);
+                                    }
+                                    detail_lines
+                                        .push(format!("{} |<faded>({})|", log_line, weapon.name))
+                                }
+                            }
+                        }
+
+                        for (name, effect) in enhancements {
+                            if let Some(effect) = effect.on_damage_effect {
+                                let log_line = match effect {
+                                    AttackEnhancementOnHitEffect::RegainActionPoint => {
+                                        attacker.action_points.gain(1);
+                                        format!("|{}| regained 1 AP", attacker.name_tag())
+                                    }
+                                    AttackEnhancementOnHitEffect::Target(
+                                        defense_type,
+                                        apply_effect,
+                                    ) => {
+                                        let mut resist = false;
+                                        if let Some(defense_type) = defense_type {
+                                            let defense = defender.defense(defense_type);
+                                            detail_lines.push(format!(
+                                                "{} vs {}={}",
+                                                roll_result,
+                                                defense_type.name(),
+                                                defense
+                                            ));
+                                            if roll_result < defense as i32 {
+                                                resist = true;
+                                            }
+                                        }
+                                        if resist {
+                                            "Resist".to_string()
+                                        } else {
+                                            let (applied, log_line, _damage) = game
+                                                .perform_effect_application(
+                                                    apply_effect,
+                                                    Some(attacker),
+                                                    None,
+                                                    defender,
+                                                );
+                                            if let Some(apply_effect) = applied {
+                                                applied_to_target.push(apply_effect);
+                                            }
+                                            log_line
+                                        }
+                                    }
+                                };
+
+                                detail_lines.push(format!("{} |<faded>({})|", log_line, name))
+                            }
+
+                            if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
+                                //*condition.stacks().unwrap() = damage;
+                                let stacks = (damage * x.num) / x.den;
+                                let line = game.perform_receive_condition(
+                                    ApplyCondition {
+                                        condition,
+                                        stacks: Some(stacks),
+                                        duration_rounds: None,
+                                    },
+                                    defender,
+                                );
+                                detail_lines.push(format!("{} |<faded>({})|", line, name))
+                            }
+                        }
+
+                        if let Some(arrow) = used_arrow {
+                            if let Some(apply_effect) = arrow.on_damage_apply {
+                                let (applied, log_line, _damage) = game.perform_effect_application(
                                     apply_effect,
-                                ) => {
-                                    let mut resist = false;
-                                    if let Some(defense_type) = defense_type {
-                                        let defense = defender.defense(defense_type);
-                                        detail_lines.push(format!(
-                                            "{} vs {}={}",
-                                            roll_result,
-                                            defense_type.name(),
-                                            defense
-                                        ));
-                                        if roll_result < defense as i32 {
-                                            resist = true;
-                                        }
-                                    }
-                                    if resist {
-                                        "Resist".to_string()
-                                    } else {
-                                        let (applied, log_line, _damage) = game
-                                            .perform_effect_application(
-                                                apply_effect,
-                                                Some(attacker),
-                                                None,
-                                                defender,
-                                            );
-                                        if let Some(apply_effect) = applied {
-                                            applied_to_target.push(apply_effect);
-                                        }
-                                        log_line
-                                    }
-                                }
-                            };
-
-                            detail_lines.push(format!("{} |<faded>({})|", log_line, name))
-                        }
-
-                        if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
-                            //*condition.stacks().unwrap() = damage;
-                            let stacks = (damage * x.num) / x.den;
-                            let line = game.perform_receive_condition(
-                                ApplyCondition {
-                                    condition,
-                                    stacks: Some(stacks),
-                                    duration_rounds: None,
-                                },
-                                defender,
-                            );
-                            detail_lines.push(format!("{} |<faded>({})|", line, name))
+                                    Some(attacker),
+                                    None,
+                                    defender,
+                                );
+                                detail_lines.push(format!("{} |<faded>({})|", log_line, arrow.name))
+                            }
                         }
                     }
 
-                    if let Some(arrow) = used_arrow {
-                        if let Some(apply_effect) = arrow.on_damage_apply {
-                            let (applied, log_line, _damage) = game.perform_effect_application(
-                                apply_effect,
-                                Some(attacker),
-                                None,
-                                defender,
-                            );
-                            detail_lines.push(format!("{} |<faded>({})|", log_line, arrow.name))
-                        }
+                    if defender.lose_protected() {
+                        detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
                     }
                 }
 
-                if defender.lose_protected() {
-                    detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
+                AttackOutcome {
+                    damage,
+                    actual_health_lost,
+                    hit_type,
+                    applied_to_target,
+                    applied_to_self,
                 }
-            }
-
-            AttackOutcome {
-                damage,
-                actual_health_lost,
-                hit_type,
-                applied_to_target,
-                applied_to_self,
             }
         };
 
@@ -3095,6 +3110,11 @@ impl CoreGame {
     }
 }
 
+fn roll_miss_chance() -> bool {
+    let mut rng = rand::rng();
+    rng.random_range(1..=10) <= 3
+}
+
 fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
         Ordering::Less => Some(format!(
@@ -3297,6 +3317,7 @@ pub fn predict_attack(
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
     // (like checking wall collisions for ranged attacks?)
+    // Note: We don't take Blinded into account
     for unmodified_roll in 1..=20 {
         let event = CoreGame::perform_attack(
             attacker,
@@ -3314,6 +3335,7 @@ pub fn predict_attack(
         } = event.outcome;
 
         match hit_type {
+            HitType::Miss => {}
             HitType::Graze => {}
             HitType::Regular => regular_hit_threshold = regular_hit_threshold.min(unmodified_roll),
             HitType::Critical => {
@@ -3578,6 +3600,7 @@ pub struct AttackOutcome {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum HitType {
+    Miss,
     Regular,
     Graze,
     Critical,
@@ -3603,7 +3626,7 @@ pub enum AbilityTargetOutcome {
         actual_health_lost: u32,
     },
     AttackedEnemy(AttackedEvent),
-    Resisted,
+    Missed,
     AffectedAlly {
         applied_effects: Vec<ApplyEffect>,
     },
@@ -3616,7 +3639,7 @@ impl AbilityTargetOutcome {
             AbilityTargetOutcome::AttackedEnemy(attacked_event) => {
                 Some(attacked_event.outcome.damage)
             }
-            AbilityTargetOutcome::Resisted => None,
+            AbilityTargetOutcome::Missed => None,
             AbilityTargetOutcome::AffectedAlly { .. } => None,
         }
     }
@@ -4087,7 +4110,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<keyword>Disadvantage| on attacks.",
-            Blinded => "|<keyword>Disadvantage| on actions.\nAlways |<keyword>Flanked| when attacked.",
+            Blinded => "|<value>30%| chance to miss target.\nAlways |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
@@ -4202,7 +4225,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => [Some(Keyword::Advantage), None],
-            Blinded => [Some(Keyword::Advantage), Some(Keyword::Flanked)],
+            Blinded => [Some(Keyword::Flanked), None],
             NearDeath => [Some(Keyword::Advantage), None],
             _ => [None, None],
         }
@@ -6634,7 +6657,7 @@ impl Character {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
         if conditions.has(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
         }
 
         if conditions.has(&Condition::BloodRage) {
@@ -6703,7 +6726,7 @@ impl Character {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
         if conditions.has(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
         }
 
         bonuses

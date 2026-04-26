@@ -3485,6 +3485,7 @@ impl GameGrid {
 
         if let Some(preview) = self.target_effect_preview.get(&character.id()) {
             let damage = preview.prediction.damage;
+            assert!(damage.min <= damage.max, "Invalid interval: {:?}", damage);
             let effective_min = damage.min.min(character.health.current());
             let effective_max = damage.max.min(character.health.current());
             let guaranteed_damage_w =
