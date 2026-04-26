@@ -574,8 +574,28 @@
     {
       "type_": "Lootgoblin",
       "pos": [
+        27,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
         25,
-        14
+        16
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        40,
+        6
       ],
       "health": null,
       "main_hand": null,

@@ -50,7 +50,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::UI_TEXTURE,
+    textures::{StatusId, UI_TEXTURE},
     tooltip::Keyword,
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
@@ -1815,8 +1815,19 @@ impl UserInterface {
             GameEvent::PlayerGainedMoney { amount } => {
                 self.log
                     .add(format!("Player gained money: |<value>{}|", amount));
-                // TODO play "kaching" sound
-                // TODO show visual effect?
+                self.sound_player.play(SoundId::Coin);
+                for char in self.characters.iter() {
+                    if char.player_controlled() {
+                        self.game_grid.add_text_effect(
+                            char.pos(),
+                            0.0,
+                            1.0,
+                            Some(StatusId::Treasure),
+                            "Treasure".to_string(),
+                            TextEffectStyle::FriendlyEffect,
+                        );
+                    }
+                }
             }
             GameEvent::PlayerCharacterEndedTheirTurn {
                 gained_ap,

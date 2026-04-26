@@ -147,6 +147,7 @@ pub enum StatusId {
     Dead,
     Wet,
     Poisoned,
+    Treasure,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -159,6 +160,7 @@ pub enum IconId {
     Block,
     Brace,
     Move,
+
     Scream,
     Mindblast,
     NecroticInfluence,
@@ -181,6 +183,7 @@ pub enum IconId {
     QuickActions,
     Go,
     Extend,
+    Escape,
     Radius,
     Precision,
     Equip,
@@ -980,6 +983,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::QuickActions => (8, 9),
         IconId::Go => (3, 4),
         IconId::Extend => (0, 6),
+        IconId::Escape => (0, 5),
         IconId::Radius => (3, 6),
         IconId::Precision => (4, 6),
         IconId::Equip => (1, 4),
@@ -1051,6 +1055,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::Dead => (2, 3),
         StatusId::Wet => (3, 3),
         StatusId::Poisoned => (4, 3),
+        StatusId::Treasure => (5, 0),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

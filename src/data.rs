@@ -1322,8 +1322,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     id: AbilityId::EnemyEscape,
     name: "Escape",
     description: "",
-    // TODO: unique icon
-    icon: IconId::Move,
+    icon: IconId::Escape,
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 0,

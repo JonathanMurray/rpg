@@ -135,6 +135,7 @@ impl CoreGame {
 
                 if let ActionOutcome::AttackHit { victim_id, damage } = action_outcome {
                     let victim = self.characters.get(victim_id);
+
                     if victim.is_dead() {
                         killed_by_action.insert(victim.id());
                     }
@@ -162,6 +163,7 @@ impl CoreGame {
                 } else if let ActionOutcome::AbilityHitEnemies { victim_ids } = action_outcome {
                     for victim_id in victim_ids {
                         let victim = self.characters.get(victim_id);
+
                         if victim.is_dead() {
                             killed_by_action.insert(victim.id());
                         }
@@ -195,6 +197,7 @@ impl CoreGame {
                     }
                 }
             } else {
+                // CHARACTER ENDED THEIR TURN
                 let name_tag = self.active_character().name_tag();
                 self.log(format!("|{}| ended their turn", name_tag)).await;
 
@@ -512,7 +515,7 @@ impl CoreGame {
                                     None,
                                 );
 
-                                self.ui_handle_event(GameEvent::Attacked(event)).await;
+                                self.on_non_ability_attack(event).await;
                             }
                         }
                     }
@@ -607,8 +610,7 @@ impl CoreGame {
                         ActionPerformanceMode::Real(self),
                         None,
                     );
-                    self.ui_handle_event(GameEvent::Attacked(event.clone()))
-                        .await;
+                    self.on_non_ability_attack(event.clone()).await;
 
                     // in case defender turned around to react, restore their original direction
                     defender.is_facing_east.set(defender_facing);
@@ -639,6 +641,13 @@ impl CoreGame {
                 let mut enemies_hit = vec![];
                 for event in ability_resolved_events {
                     event.enemies_hit(&mut enemies_hit);
+                }
+
+                for enemy_id in &enemies_hit {
+                    let victim = self.characters.get(*enemy_id);
+                    if !victim.player_controlled() {
+                        self.perform_enemy_treasure_on_hit(victim).await;
+                    }
                 }
 
                 let outcome = if enemies_hit.is_empty() {
@@ -785,6 +794,20 @@ impl CoreGame {
         self.ui_event_queue.borrow_mut().push(event);
     }
 
+    async fn on_non_ability_attack(&self, event: AttackedEvent) {
+        let target = event.target;
+
+        self.ui_handle_event(GameEvent::Attacked(event)).await;
+
+        // Treasure for ability-based attacks is handled by a different code-path.
+        // What's important is that the treasure is rewarded (audio/gfx-wise) AFTER
+        // the attack.
+        let victim = self.characters.get(target);
+        if !victim.player_controlled() {
+            self.perform_enemy_treasure_on_hit(victim).await;
+        }
+    }
+
     async fn perform_movement(
         &self,
         character_id: CharacterId,
@@ -876,7 +899,7 @@ impl CoreGame {
                                 ActionPerformanceMode::Real(self),
                                 None,
                             );
-                            self.ui_handle_event(GameEvent::Attacked(event)).await;
+                            self.on_non_ability_attack(event).await;
                         }
                     }
 
@@ -1216,7 +1239,7 @@ impl CoreGame {
         }
 
         let mut enemies_hit = vec![];
-        let mut resolve_events = vec![];
+        let mut ability_resolved_events = vec![];
 
         let mut cast_n_times = 1;
         for enhancement in enhancements {
@@ -1636,7 +1659,7 @@ impl CoreGame {
                 detail_lines,
             };
 
-            resolve_events.push(resolve_event.clone());
+            ability_resolved_events.push(resolve_event.clone());
 
             // TODO also communicate if the caster healed from hitting the target (e.g. necrotic influence)
             if let Some(game) = real_game {
@@ -1645,7 +1668,7 @@ impl CoreGame {
             }
         }
 
-        resolve_events
+        ability_resolved_events
     }
 
     async fn perform_environment_effect(
@@ -2289,21 +2312,28 @@ impl CoreGame {
         println!("--------------");
     }
 
-    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
-        let amount_lost = character.health.lose(amount);
-
-        if character.has_condition(&Condition::Treasure) {
+    async fn perform_enemy_treasure_on_hit(&self, enemy: &Character) {
+        if enemy.has_condition(&Condition::Treasure) {
             if let Some(ch) = self.player_characters().next() {
-                ch.kind.unwrap_party().gain_money(1);
-                // TODO
-                self.queue_up_ui_event(GameEvent::PlayerGainedMoney { amount: 1 });
-                character
+                let amount = if enemy.is_dead() {
+                    enemy.conditions.borrow().get_stacks(&Condition::Treasure)
+                } else {
+                    1
+                };
+
+                ch.kind.unwrap_party().gain_money(amount);
+                self.ui_handle_event(GameEvent::PlayerGainedMoney { amount })
+                    .await;
+                enemy
                     .conditions
                     .borrow_mut()
-                    .lose_stacks(&Condition::Treasure, 1);
+                    .lose_stacks(&Condition::Treasure, amount);
             }
         }
+    }
 
+    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
+        let amount_lost = character.health.lose(amount);
         character.on_health_changed();
         amount_lost
     }
@@ -4085,7 +4115,7 @@ impl Condition {
             Ferocity => "|<value>+x| attack damage",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
-            Treasure => "Carries treasure",
+            Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
         }
     }
 
@@ -4157,6 +4187,7 @@ impl Condition {
             Ferocity => StatusId::Rage,
             Wet => StatusId::Wet,
             Poisoned => StatusId::Poisoned,
+            Treasure => StatusId::Treasure,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive

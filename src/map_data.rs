@@ -348,7 +348,7 @@ pub fn create_character(
             );
             goblin.learn_ability(&ENEMY_ESCAPE);
             goblin.health.change_max_value_to(20);
-            goblin.receive_condition(Condition::Treasure, Some(3), None);
+            goblin.receive_condition(Condition::Treasure, Some(5), None);
             goblin
         }
         CharacterType::Ghoul1 => {
