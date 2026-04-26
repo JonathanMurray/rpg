@@ -204,7 +204,10 @@ pub enum IconId {
     LightningBolt,
     Execute,
 
-    DraugAttack,
+    DraugClaw,
+    DraugHaunt,
+
+    SwampDweller,
 
     HardenedSkin,
     WeaponProficiency,
@@ -959,7 +962,9 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::Block => (8, 7),
         IconId::Brace => (5, 2),
         IconId::LightningBolt => (6, 2),
-        IconId::DraugAttack => (7, 2),
+        IconId::DraugClaw => (7, 2),
+        IconId::DraugHaunt => (8, 2),
+        IconId::SwampDweller => (9, 2),
         IconId::Move => (0, 4),
         IconId::Scream => (6, 1),
         IconId::Mindblast => (7, 1),

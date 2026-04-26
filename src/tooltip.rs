@@ -20,6 +20,7 @@ pub enum Keyword {
     Pushed,
     Graze,
     Crit,
+    Flanked,
 }
 
 impl Keyword {
@@ -30,6 +31,7 @@ impl Keyword {
             Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
             Keyword::Crit => "Crit",
+            Keyword::Flanked => "Flanked",
         }
     }
 
@@ -46,6 +48,7 @@ impl Keyword {
             Keyword::Crit => {
                 "|<value>+50%| effect.\nTriggers when |<mixed_dice>| roll is |<value>16| or higher"
             }
+            Keyword::Flanked => "|<value>+5| |<red_dice>| to incoming attacks",
         }
     }
 
@@ -62,6 +65,7 @@ impl Keyword {
             Keyword::Pushed => Goodness::Bad,
             Keyword::Graze => Goodness::Bad,
             Keyword::Crit => Goodness::Good,
+            Keyword::Flanked => Goodness::Bad,
         }
     }
 }

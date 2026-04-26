@@ -11,7 +11,7 @@ use crate::{
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
         MOVE_DISTANCE_PER_RESOURCE,
     },
-    data::{DRAUG_ATTACK, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
+    data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
     pathfind::{Path, PathfindGrid},
     util::CustomShuffle,
 };
@@ -56,7 +56,7 @@ impl DraugBehaviour {
     fn get_goal(&self, game: &CoreGame) -> BotGoal {
         let bot = game.characters.get_rc(game.active_character_id);
 
-        let range = DRAUG_ATTACK.target.range(&[]).unwrap();
+        let range = DRAUG_CLAW.target.range(&[]).unwrap();
 
         let (player_chars, target_id) = self.target_selection.run(game, range);
         let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();

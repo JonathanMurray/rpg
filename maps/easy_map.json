@@ -251,6 +251,7 @@
       ]
     }
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Bob",
@@ -299,16 +300,6 @@
         15
       ],
       "health": 7,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Draug",
-      "pos": [
-        10,
-        12
-      ],
-      "health": null,
       "main_hand": null,
       "shield": null
     }

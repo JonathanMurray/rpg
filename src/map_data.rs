@@ -12,9 +12,10 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRAUG_ATTACK, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW, ENEMY_INSPIRE,
-        ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HULDRA_HEAL,
-        HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, SLASHING_RAPIER, SMALL_SHIELD,
+        DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW,
+        ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
+        HULDRA_HEAL, HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, SLASHING_RAPIER,
+        SMALL_SHIELD,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -333,7 +334,8 @@ pub fn create_character(
                 Attributes::new(4, 4, 4, 1),
                 pos,
             );
-            draug.learn_ability(&DRAUG_ATTACK);
+            draug.learn_ability(&DRAUG_CLAW);
+            draug.learn_ability(&DRAUG_HAUNT);
             draug.health.change_max_value_to(20);
             draug
         }

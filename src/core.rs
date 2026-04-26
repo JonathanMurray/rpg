@@ -4087,7 +4087,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<keyword>Disadvantage| on attacks.",
-            Blinded => "|<keyword>Disadvantage|.\nAlways |<keyword>Flanked| when attacked.",
+            Blinded => "|<keyword>Disadvantage| on actions.\nAlways |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
@@ -4202,6 +4202,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => [Some(Keyword::Advantage), None],
+            Blinded => [Some(Keyword::Advantage), Some(Keyword::Flanked)],
             NearDeath => [Some(Keyword::Advantage), None],
             _ => [None, None],
         }
@@ -4621,7 +4622,8 @@ pub enum AbilityId {
     HuldraHeal,
     HuldraInfect,
     HuldraInflictHorrors,
-    DraugAttack,
+    DraugClaw,
+    DraugHaunt,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

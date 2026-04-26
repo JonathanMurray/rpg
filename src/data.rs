@@ -1283,11 +1283,11 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     }),
 };
 
-pub const DRAUG_ATTACK: Ability = Ability {
-    id: AbilityId::DraugAttack,
-    name: "Attack",
+pub const DRAUG_HAUNT: Ability = Ability {
+    id: AbilityId::DraugHaunt,
+    name: "Haunt",
     description: "Deal |<value>2| damage and inflict |<keyword>Dazed|",
-    icon: IconId::DraugAttack,
+    icon: IconId::DraugHaunt,
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,
@@ -1303,6 +1303,41 @@ pub const DRAUG_ATTACK: Ability = Ability {
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
+                    stacks: None,
+                    duration_rounds: Some(1),
+                })),
+                None,
+            ]),
+        }),
+        impact_circle: None,
+        environment_effect: None,
+    },
+    animation_color: PURPLE,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Debuff),
+    charge_fx: None,
+};
+
+pub const DRAUG_CLAW: Ability = Ability {
+    id: AbilityId::DraugClaw,
+    name: "Claw",
+    description: "Deal |<value>4| damage and inflict |<keyword>Blinded|",
+    icon: IconId::DraugClaw,
+    action_point_cost: 3,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::Melee),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Evasion),
+            damage: Some(AbilityDamage::AtLeast(4, DamageType::Regular)),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Blinded,
                     stacks: None,
                     duration_rounds: Some(1),
                 })),
@@ -2213,8 +2248,7 @@ impl PassiveSkill {
             Vigilant => IconId::MeleeAttack,
             // TODO: unique icon
             UnbridledRage => IconId::Rage,
-            // TODO: unique icon
-            SwampDweller => IconId::NecroticInfluence,
+            SwampDweller => IconId::SwampDweller,
 
             Slasher => IconId::Slashing,
         }
@@ -2228,8 +2262,8 @@ impl PassiveSkill {
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
             BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
-            ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to Flanked.",
-            Honorless => "Attacks deal |<value>+1| damage against Flanked targets",
+            ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
+            Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
             UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
