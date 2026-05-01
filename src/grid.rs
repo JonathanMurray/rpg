@@ -3494,9 +3494,15 @@ impl GameGrid {
 
         if let Some(preview) = self.target_effect_preview.get(&character.id()) {
             let damage = preview.prediction.damage;
-            assert!(damage.min <= damage.max, "Invalid interval: {:?}", damage);
-            let effective_min = damage.min.min(character.health.current());
-            let effective_max = damage.max.min(character.health.current());
+            if let Some(damage) = damage {
+                assert!(damage.min <= damage.max, "Invalid interval: {:?}", damage);
+            }
+            let effective_min = damage
+                .map(|dmg| dmg.min.min(character.health.current()))
+                .unwrap_or(0);
+            let effective_max = damage
+                .map(|dmg| dmg.max.min(character.health.current()))
+                .unwrap_or(0);
             let guaranteed_damage_w =
                 (health_w) * (effective_min as f32 / character.health.max() as f32);
             let extra_h = 2.0;
@@ -3527,7 +3533,7 @@ impl GameGrid {
                 WHITE,
             );
 
-            let header = if damage.max > 0 {
+            let header = if let Some(damage) = damage {
                 if damage.max > damage.min {
                     format!("|<sword>|{}-{}", damage.min, damage.max)
                 } else {

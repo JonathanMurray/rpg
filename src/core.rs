@@ -3198,7 +3198,7 @@ pub struct AbilityPrediction {
 
 #[derive(Debug, Clone)]
 pub struct TargetPrediction {
-    pub damage: DamageInterval,
+    pub damage: Option<DamageInterval>,
     pub is_buff: bool,
     pub details: Vec<(&'static str, Goodness)>,
     pub graze_chance: Option<f32>,
@@ -3208,10 +3208,10 @@ pub struct TargetPrediction {
 impl From<AttackPrediction> for TargetPrediction {
     fn from(value: AttackPrediction) -> Self {
         Self {
-            damage: DamageInterval {
+            damage: Some(DamageInterval {
                 min: value.min_damage,
                 max: value.max_damage,
-            },
+            }),
             is_buff: false,
             details: value.details,
             graze_chance: Some(value.graze_chance),
@@ -3264,10 +3264,10 @@ pub fn predict_ability(
                 targets.insert(
                     target_id,
                     TargetPrediction {
-                        damage: DamageInterval {
-                            min: result.damage,
+                        damage: result.damage.map(|dmg| DamageInterval {
+                            min: dmg,
                             max: 0, // filled in later
-                        },
+                        }),
                         is_buff: result.is_buff,
                         details,
                         graze_chance: None, // filled in later
@@ -3275,7 +3275,9 @@ pub fn predict_ability(
                     },
                 );
             } else if unmodified_roll == 20 {
-                targets.get_mut(&target_id).unwrap().damage.max = result.damage;
+                if let Some(dmg) = result.damage {
+                    targets.get_mut(&target_id).unwrap().damage.unwrap().max = dmg;
+                }
             }
 
             match result.hit_type {
@@ -3570,7 +3572,7 @@ impl AbilityResolvedEvent {
             affected_targets.insert(
                 *target_id,
                 TargetResult {
-                    damage: outcome.damage().unwrap_or(0),
+                    damage: outcome.damage(),
                     is_buff: outcome.is_buff(),
                     hit_type: outcome.hit_type(),
                 },
@@ -3579,11 +3581,16 @@ impl AbilityResolvedEvent {
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
             for (target_id, outcome) in targets {
                 let entry = affected_targets.entry(*target_id).or_insert(TargetResult {
-                    damage: 0,
+                    damage: None,
                     is_buff: false,
                     hit_type: outcome.hit_type(),
                 });
-                entry.damage += outcome.damage().unwrap_or(0);
+                entry.damage = match (entry.damage, outcome.damage()) {
+                    (None, None) => None,
+                    (Some(d), None) => Some(d),
+                    (None, Some(d)) => Some(d),
+                    (Some(d1), Some(d2)) => Some(d1 + d2),
+                };
                 if outcome.is_buff() {
                     entry.is_buff = true;
                 }
@@ -3594,7 +3601,7 @@ impl AbilityResolvedEvent {
 }
 
 struct TargetResult {
-    damage: u32,
+    damage: Option<u32>,
     is_buff: bool,
     hit_type: Option<HitType>,
 }
