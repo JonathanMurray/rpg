@@ -2303,6 +2303,8 @@ impl GameGrid {
             _ => {}
         }
 
+        let mut reaction_choice = None;
+
         match ui_state {
             UiState::ReactingToMovementAttackOpportunity {
                 reactor,
@@ -2343,6 +2345,9 @@ impl GameGrid {
                         7.0,
                         true,
                     );
+                    reaction_choice = Some("Attack");
+                } else {
+                    reaction_choice = Some("No reaction");
                 }
 
                 labelled_char_ids.insert(target.id());
@@ -2379,6 +2384,9 @@ impl GameGrid {
                         7.0,
                         true,
                     );
+                    reaction_choice = Some("Attack");
+                } else {
+                    reaction_choice = Some("No reaction");
                 }
 
                 labelled_char_ids.insert(attacker.id());
@@ -2391,6 +2399,7 @@ impl GameGrid {
                 attacker,
                 defender,
                 reactor,
+                selected,
                 ..
             } => {
                 let attacker = &self.characters[attacker];
@@ -2416,9 +2425,15 @@ impl GameGrid {
                 labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
+
+                reaction_choice = selected
+                    .map(|reaction| reaction.name)
+                    .or(Some("No reaction"));
             }
 
-            UiState::ReactingToHit { victim, .. } => {
+            UiState::ReactingToHit {
+                victim, selected, ..
+            } => {
                 let reactor = &self.characters[victim];
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
@@ -2430,6 +2445,9 @@ impl GameGrid {
 
                 labelled_char_ids.insert(reactor.id());
                 self.draw_overhead_question_mark(reactor);
+                reaction_choice = selected
+                    .map(|reaction| reaction.name)
+                    .or(Some("No reaction"));
             }
 
             _ => {}
@@ -2439,14 +2457,13 @@ impl GameGrid {
             ui_state,
             UiState::ReactingToMovementAttackOpportunity { .. }
         ) {
+            // The mover should be drawn with label
             labelled_char_ids.insert(self.active_character_id);
         }
 
         let mut front_cursor_text = None;
 
-        if
-        /*is_mouse_within_grid && */
-        receptive_to_input {
+        if receptive_to_input {
             let player_action_char_target = match ui_state.players_action_target() {
                 ActionTarget::Character(char_id, _) => Some(char_id),
                 _ => None,
@@ -2609,6 +2626,14 @@ impl GameGrid {
                     if pressed_left_mouse {
                         outcome.committed_action = true;
                     }
+                }
+            }
+
+            if let Some(reaction_choice) = reaction_choice {
+                front_cursor_text =
+                    Some((format!("|<confirm>|{}", reaction_choice), CURSOR_INFO_COLOR));
+                if pressed_left_mouse {
+                    outcome.committed_action = true;
                 }
             }
 
