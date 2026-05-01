@@ -1,14 +1,21 @@
-use std::{cell::Cell, collections::HashMap, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    collections::HashMap,
+    rc::Rc,
+};
 
 use macroquad::{
     audio::{load_sound, play_sound, stop_sound, PlaySoundParams, Sound},
     rand::ChooseRandom,
+    time::get_time,
 };
+use serde::de;
 
 #[derive(Clone)]
 pub struct SoundPlayer {
     sounds: Rc<HashMap<SoundId, SoundContainer>>,
     pub enabled: Rc<Cell<bool>>,
+    queued: Rc<RefCell<Vec<(SoundId, f64)>>>,
 }
 
 struct SoundContainer {
@@ -70,7 +77,7 @@ impl SoundPlayer {
             (
                 SoundId::Damage,
                 1.0,
-                vec!["fl_damage_1.ogg", "fl_damage_2.ogg", "fl_damage_3.ogg"],
+                vec!["fl_damage_4.ogg"], //vec!["fl_damage_1.ogg", "fl_damage_2.ogg", "fl_damage_3.ogg"],
             ),
         ] {
             let mut sounds = vec![];
@@ -95,6 +102,7 @@ impl SoundPlayer {
         Self {
             sounds: Rc::new(sounds_by_id),
             enabled: Rc::new(Cell::new(true)),
+            queued: Default::default(),
         }
     }
 
@@ -117,6 +125,22 @@ impl SoundPlayer {
                 volume: container.volume,
             },
         );
+    }
+
+    pub fn play_delayed(&self, sound_id: SoundId, delay: f64) {
+        let target_time = get_time() + delay;
+        self.queued.borrow_mut().push((sound_id, target_time));
+    }
+
+    pub fn update(&self) {
+        let mut queued = self.queued.borrow_mut();
+        let t = get_time();
+        for (sound_id, target_time) in queued.iter() {
+            if t >= *target_time {
+                self.play(*sound_id);
+            }
+        }
+        queued.retain(|(_sound_id, target_time)| *target_time > t);
     }
 
     pub fn play_looping(&self, sound_id: SoundId) {

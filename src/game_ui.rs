@@ -1930,7 +1930,7 @@ impl UserInterface {
                 if source == DamageSource::Condition(Condition::Burning) {
                     self.sound_player.play(SoundId::Burning);
                 }
-                self.sound_player.play(SoundId::Damage);
+                self.sound_player.play_delayed(SoundId::Damage, 0.03);
 
                 self.game_grid.add_text_effect(
                     character.pos(),
@@ -2086,7 +2086,7 @@ impl UserInterface {
             } else {
                 self.sound_player.play(SoundId::MeleeAttack);
             }
-            self.sound_player.play(SoundId::Damage);
+            self.sound_player.play_delayed(SoundId::Damage, 0.03);
         }
         let verb = match event.outcome.hit_type {
             HitType::Miss => "missed",
@@ -2235,7 +2235,7 @@ impl UserInterface {
             } => {
                 if let Some(dmg) = damage {
                     self.animate_character_damage(target, *actual_health_lost);
-                    self.sound_player.play(SoundId::Damage);
+                    self.sound_player.play_delayed(SoundId::Damage, 0.03);
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
@@ -2341,6 +2341,8 @@ impl UserInterface {
     }
 
     pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
+        self.sound_player.update();
+
         self.set_allowed_to_use_action_buttons(
             self.player_portraits.selected_id() == self.active_character_id,
         );
