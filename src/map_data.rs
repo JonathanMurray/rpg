@@ -20,7 +20,7 @@ use crate::{
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
     resources::GameResources,
-    sounds::SoundPlayer,
+    sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, SpriteId, TerrainId},
 };
 
@@ -291,6 +291,7 @@ pub fn create_character(
             let skeleton = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Skeleton",
+                SoundId::Damage,
                 PortraitId::Skeleton,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
@@ -312,6 +313,7 @@ pub fn create_character(
             let skeleton = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Skeleton",
+                SoundId::Damage,
                 PortraitId::Skeleton,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
@@ -329,6 +331,7 @@ pub fn create_character(
             let draug = Character::new(
                 bot(BotBehaviour::Draug(Default::default()), 10.0),
                 "Draug",
+                SoundId::Damage,
                 PortraitId::Draug,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
@@ -343,6 +346,7 @@ pub fn create_character(
             let goblin = Character::new(
                 bot(BotBehaviour::LootGoblin(Default::default()), 10.0),
                 "Loot goblin",
+                SoundId::Damage,
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
@@ -358,6 +362,7 @@ pub fn create_character(
             let ghoul = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 11.0),
                 "Ghoul",
+                SoundId::Damage,
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
                 Attributes::new(1, 2, 1, 1),
@@ -372,6 +377,7 @@ pub fn create_character(
             let ghoul = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 14.0),
                 "Ghoul",
+                SoundId::Damage,
                 PortraitId::Ghoul,
                 char_data.type_.sprite_id(),
                 Attributes::new(2, 1, 1, 1),
@@ -386,6 +392,7 @@ pub fn create_character(
             let ogre = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Ogre",
+                SoundId::Damage,
                 PortraitId::Ogre,
                 SpriteId::Ogre,
                 Attributes::new(9, 4, 3, 1),
@@ -403,6 +410,7 @@ pub fn create_character(
                 //bot(BotBehaviour::Magi(Default::default()), 9.0),
                 bot(BotBehaviour::Huldra(Default::default()), 12.0),
                 "Huldra",
+                SoundId::Damage,
                 PortraitId::Huldra,
                 SpriteId::Huldra,
                 Attributes::new(2, 5, 9, 5),
@@ -420,6 +428,7 @@ pub fn create_character(
             let enslaved = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enslaved",
+                SoundId::Damage,
                 PortraitId::Ghoul,
                 SpriteId::Skeleton2,
                 Attributes::new(5, 5, 2, 1),
@@ -465,6 +474,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     let alice = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Alice),
         "Alice",
+        SoundId::DamageFemale,
         PortraitId::Alice,
         SpriteId::Alice,
         Attributes::new(3, 5, 3, 3),
@@ -493,6 +503,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
         "Bob",
+        SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
         Attributes::new(5, 3, 3, 1),
@@ -511,7 +522,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_passive(PassiveSkill::HardenedSkin);
     bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
-    //bob.learn_ability(&SWEEP_ATTACK);
+    bob.learn_ability(&SWEEP_ATTACK);
 
     let player_characters = vec![alice, bob];
 
@@ -522,6 +533,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
+        SoundId::DamageFemale,
         PortraitId::Clara,
         SpriteId::Clara,
         Attributes::new(2, 2, 3, 7),
@@ -543,6 +555,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Bob),
         "Bob",
+        SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
         Attributes::new(5, 3, 3, 3),
@@ -568,6 +581,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     let alice = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
         "Alice",
+        SoundId::DamageFemale,
         PortraitId::Alice,
         SpriteId::Alice,
         Attributes::new(3, 5, 3, 3),
@@ -605,6 +619,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
     let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
         "Clara",
+        SoundId::DamageFemale,
         PortraitId::Clara,
         SpriteId::Clara,
         Attributes::new(2, 2, 3, 7),

@@ -574,7 +574,7 @@ pub const SHIELD_BASH: Ability = Ability {
     },
     animation_color: GRAY,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
+    resolve_sound: Some(SoundId::ShieldBash),
     charge_fx: None,
 };
 
@@ -867,8 +867,8 @@ pub const SWEEP_ATTACK: Ability = Ability {
         environment_effect: None,
     },
     animation_color: BLACK,
-    initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
+    initiate_sound: Some(SoundId::SweepAttack),
+    resolve_sound: None,
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
@@ -978,7 +978,7 @@ pub const EXECUTE: Ability = Ability {
     },
     animation_color: GRAY,
     initiate_sound: None,
-    resolve_sound: Some(SoundId::Explosion),
+    resolve_sound: None,
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
@@ -1818,7 +1818,7 @@ pub const PIERCING_SHOT: Ability = Ability {
     },
     animation_color: RED,
     initiate_sound: Some(SoundId::ShootArrow),
-    resolve_sound: Some(SoundId::HitArrow),
+    resolve_sound: None, //Some(SoundId::HitArrow),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
@@ -1945,7 +1945,7 @@ pub const ENEMY_EXPLODING_ARROW: Ability = Ability {
     possible_enhancements: [None; 3],
 
     animation_color: RED,
-    initiate_sound: Some(SoundId::ShootSpell),
+    initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: Some(SoundId::FireballHit),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,

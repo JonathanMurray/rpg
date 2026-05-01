@@ -32,8 +32,8 @@ use crate::{
         AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome,
         Action, ActionReach, ActionTarget, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
-        Characters, Condition, CoreGame, DamageSource, GameEvent, HandType, HitType, MovementType,
-        OnAttackedReaction, OnHitReaction, TargetPrediction,
+        Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
+        MovementType, OnAttackedReaction, OnHitReaction, TargetPrediction,
     },
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
@@ -612,6 +612,8 @@ impl UserInterface {
 
         let mut banner = Banner::new();
         banner.set("Battle!", 2.0);
+        sound_player.play(SoundId::Battle);
+        sound_player.play(SoundId::YourTurn);
 
         let faster_movement = Rc::new(Cell::new(false));
 
@@ -1612,7 +1614,7 @@ impl UserInterface {
                 self.handle_attack_initiated(actor, target, target_reaction);
             }
             GameEvent::Attacked(event) => {
-                self.handle_attacked_event(&event);
+                self.handle_attacked_event(&event, 0);
             }
             GameEvent::AbilityWasInitiated {
                 actor,
@@ -1620,13 +1622,13 @@ impl UserInterface {
                 target,
                 area_at,
             } => {
-                if let Some(sound_id) = ability.initiate_sound {
-                    self.sound_player.play(sound_id);
-                }
-
-                let duration = self
+                let (delay, duration) = self
                     .game_grid
-                    .animate_character_initiating_ability(actor, target, ability, area_at);
+                    .animate_character_initiating_ability(actor, target, &ability, area_at);
+
+                if let Some(sound_id) = ability.initiate_sound {
+                    self.sound_player.play_delayed(sound_id, delay as f64);
+                }
 
                 self.animation_stopwatch.set_to_at_least(duration);
             }
@@ -1755,8 +1757,8 @@ impl UserInterface {
                     );
                 }
 
-                for event in attacks {
-                    self.handle_attacked_event(event);
+                for (i, event) in attacks.iter().enumerate() {
+                    self.handle_attacked_event(event, i);
                 }
             }
             GameEvent::ConsumableWasUsed {
@@ -1877,6 +1879,7 @@ impl UserInterface {
                     "+AP",
                     TextEffectStyle::FriendlyEffect,
                 );
+                self.sound_player.play(SoundId::GainedAP);
             }
             GameEvent::MovementWasInitiated {
                 character,
@@ -1930,7 +1933,7 @@ impl UserInterface {
                 if source == DamageSource::Condition(Condition::Burning) {
                     self.sound_player.play(SoundId::Burning);
                 }
-                self.sound_player.play_delayed(SoundId::Damage, 0.03);
+                self.sound_player.play_delayed(character.damage_sound, 0.03);
 
                 self.game_grid.add_text_effect(
                     character.pos(),
@@ -1965,9 +1968,17 @@ impl UserInterface {
                 // Don't make this too long, as it can happen during walking
                 //self.animation_stopwatch.set_to_at_least(0.2);
             }
-            GameEvent::GameOver(text) => {
-                self.banner.set(text, 1.5);
-                self.animation_stopwatch.set_to_at_least(1.5);
+            GameEvent::GameOver(type_) => {
+                let text = match type_ {
+                    GameOverType::Victory => "Victory",
+                    GameOverType::Defeat => "Defeat",
+                };
+                match type_ {
+                    GameOverType::Victory => self.sound_player.play(SoundId::Victory),
+                    GameOverType::Defeat => self.sound_player.play(SoundId::Defeat),
+                }
+                self.banner.set(text, 2.5);
+                self.animation_stopwatch.set_to_at_least(3.0);
             }
             GameEvent::LiquidWasConverted {
                 positions,
@@ -2060,33 +2071,39 @@ impl UserInterface {
         target_reaction: Option<(CharacterId, bool)>,
     ) {
         let ranged = self.characters.get(attacker).has_equipped_ranged_weapon();
-        if ranged {
-            self.sound_player.play(SoundId::ShootArrow);
-        }
 
-        let duration =
+        let (delay, duration) =
             self.game_grid
                 .animate_character_attacking(attacker, target, ranged, target_reaction);
+
+        if ranged {
+            self.sound_player
+                .play_delayed(SoundId::ShootArrow, delay as f64);
+        }
 
         self.animation_stopwatch.set_to_at_least(duration);
     }
 
-    fn handle_attacked_event(&mut self, event: &AttackedEvent) {
+    fn handle_attacked_event(&mut self, event: &AttackedEvent, attack_index: usize) {
         let attacker = event.attacker;
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
+        let delay = attack_index as f64 * 0.1;
+
         if event.outcome.hit_type == HitType::Miss {
-            self.sound_player.play(SoundId::AttackMiss);
+            self.sound_player.play_delayed(SoundId::AttackMiss, delay);
         } else if event.outcome.damage == 0 {
-            self.sound_player.play(SoundId::ArmorAbsorbed);
+            self.sound_player
+                .play_delayed(SoundId::ArmorAbsorbed, delay);
         } else {
             if self.characters.get(attacker).has_equipped_ranged_weapon() {
-                self.sound_player.play(SoundId::HitArrow);
+                self.sound_player.play_delayed(SoundId::HitArrow, delay);
             } else {
-                self.sound_player.play(SoundId::MeleeAttack);
+                self.sound_player.play_delayed(SoundId::MeleeAttack, delay);
             }
-            self.sound_player.play_delayed(SoundId::Damage, 0.03);
+            self.sound_player
+                .play_delayed(self.characters.get(target).damage_sound, delay + 0.03);
         }
         let verb = match event.outcome.hit_type {
             HitType::Miss => "missed",
@@ -2235,7 +2252,10 @@ impl UserInterface {
             } => {
                 if let Some(dmg) = damage {
                     self.animate_character_damage(target, *actual_health_lost);
-                    self.sound_player.play_delayed(SoundId::Damage, 0.03);
+                    self.sound_player.play_delayed(
+                        self.characters.get(target).damage_sound,
+                        start_time as f64 + 0.03,
+                    );
                     effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {

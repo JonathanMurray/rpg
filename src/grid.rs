@@ -678,9 +678,9 @@ impl GameGrid {
         &mut self,
         actor: CharacterId,
         target: Option<CharacterId>,
-        ability: Ability,
+        ability: &Ability,
         area_at: Option<(AreaShape, Position)>,
-    ) -> f32 {
+    ) -> (f32, f32) {
         let actor = self.characters.get(&actor).unwrap();
 
         let target_pos = target
@@ -692,17 +692,17 @@ impl GameGrid {
         if let Some(target_pos) = target_pos {
             // Don't show preview for player ability; they issued it and it should feel snappy.
             if !actor.player_controlled() {
-                delay = 0.3;
+                delay = 0.5;
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
                     0.0,
-                    delay,
+                    0.3,
                     AnimationDetails::AttackCrosshairPreview { target_pos },
                 ));
             }
         }
 
-        if ability.id == AbilityId::SweepAttack {
+        let duration = if ability.id == AbilityId::SweepAttack {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
                 delay,
@@ -806,7 +806,9 @@ impl GameGrid {
             }
 
             delay + casting_duration + duration
-        }
+        };
+
+        (delay, duration)
     }
 
     fn add_circle_projectile_effect(
@@ -877,7 +879,7 @@ impl GameGrid {
         target: CharacterId,
         ranged: bool,
         target_reaction: Option<(CharacterId, bool)>,
-    ) -> f32 {
+    ) -> (f32, f32) {
         let attacker = &self.characters[&attacker];
         let target = &self.characters[&target];
         let target_pos = target.pos();
@@ -886,11 +888,11 @@ impl GameGrid {
 
         // Don't show preview for player attack; they issued it and it should feel snappy.
         if !attacker.player_controlled() {
-            delay = 0.3;
+            delay = 0.5;
             self.character_animations.push(CharacterAnimation::new(
                 attacker.id(),
                 0.0,
-                delay,
+                0.3,
                 AnimationDetails::AttackCrosshairPreview { target_pos },
             ));
         }
@@ -996,7 +998,7 @@ impl GameGrid {
             0.1
         };
 
-        delay + duration
+        (delay, delay + duration)
     }
 
     pub fn animate_character_health_change(
@@ -2253,12 +2255,14 @@ impl GameGrid {
                     AreaShape::Line => {
                         let point =
                             if let ActionTarget::Position(pos) = ui_state.players_action_target() {
+                                println!("players_action_target = {:?}", pos);
                                 Some(pos)
                             } else if is_mouse_within_grid && receptive_to_input {
                                 Some(mouse_grid_pos)
                             } else {
                                 None
                             };
+                        dbg!(mouse_grid_pos, is_mouse_within_grid, point);
                         if let Some(mut to) = point {
                             let from = active_char_pos;
                             let mut dx = to.0 - from.0;
@@ -2269,6 +2273,8 @@ impl GameGrid {
                             dy = (dy as f32 * multiplier) as i32;
                             to = (from.0 + dx, from.1 + dy);
                             snapped_position_target = Some(to);
+
+                            let mut prev = from;
 
                             line_visitor(from, to, |x, y| {
                                 let obstructed = matches!(
@@ -2282,9 +2288,10 @@ impl GameGrid {
                                 };
                                 self.fill_cell((x, y), color, 0.0);
                                 if obstructed {
-                                    snapped_position_target = Some((x, y));
+                                    snapped_position_target = Some(prev);
                                     true
                                 } else {
+                                    prev = (x, y);
                                     false
                                 }
                             });
@@ -2525,7 +2532,6 @@ impl GameGrid {
                     } else {
                         let mut is_mouse_pos_out_of_range = false;
                         if let Some((char_id, range, _indicator)) = range_indicator {
-                            // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -2553,7 +2559,9 @@ impl GameGrid {
                             AreaShape::Line => {}
                         };
 
-                        if is_mouse_pos_out_of_range && snapped_position_target.is_none() {
+                        if (is_mouse_pos_out_of_range || !is_mouse_within_grid)
+                            && snapped_position_target.is_none()
+                        {
                             self.draw_invalid_target_marker(mouse_grid_pos);
                         } else {
                             let position_target = snapped_position_target.unwrap_or(mouse_grid_pos);

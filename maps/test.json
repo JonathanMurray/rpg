@@ -414,6 +414,7 @@
       ]
     }
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Clara",
@@ -426,10 +427,20 @@
       "shield": null
     },
     {
-      "type_": "Skeleton",
+      "type_": "Ghoul1",
       "pos": [
-        14,
-        30
+        16,
+        26
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        9,
+        24
       ],
       "health": null,
       "main_hand": null,

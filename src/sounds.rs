@@ -44,30 +44,37 @@ impl SoundPlayer {
             (SoundId::DragEquipment, 1.0, vec!["click_2"]),
             (SoundId::DropEquipment, 1.0, vec!["click_3"]),
             (SoundId::Explosion, 1.0, vec!["explosion"]),
-            (SoundId::FireballHit, 1.0, vec!["fl_fireball_hit.ogg"]),
+            (SoundId::ShieldBash, 1.5, vec!["fl_shield_bash.ogg"]),
+            (SoundId::SweepAttack, 1.0, vec!["fl_sweep_attack.ogg"]),
+            (SoundId::FireballHit, 0.6, vec!["fl_fireball_hit.ogg"]),
             (SoundId::Powerup, 1.0, vec!["fl_spell_buff.ogg"]),
             (SoundId::BuffBrace, 1.0, vec!["fl_buff_brace.ogg"]),
             (SoundId::Heal, 1.0, vec!["fl_heal.ogg"]),
-            (SoundId::MeleeAttack, 1.0, vec!["melee_attack"]),
+            (SoundId::MeleeAttack, 0.3, vec!["melee_attack"]),
             (SoundId::AttackMiss, 1.0, vec!["fl_miss.ogg"]),
             (SoundId::Resist, 1.0, vec!["fl_resist.ogg"]),
             (SoundId::ArmorAbsorbed, 1.0, vec!["fl_armor_absorbed.ogg"]),
-            (SoundId::ShootArrow, 1.0, vec!["shoot_arrow_2"]),
-            (SoundId::HitArrow, 1.0, vec!["hit_arrow"]),
+            //(SoundId::ShootArrow, 1.0, vec!["shoot_arrow_2"]),
+            (SoundId::ShootArrow, 1.0, vec!["fl_shoot_arrow.ogg"]),
+            //(SoundId::HitArrow, 1.0, vec!["hit_arrow"]),
+            (SoundId::HitArrow, 1.0, vec!["fl_thump.ogg"]),
             (SoundId::Walk, 1.0, vec!["walk3"]),
             (SoundId::Debuff, 1.0, vec!["fl_spell_debuff.ogg"]),
             (SoundId::ShootSpell, 1.0, vec!["fl_spell_projectile_2.ogg"]),
-            (SoundId::Death, 1.0, vec!["fl_death.ogg"]),
+            //(SoundId::Death, 1.0, vec!["fl_death.ogg"]),
+            (SoundId::Death, 1.0, vec!["fl_death_2.ogg"]),
+            (SoundId::Ding, 1.0, vec!["fl_ding.ogg"]),
             (SoundId::SheetOpen, 1.0, vec!["sheet_open"]),
             (SoundId::SheetClose, 1.0, vec!["sheet_close"]),
             (SoundId::Burning, 1.0, vec!["fire"]),
             (SoundId::Invalid, 1.0, vec!["invalid"]),
             (SoundId::EndTurn, 1.0, vec!["end_turn"]),
-            (SoundId::YourTurn, 1.0, vec!["your_turn3"]),
+            (SoundId::YourTurn, 0.4, vec!["your_turn3"]),
             //(SoundId::FireCrackle, 1.0, vec!["looping_effect.ogg"]),
             (SoundId::FireCrackle, 1.0, vec!["fl_crackling_noise_2.ogg"]),
             (SoundId::MechanicNoise, 1.0, vec!["fl_wobble.ogg"]),
             (SoundId::SelectTarget, 1.0, vec!["fl_blip_3.ogg"]),
+            (SoundId::GainedAP, 1.0, vec!["fl_blip_3.ogg"]),
             (SoundId::HoverTarget, 1.0, vec!["fl_blip_short_3.ogg"]),
             (SoundId::Scale1, 1.0, vec!["fl_scale_1.ogg"]),
             (SoundId::Scale2, 1.0, vec!["fl_scale_2.ogg"]),
@@ -77,8 +84,13 @@ impl SoundPlayer {
             (
                 SoundId::Damage,
                 1.0,
-                vec!["fl_damage_4.ogg"], //vec!["fl_damage_1.ogg", "fl_damage_2.ogg", "fl_damage_3.ogg"],
+                vec!["fl_damage_4.ogg", "fl_damage_7.ogg"],
             ),
+            (SoundId::DamageBob, 1.0, vec!["fl_damage_5.ogg"]),
+            (SoundId::DamageFemale, 1.0, vec!["fl_damage_8.ogg"]),
+            (SoundId::Victory, 1.0, vec!["fl_fanfare.ogg"]),
+            (SoundId::Defeat, 1.0, vec!["fl_defeat.ogg"]),
+            (SoundId::Battle, 1.0, vec!["fl_battle.ogg"]),
         ] {
             let mut sounds = vec![];
             for name in names {
@@ -128,8 +140,12 @@ impl SoundPlayer {
     }
 
     pub fn play_delayed(&self, sound_id: SoundId, delay: f64) {
-        let target_time = get_time() + delay;
-        self.queued.borrow_mut().push((sound_id, target_time));
+        if delay == 0.0 {
+            self.play(sound_id);
+        } else {
+            let target_time = get_time() + delay;
+            self.queued.borrow_mut().push((sound_id, target_time));
+        }
     }
 
     pub fn update(&self) {
@@ -173,6 +189,8 @@ pub enum SoundId {
     DragEquipment,
     DropEquipment,
     Explosion,
+    ShieldBash,
+    SweepAttack,
     FireballHit,
     Powerup,
     BuffBrace,
@@ -187,6 +205,7 @@ pub enum SoundId {
     Debuff,
     ShootSpell,
     Death,
+    Ding,
     SheetOpen,
     SheetClose,
     Burning,
@@ -197,10 +216,16 @@ pub enum SoundId {
     MechanicNoise,
     SelectTarget,
     HoverTarget,
+    GainedAP,
     Scale1,
     Scale2,
     Scale3,
     Scale4,
     Scale5,
     Damage,
+    DamageBob,
+    DamageFemale,
+    Victory,
+    Defeat,
+    Battle,
 }

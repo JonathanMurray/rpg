@@ -100,11 +100,13 @@ impl CoreGame {
 
             if enemy_count == 0 {
                 println!("No enemies remaining. Exiting game loop");
-                self.ui_handle_event(GameEvent::GameOver("Victory")).await;
+                self.ui_handle_event(GameEvent::GameOver(GameOverType::Victory))
+                    .await;
                 return Ok(());
             }
             if enemy_count == self.characters.0.len() {
-                self.ui_handle_event(GameEvent::GameOver("Defeat")).await;
+                self.ui_handle_event(GameEvent::GameOver(GameOverType::Defeat))
+                    .await;
                 return Ok(());
             }
 
@@ -1530,6 +1532,8 @@ impl CoreGame {
 
                     if let Some(game) = real_game {
                         assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
+                        // TODO:
+                        // assertion failed: !game.pathfind_grid.obstructed_line_of_sight(caster.pos(), target_pos)
                         assert!(!game
                             .pathfind_grid
                             .obstructed_line_of_sight(caster.pos(), target_pos));
@@ -3276,7 +3280,13 @@ pub fn predict_ability(
                 );
             } else if unmodified_roll == 20 {
                 if let Some(dmg) = result.damage {
-                    targets.get_mut(&target_id).unwrap().damage.unwrap().max = dmg;
+                    targets
+                        .get_mut(&target_id)
+                        .unwrap()
+                        .damage
+                        .as_mut()
+                        .unwrap()
+                        .max = dmg;
                 }
             }
 
@@ -3430,9 +3440,14 @@ pub trait GameEventHandler {
 }
 
 #[derive(Debug, Clone)]
+pub enum GameOverType {
+    Victory,
+    Defeat,
+}
+#[derive(Debug, Clone)]
 pub enum GameEvent {
     LogLine(String),
-    GameOver(&'static str),
+    GameOver(GameOverType),
     PlayerGainedMoney {
         amount: u32,
     },
@@ -3600,6 +3615,7 @@ impl AbilityResolvedEvent {
     }
 }
 
+#[derive(Debug)]
 struct TargetResult {
     damage: Option<u32>,
     is_buff: bool,
@@ -5132,6 +5148,7 @@ pub struct Character {
     pub name: &'static str,
     pub portrait: PortraitId,
 
+    pub damage_sound: SoundId,
     pub sprite: SpriteId,
     pub kind: CharacterKind,
     pub position: Cell<Position>,
@@ -5175,6 +5192,7 @@ impl Character {
     pub fn new(
         kind: CharacterKind,
         name: &'static str,
+        damage_sound: SoundId,
         portrait: PortraitId,
         sprite: SpriteId,
         base_attributes: Attributes,
@@ -5204,6 +5222,7 @@ impl Character {
             has_used_off_hand_reaction_this_round: Cell::new(false),
             is_part_of_active_group: Cell::new(false),
             portrait,
+            damage_sound,
             sprite,
             kind,
             position: Cell::new(position),
