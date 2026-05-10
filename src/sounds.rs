@@ -28,6 +28,7 @@ impl SoundPlayer {
         let mut sounds_by_id = HashMap::new();
 
         for (id, volume, names) in &[
+            (SoundId::Execute, 1.6, vec!["fl_execute.ogg"]),
             (SoundId::Coin, 0.2, vec!["coin"]),
             (
                 SoundId::HoverButton,
@@ -60,7 +61,8 @@ impl SoundPlayer {
             (SoundId::HitArrow, 1.0, vec!["fl_thump.ogg"]),
             (SoundId::Walk, 1.0, vec!["walk3"]),
             (SoundId::Debuff, 1.0, vec!["fl_spell_debuff.ogg"]),
-            (SoundId::ShootSpell, 1.0, vec!["fl_spell_projectile_2.ogg"]),
+            //(SoundId::ShootSpell, 1.0, vec!["fl_spell_projectile_2.ogg"]),
+            (SoundId::ShootSpell, 1.0, vec!["fl_shoot_swoosh.ogg"]),
             //(SoundId::Death, 1.0, vec!["fl_death.ogg"]),
             (SoundId::Death, 1.0, vec!["fl_death_2.ogg"]),
             (SoundId::Ding, 1.0, vec!["fl_ding.ogg"]),
@@ -69,7 +71,7 @@ impl SoundPlayer {
             //(SoundId::SheetClose, 1.0, vec!["sheet_close"]),
             (SoundId::SheetClose, 0.7, vec!["fl_page_close2.ogg"]),
             (SoundId::Burning, 1.0, vec!["fire"]),
-            (SoundId::Invalid, 1.0, vec!["invalid"]),
+            (SoundId::Invalid, 0.3, vec!["invalid"]),
             (SoundId::EndTurn, 1.0, vec!["end_turn"]),
             (SoundId::YourTurn, 0.4, vec!["your_turn3"]),
             //(SoundId::FireCrackle, 1.0, vec!["looping_effect.ogg"]),
@@ -185,6 +187,7 @@ impl SoundPlayer {
 
 #[derive(Copy, Clone, Debug, PartialEq, Hash, Eq)]
 pub enum SoundId {
+    Execute,
     Coin,
     HoverButton,
     ClickButton,

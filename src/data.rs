@@ -959,7 +959,7 @@ pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
 pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
-    description: "Attack with penalty, and regain |<value>2| AP if it kills",
+    description: "Attack wildly, and regain |<value>2| AP if it kills",
     icon: IconId::Execute,
     action_point_cost: 3,
     mana_cost: 0,
@@ -977,7 +977,7 @@ pub const EXECUTE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
-    initiate_sound: None,
+    initiate_sound: Some(SoundId::Execute),
     resolve_sound: None,
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
