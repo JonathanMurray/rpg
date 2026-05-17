@@ -427,6 +427,13 @@ impl GameGrid {
         let ch = self.characters.remove(&character_id).unwrap();
         self.pathfind_grid.set_occupied(ch.pos(), None);
         self.on_removed_character(character_id);
+        if self.active_character_id == character_id {
+            println!(
+                "editor_remove_character(). Removed {:?}, so setting new active character id...",
+                character_id
+            );
+            self.active_character_id = *self.characters.keys().next().unwrap();
+        }
     }
 
     pub fn convert_liquid(

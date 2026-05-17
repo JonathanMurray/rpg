@@ -1995,7 +1995,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
     // TODO: unique animation/sound
     animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootSpell),
-    resolve_sound: Some(SoundId::FireballHit),
+    resolve_sound: Some(SoundId::LightningHit),
     charge_fx: Some(AbilityChargeFx {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::FireCrackle,

@@ -45,7 +45,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
-    pathfind::PathfindGrid,
+    pathfind::{Liquid, PathfindGrid},
     resources::{GameResources, UiResources},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
@@ -1957,6 +1957,13 @@ impl UserInterface {
             } => {
                 let character = self.characters.get(character);
 
+                match condition {
+                    Condition::Ferocity => {
+                        self.sound_player.play(SoundId::Execute);
+                    }
+                    _ => {}
+                }
+
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
@@ -1986,6 +1993,12 @@ impl UserInterface {
                 to,
             } => {
                 self.game_grid.convert_liquid(positions, from, to);
+                match to {
+                    Liquid::Water => {}
+                    Liquid::Poison => {
+                        self.sound_player.play(SoundId::Poison);
+                    }
+                }
             }
         }
     }
@@ -2187,9 +2200,10 @@ impl UserInterface {
             );
         };
         if !applied_to_self.is_empty() {
-            let mut s = String::new();
-            let mut texture = None;
+            let mut delay = 0.3;
             for apply_effect in applied_to_self {
+                let mut s = String::new();
+                let mut texture = None;
                 if let ApplyEffect::Condition(condition) = apply_effect {
                     texture = Some(condition.condition.status_icon());
                 }
@@ -2205,15 +2219,16 @@ impl UserInterface {
                 } else {
                     s.push_str(&format!("{} ", apply_effect));
                 }
+                self.game_grid.add_text_effect(
+                    attacker_pos,
+                    delay,
+                    2.0,
+                    texture,
+                    s,
+                    TextEffectStyle::FriendlyEffect,
+                );
+                delay += 0.5;
             }
-            self.game_grid.add_text_effect(
-                attacker_pos,
-                0.0,
-                2.0,
-                texture,
-                s,
-                TextEffectStyle::FriendlyEffect,
-            );
         };
 
         if damage_was_dealt {

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
+use std::env;
 use std::rc::Rc;
+use std::str::FromStr;
 
 use macroquad::color::LIGHTGRAY;
 use macroquad::miniquad::window::{self, set_window_position};
@@ -31,6 +33,12 @@ use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
 
 #[macroquad::main(window_conf)]
 async fn main() {
+    let args: Vec<String> = env::args().collect();
+    let fight_id = args.into_iter().nth(1).map(|f| {
+        dbg!(&f);
+        FightId::from_str(&f).expect("fight_id arg")
+    });
+
     // Seed the random numbers
     rand::srand(miniquad::date::now() as u64);
 
@@ -76,18 +84,32 @@ async fn main() {
     */
     // TODO
 
-    run_demo(&resources, &ui_resources, sound_player).await;
+    run_demo(&resources, &ui_resources, sound_player, fight_id).await;
 }
 
 async fn run_demo(
     resources: &GameResources,
     ui_resources: &UiResources,
     sound_player: SoundPlayer,
+    fight_id: Option<FightId>,
 ) {
     loop {
         let (party, player_characters) = make_low_level_party();
         let mut player_characters: Vec<Rc<Character>> =
             player_characters.into_iter().map(Rc::new).collect();
+
+        if let Some(fight_id) = &fight_id {
+            // TODO: construct party of characters that match the data in the map file
+            run_fight_loop(
+                resources.clone(),
+                &player_characters,
+                *fight_id,
+                ui_resources.clone(),
+                sound_player.clone(),
+            )
+            .await;
+            return;
+        }
 
         //player_characters.push(Rc::new(make_medium_clara(&party)));
 
@@ -284,6 +306,7 @@ async fn run_fight_loop(
         .map(Rc::clone)
         .collect();
     let init_state = init_fight_map(player_characters, fight_id);
+    dbg!(&init_state.active_character_id);
     let core_game = init_core_game(resources, ui_resources, sound_player, init_state);
     // Run one quick frame, so that the core game doesn't think that much time has elapsed on the very first frame
     next_frame().await;

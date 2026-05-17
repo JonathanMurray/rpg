@@ -1,7 +1,8 @@
-use std::{collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc, str::FromStr};
 
 use indexmap::IndexMap;
 use rand::distr::Distribution;
+use serde::Deserialize;
 
 use crate::{
     core::{Character, CharacterId, Position},
@@ -103,4 +104,15 @@ pub enum FightId {
     Test,
     VerticalSlice,
     VerticalSliceNew,
+}
+
+impl FromStr for FightId {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "test" => Ok(FightId::Test),
+            _ => Err(()),
+        }
+    }
 }

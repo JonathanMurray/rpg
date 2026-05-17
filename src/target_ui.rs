@@ -24,7 +24,7 @@ use crate::{
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
     textures::PortraitId,
-    util::COL_RED,
+    util::{plus_minus, COL_RED},
 };
 
 const BG_COLOR: Color = Color::new(0.1, 0.1, 0.1, 0.85);
@@ -302,9 +302,9 @@ impl TargetUi {
                 let mut stats_text = format!("|<boot>| {:.1}", char.move_speed());
                 if char.weapon(HandType::MainHand).is_some() {
                     stats_text.push_str(&format!(
-                        "   |<sword>| {}   |<red_dice>| +{}   |<helmet>| {}",
+                        "   |<sword>| {}   |<red_dice>| {}   |<helmet>| {}",
                         char.weapon_damage_str(HandType::MainHand),
-                        char.attack_modifier(HandType::MainHand),
+                        plus_minus(char.attack_modifier(HandType::MainHand)),
                         char.armor_str()
                     ));
                 }

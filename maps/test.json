@@ -417,9 +417,19 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Clara",
+      "type_": "Alice",
       "pos": [
-        10,
+        9,
+        24
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        5,
         30
       ],
       "health": null,
@@ -427,20 +437,10 @@
       "shield": null
     },
     {
-      "type_": "Ghoul1",
+      "type_": "Enslaved",
       "pos": [
-        16,
+        15,
         26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null
-    },
-    {
-      "type_": "Alice",
-      "pos": [
-        9,
-        24
       ],
       "health": null,
       "main_hand": null,
