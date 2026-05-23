@@ -1497,7 +1497,7 @@ pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
     description:
-        "Restore target's |<heart>| health. Remove |<keyword>Bleeding| and |<keyword>Burning|.",
+        "Restore target's |<heart>| health. Remove |<keyword>Bleeding| and |<keyword>Poisoned|.",
     icon: IconId::Heal,
     action_point_cost: 2,
     mana_cost: 1,

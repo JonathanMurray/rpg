@@ -51,7 +51,10 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
     textures::{StatusId, UI_TEXTURE},
-    tooltip::Keyword,
+    tooltip::{
+        Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
+        KEYWORD_TOOLTIP_COUNTER,
+    },
     util::{COL_BLUE, COL_GREEN_0, COL_RED},
 };
 use crate::{
@@ -612,8 +615,10 @@ impl UserInterface {
 
         let mut banner = Banner::new();
         banner.set("Battle!", 2.0);
+        /*
         sound_player.play(SoundId::Battle);
         sound_player.play(SoundId::YourTurn);
+         */
 
         let faster_movement = Rc::new(Cell::new(false));
 
@@ -657,6 +662,8 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) -> Option<PlayerChose> {
+        DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
+
         let ui_y = screen_height() - 230.0;
         let ui_x0 = screen_width() / 2.0 - 350.0;
         let ui_x1 = screen_width() / 2.0 + 350.0;
@@ -861,6 +868,11 @@ impl UserInterface {
 
         let h = self.settings.size().1;
         self.settings.draw(0.0, screen_height() - h);
+
+        let keyword_tooltip =
+            DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.load(std::sync::atomic::Ordering::Relaxed);
+        DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME
+            .store(keyword_tooltip, std::sync::atomic::Ordering::Relaxed);
 
         player_chose
     }

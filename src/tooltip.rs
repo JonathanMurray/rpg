@@ -1,9 +1,12 @@
+use std::sync::atomic::{AtomicBool, AtomicU32};
+
 use macroquad::{
     color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
     miniquad::window::screen_size,
     shapes::draw_rectangle,
     text::{Font, TextParams},
+    time::{get_frame_time, get_time},
 };
 
 use crate::{
@@ -332,10 +335,26 @@ pub fn draw_tooltip(
     for line in physical_content_lines {
         draw_line(line, None, false, None);
     }
-    draw_keyword_tooltips_relative_to_rect(font, has_keywords, tooltip_rect);
+    if !has_keywords.is_empty() {
+        DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(true, std::sync::atomic::Ordering::Relaxed);
+        if !DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME.load(std::sync::atomic::Ordering::Relaxed) {
+            // The keyword tooltip will be shown soon
+            KEYWORD_TOOLTIP_COUNTER.store(0, std::sync::atomic::Ordering::Relaxed);
+        }
+        let elapsed_ms = (get_frame_time() * 1000.0) as u32;
+
+        if KEYWORD_TOOLTIP_COUNTER.fetch_add(elapsed_ms, std::sync::atomic::Ordering::Relaxed) > 200
+        {
+            draw_keyword_tooltips_relative_to_rect(font, has_keywords, tooltip_rect);
+        }
+    }
 
     tooltip_rect
 }
+
+pub static DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME: AtomicBool = AtomicBool::new(false);
+pub static DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME: AtomicBool = AtomicBool::new(false);
+pub static KEYWORD_TOOLTIP_COUNTER: AtomicU32 = AtomicU32::new(0);
 
 pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword], mut rect: Rect) {
     for (i, keyword) in keywords.iter().enumerate() {
