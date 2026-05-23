@@ -3675,13 +3675,14 @@ impl GameGrid {
 
     fn draw_character_highlight(&self, character_id: CharacterId, color: Color, margin: f32) {
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        draw_rectangle(
+        let rect = (
             x - self.cell_w + margin,
             y - self.cell_w + margin,
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
-            color,
         );
+        draw_rectangle(rect.0, rect.1, rect.2, rect.3, color);
+        draw_rectangle_lines(rect.0, rect.1, rect.2, rect.3, 1.0, WHITE);
     }
 
     fn draw_circular_character_highlight(
