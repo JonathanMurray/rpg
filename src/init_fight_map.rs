@@ -5,7 +5,7 @@ use rand::distr::Distribution;
 use serde::Deserialize;
 
 use crate::{
-    core::{Character, CharacterId, Position},
+    core::{Character, CharacterId, PlayerId, Position},
     grid::ControlPoint,
     map_data::{create_character, CharacterType, MapData},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -13,9 +13,9 @@ use crate::{
 };
 
 pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) -> GameInitState {
-    let mut player_chars_by_name: HashMap<String, Rc<Character>> = player_characters
+    let mut player_chars_by_id: HashMap<PlayerId, Rc<Character>> = player_characters
         .into_iter()
-        .map(|ch| (ch.name.clone(), ch))
+        .map(|ch| (ch.player_id(), ch))
         .collect();
     let filename = match fight_id {
         FightId::VerticalSliceNew => "ogre_room.json",
@@ -32,16 +32,15 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
         let char: Option<Rc<Character>> = match char_data.type_ {
-            // TODO: Handle this better than string-matching on the name
-            CharacterType::Bob => player_chars_by_name.remove("Bob").inspect(|ch| {
+            CharacterType::Bob => player_chars_by_id.remove(&PlayerId::Bob).inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
             }),
-            CharacterType::Alice => player_chars_by_name.remove("Alice").inspect(|ch| {
+            CharacterType::Alice => player_chars_by_id.remove(&PlayerId::Alice).inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
             }),
-            CharacterType::Clara => player_chars_by_name.remove("Clara").inspect(|ch| {
+            CharacterType::Clara => player_chars_by_id.remove(&PlayerId::Clara).inspect(|ch| {
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
             }),
@@ -54,10 +53,10 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     }
 
     assert_eq!(
-        player_chars_by_name.len(),
+        player_chars_by_id.len(),
         0,
         "Unassigned player characters: {:?}",
-        player_chars_by_name.keys()
+        player_chars_by_id.keys()
     );
 
     for (pos, terrain_id) in &map_data.decorations {

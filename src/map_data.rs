@@ -478,7 +478,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     let alice = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Alice),
-        "Alice",
+        "Ylva",
         SoundId::DamageFemale,
         PortraitId::Alice,
         SpriteId::Alice,
@@ -509,7 +509,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
-        "Bob",
+        "Gorm",
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
@@ -539,7 +539,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     let clara = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Clara),
-        "Clara",
+        "Idun",
         SoundId::DamageFemale,
         PortraitId::Clara,
         SpriteId::Clara,
@@ -587,7 +587,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
 pub fn make_high_alice(party: &Rc<Party>) -> Character {
     let alice = Character::new(
         CharacterKind::Player(Rc::clone(party), PlayerId::Alice),
-        "Alice",
+        "Ylva",
         SoundId::DamageFemale,
         PortraitId::Alice,
         SpriteId::Alice,
