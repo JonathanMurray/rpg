@@ -265,6 +265,7 @@
     },
     {
       "type_": "Ghoul2",
+      "name": "Wretch",
       "pos": [
         6,
         12
@@ -275,6 +276,7 @@
     },
     {
       "type_": "Ghoul2",
+      "name": "Wretch",
       "pos": [
         4,
         16
@@ -295,6 +297,7 @@
     },
     {
       "type_": "Ghoul1",
+      "name": "Pyromaniac",
       "pos": [
         20,
         15

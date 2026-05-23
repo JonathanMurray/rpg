@@ -577,7 +577,7 @@ impl PlayerCharacterPortrait {
         texture: Texture2D,
         sound_player: SoundPlayer,
     ) -> Self {
-        let mut text = TextLine::new(character.name, 20, WHITE, Some(font.clone()));
+        let mut text = TextLine::new(&character.name, 20, WHITE, Some(font.clone()));
         text.set_depth(BLACK, 2.0);
 
         let mut status_rects = vec![];

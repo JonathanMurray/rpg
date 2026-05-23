@@ -355,12 +355,12 @@ async fn main() {
                                     game_grid.characters.keys().copied().max().unwrap_or(0);
                                 let char_data = CharacterData::base(*char_type, pos);
                                 let char =
-                                    create_character(pos, char_data, Some(&party), max_id + 1);
+                                    create_character(pos, &char_data, Some(&party), max_id + 1);
                                 game_grid
                                     .pathfind_grid
                                     .set_occupied(pos, Some(Occupation::Character(char.id())));
                                 game_grid.editor_add_character(char.id(), Rc::clone(&char));
-                                map_data.characters.push(char_data);
+                                map_data.characters.push(char_data.clone());
                                 has_unsaved_changes = true;
                             }
                         }
@@ -839,7 +839,7 @@ fn build_character_editor(big_font: &Font, simple_font: &Font, char: &Character)
                                 Some(simple_font.clone()),
                             )),
                             Element::Text(TextLine::new(
-                                char.name,
+                                &char.name,
                                 16,
                                 WHITE,
                                 Some(simple_font.clone()),

@@ -5145,7 +5145,7 @@ pub struct Character {
     pub has_used_main_hand_reaction_this_round: Cell<bool>,
     pub has_used_off_hand_reaction_this_round: Cell<bool>,
 
-    pub name: &'static str,
+    pub name: String,
     pub portrait: PortraitId,
 
     pub damage_sound: SoundId,
@@ -5191,7 +5191,7 @@ pub struct Character {
 impl Character {
     pub fn new(
         kind: CharacterKind,
-        name: &'static str,
+        name: impl Into<String>,
         damage_sound: SoundId,
         portrait: PortraitId,
         sprite: SpriteId,
@@ -5226,7 +5226,7 @@ impl Character {
             sprite,
             kind,
             position: Cell::new(position),
-            name,
+            name: name.into(),
             base_attributes,
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),

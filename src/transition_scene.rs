@@ -157,7 +157,7 @@ pub async fn run_transition_loop(
                 texture,
                 sound_player.clone(),
             );
-            let name = Element::Text(TextLine::new(char.name, 18, WHITE, Some(big_font.clone())));
+            let name = Element::Text(TextLine::new(&char.name, 18, WHITE, Some(big_font.clone())));
             let mut portrait_rows = vec![
                 Element::boxed(portrait),
                 name,

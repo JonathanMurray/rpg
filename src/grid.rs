@@ -3428,8 +3428,8 @@ impl GameGrid {
         }
 
         let font_size = 12;
-        let header = character.name;
-        let text_dimensions = measure_text(header, Some(&self.big_font), font_size, 1.0);
+        let header = &character.name;
+        let text_dimensions = measure_text(&header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
         let status_w = 10.0;
@@ -3467,7 +3467,7 @@ impl GameGrid {
         if draw_name {
             draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
             draw_text_rounded(
-                header,
+                &header,
                 box_x + text_pad,
                 box_y + text_pad + text_dimensions.offset_y,
                 TextParams {

@@ -559,7 +559,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Alice",
@@ -569,17 +570,19 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Lootgoblin",
       "pos": [
-        27,
-        22
+        24,
+        20
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Draug",
@@ -589,7 +592,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Draug",
@@ -599,7 +603,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     }
   ]
 }

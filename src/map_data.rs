@@ -44,7 +44,7 @@ pub fn create_game_grid(
 
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
-        let char = create_character(pos, *char_data, Some(party), i as CharacterId);
+        let char = create_character(pos, char_data, Some(party), i as CharacterId);
         pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
         characters.insert(char.id(), char);
     }
@@ -206,19 +206,20 @@ impl CharacterType {
             CharacterType::Ogre => SpriteId::Ogre,
             CharacterType::Huldra => SpriteId::Huldra,
             CharacterType::Enslaved => SpriteId::Skeleton2,
-            CharacterType::Ghoul1 => SpriteId::Ghoul,
+            CharacterType::Ghoul1 => SpriteId::Pyromaniac,
             CharacterType::Ghoul2 => SpriteId::Ghoul,
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Copy, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct CharacterData {
     pub type_: CharacterType,
     pub pos: Position,
     pub health: Option<u32>,
     pub main_hand: Option<WeaponId>,
     pub shield: Option<ShieldId>,
+    pub name: Option<String>,
 }
 
 impl CharacterData {
@@ -229,6 +230,7 @@ impl CharacterData {
             health: None,
             main_hand: None,
             shield: None,
+            name: None,
         }
     }
 }
@@ -267,11 +269,11 @@ fn create_shield(id: ShieldId) -> Shield {
 
 pub fn create_character(
     pos: Position,
-    char_data: CharacterData,
+    char_data: &CharacterData,
     party: Option<&Rc<Party>>,
     id: CharacterId,
 ) -> Rc<Character> {
-    let char = match char_data.type_ {
+    let mut char = match char_data.type_ {
         CharacterType::Bob => {
             let char = make_high_bob(party.unwrap());
             char.position.set(pos);
@@ -347,7 +349,7 @@ pub fn create_character(
                 bot(BotBehaviour::LootGoblin(Default::default()), 10.0),
                 "Loot goblin",
                 SoundId::Damage,
-                PortraitId::Ghoul,
+                PortraitId::Lootgoblin,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
                 pos,
@@ -363,7 +365,7 @@ pub fn create_character(
                 bot(BotBehaviour::Fighter(Default::default()), 11.0),
                 "Ghoul",
                 SoundId::Damage,
-                PortraitId::Ghoul,
+                PortraitId::Pyromaniac,
                 char_data.type_.sprite_id(),
                 Attributes::new(1, 2, 1, 1),
                 pos,
@@ -429,7 +431,7 @@ pub fn create_character(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enslaved",
                 SoundId::Damage,
-                PortraitId::Ghoul,
+                PortraitId::Enslaved,
                 SpriteId::Skeleton2,
                 Attributes::new(5, 5, 2, 1),
                 pos,
@@ -452,6 +454,9 @@ pub fn create_character(
     if let Some(shield_id) = char_data.shield {
         char.set_shield(create_shield(shield_id));
         char.learn_ability(&ENEMY_BRACE);
+    }
+    if let Some(name) = &char_data.name {
+        char.name = name.clone();
     }
 
     char.set_id(id);

@@ -24,6 +24,7 @@ pub enum SpriteId {
     Draug,
     Lootgoblin,
     Ghoul,
+    Pyromaniac,
     Ogre,
     Magi,
     Warhammer,
@@ -57,6 +58,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Draug, "draug.png"),
         (SpriteId::Lootgoblin, "lootgoblin.png"),
         (SpriteId::Ghoul, "ghoul.png"),
+        (SpriteId::Pyromaniac, "pyromaniac.png"),
         (SpriteId::Ogre, "ogre.png"),
         (SpriteId::Magi, "magi.png"),
         (SpriteId::Warhammer, "warhammer.png"),
@@ -106,6 +108,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Ogre => 26,
         SpriteId::Magi => 25,
         SpriteId::Ghoul => 24,
+        SpriteId::Pyromaniac => 24,
         SpriteId::Draug => 26,
         SpriteId::Lootgoblin => 24,
 
@@ -198,6 +201,8 @@ pub enum IconId {
     Stabbing,
     Feint,
     Heal,
+    BloodMagic,
+
     Inferno,
     Energize,
     Inspire,
@@ -234,6 +239,9 @@ pub enum PortraitId {
     Magi,
     Huldra,
     Ghoul,
+    Lootgoblin,
+    Pyromaniac,
+    Enslaved,
     Ogre,
 }
 
@@ -247,6 +255,9 @@ pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
         (PortraitId::Draug, "portrait_draug.png"),
         (PortraitId::Huldra, "portrait_huldra.png"),
         (PortraitId::Ghoul, "portrait_ghoul.png"),
+        (PortraitId::Lootgoblin, "portrait_lootgoblin.png"),
+        (PortraitId::Pyromaniac, "portrait_pyromaniac.png"),
+        (PortraitId::Enslaved, "portrait_enslaved.png"),
         (PortraitId::Ogre, "portrait_ogre.png"),
     ])
     .await
@@ -1004,6 +1015,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::Stabbing => (1, 8),
         IconId::Feint => (0, 7),
         IconId::Heal => (6, 1),
+        IconId::BloodMagic => (0, 3),
         IconId::Inferno => (3, 2),
         IconId::Energize => (4, 1),
         IconId::Inspire => (4, 2),

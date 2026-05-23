@@ -691,6 +691,7 @@
     },
     {
       "type_": "Ogre",
+      "name": "Brawler",
       "pos": [
         46,
         25
@@ -701,6 +702,7 @@
     },
     {
       "type_": "SkeletonLeader",
+      "name": "Guard",
       "pos": [
         30,
         21
@@ -711,6 +713,7 @@
     },
     {
       "type_": "Ghoul2",
+      "name": "Wretch",
       "pos": [
         14,
         30
@@ -721,6 +724,7 @@
     },
     {
       "type_": "Ghoul2",
+      "name": "Wretch",
       "pos": [
         11,
         26
@@ -731,6 +735,7 @@
     },
     {
       "type_": "Ghoul2",
+      "name": "Wretch",
       "pos": [
         11,
         31
@@ -741,6 +746,7 @@
     },
     {
       "type_": "Ghoul1",
+      "name": "Pyromaniac",
       "pos": [
         39,
         16
@@ -751,6 +757,7 @@
     },
     {
       "type_": "Ghoul1",
+      "name": "Pyromaniac",
       "pos": [
         41,
         20

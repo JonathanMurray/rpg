@@ -137,7 +137,7 @@ impl CharacterSheet {
             },
             children: vec![
                 Element::Text(
-                    TextLine::new(character.name, 28, SKYBLUE, Some(font.clone()))
+                    TextLine::new(&character.name, 28, SKYBLUE, Some(font.clone()))
                         .with_depth(DARKBLUE, 1.0)
                         .with_padding(10.0, 10.0),
                 ),

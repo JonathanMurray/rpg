@@ -319,7 +319,7 @@ impl std::fmt::Debug for BotGoal {
                 "action",
                 &(
                     self.action.0,
-                    self.action.1.as_ref().map(|ch| (ch.name, ch.id())),
+                    self.action.1.as_ref().map(|ch| (&ch.name, ch.id())),
                 ),
             )
             .field("fallback_actions", &self.fallback_actions)
@@ -496,7 +496,7 @@ fn candidate_actions(bot: &Character) -> Vec<BotAction> {
     if bot.weapon(HandType::MainHand).is_some() {
         candidates.push(BotAction::Attack);
     }
-    dbg!(bot.name);
+    dbg!(&bot.name);
     //for a in bot.usable_abilities() {
     for a in bot.known_abilities() {
         dbg!(a.name);

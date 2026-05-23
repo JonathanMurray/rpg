@@ -1451,9 +1451,9 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
 
 pub static HULDRA_HEAL: Ability = Ability {
     id: AbilityId::HuldraHeal,
-    name: "Bless",
+    name: "Blood magic",
     description: "",
-    icon: IconId::Heal,
+    icon: IconId::BloodMagic,
     action_point_cost: 3,
     mana_cost: 0,
     stamina_cost: 0,

@@ -13,9 +13,9 @@ use crate::{
 };
 
 pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) -> GameInitState {
-    let mut player_chars_by_name: HashMap<&'static str, Rc<Character>> = player_characters
+    let mut player_chars_by_name: HashMap<String, Rc<Character>> = player_characters
         .into_iter()
-        .map(|ch| (ch.name, ch))
+        .map(|ch| (ch.name.clone(), ch))
         .collect();
     let filename = match fight_id {
         FightId::VerticalSliceNew => "ogre_room.json",
@@ -45,7 +45,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
                 ch.set_id(i as CharacterId);
                 ch.position.set(pos);
             }),
-            _ => Some(create_character(pos, *char_data, None, i as CharacterId)),
+            _ => Some(create_character(pos, &char_data, None, i as CharacterId)),
         };
         if let Some(char) = char {
             pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
