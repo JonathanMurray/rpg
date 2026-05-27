@@ -229,7 +229,7 @@ pub enum RangeIndicator {
     ObstructedLineOfSight,
 }
 
-const ZOOM_LEVELS: [f32; 4] = [50.0 / 3.0, 64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
+const ZOOM_LEVELS: [f32; 3] = [64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
