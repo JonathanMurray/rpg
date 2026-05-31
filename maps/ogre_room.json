@@ -702,7 +702,7 @@
     },
     {
       "type_": "SkeletonLeader",
-      "name": "Guard",
+      "name": "Guardian",
       "pos": [
         30,
         21
@@ -712,8 +712,7 @@
       "shield": null
     },
     {
-      "type_": "Ghoul2",
-      "name": "Wretch",
+      "type_": "Scoundrel",
       "pos": [
         14,
         30
@@ -723,8 +722,7 @@
       "shield": null
     },
     {
-      "type_": "Ghoul2",
-      "name": "Wretch",
+      "type_": "Scoundrel",
       "pos": [
         11,
         26
@@ -734,8 +732,7 @@
       "shield": "BadSmallShield"
     },
     {
-      "type_": "Ghoul2",
-      "name": "Wretch",
+      "type_": "Scoundrel",
       "pos": [
         11,
         31
@@ -746,7 +743,7 @@
     },
     {
       "type_": "Ghoul1",
-      "name": "Pyromaniac",
+      "name": "Troublemaker",
       "pos": [
         39,
         16
@@ -757,7 +754,7 @@
     },
     {
       "type_": "Ghoul1",
-      "name": "Pyromaniac",
+      "name": "Troublemaker",
       "pos": [
         41,
         20

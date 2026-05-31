@@ -264,8 +264,8 @@
       "shield": null
     },
     {
-      "type_": "Ghoul2",
-      "name": "Wretch",
+      "type_": "Scoundrel",
+      "name": "Scoundrel",
       "pos": [
         6,
         12
@@ -297,7 +297,7 @@
     },
     {
       "type_": "Ghoul1",
-      "name": "Pyromaniac",
+      "name": "Troublemaker",
       "pos": [
         20,
         15

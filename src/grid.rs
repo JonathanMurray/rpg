@@ -61,7 +61,10 @@ use crate::{
         EffectId, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation,
         WaterType, LIGHTNING_BOLT_FX,
     },
-    util::{line_visitor, oscillate, oscillate_square, rgb, COL_RED, COL_RED_BRIGHT},
+    util::{
+        line_visitor, oscillate, oscillate_loop, oscillate_square, rgb, COL_BRIGHT, COL_RED,
+        COL_RED_BRIGHT,
+    },
 };
 use crate::{
     core::{CharacterId, HandType, Range},
@@ -72,7 +75,7 @@ const BACKGROUND_COLOR: Color = rgb(12, 64, 59); // COL_GRAY; // Color::new(0.2,
                                                  //const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
 const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.2);
-const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.08);
+
 //const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
 const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
@@ -90,9 +93,12 @@ const HOVER_ALLY_COLOR: Color = Color::new(0.2, 0.8, 0.2, 1.0);
 
 const ACTIVE_CHARACTER_COLOR: Color = Color::new(1.0, 0.8, 0.0, 0.25);
 const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
-const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
+//const SELECTED_CHARACTER_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
+//const SELECTED_CHARACTER_COLOR: Color = rgb(251, 184, 255);
+const SELECTED_CHARACTER_COLOR: Color = rgb(117, 217, 242);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
 const MOVE_RANGE_EXTENDED_COLOR: Color = Color::new(0.8, 0.2, 0.2, 0.8);
+const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.7, 0.9, 0.7, 0.15);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);
 //const RANGE_INDICATOR_GOOD_COLOR: Color = GREEN;
@@ -1222,7 +1228,7 @@ impl GameGrid {
         pos = (pos.0 + dx, pos.1 + dy);
 
         let mut font = &self.big_font;
-        let mut font_size = 20;
+        let mut font_size = 28;
         let mut rise_indefinitely = true;
         let mut background = false;
         let color = match style {
@@ -1250,8 +1256,8 @@ impl GameGrid {
                 ORANGE
             }
             TextEffectStyle::HostileGraze => LIGHTGRAY,
-            TextEffectStyle::HostileHit => ORANGE,
-            TextEffectStyle::HostileCrit => RED,
+            TextEffectStyle::HostileHit => rgb(201, 226, 118),
+            TextEffectStyle::HostileCrit => rgb(201, 226, 118),
         };
 
         let effect = ConcreteEffect {
@@ -2143,7 +2149,7 @@ impl GameGrid {
             }
         }
 
-        let mut labelled_char_ids: HashSet<CharacterId> = Default::default();
+        let mut detail_labelled_char_ids: HashSet<CharacterId> = Default::default();
 
         for character in self.characters.values() {
             if character.id() == self.active_character_id {
@@ -2167,7 +2173,7 @@ impl GameGrid {
             self.draw_character(character);
 
             if is_key_down(KeyCode::LeftAlt) {
-                labelled_char_ids.insert(character.id());
+                detail_labelled_char_ids.insert(character.id());
             }
         }
 
@@ -2191,7 +2197,7 @@ impl GameGrid {
 
             for character in self.characters.values() {
                 if target_within_range_squared(range.squared(), char_pos, character.pos()) {
-                    labelled_char_ids.insert(character.id());
+                    detail_labelled_char_ids.insert(character.id());
                 }
             }
         }
@@ -2357,8 +2363,8 @@ impl GameGrid {
                     reaction_choice = Some("No reaction");
                 }
 
-                labelled_char_ids.insert(target.id());
-                labelled_char_ids.insert(reactor.id());
+                detail_labelled_char_ids.insert(target.id());
+                detail_labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
             }
@@ -2396,8 +2402,8 @@ impl GameGrid {
                     reaction_choice = Some("No reaction");
                 }
 
-                labelled_char_ids.insert(attacker.id());
-                labelled_char_ids.insert(reactor.id());
+                detail_labelled_char_ids.insert(attacker.id());
+                detail_labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
             }
@@ -2427,9 +2433,9 @@ impl GameGrid {
                     7.0,
                     true,
                 );
-                labelled_char_ids.insert(attacker.id());
-                labelled_char_ids.insert(defender.id());
-                labelled_char_ids.insert(reactor.id());
+                detail_labelled_char_ids.insert(attacker.id());
+                detail_labelled_char_ids.insert(defender.id());
+                detail_labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
 
@@ -2450,7 +2456,7 @@ impl GameGrid {
                     true,
                 );
 
-                labelled_char_ids.insert(reactor.id());
+                detail_labelled_char_ids.insert(reactor.id());
                 self.draw_overhead_question_mark(reactor);
                 reaction_choice = selected
                     .map(|reaction| reaction.name)
@@ -2465,7 +2471,7 @@ impl GameGrid {
             UiState::ReactingToMovementAttackOpportunity { .. }
         ) {
             // The mover should be drawn with label
-            labelled_char_ids.insert(self.active_character_id);
+            detail_labelled_char_ids.insert(self.active_character_id);
         }
 
         let mut front_cursor_text = None;
@@ -2902,8 +2908,26 @@ impl GameGrid {
             if !matches!(ui_state, UiState::Idle { .. }) {
                 let pos = self.character_screen_pos(&self.characters[&id]);
                 let animated = self.active_character_id == id && mouse_state == MouseState::None;
-                self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 2.0, animated);
+                self.draw_cornered_outline(pos, SELECTED_CHARACTER_COLOR, -1.0, 3.0, animated);
             }
+        }
+
+        if let Some(id) = self.hovered_character {
+            if id != self.active_character_id {
+                let char = &self.characters[&id];
+                detail_labelled_char_ids.insert(char.id());
+            }
+        }
+
+        for char in self.characters.values() {
+            if char.id() == self.active_character_id
+                || matches!(ui_state.players_action_target(), ActionTarget::Character(id, _) if id == char.id())
+            {
+                // Active character, or active target => draw their label later, on top of action arrow and crosshair
+                continue;
+            }
+            let draw_name = detail_labelled_char_ids.contains(&char.id());
+            self._draw_character_label(char, draw_name, active_char_reserved_and_hovered_ap);
         }
 
         match ui_state.players_action_target() {
@@ -2930,7 +2954,7 @@ impl GameGrid {
                     );
                 }
 
-                labelled_char_ids.insert(target.id());
+                detail_labelled_char_ids.insert(target.id());
             }
             ActionTarget::Position(target_pos) => {
                 let cannot_reach =
@@ -2957,22 +2981,14 @@ impl GameGrid {
             );
         }
 
-        if let Some(id) = self.hovered_character {
-            if id != self.active_character_id {
-                let char = &self.characters[&id];
-                labelled_char_ids.insert(char.id());
-            }
-        }
-
         for char in self.characters.values() {
-            let draw_name = labelled_char_ids.contains(&char.id());
-            let discrete_healthbar = !draw_name;
-            self._draw_character_label(
-                char,
-                draw_name,
-                discrete_healthbar,
-                active_char_reserved_and_hovered_ap,
-            );
+            if char.id() == self.active_character_id
+                || matches!(ui_state.players_action_target(), ActionTarget::Character(id, _) if id == char.id())
+            {
+                // Active character, or active target => Not drawn yet, time to draw them now
+                let draw_name = detail_labelled_char_ids.contains(&char.id());
+                self._draw_character_label(char, draw_name, active_char_reserved_and_hovered_ap);
+            }
         }
 
         for char_animation in &self.character_animations {
@@ -3400,10 +3416,10 @@ impl GameGrid {
     fn _draw_character_label(
         &self,
         character: &Character,
-        draw_name: bool,
-        discrete_healthbar: bool,
+        detailed: bool,
         active_char_reserved_and_hovered_ap: (i32, i32),
     ) {
+        let discrete_healthbar = !detailed;
         let draw_action_points = (character.player_controlled()
             && !character.has_taken_a_turn_this_round.get())
             || self.active_character_id == character.id()
@@ -3464,7 +3480,7 @@ impl GameGrid {
 
         let mut status_y;
 
-        if draw_name {
+        if detailed {
             draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
             draw_text_rounded(
                 &header,
@@ -3473,7 +3489,7 @@ impl GameGrid {
                 TextParams {
                     font: Some(&self.big_font),
                     font_size,
-                    color: WHITE,
+                    color: COL_BRIGHT,
                     ..Default::default()
                 },
             );
@@ -3906,20 +3922,38 @@ impl GameGrid {
         let target_y = self.grid_y_to_screen(target_pos.1);
         let depth = 2.0;
 
+        let actor_vec = Vec2::new(actor_x, actor_y);
+        let target_vec = Vec2::new(target_x, target_y);
+
         draw_dashed_line_ex(
-            (actor_x, actor_y),
-            (target_x, target_y),
+            actor_vec.move_towards(target_vec, self.cell_w / 2.0).into(),
+            target_vec.move_towards(actor_vec, self.cell_w / 2.0).into(),
             thickness,
             crosshair_color,
             10.0,
             Some((Color::new(0.0, 0.0, 0.0, 0.5), depth)),
-            Some(self.cell_w * 0.8),
             animated,
         );
 
+        draw_rectangle_lines_ex(
+            target_x,
+            target_y,
+            self.cell_w / 2.0,
+            self.cell_w / 2.0,
+            4.0,
+            DrawRectangleParams {
+                color: crosshair_color,
+                rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
+                offset: (0.5, 0.5).into(),
+                ..Default::default()
+            },
+        );
+
+        /*
         let cross_hair_r = self.cell_w * 0.4;
         draw_crosshair((target_x + depth, target_y + depth), cross_hair_r, BLACK);
         draw_crosshair((target_x, target_y), cross_hair_r, crosshair_color);
+         */
     }
 
     fn draw_static_text(
@@ -4207,7 +4241,7 @@ impl GameGrid {
         thickness: f32,
         color: Color,
     ) {
-        let segment_len = 8.0;
+        let segment_len = 12.0;
 
         let (x, y) = self.grid_pos_to_screen((x, y));
         let (w, h) = (self.cell_w, self.cell_w);
@@ -4488,7 +4522,7 @@ impl EffectGraphics {
                     color: Color::new(0.0, 0.0, 0.0, alpha),
                     ..Default::default()
                 };
-                draw_text_with_font_tags(text, x0 + 1.0, y0 + 1.0, text_params.clone(), false);
+                draw_text_with_font_tags(text, x0 + 2.0, y0 + 2.0, text_params.clone(), false);
 
                 // Then the regular text
                 text_params.color = *color;

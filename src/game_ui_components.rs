@@ -13,7 +13,6 @@ use macroquad::{
     texture::{draw_texture, draw_texture_ex, DrawTextureParams},
 };
 
-use crate::tooltip::{draw_tooltip, Keyword, TooltipPositionPreference};
 use crate::{
     base_ui::{
         draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
@@ -24,6 +23,10 @@ use crate::{
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
+};
+use crate::{
+    tooltip::{draw_tooltip, Keyword, TooltipPositionPreference},
+    util::{COL_DARK, COL_GOLD},
 };
 use indexmap::IndexMap;
 use macroquad::{
@@ -324,7 +327,7 @@ impl Drawable for CharacterSheetToggle {
         }
 
         if self.shown.get() {
-            draw_rectangle_lines(x, y, size.0, size.1, 2.0, GOLD);
+            draw_rectangle_lines(x, y, size.0, size.1, 2.0, COL_GOLD);
         } else {
             draw_rectangle_lines(x, y, size.0, size.1, 1.0, LIGHTGRAY);
         }
@@ -719,7 +722,7 @@ impl Drawable for PlayerCharacterPortrait {
             let v1 = (x_mid - arrow_w / 2.0, y - margin - arrow_h).into();
             let v2 = (x_mid + arrow_w / 2.0, y - margin - arrow_h).into();
             let v3 = (x_mid, y - margin).into();
-            draw_triangle(v1, v2, v3, GOLD);
+            draw_triangle(v1, v2, v3, COL_GOLD);
             draw_triangle_lines(v1, v2, v3, 1.0, LIGHTGRAY);
 
             let mut btn_rect = Rect::new(x, button_y, w, button_h);
@@ -752,7 +755,7 @@ impl Drawable for PlayerCharacterPortrait {
                     btn_rect.w + hor_pad * 2.0,
                     btn_rect.h + vert_pad * 2.0,
                 );
-                let mut color = GOLD;
+                let mut color = COL_GOLD;
                 color.a = oscillate(1.3, 0.2, 0.9);
                 draw_rectangle_lines(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 3.0, color);
             } else {
@@ -786,7 +789,7 @@ impl Drawable for PlayerCharacterPortrait {
                 TextParams {
                     font: Some(&self.font),
                     font_size,
-                    color: GOLD,
+                    color: COL_GOLD,
                     ..Default::default()
                 },
             );
@@ -895,7 +898,7 @@ impl Log {
                 style: Style {
                     background_color: Some(BLACK),
                     padding: 5.0,
-                    border_color: Some(GOLD),
+                    border_color: Some(COL_GOLD),
                     ..Default::default()
                 },
                 children: details
@@ -1086,7 +1089,7 @@ impl Drawable for ActionPointsRow {
                         x0 + self.cell_size.0 / 2.0,
                         y0 + self.cell_size.1 / 2.0,
                         r,
-                        GOLD,
+                        COL_GOLD,
                     );
                 }
             } else if reserved {
@@ -1094,7 +1097,7 @@ impl Drawable for ActionPointsRow {
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    GOLD,
+                    COL_GOLD,
                 );
                 // Make it brighter
                 draw_circle(

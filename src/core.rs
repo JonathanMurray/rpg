@@ -929,18 +929,20 @@ impl CoreGame {
                 character.set_facing_toward(new_position);
             }
 
+            let new_liquid = self.pathfind_grid.is_character_in_liquid(new_position);
+
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
                 from: prev_position,
                 to: new_position,
                 movement_type,
                 step_idx,
+                liquid: new_liquid,
             })
             .await;
 
             if character.is_swamp_dweller() {
                 let prev_liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
-                let new_liquid = self.pathfind_grid.is_character_in_liquid(new_position);
                 if new_liquid.is_none() && prev_liquid == Some(Liquid::Poison) {
                     self.handle_swamp_dweller_left_poison(character).await;
                 }
@@ -3466,6 +3468,7 @@ pub enum GameEvent {
         to: Position,
         movement_type: MovementType,
         step_idx: u32,
+        liquid: Option<Liquid>,
     },
     CharacterReactedToAttacked {
         reactor: CharacterId,

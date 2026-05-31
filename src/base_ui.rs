@@ -12,6 +12,7 @@ use macroquad::{
 use std::{
     cell::{Cell, RefCell},
     collections::HashMap,
+    f32::consts::PI,
     rc::{Rc, Weak},
     sync::OnceLock,
 };
@@ -26,7 +27,10 @@ use crate::{
         SWORD_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{COL_ALICE, COL_BOB, COL_CLARA, COL_ENEMY, COL_LIGHT_BLUE},
+    util::{
+        oscillate, oscillate_loop, COL_ALICE, COL_BOB, COL_BRIGHT, COL_CLARA, COL_ENEMY,
+        COL_LIGHT_BLUE,
+    },
 };
 
 pub trait Drawable {
@@ -250,6 +254,12 @@ impl TextLine {
         color: Color,
         font: Option<Font>,
     ) -> Self {
+        let color = if color == WHITE {
+            // TODO don't override like this
+            COL_BRIGHT
+        } else {
+            color
+        };
         let mut this = Self {
             size: (0.0, 0.0),
             string: string.into(),
@@ -542,7 +552,22 @@ pub fn draw_text_with_font_tags(
     for mut part in parts {
         if let Some((symbol_w, texture)) = TAGS.get(part) {
             if render_tags {
-                draw_texture(texture.get().unwrap(), x0, y - 13.0, WHITE);
+                if part == "<confirm>" {
+                    draw_texture_ex(
+                        texture.get().unwrap(),
+                        x0,
+                        y - 13.0,
+                        WHITE,
+                        DrawTextureParams {
+                            rotation: oscillate_loop(1.0, 0.0, PI * 2.0),
+                            source: Some(Rect::new(0.0, 2.0, 13.0, 13.0)),
+                            pivot: Some((x0 + 6.5, y - 13.0 + 6.5).into()),
+                            ..Default::default()
+                        },
+                    );
+                } else {
+                    draw_texture(texture.get().unwrap(), x0, y - 13.0, WHITE);
+                }
             }
             x0 += symbol_w;
         } else {

@@ -95,6 +95,13 @@ pub fn oscillate(cycle_duration: f32, from: f32, to: f32) -> f32 {
     }
 }
 
+pub fn oscillate_loop(cycle_duration: f32, from: f32, to: f32) -> f32 {
+    let game_time = get_time();
+    let t = ((game_time as f32) / cycle_duration).fract();
+
+    from + (to - from) * t
+}
+
 pub fn oscillate_square(cycle_duration: f32, from: f32, to: f32) -> f32 {
     let game_time = get_time();
     let t = ((game_time as f32) / cycle_duration).fract();
@@ -127,3 +134,9 @@ pub const COL_BOB: Color = rgb(85, 167, 212);
 pub const COL_ALICE: Color = rgb(144, 181, 58);
 pub const COL_CLARA: Color = rgb(199, 131, 233);
 pub const COL_ENEMY: Color = COL_RED;
+
+pub const COL_DARK: Color = rgb(34, 39, 52);
+pub const COL_BRIGHT: Color = rgb(230, 234, 234);
+//pub const COL_GOLD: Color = rgb(219, 157, 40);
+//pub const COL_GOLD: Color = rgb(228, 139, 71);
+pub const COL_GOLD: Color = rgb(245, 207, 138);

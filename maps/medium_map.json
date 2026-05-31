@@ -245,7 +245,7 @@
     },
     {
       "type_": "Skeleton",
-      "name": "Guard",
+      "name": "Guardian",
       "pos": [
         19,
         19
@@ -277,8 +277,8 @@
       "shield": null
     },
     {
-      "type_": "Ghoul2",
-      "name": "Wretch",
+      "type_": "Scoundrel",
+      "name": "Scoundrel",
       "pos": [
         23,
         5
@@ -289,7 +289,7 @@
     },
     {
       "type_": "Ghoul1",
-      "name": "Pyromaniac",
+      "name": "Troublemaker",
       "pos": [
         24,
         17

@@ -191,6 +191,7 @@ pub enum CharacterType {
     Enslaved,
     Ghoul1,
     Ghoul2,
+    Scoundrel,
 }
 
 impl CharacterType {
@@ -208,6 +209,7 @@ impl CharacterType {
             CharacterType::Enslaved => SpriteId::Skeleton2,
             CharacterType::Ghoul1 => SpriteId::Pyromaniac,
             CharacterType::Ghoul2 => SpriteId::Ghoul,
+            CharacterType::Scoundrel => SpriteId::Scoundrel,
         }
     }
 }
@@ -389,6 +391,21 @@ pub fn create_character(
             ghoul.armor_piece.set(Some(SHIRT));
             ghoul.set_weapon(HandType::MainHand, BAD_SWORD);
             ghoul
+        }
+        CharacterType::Scoundrel => {
+            let scoundrel = Character::new(
+                bot(BotBehaviour::Fighter(Default::default()), 14.0),
+                "Scoundrel",
+                SoundId::Damage,
+                PortraitId::Scoundrel,
+                char_data.type_.sprite_id(),
+                Attributes::new(2, 1, 1, 1),
+                pos,
+            );
+            scoundrel.health.change_max_value_to(12);
+            scoundrel.armor_piece.set(Some(SHIRT));
+            scoundrel.set_weapon(HandType::MainHand, BAD_SWORD);
+            scoundrel
         }
         CharacterType::Ogre => {
             let ogre = Character::new(

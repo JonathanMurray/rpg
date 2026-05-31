@@ -31,7 +31,7 @@ use crate::{
     pathfind::Liquid,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, COL_GREEN_2, COL_RED},
+    util::{oscillate, COL_GOLD, COL_GREEN_2, COL_RED},
 };
 
 pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
@@ -868,7 +868,7 @@ impl ActionButton {
         let r = 2.5;
         let mut ap_circles = vec![];
 
-        let ap_color = Rc::new(Cell::new(GOLD));
+        let ap_color = Rc::new(Cell::new(COL_GOLD));
 
         for _ in 0..action_points {
             ap_circles.push(Element::Circle(Circle {
@@ -965,7 +965,7 @@ impl ActionButton {
     }
 
     pub fn set_has_enough_ap(&self, has_enough_ap: bool) {
-        let color = if has_enough_ap { GOLD } else { COL_RED };
+        let color = if has_enough_ap { COL_GOLD } else { COL_RED };
         self.ap_color.set(color);
     }
 

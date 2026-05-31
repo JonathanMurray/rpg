@@ -1,5 +1,5 @@
 use macroquad::{
-    color::Color,
+    color::{Color, GREEN, MAGENTA},
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle},
     time::get_time,
 };
@@ -67,16 +67,7 @@ pub fn draw_dashed_line(
     depth: Option<(Color, f32)>,
     animated: bool,
 ) {
-    draw_dashed_line_ex(
-        from,
-        to,
-        thickness,
-        color,
-        segment_len,
-        depth,
-        None,
-        animated,
-    );
+    draw_dashed_line_ex(from, to, thickness, color, segment_len, depth, animated);
 }
 
 pub fn draw_dashed_line_ex(
@@ -86,7 +77,6 @@ pub fn draw_dashed_line_ex(
     color: Color,
     segment_len: f32,
     depth: Option<(Color, f32)>,
-    trim_start_and_end: Option<f32>,
     animated: bool,
 ) {
     if let Some((color, offset)) = depth {
@@ -97,7 +87,6 @@ pub fn draw_dashed_line_ex(
             color,
             segment_len,
             None,
-            trim_start_and_end,
             animated,
         );
     }
@@ -111,24 +100,14 @@ pub fn draw_dashed_line_ex(
 
     let line_len = ((to.0 - from.0).powf(2.0) + (to.1 - from.1).powf(2.0)).sqrt();
     // "Segments" alternate between "drawn" and "skipped over" to create the dash effect
-    let num_segments = (line_len / segment_len) as u32;
-    let dx = (to.0 - from.0) / num_segments as f32;
-    let dy = (to.1 - from.1) / num_segments as f32;
+    let num_segments = (line_len / segment_len);
+    let dx = (to.0 - from.0) / num_segments;
+    let dy = (to.1 - from.1) / num_segments;
 
     let offset_x = (to.0 - from.0) * (start_offset / line_len);
     let offset_y = (to.1 - from.1) * (start_offset / line_len);
 
     let draw_dash = |(mut x0, mut y0): (f32, f32), (mut x1, mut y1): (f32, f32)| {
-        let mut skip = false;
-        if let Some(trim) = trim_start_and_end {
-            if (x0 - from.0).abs() < trim && (y0 - from.1).abs() < trim {
-                skip = true;
-            }
-            if (x1 - to.0).abs() < trim && (y1 - to.1).abs() < trim {
-                skip = true;
-            }
-        }
-
         // Don't show the part of the dash that goes outside of the (from, to) line
         if from.0 < to.0 {
             x0 = x0.min(to.0).max(from.0);
@@ -145,29 +124,31 @@ pub fn draw_dashed_line_ex(
             y1 = y1.min(from.1).max(to.1);
         }
 
-        if !skip {
-            draw_line(x0, y0, x1, y1, thickness, color);
-        }
+        draw_line(x0, y0, x1, y1, thickness, color);
     };
 
     let (mut prev_x, mut prev_y) = (from.0 + offset_x, from.1 + offset_y);
-    for i in 1..=num_segments {
+    for i in 1..=(num_segments as u32 + 1) {
         let x = prev_x + dx;
         let y = prev_y + dy;
         if i % 2 == 1 {
             draw_dash((prev_x, prev_y), (x, y));
         } else {
             // TODO
-            //draw_line(prev_x    ,prev_y, x, y, 4.0, MAGENTA);
+            //draw_line(prev_x    ,prev_y, x, y, 4.0, GREEN);
         }
         prev_x = x;
         prev_y = y;
     }
 
-    draw_dash(
-        (prev_x, prev_y),
-        (to.0 + offset_x + dx, to.1 + offset_y + dy),
-    );
+    /*
+    if num_segments as u32 % 2 == 0 {
+        draw_dash(
+            (prev_x, prev_y),
+            (to.0 + offset_x + dx, to.1 + offset_y + dy),
+        );
+    }
+     */
 }
 
 pub fn draw_dashed_rectangle_lines(

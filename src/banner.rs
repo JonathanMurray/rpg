@@ -6,6 +6,8 @@ use macroquad::{
     window::{screen_height, screen_width},
 };
 
+use crate::util::COL_GOLD;
+
 pub struct Banner {
     inner: Option<_Banner>,
 }
@@ -59,7 +61,7 @@ impl Banner {
                 x_text = x_mid - text_dim.width / 2.0;
             };
 
-            let mut text_color = GOLD;
+            let mut text_color = COL_GOLD;
 
             let bg_alpha;
             let end_fade_duration = 0.2;

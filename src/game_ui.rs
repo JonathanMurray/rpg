@@ -11,7 +11,7 @@ use macroquad::{
         is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
     },
     math::Rect,
-    shapes::draw_rectangle,
+    shapes::{draw_line, draw_rectangle},
     text::Font,
     texture::draw_texture,
     window::{screen_height, screen_width},
@@ -33,8 +33,9 @@ use crate::{
         Action, ActionReach, ActionTarget, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
         AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
         Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
-        MovementType, OnAttackedReaction, OnHitReaction, TargetPrediction,
+        MovementType, OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
     },
+    drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
     game_ui_components::{
         ActionPointsRow, CharacterSheetToggle, LabelledResourceBar, Log, PlayerPortraits,
@@ -55,7 +56,7 @@ use crate::{
         Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
     },
-    util::{COL_BLUE, COL_GREEN_0, COL_RED},
+    util::{COL_BLUE, COL_DARK, COL_GREEN_0, COL_RED},
 };
 use crate::{
     pathfind::PathNode,
@@ -1545,15 +1546,7 @@ impl UserInterface {
             }
             GameEvent::CharacterReactedToAttacked { reactor } => {
                 let reactor_pos = self.characters.get(reactor).pos();
-                self.game_grid.add_text_effect(
-                    reactor_pos,
-                    0.0,
-                    1.0,
-                    None,
-                    "!".to_string(),
-                    TextEffectStyle::ReactionExclamation,
-                );
-                self.animation_stopwatch.set_to_at_least(0.5);
+                self.animate_reaction(reactor_pos);
             }
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
@@ -1562,16 +1555,7 @@ impl UserInterface {
                     "|{}| makes an opportunity attack:",
                     reactor.name_tag()
                 ));
-                self.game_grid.add_text_effect(
-                    reactor.pos(),
-                    0.0,
-                    1.0,
-                    None,
-                    "!".to_string(),
-                    TextEffectStyle::ReactionExclamation,
-                );
-
-                self.animation_stopwatch.set_to_at_least(0.5);
+                self.animate_reaction(reactor.pos());
             }
             GameEvent::CharacterReactedToHit {
                 main_line,
@@ -1911,6 +1895,7 @@ impl UserInterface {
                 to,
                 movement_type,
                 step_idx,
+                liquid,
             } => {
                 let mut duration = if self.faster_movement.get() {
                     0.07
@@ -1926,7 +1911,11 @@ impl UserInterface {
                 self.game_grid
                     .set_character_motion(character, from, to, duration, movement_type);
                 if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
-                    self.sound_player.play(SoundId::Walk);
+                    if liquid.is_some() {
+                        self.sound_player.play(SoundId::WalkWater);
+                    } else {
+                        self.sound_player.play(SoundId::Walk);
+                    }
                 }
                 self.animation_stopwatch.set_to_at_least(duration);
             }
@@ -2013,6 +2002,19 @@ impl UserInterface {
                 }
             }
         }
+    }
+
+    fn animate_reaction(&mut self, reactor_pos: Position) {
+        self.game_grid.add_text_effect(
+            reactor_pos,
+            0.0,
+            1.0,
+            None,
+            "!".to_string(),
+            TextEffectStyle::ReactionExclamation,
+        );
+        self.sound_player.play(SoundId::React);
+        self.animation_stopwatch.set_to_at_least(0.5);
     }
 
     fn animate_character_damage(&mut self, character_id: CharacterId, actual_health_lost: u32) {
@@ -2127,9 +2129,13 @@ impl UserInterface {
             } else {
                 self.sound_player.play_delayed(SoundId::MeleeAttack, delay);
             }
+            if matches!(event.outcome.hit_type, HitType::Critical) {
+                self.sound_player.play_delayed(SoundId::Crit, delay + 0.02);
+            }
             self.sound_player
                 .play_delayed(self.characters.get(target).damage_sound, delay + 0.03);
         }
+
         let verb = match event.outcome.hit_type {
             HitType::Miss => "missed",
             HitType::Regular => "hit",
