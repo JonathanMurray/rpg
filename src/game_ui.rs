@@ -2333,6 +2333,7 @@ impl UserInterface {
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                 dbg!(applied_effects);
+                self.game_grid.animate_magic_sparks(target);
                 for apply_effect in applied_effects {
                     let mut s = String::new();
                     let mut texture = None;

@@ -1,5 +1,5 @@
 use std::{
-    cell::Ref,
+    cell::{Ref, RefCell},
     cmp::Ordering,
     collections::{HashMap, HashSet},
     f32::consts::PI,
@@ -157,6 +157,9 @@ enum AnimationDetails {
         from: Position,
         to: Position,
         movement_type: MovementType,
+    },
+    MagicSparks {
+        particles: RefCell<Vec<(f32, f32)>>,
     },
     MotionPreview {
         positions: Vec<Position>,
@@ -684,6 +687,17 @@ impl GameGrid {
             0.0,
             duration,
             AnimationDetails::Death,
+        ));
+    }
+
+    pub fn animate_magic_sparks(&mut self, char: CharacterId) {
+        self.character_animations.push(CharacterAnimation::new(
+            char,
+            0.0,
+            0.5,
+            AnimationDetails::MagicSparks {
+                particles: Default::default(),
+            },
         ));
     }
 
@@ -1546,6 +1560,7 @@ impl GameGrid {
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
                 }
+
                 AnimationDetails::Motion {
                     movement_type,
                     from,
@@ -1583,6 +1598,9 @@ impl GameGrid {
                 AnimationDetails::Death => {
                     params.rotation = PI * 0.5;
                     dying = true;
+                }
+                AnimationDetails::MagicSparks { .. } => {
+                    // THis is drawn separately
                 }
                 AnimationDetails::AttackCrosshairPreview { .. } => {
                     // This is drawn separately, after all the characters
@@ -2992,18 +3010,47 @@ impl GameGrid {
         }
 
         for char_animation in &self.character_animations {
-            if let AnimationDetails::SpeechBubble { text } = char_animation.kind {
-                self.draw_speech_bubble(text, char_animation.character_id);
-            } else if let AnimationDetails::AttackCrosshairPreview { target_pos } =
-                char_animation.kind
-            {
-                self.draw_target_crosshair(
-                    self.characters[&char_animation.character_id].pos(),
-                    target_pos,
-                    ENEMYS_TARGET_CROSSHAIR_COLOR,
-                    7.0,
-                    false,
-                );
+            match &char_animation.kind {
+                AnimationDetails::SpeechBubble { text } => {
+                    self.draw_speech_bubble(text, char_animation.character_id);
+                }
+                AnimationDetails::AttackCrosshairPreview { target_pos } => {
+                    self.draw_target_crosshair(
+                        self.characters[&char_animation.character_id].pos(),
+                        *target_pos,
+                        ENEMYS_TARGET_CROSSHAIR_COLOR,
+                        7.0,
+                        false,
+                    );
+                }
+                AnimationDetails::MagicSparks { particles } => {
+                    let pos =
+                        self.character_screen_pos(&self.characters[&char_animation.character_id]);
+                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let remaining_ratio = char_animation.remaining_duration_ratio();
+                    let num_particles = ((1.0 - remaining_ratio.max(0.5)) * 20.0) as usize;
+                    let mut particles = particles.borrow_mut();
+                    for i in particles.len()..=num_particles {
+                        particles.push((
+                            rand::random_range(-1.0..1.0),
+                            -0.25 * (i as f32) + rand::random_range(-0.35..0.35),
+                        ));
+                    }
+                    for (i, p) in particles.iter().enumerate() {
+                        let w = self.cell_w * 0.3;
+                        let h = self.cell_w * 0.3;
+                        let mut color = WHITE;
+                        color.a = 1.2 - 2.0 * (1.0 - remaining_ratio) + 0.02 * i as f32;
+                        draw_rectangle(
+                            pos.0 + p.0 * self.cell_w - w / 2.0,
+                            pos.1 + p.1 * self.cell_w - h / 2.0,
+                            w,
+                            h,
+                            color,
+                        );
+                    }
+                }
+                _ => {}
             }
         }
 
