@@ -1272,14 +1272,15 @@ impl CoreGame {
             let mut maybe_ability_roll = None;
 
             if let Some(roll_type) = ability.roll {
-                let dice_roll = simulated_roll.unwrap_or(roll_d20_with_advantage(advantange_level));
+                let unmodified_roll =
+                    simulated_roll.unwrap_or(roll_d20_with_advantage(advantange_level));
 
                 if let Some(description) = roll_description(advantange_level) {
                     detail_lines.push(description);
                 }
 
-                let mut dice_roll_line = format!("Rolled: {}", dice_roll);
-                let mut roll_calculation = dice_roll as i32;
+                let mut dice_roll_line = format!("Rolled: {}", unmodified_roll);
+                let mut roll_calculation = unmodified_roll as i32;
                 match roll_type {
                     AbilityRollType::Spell => {
                         let modifier = caster.spell_modifier() as i32;
@@ -1305,6 +1306,7 @@ impl CoreGame {
                         dice_roll_line.push_str(&format!(" = |<value>{}|", ability_result));
 
                         maybe_ability_roll = Some(AbilityRoll::RolledWithSpellModifier {
+                            unmodified_roll,
                             result: ability_result,
                             line: dice_roll_line,
                         });
@@ -1331,6 +1333,7 @@ impl CoreGame {
                         dice_roll_line.push_str(&format!(" = |<value>{}|", ability_result));
 
                         maybe_ability_roll = Some(AbilityRoll::RolledWithAttackModifier {
+                            unmodified_roll,
                             result: ability_result,
                             line: dice_roll_line,
                         });
@@ -1390,12 +1393,16 @@ impl CoreGame {
                     let mut ability_roll = maybe_ability_roll.unwrap();
 
                     let rolled = match &mut ability_roll {
-                        AbilityRoll::RolledWithSpellModifier { result, line } => {
-                            Some((result, line))
-                        }
-                        AbilityRoll::RolledWithAttackModifier { result, line } => {
-                            Some((result, line))
-                        }
+                        AbilityRoll::RolledWithSpellModifier {
+                            unmodified_roll,
+                            result,
+                            line,
+                        } => Some((result, line)),
+                        AbilityRoll::RolledWithAttackModifier {
+                            unmodified_roll,
+                            result,
+                            line,
+                        } => Some((result, line)),
                         AbilityRoll::WillRollDuringAttack { .. } => None,
                     };
 
@@ -1434,12 +1441,9 @@ impl CoreGame {
                     let before = SystemTime::now();
 
                     let mut miss = false;
-                    if mode.real_game().is_some() && caster.has_condition(&Condition::Blinded) {
-                        miss = roll_blinded_miss_chance();
-                    }
 
                     if miss {
-                        detail_lines.push("Miss! |<faded>(Blinded: 30% miss chance)|".to_string());
+                        detail_lines.push("Miss!".to_string());
                         target_outcome = Some((*target_id, AbilityTargetOutcome::Missed));
                     } else {
                         let outcome = Self::perform_ability_enemy_effect(
@@ -1491,10 +1495,11 @@ impl CoreGame {
                     let target = mode.characters().get(*target_id);
 
                     let ability_roll = maybe_ability_roll.unwrap();
-                    let (ability_result, dice_roll_line) = ability_roll.unwrap_actual_roll();
+                    let (unmodified_roll, modified_roll, dice_roll_line) =
+                        ability_roll.unwrap_actual_roll();
                     detail_lines.push(dice_roll_line.to_string());
 
-                    let degree_of_success = ability_result / 10;
+                    let degree_of_success = modified_roll / 10;
                     if degree_of_success > 0 {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
@@ -1551,7 +1556,9 @@ impl CoreGame {
 
                     let ability_roll = maybe_ability_roll.unwrap();
 
-                    if let Some((_ability_result, dice_roll_line)) = ability_roll.actual_roll() {
+                    if let Some((_unmodified_roll, _ability_result, dice_roll_line)) =
+                        ability_roll.actual_roll()
+                    {
                         detail_lines.push(dice_roll_line.to_string());
                     }
 
@@ -1588,17 +1595,20 @@ impl CoreGame {
                         .await;
                     }
 
-                    if let Some(AbilityRoll::RolledWithSpellModifier { result: _, line }) =
-                        &maybe_ability_roll
+                    if let Some(AbilityRoll::RolledWithSpellModifier {
+                        unmodified_roll,
+                        result: _,
+                        line,
+                    }) = &maybe_ability_roll
                     {
                         detail_lines.push(line.clone());
                     }
 
                     if let Some(effect) = self_effect {
                         let degree_of_success = if let Some(ability_roll) = &maybe_ability_roll {
-                            let (ability_result, _dice_roll_line) =
+                            let (_unmodified_roll, modified_roll, _dice_roll_line) =
                                 ability_roll.unwrap_actual_roll();
-                            ability_result / 10
+                            modified_roll / 10
                         } else {
                             0
                         };
@@ -1787,9 +1797,9 @@ impl CoreGame {
             }
         }
 
-        let roll_result = ability_roll.unwrap_actual_roll().0;
+        let modified_roll = ability_roll.unwrap_actual_roll().1;
 
-        let degree_of_success = roll_result / 10;
+        let degree_of_success = modified_roll / 10;
         if degree_of_success > 0 {
             detail_lines.push(format!("Fortune: {}", degree_of_success));
         }
@@ -1944,7 +1954,7 @@ impl CoreGame {
                 match effect {
                     AbilityNegativeEffect::Spell(spell_enemy_effect) => {
                         if let Some(contest) = spell_enemy_effect.defense_type {
-                            let roll_result = ability_roll.unwrap_actual_roll().0;
+                            let modified_roll = ability_roll.unwrap_actual_roll().1;
                             let (def_str, def_value) = match contest {
                                 DefenseType::Will => ("Will", other_char.will()),
                                 DefenseType::Evasion => ("Evasion", other_char.evasion()),
@@ -1952,10 +1962,10 @@ impl CoreGame {
                             };
                             line.push_str(&format!(
                                 ": {} - {} (|<shield>|<stat>{}) = |<value>{}|",
-                                roll_result,
+                                modified_roll,
                                 def_value,
                                 def_str,
-                                roll_result - def_value as i32
+                                modified_roll - def_value as i32
                             ));
                         }
                     }
@@ -2090,17 +2100,24 @@ impl CoreGame {
                     DefenseType::Toughness => target.toughness(),
                 };
 
-                let final_result = ability_roll.unwrap_actual_roll().0 - defense as i32;
+                let (unmodified_roll, modified_roll, _) = ability_roll.unwrap_actual_roll();
+                let final_result = modified_roll - defense as i32;
 
-                if final_result < 6 {
-                    detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
-                    HitType::Graze
-                } else if final_result < 16 {
+                if unmodified_roll == 1 {
+                    detail_lines.push("  Miss |<faded>(natural 1)|".to_string());
+                    HitType::Miss
+                } else if unmodified_roll == 20 {
+                    detail_lines.push("  Crit |<faded>(natural 20)|".to_string());
+                    HitType::Critical
+                } else if final_result <= 5 {
+                    detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
+                    HitType::Weak
+                } else if final_result <= 15 {
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                     HitType::Regular
                 } else {
-                    detail_lines.push("  Crit |<faded>(16 or higher)|".to_string());
-                    HitType::Critical
+                    detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
+                    HitType::Strong
                 }
             }
             None => HitType::Regular,
@@ -2110,7 +2127,7 @@ impl CoreGame {
 
         let damage = if let Some(ability_damage) = spell_enemy_effect.damage {
             let mut dmg_calculation;
-            let mut increased_by_good_roll = true;
+            let mut is_damage_affected_by_roll = true;
             let mut dmg_str = "  Damage: ".to_string();
             let is_fire_dmg;
             let is_lightning_dmg;
@@ -2118,7 +2135,7 @@ impl CoreGame {
             match ability_damage {
                 AbilityDamage::Static(n, dmg_type) => {
                     dmg_calculation = n as i32;
-                    increased_by_good_roll = false;
+                    is_damage_affected_by_roll = false;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
@@ -2131,46 +2148,70 @@ impl CoreGame {
                 }
             };
 
-            for enhancement in enhancements {
-                let e = enhancement.spell_effect.unwrap();
-                let bonus_dmg = if area_center.is_some() {
-                    e.bonus_area_damage
-                } else {
-                    e.bonus_target_damage
-                };
-                if bonus_dmg > 0 {
-                    dmg_str.push_str(&format!(" +{} |<faded>({})|", bonus_dmg, enhancement.name));
-                    dmg_calculation += bonus_dmg as i32;
+            if is_damage_affected_by_roll && hit_type == HitType::Miss {
+                dmg_str.push_str(&format!(" -100% |<faded>(miss)|"));
+                dmg_calculation = 0;
+            } else {
+                for enhancement in enhancements {
+                    let e = enhancement.spell_effect.unwrap();
+                    let bonus_dmg = if area_center.is_some() {
+                        e.bonus_area_damage
+                    } else {
+                        e.bonus_target_damage
+                    };
+                    if bonus_dmg > 0 {
+                        dmg_str
+                            .push_str(&format!(" +{} |<faded>({})|", bonus_dmg, enhancement.name));
+                        dmg_calculation += bonus_dmg as i32;
+                    }
                 }
-            }
 
-            // Multipliers (like Crit/Wet) do not stack.
-            let mut multiplicative_bonus_dmg = 0;
-            if hit_type == HitType::Graze {
-                dmg_str.push_str(" -50% |<faded>(Graze)|");
-                multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.5).ceil() as i32;
-            } else if increased_by_good_roll && hit_type == HitType::Critical {
-                dmg_str.push_str(" +50% |<faded>(Crit)|");
-                multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
-            }
-            if target.has_condition(&Condition::Wet) {
-                if is_fire_dmg {
-                    dmg_str.push_str(" -25% |<faded>(Wet)|");
-                    multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                // Multipliers (like Crit/Wet) do not stack.
+                let mut multiplicative_bonus_dmg = 0;
+                if is_damage_affected_by_roll {
+                    match hit_type {
+                        HitType::Miss => {
+                            dmg_str.push_str(" -100% |<faded>(Miss)|");
+                            multiplicative_bonus_dmg -= dmg_calculation;
+                        }
+                        HitType::Weak => {
+                            dmg_str.push_str(" -50% |<faded>(Weak)|");
+                            multiplicative_bonus_dmg -=
+                                (dmg_calculation as f32 * 0.5).ceil() as i32;
+                        }
+                        HitType::Regular => {}
+                        HitType::Strong => {
+                            dmg_str.push_str(" +50% |<faded>(Strong)|");
+                            multiplicative_bonus_dmg +=
+                                (dmg_calculation as f32 * 0.5).ceil() as i32;
+                        }
+                        HitType::Critical => {
+                            dmg_str.push_str(" +75% |<faded>(Crit)|");
+                            multiplicative_bonus_dmg +=
+                                (dmg_calculation as f32 * 0.75).ceil() as i32;
+                        }
+                    }
                 }
-                if is_lightning_dmg {
-                    dmg_str.push_str(" +50% |<faded>(Wet)|");
-                    multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
-                }
-            }
-            dmg_calculation += multiplicative_bonus_dmg;
 
-            if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
-                // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
-                if target.conditions.borrow().has(&Condition::Protected) {
-                    apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
-                    dbg!(&dmg_str);
-                    dbg!(&dmg_calculation);
+                if target.has_condition(&Condition::Wet) {
+                    if is_fire_dmg {
+                        dmg_str.push_str(" -25% |<faded>(Wet)|");
+                        multiplicative_bonus_dmg -= (dmg_calculation as f32 * 0.25).ceil() as i32;
+                    }
+                    if is_lightning_dmg {
+                        dmg_str.push_str(" +50% |<faded>(Wet)|");
+                        multiplicative_bonus_dmg += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                    }
+                }
+                dmg_calculation += multiplicative_bonus_dmg;
+
+                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                    // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
+                    if target.conditions.borrow().has(&Condition::Protected) {
+                        apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
+                        dbg!(&dmg_str);
+                        dbg!(&dmg_calculation);
+                    }
                 }
             }
 
@@ -2190,7 +2231,7 @@ impl CoreGame {
         let mut applied_effects = vec![];
 
         fn apply_hit_type(stacks: &mut u32, hit_type: HitType, reduced_to_nothing: &mut bool) {
-            if hit_type == HitType::Graze {
+            if hit_type == HitType::Weak {
                 // -50% Graze
                 *stacks -= (*stacks as f32 * 0.5).ceil() as u32;
             } else if hit_type == HitType::Critical {
@@ -2446,10 +2487,11 @@ impl CoreGame {
             }
         }
 
-        let unmodified_roll =
-            mode.simulated_roll()
-                .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage)) as i32;
-        let roll_result = (unmodified_roll + attack_modifier) + attack_bonus.flat_amount;
+        let unmodified_roll: u32 = mode
+            .simulated_roll()
+            .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
+
+        let roll_result = (unmodified_roll as i32 + attack_modifier) + attack_bonus.flat_amount;
         let final_result = roll_result - evasion as i32;
 
         if game.is_some() {
@@ -2498,21 +2540,19 @@ impl CoreGame {
         if game.is_some() {
             // TODO: Include details here about where this attack bonus comes from
             let attack_bonus_str = if attack_bonus.flat_amount != 0 {
-                format!("({})", plus_minus(attack_bonus.flat_amount))
+                format!("({}) ", plus_minus(attack_bonus.flat_amount))
             } else {
                 "".to_string()
             };
+            detail_lines.push(format!("Rolled: |<value>{}|", unmodified_roll,));
             detail_lines.push(format!(
-                "Rolled: {} {} (|<red_dice>|<stat>Attack|)| {}= |<value>{}|",
+                "{} {} (|<red_dice>|<stat>Attack|)| {}- {} (|<shield>|<stat>Evasion|) = |<value>{}|",
                 unmodified_roll,
                 plus_minus(attack_modifier),
                 attack_bonus_str,
-                roll_result,
+                evasion,
+                final_result,
             ));
-            detail_lines.push(format!(
-                "{} - {} (|<shield>|<stat>Evasion|) = |<value>{}|",
-                roll_result, evasion, final_result
-            ))
         }
 
         let weapon = attacker.weapon(hand_type).unwrap();
@@ -2572,66 +2612,53 @@ impl CoreGame {
                 dmg_calculation -= armor_value as i32;
             }
 
-            let mut miss_from_blinded = false;
-            let mut crit_from_flanking = false;
-            // Don't apply miss/crit chance in damage prediction (since the prediction assumes that a high roll
-            // cannot deal less damage than a low roll).
-            // deal less damage than high attack rolls).
-            if game.is_some() {
-                if attacker.has_condition(&Condition::Blinded) {
-                    miss_from_blinded = roll_blinded_miss_chance();
-                }
-                if flanking {
-                    crit_from_flanking = roll_flanked_crit_chance();
-                }
-            }
-
-            //  <=5: graze
-            // 6-15: hit
-            // >=16: crit
-            let hit_type = if miss_from_blinded {
+            //  <=5: weak
+            // 6-15: regular
+            // >=16: strong
+            let hit_type = if unmodified_roll == 1 {
                 HitType::Miss
-            } else if crit_from_flanking {
+            } else if unmodified_roll == 20 {
                 HitType::Critical
             } else if final_result <= 5 {
-                HitType::Graze
+                HitType::Weak
             } else if final_result <= 15 {
                 HitType::Regular
             } else {
-                HitType::Critical
+                HitType::Strong
             };
 
             match hit_type {
                 HitType::Miss => {
-                    detail_lines.push("Miss! |<faded>(Blinded: 30% miss chance)|".to_string());
+                    detail_lines.push("Miss! |<faded>(natural 1)|".to_string());
                 }
-                HitType::Graze => {
+                HitType::Weak => {
                     if let Some(source) = graze_improvement {
-                        dmg_str.push_str(&format!(" -25% |<faded>(graze, {})|", source));
+                        dmg_str.push_str(&format!(" -25% |<faded>(weak, {})|", source));
                         dmg_calculation -= (dmg_calculation as f32 * 0.25).ceil() as i32;
                     } else {
-                        dmg_str.push_str(" -50% |<faded>(graze)|");
+                        dmg_str.push_str(" -50% |<faded>(weak)|");
                         dmg_calculation -= (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    detail_lines.push("  Graze |<faded>(5 or lower)|".to_string());
+                    detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
                 }
                 HitType::Regular => {
                     detail_lines.push("  Hit |<faded>(6-15)|".to_string());
                 }
+                HitType::Strong => {
+                    dmg_str.push_str(" +50% |<faded>(strong)|");
+                    dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
+                    detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
+                }
                 HitType::Critical => {
                     if let Some(source) = crit_improvement {
-                        dmg_str.push_str(&format!(" +75% |<faded>(crit, {})|", source));
+                        dmg_str.push_str(&format!(" +100% |<faded>(crit, {})|", source));
+                        dmg_calculation += (dmg_calculation as f32 * 1.0).ceil() as i32;
+                    } else {
+                        dmg_str.push_str(" +75% |<faded>(crit)|");
                         dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
-                    } else {
-                        dmg_str.push_str(" +50% |<faded>(crit)|");
-                        dmg_calculation += (dmg_calculation as f32 * 0.5).ceil() as i32;
                     }
-                    if crit_from_flanking {
-                        detail_lines
-                            .push("  Critical Hit |<faded>(Flanked: 30% crit chance)|".to_string());
-                    } else {
-                        detail_lines.push("  Critical Hit |<faded>(16 or higher)|".to_string());
-                    }
+
+                    detail_lines.push("  Critical Hit |<faded>(natural 20)|".to_string());
                 }
             }
 
@@ -2864,6 +2891,7 @@ impl CoreGame {
                     let area_target_outcomes = Self::perform_ability_area_effect(
                         arrow.name,
                         AbilityRoll::RolledWithSpellModifier {
+                            unmodified_roll,
                             result: roll_result,
                             line: "".to_string(),
                         },
@@ -3135,11 +3163,6 @@ fn roll_blinded_miss_chance() -> bool {
     rng.random_range(1..=10) <= 3
 }
 
-fn roll_flanked_crit_chance() -> bool {
-    let mut rng = rand::rng();
-    rng.random_range(1..=10) <= 3
-}
-
 fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
         Ordering::Less => Some(format!(
@@ -3345,13 +3368,15 @@ pub fn predict_attack(
     }
 
     let mut regular_hit_threshold = 21;
+    let mut strong_hit_threshold = 21;
     let mut crit_threshold = 21;
 
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
     // (like checking wall collisions for ranged attacks?)
     // Note: We don't take Blinded into account
-    for unmodified_roll in 1..=20 {
+    // Exclude natural miss and natural crit in prediction
+    for unmodified_roll in 2..=19 {
         let event = CoreGame::perform_attack(
             attacker,
             hand_type,
@@ -3369,10 +3394,15 @@ pub fn predict_attack(
 
         match hit_type {
             HitType::Miss => {}
-            HitType::Graze => {}
+            HitType::Weak => {}
             HitType::Regular => regular_hit_threshold = regular_hit_threshold.min(unmodified_roll),
+            HitType::Strong => {
+                regular_hit_threshold = regular_hit_threshold.min(unmodified_roll);
+                strong_hit_threshold = strong_hit_threshold.min(unmodified_roll);
+            }
             HitType::Critical => {
                 regular_hit_threshold = regular_hit_threshold.min(unmodified_roll);
+                strong_hit_threshold = strong_hit_threshold.min(unmodified_roll);
                 crit_threshold = crit_threshold.min(unmodified_roll);
             }
         }
@@ -3412,20 +3442,38 @@ pub fn predict_attack(
 
 #[derive(Debug)]
 enum AbilityRoll {
-    RolledWithSpellModifier { result: i32, line: String },
-    RolledWithAttackModifier { result: i32, line: String },
-    WillRollDuringAttack { bonus: i32 },
+    RolledWithSpellModifier {
+        unmodified_roll: u32,
+        result: i32,
+        line: String,
+    },
+    RolledWithAttackModifier {
+        unmodified_roll: u32,
+        result: i32,
+        line: String,
+    },
+    WillRollDuringAttack {
+        bonus: i32,
+    },
 }
 
 impl AbilityRoll {
-    fn actual_roll(&self) -> Option<(i32, &str)> {
+    fn actual_roll(&self) -> Option<(u32, i32, &str)> {
         match self {
-            AbilityRoll::RolledWithSpellModifier { result, line } => Some((*result, line)),
-            AbilityRoll::RolledWithAttackModifier { result, line } => Some((*result, line)),
+            AbilityRoll::RolledWithSpellModifier {
+                unmodified_roll,
+                result,
+                line,
+            } => Some((*unmodified_roll, *result, line)),
+            AbilityRoll::RolledWithAttackModifier {
+                unmodified_roll,
+                result,
+                line,
+            } => Some((*unmodified_roll, *result, line)),
             AbilityRoll::WillRollDuringAttack { .. } => None,
         }
     }
-    fn unwrap_actual_roll(&self) -> (i32, &str) {
+    fn unwrap_actual_roll(&self) -> (u32, i32, &str) {
         self.actual_roll()
             .unwrap_or_else(|| panic!("haven't rolled"))
     }
@@ -3646,8 +3694,9 @@ pub struct AttackOutcome {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum HitType {
     Miss,
+    Weak,
     Regular,
-    Graze,
+    Strong,
     Critical,
 }
 
@@ -4083,7 +4132,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
-            Blinded => "|<value>30%| chance to miss.\nAutomatically |<keyword>Flanked| when attacked.",
+            Blinded => "<keyword>Disadvantage| on actions.\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
@@ -6578,8 +6627,11 @@ impl Character {
         let target_pos = target.pos();
         let mut bonuses = vec![];
 
+        if self.has_condition(&Condition::Blinded) {
+            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+        }
         if is_target_flanked(self.pos(), target) {
-            bonuses.push(("Flanked", RollBonusContributor::OtherPositive));
+            bonuses.push(("Flanked", RollBonusContributor::Advantage(1)));
         }
 
         let (_range, reach) = self.reaches_with_attack(
@@ -6634,9 +6686,6 @@ impl Character {
 
         if conditions.has(&Condition::NearDeath) {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
-        }
-        if conditions.has(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
         }
 
         if conditions.has(&Condition::BloodRage) {

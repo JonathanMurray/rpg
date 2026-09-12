@@ -522,7 +522,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     //alice.learn_ability(&ENEMY_EXPLODING_ARROW);
     //alice.learn_ability(&SHACKLED_MIND);
     //alice.learn_ability(&FIREBALL);
-    //alice.learn_ability(&LIGHTNING_BOLT);
+    alice.learn_ability(&LIGHTNING_BOLT);
 
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),

@@ -1672,8 +1672,9 @@ impl UserInterface {
                             } else if applied_effects.is_empty() {
                                 let suffix = match hit_type {
                                     HitType::Miss => " (miss)",
+                                    HitType::Weak => " (graze)",
                                     HitType::Regular => " (hit)",
-                                    HitType::Graze => " (graze)",
+                                    HitType::Strong => "  (strong)",
                                     HitType::Critical => " (crit)",
                                 };
                                 line.push_str(suffix);
@@ -2138,8 +2139,8 @@ impl UserInterface {
 
         let verb = match event.outcome.hit_type {
             HitType::Miss => "missed",
-            HitType::Regular => "hit",
-            HitType::Graze => "grazed",
+            HitType::Weak => "grazed",
+            HitType::Regular | HitType::Strong => "hit",
             HitType::Critical => "crit",
         };
         let applied_to_target = &event.outcome.applied_to_target;
@@ -2178,17 +2179,17 @@ impl UserInterface {
                 damage,
                 hit_type: HitType::Miss,
                 ..
-            } => ("Miss!".to_string(), TextEffectStyle::HostileGraze),
+            } => ("Miss!".to_string(), TextEffectStyle::Miss),
             AttackOutcome {
                 damage,
-                hit_type: HitType::Regular,
-                ..
-            } => (format!("{}", damage), TextEffectStyle::HostileHit),
-            AttackOutcome {
-                damage,
-                hit_type: HitType::Graze,
+                hit_type: HitType::Weak,
                 ..
             } => (format!("{}", damage), TextEffectStyle::HostileGraze),
+            AttackOutcome {
+                damage,
+                hit_type: HitType::Regular | HitType::Strong,
+                ..
+            } => (format!("{}", damage), TextEffectStyle::HostileHit),
             AttackOutcome {
                 damage,
                 hit_type: HitType::Critical,
@@ -2289,21 +2290,25 @@ impl UserInterface {
                         self.characters.get(target).damage_sound,
                         start_time as f64 + 0.03,
                     );
-                    effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
+                    if hit_type == &HitType::Miss {
+                        effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0));
+                    } else {
+                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
+                    }
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
                         HitType::Miss => {
                             (None, "Miss".to_string(), TextEffectStyle::HostileGraze, 1.0)
                         }
-                        HitType::Regular => {
-                            (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
-                        }
-                        HitType::Graze => (
+                        HitType::Weak => (
                             None,
                             "Graze".to_string(),
                             TextEffectStyle::HostileGraze,
                             1.0,
                         ),
+                        HitType::Regular | HitType::Strong => {
+                            (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
+                        }
                         HitType::Critical => {
                             (None, "Crit".to_string(), TextEffectStyle::HostileCrit, 1.0)
                         }

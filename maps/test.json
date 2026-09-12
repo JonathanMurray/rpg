@@ -419,12 +419,13 @@
     {
       "type_": "Alice",
       "pos": [
-        9,
-        24
+        12,
+        29
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Bob",
@@ -434,17 +435,19 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Enslaved",
       "pos": [
-        15,
-        26
+        8,
+        29
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     }
   ]
 }

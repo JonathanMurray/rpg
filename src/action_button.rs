@@ -259,13 +259,13 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if effect.roll_advantage > 0 {
         t.technical_description.push(format!(
-            "|<value>+{}| |<keyword>Advantage|",
+            "|<value>+{}| |<keyword>Advantage| |<mixed_dice>|",
             effect.roll_advantage
         ));
         t.keywords.push(Keyword::Advantage);
     } else if effect.roll_advantage < 0 {
         t.technical_description.push(format!(
-            "|<value>-{}| |<keyword>Advantage|",
+            "|<value>-{}| |<keyword>Advantage| |<mixed_dice>|",
             -effect.roll_advantage
         ));
         t.keywords.push(Keyword::Advantage);
@@ -277,7 +277,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
     if effect.improved_crit {
         t.technical_description
-            .push("|<keyword>Crit| bonus damage increased by |<value>25%|".to_string());
+            .push("|<value>+100%| |<keyword>Crit| damage (instead of |<value>+75%|)".to_string());
         t.keywords.push(Keyword::Crit);
     }
     if let Some((x, condition)) = effect.inflict_x_condition_per_damage {

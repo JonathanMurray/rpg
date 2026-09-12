@@ -46,10 +46,10 @@ impl Keyword {
                 "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance."
             }
             Keyword::Graze => {
-                "|<value>-50%| effect.\nTriggers when |<mixed_dice>| roll is |<value>5| or lower."
+                "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower."
             }
             Keyword::Crit => {
-                "|<value>+50%| effect.\nTriggers when |<mixed_dice>| roll is |<value>16| or higher."
+                "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers)."
             }
             Keyword::Flanked => "|<value>30%| chance to |<keyword>Crit|.",
         }
