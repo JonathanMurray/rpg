@@ -30,6 +30,8 @@ pub const ACTION_POINTS_PER_TURN: u32 = 4;
 
 pub const MOVE_DISTANCE_PER_RESOURCE: u32 = 4;
 
+pub const MOVE_COST_FACTOR_IN_LIQUID: f32 = 2.0;
+
 #[derive(Debug)]
 enum ActionOutcome {
     AttackHit { victim_id: CharacterId, damage: u32 },
@@ -40,7 +42,6 @@ enum ActionOutcome {
 pub struct CoreGame {
     pub characters: Characters,
     pub active_character_id: CharacterId,
-    ui_event_queue: RefCell<Vec<GameEvent>>,
     user_interface: GameUserInterfaceConnection,
     pub pathfind_grid: Rc<PathfindGrid>,
     round_index: u32,
@@ -55,7 +56,6 @@ impl CoreGame {
         Self {
             characters,
             active_character_id: init_state.active_character_id,
-            ui_event_queue: Default::default(),
             user_interface,
             pathfind_grid: init_state.pathfind_grid.clone(),
             round_index: 0,
@@ -90,7 +90,7 @@ impl CoreGame {
                 self.active_character().name
             );
 
-            self.ui_handle_queued_events().await;
+            //self.ui_handle_queued_events().await;
 
             let enemy_count = self
                 .characters
@@ -755,50 +755,10 @@ impl CoreGame {
     }
 
     async fn ui_handle_event(&self, event: GameEvent) {
-        println!("ui handle event ({:?}) ...", event);
-
-        self.ui_handle_queued_events().await;
+        //println!("ui handle event ({:?}) ...", event);
 
         println!("now will actually handle the event ...");
         self.user_interface.handle_event(self, event).await
-    }
-
-    async fn ui_handle_queued_events(&self) {
-        //TODO
-        println!("ui handle queued events");
-
-        // TODO  causes stack overflow for some reason
-
-        loop {
-            let popped = {
-                let mut queue_ref = self.ui_event_queue.borrow_mut();
-                queue_ref.pop()
-            };
-            if let Some(event) = popped {
-                println!("queued evnt: {:?}", event);
-                self.user_interface.handle_event(self, event).await
-            } else {
-                println!("no queued event, breaking");
-                break;
-            }
-        }
-
-        /*
-        for _ in 0..2 {
-            let mut queue_ref = self.ui_event_queue.borrow_mut();
-            let popped = queue_ref.pop();
-            drop(queue_ref);
-            //drop(popped);
-            self.user_interface.handle_event(self, GameEvent::LogLine("hello".to_string())).await
-        }
-          */
-
-        println!("drained event queue");
-    }
-
-    fn queue_up_ui_event(&self, event: GameEvent) {
-        println!("ui queue up event ({:?}) ...", event);
-        self.ui_event_queue.borrow_mut().push(event);
     }
 
     async fn on_non_ability_attack(&self, event: AttackedEvent) {
@@ -5310,7 +5270,7 @@ impl Party {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Character {
     id: Cell<Option<CharacterId>>,
     index_in_round: Cell<Option<u32>>,
@@ -5362,6 +5322,14 @@ pub struct Character {
     pub is_facing_east: Cell<bool>,
     is_being_pushed_in_direction: Cell<Option<(i32, i32)>>,
     pub has_escaped_from_battle: Cell<bool>,
+}
+
+impl core::fmt::Debug for Character {
+    fn fmt(&self, f: &mut core::fmt::Formatter) -> core::fmt::Result {
+        f.debug_struct("Character")
+            .field("name", &self.name)
+            .finish()
+    }
 }
 
 impl Character {

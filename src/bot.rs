@@ -12,7 +12,7 @@ use crate::{
         MOVE_DISTANCE_PER_RESOURCE,
     },
     data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
-    pathfind::{Path, PathfindGrid},
+    pathfind::{Path, PathfindGrid, TraversalType},
     util::CustomShuffle,
 };
 
@@ -401,6 +401,8 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 pos,
                 0.0,
                 EXPLORATION_RANGE,
+                true,
+                TraversalType::SlowedDownByLiquid,
             )
         }
     }
@@ -539,6 +541,8 @@ fn find_path(
         target.pos(),
         proximity_squared,
         EXPLORATION_RANGE,
+        true,
+        TraversalType::SlowedDownByLiquid,
     )
 }
 

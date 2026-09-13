@@ -11,7 +11,7 @@ use indexmap::IndexMap;
 use crate::{
     core::{
         distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
-        CENTER_MELEE_RANGE_SQUARED,
+        CENTER_MELEE_RANGE_SQUARED, MOVE_COST_FACTOR_IN_LIQUID,
     },
     grid::ControlPoint,
     util::line_visitor,
@@ -76,6 +76,23 @@ pub struct ChartNode {
     pub came_from: Position,
 }
 
+impl Ord for ChartNode {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other
+            .distance_from_start
+            .total_cmp(&self.distance_from_start)
+            .then_with(|| self.position.cmp(&other.position))
+    }
+}
+
+impl Eq for ChartNode {}
+
+impl PartialOrd for ChartNode {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
 #[derive(Debug)]
 pub struct Path {
     // total distance (walking, not flying) from start to end
@@ -89,6 +106,12 @@ pub struct PathNode {
     pub distance_from_start: f32,
     pub position: Position,
     pub difficult_terrain: bool,
+}
+
+#[derive(Debug, PartialEq)]
+pub enum TraversalType {
+    SlowedDownByLiquid,
+    NotSlowedDownByLiquid,
 }
 
 impl PathfindGrid {
@@ -226,6 +249,8 @@ impl PathfindGrid {
         start: Position,
         target: Position,
         exploration_range: f32,
+        accept_fallback_path: bool,
+        traversal_type: TraversalType,
     ) -> Option<Path> {
         self.find_shortest_path_to_proximity(
             character_id,
@@ -233,18 +258,24 @@ impl PathfindGrid {
             target,
             CENTER_MELEE_RANGE_SQUARED,
             exploration_range,
+            accept_fallback_path,
+            traversal_type,
         )
     }
 
+    /*
     pub fn find_shortest_path_to(
         &self,
         character_id: CharacterId,
         start: Position,
         target: Position,
+        traversal_type: TraversalType
     ) -> Option<Path> {
         let proximity_sq = 0.0; // i.e. that exact position
-        self.find_shortest_path_to_proximity(character_id, start, target, proximity_sq, 20.0)
+        self.find_shortest_path_to_proximity(character_id, start, target, proximity_sq, 20.0, false,
+        traversal_type)
     }
+     */
 
     pub fn find_shortest_path_to_proximity(
         &self,
@@ -253,6 +284,8 @@ impl PathfindGrid {
         target: Position,
         proximity_squared: f32,
         exploration_range: f32,
+        accept_fallback_path: bool,
+        traversal_type: TraversalType,
     ) -> Option<Path> {
         let before = Instant::now();
 
@@ -265,6 +298,7 @@ impl PathfindGrid {
                 pos: target,
                 proximity_squared,
             }),
+            traversal_type,
         );
         let mut shortest_valid_path: Option<Path> = None;
         let mut closest_fallback_path: Option<(f32, Path)> = None;
@@ -306,8 +340,13 @@ impl PathfindGrid {
             //println!("Found valid path");
             Some(path)
         } else if let Some((_, path)) = closest_fallback_path {
-            println!("Using fallback path");
-            Some(path)
+            if accept_fallback_path {
+                println!("Using fallback path");
+                Some(path)
+            } else {
+                println!("Not accepting fallback path");
+                None
+            }
         } else {
             println!("Found no path (not even fallback)");
             None
@@ -320,6 +359,7 @@ impl PathfindGrid {
         start: Position,
         range: f32,
         target: Option<Target>,
+        traversal_type: TraversalType,
     ) -> Ref<IndexMap<Position, ChartNode>> {
         /*
         println!(
@@ -336,7 +376,7 @@ impl PathfindGrid {
         {
             /*
             println!(
-                "CACHED",
+                "RETURNING CACHED EXPLORATION ",
             );
              */
 
@@ -356,12 +396,11 @@ impl PathfindGrid {
         {
             for (pos, _chart_node) in self.cached_exploration_chart.borrow().iter() {
                 if within_range_squared(proximity_squared, *pos, target_pos) {
-                    /*
                     println!(
                         "explore_outward(char={}, start={:?}, range={}, target={:?}. Found target within cache: pos={:?}",
                         character_id, start, range, target, pos
                     );
-                     */
+
                     return self.cached_exploration_chart.borrow();
                 }
             }
@@ -404,6 +443,7 @@ impl PathfindGrid {
 
         while !next.is_empty() {
             let chart_node = next.pop().unwrap();
+            //println!("{} nodes left on the stack", next.len());
             //println!("  visiting: {:?}", chart_node.position);
 
             assert!(chart_node.position.0 >= 0 && chart_node.position.1 >= 0);
@@ -411,6 +451,7 @@ impl PathfindGrid {
             if let Some(prev_chart_node) = mut_chart.get(&chart_node.position) {
                 if prev_chart_node.distance_from_start <= chart_node.distance_from_start {
                     // We already know another shorter route to this node
+                    //println!("we already know another shorter route to this node");
                     continue;
                 }
             }
@@ -431,8 +472,10 @@ impl PathfindGrid {
                         } else {
                             1.0
                         };
-                        if self.liquids.borrow().contains_key(&(x0, y0)) {
-                            local_cost *= 2.0;
+                        if traversal_type == TraversalType::SlowedDownByLiquid
+                            && self.liquids.borrow().contains_key(&(x0, y0))
+                        {
+                            local_cost *= MOVE_COST_FACTOR_IN_LIQUID;
                         }
                         neighbors.push(((x0, y0), dist + local_cost));
                     }
@@ -476,7 +519,16 @@ impl PathfindGrid {
                             - proximity_squared.sqrt()
                             > range
                         {
+                            println!(
+                                "Shouldn't explore neighbor {:?} (from {:?})",
+                                neighbor_pos, chart_node.position
+                            );
                             should_explore_neighbor = false;
+                        } else {
+                            println!(
+                                "Should explore neighbor {:?} (from {:?})",
+                                neighbor_pos, chart_node.position
+                            );
                         }
                     } else {
                         // Visiting this neighbor would exceed the allowed exploration range
@@ -683,21 +735,4 @@ impl PathfindGrid {
 pub enum Collision {
     Terrain,
     Characters(HashSet<CharacterId>),
-}
-
-impl Ord for ChartNode {
-    fn cmp(&self, other: &Self) -> Ordering {
-        other
-            .distance_from_start
-            .total_cmp(&self.distance_from_start)
-            .then_with(|| self.position.cmp(&other.position))
-    }
-}
-
-impl Eq for ChartNode {}
-
-impl PartialOrd for ChartNode {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
 }

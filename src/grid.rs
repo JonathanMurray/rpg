@@ -54,7 +54,8 @@ use crate::{
     game_ui::{ConfiguredAction, UiState},
     game_ui_components::ActionPointsRow,
     pathfind::{
-        ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, CELLS_PER_ENTITY,
+        ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, TraversalType,
+        CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
@@ -86,6 +87,7 @@ const HOVER_MOVEMENT_ARROW_COLOR: Color = Color::new(0.7, 0.6, 0.6, 0.8);
 //const HOVER_INVALID_TARGET_COLOR: Color = ORANGE;
 const HOVER_TERRAIN_NEED_CHAR_TARGET_COLOR: Color = LIGHTGRAY;
 
+const ABILITY_MOVEMENT_DST_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
 const HOVER_NEUTRAL_COLOR: Color = Color::new(0.8, 0.8, 0.8, 0.6);
 const HOVER_ENEMY_COLOR: Color = Color::new(0.8, 0.2, 0.2, 1.0);
 //const TARGET_ENEMY_COLOR: Color = Color::new(1.0, 0.0, 0.3, 1.0);
@@ -751,6 +753,18 @@ impl GameGrid {
             ));
             // The ability should resolve in the middle of the character's animation, before they retract from the target
             delay + 0.1
+        } else if ability.id == AbilityId::LungeAttack {
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                delay,
+                0.4,
+                AnimationDetails::MeleeAttack {
+                    toward: target_pos.unwrap(),
+                    with_shield: false,
+                },
+            ));
+            // The ability should resolve in the middle of the character's animation, before they retract from the target
+            delay + 0.1
         } else if ability.id == AbilityId::Execute {
             self.character_animations.push(CharacterAnimation::new(
                 actor.id(),
@@ -1125,9 +1139,13 @@ impl GameGrid {
             character.remaining_movement.get()
                 + (character.action_points.current() * MOVE_DISTANCE_PER_RESOURCE) as f32
         };
-        let routes = self
-            .pathfind_grid
-            .explore_outward(character_id, pos, exploration_range, None);
+        let routes = self.pathfind_grid.explore_outward(
+            character_id,
+            pos,
+            exploration_range,
+            None,
+            TraversalType::SlowedDownByLiquid,
+        );
 
         //dbg!(routes.len());
 
@@ -2778,6 +2796,7 @@ impl GameGrid {
                 self.hovered_character.or(self.hovered_character_portrait)
             {
                 let hovered_char = &self.characters[&hovered_id];
+                let hovered_char_pos = hovered_char.pos();
                 if hovered_char.player_controlled() {
                     if matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         if self.prev_hovered_character != Some(hovered_id) {
@@ -2838,14 +2857,26 @@ impl GameGrid {
                         ..
                     } = mouse_state
                     {
+                        if self.prev_hovered_character != Some(hovered_id) {
+                            self.sound_player.play(SoundId::HoverTarget);
+                        }
+                        self.draw_cornered_outline(
+                            self.grid_pos_to_screen(hovered_char_pos),
+                            HOVER_ENEMY_COLOR,
+                            5.0,
+                            3.0,
+                            true,
+                        );
                         if let Some(move_range) = maybe_move_to_target {
+                            //dbg!(move_range);
+
                             let positions = if within_range_squared(
                                 move_range.squared(),
                                 active_char_pos,
-                                mouse_grid_pos,
+                                hovered_char_pos,
                             ) {
                                 self.try_find_path_to_action_target(
-                                    mouse_grid_pos,
+                                    hovered_char_pos,
                                     active_char_pos,
                                     move_range,
                                 )
@@ -2853,22 +2884,19 @@ impl GameGrid {
                                 vec![]
                             };
 
+                            /*
+                            println!(
+                                "Hovering enemy target with movement-based action; positions={:?}",
+                                positions
+                            );
+                             */
+
                             self.draw_movement_to_target(
                                 active_char_pos,
-                                mouse_grid_pos,
+                                hovered_char_pos,
                                 positions,
                             );
                         } else {
-                            if self.prev_hovered_character != Some(hovered_id) {
-                                self.sound_player.play(SoundId::HoverTarget);
-                            }
-                            self.draw_cornered_outline(
-                                self.grid_pos_to_screen(hovered_char.pos()),
-                                HOVER_ENEMY_COLOR,
-                                5.0,
-                                3.0,
-                                true,
-                            );
                             let cannot_reach = matches!(
                                 range_indicator,
                                 Some((_, _, RangeIndicator::CannotReach))
@@ -2945,7 +2973,7 @@ impl GameGrid {
                         {
                             let movement = move_into_melee.map(|move_range| {
                                 let mut path = self.try_find_path_to_action_target(
-                                    mouse_grid_pos,
+                                    hovered_char_pos,
                                     active_char_pos,
                                     move_range,
                                 );
@@ -2958,6 +2986,7 @@ impl GameGrid {
 
                             ui_state.set_target(ActionTarget::Character(hovered_id, movement));
                             outcome.switched_players_action_target = true;
+                            println!("Target was set to enemy");
                         } else if !matches!(mouse_state, MouseState::RequiresAllyTarget) {
                         }
                     }
@@ -3356,6 +3385,7 @@ impl GameGrid {
         target_pos: (i32, i32),
         movement_to_target: Vec<(i32, i32)>,
     ) {
+        //dbg!(&movement_to_target);
         if movement_to_target.len() < 2 {
             let invalid_path = [actor_pos, target_pos];
             self.draw_movement_path_with_arrow(
@@ -3366,6 +3396,15 @@ impl GameGrid {
                 RED,
             );
         } else {
+            // Highlight the position where you'll end up after the movement
+            self.draw_cornered_outline(
+                self.grid_pos_to_screen(movement_to_target[movement_to_target.len() - 1]),
+                ABILITY_MOVEMENT_DST_COLOR,
+                5.0,
+                3.0,
+                false,
+            );
+
             self.draw_target_crosshair(
                 *movement_to_target.last().unwrap(),
                 target_pos,
@@ -3394,11 +3433,23 @@ impl GameGrid {
             actor_id,
             actor_pos,
             target_pos,
-            f32::from(move_range) - 1.0,
+            f32::from(move_range),
+            false,
+            // Actions that move toward a target ignore slow movement speed in liquids.
+            // If they didn't, we couldn't assume that the ability's range covered a circle
+            // around the caster. Let's not deal with that right now.
+            TraversalType::NotSlowedDownByLiquid,
         );
 
+        /*
+        println!(
+            "Tried to find path from {:?} to {:?} (range={:?})",
+            actor_pos, target_pos, move_range
+        );
+        dbg!(&maybe_path);
+         */
+
         if let Some(path) = maybe_path {
-            //path.positions.iter().rev().map(|(_dist, pos)| *pos).collect()
             path.nodes.iter().map(|node| node.position).collect()
         } else {
             vec![]
@@ -4267,12 +4318,11 @@ impl GameGrid {
                 Color::new(1.0, 1.0, 1.0, 0.5)
             };
 
-            draw_circle(
-                self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0,
-                self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0,
-                3.0,
-                circle_color,
-            );
+            let x = self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0;
+            let y = self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0;
+            let r = 3.0;
+            draw_circle(x, y, r, circle_color);
+            draw_circle_lines(x, y, r, 2.0, BLACK);
 
             if let Some(next) = path.next() {
                 a = b;

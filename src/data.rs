@@ -951,9 +951,9 @@ pub const LUNGE_ATTACK: Ability = Ability {
     name: "Lunge attack",
     description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
-    action_point_cost: 2,
+    action_point_cost: 3,
     mana_cost: 0,
-    stamina_cost: 2,
+    stamina_cost: 1,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),

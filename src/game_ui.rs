@@ -34,6 +34,7 @@ use crate::{
         AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
         Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
         MovementType, OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
+        MOVE_COST_FACTOR_IN_LIQUID,
     },
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
@@ -1910,6 +1911,13 @@ impl UserInterface {
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
                     duration *= 1.41;
+                }
+
+                if movement_type == MovementType::AbilityEngage {
+                    // Lunge attack for example must reasonably be faster than regular movement
+                    duration *= 0.7;
+                } else if liquid.is_some() {
+                    duration *= MOVE_COST_FACTOR_IN_LIQUID;
                 }
 
                 self.game_grid

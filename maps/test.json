@@ -419,8 +419,8 @@
     {
       "type_": "Alice",
       "pos": [
-        12,
-        29
+        20,
+        26
       ],
       "health": null,
       "main_hand": null,
@@ -431,7 +431,7 @@
       "type_": "Bob",
       "pos": [
         6,
-        19
+        25
       ],
       "health": null,
       "main_hand": null,
@@ -441,19 +441,8 @@
     {
       "type_": "Enslaved",
       "pos": [
-        5,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        5,
-        28
+        12,
+        19
       ],
       "health": null,
       "main_hand": null,
