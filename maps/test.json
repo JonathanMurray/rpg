@@ -430,8 +430,8 @@
     {
       "type_": "Bob",
       "pos": [
-        5,
-        30
+        6,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -441,8 +441,19 @@
     {
       "type_": "Enslaved",
       "pos": [
-        8,
-        29
+        5,
+        31
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        5,
+        28
       ],
       "health": null,
       "main_hand": null,

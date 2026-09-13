@@ -41,10 +41,11 @@ use crate::{
         draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable, Style,
     },
     core::{
-        distance_between, effective_push_amount, pushed_vector, target_within_range_squared,
-        within_range_squared, Ability, AbilityId, AbilityReach, AbilityTarget, ActionReach,
-        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AttackAction, BaseAction, Character,
-        Goodness, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        distance_between, effective_push_amount, is_target_within_shape, is_valid_area_target,
+        pushed_vector, target_within_range_squared, within_range_squared, Ability, AbilityId,
+        AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyEffect, AreaEffect, AreaShape,
+        AttackAction, AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
+        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -67,7 +68,7 @@ use crate::{
     },
 };
 use crate::{
-    core::{CharacterId, HandType, Range},
+    core::{AbilityEffect, CharacterId, HandType, Range},
     drawing::{draw_arrow, draw_dashed_line},
 };
 
@@ -1144,11 +1145,6 @@ impl GameGrid {
         self.action_usability_problem = action_usability_problem;
         self.selected_player_character_id = selected_player_character_id;
 
-        //let pos: (i32, i32) = &self.characters[&self.active_character_id].pos();
-        //self.routes =
-        //    self.pathfind_grid
-        //        .explore_outward(active_character_id, pos, self.movement_range.max());
-
         for effect in &mut self.effects {
             effect.age += elapsed;
         }
@@ -2021,7 +2017,24 @@ impl GameGrid {
             self.draw_movement_path_background(self.active_character_id);
         }
 
-        let mut is_casting = None;
+        let mut pushed_targets = vec![];
+
+        if let UiState::ConfiguringAction(ConfiguredAction::Attack {
+            selected_enhancements,
+            target,
+            ..
+        }) = ui_state
+        {
+            if let Some(target_id) = target {
+                self.acquire_pushed_targets_from_attack(
+                    *target_id,
+                    selected_enhancements,
+                    &mut pushed_targets,
+                );
+            }
+        }
+
+        let mut is_casting: Option<&mut &'static Ability> = None;
         if let UiState::ConfiguringAction(ConfiguredAction::UseAbility {
             ability,
             selected_enhancements,
@@ -2046,12 +2059,6 @@ impl GameGrid {
 
                 if let ActionTarget::Character(target_id, _movement) = target {
                     let target = &self.characters[target_id];
-                    let mut target_screen_pos = self.character_screen_pos(&target);
-                    target_screen_pos = (
-                        target_screen_pos.0 + self.cell_w / 2.0,
-                        target_screen_pos.1 + self.cell_w / 2.0,
-                    );
-
                     let push_amount = effective_push_amount(
                         base_push_amount,
                         &self.characters[&self.active_character_id],
@@ -2059,18 +2066,8 @@ impl GameGrid {
                     );
 
                     let pushed_vec = pushed_vector(active_char_pos, target.pos(), push_amount);
-                    draw_dashed_line_ex(
-                        target_screen_pos,
-                        (
-                            target_screen_pos.0 + self.cell_w * pushed_vec.0 as f32,
-                            target_screen_pos.1 + self.cell_w * pushed_vec.1 as f32,
-                        ),
-                        8.0,
-                        RED,
-                        5.0,
-                        Some((Color::new(0.0, 0.0, 0.0, 0.5), 1.0)),
-                        true,
-                    );
+
+                    pushed_targets.push((*target_id, pushed_vec));
                 }
             }
 
@@ -3102,6 +3099,18 @@ impl GameGrid {
             }
         }
 
+        if !pushed_targets.is_empty() {
+            for character_id in self.characters.keys() {
+                self.draw_character_highlight(
+                    *character_id,
+                    CELL_OCCUPIED_COLOR,
+                    self.cell_w * 0.1,
+                );
+            }
+        }
+
+        self.draw_pushed_targets(&pushed_targets);
+
         self.draw_effects();
 
         if let Some((text, color)) = front_cursor_text {
@@ -3123,6 +3132,84 @@ impl GameGrid {
         self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
         outcome
+    }
+
+    fn acquire_pushed_targets_from_attack(
+        &self,
+        target_id: CharacterId,
+        selected_enhancements: &[AttackEnhancement],
+        pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
+    ) {
+        for enhancement in selected_enhancements {
+            // PREVIEW ARROW EFFECTS
+            if enhancement.effect.consume_equipped_arrow {
+                let attacker = &self.characters[&self.active_character_id];
+                let arrow = attacker.unwrap_arrow();
+                if let Some(area_effect) = arrow.area_effect {
+                    let target_char = &self.characters[&target_id];
+
+                    for other_char in self.characters.values() {
+                        if !is_valid_area_target(attacker, other_char, area_effect.acquisition) {
+                            continue;
+                        }
+
+                        if is_target_within_shape(
+                            attacker.pos(),
+                            target_char.pos(),
+                            area_effect.shape,
+                            other_char,
+                        ) {
+                            if let AbilityEffect::Negative(effect) = area_effect.effect {
+                                if let Some(base_push_amount) = effect.knockback() {
+                                    //self.draw_filled_occupied_cells();
+
+                                    let push_amount = effective_push_amount(
+                                        base_push_amount,
+                                        &attacker,
+                                        other_char,
+                                    );
+
+                                    let source_pos = if target_char.id() == other_char.id() {
+                                        attacker.pos()
+                                    } else {
+                                        target_char.pos()
+                                    };
+
+                                    let pushed_vec =
+                                        pushed_vector(source_pos, other_char.pos(), push_amount);
+
+                                    pushed_targets.push((other_char.id(), pushed_vec));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn draw_pushed_targets(&self, pushed_targets: &[(CharacterId, (i32, i32))]) {
+        for (pushed_target_id, pushed_vec) in pushed_targets {
+            let mut target_screen_pos =
+                self.character_screen_pos(&self.characters[&pushed_target_id]);
+            target_screen_pos = (
+                target_screen_pos.0 + self.cell_w / 2.0,
+                target_screen_pos.1 + self.cell_w / 2.0,
+            );
+
+            draw_dashed_line_ex(
+                target_screen_pos,
+                (
+                    target_screen_pos.0 + self.cell_w * pushed_vec.0 as f32,
+                    target_screen_pos.1 + self.cell_w * pushed_vec.1 as f32,
+                ),
+                8.0,
+                RED,
+                5.0,
+                Some((Color::new(0.0, 0.0, 0.0, 0.5), 1.0)),
+                true,
+            );
+        }
     }
 
     fn draw_cursor_text(

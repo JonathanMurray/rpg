@@ -162,7 +162,7 @@ async fn run_demo(
                                 ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
                                 ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
                             ],
-                            vec![],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2))],
                         ),
                     ),
                 ],
@@ -178,7 +178,8 @@ async fn run_demo(
                         PlayerId::Alice,
                         CharacterGrowth::of(
                             vec![ButtonAction::AbilityEnhancement(HEAL_ENERGIZE)],
-                            vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
+                            vec![],
+                            //vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
                         ),
                     ),
                     (PlayerId::Clara, CharacterGrowth::new_joiner()),

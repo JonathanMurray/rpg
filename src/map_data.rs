@@ -12,7 +12,7 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_ESCAPE, ENEMY_EXPLODING_ARROW,
+        DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE,
         ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
         HULDRA_HEAL, HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, SLASHING_RAPIER,
         SMALL_SHIELD,
@@ -374,7 +374,7 @@ pub fn create_character(
             );
             ghoul.health.change_max_value_to(9);
             ghoul.set_weapon(HandType::MainHand, BAD_BOW);
-            ghoul.learn_ability(&ENEMY_EXPLODING_ARROW);
+            ghoul.learn_ability(&ENEMY_BURNING_ARROW);
             ghoul
         }
         CharacterType::Ghoul2 => {

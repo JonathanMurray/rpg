@@ -326,7 +326,11 @@ impl CoreGame {
         dx: i32,
         dy: i32,
     ) -> Result<(), QuitEvent> {
-        assert!((dx, dy) != (0, 0) && (dx == 0 || dy == 0));
+        assert!(
+            (dx, dy) != (0, 0) && (dx == 0 || dy == 0),
+            "invalid push vector: {:?}",
+            (dx, dy)
+        );
         let mut positions = vec![];
         if dx != 0 {
             for i in 0..=dx.abs() {
@@ -1190,7 +1194,9 @@ impl CoreGame {
 
                 let push_amount = effective_push_amount(base_push_amount, giver, receiver);
                 let vector = pushed_vector(source_pos, receiver.pos(), push_amount);
-                receiver.is_being_pushed_in_direction.set(Some(vector));
+                if vector != (0, 0) {
+                    receiver.is_being_pushed_in_direction.set(Some(vector));
+                }
                 actual_effect = Some(e);
                 format!(
                     "  |{}| was knocked back ({})",
@@ -1971,13 +1977,7 @@ impl CoreGame {
         }
 
         for other_char in mode.characters().iter() {
-            let is_ally = other_char.player_controlled() == caster.player_controlled();
-            let valid_target = match acquisition {
-                AreaTargetAcquisition::Enemies => !is_ally,
-                AreaTargetAcquisition::Everyone => true,
-                AreaTargetAcquisition::Allies => unreachable!(),
-            };
-            if !valid_target {
+            if !is_valid_area_target(caster, other_char, acquisition) {
                 continue;
             }
 
@@ -3230,7 +3230,10 @@ fn modify_effect_by_hit_type(
         }
         ApplyEffect::PerBleeding { .. } => {}
         ApplyEffect::ConsumeCondition { .. } => {}
-        ApplyEffect::Pushed(..) => {
+        ApplyEffect::Pushed(amount) => {
+            if hit_type == HitType::Miss {
+                *amount = 0;
+            }
             // Push distance is determined by attacker's attack modifier and target's toughness
         }
         ApplyEffect::Escape => {}
@@ -3248,9 +3251,6 @@ pub fn effective_push_amount(base_amount: u32, pusher: &Character, target: &Char
     } else {
         change.ceil() as i32
     };
-
-    dbg!(factor);
-    dbg!(change);
 
     (base_amount as i32 + change).max(0) as u32
 }
@@ -3996,6 +3996,19 @@ impl Characters {
 
     pub fn as_map(&self) -> HashMap<CharacterId, Rc<Character>> {
         self.0.iter().map(|ch| (ch.id(), Rc::clone(ch))).collect()
+    }
+}
+
+pub fn is_valid_area_target(
+    actor: &Character,
+    other_char: &Character,
+    acquisition: AreaTargetAcquisition,
+) -> bool {
+    let is_ally = other_char.player_controlled() == actor.player_controlled();
+    match acquisition {
+        AreaTargetAcquisition::Enemies => !is_ally,
+        AreaTargetAcquisition::Everyone => true,
+        AreaTargetAcquisition::Allies => unreachable!(),
     }
 }
 
@@ -4767,7 +4780,7 @@ pub enum AbilityId {
     ManaTest,
     PoisonTest,
 
-    EnemyExplodingArrow,
+    EnemyBurningArrow,
     EnemySlashingAttack,
     EnemyEscape,
     HuldraHeal,
@@ -5429,6 +5442,10 @@ impl Character {
             is_being_pushed_in_direction: Cell::new(None),
             has_escaped_from_battle: Cell::new(false),
         }
+    }
+
+    pub fn unwrap_arrow(&self) -> Arrow {
+        self.arrows.get().unwrap().arrow
     }
 
     fn thorns(&self) -> u32 {

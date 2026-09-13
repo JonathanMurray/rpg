@@ -1935,9 +1935,9 @@ pub const FIREBALL: Ability = Ability {
     }),
 };
 
-pub const ENEMY_EXPLODING_ARROW: Ability = Ability {
-    id: AbilityId::EnemyExplodingArrow,
-    name: "Exploding arrow",
+pub const ENEMY_BURNING_ARROW: Ability = Ability {
+    id: AbilityId::EnemyBurningArrow,
+    name: "Burning arrow",
     description: "Deal fire damage to an enemy and its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 4,

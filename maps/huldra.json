@@ -527,6 +527,7 @@
       ]
     }
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Bob",
@@ -536,7 +537,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Alice",
@@ -546,7 +548,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Huldra",
@@ -556,7 +559,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Enslaved",
@@ -566,7 +570,8 @@
       ],
       "health": 28,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Enslaved",
@@ -576,7 +581,8 @@
       ],
       "health": null,
       "main_hand": "EnslavedRapier",
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Clara",
@@ -586,7 +592,30 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        11,
+        20
+      ],
+      "health": 8,
+      "main_hand": null,
+      "shield": null,
+      "name": "Troublemaker"
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        20,
+        20
+      ],
+      "health": 9,
+      "main_hand": null,
+      "shield": null,
+      "name": "Wretch"
     }
   ]
 }
