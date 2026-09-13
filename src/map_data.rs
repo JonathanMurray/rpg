@@ -15,7 +15,7 @@ use crate::{
         DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE,
         ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
         HULDRA_HEAL, HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, SLASHING_RAPIER,
-        SMALL_SHIELD,
+        SMALL_SHIELD, STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -563,7 +563,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
         Attributes::new(2, 2, 3, 7),
         (3, 10),
     );
-    clara.set_weapon(HandType::MainHand, DAGGER);
+    clara.set_weapon(HandType::MainHand, STAFF);
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_ability(&FIREBALL);
@@ -649,7 +649,7 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
         Attributes::new(2, 2, 3, 7),
         (3, 10),
     );
-    clara.set_weapon(HandType::MainHand, DAGGER);
+    clara.set_weapon(HandType::MainHand, STAFF);
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
     clara.learn_passive(PassiveSkill::CriticalCharge);

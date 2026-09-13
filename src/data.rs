@@ -422,6 +422,22 @@ pub const BONE_CRUSHER: Weapon = Weapon {
     weight: 7,
 };
 
+pub const STAFF: Weapon = Weapon {
+    name: "Staff",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 5,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Agility,
+    attack_enhancement: None,
+    on_attacked_reaction: None,
+    bonus_melee_evasion: 2,
+    on_damage: None,
+    sprite: Some(SpriteId::Staff),
+    icon: EquipmentIconId::Staff,
+    weight: 2,
+};
+
 pub const BAD_BOW: Weapon = Weapon {
     name: "Bad bow",
     range: WeaponRange::Ranged(15.5),
