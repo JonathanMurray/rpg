@@ -2143,8 +2143,7 @@ impl UserInterface {
 
         let verb = match event.outcome.hit_type {
             HitType::Miss => "missed",
-            HitType::Weak => "grazed",
-            HitType::Regular | HitType::Strong => "hit",
+            HitType::Weak | HitType::Regular | HitType::Strong => "hit",
             HitType::Critical => "crit",
         };
         let applied_to_target = &event.outcome.applied_to_target;

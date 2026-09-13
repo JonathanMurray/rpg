@@ -545,9 +545,15 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             }
             AbilityRollType::RollDuringAttack(bonus) => {
                 if bonus < 0 {
-                    format!("|<red_dice>| |<stat>Attack (-{})|", -bonus)
+                    format!(
+                        "|<red_dice>| |<stat>Attack (|<value>-{}| |<keyword>Advantage|)|",
+                        -bonus
+                    )
                 } else if bonus > 0 {
-                    format!("|<red_dice>| |<stat>Attack (+{})|", bonus)
+                    format!(
+                        "|<red_dice>| |<stat>Attack (|<value>+{}| |<keyword>Advantage|)|",
+                        bonus
+                    )
                 } else {
                     "|<red_dice>| |<stat>Attack|".to_string()
                 }
@@ -753,10 +759,18 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
         AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
             t.technical_description
                 .push(defense_str(DefenseType::Evasion).to_string());
-            let dmg_str = ability_attack_effect
-                .override_damage
-                .map(|dmg| dmg.to_string())
-                .unwrap_or("weapon".to_string());
+
+            let dmg_str = match ability_attack_effect.override_weapon_damage {
+                Some(override_dmg) => override_dmg.to_string(),
+                None => {
+                    if ability_attack_effect.bonus_damage > 0 {
+                        format!("weapon + {}", ability_attack_effect.bonus_damage)
+                    } else {
+                        "weapon".to_string()
+                    }
+                }
+            };
+
             t.technical_description
                 .push(format!("  |<sword>| |<value>{dmg_str}|"));
             if let Some(apply_effect) = ability_attack_effect.on_hit {

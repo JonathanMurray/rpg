@@ -2059,7 +2059,7 @@ impl CoreGame {
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
-                let roll_modifier = ability_roll.unwrap_attack_bonus();
+                let roll_modifier = ability_roll.unwrap_attack_advantage_bonus();
                 caster.set_facing_toward(target.pos());
                 let event: AttackedEvent = Self::perform_attack(
                     caster,
@@ -2415,7 +2415,7 @@ impl CoreGame {
         enhancements: &[(&'static str, AttackEnhancementEffect)],
         defender: &Rc<Character>,
         maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
-        ability_roll_modifier: i32,
+        ability_roll_advantage: i32,
         mode: ActionPerformanceMode,
         ability_attack_effect: Option<AbilityAttackEffect>,
     ) -> AttackedEvent {
@@ -2431,9 +2431,9 @@ impl CoreGame {
             enhancements,
             maybe_reaction.map(|(_reactor, reaction)| reaction),
         );
-        attack_bonus.flat_amount += ability_roll_modifier;
+        attack_bonus.advantage += ability_roll_advantage;
 
-        let mut evasion = defender.evasion();
+        let base_evasion = defender.evasion();
 
         let attack_modifier = attacker.attack_modifier(hand_type);
 
@@ -2441,6 +2441,9 @@ impl CoreGame {
 
         let mut armor_value = defender.protection_from_armor();
         let mut damage_prevention = None;
+
+        let mut total_bonus_evasion = 0;
+        let mut evasion_str = "".to_string();
 
         if let Some((reactor, reaction)) = maybe_reaction {
             if let Some(game) = game {
@@ -2455,17 +2458,8 @@ impl CoreGame {
 
             let bonus_evasion = reaction.effect.bonus_evasion;
             if bonus_evasion > 0 {
-                evasion += bonus_evasion;
-
-                if game.is_some() {
-                    detail_lines.push(format!(
-                        "  |<shield>| |<stat>Evasion|: {} +{} |<faded>({})| = |<value>{}|",
-                        evasion - bonus_evasion,
-                        bonus_evasion,
-                        reaction.name,
-                        evasion
-                    ));
-                }
+                total_bonus_evasion += bonus_evasion;
+                evasion_str.push_str(&format!("+{} ({})", bonus_evasion, reaction.name));
             }
 
             let bonus_armor = reaction.effect.bonus_armor;
@@ -2487,12 +2481,24 @@ impl CoreGame {
             }
         }
 
+        let attacker_weapon = attacker.weapon(hand_type).unwrap();
+
+        if let Some(weapon) = defender.weapon(HandType::MainHand) {
+            if attacker_weapon.is_melee() && weapon.bonus_melee_evasion > 0 {
+                total_bonus_evasion += weapon.bonus_melee_evasion;
+                evasion_str.push_str(&format!(
+                    "+{} ({})",
+                    weapon.bonus_melee_evasion, weapon.name
+                ));
+            }
+        }
+
         let unmodified_roll: u32 = mode
             .simulated_roll()
             .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
 
         let roll_result = (unmodified_roll as i32 + attack_modifier) + attack_bonus.flat_amount;
-        let final_result = roll_result - evasion as i32;
+        let final_result = roll_result - base_evasion as i32;
 
         if game.is_some() {
             if let Some(description) = roll_description(attack_bonus.advantage) {
@@ -2500,8 +2506,19 @@ impl CoreGame {
             }
         }
 
+        if total_bonus_evasion > 0 {
+            if game.is_some() {
+                detail_lines.push(format!(
+                    "|<shield>| |<stat>Evasion|: {} {} = |<value>{}|",
+                    base_evasion,
+                    evasion_str,
+                    base_evasion + total_bonus_evasion
+                ));
+            }
+        }
+
         let mut armor_penetrators = vec![];
-        let weapon = attacker.weapon(hand_type).unwrap();
+
         let mut used_arrow = None;
 
         for (name, effect) in enhancements {
@@ -2511,7 +2528,7 @@ impl CoreGame {
             }
             if effect.consume_equipped_arrow {
                 assert!(used_arrow.is_none());
-                assert!(!weapon.is_melee());
+                assert!(!attacker_weapon.is_melee());
                 let stack = attacker.arrows.get().unwrap();
                 used_arrow = Some(stack.arrow);
                 if game.is_some() {
@@ -2550,22 +2567,36 @@ impl CoreGame {
                 unmodified_roll,
                 plus_minus(attack_modifier),
                 attack_bonus_str,
-                evasion,
+                base_evasion + total_bonus_evasion,
                 final_result,
             ));
         }
 
         let weapon = attacker.weapon(hand_type).unwrap();
         let outcome = {
-            let dmg_override = ability_attack_effect.and_then(|e| e.override_damage);
+            let mut dmg_weapon_override = None;
             let mut dmg_str = "  Damage: ".to_string();
             let mut dmg_calculation;
-            if let Some(dmg) = dmg_override {
+
+            if let Some(e) = ability_attack_effect {
+                dmg_weapon_override = e.override_weapon_damage;
+            }
+
+            if let Some(dmg) = dmg_weapon_override {
                 dmg_calculation = dmg as i32;
                 dmg_str.push_str(&dmg.to_string());
             } else {
                 dmg_calculation = weapon.damage as i32;
                 dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, weapon.name));
+            }
+
+            if let Some(e) = ability_attack_effect {
+                let bonus_dmg = e.bonus_damage;
+                if bonus_dmg > 0 {
+                    // TODO use the ability's name instead of just "ability"
+                    dmg_str.push_str(&format!(" +{} |<faded>(ability)|", bonus_dmg));
+                    dmg_calculation += bonus_dmg as i32;
+                }
             }
 
             let mut graze_improvement = None;
@@ -3265,7 +3296,8 @@ pub fn predict_ability(
     let mut targets: HashMap<CharacterId, TargetPrediction> = Default::default();
     // PERFORMANCE NOTE: This is very inefficient. A single frame can take > 100ms due to calling this. Luckily, prediction happens infrequently
     // and there's currently not much animation in the game that is noticeably affected.
-    for unmodified_roll in 1..=20 {
+    // Exclude natural miss and natural crit in prediction
+    for unmodified_roll in 2..=19 {
         let event = &pollster::FutureExt::block_on(CoreGame::perform_ability(
             caster,
             ability,
@@ -3275,7 +3307,7 @@ pub fn predict_ability(
         ))[0];
 
         for (target_id, result) in event.affected_targets() {
-            if unmodified_roll == 1 {
+            if unmodified_roll == 2 {
                 let mut details: Vec<(&'static str, Goodness)> = vec![];
 
                 if let Some(roll) = ability.roll {
@@ -3303,7 +3335,7 @@ pub fn predict_ability(
                         crit_chance: None,  // filled in later
                     },
                 );
-            } else if unmodified_roll == 20 {
+            } else if unmodified_roll == 19 {
                 if let Some(dmg) = result.damage {
                     targets
                         .get_mut(&target_id)
@@ -3374,7 +3406,6 @@ pub fn predict_attack(
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
     // (like checking wall collisions for ranged attacks?)
-    // Note: We don't take Blinded into account
     // Exclude natural miss and natural crit in prediction
     for unmodified_roll in 2..=19 {
         let event = CoreGame::perform_attack(
@@ -3477,7 +3508,7 @@ impl AbilityRoll {
         self.actual_roll()
             .unwrap_or_else(|| panic!("haven't rolled"))
     }
-    fn unwrap_attack_bonus(&self) -> i32 {
+    fn unwrap_attack_advantage_bonus(&self) -> i32 {
         match self {
             AbilityRoll::WillRollDuringAttack { bonus } => *bonus,
             unexpected => panic!("Not attack roll: {:?}", unexpected),
@@ -4729,7 +4760,9 @@ impl AbilityNegativeEffect {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityAttackEffect {
-    pub override_damage: Option<u32>,
+    pub override_weapon_damage: Option<u32>,
+    pub bonus_damage: u32,
+    pub bonus_advantage: u32,
     pub on_hit: Option<ApplyEffect>,
     pub on_kill_apply_self: Option<ApplyEffect>,
 }
@@ -4737,7 +4770,9 @@ pub struct AbilityAttackEffect {
 impl AbilityAttackEffect {
     pub const fn default() -> Self {
         Self {
-            override_damage: None,
+            override_weapon_damage: None,
+            bonus_damage: 0,
+            bonus_advantage: 0,
             on_hit: None,
             on_kill_apply_self: None,
         }
@@ -7179,6 +7214,7 @@ pub struct Weapon {
     pub attack_attribute: AttackAttribute,
     pub attack_enhancement: Option<AttackEnhancement>,
     pub on_attacked_reaction: Option<OnAttackedReaction>,
+    pub bonus_melee_evasion: u32,
     pub on_damage: Option<AttackHitEffect>,
     pub weight: u32,
 }

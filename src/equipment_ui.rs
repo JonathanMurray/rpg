@@ -122,6 +122,10 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             }
         }
     }
+    if weapon.bonus_melee_evasion > 0 {
+        t.technical_description
+            .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
+    }
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description
             .push(format!("Skill: |<keyword>{}|", reaction.name));
@@ -134,6 +138,13 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     t.technical_description.push(weight_str(weapon.weight));
 
     t
+}
+
+fn bonus_melee_evasion_str(value: u32) -> String {
+    format!(
+        "|<value>+{}| |<shield>|<stat>Evasion| against melee attacks",
+        value
+    )
 }
 
 fn shield_tooltip(shield: &Shield) -> Tooltip {
