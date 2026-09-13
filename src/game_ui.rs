@@ -616,10 +616,9 @@ impl UserInterface {
 
         let mut banner = Banner::new();
         banner.set("Battle!", 2.0);
-        /*
-        sound_player.play(SoundId::Battle);
+
+        //sound_player.play(SoundId::Battle);
         sound_player.play(SoundId::YourTurn);
-         */
 
         let faster_movement = Rc::new(Cell::new(false));
 

@@ -1060,6 +1060,39 @@ impl CoreGame {
         }
     }
 
+    fn perform_effect_application_according_to_hit_type_and_target(
+        &self,
+        hit_type: HitType,
+        mut effect: ApplyEffect,
+        giver: Option<&Character>,
+        area_center: Option<Position>,
+        receiver: &Character,
+        applied_effects: &mut Vec<ApplyEffect>,
+        damage_from_effects: &mut u32,
+        actual_health_lost: &mut u32,
+        name: Option<&'static str>,
+    ) -> String {
+        let mut reduced_to_nothing = false;
+        modify_effect_by_hit_type(&mut effect, hit_type, &mut reduced_to_nothing);
+        if reduced_to_nothing {
+            format!("|<keyword>{}| was skipped", effect)
+        } else {
+            let (applied, log_line, damage) =
+                self.perform_effect_application(effect, giver, area_center, receiver);
+            if let Some(applied) = applied {
+                applied_effects.push(applied);
+            }
+            *damage_from_effects += damage;
+            *actual_health_lost += damage;
+
+            if let Some(name) = name {
+                format!("{} |<faded>({})|", log_line, name)
+            } else {
+                log_line
+            }
+        }
+    }
+
     fn perform_effect_application(
         &self,
         effect: ApplyEffect,
@@ -1144,7 +1177,7 @@ impl CoreGame {
                 }
                 line
             }
-            e @ ApplyEffect::Pushed(amount) => {
+            e @ ApplyEffect::Pushed(base_push_amount) => {
                 let giver = giver.unwrap();
                 let mut source_pos = giver.pos();
 
@@ -1155,16 +1188,15 @@ impl CoreGame {
                     }
                 }
 
-                let dx = receiver.pos().0 - source_pos.0;
-                let dy = receiver.pos().1 - source_pos.1;
-                let vector = if dx.abs() >= dy.abs() {
-                    (amount as i32 * dx.signum(), 0)
-                } else {
-                    (0, amount as i32 * dy.signum())
-                };
+                let push_amount = effective_push_amount(base_push_amount, giver, receiver);
+                let vector = pushed_vector(source_pos, receiver.pos(), push_amount);
                 receiver.is_being_pushed_in_direction.set(Some(vector));
                 actual_effect = Some(e);
-                format!("  |{}| was knocked back ({})", receiver.name_tag(), amount)
+                format!(
+                    "  |{}| was knocked back ({})",
+                    receiver.name_tag(),
+                    push_amount
+                )
             }
             ApplyEffect::Escape => {
                 receiver.has_escaped_from_battle.set(true);
@@ -2230,100 +2262,51 @@ impl CoreGame {
 
         let mut applied_effects = vec![];
 
-        fn apply_hit_type(stacks: &mut u32, hit_type: HitType, reduced_to_nothing: &mut bool) {
-            if hit_type == HitType::Weak {
-                // -50% Graze
-                *stacks -= (*stacks as f32 * 0.5).ceil() as u32;
-            } else if hit_type == HitType::Critical {
-                // +50% Crit
-                *stacks += (*stacks as f32 * 0.5).ceil() as u32;
-            }
-
-            if *stacks <= 0 {
-                *reduced_to_nothing = true;
-            }
-        }
-
         let mut damage_from_effects = 0;
 
         if let Some(game) = real_game {
-            for mut effect in spell_enemy_effect
+            for effect in spell_enemy_effect
                 .on_hit
                 .unwrap_or_default()
                 .iter()
                 .copied()
                 .flatten()
             {
-                let mut reduced_to_nothing = false;
-                match effect {
-                    ApplyEffect::RemoveActionPoints(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing);
-                    }
-                    ApplyEffect::GainActionPoints(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing);
-                    }
-                    ApplyEffect::GainStamina(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
-                    }
-                    ApplyEffect::GainMana(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
-                    }
-                    ApplyEffect::LoseHealth(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
-                    }
-                    ApplyEffect::GainHealth(ref mut n) => {
-                        apply_hit_type(n, hit_type, &mut reduced_to_nothing)
-                    }
-                    ApplyEffect::Condition(ref mut apply_condition) => {
-                        if let Some(stacks) = &mut apply_condition.stacks {
-                            apply_hit_type(stacks, hit_type, &mut reduced_to_nothing);
-                        }
-                        if let Some(rounds) = &mut apply_condition.duration_rounds {
-                            apply_hit_type(rounds, hit_type, &mut reduced_to_nothing);
-                        }
-                    }
-                    ApplyEffect::PerBleeding { .. } => {}
-                    ApplyEffect::ConsumeCondition { .. } => {}
-                    ApplyEffect::Pushed(ref mut distance) => {
-                        apply_hit_type(distance, hit_type, &mut reduced_to_nothing);
-                    }
-                    ApplyEffect::Escape => {}
-                }
-
-                if reduced_to_nothing {
-                    detail_lines.push(format!(
-                        "|<keyword>{}| was reduced to nothing |<faded>(Graze)|",
-                        effect
-                    ));
-                } else {
-                    let (applied, log_line, damage) =
-                        game.perform_effect_application(effect, Some(caster), area_center, target);
-                    if let Some(applied) = applied {
-                        applied_effects.push(applied);
-                    }
-                    damage_from_effects += damage;
-                    actual_health_lost += damage;
-                    detail_lines.push(log_line);
-                }
+                let log_line = game.perform_effect_application_according_to_hit_type_and_target(
+                    hit_type,
+                    effect,
+                    Some(caster),
+                    area_center,
+                    target,
+                    &mut applied_effects,
+                    &mut damage_from_effects,
+                    &mut actual_health_lost,
+                    None,
+                );
+                detail_lines.push(log_line);
             }
 
             for enhancement in enhancements {
-                // TODO: shouldn't these also be affected by degree of success?
                 let e = enhancement.spell_effect.unwrap();
                 let effects = if area_center.is_some() {
                     e.area_on_hit
                 } else {
                     e.target_on_hit
                 };
-                for effect in effects.iter().flatten().flatten() {
-                    let (applied, log_line, damage) =
-                        game.perform_effect_application(*effect, Some(caster), area_center, target);
-                    if let Some(applied) = applied {
-                        applied_effects.push(applied);
-                    }
-                    damage_from_effects += damage;
-                    actual_health_lost += damage;
-                    detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
+                for effect in effects.iter().flatten().flatten().copied() {
+                    let log_line = game
+                        .perform_effect_application_according_to_hit_type_and_target(
+                            hit_type,
+                            effect,
+                            Some(caster),
+                            area_center,
+                            target,
+                            &mut applied_effects,
+                            &mut damage_from_effects,
+                            &mut actual_health_lost,
+                            Some(enhancement.name),
+                        );
+                    detail_lines.push(log_line);
                 }
             }
 
@@ -3189,9 +3172,97 @@ impl CoreGame {
     }
 }
 
-fn roll_blinded_miss_chance() -> bool {
-    let mut rng = rand::rng();
-    rng.random_range(1..=10) <= 3
+fn modify_stacks_by_hit_type(stacks: &mut u32, hit_type: HitType, reduced_to_nothing: &mut bool) {
+    match hit_type {
+        HitType::Miss => *stacks = 0,
+        HitType::Weak => {
+            // -50% Graze
+            *stacks -= (*stacks as f32 * 0.5).ceil() as u32;
+        }
+        HitType::Regular => {}
+        HitType::Strong => {
+            // +50% Strong
+            *stacks += (*stacks as f32 * 0.5).ceil() as u32;
+        }
+        HitType::Critical => {
+            // +75% Strong
+            println!("increased effect from {} by 75% from crit", stacks); //TODO
+            *stacks += (*stacks as f32 * 0.75).ceil() as u32;
+        }
+    }
+
+    if *stacks <= 0 {
+        *reduced_to_nothing = true;
+    }
+}
+
+fn modify_effect_by_hit_type(
+    effect: &mut ApplyEffect,
+    hit_type: HitType,
+    reduced_to_nothing: &mut bool,
+) {
+    match effect {
+        ApplyEffect::RemoveActionPoints(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing);
+        }
+        ApplyEffect::GainActionPoints(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing);
+        }
+        ApplyEffect::GainStamina(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
+        }
+        ApplyEffect::GainMana(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
+        }
+        ApplyEffect::LoseHealth(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
+        }
+        ApplyEffect::GainHealth(ref mut n) => {
+            modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing)
+        }
+        ApplyEffect::Condition(ref mut apply_condition) => {
+            if let Some(stacks) = &mut apply_condition.stacks {
+                modify_stacks_by_hit_type(stacks, hit_type, reduced_to_nothing);
+            }
+            if let Some(rounds) = &mut apply_condition.duration_rounds {
+                modify_stacks_by_hit_type(rounds, hit_type, reduced_to_nothing);
+            }
+        }
+        ApplyEffect::PerBleeding { .. } => {}
+        ApplyEffect::ConsumeCondition { .. } => {}
+        ApplyEffect::Pushed(..) => {
+            // Push distance is determined by attacker's attack modifier and target's toughness
+        }
+        ApplyEffect::Escape => {}
+    }
+}
+
+pub fn effective_push_amount(base_amount: u32, pusher: &Character, target: &Character) -> u32 {
+    let atk_mod = pusher.attack_modifier(HandType::MainHand);
+
+    let factor = (atk_mod as f32 - target.toughness() as f32) / 10.0;
+    let change = base_amount as f32 * factor;
+    // Round away from 0
+    let change = if change < 0.0 {
+        change.floor() as i32
+    } else {
+        change.ceil() as i32
+    };
+
+    dbg!(factor);
+    dbg!(change);
+
+    (base_amount as i32 + change).max(0) as u32
+}
+
+pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) -> (i32, i32) {
+    let dx = receiver_pos.0 - source_pos.0;
+    let dy = receiver_pos.1 - source_pos.1;
+    if dx.abs() >= dy.abs() {
+        (amount as i32 * dx.signum(), 0)
+    } else {
+        (0, amount as i32 * dy.signum())
+    }
 }
 
 fn roll_description(advantage: i32) -> Option<String> {
@@ -4655,10 +4726,10 @@ impl Ability {
         }
     }
 
-    pub fn has_knockback(&self) -> bool {
+    pub fn knockback(&self) -> Option<u32> {
         match self.target {
-            AbilityTarget::Enemy { effect, .. } => effect.has_knockback(),
-            _ => false,
+            AbilityTarget::Enemy { effect, .. } => effect.knockback(),
+            _ => None,
         }
     }
 }
@@ -4746,15 +4817,15 @@ impl AbilityNegativeEffect {
         }
     }
 
-    pub fn has_knockback(&self) -> bool {
+    pub fn knockback(&self) -> Option<u32> {
         if let AbilityNegativeEffect::Spell(sne) = self {
             for effect in sne.on_hit.iter().flatten().flatten() {
-                if matches!(effect, ApplyEffect::Pushed { .. }) {
-                    return true;
+                if let ApplyEffect::Pushed(amount) = effect {
+                    return Some(*amount);
                 }
             }
         }
-        false
+        None
     }
 }
 

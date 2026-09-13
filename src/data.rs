@@ -981,7 +981,7 @@ pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
 pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
-    description: "Attack fiercely, and regain |<value>2| AP if it kills",
+    description: "Attack with advantage, and regain |<value>2| AP if it kills",
     icon: IconId::Execute,
     action_point_cost: 3,
     mana_cost: 0,
@@ -2007,7 +2007,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
             acquisition: AreaTargetAcquisition::Everyone,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(6, DamageType::Lightning)),
+                damage: Some(AbilityDamage::AtLeast(7, DamageType::Lightning)),
                 on_hit: None,
             })),
         },

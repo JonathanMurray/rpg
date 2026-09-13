@@ -41,10 +41,10 @@ use crate::{
         draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable, Style,
     },
     core::{
-        distance_between, target_within_range_squared, within_range_squared, Ability, AbilityId,
-        AbilityReach, AbilityTarget, ActionReach, ActionTarget, AreaEffect, AreaShape,
-        AttackAction, BaseAction, Character, Goodness, MovementType, Position, TargetPrediction,
-        MOVE_DISTANCE_PER_RESOURCE,
+        distance_between, effective_push_amount, pushed_vector, target_within_range_squared,
+        within_range_squared, Ability, AbilityId, AbilityReach, AbilityTarget, ActionReach,
+        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AttackAction, BaseAction, Character,
+        Goodness, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -2022,10 +2022,58 @@ impl GameGrid {
         }
 
         let mut is_casting = None;
-        if let UiState::ConfiguringAction(ConfiguredAction::UseAbility { ability, .. }) = ui_state {
-            if ability.has_knockback() {
-                self.draw_filled_occupied_cells();
+        if let UiState::ConfiguringAction(ConfiguredAction::UseAbility {
+            ability,
+            selected_enhancements,
+            target,
+            ..
+        }) = ui_state
+        {
+            let mut ability_knockback = ability.knockback();
+
+            for enhancement in selected_enhancements {
+                if let Some(e) = enhancement.spell_effect {
+                    for apply_effect in e.target_on_hit.iter().flatten().flatten() {
+                        if let ApplyEffect::Pushed(amount) = *apply_effect {
+                            ability_knockback = Some(amount);
+                        }
+                    }
+                }
             }
+
+            if let Some(base_push_amount) = ability_knockback {
+                self.draw_filled_occupied_cells();
+
+                if let ActionTarget::Character(target_id, _movement) = target {
+                    let target = &self.characters[target_id];
+                    let mut target_screen_pos = self.character_screen_pos(&target);
+                    target_screen_pos = (
+                        target_screen_pos.0 + self.cell_w / 2.0,
+                        target_screen_pos.1 + self.cell_w / 2.0,
+                    );
+
+                    let push_amount = effective_push_amount(
+                        base_push_amount,
+                        &self.characters[&self.active_character_id],
+                        target,
+                    );
+
+                    let pushed_vec = pushed_vector(active_char_pos, target.pos(), push_amount);
+                    draw_dashed_line_ex(
+                        target_screen_pos,
+                        (
+                            target_screen_pos.0 + self.cell_w * pushed_vec.0 as f32,
+                            target_screen_pos.1 + self.cell_w * pushed_vec.1 as f32,
+                        ),
+                        8.0,
+                        RED,
+                        5.0,
+                        Some((Color::new(0.0, 0.0, 0.0, 0.5), 1.0)),
+                        true,
+                    );
+                }
+            }
+
             // TODO: different graphics for different abilities
             /*
             if ability.id == AbilityId::Fireball {

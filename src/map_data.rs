@@ -521,8 +521,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     //alice.set_weapon(HandType::MainHand, MAGIC_SWORD);
     //alice.learn_ability(&ENEMY_EXPLODING_ARROW);
     //alice.learn_ability(&SHACKLED_MIND);
-    alice.learn_ability(&FIREBALL);
-    alice.learn_ability(&LIGHTNING_BOLT);
+    //alice.learn_ability(&FIREBALL);
+    //alice.learn_ability(&LIGHTNING_BOLT);
 
     let bob = Character::new(
         CharacterKind::Player(Rc::clone(&party), PlayerId::Bob),
@@ -541,8 +541,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
 
-    bob.learn_ability(&EXECUTE);
-    bob.learn_ability_enhancement(EXECUTE_BLOODLUST);
+    //bob.learn_ability(&EXECUTE);
+    //bob.learn_ability_enhancement(EXECUTE_BLOODLUST);
     //bob.learn_passive(PassiveSkill::HardenedSkin);
     ////bob.learn_passive(PassiveSkill::Reaper);
     //bob.set_weapon(HandType::MainHand, ZERO_SWORD);
