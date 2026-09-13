@@ -52,7 +52,10 @@ impl Drawable for ConditionsList {
                 None,
                 &content_lines,
                 &[],
-                Some(Keyword::Cond(condition_info.condition)),
+                Some(Keyword::Cond(
+                    condition_info.condition,
+                    condition_info.stacks,
+                )),
             );
         }
     }

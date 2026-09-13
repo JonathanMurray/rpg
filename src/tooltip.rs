@@ -11,14 +11,14 @@ use macroquad::{
 
 use crate::{
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
-    core::{Condition, Goodness},
+    core::{cond_description_with_populated_stacks, Condition, ConditionInfo, Goodness},
     drawing::draw_rounded_rectangle_lines,
     textures::{draw_status_icon, StatusId},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
-    Cond(Condition),
+    Cond(Condition, Option<u32>),
     Advantage,
     Pushed,
     Graze,
@@ -29,7 +29,7 @@ pub enum Keyword {
 impl Keyword {
     fn name(&self) -> &str {
         match self {
-            Keyword::Cond(condition) => condition.name(),
+            Keyword::Cond(condition, amount) => condition.name(),
             Keyword::Advantage => "Advantage / Disadvantage",
             Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
@@ -38,26 +38,32 @@ impl Keyword {
         }
     }
 
-    fn description(&self) -> &str {
+    fn description(&self) -> String {
         match self {
-            Keyword::Cond(condition) => condition.description(),
-            Keyword::Advantage => "Roll extra dice and take the highest / lowest result",
+            Keyword::Cond(condition, amount) => {
+                if let Some(stacks) = amount {
+                    cond_description_with_populated_stacks(*condition, *stacks)
+                } else{
+                    condition.description().to_string()
+                }
+            },
+            Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
-                "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance."
+                "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
             }
             Keyword::Graze => {
-                "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower."
+                "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower.".to_string()
             }
             Keyword::Crit => {
-                "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers)."
+                "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers).".to_string()
             }
-            Keyword::Flanked => "|<value>30%| chance to |<keyword>Crit|.",
+            Keyword::Flanked => "|<value>30%| chance to |<keyword>Crit|.".to_string(),
         }
     }
 
     fn goodness(&self) -> Goodness {
         match self {
-            Keyword::Cond(condition) => {
+            Keyword::Cond(condition, amount) => {
                 if condition.is_positive() {
                     Goodness::Good
                 } else {
@@ -127,7 +133,7 @@ pub fn draw_tooltip(
     };
 
     let header_status_icon = header_keyword.and_then(|keyword| match keyword {
-        Keyword::Cond(condition) => Some(condition.status_icon()),
+        Keyword::Cond(condition, amount) => Some(condition.status_icon()),
         _ => None,
     });
 
@@ -363,7 +369,8 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
         } else {
             TooltipPositionPreference::At((rect.x, rect.y + rect.h))
         };
-        let content_lines: Vec<&str> = keyword.description().split("\n").collect();
+        let description = keyword.description();
+        let content_lines: Vec<&str> = description.split("\n").collect();
         rect = draw_tooltip(
             font,
             pos_preference,
@@ -380,7 +387,8 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
 
 pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f32) {
     for keyword in keywords {
-        let content_lines: Vec<&str> = keyword.description().split("\n").collect();
+        let description = keyword.description();
+        let content_lines: Vec<&str> = description.split("\n").collect();
         let rect = draw_tooltip(
             font,
             TooltipPositionPreference::At((x, y)),

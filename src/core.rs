@@ -3980,6 +3980,7 @@ impl Display for ApplyEffect {
 pub struct OnAttackedReaction {
     pub id: OnAttackedReactionId,
     pub name: &'static str,
+    pub granted_from: Option<&'static str>,
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,
@@ -4275,15 +4276,19 @@ pub struct ConditionInfo {
 impl ConditionInfo {
     pub fn populated_description(&self) -> String {
         if let Some(stacks) = self.stacks {
-            self.condition
-                .description()
-                .replace("|<value>-x|", &format!("|<value>-{stacks}|"))
-                .replace("|<value>+x|", &format!("|<value>+{stacks}|"))
-                .replace("|<value>x|", &format!("|<value>{stacks}|"))
+            cond_description_with_populated_stacks(self.condition, stacks)
         } else {
             self.condition.description().to_string()
         }
     }
+}
+
+pub fn cond_description_with_populated_stacks(condition: Condition, stacks: u32) -> String {
+    condition
+        .description()
+        .replace("|<value>-x|", &format!("|<value>-{stacks}|"))
+        .replace("|<value>+x|", &format!("|<value>+{stacks}|"))
+        .replace("|<value>x|", &format!("|<value>{stacks}|"))
 }
 
 impl Display for ConditionInfo {
@@ -6223,12 +6228,14 @@ impl Character {
             known.push(*reaction);
         }
         if let Some(weapon) = &self.weapon(HandType::MainHand) {
-            if let Some(reaction) = weapon.on_attacked_reaction {
+            if let Some(mut reaction) = weapon.on_attacked_reaction {
+                reaction.granted_from = Some(weapon.name);
                 known.push(reaction);
             }
         }
         if let Some(shield) = &self.shield() {
-            if let Some(reaction) = shield.on_attacked_reaction {
+            if let Some(mut reaction) = shield.on_attacked_reaction {
+                reaction.granted_from = Some(shield.name);
                 known.push(reaction);
             }
         }

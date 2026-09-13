@@ -462,7 +462,7 @@ impl CharacterUi {
                 "Health |<heart>|",
                 vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>10%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string(),
                 "Being |<heart>| < 20% causes |<keyword>Near-death|.".to_string()],
-                vec![Keyword::Cond(Condition::NearDeath)]
+                vec![Keyword::Cond(Condition::NearDeath, None)]
             ))
         } else if self.stamina_bar.borrow().hovered.get() {
             Some((
@@ -1340,6 +1340,9 @@ impl UserInterface {
                 is_configuring_action = true;
                 self.set_allowed_to_use_action_buttons(true);
 
+                // An interesting idea with a "charging up" sound, but needs better (and non-looping) sound effects
+                //
+                /*
                 if let ConfiguredAction::UseAbility { ability, .. } = configured_action {
                     if ability.id == AbilityId::Fireball {
                         self.sound_player.play_looping(SoundId::FireCrackle);
@@ -1347,6 +1350,7 @@ impl UserInterface {
                         self.sound_player.play_looping(SoundId::MechanicNoise);
                     }
                 }
+                 */
 
                 relevant_action_button = self.character_uis[&self.active_character_id]
                     .tracked_action_buttons
@@ -1419,7 +1423,7 @@ impl UserInterface {
         }
 
         if let Some(reactor) = is_reacting {
-            self.sound_player.play(SoundId::YourTurn);
+            self.sound_player.play(SoundId::ChooseReaction);
 
             //self.target_ui
             //    .set_action("Reaction!".to_string(), vec![], false);
@@ -1552,7 +1556,7 @@ impl UserInterface {
                 let reactor = self.characters.get(reactor);
 
                 self.log.add(format!(
-                    "|{}| makes an opportunity attack:",
+                    "|{}| made an opportunity attack:",
                     reactor.name_tag()
                 ));
                 self.animate_reaction(reactor.pos());

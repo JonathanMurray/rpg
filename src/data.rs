@@ -772,6 +772,7 @@ pub const CRIPPLING_SHOT: AttackEnhancement = AttackEnhancement {
 pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Parry,
     name: "Parry 2",
+    granted_from: None,
     description: "Protect yourself |<faded>(1 melee attack per round)|",
     icon: IconId::Parry,
     action_point_cost: 0,
@@ -789,6 +790,7 @@ pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
 pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Block 3",
+    granted_from: None,
     description: "Protect yourself or adjacent ally |<faded>(1 attack per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
@@ -806,6 +808,7 @@ pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::SideStep,
     name: "Side step",
+    granted_from: None,
     description: "Attempt to dodge an incoming attack",
     icon: IconId::Sidestep,
     action_point_cost: 1,
@@ -2274,10 +2277,10 @@ impl PassiveSkill {
     pub fn keywords(&self) -> &'static [Keyword] {
         use PassiveSkill::*;
         match self {
-            BloodRage => &[Keyword::Cond(Condition::NearDeath)],
-            UnbridledRage => &[Keyword::Cond(Condition::Ferocity)],
-            SwampDweller => &[Keyword::Cond(Condition::Poisoned)],
-            Slasher => &[Keyword::Cond(Condition::Bleeding)],
+            BloodRage => &[Keyword::Cond(Condition::NearDeath, None)],
+            UnbridledRage => &[Keyword::Cond(Condition::Ferocity, None)],
+            SwampDweller => &[Keyword::Cond(Condition::Poisoned, None)],
+            Slasher => &[Keyword::Cond(Condition::Bleeding, None)],
             _ => &[],
         }
     }

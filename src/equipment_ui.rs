@@ -111,11 +111,12 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description.push(format!("On damage: {effect}"));
         if let AttackHitEffect::ApplyTarget(apply_effect) = effect {
             match apply_effect {
-                ApplyEffect::Condition(apply_condition) => {
-                    t.keywords.push(Keyword::Cond(apply_condition.condition))
-                }
+                ApplyEffect::Condition(apply_condition) => t.keywords.push(Keyword::Cond(
+                    apply_condition.condition,
+                    apply_condition.stacks,
+                )),
                 ApplyEffect::ConsumeCondition { condition } => {
-                    t.keywords.push(Keyword::Cond(condition))
+                    t.keywords.push(Keyword::Cond(condition, None))
                 }
                 _ => {}
             }

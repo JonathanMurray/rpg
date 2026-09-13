@@ -494,7 +494,7 @@ impl PlayerPortraits {
                     None,
                     &content_lines,
                     &[],
-                    Some(Keyword::Cond(info.condition)),
+                    Some(Keyword::Cond(info.condition, None)),
                 );
             }
         }

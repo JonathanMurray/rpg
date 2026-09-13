@@ -112,7 +112,7 @@ pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
     // If any of the tooltip's keywords mention other keywords, add them as well
     let mut additional_keywords = HashSet::new();
     for keyword in &tooltip.keywords {
-        if let Keyword::Cond(condition) = keyword {
+        if let Keyword::Cond(condition, amount) = keyword {
             for k in condition.related_keywords().into_iter().flatten() {
                 additional_keywords.insert(k);
             }
@@ -162,12 +162,19 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
         ));
     }
 
+    let mut header = reaction.name.to_string();
+    if let Some(granted_from) = reaction.granted_from {
+        header.push_str(&format!(" ({})", granted_from));
+    }
+
+    let header = format!(
+        "{} {}",
+        header,
+        cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+    );
+
     Tooltip {
-        header: format!(
-            "{} {}",
-            reaction.name,
-            cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
-        ),
+        header,
         description: Some(reaction.description),
         error: None,
         technical_description,
@@ -291,7 +298,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
                 format!("{} ", x.den)
             }
         ));
-        t.keywords.push(Keyword::Cond(condition));
+        t.keywords.push(Keyword::Cond(condition, None));
     }
 
     if effect.armor_penetration > 0 {
@@ -479,7 +486,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 line.push_str(&format!(" for |<value>{}| rounds", rounds));
             }
             t.technical_description.push(line);
-            t.keywords.push(Keyword::Cond(apply_condition.condition));
+            t.keywords.push(Keyword::Cond(
+                apply_condition.condition,
+                apply_condition.stacks,
+            ));
         }
         ApplyEffect::PerBleeding {
             damage,
@@ -494,7 +504,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             let line = format!("  Removes |<keyword>{}|", condition.name());
 
             t.technical_description.push(line);
-            t.keywords.push(Keyword::Cond(condition));
+            t.keywords.push(Keyword::Cond(condition, None));
         }
         ApplyEffect::Pushed(amount) => {
             t.technical_description
@@ -652,10 +662,10 @@ fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
             t.technical_description
                 .push(format!("  Surrounding {} becomes {}", from, to));
             if [from, to].contains(&Liquid::Poison) {
-                t.keywords.push(Keyword::Cond(Condition::Poisoned));
+                t.keywords.push(Keyword::Cond(Condition::Poisoned, None));
             }
             if [from, to].contains(&Liquid::Water) {
-                t.keywords.push(Keyword::Cond(Condition::Wet));
+                t.keywords.push(Keyword::Cond(Condition::Wet, None));
             }
         }
     }
