@@ -1835,11 +1835,12 @@ pub const HEALING_RAIN: Ability = Ability {
 pub const DASH: Ability = Ability {
     id: AbilityId::Dash,
     name: "Dash",
-    description: "Move a bit",
+    description:
+        "Move swiftly in a straight line, without triggering opportunity attacks from enemies.",
     icon: IconId::Move,
-    action_point_cost: 0, //1,
+    action_point_cost: 1,
     mana_cost: 0,
-    stamina_cost: 0, //2,
+    stamina_cost: 2,
     requirement: None,
 
     roll: None,

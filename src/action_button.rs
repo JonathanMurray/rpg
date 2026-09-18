@@ -434,9 +434,9 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
-                "Move a limited distance for free every turn. Spend X stamina |<stamina>| or AP to move further.",
+                "Move a limited distance for free every turn. Spend AP to move further.",
             ),
-            technical_description: vec!["|<boot>||<stat>Move| + 4X".to_string()],
+            //technical_description: vec!["|<boot>||<stat>Move| + 4X".to_string()],
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {
@@ -659,8 +659,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
         }
 
         AbilityTarget::Destination { range } => {
-            t.technical_description
-                .push("TODO: describe ability target position".to_string());
+            t.technical_description.push(format!("range {range}"));
         }
     };
 

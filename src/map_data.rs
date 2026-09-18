@@ -515,6 +515,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
      */
 
     alice.armor_piece.set(Some(SHIRT));
+    alice.learn_ability(&DASH);
     alice.learn_ability(&INSPIRE);
 
     // TODO
@@ -536,11 +537,9 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.set_weapon(HandType::MainHand, SWORD);
     bob.set_shield(SMALL_SHIELD);
     bob.armor_piece.set(Some(DRUID_COAT));
+    bob.learn_ability(&DASH);
     bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
-    bob.learn_ability(&DASH);
-    bob.learn_ability(&PIERCING_SHOT);
-    bob.learn_ability(&INFLICT_WOUNDS);
 
     // TODO
 
@@ -569,6 +568,7 @@ pub fn make_medium_clara(party: &Rc<Party>) -> Character {
     clara.set_weapon(HandType::MainHand, STAFF);
     // TODO:
     clara.armor_piece.set(Some(SHIRT));
+    clara.learn_ability(&DASH);
     clara.learn_ability(&FIREBALL);
     clara.learn_ability_enhancement(FIREBALL_REACH);
     clara.learn_ability(&LIGHTNING_BOLT);

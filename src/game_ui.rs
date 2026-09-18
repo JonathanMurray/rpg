@@ -2154,6 +2154,9 @@ impl UserInterface {
 
         let delay = attack_index as f64 * 0.1;
 
+        let target_pos = self.characters.get(target).pos();
+        let attacker_pos = self.characters.get(attacker).pos();
+
         if event.outcome.hit_type == HitType::Miss {
             self.sound_player.play_delayed(SoundId::AttackMiss, delay);
         } else if event.outcome.damage == 0 {
@@ -2167,6 +2170,14 @@ impl UserInterface {
             }
             if matches!(event.outcome.hit_type, HitType::Critical) {
                 self.sound_player.play_delayed(SoundId::Crit, delay + 0.02);
+                self.game_grid.add_text_effect(
+                    target_pos,
+                    0.0,
+                    1.0,
+                    None,
+                    "Critical Hit!",
+                    TextEffectStyle::CriticalHitLabel,
+                );
             }
             self.sound_player
                 .play_delayed(self.characters.get(target).damage_sound, delay + 0.03);
@@ -2205,9 +2216,6 @@ impl UserInterface {
 
         self.log.add_with_details(line, detail_lines);
 
-        let target_pos = self.characters.get(target).pos();
-        let attacker_pos = self.characters.get(attacker).pos();
-
         let (impact_text, text_style) = match event.outcome {
             AttackOutcome {
                 damage,
@@ -2232,7 +2240,7 @@ impl UserInterface {
         };
 
         self.game_grid
-            .add_text_effect(target_pos, 0.0, 1.0, None, impact_text, text_style);
+            .add_text_effect(target_pos, 0.0, 1.5, None, impact_text, text_style);
 
         if !applied_to_target.is_empty() {
             let mut s = String::new();
@@ -2264,7 +2272,7 @@ impl UserInterface {
                     self.game_grid.add_text_effect(
                         attacker_pos,
                         0.0,
-                        1.0,
+                        1.5,
                         texture,
                         format!("{}", amount),
                         TextEffectStyle::HostileHit,
@@ -2326,8 +2334,16 @@ impl UserInterface {
                     );
                     if hit_type == &HitType::Miss {
                         effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0));
+                    } else if hit_type == &HitType::Critical {
+                        effects.push((
+                            None,
+                            "Critical Hit!".to_string(),
+                            TextEffectStyle::CriticalHitLabel,
+                            1.0,
+                        ));
+                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileCrit, 1.5));
                     } else {
-                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.0));
+                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.5));
                     }
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
@@ -2343,9 +2359,12 @@ impl UserInterface {
                         HitType::Regular | HitType::Strong => {
                             (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
                         }
-                        HitType::Critical => {
-                            (None, "Crit".to_string(), TextEffectStyle::HostileCrit, 1.0)
-                        }
+                        HitType::Critical => (
+                            None,
+                            "Critical Hit!".to_string(),
+                            TextEffectStyle::CriticalHitLabel,
+                            1.0,
+                        ),
                     };
                     effects.push(effect);
                 }
@@ -2394,14 +2413,14 @@ impl UserInterface {
         };
 
         let mut effect_start_time = start_time;
-        for (texture, target_text, goodness, duration) in effects {
+        for (texture, target_text, style, duration) in effects {
             self.game_grid.add_text_effect(
                 target_pos,
                 effect_start_time,
                 duration,
                 texture,
                 target_text,
-                goodness,
+                style,
             );
             effect_start_time += 0.35;
         }

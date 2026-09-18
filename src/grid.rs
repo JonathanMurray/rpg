@@ -20,7 +20,7 @@ use macroquad::{
     time::get_time,
     window::{screen_height, screen_width},
 };
-use rand::{random_range, Rng};
+use rand::{random, random_range, Rng};
 use serde::{Deserialize, Serialize};
 
 use std::cell::Cell;
@@ -219,6 +219,7 @@ pub enum TextEffectStyle {
     HostileGraze,
     HostileHit,
     HostileCrit,
+    CriticalHitLabel,
 }
 
 struct ParticleGroup {
@@ -1264,9 +1265,23 @@ impl GameGrid {
                 background = true;
                 ORANGE
             }
+            TextEffectStyle::CriticalHitLabel => {
+                font_size = 24;
+                rise_indefinitely = false;
+                RED
+            }
             TextEffectStyle::HostileGraze => LIGHTGRAY,
             TextEffectStyle::HostileHit => rgb(201, 226, 118),
             TextEffectStyle::HostileCrit => rgb(201, 226, 118),
+        };
+
+        let random_movement = if rise_indefinitely {
+            Some((
+                rng.random_range(-1.0..1.0) * 30.0,
+                rng.random_range(0.0..1.0) * 40.0,
+            ))
+        } else {
+            None
         };
 
         let effect = ConcreteEffect {
@@ -1281,7 +1296,7 @@ impl GameGrid {
                     font: font.clone(),
                     font_size,
                     color,
-                    rise_indefinitely,
+                    random_movement,
                     background,
                 }),
             ),
@@ -4683,7 +4698,7 @@ pub struct TextEffect {
     font: Font,
     font_size: u16,
     color: Color,
-    rise_indefinitely: bool,
+    random_movement: Option<(f32, f32)>,
     background: bool,
 }
 
@@ -4764,7 +4779,7 @@ impl EffectGraphics {
                 font,
                 font_size,
                 color,
-                rise_indefinitely,
+                random_movement,
                 background,
             }) => {
                 //let font_size = 20;
@@ -4772,22 +4787,27 @@ impl EffectGraphics {
                 let text_dimensions =
                     measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
 
-                let grow_duration = 0.25;
+                let quick_rise_duration = 0.0;
+                let grow_duration = 0.15;
 
                 let font_scale = if effect.age < grow_duration {
-                    1.0 * effect.age / grow_duration
+                    0.5 + 0.5 * effect.age / grow_duration
                 } else {
                     1.0
                 };
 
-                let x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
+                let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
 
-                let y_offset = if *rise_indefinitely {
-                    t * cell_w * 2.0
-                } else if t < 0.3 {
-                    t / 0.3 * cell_w
+                if let Some(movement) = random_movement {
+                    x0 += t * movement.0;
+                }
+
+                let y_offset = if let Some(movement) = random_movement {
+                    t * movement.1
+                } else if t < quick_rise_duration {
+                    t / quick_rise_duration * cell_w * 2.0
                 } else {
-                    cell_w
+                    cell_w * 2.0
                 };
 
                 let y0 = y - cell_w - y_offset;
