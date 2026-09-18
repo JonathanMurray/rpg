@@ -3174,7 +3174,6 @@ impl GameGrid {
 
         if inspect_target != self.prev_inspect_target {
             outcome.switched_inspect_target = Some(inspect_target);
-            dbg!("NEW INSPECT TARGET: {:?}", inspect_target);
             self.prev_inspect_target = inspect_target;
         }
 

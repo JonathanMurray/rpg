@@ -129,7 +129,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         .with_tooltip(
             font.clone(),
             "Movement |<boot>|",
-            vec!["Move this far every turn without spending stamina |<stamina>|.".to_string()],
+            vec!["You can move this far every turn without spending AP.".to_string()],
             vec![],
         ),
     );

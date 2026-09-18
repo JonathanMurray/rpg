@@ -1675,6 +1675,7 @@ impl UserInterface {
                             applied_effects,
                             ..
                         } => {
+                            missed = matches!(hit_type, HitType::Miss);
                             if let Some(dmg) = damage {
                                 line.push_str(&format!(" (|<value>{}| damage)", dmg))
                             } else if applied_effects.is_empty() {
@@ -1689,10 +1690,6 @@ impl UserInterface {
                             } else if applied_effects.len() == 1 {
                                 line.push_str(&format!("  ({})", applied_effects[0]));
                             }
-                        }
-                        AbilityTargetOutcome::Missed => {
-                            missed = true;
-                            line.push_str(" (miss)");
                         }
                         AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                             if applied_effects.len() == 1 {
@@ -2319,6 +2316,8 @@ impl UserInterface {
     ) {
         let mut effects = vec![];
 
+        dbg!(outcome);
+
         match &outcome {
             AbilityTargetOutcome::HitEnemy {
                 damage,
@@ -2327,29 +2326,44 @@ impl UserInterface {
                 actual_health_lost,
             } => {
                 if let Some(dmg) = damage {
-                    self.animate_character_damage(target, *actual_health_lost);
-                    self.sound_player.play_delayed(
-                        self.characters.get(target).damage_sound,
-                        start_time as f64 + 0.03,
-                    );
                     if hit_type == &HitType::Miss {
                         effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0));
-                    } else if hit_type == &HitType::Critical {
-                        effects.push((
-                            None,
-                            "Critical Hit!".to_string(),
-                            TextEffectStyle::CriticalHitLabel,
-                            1.0,
-                        ));
-                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileCrit, 1.5));
                     } else {
-                        effects.push((None, format!("{}", dmg), TextEffectStyle::HostileHit, 1.5));
+                        self.animate_character_damage(target, *actual_health_lost);
+                        self.sound_player.play_delayed(
+                            self.characters.get(target).damage_sound,
+                            start_time as f64 + 0.03,
+                        );
+                        if hit_type == &HitType::Critical {
+                            effects.push((
+                                None,
+                                "Critical Hit!".to_string(),
+                                TextEffectStyle::CriticalHitLabel,
+                                1.0,
+                            ));
+                            effects.push((
+                                None,
+                                format!("{}", dmg),
+                                TextEffectStyle::HostileCrit,
+                                1.5,
+                            ));
+                        } else {
+                            effects.push((
+                                None,
+                                format!("{}", dmg),
+                                TextEffectStyle::HostileHit,
+                                1.5,
+                            ));
+                        }
                     }
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
-                        HitType::Miss => {
-                            (None, "Miss".to_string(), TextEffectStyle::HostileGraze, 1.0)
-                        }
+                        HitType::Miss => (
+                            None,
+                            "Miss!".to_string(),
+                            TextEffectStyle::HostileGraze,
+                            1.0,
+                        ),
                         HitType::Weak => (
                             None,
                             "Graze".to_string(),
@@ -2385,9 +2399,6 @@ impl UserInterface {
                         ));
                     }
                 };
-            }
-            AbilityTargetOutcome::Missed => {
-                effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0))
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                 dbg!(applied_effects);

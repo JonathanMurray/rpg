@@ -169,6 +169,7 @@ pub enum IconId {
     Block,
     Brace,
     Move,
+    Dash,
 
     Scream,
     Mindblast,
@@ -987,6 +988,7 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::DraugHaunt => (8, 2),
         IconId::SwampDweller => (9, 2),
         IconId::Move => (0, 4),
+        IconId::Dash => (1, 5),
         IconId::Scream => (6, 1),
         IconId::Mindblast => (7, 1),
         IconId::NecroticInfluence => (1, 1),

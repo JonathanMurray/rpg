@@ -1546,7 +1546,7 @@ pub const HEAL: Ability = Ability {
     target: AbilityTarget::Ally {
         range: Range::Float(9.5),
         effect: AbilityPositiveEffect {
-            healing: 3,
+            healing: 5,
             apply: Some([
                 Some(ApplyEffect::ConsumeCondition {
                     condition: Condition::Bleeding,
@@ -1626,7 +1626,7 @@ pub const INSPIRE: Ability = Ability {
     description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 2,
-    mana_cost: 1,
+    mana_cost: 2,
     stamina_cost: 0,
     requirement: None,
 
@@ -1837,16 +1837,15 @@ pub const DASH: Ability = Ability {
     name: "Dash",
     description:
         "Move swiftly in a straight line, without triggering opportunity attacks from enemies.",
-    icon: IconId::Move,
+    icon: IconId::Dash,
     action_point_cost: 1,
     mana_cost: 0,
     stamina_cost: 2,
     requirement: None,
-
     roll: None,
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Destination {
-        range: Range::Float(10.0),
+        range: Range::Float(12.0),
     },
     animation_color: RED,
     initiate_sound: None,

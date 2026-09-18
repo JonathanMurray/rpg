@@ -430,8 +430,8 @@
     {
       "type_": "Bob",
       "pos": [
-        6,
-        25
+        9,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -443,6 +443,28 @@
       "pos": [
         12,
         19
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        14,
+        28
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        15,
+        17
       ],
       "health": null,
       "main_hand": null,

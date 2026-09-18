@@ -299,7 +299,7 @@ impl TargetUi {
             ];
 
             if !char.player_controlled() {
-                let mut stats_text = format!("|<boot>| {:.1}", char.free_movement());
+                let mut stats_text = format!("|<boot>| {:.1}", char.free_movement_per_turn());
                 if char.weapon(HandType::MainHand).is_some() {
                     stats_text.push_str(&format!(
                         "   |<sword>| {}   |<red_dice>| {}   |<helmet>| {}",
