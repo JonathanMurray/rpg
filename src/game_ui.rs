@@ -28,13 +28,13 @@ use crate::{
     character_sheet::{CharacterSheet, CHARACTER_SHEET_BG_COLOR},
     conditions_ui::ConditionsList,
     core::{
-        predict_ability, predict_attack, Ability, AbilityAreaOutcome, AbilityEnhancement,
-        AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget, AbilityTargetOutcome,
-        Action, ActionReach, ActionTarget, ApplyEffect, AreaShape, AttackAction, AttackEnhancement,
-        AttackEnhancementEffect, AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId,
-        Characters, Condition, CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType,
-        MovementType, OnAttackedReaction, OnHitReaction, Position, TargetPrediction,
-        MOVE_COST_FACTOR_IN_LIQUID,
+        distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
+        AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
+        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
+        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource,
+        GameEvent, GameOverType, HandType, HitType, MovementType, OnAttackedReaction,
+        OnHitReaction, Position, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     drawing::draw_dashed_line_ex,
     equipment_ui::{EquipmentConsumption, EquipmentDrag},
@@ -260,7 +260,10 @@ impl ConfiguredAction {
                 }
 
                 ActionTarget::Position(target_pos) => {
-                    assert!(matches!(ability.target, AbilityTarget::Area { .. }));
+                    assert!(matches!(
+                        ability.target,
+                        AbilityTarget::Area { .. } | AbilityTarget::Destination { .. }
+                    ));
                     if relevant_character.reaches_with_ability(
                         ability,
                         selected_enhancements,
@@ -277,6 +280,7 @@ impl ConfiguredAction {
                     AbilityTarget::Enemy { .. } => Some("Select an enemy"),
                     AbilityTarget::Ally { .. } => Some("Select an ally"),
                     AbilityTarget::Area { .. } => Some("Select an area"),
+                    AbilityTarget::Destination { .. } => Some("Select a destination"),
                 },
             },
 
@@ -1902,11 +1906,13 @@ impl UserInterface {
                 step_idx,
                 liquid,
             } => {
-                let mut duration = if self.faster_movement.get() {
+                let base_duration = if self.faster_movement.get() {
                     0.07
                 } else {
                     0.14
                 };
+
+                let mut duration = base_duration;
 
                 if from.0 != to.0 || from.1 != to.1 {
                     // diagonal takes longer
@@ -1914,15 +1920,24 @@ impl UserInterface {
                 }
 
                 if movement_type == MovementType::AbilityEngage {
-                    // Lunge attack for example must reasonably be faster than regular movement
+                    // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid
                     duration *= 0.7;
                 } else if liquid.is_some() {
                     duration *= MOVE_COST_FACTOR_IN_LIQUID;
                 }
 
+                if movement_type == MovementType::Dash {
+                    // Dash makes an immediate jump between two positions that aren't necessarily adjacent,
+                    let dist = distance_between(from, to);
+                    // Dash should appear significantly faster than regular movement
+                    duration = base_duration * dist * 0.5;
+                }
+
                 self.game_grid
                     .set_character_motion(character, from, to, duration, movement_type);
-                if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
+                if movement_type == MovementType::Dash {
+                    self.sound_player.play(SoundId::Dash);
+                } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
                     if liquid.is_some() {
                         self.sound_player.play(SoundId::WalkWater);
                     } else {

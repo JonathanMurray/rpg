@@ -1287,7 +1287,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
     description: "Deal damage and cause |<keyword>Bleeding| in an area",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
-    mana_cost: 1,
+    mana_cost: 0, // TODO: 1,
     stamina_cost: 0,
     requirement: None,
 
@@ -1830,6 +1830,27 @@ pub const HEALING_RAIN: Ability = Ability {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
     }),
+};
+
+pub const DASH: Ability = Ability {
+    id: AbilityId::Dash,
+    name: "Dash",
+    description: "Move a bit",
+    icon: IconId::Move,
+    action_point_cost: 0, //1,
+    mana_cost: 0,
+    stamina_cost: 0, //2,
+    requirement: None,
+
+    roll: None,
+    possible_enhancements: [None, None, None],
+    target: AbilityTarget::Destination {
+        range: Range::Float(10.0),
+    },
+    animation_color: RED,
+    initiate_sound: None,
+    resolve_sound: None,
+    charge_fx: None,
 };
 
 pub const PIERCING_SHOT: Ability = Ability {

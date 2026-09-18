@@ -12,7 +12,7 @@ use crate::{
     },
     data::{
         BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, CHAIN_MAIL,
-        DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE,
+        DASH, DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE,
         ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
         HULDRA_HEAL, HULDRA_INFECT, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK,
         SLASHING_RAPIER, SMALL_SHIELD, STAFF,
@@ -538,6 +538,9 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.armor_piece.set(Some(DRUID_COAT));
     bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    bob.learn_ability(&DASH);
+    bob.learn_ability(&PIERCING_SHOT);
+    bob.learn_ability(&INFLICT_WOUNDS);
 
     // TODO
 

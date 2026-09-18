@@ -8,6 +8,7 @@ use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
+use macroquad::miniquad::CursorIcon::Move;
 use rand::Rng;
 
 use crate::bot::BotBehaviour;
@@ -1213,31 +1214,33 @@ impl CoreGame {
     }
 
     async fn perform_ability(
-        caster: &Rc<Character>,
+        actor: &Rc<Character>,
         ability: &'static Ability,
         enhancements: &[AbilityEnhancement],
         selected_target: &ActionTarget,
         mode: ActionPerformanceMode<'_>,
     ) -> Vec<AbilityResolvedEvent> {
+        /*
         println!(
             "perform_ability {}, real={:?}",
             ability.name,
             matches!(mode, ActionPerformanceMode::Real(..))
         );
+         */
 
-        let caster_id = caster.id();
+        let actor_id = actor.id();
 
         let real_game: Option<&CoreGame> = mode.real_game();
         let simulated_roll = mode.simulated_roll();
 
         if real_game.is_some() {
-            caster.action_points.spend(ability.action_point_cost);
-            caster.spend_mana(ability.mana_cost);
-            caster.stamina.spend(ability.stamina_cost);
+            actor.action_points.spend(ability.action_point_cost);
+            actor.spend_mana(ability.mana_cost);
+            actor.stamina.spend(ability.stamina_cost);
             for enhancement in enhancements {
-                caster.action_points.spend(enhancement.action_point_cost);
-                caster.spend_mana(enhancement.mana_cost);
-                caster.stamina.spend(enhancement.stamina_cost);
+                actor.action_points.spend(enhancement.action_point_cost);
+                actor.spend_mana(enhancement.mana_cost);
+                actor.stamina.spend(enhancement.stamina_cost);
             }
         }
 
@@ -1281,7 +1284,7 @@ impl CoreGame {
                 let mut roll_calculation = unmodified_roll as i32;
                 match roll_type {
                     AbilityRollType::Spell => {
-                        let modifier = caster.spell_modifier() as i32;
+                        let modifier = actor.spell_modifier() as i32;
                         roll_calculation += modifier;
                         dice_roll_line.push_str(&format!(
                             " {} (|<blue_dice>| |<stat>Spell|)",
@@ -1310,7 +1313,7 @@ impl CoreGame {
                         });
                     }
                     AbilityRollType::RollAbilityWithAttackModifier => {
-                        let modifier = caster.attack_modifier(HandType::MainHand) as i32;
+                        let modifier = actor.attack_modifier(HandType::MainHand) as i32;
                         roll_calculation += modifier;
                         dice_roll_line
                             .push_str(&format!(" +{} (|<red_dice>| |<stat>Attack|)", modifier));
@@ -1360,7 +1363,7 @@ impl CoreGame {
                         if let Some(positions) = movement {
                             if let Err(e) = game
                                 .perform_movement(
-                                    caster.id(),
+                                    actor.id(),
                                     positions.clone(),
                                     MovementType::AbilityEngage,
                                 )
@@ -1374,13 +1377,13 @@ impl CoreGame {
                     let target = mode.characters().get_rc(*target_id);
 
                     if let Some(game) = real_game {
-                        assert!(caster.reaches_with_ability(ability, enhancements, target.pos()));
+                        assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
                         assert!(!game
                             .pathfind_grid
-                            .obstructed_line_of_sight(caster.pos(), target.pos()));
-                        caster.set_facing_toward(target.pos());
+                            .obstructed_line_of_sight(actor.pos(), target.pos()));
+                        actor.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
-                            actor: caster_id,
+                            actor: actor_id,
                             ability: ability.clone(),
                             target: Some(*target_id),
                             area_at: None,
@@ -1445,7 +1448,7 @@ impl CoreGame {
                         target_outcome = Some((*target_id, AbilityTargetOutcome::Missed));
                     } else {
                         let outcome = Self::perform_ability_enemy_effect(
-                            caster,
+                            actor,
                             ability.name,
                             &ability_roll,
                             enhancements,
@@ -1467,7 +1470,7 @@ impl CoreGame {
                             "AoE",
                             ability_roll,
                             enhancements,
-                            caster,
+                            actor,
                             target.position.get(),
                             &mut detail_lines,
                             area_effect,
@@ -1486,7 +1489,7 @@ impl CoreGame {
                 }
 
                 AbilityTarget::Ally { range: _, effect } => {
-                    let ActionTarget::Character(target_id, movement) = &selected_target else {
+                    let ActionTarget::Character(target_id, _movement) = &selected_target else {
                         unreachable!()
                     };
 
@@ -1502,13 +1505,13 @@ impl CoreGame {
                         detail_lines.push(format!("Fortune: {}", degree_of_success));
                     }
                     if let Some(game) = real_game {
-                        assert!(caster.reaches_with_ability(ability, enhancements, target.pos()));
+                        assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
                         assert!(!game
                             .pathfind_grid
-                            .obstructed_line_of_sight(caster.pos(), target.pos()));
-                        caster.set_facing_toward(target.pos());
+                            .obstructed_line_of_sight(actor.pos(), target.pos()));
+                        actor.set_facing_toward(target.pos());
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
-                            actor: caster_id,
+                            actor: actor_id,
                             ability: ability.clone(),
                             target: Some(*target_id),
                             area_at: None,
@@ -1536,15 +1539,15 @@ impl CoreGame {
                     let target_pos = selected_target.unwrap_position();
 
                     if let Some(game) = real_game {
-                        assert!(caster.reaches_with_ability(ability, enhancements, target_pos));
+                        assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
                         // TODO:
                         // assertion failed: !game.pathfind_grid.obstructed_line_of_sight(caster.pos(), target_pos)
                         assert!(!game
                             .pathfind_grid
-                            .obstructed_line_of_sight(caster.pos(), target_pos));
-                        caster.set_facing_toward(target_pos);
+                            .obstructed_line_of_sight(actor.pos(), target_pos));
+                        actor.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
-                            actor: caster_id,
+                            actor: actor_id,
                             ability: ability.clone(),
                             target: None,
                             area_at: Some((area_effect.shape, target_pos)),
@@ -1564,7 +1567,7 @@ impl CoreGame {
                         ability.name,
                         ability_roll,
                         enhancements,
-                        caster,
+                        actor,
                         target_pos,
                         area_effect,
                         &mut detail_lines,
@@ -1578,6 +1581,23 @@ impl CoreGame {
                     });
                 }
 
+                AbilityTarget::Destination { .. } => {
+                    if let Some(game) = real_game {
+                        dbg!(selected_target);
+                        let destination = selected_target.unwrap_position();
+                        let positions = vec![actor.pos(), destination];
+
+                        if let Err(e) = game
+                            .perform_movement(actor_id, positions, MovementType::Dash)
+                            .await
+                        {
+                            dbg!(e);
+                        }
+                    } else {
+                        //println!("simulating ability with positional target");
+                    }
+                }
+
                 AbilityTarget::None {
                     self_area,
                     self_effect,
@@ -1585,7 +1605,7 @@ impl CoreGame {
                 } => {
                     if let Some(game) = real_game {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
-                            actor: caster_id,
+                            actor: actor_id,
                             ability: ability.clone(),
                             target: None,
                             area_at: None,
@@ -1619,12 +1639,12 @@ impl CoreGame {
                             ability.name,
                             enhancements,
                             effect,
-                            caster,
+                            actor,
                             &mut detail_lines,
                             degree_of_success as u32,
                             mode,
                         );
-                        target_outcome = Some((caster_id, outcome));
+                        target_outcome = Some((actor_id, outcome));
                     }
 
                     if let Some(area_effect) = self_area {
@@ -1634,14 +1654,14 @@ impl CoreGame {
                             ability.name,
                             ability_roll,
                             enhancements,
-                            caster,
-                            caster.position.get(),
+                            actor,
+                            actor.position.get(),
                             area_effect,
                             &mut detail_lines,
                             mode,
                         );
                         area_outcome = Some(AbilityAreaOutcome {
-                            center: caster.position.get(),
+                            center: actor.position.get(),
                             targets: outcomes,
                             shape: area_effect.shape,
                         });
@@ -1651,7 +1671,7 @@ impl CoreGame {
                         if let Some(game) = real_game {
                             game.perform_environment_effect(
                                 env_effect,
-                                caster.pos(),
+                                actor.pos(),
                                 &mut detail_lines,
                             )
                             .await;
@@ -1661,7 +1681,7 @@ impl CoreGame {
             };
 
             if i < cast_n_times - 1 {
-                detail_lines.push(format!("|{}| cast again!", caster.name_tag()))
+                detail_lines.push(format!("|{}| cast again!", actor.name_tag()))
             }
 
             if let Some((target_id, outcome)) = &target_outcome {
@@ -1677,10 +1697,8 @@ impl CoreGame {
                 }
             }
 
-            let caster_id = caster.id();
-
             let resolve_event = AbilityResolvedEvent {
-                actor: caster_id,
+                actor: actor_id,
                 target_outcome,
                 area_outcome,
                 ability,
@@ -3241,6 +3259,7 @@ pub enum MovementType {
     Regular,
     AbilityEngage,
     KnockedBack,
+    Dash,
 }
 
 #[derive(Copy, Clone)]
@@ -4695,6 +4714,7 @@ impl Ability {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
             AbilityTarget::Area { .. } => true,
+            AbilityTarget::Destination { .. } => true,
             AbilityTarget::None { .. } => false,
         }
     }
@@ -4724,6 +4744,7 @@ pub enum AbilityId {
     ShackledMind,
     MindBlast,
     InflictWounds,
+    Dash,
     PiercingShot,
     Heal,
     HealingNova,
@@ -4861,6 +4882,10 @@ pub enum AbilityTarget {
         area_effect: AreaEffect,
     },
 
+    Destination {
+        range: Range,
+    },
+
     None {
         self_area: Option<AreaEffect>,
         self_effect: Option<AbilityPositiveEffect>,
@@ -4905,6 +4930,7 @@ impl AbilityTarget {
             AbilityTarget::Enemy { .. } => true,
             AbilityTarget::Ally { .. } => true,
             AbilityTarget::Area { .. } => false,
+            AbilityTarget::Destination { .. } => false,
             AbilityTarget::None { .. } => false,
         }
     }
@@ -4917,6 +4943,7 @@ impl AbilityTarget {
             },
             AbilityTarget::Ally { range, .. } => Some(*range),
             AbilityTarget::Area { range, .. } => Some(*range),
+            AbilityTarget::Destination { range } => Some(*range),
             AbilityTarget::None { .. } => None,
         }
     }
@@ -5198,7 +5225,8 @@ impl Attributes {
     }
 
     fn move_speed(&self) -> f32 {
-        6.0 + self.agility.get() as f32 * 0.5
+        self.agility.get() as f32 * 0.5
+        //6.0 + self.agility.get() as f32 * 0.5
     }
 
     fn max_health(&self) -> u32 {
@@ -6087,6 +6115,9 @@ impl Character {
                 target_within_range_squared(range.squared(), self.position.get(), target_pos)
             }
             AbilityTarget::Area { .. } => {
+                within_range_squared(range.squared(), self.position.get(), target_pos)
+            }
+            AbilityTarget::Destination { .. } => {
                 within_range_squared(range.squared(), self.position.get(), target_pos)
             }
             AbilityTarget::None { .. } => {

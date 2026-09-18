@@ -657,6 +657,11 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
         AbilityTarget::Area { range, area_effect } => {
             describe_area_effect(Some(range), area_effect, &mut t)
         }
+
+        AbilityTarget::Destination { range } => {
+            t.technical_description
+                .push("TODO: describe ability target position".to_string());
+        }
     };
 
     t
