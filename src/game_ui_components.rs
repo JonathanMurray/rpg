@@ -5,7 +5,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{SKYBLUE, YELLOW},
+    color::{MAGENTA, SKYBLUE, YELLOW},
     input::{is_key_pressed, KeyCode},
     math::Rect,
     shapes::{draw_triangle, draw_triangle_lines},
@@ -950,6 +950,12 @@ impl Log {
     }
 }
 
+struct ApLostAnimation {
+    ap: u32,
+    age: f32,
+    max_age: f32,
+}
+
 struct ApGainAnimation {
     total_gain: u32,
     gained_so_far: u32,
@@ -969,6 +975,7 @@ pub struct ActionPointsRow {
     radius_factor: f32,
     pub hovered: Cell<bool>,
     gain_animation: Option<ApGainAnimation>,
+    recently_lost_animation: Option<ApLostAnimation>,
 }
 
 impl ActionPointsRow {
@@ -984,6 +991,7 @@ impl ActionPointsRow {
             style,
             hovered: Cell::new(false),
             gain_animation: None,
+            recently_lost_animation: None,
         }
     }
 
@@ -993,6 +1001,14 @@ impl ActionPointsRow {
             gained_so_far: 0,
             duration_per_ap: duration / total_gain as f32,
             age: 0.0,
+        });
+    }
+
+    pub fn animate_lost(&mut self, lost: u32, age: f32, max_age: f32) {
+        self.recently_lost_animation = Some(ApLostAnimation {
+            ap: lost,
+            age,
+            max_age,
         });
     }
 
@@ -1018,6 +1034,13 @@ impl ActionPointsRow {
                 self.gain_animation = None;
             }
         }
+
+        if let Some(animation) = &mut self.recently_lost_animation {
+            animation.age += elapsed;
+            if animation.age > animation.max_age {
+                self.recently_lost_animation = None;
+            }
+        }
     }
 }
 
@@ -1038,6 +1061,12 @@ impl Drawable for ActionPointsRow {
 
         let (reserved_ap, hovered_ap) = self.reserved_and_hovered_ap;
 
+        let num_recently_lost = self
+            .recently_lost_animation
+            .as_ref()
+            .map(|a| a.ap)
+            .unwrap_or(0);
+
         for i in 0..self.max_ap as i32 {
             let is_point_hovered = if hovered_ap >= 0 {
                 ((self.current_ap as i32).saturating_sub(hovered_ap)..(self.current_ap as i32))
@@ -1050,6 +1079,7 @@ impl Drawable for ActionPointsRow {
             let mut reserved = false;
             let mut available = false;
             let mut missing = false;
+            let mut recently_lost = false;
 
             let mut currently_animated = None;
             if let Some(animation) = &self.gain_animation {
@@ -1062,10 +1092,14 @@ impl Drawable for ActionPointsRow {
                     available = true;
                 } else if i < self.current_ap as i32 {
                     reserved = true;
-                } else if (i) < (reserved_ap).max(hovered_ap) {
+                } else if i < (reserved_ap).max(hovered_ap) {
                     overcomitted = true;
                 } else {
                     missing = true;
+
+                    if (i as u32) < self.current_ap + num_recently_lost {
+                        recently_lost = true;
+                    }
                 }
             } else {
                 // A negative reserved_ap means that the player is about to make an action that will grant AP (such as
@@ -1108,10 +1142,6 @@ impl Drawable for ActionPointsRow {
                 );
 
                 // Pulsating glowing border
-                //let game_time = get_time();
-                //let t = (game_time * 1.1).fract() as f32;
-                // 0.5 to 0.7
-                //let alpha = 0.5 + 0.4 * (if t < 0.5 { t } else { 1.0 - t });
                 let alpha = oscillate(0.9, 0.5, 0.7);
 
                 draw_circle_lines(
@@ -1128,6 +1158,17 @@ impl Drawable for ActionPointsRow {
                     r,
                     GRAY,
                 );
+
+                if recently_lost {
+                    let recently_lost = self.recently_lost_animation.as_ref().unwrap();
+                    let ratio = recently_lost.age / recently_lost.max_age;
+                    draw_circle(
+                        x0 + self.cell_size.0 / 2.0,
+                        y0 + self.cell_size.1 / 2.0,
+                        (1.5 - ratio) * r,
+                        RED,
+                    );
+                }
             }
 
             if overcomitted {

@@ -465,7 +465,8 @@ impl CoreGame {
                     attacker.on_mana_changed();
                 }
 
-                attacker.action_points.spend(action_point_cost as u32);
+                self.perform_spend_ap(attacker, action_point_cost as u32)
+                    .await;
 
                 let is_within_melee =
                     within_meele(attacker.position.get(), defender.position.get());
@@ -510,7 +511,7 @@ impl CoreGame {
                                 })
                                 .await;
 
-                                reactor.action_points.spend(1);
+                                self.perform_spend_ap(reactor, 1).await;
 
                                 let event = Self::perform_attack(
                                     reactor,
@@ -591,6 +592,12 @@ impl CoreGame {
                             reactor: reactor.id(),
                         })
                         .await;
+
+                        self.perform_spend_ap(reactor, reaction.action_point_cost)
+                            .await;
+                        reactor.stamina.spend(reaction.stamina_cost);
+                        reactor.on_use_on_attacked_reaction(reaction);
+
                         Some((reactor.id(), with_shield))
                     } else {
                         None
@@ -675,7 +682,14 @@ impl CoreGame {
             } => {
                 let character = self.active_character();
 
-                character.pay_for_movement(total_distance, extra_cost);
+                self.perform_spend_ap(character, extra_cost).await;
+
+                let paid_distance = extra_cost as f32 * character.move_distance_per_resource();
+                if total_distance > paid_distance {
+                    character.spend_movement(total_distance - paid_distance);
+                } else if total_distance < paid_distance {
+                    character.gain_movement(paid_distance - total_distance);
+                }
 
                 self.ui_handle_event(GameEvent::MovementWasInitiated {
                     character: self.active_character_id,
@@ -693,7 +707,7 @@ impl CoreGame {
                 if character.enabled_quick_actions.get() {
                     character.stamina.spend(1);
                 } else {
-                    character.action_points.spend(1);
+                    self.perform_spend_ap(character, 1).await;
                 }
                 character.swap_equipment_slots(from, to);
                 Ok(ActionOutcome::Default)
@@ -706,7 +720,7 @@ impl CoreGame {
                 if character.enabled_quick_actions.get() {
                     character.stamina.spend(1);
                 } else {
-                    character.action_points.spend(1);
+                    self.perform_spend_ap(character, 1).await;
                 }
                 let slot_role = EquipmentSlotRole::Inventory(inventory_equipment_index);
                 let consumable = match character.equipment(slot_role).unwrap() {
@@ -743,6 +757,16 @@ impl CoreGame {
                 Ok(ActionOutcome::Default)
             }
         }
+    }
+
+    async fn perform_spend_ap(&self, character: &Character, amount: u32) {
+        character.action_points.spend(amount);
+
+        self.ui_handle_event(GameEvent::CharacterLostAP {
+            character: character.id(),
+            amount,
+        })
+        .await;
     }
 
     async fn ui_handle_event(&self, event: GameEvent) {
@@ -838,7 +862,7 @@ impl CoreGame {
                             )
                             .await;
 
-                            reactor.action_points.spend(1);
+                            self.perform_spend_ap(reactor, 1).await;
 
                             self.ui_handle_event(GameEvent::AttackWasInitiated {
                                 actor: reactor.id(),
@@ -1223,15 +1247,18 @@ impl CoreGame {
         let real_game: Option<&CoreGame> = mode.real_game();
         let simulated_roll = mode.simulated_roll();
 
-        if real_game.is_some() {
-            actor.action_points.spend(ability.action_point_cost);
+        if let Some(game) = real_game {
+            let mut ap_cost = ability.action_point_cost;
+
             actor.spend_mana(ability.mana_cost);
             actor.stamina.spend(ability.stamina_cost);
             for enhancement in enhancements {
-                actor.action_points.spend(enhancement.action_point_cost);
+                ap_cost += enhancement.action_point_cost;
                 actor.spend_mana(enhancement.mana_cost);
                 actor.stamina.spend(enhancement.stamina_cost);
             }
+
+            game.perform_spend_ap(actor, ap_cost).await;
         }
 
         let mut enemies_hit = vec![];
@@ -2399,7 +2426,6 @@ impl CoreGame {
         if let Some((reactor, reaction)) = maybe_reaction {
             if let Some(game) = game {
                 let reactor = game.characters.get(reactor);
-                reactor.on_use_on_attacked_reaction(reaction);
                 detail_lines.push(format!(
                     "|{}| reacted with {}",
                     reactor.name_tag(),
@@ -2904,7 +2930,8 @@ impl CoreGame {
 
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
         let reactor = self.characters.get(reactor_id);
-        reactor.action_points.spend(reaction.action_point_cost);
+        self.perform_spend_ap(reactor, reaction.action_point_cost)
+            .await;
         reactor.stamina.spend(reaction.stamina_cost);
         let reactor_name_tag = reactor.name_tag();
 
@@ -3647,6 +3674,10 @@ pub enum GameEvent {
     },
     CharacterGainedAP {
         character: CharacterId,
+    },
+    CharacterLostAP {
+        character: CharacterId,
+        amount: u32,
     },
 }
 
@@ -5651,17 +5682,6 @@ impl Character {
         self.base_free_movement.get() * self.move_speed_modifier()
     }
 
-    fn pay_for_movement(&self, distance: f32, extra_cost: u32) {
-        self.action_points.spend(extra_cost);
-
-        let paid_distance = extra_cost as f32 * self.move_distance_per_resource();
-        if distance > paid_distance {
-            self.spend_movement(distance - paid_distance);
-        } else if distance < paid_distance {
-            self.gain_movement(paid_distance - distance);
-        }
-    }
-
     pub fn cost_to_move(&self, distance: f32) -> u32 {
         let remaining_free = self.remaining_movement.get();
 
@@ -6424,8 +6444,6 @@ impl Character {
     }
 
     fn on_use_on_attacked_reaction(&self, reaction: OnAttackedReaction) {
-        self.action_points.spend(reaction.action_point_cost);
-        self.stamina.spend(reaction.stamina_cost);
         match reaction.used_hand {
             Some(HandType::MainHand) => self.has_used_main_hand_reaction_this_round.set(true),
             Some(HandType::OffHand) => self.has_used_off_hand_reaction_this_round.set(true),

@@ -1886,6 +1886,10 @@ impl UserInterface {
                 );
                 self.sound_player.play(SoundId::GainedAP);
             }
+            GameEvent::CharacterLostAP { character, amount } => {
+                self.game_grid
+                    .animate_character_lost_ap(character, 0.6, amount);
+            }
             GameEvent::MovementWasInitiated {
                 character,
                 positions,
@@ -1906,6 +1910,8 @@ impl UserInterface {
                 step_idx,
                 liquid,
             } => {
+                let mover = self.characters.get(character);
+
                 let base_duration = if self.faster_movement.get() {
                     0.07
                 } else {
@@ -1920,7 +1926,7 @@ impl UserInterface {
                 }
 
                 // Indicate when the character has a temporarily modified move speed (from some Condition)
-                duration /= self.characters.get(character).move_speed_modifier();
+                duration /= mover.move_speed_modifier();
 
                 if movement_type == MovementType::AbilityEngage {
                     // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid

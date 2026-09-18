@@ -193,6 +193,9 @@ enum AnimationDetails {
     SpeechBubble {
         text: &'static str,
     },
+    ApLost {
+        amount: u32,
+    },
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -1049,6 +1052,20 @@ impl GameGrid {
         });
     }
 
+    pub fn animate_character_lost_ap(
+        &mut self,
+        character_id: CharacterId,
+        duration: f32,
+        amount: u32,
+    ) {
+        self.character_animations.push(CharacterAnimation::new(
+            character_id,
+            0.0,
+            duration,
+            AnimationDetails::ApLost { amount },
+        ));
+    }
+
     pub fn animate_character_speaking(
         &mut self,
         character_id: CharacterId,
@@ -1761,6 +1778,7 @@ impl GameGrid {
                 AnimationDetails::SpeechBubble { .. } => {
                     // This is drawn separately, after all the characters
                 }
+                AnimationDetails::ApLost { .. } => {}
             }
         }
 
@@ -3749,6 +3767,17 @@ impl GameGrid {
             );
             if character.id() == self.active_character_id {
                 action_points_row.reserved_and_hovered_ap = active_char_reserved_and_hovered_ap;
+            }
+            for animation in &self.character_animations {
+                if animation.character_id == character.id() {
+                    if let AnimationDetails::ApLost { amount } = animation.kind {
+                        action_points_row.animate_lost(
+                            amount,
+                            animation.duration - animation.remaining_duration,
+                            animation.duration,
+                        );
+                    }
+                }
             }
             action_points_row.padding = 1.0;
             action_points_row.current_ap = character.action_points.current();
