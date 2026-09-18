@@ -470,6 +470,39 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        12,
+        12
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        17,
+        10
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        18,
+        4
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

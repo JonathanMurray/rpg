@@ -57,7 +57,7 @@ use crate::{
         Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
     },
-    util::{COL_BLUE, COL_DARK, COL_GREEN_0, COL_RED},
+    util::{line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0, COL_RED},
 };
 use crate::{
     pathfind::PathNode,
@@ -1129,10 +1129,11 @@ impl UserInterface {
     }
 
     fn refresh_use_ability_state(&mut self) {
+        self.refresh_line_ability_target();
+
         let UiState::ConfiguringAction(configured_action) = &*self.state.borrow() else {
             panic!()
         };
-
         let ConfiguredAction::UseAbility {
             ability,
             selected_enhancements,
@@ -1141,57 +1142,6 @@ impl UserInterface {
         else {
             panic!()
         };
-
-        println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
-
-        /*
-        let mut details = vec![];
-        match target {
-            ActionTarget::Character(target_id, movement, ..) => {
-                let target_char = self.characters.get(*target_id);
-
-                if !self.active_character().reaches_with_ability(
-                    ability,
-                    selected_enhancements,
-                    target_char.pos(),
-                ) {
-                    details.push(("Out of reach!".to_string(), Goodness::Bad));
-                }
-
-                if let Some(movement) = movement {
-                    if movement.is_empty() {
-                        details.push(("No valid path!".to_string(), Goodness::Bad));
-                    }
-                }
-
-                if let Some(ability_roll) = ability.roll {
-                    // TODO For attack-based abilities, these details SHOULD use attack rules, and not ability rules (?)
-                    // For example, the below probably doesn't account correctly for flanking?
-                    for (term, bonus) in self
-                        .active_character()
-                        .outgoing_ability_roll_bonuses(selected_enhancements, ability_roll)
-                    {
-                        details.push((term.to_string(), bonus.goodness()));
-                    }
-                    for (term, bonus) in target_char.incoming_ability_bonuses() {
-                        details.push((term.to_string(), bonus.goodness()));
-                    }
-                }
-
-                let action_text = match ability.target {
-                    AbilityTarget::Enemy { .. } | AbilityTarget::Ally { .. } => {
-                        ability.name.to_string()
-                    }
-                    AbilityTarget::None { .. } | AbilityTarget::Area { .. } => {
-                        unreachable!()
-                    }
-                };
-
-                self.target_ui.set_action(action_text, details.clone(), true);
-            }
-
-        }
-         */
 
         self.game_grid.clear_target_effect_previews();
 
@@ -1216,6 +1166,46 @@ impl UserInterface {
                         character_id: target_id,
                         prediction,
                     });
+            }
+        }
+    }
+
+    fn refresh_line_ability_target(&self) {
+        let UiState::ConfiguringAction(configured_action) = &mut *self.state.borrow_mut() else {
+            panic!()
+        };
+
+        let ConfiguredAction::UseAbility {
+            ability,
+            selected_enhancements,
+            target,
+        } = configured_action
+        else {
+            panic!()
+        };
+
+        println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
+
+        if let AbilityTarget::Area {
+            mut range,
+            area_effect,
+        } = ability.target
+        {
+            if area_effect.shape == AreaShape::Line {
+                if let ActionTarget::Position(pos) = target {
+                    let mut increased_range = 0.0;
+                    for effect in selected_enhancements.iter().filter_map(|e| e.spell_effect) {
+                        if effect.increased_range_tenths > 0 {
+                            increased_range += effect.increased_range_tenths as f32 * 0.1;
+                        }
+                    }
+
+                    if increased_range > 0.0 {
+                        range = range.plusf(increased_range);
+                    }
+
+                    modify_line_len(self.active_character().pos(), pos, range, true);
+                }
             }
         }
     }

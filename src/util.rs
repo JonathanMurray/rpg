@@ -1,7 +1,7 @@
 use macroquad::{color::Color, rand::gen_range, time::get_time};
 use rand::Rng;
 
-use crate::core::{sq_distance_between, Position, CENTER_MELEE_RANGE_SQUARED};
+use crate::core::{sq_distance_between, Position, Range, CENTER_MELEE_RANGE_SQUARED};
 
 pub fn are_entities_within_melee(a: Position, b: Position) -> bool {
     sq_distance_between(a, b) <= CENTER_MELEE_RANGE_SQUARED
@@ -49,6 +49,19 @@ impl<T> CustomShuffle<T> for Vec<T> {
             let j = gen_range(0, i + 1);
             self.swap(i, j);
         }
+    }
+}
+
+pub fn modify_line_len(from: Position, to: &mut Position, range: Range, extend_to_range: bool) {
+    let mut dx = to.0 - from.0;
+    let mut dy = to.1 - from.1;
+    let dist = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
+    let multiplier: f32 = f32::from(range) / dist;
+
+    if extend_to_range || multiplier < 1.0 {
+        dx = (dx as f32 * multiplier) as i32;
+        dy = (dy as f32 * multiplier) as i32;
+        *to = (from.0 + dx, from.1 + dy);
     }
 }
 

@@ -64,8 +64,8 @@ use crate::{
         WaterType, LIGHTNING_BOLT_FX,
     },
     util::{
-        line_visitor, oscillate, oscillate_loop, oscillate_square, rgb, COL_BRIGHT, COL_RED,
-        COL_RED_BRIGHT,
+        line_visitor, modify_line_len, oscillate, oscillate_loop, oscillate_square, rgb,
+        COL_BRIGHT, COL_RED, COL_RED_BRIGHT,
     },
 };
 use crate::{
@@ -2140,63 +2140,65 @@ impl GameGrid {
                     ability,
                     selected_enhancements,
                     target,
-                } => match ability.target {
-                    AbilityTarget::Enemy {
-                        impact_circle: impact_area,
-                        reach,
-                        ..
-                    } => {
-                        let mut area_radius = None;
-                        if let Some((mut radius, _acquisition, _effect)) = impact_area {
-                            for effect in
-                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
-                            {
-                                if effect.increased_radius_tenths > 0 {
-                                    radius =
-                                        radius.plusf(effect.increased_radius_tenths as f32 * 0.1);
+                } => {
+                    let mut increased_radius = 0.0;
+                    let mut increased_range = 0.0;
+
+                    for effect in selected_enhancements.iter().filter_map(|e| e.spell_effect) {
+                        if effect.increased_radius_tenths > 0 {
+                            increased_radius =
+                                increased_radius + effect.increased_radius_tenths as f32 * 0.1;
+                        }
+
+                        if effect.increased_range_tenths > 0 {
+                            increased_range =
+                                increased_range + effect.increased_range_tenths as f32 * 0.1;
+                        }
+                    }
+
+                    match ability.target {
+                        AbilityTarget::Enemy {
+                            impact_circle: impact_area,
+                            reach,
+                            ..
+                        } => {
+                            let mut area_radius = None;
+                            if let Some((radius, _acquisition, _effect)) = impact_area {
+                                area_radius = Some(radius.plusf(increased_radius));
+                                if *target == ActionTarget::None {
+                                    should_highlight_character_occupations = true;
                                 }
                             }
-                            area_radius = Some(radius);
+                            let mut move_into_melee = None;
+                            if let AbilityReach::MoveIntoMelee(range) = reach {
+                                move_into_melee = Some(range.plusf(increased_range));
+                            }
+
+                            MouseState::RequiresEnemyTarget {
+                                area_radius,
+                                move_into_melee,
+                            }
+                        }
+                        AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
+                        AbilityTarget::Area { area_effect, range } => {
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
-                        }
-                        let mut move_into_melee = None;
-                        if let AbilityReach::MoveIntoMelee(mut range) = reach {
-                            for effect in
-                                selected_enhancements.iter().filter_map(|e| e.spell_effect)
-                            {
-                                if effect.increased_range_tenths > 0 {
-                                    range = range.plusf(effect.increased_range_tenths as f32 * 0.1);
-                                }
+
+                            MouseState::RequiresPositionTarget {
+                                shape: Some(area_effect.shape),
+                                range: range.plusf(increased_range),
                             }
-                            move_into_melee = Some(range);
                         }
-
-                        MouseState::RequiresEnemyTarget {
-                            area_radius,
-                            move_into_melee,
+                        AbilityTarget::Destination { range } => {
+                            if *target == ActionTarget::None {
+                                should_highlight_character_occupations = true;
+                            }
+                            MouseState::RequiresPositionTarget { shape: None, range }
                         }
+                        AbilityTarget::None { .. } => MouseState::ImplicitTarget,
                     }
-                    AbilityTarget::Ally { .. } => MouseState::RequiresAllyTarget,
-                    AbilityTarget::Area { area_effect, range } => {
-                        if *target == ActionTarget::None {
-                            should_highlight_character_occupations = true;
-                        }
-
-                        MouseState::RequiresPositionTarget {
-                            shape: Some(area_effect.shape),
-                            range,
-                        }
-                    }
-                    AbilityTarget::Destination { range } => {
-                        if *target == ActionTarget::None {
-                            should_highlight_character_occupations = true;
-                        }
-                        MouseState::RequiresPositionTarget { shape: None, range }
-                    }
-                    AbilityTarget::None { .. } => MouseState::ImplicitTarget,
-                },
+                }
 
                 ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
 
@@ -2344,6 +2346,10 @@ impl GameGrid {
                     //println!("players_action_target = {:?}", pos);
                     Some(pos)
                 } else if is_mouse_within_grid && receptive_to_input {
+                    println!(
+                        "requires position target; mouse_grid_pos={:?}",
+                        mouse_grid_pos
+                    );
                     Some(mouse_grid_pos)
                 } else {
                     None
@@ -3269,24 +3275,13 @@ impl GameGrid {
     ) -> Position {
         let from = actor.pos();
 
-        let mut dx = to.0 - from.0;
-        let mut dy = to.1 - from.1;
-        let dist = ((dx.pow(2) + dy.pow(2)) as f32).sqrt();
-        let multiplier: f32 = f32::from(range) / dist;
-
-        // Dash should be limited to range
-        // If not Dash, also extend to range
-        if !(dash && multiplier > 1.0) {
-            dx = (dx as f32 * multiplier) as i32;
-            dy = (dy as f32 * multiplier) as i32;
-            to = (from.0 + dx, from.1 + dy);
-        }
+        // Dash => limited to range
+        // not Dash => limited to range and extend to range
+        modify_line_len(from, &mut to, range, !dash);
 
         let mut end = to;
 
         let mut prev = from;
-
-        //println!("Drawing line using line_visitor");
 
         let obstructs = |occupation: Option<&Occupation>| {
             if dash {

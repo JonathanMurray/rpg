@@ -2116,7 +2116,7 @@ impl CoreGame {
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
-        println!("perform_spell_enemy_effect({}) ...", ability_name);
+        //println!("perform_spell_enemy_effect({}) ...", ability_name);
         //dbg!(ability_roll);
         let real_game = mode.real_game();
 
