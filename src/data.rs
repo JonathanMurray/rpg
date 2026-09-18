@@ -548,7 +548,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
         acquisition: AreaTargetAcquisition::Everyone,
         effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::Static(2, DamageType::Fire)),
+            damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
             on_hit: Some([Some(ApplyEffect::Pushed(2)), None]),
         })),
     }),
@@ -594,7 +594,7 @@ pub const SHIELD_BASH: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
@@ -628,7 +628,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
@@ -1249,7 +1249,7 @@ pub const MIND_BLAST: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(13.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
-            damage: Some(AbilityDamage::Static(4, DamageType::Regular)),
+            damage: Some(AbilityDamage::Fixed(4, DamageType::Regular)),
             on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
         }),
         impact_circle: None,
@@ -1300,7 +1300,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(4, DamageType::Regular)),
+                damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
                 on_hit: Some([
                     Some(ApplyEffect::Condition(ApplyCondition {
                         condition: Condition::Bleeding,
@@ -1337,7 +1337,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
-            damage: Some(AbilityDamage::AtLeast(2, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Dazed,
@@ -1372,7 +1372,7 @@ pub const DRAUG_CLAW: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::AtLeast(4, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Blinded,
@@ -1432,7 +1432,7 @@ pub const HULDRA_INFECT: Ability = Ability {
     target: AbilityTarget::Enemy {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Poisoned,
@@ -1943,15 +1943,15 @@ pub const FIREBALL: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(12.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::AtLeast(4, DamageType::Fire)),
+            damage: Some(AbilityDamage::Dynamic(4, DamageType::Fire)),
             on_hit: None,
         }),
         impact_circle: Some((
             Range::Float(3.5),
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
-                defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(4, DamageType::Fire)),
+                defense_type: None,
+                damage: Some(AbilityDamage::Fixed(4, DamageType::Fire)),
                 on_hit: None,
             }),
         )),
@@ -1987,7 +1987,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(12.5)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: None,
         }),
         impact_circle: Some((
@@ -1995,7 +1995,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
             AreaTargetAcquisition::Everyone,
             AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(2, DamageType::Fire)),
+                damage: Some(AbilityDamage::Dynamic(2, DamageType::Fire)),
                 on_hit: None,
             }),
         )),
@@ -2044,7 +2044,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
             acquisition: AreaTargetAcquisition::Everyone,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
-                damage: Some(AbilityDamage::AtLeast(7, DamageType::Lightning)),
+                damage: Some(AbilityDamage::Dynamic(7, DamageType::Lightning)),
                 on_hit: None,
             })),
         },
@@ -2079,7 +2079,7 @@ pub const KILL: Ability = Ability {
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
-                damage: Some(AbilityDamage::Static(99, DamageType::Regular)),
+                damage: Some(AbilityDamage::Fixed(99, DamageType::Regular)),
                 on_hit: None,
             })),
         }),
@@ -2188,7 +2188,7 @@ pub const SEARING_LIGHT: Ability = Ability {
         reach: AbilityReach::Range(Range::Ranged(9)),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
-            damage: Some(AbilityDamage::AtLeast(3, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
                     condition: Condition::Blinded,

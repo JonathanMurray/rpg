@@ -2161,14 +2161,14 @@ impl CoreGame {
             let is_lightning_dmg;
 
             match ability_damage {
-                AbilityDamage::Static(n, dmg_type) => {
+                AbilityDamage::Fixed(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_damage_affected_by_roll = false;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
                     dmg_str.push_str(&format!("{} |<faded>({})|", dmg_calculation, ability_name));
                 }
-                AbilityDamage::AtLeast(n, dmg_type) => {
+                AbilityDamage::Dynamic(n, dmg_type) => {
                     dmg_calculation = n as i32;
                     is_fire_dmg = matches!(dmg_type, DamageType::Fire);
                     is_lightning_dmg = matches!(dmg_type, DamageType::Lightning);
@@ -2237,8 +2237,6 @@ impl CoreGame {
                     // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                     if target.conditions.borrow().has(&Condition::Protected) {
                         apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
-                        dbg!(&dmg_str);
-                        dbg!(&dmg_calculation);
                     }
                 }
             }
@@ -4914,8 +4912,8 @@ pub enum DamageType {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AbilityDamage {
-    Static(u32, DamageType),
-    AtLeast(u32, DamageType),
+    Fixed(u32, DamageType),
+    Dynamic(u32, DamageType),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

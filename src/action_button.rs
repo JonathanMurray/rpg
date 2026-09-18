@@ -743,8 +743,8 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
 
             if let Some(ability_dmg) = effect.damage {
                 let (value, dmg_type) = match ability_dmg {
-                    AbilityDamage::Static(n, dmg_type) => (n, dmg_type),
-                    AbilityDamage::AtLeast(n, dmg_type) => (n, dmg_type),
+                    AbilityDamage::Fixed(n, dmg_type) => (n, dmg_type),
+                    AbilityDamage::Dynamic(n, dmg_type) => (n, dmg_type),
                 };
                 let mut line = format!("  |<sword>| |<value>{}|", value);
                 match dmg_type {
