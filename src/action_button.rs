@@ -451,7 +451,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
         },
         BaseAction::ToggleQuickActions => Tooltip {
             header: "Quick actions".to_string(),
-            description: Some("Spend stamina |<stamina>| on movement and inventory management, instead of AP."),
+            description: Some("Spend stamina |<stamina>| on inventory management, instead of AP."),
             ..Default::default()
         },
     }

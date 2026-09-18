@@ -120,7 +120,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
 
     let movement_row = Element::Text(
         TextLine::new(
-            format!("|<boot>| : {}", character.base_move_speed.get()),
+            format!("|<boot>| : {}", character.base_free_movement.get()),
             16,
             WHITE,
             Some(font.clone()),

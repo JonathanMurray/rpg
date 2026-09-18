@@ -9,7 +9,6 @@ use crate::{
         distance_between, sq_distance_between, Ability, AbilityId, AbilityTarget, Action,
         ActionReach, ActionTarget, Character, CharacterId, Condition, CoreGame, HandType,
         OnAttackedReaction, OnHitReaction, Position, Range, CENTER_MELEE_RANGE_SQUARED,
-        MOVE_DISTANCE_PER_RESOURCE,
     },
     data::{DRAUG_CLAW, ENEMY_ESCAPE, HULDRA_HEAL, HULDRA_INFECT},
     pathfind::{Path, PathfindGrid, TraversalType},
@@ -729,7 +728,8 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     let max_extra_cost = character.action_points.current();
     for node in path.nodes.iter() {
         if node.distance_from_start
-            <= remaining_free_movement + (max_extra_cost * MOVE_DISTANCE_PER_RESOURCE) as f32
+        // instead ask character
+            <= remaining_free_movement + (max_extra_cost as f32 * character.move_distance_per_resource())
         {
             positions.push(node.position);
             total_distance = node.distance_from_start;
@@ -737,9 +737,9 @@ pub fn convert_path_to_move_action(character: &Character, path: Path) -> Option<
     }
 
     let extra_cost = ((total_distance - remaining_free_movement)
-        / MOVE_DISTANCE_PER_RESOURCE as f32)
-        .max(0.0)
-        .ceil() as u32;
+        / character.move_distance_per_resource())
+    .max(0.0)
+    .ceil() as u32;
 
     if total_distance > 0.0 {
         Some(Action::Move {

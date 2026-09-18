@@ -205,17 +205,7 @@ impl ActivityPopup {
             width += margin_between_choices_and_proceed;
         }
 
-        let enabled_quick_actions = self
-            .characters
-            .get(self.relevant_character_id)
-            .enabled_quick_actions
-            .get();
-
-        let sprint_text = if enabled_quick_actions {
-            "Stamina cost:"
-        } else {
-            "AP cost:"
-        };
+        let sprint_text = "AP cost:";
         let sprint_margin = 15.0;
         if let Some(slider) = &self.movement_cost_slider {
             let text_dimensions = measure_text(
@@ -286,7 +276,7 @@ impl ActivityPopup {
                 base_text_params.clone(),
             );
 
-            slider.draw(x_btn, y - slider.size().1 - 5.0, enabled_quick_actions);
+            slider.draw(x_btn, y - slider.size().1 - 5.0);
             let movement_config_w = slider.size().0.max(text_dimensions.width);
             x_btn += movement_config_w + sprint_margin;
         }
@@ -505,11 +495,7 @@ impl ActivityPopup {
         // TODO: bug: this unwrap panicked, when clicking on an enemy on the grid?
         let slider = self.movement_cost_slider.as_mut().unwrap();
         let character = self.characters.get(self.relevant_character_id);
-        let max_cost = if character.enabled_quick_actions.get() {
-            character.stamina.current()
-        } else {
-            character.action_points.current()
-        };
+        let max_cost = character.action_points.current();
         slider.set_max_allowed(max_cost);
 
         assert!(cost <= max_cost);
@@ -531,7 +517,7 @@ impl ActivityPopup {
             .enabled_quick_actions
             .get();
 
-        if !enabled_quick_actions && self.movement_cost() > 0 {
+        if self.movement_cost() > 0 {
             return (self.movement_cost() as i32, 0);
         }
 
@@ -611,10 +597,6 @@ impl ActivityPopup {
             .get(self.relevant_character_id)
             .enabled_quick_actions
             .get();
-
-        if enabled_quick_actions && self.movement_cost() > 0 {
-            return self.movement_cost();
-        }
 
         let borrowed_state = self.ui_state.borrow();
         let base_action = match &*borrowed_state {
@@ -942,19 +924,13 @@ impl MovementCostSlider {
         self.selected_i
     }
 
-    fn draw(&mut self, x: f32, y: f32, spend_stamina: bool) {
+    fn draw(&mut self, x: f32, y: f32) {
         let (w, h) = (self.cell_w, self.cell_h);
 
         let pad = 2.0;
         for i in 0..self.selected_i + 1 {
             let x0 = x + w * i as f32;
-            let color = if i == 0 {
-                DARKGRAY
-            } else if spend_stamina {
-                COL_GREEN_0
-            } else {
-                ORANGE
-            };
+            let color = if i == 0 { DARKGRAY } else { ORANGE };
             draw_rectangle(x0 + pad, y + pad, w - pad * 2.0, h - pad * 2.0, color);
         }
         for i in 0..self.max_allowed + 1 {

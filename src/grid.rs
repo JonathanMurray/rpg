@@ -195,43 +195,6 @@ enum AnimationDetails {
     },
 }
 
-struct MovementRange {
-    speed: f32,
-    max_range: f32,
-}
-
-impl MovementRange {
-    fn max(&self) -> f32 {
-        self.max_range
-    }
-
-    fn set(&mut self, speed: f32, max_range: f32) {
-        //dbg!(("movement_range.set()", speed, max_range));
-        self.speed = speed;
-        self.max_range = max_range;
-    }
-
-    fn cost(&self, range: f32, character_remaining_movement: f32) -> u32 {
-        let additional_range = range - character_remaining_movement;
-
-        //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
-        if additional_range <= 0.0 {
-            0
-        } else {
-            (additional_range / MOVE_DISTANCE_PER_RESOURCE as f32).ceil() as u32
-        }
-    }
-}
-
-impl Default for MovementRange {
-    fn default() -> Self {
-        Self {
-            speed: 0.0,
-            max_range: 0.0,
-        }
-    }
-}
-
 #[derive(Debug, Copy, Clone)]
 pub enum RangeIndicator {
     ActionTargetRange,
@@ -312,7 +275,7 @@ pub struct GameGrid {
     active_character_id: CharacterId,
     action_usability_problem: Option<&'static str>,
 
-    movement_range: MovementRange,
+    movement_range: f32,
 
     hovered_character: Option<CharacterId>,
     prev_hovered_character: Option<CharacterId>,
@@ -355,7 +318,7 @@ impl GameGrid {
             effects: vec![],
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
-            movement_range: MovementRange::default(),
+            movement_range: 0.0,
             hovered_character: None,
             prev_hovered_character: None,
             hovered_character_portrait: None,
@@ -1134,10 +1097,11 @@ impl GameGrid {
         let character = &self.characters[&character_id];
         let pos: (i32, i32) = character.pos();
         let exploration_range = if character.player_controlled() {
-            self.movement_range.max()
+            self.movement_range
         } else {
             character.remaining_movement.get()
-                + (character.action_points.current() * MOVE_DISTANCE_PER_RESOURCE) as f32
+                + (character.action_points.current() as f32
+                    * character.move_distance_per_resource())
         };
         let routes = self.pathfind_grid.explore_outward(
             character_id,
@@ -1331,16 +1295,11 @@ impl GameGrid {
         let active_char = &self.characters[&active_char_id];
         println!("update_move_speed({})", active_char.name);
 
-        let speed = active_char.move_speed();
-        let resource = if active_char.enabled_quick_actions.get() {
-            active_char.stamina.current()
-        } else {
-            active_char.action_points.current()
-        };
-        let max_range =
-            active_char.remaining_movement.get() + (resource * MOVE_DISTANCE_PER_RESOURCE) as f32;
+        let max_range = active_char.remaining_movement.get()
+            + (active_char.action_points.current() as f32
+                * active_char.move_distance_per_resource());
 
-        self.movement_range.set(speed, max_range);
+        self.movement_range = max_range;
     }
 
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
@@ -2803,11 +2762,8 @@ impl GameGrid {
                     self.characters[&self.active_character_id]
                         .set_facing_toward(*hovered_route_dst);
 
-                    let remaining_movement = self.active_char_remaining_movement();
-
-                    let cost = self
-                        .movement_range
-                        .cost(hovered_route_node.distance_from_start, remaining_movement);
+                    let cost = self.characters[&self.active_character_id]
+                        .cost_to_move(hovered_route_node.distance_from_start);
 
                     if pressed_left_mouse && !outcome.committed_action {
                         let commit_movement = matches!(
@@ -3387,7 +3343,7 @@ impl GameGrid {
             // distance_from_start == 0, means we're hovering the character's current position
             Some(node)
                 if node.distance_from_start > 0.0
-                    && node.distance_from_start <= self.movement_range.max() =>
+                    && node.distance_from_start <= self.movement_range =>
             {
                 return Some((mouse_grid_pos, *node));
             }
@@ -3415,7 +3371,7 @@ impl GameGrid {
             for adj in adjacent_cells {
                 if let Some(node) = self.routes(self.active_character_id).get(&adj) {
                     if node.distance_from_start > 0.0
-                        && node.distance_from_start <= self.movement_range.max()
+                        && node.distance_from_start <= self.movement_range
                     {
                         //dbg!((mouse_grid_pos, adj, node));
 
@@ -4324,11 +4280,12 @@ impl GameGrid {
         let character = &self.characters[&character_id];
 
         let extended_range = if character.player_controlled() {
-            Some(self.movement_range.max())
+            Some(self.movement_range)
         } else {
             Some(
                 character.remaining_movement.get()
-                    + (character.action_points.current() * MOVE_DISTANCE_PER_RESOURCE) as f32,
+                    + (character.action_points.current() as f32
+                        * character.move_distance_per_resource()),
             )
         };
 

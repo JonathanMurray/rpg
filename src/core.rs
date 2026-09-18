@@ -674,18 +674,8 @@ impl CoreGame {
                 total_distance,
             } => {
                 let character = self.active_character();
-                //character.action_points.spend(extra_cost);
-                if character.enabled_quick_actions.get() {
-                    character.stamina.spend(extra_cost);
-                } else {
-                    character.action_points.spend(extra_cost);
-                }
-                let paid_distance = (extra_cost * MOVE_DISTANCE_PER_RESOURCE) as f32;
-                if total_distance > paid_distance {
-                    character.spend_movement(total_distance - paid_distance);
-                } else if total_distance < paid_distance {
-                    character.gain_movement(paid_distance - total_distance);
-                }
+
+                character.pay_for_movement(total_distance, extra_cost);
 
                 self.ui_handle_event(GameEvent::MovementWasInitiated {
                     character: self.active_character_id,
@@ -3138,7 +3128,7 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
         let gain_stamina = (character.stamina.max() as f32 / 4.0).ceil() as u32;
         let gained_stamina = character.stamina.gain(gain_stamina);
-        character.regain_full_movement();
+        character.regain_full_free_movement();
 
         if character.player_controlled() {
             self.ui_handle_event(GameEvent::PlayerCharacterEndedTheirTurn {
@@ -5322,7 +5312,7 @@ pub struct Character {
     pub enabled_quick_actions: Cell<bool>,
 
     // How many cells you can move per AP
-    pub base_move_speed: Cell<f32>,
+    pub base_free_movement: Cell<f32>,
     // How many more cells can you move free of cost, this turn
     pub remaining_movement: Cell<f32>,
 
@@ -5403,7 +5393,7 @@ impl Character {
             health: NumberedResource::new(max_health),
             mana: NumberedResource::new(max_mana),
             enabled_quick_actions: Cell::new(false),
-            base_move_speed: Cell::new(move_speed),
+            base_free_movement: Cell::new(move_speed),
             remaining_movement: Cell::new(0.0),
             capacity: Cell::new(capacity),
             inventory: Default::default(),
@@ -5580,8 +5570,8 @@ impl Character {
             .add_or_remove(Condition::CriticalCharge, add);
     }
 
-    fn regain_full_movement(&self) {
-        self.remaining_movement.set(self.move_speed());
+    fn regain_full_free_movement(&self) {
+        self.remaining_movement.set(self.free_movement());
     }
 
     fn spend_movement(&self, distance: f32) {
@@ -5639,7 +5629,7 @@ impl Character {
         }
     }
 
-    pub fn move_speed(&self) -> f32 {
+    pub fn move_speed_modifier(&self) -> f32 {
         let mut modifier = 1.0;
         if self.conditions.borrow().has(&Condition::Hindered) {
             modifier -= 0.5;
@@ -5650,7 +5640,39 @@ impl Character {
         if self.conditions.borrow().has(&Condition::Hastened) {
             modifier += 0.25;
         }
-        self.base_move_speed.get() * modifier
+        modifier
+    }
+
+    pub fn move_distance_per_resource(&self) -> f32 {
+        MOVE_DISTANCE_PER_RESOURCE as f32 * self.move_speed_modifier()
+    }
+
+    pub fn free_movement(&self) -> f32 {
+        self.base_free_movement.get() * self.move_speed_modifier()
+    }
+
+    fn pay_for_movement(&self, distance: f32, extra_cost: u32) {
+        self.action_points.spend(extra_cost);
+
+        let paid_distance = extra_cost as f32 * self.move_distance_per_resource();
+        if distance > paid_distance {
+            self.spend_movement(distance - paid_distance);
+        } else if distance < paid_distance {
+            self.gain_movement(paid_distance - distance);
+        }
+    }
+
+    pub fn cost_to_move(&self, distance: f32) -> u32 {
+        let remaining_free = self.remaining_movement.get();
+
+        let additional_distance = distance - remaining_free;
+
+        //dbg!(("movement_range.cost()", range, character_remaining_movement, extra_range, result));
+        if additional_distance <= 0.0 {
+            0
+        } else {
+            (additional_distance / self.move_distance_per_resource() as f32).ceil() as u32
+        }
     }
 
     pub fn player_controlled(&self) -> bool {
@@ -5701,7 +5723,7 @@ impl Character {
         self.mana.change_max_value_to(attr.max_mana());
         self.on_mana_changed();
         self.capacity.set(attr.capacity());
-        self.base_move_speed.set(attr.move_speed());
+        self.base_free_movement.set(attr.move_speed());
     }
 
     pub fn is_dead(&self) -> bool {
@@ -5893,7 +5915,7 @@ impl Character {
     fn on_battle_start(&self) {
         self.update_player_encumbrance();
         self.action_points.current.set(ACTION_POINTS_PER_TURN);
-        self.regain_full_movement();
+        self.regain_full_free_movement();
         self.on_health_changed();
         self.has_taken_a_turn_this_round.set(false);
         self.has_used_main_hand_reaction_this_round.set(false);
@@ -6179,17 +6201,12 @@ impl Character {
     pub fn can_use_action(&self, action: BaseAction) -> bool {
         let sta = self.stamina.current() as i32;
         let ap = self.action_points.current() as i32;
-        let quick_actions = self.enabled_quick_actions.get();
         match action {
             BaseAction::Attack(attack) => {
                 matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost as i32)
             }
             BaseAction::UseAbility(ability) => self.can_use_ability(ability),
-            BaseAction::Move => {
-                self.remaining_movement.get() > 1.0
-                    || (quick_actions && sta > 0)
-                    || (!quick_actions && ap > 0)
-            }
+            BaseAction::Move => self.remaining_movement.get() > 1.0 || (ap > 0),
             BaseAction::ChangeEquipment => {
                 let cost = BaseAction::ChangeEquipment.quick_point_cost() as i32;
                 self.enabled_quick_actions.get() && sta > cost || ap > cost
@@ -6990,15 +7007,15 @@ impl Character {
         } else {
             if condition == Condition::Hindered {
                 self.remaining_movement
-                    .set(self.remaining_movement.get() - self.base_move_speed.get() * 0.5);
+                    .set(self.remaining_movement.get() - self.base_free_movement.get() * 0.5);
             } else if condition == Condition::Slowed {
                 self.action_points.lose(SLOWED_AP_PENALTY);
                 self.remaining_movement
-                    .set(self.remaining_movement.get() - self.base_move_speed.get() * 0.25);
+                    .set(self.remaining_movement.get() - self.base_free_movement.get() * 0.25);
             } else if condition == Condition::Hastened {
                 self.action_points.gain(HASTENED_AP_BONUS);
                 self.remaining_movement
-                    .set(self.remaining_movement.get() + self.base_move_speed.get() * 0.25);
+                    .set(self.remaining_movement.get() + self.base_free_movement.get() * 0.25);
             }
 
             conditions

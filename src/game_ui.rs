@@ -1919,6 +1919,9 @@ impl UserInterface {
                     duration *= 1.41;
                 }
 
+                // Indicate when the character has a temporarily modified move speed (from some Condition)
+                duration /= self.characters.get(character).move_speed_modifier();
+
                 if movement_type == MovementType::AbilityEngage {
                     // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid
                     duration *= 0.7;
