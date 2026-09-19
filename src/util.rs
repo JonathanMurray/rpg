@@ -1,10 +1,15 @@
-use macroquad::{color::Color, rand::gen_range, time::get_time};
+use macroquad::{color::Color, rand::gen_range, time::get_time, window::{screen_height, screen_width}};
 use rand::Rng;
 
 use crate::core::{sq_distance_between, Position, Range, CENTER_MELEE_RANGE_SQUARED};
 
 pub fn are_entities_within_melee(a: Position, b: Position) -> bool {
     sq_distance_between(a, b) <= CENTER_MELEE_RANGE_SQUARED
+}
+
+pub fn screen_size() -> (f32, f32) {
+    // Avoid calling macroquad::miniquad::window::screen_size as it behaves differently w.r.t. DPI
+    (screen_width(), screen_height())
 }
 
 pub fn adjacent_cells((x, y): Position) -> Vec<Position> {

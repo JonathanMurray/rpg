@@ -4,7 +4,6 @@ use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
     text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
@@ -12,7 +11,7 @@ use macroquad::{
     window::{clear_background, next_frame},
 };
 
-use crate::tooltip::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference};
+use crate::{tooltip::{TooltipPositionPreference, draw_keyword_tooltips, draw_regular_tooltip}, util::screen_size};
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable, TextLine},

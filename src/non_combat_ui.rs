@@ -8,7 +8,6 @@ use macroquad::{
     color::{Color, GRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
     shapes::draw_rectangle_lines,
     text::Font,
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
@@ -16,16 +15,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
-    },
-    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
-    character_sheet::build_spell_book,
-    core::{BaseAction, Character, HandType},
-    equipment_ui::{EquipmentDrag, EquipmentSection},
-    game_ui::ResourceBars,
-    sounds::SoundPlayer,
-    stats_ui::build_character_stats_table,
-    textures::{EquipmentIconId, PortraitId},
+        ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, draw_button_tooltip,
+    }, base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style}, character_sheet::build_spell_book, core::{BaseAction, Character, HandType}, equipment_ui::{EquipmentDrag, EquipmentSection}, game_ui::ResourceBars, sounds::SoundPlayer, stats_ui::build_character_stats_table, textures::{EquipmentIconId, PortraitId}, util::screen_size,
 };
 
 pub struct PortraitRow {

@@ -4,7 +4,6 @@ use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
     text::{measure_text, Font, TextParams},
     texture::Texture2D,
@@ -13,11 +12,7 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::draw_text_rounded,
-    core::Character,
-    non_combat_ui::NonCombatPartyUi,
-    sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
+    base_ui::draw_text_rounded, core::Character, non_combat_ui::NonCombatPartyUi, sounds::SoundPlayer, textures::{EquipmentIconId, PortraitId}, util::screen_size,
 };
 
 pub async fn run_rest_loop(

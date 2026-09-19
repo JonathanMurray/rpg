@@ -3,7 +3,6 @@ use std::{collections::HashMap, rc::Rc};
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    miniquad::window::screen_size,
     shapes::{
         draw_circle, draw_circle_lines, draw_rectangle_ex, draw_rectangle_lines,
         DrawRectangleParams,
@@ -15,14 +14,7 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::draw_text_rounded,
-    chest_scene::{generate_chest_content, ChestEntry},
-    core::{Character, EquipmentEntry},
-    data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
-    drawing::draw_dashed_line,
-    init_fight_map::FightId,
-    shop_scene::{generate_shop_contents, ShopEntry},
-    textures::{load_and_init_texture, PortraitId},
+    base_ui::draw_text_rounded, chest_scene::{ChestEntry, generate_chest_content}, core::{Character, EquipmentEntry}, data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD}, drawing::draw_dashed_line, init_fight_map::FightId, shop_scene::{ShopEntry, generate_shop_contents}, textures::{PortraitId, load_and_init_texture}, util::screen_size,
 };
 
 #[derive(Clone, Debug)]

@@ -8,7 +8,6 @@ use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    miniquad::window::screen_size,
     shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
     text::{measure_text, Font, TextParams},
     texture::Texture2D,
@@ -18,25 +17,15 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, ButtonSelected,
-        InternalUiEvent,
-    },
-    base_ui::{
-        draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
-    },
-    core::{
+        ActionButton, ButtonAction, ButtonHovered, ButtonSelected, InternalUiEvent, draw_button_tooltip,
+    }, base_ui::{
+        Align, Container, Drawable, Element, LayoutDirection, Style, TextLine, draw_text_rounded,
+    }, core::{
         Ability, AbilityEnhancement, AttackEnhancement, BaseAction, Character, OnAttackedReaction,
         OnHitReaction, Party, WeaponType,
-    },
-    data::{
-        PassiveSkill, BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN,
-        LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP,
-        SMITE, SWEEP_ATTACK,
-    },
-    non_combat_ui::{NonCombatCharacterUi, PortraitRow},
-    sounds::SoundPlayer,
-    textures::{EquipmentIconId, PortraitId},
-    util::select_n_random,
+    }, data::{
+        BRACE, CRIPPLING_SHOT, FIREBALL, HEAL, HEALING_NOVA, HEALING_RAIN, LUNGE_ATTACK, MIND_BLAST, OVERWHELMING, PassiveSkill, QUICK, RAGE, SCREAM, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
+    }, non_combat_ui::{NonCombatCharacterUi, PortraitRow}, sounds::SoundPlayer, textures::{EquipmentIconId, PortraitId}, util::{screen_size, select_n_random},
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]
