@@ -41,11 +41,12 @@ use crate::{
         draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable, Style,
     },
     core::{
-        distance_between, effective_push_amount, is_target_within_shape, is_valid_area_target,
-        pushed_vector, target_within_range_squared, within_range_squared, Ability, AbilityId,
-        AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyEffect, AreaEffect, AreaShape,
-        AttackAction, AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
-        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        can_opportunity_attack_mover, distance_between, effective_push_amount,
+        is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
+        within_range_squared, Ability, AbilityId, AbilityReach, AbilityTarget, ActionReach,
+        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AttackAction, AttackEnhancement,
+        BaseAction, Character, Goodness, MovementType, Position, TargetPrediction,
+        MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -1561,6 +1562,7 @@ impl GameGrid {
                         .map(|pos| MovementPathNode {
                             pos: *pos,
                             difficult_terrain: false,
+                            dangerous: false,
                         })
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
@@ -2421,10 +2423,12 @@ impl GameGrid {
                         MovementPathNode {
                             pos: movement.0,
                             difficult_terrain: false,
+                            dangerous: false,
                         },
                         MovementPathNode {
                             pos: movement.1,
                             difficult_terrain: false,
+                            dangerous: false,
                         },
                     ]
                     .into_iter(),
@@ -3462,6 +3466,7 @@ impl GameGrid {
                 invalid_path.into_iter().map(|pos| MovementPathNode {
                     pos,
                     difficult_terrain: false,
+                    dangerous: false,
                 }),
                 RED,
             );
@@ -3486,6 +3491,7 @@ impl GameGrid {
                 movement_to_target.into_iter().map(|pos| MovementPathNode {
                     pos,
                     difficult_terrain: false,
+                    dangerous: false,
                 }),
                 MOVEMENT_ARROW_COLOR,
             );
@@ -4349,11 +4355,31 @@ impl GameGrid {
     }
 
     fn draw_player_movement_path(&self, path: &[PathNode]) {
+        let mut movement_path = vec![(&path[0], false)];
+        let mut opportunity_attackers = vec![];
+        {
+            for w in path.windows(2) {
+                let mover = self.characters.get(&self.active_character_id).unwrap();
+                let mut dangerous = false;
+                for other_char in self.characters.values() {
+                    if can_opportunity_attack_mover(mover, w[0].position, w[1].position, other_char)
+                    {
+                        opportunity_attackers.push(other_char.id());
+                        dangerous = true;
+                    }
+                }
+                movement_path.push((&w[1], dangerous));
+            }
+        }
+
         self.draw_movement_path_with_arrow(
-            path.iter().map(|node| MovementPathNode {
-                pos: node.position,
-                difficult_terrain: node.difficult_terrain,
-            }),
+            movement_path
+                .iter()
+                .map(|(node, dangerous)| MovementPathNode {
+                    pos: node.position,
+                    difficult_terrain: node.difficult_terrain,
+                    dangerous: *dangerous,
+                }),
             HOVER_MOVEMENT_ARROW_COLOR,
         );
 
@@ -4365,6 +4391,10 @@ impl GameGrid {
         );
 
         self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0, true);
+
+        for char_id in opportunity_attackers {
+            self.draw_speech_bubble("!", char_id);
+        }
 
         //self.draw_cell_outline(destination, MAGENTA, 5.0, 2.0);
 
@@ -4379,12 +4409,6 @@ impl GameGrid {
         self.draw_static_text(&text, text_color, bg_color, 4.0, x, y + 14.0);
     }
 
-    fn active_char_remaining_movement(&self) -> f32 {
-        self.characters[&self.active_character_id]
-            .remaining_movement
-            .get()
-    }
-
     fn draw_movement_path_with_arrow(
         &self,
         mut path: impl ExactSizeIterator<Item = MovementPathNode>,
@@ -4394,15 +4418,19 @@ impl GameGrid {
         let mut b = path.next().expect("Second cell in path");
 
         loop {
-            let circle_color = if a.difficult_terrain {
-                Color::new(1.0, 0.4, 0.4, 0.8)
-            } else {
-                Color::new(1.0, 1.0, 1.0, 0.5)
-            };
+            let mut r = 3.0;
+            let mut circle_color = Color::new(1.0, 1.0, 1.0, 0.5);
+            if a.dangerous {
+                //circle_color = Color::new(0.8, 0.0, 0.0, 0.8);
+                r = oscillate(0.5, r, r * 2.0);
+            }
+            if a.difficult_terrain {
+                circle_color = Color::new(1.0, 0.4, 0.4, 0.8);
+            }
 
             let x = self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0;
             let y = self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0;
-            let r = 3.0;
+
             draw_circle(x, y, r, circle_color);
             draw_circle_lines(x, y, r, 2.0, BLACK);
 
@@ -4593,6 +4621,7 @@ impl GameGrid {
 struct MovementPathNode {
     pos: Position,
     difficult_terrain: bool,
+    dangerous: bool,
 }
 
 fn chance_to_perc_str(chance: f32) -> String {

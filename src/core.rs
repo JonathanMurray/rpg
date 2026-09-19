@@ -468,8 +468,7 @@ impl CoreGame {
                 self.perform_spend_ap(attacker, action_point_cost as u32)
                     .await;
 
-                let is_within_melee =
-                    within_meele(attacker.position.get(), defender.position.get());
+                let is_within_melee = within_meele(attacker.pos(), defender.pos());
 
                 // Opportunity attack vs ranged attacker
                 if !is_within_melee {
@@ -829,15 +828,14 @@ impl CoreGame {
             }
 
             for other_char in self.characters.iter() {
-                let unfriendly = other_char.player_controlled() != character.player_controlled();
-                let leaving_melee = within_meele(character.pos(), other_char.pos())
-                    && !within_meele(new_position, other_char.pos());
-
-                if unfriendly && leaving_melee {
+                if can_opportunity_attack_mover(
+                    character,
+                    character.pos(),
+                    new_position,
+                    other_char,
+                ) {
                     // Movement opportunity attack
-                    if movement_type == MovementType::Regular
-                        && other_char.can_use_opportunity_attack(character.id())
-                    {
+                    if movement_type == MovementType::Regular {
                         let reactor = other_char;
 
                         let chooses_to_use_opportunity_attack = self
@@ -3361,6 +3359,19 @@ impl From<AttackPrediction> for TargetPrediction {
 pub struct DamageInterval {
     pub min: u32,
     pub max: u32,
+}
+
+pub fn can_opportunity_attack_mover(
+    mover: &Character,
+    old_position: Position,
+    new_position: Position,
+    other_char: &Character,
+) -> bool {
+    let unfriendly = other_char.player_controlled() != mover.player_controlled();
+    let leaving_melee = within_meele(old_position, other_char.pos())
+        && !within_meele(new_position, other_char.pos());
+
+    unfriendly && leaving_melee && other_char.can_use_opportunity_attack(mover.id())
 }
 
 pub fn predict_ability(

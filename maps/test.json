@@ -373,17 +373,6 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Alice",
-      "pos": [
-        8,
-        30
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Bob",
       "pos": [
         9,
@@ -395,21 +384,10 @@
       "name": null
     },
     {
-      "type_": "Clara",
-      "pos": [
-        5,
-        32
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Ghoul2",
       "pos": [
-        9,
-        11
+        12,
+        18
       ],
       "health": null,
       "main_hand": null,
