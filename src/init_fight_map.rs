@@ -29,6 +29,8 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     let mut characters: Vec<Rc<Character>> = Default::default();
     let pathfind_grid = Rc::new(PathfindGrid::new(map_data.grid_dimensions));
 
+    let mut active_char_id = None;
+
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
         let char: Option<Rc<Character>> = match char_data.type_ {
@@ -46,7 +48,11 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
             }),
             _ => Some(create_character(pos, &char_data, None, i as CharacterId)),
         };
+
         if let Some(char) = char {
+            if active_char_id.is_none() && !char.is_dead() && char.player_controlled() {
+                active_char_id = Some(char.id());
+            }
             pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
             characters.push(char);
         }
@@ -71,7 +77,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
 
     GameInitState {
         characters,
-        active_character_id: 0,
+        active_character_id: active_char_id.unwrap(),
         pathfind_grid,
         background: map_data.background,
         terrain_objects: map_data.terrain_objects,
