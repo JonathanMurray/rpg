@@ -52,7 +52,7 @@ use crate::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
         draw_dashed_rectangle_sides,
     },
-    game_ui::{ConfiguredAction, UiState},
+    game_ui::{ConfiguredAction, UiState, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
     pathfind::{
         ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, TraversalType,
@@ -313,12 +313,19 @@ impl GameGrid {
         let cell_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();
+        let grid_size_on_screen = (
+            grid_dimensions.0 as f32 * cell_w,
+            grid_dimensions.1 as f32 * cell_w,
+        );
+        let camera_x = grid_size_on_screen.0 / 2.0 - screen_width() / 2.0;
+        let camera_y = grid_size_on_screen.1 / 2.0 - (screen_height() - UI_HEIGHT) / 2.0;
+
         let self_ = Self {
             sprites,
             pathfind_grid,
             //routes: Default::default(),
             dragging_camera_from: None,
-            camera_position: (Cell::new(0.0), Cell::new(0.0)),
+            camera_position: (Cell::new(camera_x), Cell::new(camera_y)),
             characters,
             effects: vec![],
             selected_player_character_id: Some(selected_character_id),
@@ -1968,12 +1975,9 @@ impl GameGrid {
             }
         }
 
-        if is_mouse_within_grid && receptive_to_dragging {
+        if receptive_to_dragging {
             if let Some(dragging_from) = self.dragging_camera_from {
-                if
-                /*is_mouse_button_down(MouseButton::Right)
-                ||*/
-                is_mouse_button_down(MouseButton::Middle) {
+                if is_mouse_button_down(MouseButton::Middle) {
                     let (dx, dy) = (
                         mouse_relative.0 - dragging_from.0,
                         mouse_relative.1 - dragging_from.1,
@@ -1985,10 +1989,7 @@ impl GameGrid {
                 }
             }
 
-            if
-            /*is_mouse_button_pressed(MouseButton::Right)
-            ||*/
-            is_mouse_button_pressed(MouseButton::Middle) {
+            if is_mouse_button_pressed(MouseButton::Middle) {
                 self.dragging_camera_from = Some(mouse_relative);
             }
 
@@ -4604,17 +4605,27 @@ impl GameGrid {
     }
 
     fn pan_camera(&self, dx: f32, dy: f32) {
+        let grid_w = self.grid_dimensions.0 as f32 * self.cell_w;
+        let grid_h = self.grid_dimensions.1 as f32 * self.cell_w;
+
         let new_x = self.camera_position.0.get() + dx;
         let new_y = self.camera_position.1.get() + dy;
-        let max_space = 450.0;
-        let max_x = self.grid_dimensions.0 as f32 * self.cell_w + max_space - screen_width();
-        let max_y = self.grid_dimensions.1 as f32 * self.cell_w + max_space - screen_height();
-        self.camera_position
-            .0
-            .set(new_x.max(-max_space).min(max_x).round());
-        self.camera_position
-            .1
-            .set(new_y.max(-max_space).min(max_y).round());
+
+        // at least this much of the grid must be visible
+        let min_visible = 200.0;
+
+        self.camera_position.0.set(
+            new_x
+                .max(-screen_width() + min_visible)
+                .min(grid_w - min_visible)
+                .round(),
+        );
+        self.camera_position.1.set(
+            new_y
+                .max(-screen_height() + min_visible)
+                .min(grid_h - min_visible)
+                .round(),
+        );
     }
 }
 

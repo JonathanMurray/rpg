@@ -369,7 +369,7 @@ pub fn create_character(
                 SoundId::Damage,
                 PortraitId::Pyromaniac,
                 char_data.type_.sprite_id(),
-                Attributes::new(1, 2, 1, 1),
+                Attributes::new(1, 3, 1, 1),
                 pos,
             );
             ghoul.health.change_max_value_to(9);

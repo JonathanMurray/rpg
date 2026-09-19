@@ -299,15 +299,15 @@ impl TargetUi {
             ];
 
             if !char.player_controlled() {
-                let mut stats_text = format!("|<boot>| {:.1}", char.free_movement_per_turn());
+                let mut stats_text = String::new(); //format!("|<boot>| {:.1}", char.free_movement_per_turn());
                 if char.weapon(HandType::MainHand).is_some() {
                     stats_text.push_str(&format!(
-                        "   |<sword>| {}   |<red_dice>| {}   |<helmet>| {}",
+                        "   |<sword>| {}   |<red_dice>| {}",
                         char.weapon_damage_str(HandType::MainHand),
                         plus_minus(char.attack_modifier(HandType::MainHand)),
-                        char.armor_str()
                     ));
                 }
+                stats_text.push_str(&format!("   |<helmet>| {}", char.armor_str()));
 
                 if bot_using_spells {
                     stats_text.push_str(&format!("   |<blue_dice>| +{}", char.spell_modifier()));

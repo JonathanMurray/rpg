@@ -4,11 +4,16 @@ use std::rc::Rc;
 use std::str::FromStr;
 
 use macroquad::color::LIGHTGRAY;
-use macroquad::miniquad::window::{self, set_window_position};
+use macroquad::miniquad::window::{
+    self, screen_size, set_fullscreen, set_window_position, set_window_size,
+};
 
 use macroquad::text::draw_text;
+use macroquad::texture::get_screen_data;
 use macroquad::time::get_time;
-use macroquad::window::{clear_background, next_frame, screen_height, screen_width};
+use macroquad::window::{
+    clear_background, next_frame, request_new_screen_size, screen_height, screen_width,
+};
 use macroquad::{
     color::BLACK,
     miniquad,
@@ -43,15 +48,33 @@ async fn main() {
     rand::srand(miniquad::date::now() as u64);
 
     // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
-    set_window_position(100, 100);
+    //set_window_position(100, 100);
 
     dbg!(get_time());
     dbg!(
         window::screen_size(),
         window::dpi_scale(),
-        window::high_dpi()
+        window::high_dpi(),
+        get_screen_data()
     );
 
+    set_fullscreen(true);
+    // Give the backend enough time to enter fullscreen, so that we can determine monitor resolution
+    for _ in 0..2 {
+        next_frame().await;
+    }
+    let monitor_size = screen_size();
+    set_fullscreen(false);
+    request_new_screen_size(monitor_size.0 - 50.0, monitor_size.1 - 100.0);
+
+    dbg!(
+        window::screen_size(),
+        window::dpi_scale(),
+        window::high_dpi(),
+        get_screen_data()
+    );
+
+    next_frame().await;
     clear_background(BLACK);
     draw_text(
         "Loading...",
@@ -327,7 +350,8 @@ fn window_conf() -> Conf {
         window_height: 1200,
         high_dpi: true,
 
-        window_resizable: false,
+        //fullscreen: true,
+        window_resizable: true,
         ..Default::default()
     }
 }

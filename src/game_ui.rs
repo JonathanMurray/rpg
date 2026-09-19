@@ -6,7 +6,7 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, MAGENTA, WHITE},
+    color::{Color, BLACK, DARKGRAY, GRAY, GREEN, LIGHTGRAY, MAGENTA, WHITE},
     input::{
         is_key_down, is_key_pressed, is_mouse_button_pressed, mouse_position, KeyCode, MouseButton,
     },
@@ -436,24 +436,26 @@ pub struct CharacterUi {
     font: Font,
 }
 
-fn resources_mid_x() -> f32 {
-    screen_width() / 2.0 - 260.0
-}
+pub const UI_HEIGHT: f32 = 230.0;
+const UI_WIDTH: f32 = 700.0;
 
 impl CharacterUi {
-    pub fn draw(&self, y: f32) {
+    pub fn draw(&self, ui_x0: f32, y: f32) {
         let y0 = y + 5.0;
+        let resources_mid_x = ui_x0 + 90.0;
         self.actions_section.draw(
-            screen_width() / 2.0 - self.actions_section.size().0 / 2.0,
+            ui_x0 + UI_WIDTH / 2.0 - self.actions_section.size().0 / 2.0,
+            //screen_width() / 2.0 - self.actions_section.size().0 / 2.0,
             y0,
         );
 
         self.action_points_row.draw(
-            resources_mid_x() - self.action_points_row.size().0 / 2.0,
+            resources_mid_x - self.action_points_row.size().0 / 2.0,
             screen_height() - 140.0,
         );
+
         let resource_bars_y = screen_height() - 110.0;
-        let resource_bars_x = resources_mid_x() - self.resource_bars.size().0 / 2.0;
+        let resource_bars_x = resources_mid_x - self.resource_bars.size().0 / 2.0;
         self.resource_bars.draw(resource_bars_x, resource_bars_y);
 
         let tooltip = if self.action_points_row.hovered.get() {
@@ -669,9 +671,13 @@ impl UserInterface {
     pub fn draw(&mut self) -> Option<PlayerChose> {
         DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
 
-        let ui_y = screen_height() - 230.0;
-        let ui_x0 = screen_width() / 2.0 - 350.0;
-        let ui_x1 = screen_width() / 2.0 + 350.0;
+        let ui_y = screen_height() - UI_HEIGHT;
+
+        let ui_x0 =
+            (screen_width() / 2.0 - 350.0).min(screen_width() - self.log.width() - 5.0 - UI_WIDTH);
+        let ui_x1 = ui_x0 + UI_WIDTH;
+
+        let resources_mid_x = ui_x0 + 90.0;
 
         let popup_rect = self.activity_popup.last_drawn_rectangle;
         let target_ui_rect = self.target_ui.last_drawn_rectangle.get();
@@ -734,20 +740,20 @@ impl UserInterface {
 
         draw_texture(UI_TEXTURE.get().unwrap(), ui_x0 - 10.0, ui_y - 10.0, WHITE);
 
-        self.activity_popup.draw(570.0, ui_y + 1.0);
+        self.activity_popup.draw(ui_x0 + 64.0, ui_y - 1.0);
 
         let may_show_end_turn_button = matches!(
             &*self.state.borrow(),
             UiState::ChoosingAction | UiState::ConfiguringAction(..)
         );
         let player_portraits_outcome = self.player_portraits.draw(
-            screen_width() / 2.0 - 120.0,
+            ui_x0 + 230.0,
             screen_height() - 120.0,
             may_show_end_turn_button,
         );
         let mut changed_character = player_portraits_outcome.changed_character;
         self.character_sheet_toggle.draw(
-            resources_mid_x() - self.character_sheet_toggle.size().0 / 2.0,
+            resources_mid_x - self.character_sheet_toggle.size().0 / 2.0,
             screen_height() - 35.0,
         );
 
@@ -803,9 +809,12 @@ impl UserInterface {
             player_chose = Some(PlayerChose::Action(None));
         }
 
+        self.settings
+            .draw(0.0, screen_height() - self.settings.size().1);
+
         let character_ui = self.character_uis.get_mut(&selected_character_id).unwrap();
 
-        character_ui.draw(ui_y + 5.0);
+        character_ui.draw(ui_x0, ui_y + 5.0);
 
         let log_x = screen_width() - self.log.width();
         self.log.draw(log_x, ui_y);
@@ -871,9 +880,6 @@ impl UserInterface {
         }
 
         self.banner.draw(&self.big_font);
-
-        let h = self.settings.size().1;
-        self.settings.draw(0.0, screen_height() - h);
 
         let keyword_tooltip =
             DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.load(std::sync::atomic::Ordering::Relaxed);
