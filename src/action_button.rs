@@ -8,7 +8,7 @@ use macroquad::{
     color::{Color, BLACK, GOLD, GREEN, LIGHTGRAY, ORANGE, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, KeyCode, MouseButton},
     math::Rect,
-    shapes::{draw_rectangle, draw_rectangle_lines},
+    shapes::draw_rectangle,
     text::{measure_text, Font, TextParams},
     time::get_time,
 };
@@ -28,6 +28,7 @@ use crate::{
     },
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
+    game_ui::draw_rectangle_lines2,
     pathfind::Liquid,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
@@ -1361,7 +1362,7 @@ impl Drawable for ActionButton {
             let x0 = x + w / 2.0 - rect_w / 2.0;
             let y0 = y - rect_h * 0.7;
             draw_rectangle(x0, y0, rect_w, rect_h, BLACK);
-            draw_rectangle_lines(x0, y0, rect_w, rect_h, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(x0, y0, rect_w, rect_h, 1.0, LIGHTGRAY);
             draw_text_rounded(
                 text,
                 x0 + rect_w / 2.0 - text_dim.width / 2.0,

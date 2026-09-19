@@ -6,7 +6,7 @@ use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
 };
-use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
+use macroquad::shapes::draw_rectangle;
 use macroquad::text::{measure_text, TextParams};
 use macroquad::window::{screen_height, screen_width};
 use macroquad::{
@@ -19,7 +19,7 @@ use crate::conditions_ui::ConditionsList;
 use crate::core::EquipmentSlotRole;
 use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
-use crate::game_ui::{ConfiguredAction, UiState};
+use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::build_character_stats_table;
 use crate::{
@@ -297,9 +297,9 @@ impl CharacterSheet {
         let cross_color = LIGHTGRAY;
         draw_cross(btn_x, btn_y, btn_w, btn_h, cross_color, 1.0, 2.0);
         if hover {
-            draw_rectangle_lines(btn_x, btn_y, btn_w, btn_h, 2.0, WHITE);
+            draw_rectangle_lines2(btn_x, btn_y, btn_w, btn_h, 2.0, WHITE);
         } else {
-            draw_rectangle_lines(btn_x, btn_y, btn_w, btn_h, 1.0, cross_color);
+            draw_rectangle_lines2(btn_x, btn_y, btn_w, btn_h, 1.0, cross_color);
         }
 
         hover && is_mouse_button_pressed(MouseButton::Left)

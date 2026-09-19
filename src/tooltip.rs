@@ -9,7 +9,11 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::{draw_text_with_font_tags, measure_text_with_font_tags}, core::{Condition, ConditionInfo, Goodness, cond_description_with_populated_stacks}, drawing::draw_rounded_rectangle_lines, textures::{StatusId, draw_status_icon}, util::screen_size,
+    base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
+    core::{cond_description_with_populated_stacks, Condition, ConditionInfo, Goodness},
+    drawing::draw_rounded_rectangle_lines,
+    textures::{draw_status_icon, StatusId},
+    util::screen_size,
 };
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]

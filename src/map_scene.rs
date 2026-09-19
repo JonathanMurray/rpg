@@ -3,10 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{
-        draw_circle, draw_circle_lines, draw_rectangle_ex, draw_rectangle_lines,
-        DrawRectangleParams,
-    },
+    shapes::{draw_circle, draw_circle_lines, draw_rectangle_ex, DrawRectangleParams},
     text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
@@ -14,7 +11,16 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::draw_text_rounded, chest_scene::{ChestEntry, generate_chest_content}, core::{Character, EquipmentEntry}, data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD}, drawing::draw_dashed_line, init_fight_map::FightId, shop_scene::{ShopEntry, generate_shop_contents}, textures::{PortraitId, load_and_init_texture}, util::screen_size,
+    base_ui::draw_text_rounded,
+    chest_scene::{generate_chest_content, ChestEntry},
+    core::{Character, EquipmentEntry},
+    data::{CHAIN_MAIL, DAGGER, LEATHER_ARMOR, RAPIER, SMALL_SHIELD, SWORD},
+    drawing::draw_dashed_line,
+    game_ui::draw_rectangle_lines2,
+    init_fight_map::FightId,
+    shop_scene::{generate_shop_contents, ShopEntry},
+    textures::{load_and_init_texture, PortraitId},
+    util::screen_size,
 };
 
 #[derive(Clone, Debug)]
@@ -374,6 +380,6 @@ impl MapScene {
             draw_texture_ex(texture, x0, y, WHITE, params);
             x0 += portrait_w;
         }
-        draw_rectangle_lines(x, y, total_w, portrait_h, 2.0, BLACK);
+        draw_rectangle_lines2(x, y, total_w, portrait_h, 2.0, BLACK);
     }
 }

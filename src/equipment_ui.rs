@@ -7,7 +7,7 @@ use macroquad::{
     color::{Color, BLACK, RED, SKYBLUE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
-    shapes::{draw_rectangle, draw_rectangle_lines},
+    shapes::draw_rectangle,
     text::{measure_text, TextParams},
 };
 
@@ -29,6 +29,7 @@ use crate::{
         EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
+    game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
     textures::{draw_eq_icon, EquipmentIconId},
     tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
@@ -523,9 +524,9 @@ impl EquipmentSection {
             } else if is_hovered {
                 if let Some(valid) = drag_validity {
                     let color = if valid { YELLOW } else { RED };
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, color);
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, color);
                 } else if slot.content.is_some() {
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
                 }
             }
         }

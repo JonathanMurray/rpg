@@ -4,14 +4,18 @@ use macroquad::{
     color::{Color, BLACK, BLUE, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    shapes::{draw_rectangle, draw_rectangle_ex, draw_rectangle_lines, DrawRectangleParams},
+    shapes::{draw_rectangle, draw_rectangle_ex, DrawRectangleParams},
     text::{measure_text, Font, TextParams},
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
     time::get_frame_time,
     window::{clear_background, next_frame},
 };
 
-use crate::{tooltip::{TooltipPositionPreference, draw_keyword_tooltips, draw_regular_tooltip}, util::screen_size};
+use crate::{
+    game_ui::draw_rectangle_lines2,
+    tooltip::{draw_keyword_tooltips, draw_regular_tooltip, TooltipPositionPreference},
+    util::screen_size,
+};
 
 use crate::{
     base_ui::{draw_text_rounded, Drawable, TextLine},
@@ -165,12 +169,12 @@ pub async fn run_shop_loop(
                         &tooltip.technical_description,
                     );
 
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
 
                     if rect.contains(mouse_position().into()) {
                         let has_space = character.has_space_in_inventory();
                         if can_afford && has_space {
-                            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
+                            draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 4.0, YELLOW);
 
                             if is_mouse_button_pressed(MouseButton::Left) {
                                 let success = character.try_gain_equipment(entry.item);
@@ -179,13 +183,13 @@ pub async fn run_shop_loop(
                                 entry.has_been_bought = true;
                             }
                         } else {
-                            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 2.0, RED);
+                            draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 2.0, RED);
                         }
 
                         hovered = Some((tooltip, tooltip_rect));
                     }
                 } else {
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, GRAY);
                 }
 
                 icon_x += icon_w + icon_margin;

@@ -11,7 +11,7 @@ use macroquad::input::{
 };
 use macroquad::math::Rect;
 use macroquad::miniquad::window::set_window_position;
-use macroquad::shapes::{draw_rectangle, draw_rectangle_lines};
+use macroquad::shapes::draw_rectangle;
 use macroquad::text::{draw_text, draw_text_ex, measure_text, Font, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::window::{next_frame, screen_height};
@@ -20,7 +20,7 @@ use macroquad::window::{screen_width, Conf};
 use rpg::base_ui::{Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine};
 use rpg::core::{Character, CharacterId, HandType, Party};
 
-use rpg::game_ui::UiState;
+use rpg::game_ui::{draw_rectangle_lines2, UiState};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
 use rpg::grid::ControlPoint;
 use rpg::init_fight_map::GameInitState;
@@ -212,7 +212,7 @@ async fn main() {
                     }
 
                     EditorAction::PlaceCharacter(id) => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
                         draw_text(
                             &format!("{:?}", id),
                             snapped_mouse_screen_pos.0,
@@ -222,7 +222,7 @@ async fn main() {
                         );
                     }
                     EditorAction::PlaceControlPoint(control_point) => {
-                        draw_rectangle_lines(
+                        draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                             game_grid.cell_w,
@@ -240,7 +240,7 @@ async fn main() {
                     }
 
                     EditorAction::EraseTerrain => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
                             snapped_mouse_screen_pos.0,
@@ -250,7 +250,7 @@ async fn main() {
                         );
                     }
                     EditorAction::EraseBackground => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
                             snapped_mouse_screen_pos.0,
@@ -260,7 +260,7 @@ async fn main() {
                         );
                     }
                     EditorAction::EraseDecoration => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
                             snapped_mouse_screen_pos.0,
@@ -270,7 +270,7 @@ async fn main() {
                         );
                     }
                     EditorAction::EraseControlPoint => {
-                        draw_rectangle_lines(
+                        draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
                             game_grid.cell_w,
@@ -297,7 +297,7 @@ async fn main() {
                     }
                     EditorAction::MoveCharacter(maybe_id) => match maybe_id.get() {
                         Some(_) => {
-                            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                            draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
                             draw_text(
                                 "Move",
                                 snapped_mouse_screen_pos.0,
@@ -317,7 +317,7 @@ async fn main() {
                         }
                     },
                     EditorAction::RemoveCharacter => {
-                        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Remove",
                             snapped_mouse_screen_pos.0,
@@ -752,7 +752,7 @@ impl Sidebar {
                 if self.selected_section_idx == section_i
                     && self.selected_action_idx == Some(action_i)
                 {
-                    draw_rectangle_lines(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
+                    draw_rectangle_lines2(x + 1.0, y + 1.0, icon_w - 2.0, icon_w - 2.0, 3.0, BLACK);
                 }
             }
 

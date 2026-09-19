@@ -12,9 +12,7 @@ use macroquad::math::Rect;
 use macroquad::miniquad::window::{screen_size, set_window_position};
 use macroquad::miniquad::{KeyCode, MouseButton};
 
-use macroquad::shapes::{
-    draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines,
-};
+use macroquad::shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle};
 use macroquad::text::{draw_text_ex, load_ttf_font, measure_text, Font, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, FilterMode, Texture2D};
 use macroquad::window::next_frame;
@@ -37,6 +35,7 @@ use crate::data::{
     QUICK, RAGE, SCREAM, SEARING_LIGHT, SHACKLED_MIND, SIDE_STEP, SMITE, SWEEP_ATTACK,
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
+use crate::game_ui::draw_rectangle_lines2;
 use crate::textures::{draw_icon, load_all_portraits, load_and_init_static, PortraitId};
 use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
@@ -714,7 +713,7 @@ pub async fn run_skill_tree_scene() {
                         },
                     );
 
-                    draw_rectangle_lines(x, y, icon_w, icon_w, 5.0, WHITE);
+                    draw_rectangle_lines2(x, y, icon_w, icon_w, 5.0, WHITE);
                 }
                 NodeContent::Attr(attribute) => {
                     draw_attr_node(attr_r, x, y, attribute);
@@ -741,7 +740,7 @@ pub async fn run_skill_tree_scene() {
                     if claimed_nodes.contains(&node.id) {
                         let x = x - icon_w / 2.0;
                         let y = y - icon_w / 2.0;
-                        draw_rectangle_lines(x, y, icon_w, icon_w, 5.0, WHITE);
+                        draw_rectangle_lines2(x, y, icon_w, icon_w, 5.0, WHITE);
                     }
                 }
             }
@@ -1054,13 +1053,13 @@ impl Drawable for AttributeButton {
 
         let (mx, my) = mouse_position();
         if (x..x + w).contains(&mx) && (y..y + h).contains(&my) {
-            draw_rectangle_lines(x, y, w, h, 4.0, WHITE);
+            draw_rectangle_lines2(x, y, w, h, 4.0, WHITE);
 
             if is_mouse_button_pressed(MouseButton::Left) {
                 self.clicked_events.borrow_mut().push(self.attr);
             }
         } else {
-            draw_rectangle_lines(x, y, w, h, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(x, y, w, h, 1.0, LIGHTGRAY);
         }
     }
 

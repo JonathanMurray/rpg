@@ -20,6 +20,7 @@ use crate::{
     },
     core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
     drawing::{draw_cross, draw_rounded_rectangle_lines},
+    game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
     util::oscillate,
@@ -32,7 +33,7 @@ use indexmap::IndexMap;
 use macroquad::{
     color::{Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, RED, WHITE},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle},
     text::Font,
     texture::Texture2D,
 };
@@ -209,7 +210,7 @@ impl Drawable for TopCharacterPortrait {
             },
         );
         self.container.draw(x + self.padding, y + self.padding);
-        draw_rectangle_lines(x, y, w, h, 2.0, LIGHTGRAY);
+        draw_rectangle_lines2(x, y, w, h, 2.0, LIGHTGRAY);
 
         let x0 = x + (w - portrait_w) / 2.0;
 
@@ -231,7 +232,7 @@ impl Drawable for TopCharacterPortrait {
             );
         }
         if self.weak_highlight || hovered {
-            draw_rectangle_lines(
+            draw_rectangle_lines2(
                 x0 + 1.0,
                 y + 1.0,
                 portrait_w - 2.0,
@@ -327,13 +328,13 @@ impl Drawable for CharacterSheetToggle {
         }
 
         if self.shown.get() {
-            draw_rectangle_lines(x, y, size.0, size.1, 2.0, COL_GOLD);
+            draw_rectangle_lines2(x, y, size.0, size.1, 2.0, COL_GOLD);
         } else {
-            draw_rectangle_lines(x, y, size.0, size.1, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(x, y, size.0, size.1, 2.0, LIGHTGRAY);
         }
 
         if hovered {
-            draw_rectangle_lines(x + 2.0, y + 2.0, size.0 - 4.0, size.1 - 4.0, 1.0, WHITE);
+            draw_rectangle_lines2(x + 2.0, y + 2.0, size.0 - 4.0, size.1 - 4.0, 2.0, WHITE);
         }
     }
 
@@ -707,7 +708,7 @@ impl Drawable for PlayerCharacterPortrait {
         let button_y = y + h + 5.0;
         let has_taken_a_turn = self.character.has_taken_a_turn_this_round.get();
         if has_taken_a_turn {
-            draw_rectangle_lines(x, button_y, w, button_h, 1.0, GRAY);
+            draw_rectangle_lines2(x, button_y, w, button_h, 1.0, GRAY);
             self.done_text.draw(
                 x + w / 2.0 - self.done_text.size().0 / 2.0,
                 button_y + button_text_vert_pad,
@@ -757,9 +758,9 @@ impl Drawable for PlayerCharacterPortrait {
                 );
                 let mut color = COL_GOLD;
                 color.a = oscillate(1.3, 0.2, 0.9);
-                draw_rectangle_lines(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 3.0, color);
+                draw_rectangle_lines2(btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 3.0, color);
             } else {
-                draw_rectangle_lines(
+                draw_rectangle_lines2(
                     btn_rect.x, btn_rect.y, btn_rect.w, btn_rect.h, 1.0, LIGHTGRAY,
                 );
             }
@@ -769,7 +770,7 @@ impl Drawable for PlayerCharacterPortrait {
                     self.sound_player.play(SoundId::HoverButton);
                 }
                 self.is_end_turn_hovered.set(true);
-                draw_rectangle_lines(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
+                draw_rectangle_lines2(x + 2.0, button_y + 2.0, w - 4.0, button_h - 4.0, 1.0, WHITE);
                 if is_mouse_button_pressed(MouseButton::Left) {
                     self.has_clicked_end_turn.set(true);
                 }
@@ -804,7 +805,7 @@ impl Drawable for PlayerCharacterPortrait {
         self.is_portrait_hovered.set(portrait_hovered);
 
         if portrait_hovered && !self.is_character_shown.get() {
-            draw_rectangle_lines(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(x + 1.0, y + 1.0, w - 2.0, h - 2.0, 1.0, LIGHTGRAY);
             if is_mouse_button_pressed(MouseButton::Left) {
                 println!(
                     "Set portrait has been clicked mouse={:?}, {},{}",
@@ -1212,7 +1213,7 @@ impl Drawable for ActionPointsRow {
 
         if reserved_ap > self.max_ap as i32 {
             let (w, h) = self.size();
-            draw_rectangle_lines(x, y, w, h, 2.0, RED);
+            draw_rectangle_lines2(x, y, w, h, 2.0, RED);
         }
     }
 
@@ -1354,10 +1355,10 @@ impl Drawable for ResourceBar {
             }
         };
 
-        draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
 
         if self.gain_animation.is_some() {
-            draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
+            draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
         }
 
         self.hovered.set(rect.contains(mouse_position().into()));

@@ -1,8 +1,10 @@
 use macroquad::{
     color::{Color, GREEN, MAGENTA},
-    shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines, draw_triangle},
+    shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_triangle},
     time::get_time,
 };
+
+use crate::game_ui::draw_rectangle_lines2;
 
 pub fn draw_arrow(
     (x, y): (f32, f32),
@@ -301,7 +303,7 @@ pub fn draw_rounded_rectangle_lines(
     inner_rounding: f32,
     outer: Option<(Color, f32)>,
 ) {
-    draw_rectangle_lines(x, y, w, h, thickness, color);
+    draw_rectangle_lines2(x, y, w, h, thickness, color);
 
     let mut passes = vec![(color, inner_rounding)];
     if let Some((outer_color, outer_rounding)) = outer {

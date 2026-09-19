@@ -3179,3 +3179,13 @@ pub enum PlayerChose {
     Action(Option<Box<Action>>),
     SwitchTo(CharacterId),
 }
+
+pub fn draw_rectangle_lines2(x: f32, y: f32, w: f32, h: f32, mut thickness: f32, color: Color) {
+    // https://github.com/not-fl3/macroquad/issues/704
+    // https://github.com/not-fl3/macroquad/issues/271
+    // On MacOS retina display, thickness=1.0 only draws half of the rectangle sides
+    if thickness == 1.0 {
+        thickness = 2.0;
+    }
+    macroquad::shapes::draw_rectangle_lines(x, y, w, h, thickness, color);
+}

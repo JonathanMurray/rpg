@@ -12,7 +12,12 @@ use macroquad::{
 };
 
 use crate::{
-    base_ui::draw_text_rounded, core::Character, non_combat_ui::NonCombatPartyUi, sounds::SoundPlayer, textures::{EquipmentIconId, PortraitId}, util::screen_size,
+    base_ui::draw_text_rounded,
+    core::Character,
+    non_combat_ui::NonCombatPartyUi,
+    sounds::SoundPlayer,
+    textures::{EquipmentIconId, PortraitId},
+    util::screen_size,
 };
 
 pub async fn run_rest_loop(

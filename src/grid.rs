@@ -12,6 +12,7 @@ use macroquad::{
     color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::{Rect, Vec2},
+    miniquad::window::dpi_scale,
     shapes::{
         draw_line, draw_rectangle_ex, draw_rectangle_lines_ex, draw_triangle, DrawRectangleParams,
     },
@@ -32,7 +33,7 @@ use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
 use macroquad::{
     color::{GREEN, RED, WHITE},
     input::{is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton},
-    shapes::{draw_circle, draw_circle_lines, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_circle, draw_circle_lines, draw_rectangle},
     text::measure_text,
 };
 
@@ -52,7 +53,7 @@ use crate::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
         draw_dashed_rectangle_sides,
     },
-    game_ui::{ConfiguredAction, UiState, UI_HEIGHT},
+    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
     pathfind::{
         ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, TraversalType,
@@ -317,6 +318,7 @@ impl GameGrid {
             grid_dimensions.0 as f32 * cell_w,
             grid_dimensions.1 as f32 * cell_w,
         );
+
         let camera_x = grid_size_on_screen.0 / 2.0 - screen_width() / 2.0;
         let camera_y = grid_size_on_screen.1 / 2.0 - (screen_height() - UI_HEIGHT) / 2.0;
 
@@ -1394,7 +1396,7 @@ impl GameGrid {
         margin: f32,
         thickness: f32,
     ) {
-        draw_rectangle_lines(
+        draw_rectangle_lines2(
             self.grid_x_to_screen(grid_x) + margin,
             self.grid_y_to_screen(grid_y) + margin,
             self.cell_w - margin * 2.0,
@@ -3831,7 +3833,7 @@ impl GameGrid {
                 let texture = info.condition.status_icon();
                 draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
                 draw_status_icon(texture, status_x, status_y, Some((status_w, status_w)));
-                draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
+                draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 /*
                 if let Some(stacks) = info.stacks {
                     draw_text_rounded(
@@ -3901,7 +3903,7 @@ impl GameGrid {
                 health_h + extra_h,
                 potential_color,
             );
-            draw_rectangle_lines(
+            draw_rectangle_lines2(
                 health_x + current_health_w - guaranteed_damage_w - potential_damage_w,
                 health_y - extra_h / 2.0,
                 potential_damage_w + guaranteed_damage_w,
@@ -3970,13 +3972,13 @@ impl GameGrid {
                         health_h + extra_h,
                     );
                     draw_rectangle(rect.x, rect.y, rect.w, rect.h, ORANGE);
-                    draw_rectangle_lines(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+                    draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
                 }
             }
         }
 
         if !discrete_healthbar {
-            draw_rectangle_lines(health_x, health_y, health_w, health_h, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(health_x, health_y, health_w, health_h, 1.0, LIGHTGRAY);
 
             //let health_text = format!("{}/{}", character.health.current(), character.health.max());
             let health_text = format!("{}", character.health.current());
@@ -4019,7 +4021,7 @@ impl GameGrid {
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
         );
         draw_rectangle(rect.0, rect.1, rect.2, rect.3, color);
-        draw_rectangle_lines(rect.0, rect.1, rect.2, rect.3, 1.0, WHITE);
+        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, WHITE);
     }
 
     fn draw_circular_character_highlight(
@@ -4856,7 +4858,7 @@ impl EffectGraphics {
                     let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
                     draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
                     draw_status_icon(*texture, status_x, status_y, Some((status_w, status_w)));
-                    draw_rectangle_lines(status_x, status_y, status_w, status_w, 1.0, GRAY);
+                    draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 }
 
                 if *background {
@@ -5051,7 +5053,7 @@ pub fn draw_action(
             dim.height + 2.0 * detail_pad,
             bg_color,
         );
-        draw_rectangle_lines(
+        draw_rectangle_lines2(
             x0,
             y0,
             dim.width + 2.0 * detail_pad,

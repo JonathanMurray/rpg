@@ -8,7 +8,7 @@ use macroquad::{
     color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
-    shapes::{draw_line, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_line, draw_rectangle},
     text::{measure_text, Font, TextParams},
 };
 
@@ -20,7 +20,7 @@ use crate::{
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
     core::{Character, CharacterId, Characters, HandType},
     drawing::draw_dashed_line,
-    game_ui::{ConfiguredAction, UiState},
+    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
     util::{plus_minus, COL_GREEN_0},
@@ -935,11 +935,11 @@ impl MovementCostSlider {
         }
         for i in 0..self.max_allowed + 1 {
             let x0 = x + w * i as f32;
-            draw_rectangle_lines(x0, y, w, h, 1.0, LIGHTGRAY);
+            draw_rectangle_lines2(x0, y, w, h, 1.0, LIGHTGRAY);
         }
         for i in self.max_allowed + 1..self.max + 1 {
             let x0 = x + w * i as f32;
-            draw_rectangle_lines(x0, y, w, h, 1.0, DARKGRAY);
+            draw_rectangle_lines2(x0, y, w, h, 1.0, DARKGRAY);
         }
 
         let text = format!("{}", self.selected_i);
@@ -960,7 +960,7 @@ impl MovementCostSlider {
 
         let x0 = x + w * self.selected_i as f32;
         let margin = 1.0;
-        draw_rectangle_lines(
+        draw_rectangle_lines2(
             x0 - margin,
             y - margin,
             w + margin * 2.0,

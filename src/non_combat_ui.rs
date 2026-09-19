@@ -8,15 +8,23 @@ use macroquad::{
     color::{Color, GRAY, WHITE, YELLOW},
     input::{is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
-    shapes::draw_rectangle_lines,
     text::Font,
     texture::{draw_texture_ex, DrawTextureParams, Texture2D},
 };
 
 use crate::{
     action_button::{
-        ActionButton, ButtonAction, ButtonHovered, InternalUiEvent, draw_button_tooltip,
-    }, base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style}, character_sheet::build_spell_book, core::{BaseAction, Character, HandType}, equipment_ui::{EquipmentDrag, EquipmentSection}, game_ui::ResourceBars, sounds::SoundPlayer, stats_ui::build_character_stats_table, textures::{EquipmentIconId, PortraitId}, util::screen_size,
+        draw_button_tooltip, ActionButton, ButtonAction, ButtonHovered, InternalUiEvent,
+    },
+    base_ui::{Align, Container, Drawable, Element, LayoutDirection, Style},
+    character_sheet::build_spell_book,
+    core::{BaseAction, Character, HandType},
+    equipment_ui::{EquipmentDrag, EquipmentSection},
+    game_ui::{draw_rectangle_lines2, ResourceBars},
+    sounds::SoundPlayer,
+    stats_ui::build_character_stats_table,
+    textures::{EquipmentIconId, PortraitId},
+    util::screen_size,
 };
 
 pub struct PortraitRow {
@@ -61,7 +69,7 @@ impl PortraitRow {
                     ..Default::default()
                 },
             );
-            draw_rectangle_lines(x, y, w, h, 3.0, border_color);
+            draw_rectangle_lines2(x, y, w, h, 3.0, border_color);
 
             if rect.contains(mouse_position().into()) && is_mouse_button_pressed(MouseButton::Left)
             {

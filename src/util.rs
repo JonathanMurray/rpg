@@ -1,4 +1,9 @@
-use macroquad::{color::Color, rand::gen_range, time::get_time, window::{screen_height, screen_width}};
+use macroquad::{
+    color::Color,
+    rand::gen_range,
+    time::get_time,
+    window::{screen_height, screen_width},
+};
 use rand::Rng;
 
 use crate::core::{sq_distance_between, Position, Range, CENTER_MELEE_RANGE_SQUARED};

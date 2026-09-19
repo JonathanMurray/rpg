@@ -5,7 +5,7 @@ use macroquad::{
     },
     math::Rect,
     prelude::TextDimensions,
-    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle, draw_rectangle_lines},
+    shapes::{draw_circle, draw_circle_lines, draw_line, draw_rectangle},
     text::{draw_text_ex, measure_text, Font, TextParams},
     texture::{draw_texture, draw_texture_ex, DrawTextureParams, Texture2D},
 };
@@ -19,6 +19,7 @@ use std::{
 
 use crate::{
     drawing::draw_rounded_rectangle_lines,
+    game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
     textures::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CHECKED_SYMBOL,
@@ -701,7 +702,7 @@ impl Style {
                     self.border_outer_rounding,
                 );
             } else {
-                draw_rectangle_lines(x, y, size.0, size.1, thickness, color);
+                draw_rectangle_lines2(x, y, size.0, size.1, thickness, color);
             }
         }
     }
@@ -1256,7 +1257,7 @@ pub fn table(
 
 pub fn draw_debug(x: f32, y: f32, w: f32, h: f32) {
     if false {
-        draw_rectangle_lines(x, y, w, h, 1.0, MAGENTA);
+        draw_rectangle_lines2(x, y, w, h, 1.0, MAGENTA);
     }
 }
 
