@@ -1562,9 +1562,19 @@ impl CoreGame {
                         assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
                         // TODO:
                         // assertion failed: !game.pathfind_grid.obstructed_line_of_sight(caster.pos(), target_pos)
-                        assert!(!game
-                            .pathfind_grid
-                            .obstructed_line_of_sight(actor.pos(), target_pos));
+
+                        if !matches!(area_effect.shape, AreaShape::Line) {
+                            // Line can be aimed through obstruction, since it always extends to max range
+                            assert!(
+                                !game
+                                    .pathfind_grid
+                                    .obstructed_line_of_sight(actor.pos(), target_pos),
+                                "{:?} {:?}",
+                                actor.pos(),
+                                target_pos
+                            );
+                        }
+
                         actor.set_facing_toward(target_pos);
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,

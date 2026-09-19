@@ -47,7 +47,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
-    pathfind::{Liquid, PathfindGrid},
+    pathfind::{Liquid, Occupation, PathfindGrid, TerrainType},
     resources::{GameResources, UiResources},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
@@ -775,6 +775,7 @@ impl UserInterface {
             if selected_character_id != self.active_character_id
                 && matches!(*self.state.borrow(), UiState::ChoosingAction)
                 && !new_selected_char.has_taken_a_turn_this_round.get()
+                && !new_selected_char.is_dead()
             {
                 if player_chose.is_some() {
                     println!(
@@ -1184,8 +1185,6 @@ impl UserInterface {
             panic!()
         };
 
-        println!("REFRESH CAST_ABILITY STATE : {}", ability.name);
-
         if let AbilityTarget::Area {
             mut range,
             area_effect,
@@ -1204,7 +1203,24 @@ impl UserInterface {
                         range = range.plusf(increased_range);
                     }
 
-                    modify_line_len(self.active_character().pos(), pos, range, true);
+                    let from = self.active_character().pos();
+                    let mut to = *pos;
+                    modify_line_len(from, &mut to, range, true);
+
+                    *pos = to;
+                    let mut prev = from;
+                    line_visitor(from, to, |x, y| {
+                        if matches!(
+                            self.game_grid.pathfind_grid.occupied().get(&(x, y)),
+                            Some(Occupation::Terrain(TerrainType::Tall))
+                        ) {
+                            *pos = prev;
+                            true
+                        } else {
+                            prev = (x, y);
+                            false
+                        }
+                    });
                 }
             }
         }
@@ -1271,7 +1287,6 @@ impl UserInterface {
 
         if self.active_character().player_controlled() {
             if self.player_portraits.selected_id() != self.active_character_id {
-                println!("SWITCHING CHAR IN PORTRAITS");
                 self.player_portraits
                     .set_selected_id(self.active_character_id);
             }
@@ -2684,11 +2699,11 @@ impl UserInterface {
 
     fn on_invalid_action_clicked(&mut self) {
         self.sound_player.play(SoundId::Invalid);
-        self.game_grid.animate_character_speaking(
-            self.player_portraits.selected_id(),
-            0.7,
-            "Can't do that!",
-        );
+        let selected_char_id = self.player_portraits.selected_id();
+        if !self.characters.get(selected_char_id).is_dead() {
+            self.game_grid
+                .animate_character_speaking(selected_char_id, 0.7, "Can't do that!");
+        }
     }
 
     fn commit_player_action(&mut self) -> PlayerChose {

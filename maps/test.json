@@ -47,7 +47,11 @@
     "(4, 37)": "StoneWallConvexNorthEast",
     "(7, 37)": "StoneWallConvexNorthEast",
     "(14, 9)": "Cauldron2",
-    "(18, 7)": "Cauldron2"
+    "(18, 7)": "Cauldron2",
+    "(4, 22)": "StoneWallConvexNorthEast",
+    "(4, 25)": "StoneWallConvexNorthEast",
+    "(7, 25)": "StoneWallConvexNorthEast",
+    "(7, 22)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -257,25 +261,25 @@
         "Water"
       ]
     },
-    "(4, 19)": {
+    "(13, 25)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(4, 22)": {
+    "(13, 13)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(4, 25)": {
+    "(13, 19)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(4, 28)": {
+    "(13, 31)": {
       "NewWater": [
         "NorthEast",
         "Water"
@@ -293,25 +297,25 @@
         "Water"
       ]
     },
-    "(7, 28)": {
+    "(10, 31)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(7, 25)": {
+    "(13, 22)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(7, 22)": {
+    "(13, 16)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(7, 19)": {
+    "(13, 28)": {
       "NewWater": [
         "NorthEast",
         "Water"
@@ -364,54 +368,6 @@
         "NorthEast",
         "Water"
       ]
-    },
-    "(10, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
     }
   },
   "control_points": {},
@@ -419,8 +375,8 @@
     {
       "type_": "Alice",
       "pos": [
-        20,
-        26
+        8,
+        30
       ],
       "health": null,
       "main_hand": null,
@@ -439,21 +395,10 @@
       "name": null
     },
     {
-      "type_": "Enslaved",
-      "pos": [
-        12,
-        19
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Clara",
       "pos": [
-        14,
-        28
+        5,
+        32
       ],
       "health": null,
       "main_hand": null,
@@ -463,41 +408,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        15,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        12,
-        12
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        17,
-        10
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        18,
-        4
+        9,
+        11
       ],
       "health": null,
       "main_hand": null,

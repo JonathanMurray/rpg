@@ -1278,7 +1278,7 @@ impl GameGrid {
         let random_movement = if rise_indefinitely {
             Some((
                 rng.random_range(-1.0..1.0) * 30.0,
-                rng.random_range(0.0..1.0) * 40.0,
+                rng.random_range(0.2..1.0) * 40.0,
             ))
         } else {
             None
@@ -1296,7 +1296,7 @@ impl GameGrid {
                     font: font.clone(),
                     font_size,
                     color,
-                    random_movement,
+                    movement: random_movement,
                     background,
                 }),
             ),
@@ -2346,10 +2346,6 @@ impl GameGrid {
                     //println!("players_action_target = {:?}", pos);
                     Some(pos)
                 } else if is_mouse_within_grid && receptive_to_input {
-                    println!(
-                        "requires position target; mouse_grid_pos={:?}",
-                        mouse_grid_pos
-                    );
                     Some(mouse_grid_pos)
                 } else {
                     None
@@ -4692,7 +4688,7 @@ pub struct TextEffect {
     font: Font,
     font_size: u16,
     color: Color,
-    random_movement: Option<(f32, f32)>,
+    movement: Option<(f32, f32)>,
     background: bool,
 }
 
@@ -4773,7 +4769,7 @@ impl EffectGraphics {
                 font,
                 font_size,
                 color,
-                random_movement,
+                movement,
                 background,
             }) => {
                 //let font_size = 20;
@@ -4781,7 +4777,7 @@ impl EffectGraphics {
                 let text_dimensions =
                     measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
 
-                let quick_rise_duration = 0.0;
+                let quick_rise_duration = 0.1;
                 let grow_duration = 0.15;
 
                 let font_scale = if effect.age < grow_duration {
@@ -4792,14 +4788,14 @@ impl EffectGraphics {
 
                 let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
 
-                if let Some(movement) = random_movement {
-                    x0 += t * movement.0;
+                if let Some(movement) = movement {
+                    x0 += t.sqrt() * movement.0;
                 }
 
-                let y_offset = if let Some(movement) = random_movement {
-                    t * movement.1
+                let y_offset = if let Some(movement) = movement {
+                    t.sqrt() * movement.1
                 } else if t < quick_rise_duration {
-                    t / quick_rise_duration * cell_w * 2.0
+                    cell_w + (t / quick_rise_duration).sqrt() * cell_w
                 } else {
                     cell_w * 2.0
                 };
