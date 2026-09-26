@@ -874,8 +874,14 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
             ch as u8 - b'0'
         } else if ch == '%' {
             10
-        } else {
+        } else if ch == '-' {
             11
+        } else if ch == '^' {
+            12
+        } else if ch == 'v' {
+            13
+        } else {
+            14
         };
         draw_texture_ex(
             texture,

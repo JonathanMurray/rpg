@@ -1068,19 +1068,6 @@ impl UserInterface {
             Some(target_id) => {
                 let target_char = self.characters.get_rc(*target_id);
 
-                let (_range, reach) = self.active_character().reaches_with_attack(
-                    attack.hand,
-                    target_char.position.get(),
-                    selected_enhancements.iter().map(|e| e.effect),
-                );
-
-                /*
-                let mut details: Vec<(&'static str, Goodness)> = vec![];
-                if matches!(reach, ActionReach::No) {
-                    details.push((OUT_OF_REACH, Goodness::Bad));
-                }
-                 */
-
                 let selected_enhancement_effects: Vec<(&'static str, AttackEnhancementEffect)> =
                     selected_enhancements
                         .iter()
@@ -1110,6 +1097,9 @@ impl UserInterface {
                                 details: vec![],
                                 graze_chance: None,
                                 crit_chance: None,
+
+                                // TODO
+                                expected_roll_outcome: None,
                             },
                         });
                 }
@@ -1603,9 +1593,9 @@ impl UserInterface {
                         self.game_grid.add_text_effect(
                             attacker_pos,
                             0.0,
-                            1.0,
+                            1.5,
                             None,
-                            "Miss".to_string(),
+                            "Miss!".to_string(),
                             TextEffectStyle::Miss,
                         );
                     }
@@ -2174,7 +2164,7 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     target_pos,
                     0.0,
-                    1.0,
+                    1.5,
                     None,
                     "Critical Hit!",
                     TextEffectStyle::CriticalHitLabel,
@@ -2336,7 +2326,7 @@ impl UserInterface {
             } => {
                 if let Some(dmg) = damage {
                     if hit_type == &HitType::Miss {
-                        effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.0));
+                        effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
                     } else {
                         self.animate_character_damage(target, *actual_health_lost);
                         self.sound_player.play_delayed(
@@ -2348,7 +2338,7 @@ impl UserInterface {
                                 None,
                                 "Critical Hit!".to_string(),
                                 TextEffectStyle::CriticalHitLabel,
-                                1.0,
+                                1.5,
                             ));
                             effects.push((
                                 None,
@@ -2367,12 +2357,7 @@ impl UserInterface {
                     }
                 } else if applied_effects.is_empty() {
                     let effect = match hit_type {
-                        HitType::Miss => (
-                            None,
-                            "Miss!".to_string(),
-                            TextEffectStyle::HostileGraze,
-                            1.0,
-                        ),
+                        HitType::Miss => (None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5),
                         HitType::Weak => (
                             None,
                             "Graze".to_string(),
@@ -2386,7 +2371,7 @@ impl UserInterface {
                             None,
                             "Critical Hit!".to_string(),
                             TextEffectStyle::CriticalHitLabel,
-                            1.0,
+                            1.5,
                         ),
                     };
                     effects.push(effect);

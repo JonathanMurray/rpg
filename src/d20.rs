@@ -34,11 +34,12 @@ pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
 }
 
 fn roll_d20() -> u32 {
+    //if rand::rng().random_bool(0.5) {20} else {1}
     let mut rng = rand::rng();
     rng.random_range(1..=20)
 }
 
-#[derive(Default, Copy, Clone)]
+#[derive(Default, Copy, Clone, Debug)]
 pub struct DiceRollBonus {
     pub advantage: i32,
     pub flat_amount: i32,
@@ -57,5 +58,41 @@ impl DiceRollBonus {
             advantage: 0,
             flat_amount: 0,
         }
+    }
+
+    pub fn expected_outcome(&self) -> f32 {
+        let expected_roll = expected_roll_with_adv(self.advantage);
+        dbg!(self.advantage, expected_roll);
+        expected_roll + self.flat_amount as f32
+    }
+}
+
+pub fn expected_roll_with_adv(advantage: i32) -> f32 {
+    if advantage == 0 {
+        return 10.5;
+    }
+
+    // https://math.stackexchange.com/a/1696755
+
+    // Roll n dice
+    let n = (advantage.abs() + 1) as u32;
+
+    // Expected value of the max dice
+    let expected_max = {
+        let mut subtractor = 0.0;
+        for i in 1i32..20i32 {
+            subtractor += (i as f32).powf(n as f32);
+        }
+        subtractor *= 20f32.powf(-(n as f32));
+        20.0 - subtractor
+    };
+
+    // Expected value of the min dice
+    let expected_min = 21.0 - expected_max;
+
+    if advantage > 0 {
+        expected_max
+    } else {
+        expected_min
     }
 }

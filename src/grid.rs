@@ -1269,7 +1269,11 @@ impl GameGrid {
                 WHITE
                 //Color::new(1.0, 0.8, 0.8, 1.0)
             }
-            TextEffectStyle::Miss => WHITE,
+            TextEffectStyle::Miss => {
+                font_size = 24;
+                rise_indefinitely = false;
+                WHITE
+            }
             TextEffectStyle::ReactionExclamation => {
                 rise_indefinitely = false;
                 background = true;
@@ -3936,17 +3940,20 @@ impl GameGrid {
             let x0 = health_x + health_w / 2.0;
             let y0 = health_y + health_h + 2.0;
 
-            let graze_text = preview
-                .prediction
-                .graze_chance
-                .filter(|chance| *chance > 0.0)
-                .map(chance_to_perc_str);
-
-            let crit_text = preview
-                .prediction
-                .crit_chance
-                .filter(|chance| *chance > 0.0)
-                .map(chance_to_perc_str);
+            let outcome_text;
+            let positive;
+            if let Some(expected) = preview.prediction.expected_roll_outcome {
+                positive = expected >= 10.5;
+                let expected_str = format!(
+                    "{}{}",
+                    (expected - 10.5).round(),
+                    if positive { "^" } else { "v" }
+                );
+                outcome_text = Some(expected_str);
+            } else {
+                positive = true;
+                outcome_text = None;
+            }
 
             draw_action(
                 (x0, y0),
@@ -3954,9 +3961,8 @@ impl GameGrid {
                 &header,
                 &self.simple_font,
                 &preview.prediction.details,
-                &self.tiny_font,
-                graze_text,
-                crit_text,
+                outcome_text,
+                positive,
             );
         }
 
@@ -4829,8 +4835,8 @@ impl EffectGraphics {
                 let text_dimensions =
                     measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
 
-                let quick_rise_duration = 0.1;
-                let grow_duration = 0.15;
+                let quick_rise_duration = 0.15;
+                let grow_duration = 0.1;
 
                 let font_scale = if effect.age < grow_duration {
                     0.5 + 0.5 * effect.age / grow_duration
@@ -4862,7 +4868,7 @@ impl EffectGraphics {
                 let y0 = y - cell_w - y_offset;
 
                 let remaining = effect.end_time - effect.age;
-                let fade_duration = 0.4;
+                let fade_duration = 0.3;
                 let alpha = if remaining < fade_duration {
                     remaining / fade_duration
                 } else {
@@ -4944,16 +4950,15 @@ fn has_non_empty_movement_path(ui_state: &UiState) -> bool {
 }
 
 pub fn draw_action(
-    pos: (f32, f32),
+    mid_pos: (f32, f32),
     header_font: &Font,
     header: &str,
     details_font: &Font,
     details: &[(&'static str, Goodness)],
-    percentage_font: &Font,
-    graze_text: Option<String>,
-    crit_text: Option<String>,
+    outcome_text: Option<String>,
+    positive: bool,
 ) {
-    let (mut x, y) = pos;
+    let (mut xmid, y) = mid_pos;
 
     let header_font_size = 16;
     let detail_font_size = 13;
@@ -4977,7 +4982,6 @@ pub fn draw_action(
     }
 
     let mut details_w = 0.0;
-    let mut details_h = 0.0;
     let mut details_max_offset = 0.0;
     if !details.is_empty() {
         let mut details_relative_y_interval = [f32::MAX, f32::MIN];
@@ -5001,39 +5005,23 @@ pub fn draw_action(
         }
         details_w += details.len() as f32 * detail_pad * 2.0
             + (details.len() - 1) as f32 * detail_hor_margin;
-        details_h =
-            details_relative_y_interval[1] - details_relative_y_interval[0] + detail_pad * 2.0;
     }
 
-    x -= header_w / 2.0;
+    let outcome_w = outcome_text
+        .as_ref()
+        .map(|s| measure_tiny_font(s).0 + 5.0)
+        .unwrap_or(0.0);
 
-    let mut x0 = x;
+    let outcome_margin = 3.0;
+
+    let mut x0 = xmid - (header_w + outcome_margin + outcome_w) / 2.0;
     let mut y0 = y; // - h;
 
     let header_y = y0 + header_pad + header_dim.offset_y;
 
-    let perc_pad = 5.0;
-    let graze_w = graze_text
-        .as_ref()
-        .map(|s| measure_tiny_font(s).0 + perc_pad)
-        .unwrap_or(0.0);
+    let total_w = header_w + outcome_margin + outcome_w;
 
-    let crit_w = crit_text
-        .as_ref()
-        .map(|s| measure_tiny_font(s).0 + perc_pad)
-        .unwrap_or(0.0);
-
-    draw_rectangle(
-        x0 - graze_w,
-        y0,
-        graze_w + header_w + crit_w,
-        header_h,
-        Color::new(0.0, 0.0, 0.0, 0.8),
-    );
-
-    if let Some(s) = graze_text {
-        draw_tiny_font(&s, x0 - graze_w + perc_pad, header_y, TinyFontColor::Red);
-    }
+    draw_rectangle(x0, y0, total_w, header_h, Color::new(0.0, 0.0, 0.0, 0.8));
 
     draw_text_with_font_tags(
         header,
@@ -5043,13 +5031,18 @@ pub fn draw_action(
         true,
     );
 
-    if let Some(s) = &crit_text {
-        draw_tiny_font(s, x0 + header_w, header_y, TinyFontColor::Green);
+    if let Some(s) = &outcome_text {
+        let color = if positive {
+            TinyFontColor::Green
+        } else {
+            TinyFontColor::Red
+        };
+        draw_tiny_font(s, x0 + header_w + outcome_margin, header_y, color);
     }
 
     y0 += header_dim.offset_y + header_pad * 2.0 + vert_margin;
 
-    x0 += (header_w - details_w) / 2.0;
+    x0 = xmid - details_w / 2.0;
 
     for (line, goodness) in details {
         let mut params = header_params.clone();

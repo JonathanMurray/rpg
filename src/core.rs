@@ -3325,6 +3325,7 @@ pub struct AttackPrediction {
     pub graze_chance: f32,
     pub crit_chance: f32,
     pub area_targets: Vec<CharacterId>,
+    pub expected_roll_outcome: f32,
 }
 
 pub struct AbilityPrediction {
@@ -3338,6 +3339,7 @@ pub struct TargetPrediction {
     pub details: Vec<(&'static str, Goodness)>,
     pub graze_chance: Option<f32>,
     pub crit_chance: Option<f32>,
+    pub expected_roll_outcome: Option<f32>,
 }
 
 impl From<AttackPrediction> for TargetPrediction {
@@ -3351,6 +3353,7 @@ impl From<AttackPrediction> for TargetPrediction {
             details: value.details,
             graze_chance: Some(value.graze_chance),
             crit_chance: Some(value.crit_chance),
+            expected_roll_outcome: Some(value.expected_roll_outcome),
         }
     }
 }
@@ -3410,6 +3413,35 @@ pub fn predict_ability(
                     }
                 }
 
+                let mut expected_roll_outcome = None;
+                if let Some(roll_type) = ability.roll {
+                    dbg!(ability.name, roll_type);
+                    let defender = characters.get(target_id);
+                    let dice_roll_bonus =
+                        ability_roll_bonus(caster, defender, enhancements, roll_type);
+
+                    dbg!(&dice_roll_bonus);
+
+                    if let Some(defense_type) = ability.target_defense() {
+                        dbg!(defense_type);
+                        let caster_modifier = match roll_type {
+                            AbilityRollType::Spell => caster.spell_modifier() as i32,
+                            AbilityRollType::RollDuringAttack(..) => {
+                                caster.attack_modifier(HandType::MainHand)
+                            }
+                            AbilityRollType::RollAbilityWithAttackModifier => {
+                                caster.attack_modifier(HandType::MainHand)
+                            }
+                        };
+                        expected_roll_outcome = Some(
+                            dice_roll_bonus.expected_outcome() + caster_modifier as f32
+                                - defender.defense(defense_type) as f32,
+                        );
+                    }
+                }
+
+                dbg!(expected_roll_outcome);
+
                 targets.insert(
                     target_id,
                     TargetPrediction {
@@ -3421,6 +3453,7 @@ pub fn predict_ability(
                         details,
                         graze_chance: None, // filled in later
                         crit_chance: None,  // filled in later
+                        expected_roll_outcome,
                     },
                 );
             } else if unmodified_roll == 19 {
@@ -3558,6 +3591,18 @@ pub fn predict_attack(
     let crit_chance =
         probability_of_d20_reaching(crit_threshold, DiceRollBonus::from_advantage(advantage));
 
+    let dice_roll_bonus = attack_roll_bonus(
+        attacker,
+        HandType::MainHand,
+        defender,
+        enhancements,
+        reaction.map(|(_, r)| r),
+    );
+
+    let expected_roll_outcome = dice_roll_bonus.expected_outcome()
+        + attacker.attack_modifier(HandType::MainHand) as f32
+        - defender.evasion() as f32;
+
     AttackPrediction {
         percentage_chance_deal_damage: percentage_deal_damage,
         min_damage: min_dmg.unwrap(),
@@ -3567,6 +3612,7 @@ pub fn predict_attack(
         graze_chance,
         crit_chance,
         area_targets,
+        expected_roll_outcome,
     }
 }
 
@@ -4811,6 +4857,30 @@ impl Ability {
         match self.target {
             AbilityTarget::Enemy { effect, .. } => effect.knockback(),
             _ => None,
+        }
+    }
+
+    pub fn target_defense(&self) -> Option<DefenseType> {
+        match self.target {
+            AbilityTarget::Enemy { effect, .. } => match effect {
+                AbilityNegativeEffect::Spell(spell_negative_effect) => {
+                    spell_negative_effect.defense_type
+                }
+                AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
+            },
+            AbilityTarget::Ally { .. } => None,
+            AbilityTarget::Area { area_effect, .. } => match area_effect.effect {
+                AbilityEffect::Negative(ability_negative_effect) => match ability_negative_effect {
+                    AbilityNegativeEffect::Spell(spell_negative_effect) => {
+                        spell_negative_effect.defense_type
+                    }
+                    AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
+                },
+                AbilityEffect::Positive(..) => None,
+            },
+            AbilityTarget::Destination { .. } => None,
+            // TODO what about untargetted aggressive AoE:s
+            AbilityTarget::None { .. } => None,
         }
     }
 }
@@ -6901,7 +6971,7 @@ impl Character {
         }
         if self.has_condition(&Condition::Dazed) {
             // applied from attack_modifer()
-            bonuses.push(("Dazed", RollBonusContributor::OtherPositive));
+            bonuses.push(("Dazed", RollBonusContributor::OtherNegative));
         }
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Raging)

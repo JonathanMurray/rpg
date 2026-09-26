@@ -54,7 +54,7 @@ impl SoundPlayer {
             (SoundId::BuffBrace, 1.0, vec!["fl_buff_brace.ogg"]),
             (SoundId::Heal, 1.0, vec!["fl_heal.ogg"]),
             (SoundId::MeleeAttack, 0.3, vec!["melee_attack"]),
-            (SoundId::AttackMiss, 1.0, vec!["fl_miss.ogg"]),
+            (SoundId::AttackMiss, 0.6, vec!["fl_miss.ogg"]),
             (SoundId::Resist, 1.0, vec!["fl_resist.ogg"]),
             (SoundId::ArmorAbsorbed, 1.0, vec!["fl_armor_absorbed.ogg"]),
             //(SoundId::ShootArrow, 1.0, vec!["shoot_arrow_2"]),
