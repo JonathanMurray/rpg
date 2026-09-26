@@ -1496,10 +1496,12 @@ impl CoreGame {
                             mode,
                         );
 
+                        let shape = &mut AreaShape::Circle(radius);
+                        Self::modify_shape_radius(shape, enhancements);
                         area_outcome = Some(AbilityAreaOutcome {
                             center: target.position.get(),
                             targets: area_target_outcomes,
-                            shape: AreaShape::Circle(radius),
+                            shape: *shape,
                         });
                     }
 
@@ -1949,6 +1951,19 @@ impl CoreGame {
         AbilityTargetOutcome::AffectedAlly { applied_effects }
     }
 
+    fn modify_shape_radius(shape: &mut AreaShape, enhancements: &[AbilityEnhancement]) {
+        for enhancement in enhancements {
+            if let Some(e) = enhancement.spell_effect {
+                if e.increased_radius_tenths > 0 {
+                    let AreaShape::Circle(radius) = shape else {
+                        panic!()
+                    };
+                    *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+                }
+            }
+        }
+    }
+
     fn perform_ability_area_enemy_effect(
         mut shape: AreaShape,
         name: &'static str,
@@ -1965,16 +1980,7 @@ impl CoreGame {
 
         let mut target_outcomes = vec![];
 
-        for enhancement in enhancements {
-            if let Some(e) = enhancement.spell_effect {
-                if e.increased_radius_tenths > 0 {
-                    let AreaShape::Circle(radius) = &mut shape else {
-                        panic!()
-                    };
-                    *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
-                }
-            }
-        }
+        Self::modify_shape_radius(&mut shape, enhancements);
 
         for other_char in mode.characters().iter() {
             if !is_valid_area_target(caster, other_char, acquisition) {

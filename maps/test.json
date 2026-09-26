@@ -375,7 +375,7 @@
     {
       "type_": "Bob",
       "pos": [
-        9,
+        7,
         19
       ],
       "health": null,
@@ -386,19 +386,8 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        12,
-        18
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
-        12,
-        22
+        10,
+        19
       ],
       "health": null,
       "main_hand": null,
@@ -408,7 +397,7 @@
     {
       "type_": "Alice",
       "pos": [
-        11,
+        13,
         26
       ],
       "health": null,
@@ -419,30 +408,30 @@
     {
       "type_": "Ghoul2",
       "pos": [
-        12,
-        15
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ogre",
-      "pos": [
-        17,
-        12
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "SkeletonLeader",
-      "pos": [
-        15,
+        10,
         22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        10,
+        29
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Draug",
+      "pos": [
+        14,
+        20
       ],
       "health": null,
       "main_hand": null,

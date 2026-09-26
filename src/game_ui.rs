@@ -2064,6 +2064,8 @@ impl UserInterface {
         let area_duration = 0.2;
 
         if let Some(AreaShape::Circle(radius)) = shape {
+            let mut fill_color = animation_color;
+            fill_color.a = 0.5;
             self.game_grid.add_effect(
                 *area_center_pos,
                 *area_center_pos,
@@ -2073,9 +2075,10 @@ impl UserInterface {
                     variant: EffectVariant::At(
                         EffectPosition::Destination,
                         EffectGraphics::Circle {
-                            radius: f32::from(radius) * self.game_grid.cell_w,
-                            end_radius: None,
+                            radius: f32::from(radius) * self.game_grid.cell_w * 0.1,
+                            end_radius: Some(f32::from(radius) * self.game_grid.cell_w),
                             fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
+                            //fill: Some(fill_color),
                             stroke: None,
                         },
                     ),
@@ -2314,8 +2317,6 @@ impl UserInterface {
         target_pos: (i32, i32),
     ) {
         let mut effects = vec![];
-
-        dbg!(outcome);
 
         match &outcome {
             AbilityTargetOutcome::HitEnemy {

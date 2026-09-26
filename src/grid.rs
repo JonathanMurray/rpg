@@ -4767,7 +4767,7 @@ impl EffectGraphics {
                 y += cell_w / 2.0;
                 let r = match end_radius {
                     None => *radius,
-                    Some(end_radius) => *radius + (end_radius - radius) * t,
+                    Some(end_radius) => *radius + (end_radius - radius) * t.sqrt(),
                 };
                 if let Some(color) = fill {
                     draw_circle(x, y, r, *color);

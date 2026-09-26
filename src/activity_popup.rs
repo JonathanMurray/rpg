@@ -205,6 +205,7 @@ impl ActivityPopup {
             width += margin_between_choices_and_proceed;
         }
 
+        /*
         let sprint_text = "AP cost:";
         let sprint_margin = 15.0;
         if let Some(slider) = &self.movement_cost_slider {
@@ -217,6 +218,7 @@ impl ActivityPopup {
             let move_config_w = slider.size().0.max(text_dimensions.width);
             width += move_config_w + sprint_margin;
         }
+         */
 
         width += hor_pad * 2.0;
 
@@ -268,6 +270,7 @@ impl ActivityPopup {
 
         let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
 
+        /*
         if let Some(slider) = &mut self.movement_cost_slider {
             let text_dimensions = draw_text_rounded(
                 sprint_text,
@@ -280,6 +283,7 @@ impl ActivityPopup {
             let movement_config_w = slider.size().0.max(text_dimensions.width);
             x_btn += movement_config_w + sprint_margin;
         }
+         */
 
         let y_btn = y - height / 2.0 - 32.0;
 
