@@ -15,6 +15,7 @@ pub fn build_settings(
     simple_font: &Font,
     sound_player: SoundPlayer,
     faster_movement: Rc<Cell<bool>>,
+    slow_motion: Rc<Cell<bool>>,
 ) -> Container {
     Container {
         layout_dir: LayoutDirection::Vertical,
@@ -66,6 +67,25 @@ pub fn build_settings(
                                 (16.0, 16.0),
                                 sound_player.clone(),
                                 faster_movement,
+                            ))),
+                        ],
+                        ..Default::default()
+                    }),
+                    Element::Container(Container {
+                        layout_dir: LayoutDirection::Horizontal,
+                        align: Align::Center,
+                        margin: 5.0,
+                        children: vec![
+                            Element::Text(TextLine::new(
+                                "Slow-motion",
+                                16,
+                                WHITE,
+                                Some(simple_font.clone()),
+                            )),
+                            Element::Box(Box::new(Checkbox::new(
+                                (16.0, 16.0),
+                                sound_player.clone(),
+                                slow_motion,
                             ))),
                         ],
                         ..Default::default()

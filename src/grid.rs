@@ -165,6 +165,7 @@ enum AnimationDetails {
     },
     MagicSparks {
         particles: RefCell<Vec<(f32, f32)>>,
+        color: Color,
     },
     MotionPreview {
         positions: Vec<Position>,
@@ -180,7 +181,9 @@ enum AnimationDetails {
     AttackCrosshairPreview {
         target_pos: Position,
     },
-    CastingSpell {},
+    CastingSpell {
+        color: Color,
+    },
     MeleeAttack {
         toward: Position,
         with_shield: bool,
@@ -670,13 +673,14 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_magic_sparks(&mut self, char: CharacterId) {
+    pub fn animate_magic_sparks(&mut self, char: CharacterId, color: Color) {
         self.character_animations.push(CharacterAnimation::new(
             char,
             0.0,
             0.5,
             AnimationDetails::MagicSparks {
                 particles: Default::default(),
+                color,
             },
         ));
     }
@@ -760,7 +764,9 @@ impl GameGrid {
                 actor.id(),
                 delay,
                 casting_duration,
-                AnimationDetails::CastingSpell {},
+                AnimationDetails::CastingSpell {
+                    color: ability.animation_color,
+                },
             ));
 
             let animation_color = ability.animation_color;
@@ -838,58 +844,25 @@ impl GameGrid {
         caster_pos: (i32, i32),
         target_pos: (i32, i32),
     ) {
-        self.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 10.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
-
-        self.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time: start_time + 0.025,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 8.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
-        self.add_effect(
-            caster_pos,
-            target_pos,
-            Effect {
-                start_time: start_time + 0.05,
-                end_time: start_time + duration,
-                variant: EffectVariant::At(
-                    EffectPosition::Projectile,
-                    EffectGraphics::Circle {
-                        radius: 6.0,
-                        end_radius: None,
-                        fill: Some(animation_color),
-                        stroke: None,
-                    },
-                ),
-            },
-        );
+        for i in 0..4 {
+            self.add_effect(
+                caster_pos,
+                target_pos,
+                Effect {
+                    start_time: start_time + i as f32 * 0.025,
+                    end_time: start_time + duration + i as f32 * 0.025,
+                    variant: EffectVariant::At(
+                        EffectPosition::Projectile,
+                        EffectGraphics::Circle {
+                            radius: 12.0 - i as f32 * 2.0,
+                            end_radius: None,
+                            fill: Some(animation_color),
+                            stroke: Some((Color::new(0.9, 0.9, 0.9, 0.5), 2.0)),
+                        },
+                    ),
+                },
+            );
+        }
     }
 
     pub fn animate_character_attacking(
@@ -967,7 +940,7 @@ impl GameGrid {
                             radius: 25.0,
                             end_radius: Some(5.0),
                             fill: None,
-                            stroke: Some((MAGENTA, 2.0)),
+                            stroke: Some((RED, 2.0)),
                         },
                     ),
                 },
@@ -1009,7 +982,7 @@ impl GameGrid {
                             radius: 25.0,
                             end_radius: Some(5.0),
                             fill: None,
-                            stroke: Some((MAGENTA, 2.0)),
+                            stroke: Some((RED, 2.0)),
                         },
                     ),
                 },
@@ -1171,7 +1144,7 @@ impl GameGrid {
             let mut fresh_count = 0;
             for particle in &mut particle_group.particles {
                 particle.y -= elapsed * 1.5;
-                particle.alpha -= elapsed * (0.1 + rng.random_range(0.0..0.2));
+                particle.alpha -= elapsed * (0.3 + rng.random_range(0.0..0.2));
                 if particle.alpha > 0.2 {
                     fresh_count += 1;
                 }
@@ -1181,13 +1154,13 @@ impl GameGrid {
                 let char_pos = &self.characters[&particle_group.character_id].pos();
                 let px = char_pos.0 as f32 + 0.5 + rng.random_range(-1.3..=1.3);
                 let py = char_pos.1 as f32 + 0.2 + rng.random_range(-1.0..=0.0);
-                let radius = 2.0 + rng.random_range(0.0..5.0);
+                let radius = 2.0 + rng.random_range(0.0..4.0);
 
                 let p = Particle {
                     x: px,
                     y: py,
                     radius,
-                    alpha: 0.15 + rng.random_range(0.0..0.2),
+                    alpha: 0.5 + rng.random_range(0.0..0.3),
                 };
 
                 particle_group.particles.push(p);
@@ -1685,7 +1658,7 @@ impl GameGrid {
                         }
                     }
                 }
-                AnimationDetails::CastingSpell {} => {
+                AnimationDetails::CastingSpell { .. } => {
                     // t goes from 0 to 1
                     let t = 1.0 - animation.remaining_duration_ratio();
 
@@ -2305,9 +2278,16 @@ impl GameGrid {
                 let mut color = group.color;
                 color.a = particle.alpha;
                 let r = particle.radius;
+                let line_color = Color::new(0.8, 0.8, 0.8, 0.3 + particle.alpha);
                 match group.shape {
-                    ParticleShape::Circle => draw_circle(x, y, r, color),
-                    ParticleShape::Rect => draw_rectangle(x - r, y - r, r, r, color),
+                    ParticleShape::Circle => {
+                        draw_circle(x, y, r, color);
+                        draw_circle_lines(x, y, r, 1.0, line_color);
+                    }
+                    ParticleShape::Rect => {
+                        draw_rectangle(x - r, y - r, r * 2.0, r * 2.0, color);
+                        draw_rectangle_lines2(x - r, y - r, r * 2.0, r * 2.0, 2.0, line_color);
+                    }
                 }
             }
         }
@@ -3148,7 +3128,7 @@ impl GameGrid {
                         false,
                     );
                 }
-                AnimationDetails::MagicSparks { particles } => {
+                AnimationDetails::MagicSparks { particles, color } => {
                     let pos =
                         self.character_screen_pos(&self.characters[&char_animation.character_id]);
                     let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
@@ -3164,7 +3144,7 @@ impl GameGrid {
                     for (i, p) in particles.iter().enumerate() {
                         let w = self.cell_w * 0.3;
                         let h = self.cell_w * 0.3;
-                        let mut color = WHITE;
+                        let mut color = *color;
                         color.a = 1.2 - 2.0 * (1.0 - remaining_ratio) + 0.02 * i as f32;
                         draw_rectangle(
                             pos.0 + p.0 * self.cell_w - w / 2.0,
@@ -3174,6 +3154,25 @@ impl GameGrid {
                             color,
                         );
                     }
+                }
+                AnimationDetails::CastingSpell { color } => {
+                    let pos =
+                        self.character_screen_pos(&self.characters[&char_animation.character_id]);
+                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let t = 1.0 - char_animation.remaining_duration_ratio();
+                    let max_r = 3.0 * self.cell_w;
+                    let expand = 0.7;
+                    let implode = 0.1;
+                    if t < expand {
+                        let r = max_r * (t / expand).powf(1.5);
+                        draw_circle_lines(pos.0, pos.1, r, 3.0, *color);
+                    } else {
+                        let r = (max_r - max_r * (t - expand) / (implode)).max(0.0);
+                        draw_circle_lines(pos.0, pos.1, r, 5.0, *color);
+                        draw_circle_lines(pos.0, pos.1, r * 1.2, 4.0, *color);
+                        draw_circle_lines(pos.0, pos.1, r * 1.4, 3.0, *color);
+                        draw_circle(pos.0, pos.1, r * 1.4, color.with_alpha(0.3));
+                    };
                 }
                 _ => {}
             }
@@ -4208,7 +4207,6 @@ impl GameGrid {
                             WHITE,
                             params,
                         );
-                        //draw_circle(pos.x, pos.y, 5.0, MAGENTA);
                     }
 
                     //draw_texture_ex(texture, to.0, to.1, WHITE, params);
@@ -4414,8 +4412,6 @@ impl GameGrid {
         for char_id in opportunity_attackers {
             self.draw_speech_bubble("!", char_id);
         }
-
-        //self.draw_cell_outline(destination, MAGENTA, 5.0, 2.0);
 
         let text_color = LIGHTGRAY;
         let bg_color = Color::new(0.0, 0.0, 0.0, 0.5);
@@ -4765,12 +4761,25 @@ impl EffectGraphics {
             } => {
                 x += cell_w / 2.0;
                 y += cell_w / 2.0;
+
+                let expand = 0.1;
+
                 let r = match end_radius {
                     None => *radius,
-                    Some(end_radius) => *radius + (end_radius - radius) * t.sqrt(),
+                    Some(end_radius) => {
+                        if t < expand {
+                            *radius + (end_radius - radius) * (t / expand).sqrt()
+                        } else {
+                            *end_radius
+                        }
+                    }
                 };
-                if let Some(color) = fill {
-                    draw_circle(x, y, r, *color);
+
+                if let Some(mut color) = fill {
+                    if t > expand {
+                        color.a *= 1.0 - (t - expand) / (1.0 - expand);
+                    }
+                    draw_circle(x, y, r, color);
                 }
                 if let Some((color, thickness)) = stroke {
                     draw_circle_lines(x, y, r, *thickness, *color);

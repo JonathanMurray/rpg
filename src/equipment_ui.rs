@@ -95,10 +95,8 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
 
 fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     let mut t = Tooltip::new(weapon.name);
-    t.technical_description.push(format!(
-        "|<sword>| |<value>{}|  ({} AP)",
-        weapon.damage, weapon.action_point_cost
-    ));
+    t.technical_description
+        .push(format!("|<sword>| |<value>{}|", weapon.damage));
 
     if weapon.grip == WeaponGrip::TwoHanded {
         t.technical_description.push("Two-handed".to_string());

@@ -1,4 +1,4 @@
-use macroquad::color::{BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
+use macroquad::color::{Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED, YELLOW};
 
 use crate::{
     core::{
@@ -1208,7 +1208,7 @@ pub const SHACKLED_MIND: Ability = Ability {
         None,
     ],
 
-    animation_color: PURPLE,
+    animation_color: Color::new(0.6, 0.3, 0.8, 1.00),
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: Some(AbilityChargeFx {
@@ -1875,7 +1875,7 @@ pub const PIERCING_SHOT: Ability = Ability {
             )),
         },
     },
-    animation_color: RED,
+    animation_color: YELLOW,
     initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: None, //Some(SoundId::HitArrow),
     charge_fx: Some(AbilityChargeFx {

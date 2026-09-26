@@ -678,6 +678,7 @@
       ]
     }
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Bob",
@@ -687,29 +688,30 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ogre",
-      "name": "Brawler",
       "pos": [
-        46,
-        25
+        39,
+        24
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Brawler"
     },
     {
       "type_": "SkeletonLeader",
-      "name": "Guardian",
       "pos": [
-        30,
-        21
+        31,
+        22
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Guardian"
     },
     {
       "type_": "Scoundrel",
@@ -719,7 +721,8 @@
       ],
       "health": 12,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Scoundrel",
@@ -729,7 +732,8 @@
       ],
       "health": 13,
       "main_hand": null,
-      "shield": "BadSmallShield"
+      "shield": "BadSmallShield",
+      "name": null
     },
     {
       "type_": "Scoundrel",
@@ -739,29 +743,30 @@
       ],
       "health": 11,
       "main_hand": "BadDagger",
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul1",
-      "name": "Troublemaker",
       "pos": [
-        39,
-        16
+        30,
+        17
       ],
       "health": 8,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Troublemaker"
     },
     {
       "type_": "Ghoul1",
-      "name": "Troublemaker",
       "pos": [
-        41,
-        20
+        45,
+        19
       ],
       "health": 10,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Troublemaker"
     },
     {
       "type_": "Alice",
@@ -771,7 +776,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Clara",
@@ -781,7 +787,19 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        45,
+        23
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }
