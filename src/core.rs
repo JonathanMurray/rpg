@@ -2900,31 +2900,29 @@ impl CoreGame {
                 }
             }
 
-            if let Some(arrow) = used_arrow {
-                if let Some(area_effect) = arrow.area_effect {
-                    detail_lines.push("".to_string());
-                    detail_lines.push(format!("{}:", arrow.name));
-                    // TODO: This AoE should also be performed (predicted) in attack-prediction mode (so that enemies' healthbar previews can be shown
-                    // also for the AoE targets)
-                    let area_target_outcomes = Self::perform_ability_area_effect(
-                        arrow.name,
-                        RollInstruction::RollWithSpellModifier {
-                            advantage: attack_bonus.advantage,
-                            bonus: attack_roll_bonus,
-                        },
-                        &[],
-                        attacker,
-                        defender.pos(),
-                        area_effect,
-                        &mut detail_lines,
-                        mode,
-                    );
-                    area_outcomes = Some(area_target_outcomes);
-                }
-            }
-
             if weapon.is_melee() {
                 game.perform_engagement(attacker, defender);
+            }
+        }
+
+        if let Some(arrow) = used_arrow {
+            if let Some(area_effect) = arrow.area_effect {
+                detail_lines.push("".to_string());
+                detail_lines.push(format!("{}:", arrow.name));
+                let area_target_outcomes = Self::perform_ability_area_effect(
+                    arrow.name,
+                    RollInstruction::RollWithSpellModifier {
+                        advantage: attack_bonus.advantage,
+                        bonus: attack_roll_bonus,
+                    },
+                    &[],
+                    attacker,
+                    defender.pos(),
+                    area_effect,
+                    &mut detail_lines,
+                    mode,
+                );
+                area_outcomes = Some(area_target_outcomes);
             }
         }
 
@@ -3326,6 +3324,7 @@ pub struct AttackPrediction {
     pub details: Vec<(&'static str, Goodness)>,
     pub graze_chance: f32,
     pub crit_chance: f32,
+    pub area_targets: Vec<CharacterId>,
 }
 
 pub struct AbilityPrediction {
@@ -3492,6 +3491,8 @@ pub fn predict_attack(
     let mut strong_hit_threshold = 21;
     let mut crit_threshold = 21;
 
+    let mut area_targets = vec![];
+
     // TODO: The average doesn't account for advantage!
     // TODO: This could be expensive if we are performing non-negligible calculations in perform_attack
     // (like checking wall collisions for ranged attacks?)
@@ -3511,6 +3512,14 @@ pub fn predict_attack(
         let AttackOutcome {
             damage, hit_type, ..
         } = event.outcome;
+
+        if area_targets.is_empty() {
+            if let Some(outcomes) = event.area_outcomes {
+                for (target_id, _) in outcomes {
+                    area_targets.push(target_id);
+                }
+            }
+        }
 
         match hit_type {
             HitType::Miss => {}
@@ -3557,6 +3566,7 @@ pub fn predict_attack(
         details,
         graze_chance,
         crit_chance,
+        area_targets,
     }
 }
 

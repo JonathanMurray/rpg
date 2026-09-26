@@ -78,7 +78,7 @@ use crate::{
 const BACKGROUND_COLOR: Color = rgb(12, 64, 59); // COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
                                                  //const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
 
-const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.2);
+const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.1);
 
 //const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
@@ -2099,14 +2099,6 @@ impl GameGrid {
                 }
             }
 
-            // TODO: different graphics for different abilities
-            /*
-            if ability.id == AbilityId::Fireball {
-                is_casting = Some(ability.animation_color);
-            } else if ability.id == AbilityId::ShackledMind {
-                is_casting = Some(ability.animation_color);
-            }
-             */
             if ability.charge_fx.is_some() {
                 is_casting = Some(ability);
             }
@@ -2136,10 +2128,31 @@ impl GameGrid {
             UiState::ChoosingAction => MouseState::None,
 
             UiState::ConfiguringAction(base_action) => match base_action {
-                ConfiguredAction::Attack { .. } => MouseState::RequiresEnemyTarget {
-                    area_radius: None,
-                    move_into_melee: None,
-                },
+                ConfiguredAction::Attack {
+                    selected_enhancements,
+                    ..
+                } => {
+                    let mut area_radius = None;
+
+                    // ARROW AOE
+                    for e in selected_enhancements {
+                        if e.effect.consume_equipped_arrow {
+                            let arrow = self.characters[&self.active_character_id].unwrap_arrow();
+                            if let Some(AreaEffect {
+                                shape: AreaShape::Circle(range),
+                                ..
+                            }) = arrow.area_effect
+                            {
+                                area_radius = Some(range);
+                            }
+                        }
+                    }
+
+                    MouseState::RequiresEnemyTarget {
+                        area_radius,
+                        move_into_melee: None,
+                    }
+                }
 
                 ConfiguredAction::UseAbility {
                     ability,
@@ -2250,13 +2263,18 @@ impl GameGrid {
 
         let mut detail_labelled_char_ids: HashSet<CharacterId> = Default::default();
 
+        if !pushed_targets.is_empty() {
+            should_highlight_character_occupations = true;
+        }
+
         for character in self.characters.values() {
             if character.id() == self.active_character_id {
-                self.draw_character_highlight(character.id(), ACTIVE_CHARACTER_COLOR, 3.0);
+                self.draw_character_highlight(character.id(), ACTIVE_CHARACTER_COLOR, WHITE, 3.0);
             } else if should_highlight_character_occupations {
                 self.draw_character_highlight(
                     character.id(),
                     CELL_OCCUPIED_COLOR,
+                    Color::new(0.9, 0.7, 0.7, 0.4),
                     self.cell_w * 0.1,
                 );
             }
@@ -3157,16 +3175,6 @@ impl GameGrid {
             }
         }
 
-        if !pushed_targets.is_empty() {
-            for character_id in self.characters.keys() {
-                self.draw_character_highlight(
-                    *character_id,
-                    CELL_OCCUPIED_COLOR,
-                    self.cell_w * 0.1,
-                );
-            }
-        }
-
         self.draw_pushed_targets(&pushed_targets);
 
         self.draw_effects();
@@ -4012,7 +4020,13 @@ impl GameGrid {
         }
     }
 
-    fn draw_character_highlight(&self, character_id: CharacterId, color: Color, margin: f32) {
+    fn draw_character_highlight(
+        &self,
+        character_id: CharacterId,
+        bg_color: Color,
+        border_color: Color,
+        margin: f32,
+    ) {
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
         let rect = (
             x - self.cell_w + margin,
@@ -4020,8 +4034,8 @@ impl GameGrid {
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
         );
-        draw_rectangle(rect.0, rect.1, rect.2, rect.3, color);
-        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, WHITE);
+        draw_rectangle(rect.0, rect.1, rect.2, rect.3, bg_color);
+        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, border_color);
     }
 
     fn draw_circular_character_highlight(
@@ -4031,12 +4045,8 @@ impl GameGrid {
         margin: f32,
     ) {
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        draw_circle(
-            x + self.cell_w / 2.0,
-            y + self.cell_w / 2.0,
-            self.cell_w * 1.5 - margin,
-            color,
-        );
+        let r = oscillate(0.7, self.cell_w * 1.4, self.cell_w * 1.5) - margin;
+        draw_circle(x + self.cell_w / 2.0, y + self.cell_w / 2.0, r, color);
     }
 
     fn draw_cornered_outline(

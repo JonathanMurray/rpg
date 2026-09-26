@@ -30,10 +30,10 @@ use crate::{
     core::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaShape,
-        AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome, AttackedEvent,
-        BaseAction, Character, CharacterId, Characters, Condition, CoreGame, DamageSource,
-        GameEvent, GameOverType, HandType, HitType, MovementType, OnAttackedReaction,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaEffect,
+        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
+        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
+        DamageSource, GameEvent, GameOverType, HandType, HitType, MovementType, OnAttackedReaction,
         OnHitReaction, Position, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     drawing::draw_dashed_line_ex,
@@ -1087,9 +1087,11 @@ impl UserInterface {
                         .map(|e| (e.name, e.effect))
                         .collect();
 
+                let active_char = self.characters.get_rc(self.active_character_id);
+
                 let prediction = predict_attack(
                     &self.characters,
-                    self.characters.get_rc(self.active_character_id),
+                    active_char,
                     attack.hand,
                     &selected_enhancement_effects,
                     target_char,
@@ -1097,42 +1099,31 @@ impl UserInterface {
                     0,
                 );
 
-                /*
-                for (term, bonus) in self.active_character().outgoing_attack_bonuses(
-                    attack.hand,
-                    &selected_enhancement_effects,
-                    target_char,
-                ) {
-                    details.push((term, bonus.goodness()));
-                }
-                for (term, bonus) in target_char.incoming_attack_bonuses(None) {
-                    details.push((term, bonus.goodness()));
-                }
-
-                let header = format!(
-                    "|<sword>| {}-{}",
-                    prediction.min_damage, prediction.max_damage,
-                );
-                 */
-
                 self.game_grid.clear_target_effect_previews();
+                for area_target in &prediction.area_targets {
+                    self.game_grid
+                        .set_target_effect_preview(TargetEffectPreview {
+                            character_id: *area_target,
+                            prediction: TargetPrediction {
+                                damage: None,
+                                is_buff: false,
+                                details: vec![],
+                                graze_chance: None,
+                                crit_chance: None,
+                            },
+                        });
+                }
                 self.game_grid
                     .set_target_effect_preview(TargetEffectPreview {
                         character_id: *target_id,
                         prediction: TargetPrediction::from(prediction),
                     });
-
-                //self.target_ui.set_action(header, details, true);
             }
 
             None => {
                 self.game_grid.clear_target_effect_previews();
-                //self.target_ui
-                //.set_action("Select an enemy".to_string(), vec![], false);
             }
         }
-
-        //self.activity_popup.refresh_enabled_state();
     }
 
     fn refresh_use_ability_state(&mut self) {
