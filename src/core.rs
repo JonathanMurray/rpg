@@ -1909,7 +1909,9 @@ impl CoreGame {
         };
 
         if let Some(game) = real_game {
-            for mut effect in ally_effect.apply.iter().flatten().flatten().copied() {
+            let effects = ally_effect.apply.iter().flatten().flatten().copied();
+
+            for mut effect in effects {
                 match effect {
                     ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainActionPoints(ref mut n) => *n += degree_of_success,
@@ -2483,14 +2485,9 @@ impl CoreGame {
             }
         }
 
-        let unmodified_roll: u32 = mode
+        let mut unmodified_roll: u32 = mode
             .simulated_roll()
             .unwrap_or(roll_d20_with_advantage(attack_bonus.advantage));
-
-        let attack_roll_bonus = attack_modifier + attack_bonus.flat_amount;
-
-        let roll_result = unmodified_roll as i32 + attack_roll_bonus;
-        let final_result = roll_result - base_evasion as i32;
 
         if game.is_some() {
             if let Some(description) = roll_description(attack_bonus.advantage) {
@@ -2508,6 +2505,22 @@ impl CoreGame {
                 ));
             }
         }
+
+        if game.is_some() {
+            detail_lines.push(format!("Rolled: |<value>{}|", unmodified_roll));
+        }
+
+        if attacker.has_condition(&Condition::Ruthless) {
+            unmodified_roll = 20;
+            if game.is_some() {
+                detail_lines.push(format!("Changed to {} (|<faded>Ruthless)", unmodified_roll));
+            }
+        }
+
+        let attack_roll_bonus = attack_modifier + attack_bonus.flat_amount;
+
+        let roll_result = unmodified_roll as i32 + attack_roll_bonus;
+        let final_result = roll_result - base_evasion as i32;
 
         let mut armor_penetrators = vec![];
 
@@ -2553,7 +2566,7 @@ impl CoreGame {
             } else {
                 "".to_string()
             };
-            detail_lines.push(format!("Rolled: |<value>{}|", unmodified_roll));
+
             detail_lines.push(format!(
                 "{} {} (|<red_dice>|<stat>Attack|)| {}- {} (|<shield>|<stat>Evasion|) = |<value>{}|",
                 unmodified_roll,
@@ -2879,6 +2892,14 @@ impl CoreGame {
 
                     if defender.lose_protected() {
                         detail_lines.push(format!("|{}| lost Protected", defender.name_tag()));
+                    }
+
+                    if attacker
+                        .conditions
+                        .borrow_mut()
+                        .remove(&Condition::Ruthless)
+                    {
+                        detail_lines.push(format!("|{}| lost Ruthless", attacker.name_tag()));
                     }
                 }
 
@@ -4320,6 +4341,7 @@ pub enum Condition {
     ArcaneSurge,
     HealthPotionRecovering,
     Ferocity,
+    Ruthless,
     Wet,
     Poisoned,
     Treasure,
@@ -4356,6 +4378,7 @@ impl Condition {
             ArcaneSurge => "Arcane surge",
             HealthPotionRecovering => "Recovering",
             Ferocity => "Ferocity",
+            Ruthless => "Ruthless",
             Wet => "Wet",
             Poisoned => "Poisoned",
             Treasure => "Treasure",
@@ -4392,6 +4415,7 @@ impl Condition {
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
+            Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
@@ -4428,6 +4452,7 @@ impl Condition {
             ArcaneSurge => true,
             HealthPotionRecovering => true,
             Ferocity => true,
+            Ruthless => true,
             Wet => true,
             Poisoned => false,
             Treasure => true,
@@ -4464,6 +4489,7 @@ impl Condition {
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
             Ferocity => StatusId::Rage,
+            Ruthless => StatusId::Rage,
             Wet => StatusId::Wet,
             Poisoned => StatusId::Poisoned,
             Treasure => StatusId::Treasure,

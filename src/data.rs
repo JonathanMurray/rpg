@@ -1620,6 +1620,29 @@ pub const HASTE: Ability = Ability {
     }),
 };
 
+pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::Inspire,
+    name: "Ruthless",
+    description: "Also make targets |<keyword>Ruthless|",
+    icon: IconId::Rage,
+    action_point_cost: 1,
+    mana_cost: 1,
+    stamina_cost: 0,
+    spell_effect: Some(SpellEnhancementEffect {
+        target_on_hit: Some([
+            Some(ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Ruthless,
+                stacks: None,
+                duration_rounds: Some(2),
+            })),
+            None,
+        ]),
+        ..SpellEnhancementEffect::default()
+    }),
+    attack_effect: None,
+    apply_on_self_per_area_target_hit: None,
+};
+
 pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
@@ -1631,7 +1654,7 @@ pub const INSPIRE: Ability = Ability {
     requirement: None,
 
     roll: Some(AbilityRollType::Spell),
-    possible_enhancements: [None, None, None],
+    possible_enhancements: [Some(INSPIRE_RUTHLESS), None, None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Float(12.5)),
