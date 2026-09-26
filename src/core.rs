@@ -2903,6 +2903,7 @@ impl CoreGame {
             if let Some(arrow) = used_arrow {
                 if let Some(area_effect) = arrow.area_effect {
                     detail_lines.push("".to_string());
+                    detail_lines.push(format!("{}:", arrow.name));
                     // TODO: This AoE should also be performed (predicted) in attack-prediction mode (so that enemies' healthbar previews can be shown
                     // also for the AoE targets)
                     let area_target_outcomes = Self::perform_ability_area_effect(

@@ -102,7 +102,7 @@ const CHARACTER_DAMAGE_PREVIEW_COLOR: Color = Color::new(0.9, 0.1, 0.1, 0.4);
 //const SELECTED_CHARACTER_COLOR: Color = rgb(251, 184, 255);
 const SELECTED_CHARACTER_COLOR: Color = rgb(117, 217, 242);
 const MOVE_RANGE_COLOR: Color = Color::new(0.2, 0.8, 0.2, 0.8);
-const MOVE_RANGE_EXTENDED_COLOR: Color = Color::new(0.8, 0.2, 0.2, 0.8);
+const MOVE_RANGE_EXTENDED_COLOR: Color = rgb(117, 217, 242); //Color::new(0.8, 0.2, 0.2, 0.8);
 const MOVEMENT_PREVIEW_GRID_COLOR: Color = Color::new(0.7, 0.9, 0.7, 0.15);
 
 const ACTION_RANGE_INDICATOR_BACKGROUND: Color = Color::new(0.7, 0.7, 0.7, 0.1);

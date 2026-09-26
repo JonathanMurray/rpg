@@ -393,6 +393,50 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        12,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        11,
+        26
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        12,
+        15
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ogre",
+      "pos": [
+        17,
+        12
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

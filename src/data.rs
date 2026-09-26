@@ -2038,7 +2038,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     target: AbilityTarget::Area {
-        range: Range::Float(18.0),
+        range: Range::Float(12.0),
         area_effect: AreaEffect {
             shape: AreaShape::Line,
             acquisition: AreaTargetAcquisition::Everyone,
