@@ -1742,7 +1742,7 @@ impl UserInterface {
                 if let Some((target, outcome)) = &target_outcome {
                     let target_pos = self.characters.get(*target).pos();
                     self.game_grid.animate_character_shaking(*target, 0.2);
-                    self.add_effect_for_ability_target_outcome(outcome, 0.0, *target, target_pos);
+                    self.add_effect_for_target_outcome(outcome, 0.0, *target, target_pos);
                     self.animation_stopwatch.set_to_at_least(0.3);
                 }
 
@@ -1919,26 +1919,28 @@ impl UserInterface {
 
                 let mut duration = base_duration;
 
-                if from.0 != to.0 || from.1 != to.1 {
-                    // diagonal takes longer
-                    duration *= 1.41;
-                }
-
-                // Indicate when the character has a temporarily modified move speed (from some Condition)
-                duration /= mover.move_speed_modifier();
-
-                if movement_type == MovementType::AbilityEngage {
-                    // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid
-                    duration *= 0.7;
-                } else if liquid.is_some() {
-                    duration *= MOVE_COST_FACTOR_IN_LIQUID;
-                }
-
                 if movement_type == MovementType::Dash {
                     // Dash makes an immediate jump between two positions that aren't necessarily adjacent,
                     let dist = distance_between(from, to);
                     // Dash should appear significantly faster than regular movement
                     duration = base_duration * dist * 0.5;
+                } else {
+                    if from.0 != to.0 || from.1 != to.1 {
+                        // diagonal takes longer
+                        duration *= 1.41;
+                    }
+
+                    // Indicate when the character has a temporarily modified move speed (from some Condition)
+                    if movement_type != MovementType::KnockedBack {
+                        duration /= mover.move_speed_modifier();
+                    }
+
+                    if movement_type == MovementType::AbilityEngage {
+                        // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid
+                        duration *= 0.7;
+                    } else if liquid.is_some() && movement_type != MovementType::KnockedBack {
+                        duration *= MOVE_COST_FACTOR_IN_LIQUID;
+                    }
                 }
 
                 self.game_grid
@@ -2118,7 +2120,7 @@ impl UserInterface {
 
             self.game_grid.animate_character_shaking(*target_id, 0.2);
 
-            self.add_effect_for_ability_target_outcome(outcome, start, *target_id, target_pos);
+            self.add_effect_for_target_outcome(outcome, start, *target_id, target_pos);
 
             self.animation_stopwatch.set_to_at_least(start_time + 0.3);
 
@@ -2245,6 +2247,11 @@ impl UserInterface {
             let mut s = String::new();
             let mut texture = None;
             for apply_effect in applied_to_target {
+                if matches!(apply_effect, ApplyEffect::Pushed(..)) {
+                    // No text needed - the character is shown being pushed
+                    continue;
+                }
+
                 if let ApplyEffect::Condition(condition) = apply_effect {
                     texture = Some(condition.condition.status_icon());
                 }
@@ -2295,8 +2302,8 @@ impl UserInterface {
             self.game_grid.animate_character_shaking(target, 0.2);
         }
 
-        if let Some(outcomes) = &event.area_outcomes {
-            self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, None, outcomes);
+        if let Some((shape, outcomes)) = &event.area_outcomes {
+            self.add_effects_for_area_outcomes(0.0, MAGENTA, &target_pos, Some(*shape), outcomes);
         }
 
         let duration = if self.characters.get(attacker).player_controlled() {
@@ -2309,7 +2316,7 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(duration);
     }
 
-    fn add_effect_for_ability_target_outcome(
+    fn add_effect_for_target_outcome(
         &mut self,
         outcome: &AbilityTargetOutcome,
         start_time: f32,
@@ -2387,6 +2394,10 @@ impl UserInterface {
 
                 if !applied_effects.is_empty() {
                     for apply_effect in applied_effects {
+                        if matches!(apply_effect, ApplyEffect::Pushed(..)) {
+                            // No text needed - the character is shown being pushed
+                            continue;
+                        }
                         let mut s = String::new();
                         let mut texture = None;
                         if let ApplyEffect::Condition(condition) = *apply_effect {

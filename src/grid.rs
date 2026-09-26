@@ -4840,12 +4840,19 @@ impl EffectGraphics {
 
                 let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
 
+                let slow_move_duration = 0.7;
+                let movement_factor = if t < slow_move_duration {
+                    (t / slow_move_duration).powf(0.3)
+                } else {
+                    1.0
+                };
+
                 if let Some(movement) = movement {
-                    x0 += t.sqrt() * movement.0;
+                    x0 += movement_factor * movement.0;
                 }
 
                 let y_offset = if let Some(movement) = movement {
-                    t.sqrt() * movement.1
+                    movement_factor * movement.1
                 } else if t < quick_rise_duration {
                     cell_w + (t / quick_rise_duration).sqrt() * cell_w
                 } else {

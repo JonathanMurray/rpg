@@ -2922,7 +2922,7 @@ impl CoreGame {
                     &mut detail_lines,
                     mode,
                 );
-                area_outcomes = Some(area_target_outcomes);
+                area_outcomes = Some((area_effect.shape, area_target_outcomes));
             }
         }
 
@@ -3514,7 +3514,7 @@ pub fn predict_attack(
         } = event.outcome;
 
         if area_targets.is_empty() {
-            if let Some(outcomes) = event.area_outcomes {
+            if let Some((shape, outcomes)) = event.area_outcomes {
                 for (target_id, _) in outcomes {
                     area_targets.push(target_id);
                 }
@@ -3852,7 +3852,7 @@ pub struct AttackedEvent {
     pub target: CharacterId,
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
-    pub area_outcomes: Option<Vec<(CharacterId, AbilityTargetOutcome)>>,
+    pub area_outcomes: Option<(AreaShape, Vec<(CharacterId, AbilityTargetOutcome)>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -4143,10 +4143,7 @@ impl Display for ApplyEffect {
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
             }
-            ApplyEffect::PerBleeding {
-                damage,
-                caster_healing_percentage,
-            } => {
+            ApplyEffect::PerBleeding { damage, .. } => {
                 f.write_fmt(format_args!("{} damage per Bleeding", damage))?;
 
                 Ok(())
@@ -4154,7 +4151,7 @@ impl Display for ApplyEffect {
             ApplyEffect::ConsumeCondition { condition } => {
                 f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
-            ApplyEffect::Pushed(..) => f.write_str("Pushed"),
+            ApplyEffect::Pushed(distance) => f.write_fmt(format_args!("{distance}")),
             ApplyEffect::Escape => f.write_str("Escaped"),
         }
     }
