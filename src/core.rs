@@ -1138,7 +1138,7 @@ impl CoreGame {
                 )
             }
             e @ ApplyEffect::ConsumeCondition { condition } => {
-                let prev_stacks = receiver.conditions.borrow().get_stacks(&condition);
+                let prev_stacks = receiver.get_condition_stacks(condition);
                 let did_clear = receiver.clear_condition(condition);
                 let mut line = "".to_string();
                 if did_clear {
@@ -2370,7 +2370,7 @@ impl CoreGame {
         if enemy.has_condition(&Condition::Treasure) {
             if let Some(ch) = self.player_characters().next() {
                 let amount = if enemy.is_dead() {
-                    enemy.conditions.borrow().get_stacks(&Condition::Treasure)
+                    enemy.get_condition_stacks(Condition::Treasure)
                 } else {
                     1
                 };
@@ -2613,6 +2613,15 @@ impl CoreGame {
                     dmg_str.push_str(&format!(" +{} |<faded>({})|", bonus_dmg, name));
                     dmg_calculation += bonus_dmg as i32;
                 }
+                if let Some((condition, amount)) = effect.bonus_damage_per_self_condition {
+                    let bonus_dmg = attacker.get_condition_stacks(condition) * amount;
+                    dmg_str.push_str(&format!(" +{} |<faded>({})|", bonus_dmg, condition.name()));
+                    dmg_calculation += bonus_dmg as i32;
+
+                    if game.is_some() {
+                        attacker.conditions.borrow_mut().remove(&condition);
+                    }
+                }
                 if effect.improved_graze {
                     graze_improvement = Some(name);
                 }
@@ -2631,10 +2640,7 @@ impl CoreGame {
                 }
             }
 
-            let ferocity = attacker
-                .conditions
-                .borrow()
-                .get_stacks(&Condition::Ferocity);
+            let ferocity = attacker.get_condition_stacks(Condition::Ferocity);
             if ferocity > 0 {
                 dmg_str.push_str(&format!(" +{} |<faded>(Ferocity)|", ferocity));
                 dmg_calculation += ferocity as i32;
@@ -4298,10 +4304,10 @@ impl Display for AttackHitEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AttackHitEffect::ApplyTarget(apply_effect) => {
-                f.write_fmt(format_args!("(target) {}", apply_effect))
+                f.write_fmt(format_args!("|<faded>(target)| {}", apply_effect))
             }
             AttackHitEffect::ApplySelf(apply_effect) => {
-                f.write_fmt(format_args!("(self) {}", apply_effect))
+                f.write_fmt(format_args!("|<faded>(self)| {}", apply_effect))
             }
         }
     }
@@ -4345,6 +4351,7 @@ pub enum Condition {
     Wet,
     Poisoned,
     Treasure,
+    HungeringBladeSouls,
 }
 
 impl Condition {
@@ -4382,6 +4389,7 @@ impl Condition {
             Wet => "Wet",
             Poisoned => "Poisoned",
             Treasure => "Treasure",
+            HungeringBladeSouls => "Captured souls",
         }
     }
 
@@ -4419,6 +4427,7 @@ impl Condition {
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
+            HungeringBladeSouls => "Can be unleashed to empower an attack"
         }
     }
 
@@ -4456,13 +4465,14 @@ impl Condition {
             Wet => true,
             Poisoned => false,
             Treasure => true,
+            HungeringBladeSouls => true,
         }
     }
 
     pub const fn has_cumulative_stacking(&self) -> bool {
         use Condition::*;
         match self {
-            Bleeding | Burning | ArcaneSurge | Ferocity => true,
+            Bleeding | Burning | ArcaneSurge | Ferocity | HungeringBladeSouls => true,
             _ => false,
         }
     }
@@ -4493,6 +4503,7 @@ impl Condition {
             Wet => StatusId::Wet,
             Poisoned => StatusId::Poisoned,
             Treasure => StatusId::Treasure,
+            HungeringBladeSouls => StatusId::HungeringBladeSouls,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -5265,6 +5276,7 @@ pub struct AttackEnhancementEffect {
     pub roll_modifier: i32,
     pub roll_advantage: i32,
     pub bonus_damage: u32,
+    pub bonus_damage_per_self_condition: Option<(Condition, u32)>,
     pub action_point_discount: u32,
     pub inflict_x_condition_per_damage: Option<(Fraction, Condition)>,
     pub armor_penetration: u32,
@@ -5293,6 +5305,7 @@ impl AttackEnhancementEffect {
         Self {
             action_point_discount: 0,
             bonus_damage: 0,
+            bonus_damage_per_self_condition: None,
             roll_advantage: 0,
             on_damage_effect: None,
             roll_modifier: 0,
@@ -6046,7 +6059,7 @@ impl Character {
 
     pub fn weapon_damage_str(&self, hand: HandType) -> String {
         let weapon = self.weapon(hand).unwrap();
-        let ferocity = self.conditions.borrow().get_stacks(&Condition::Ferocity);
+        let ferocity = self.get_condition_stacks(Condition::Ferocity);
         if ferocity > 0 {
             format!("{} |<keyword>+{}|", weapon.damage, ferocity)
         } else {
@@ -6902,16 +6915,14 @@ impl Character {
         res
     }
 
+    fn get_condition_stacks(&self, condition: Condition) -> u32 {
+        self.conditions.borrow().get_stacks(&condition)
+    }
+
     fn hand_exertion(&self, hand_type: HandType) -> u32 {
         match hand_type {
-            HandType::MainHand => self
-                .conditions
-                .borrow()
-                .get_stacks(&Condition::MainHandExertion),
-            HandType::OffHand => self
-                .conditions
-                .borrow()
-                .get_stacks(&Condition::OffHandExertion),
+            HandType::MainHand => self.get_condition_stacks(Condition::MainHandExertion),
+            HandType::OffHand => self.get_condition_stacks(Condition::OffHandExertion),
         }
     }
 

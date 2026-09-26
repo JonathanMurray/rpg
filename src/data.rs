@@ -251,6 +251,40 @@ pub const MAGIC_SWORD: Weapon = Weapon {
     weight: 2,
 };
 
+pub const HUNGERING_BLADE: Weapon = Weapon {
+    name: "Hungering blade",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 6,
+    grip: WeaponGrip::Versatile,
+    attack_attribute: AttackAttribute::Finesse,
+    attack_enhancement: Some(AttackEnhancement {
+        name: "Unleash souls",
+        description: "",
+        icon: IconId::Banshee,
+        action_point_cost: 0,
+        mana_cost: 0,
+        stamina_cost: 1,
+        weapon_requirement: Some(WeaponType::Melee),
+        effect: AttackEnhancementEffect {
+            bonus_damage_per_self_condition: Some((Condition::HungeringBladeSouls, 2)),
+            ..AttackEnhancementEffect::default()
+        },
+    }),
+    on_attacked_reaction: None,
+    bonus_melee_evasion: 3,
+    on_damage: Some(AttackHitEffect::ApplySelf(ApplyEffect::Condition(
+        ApplyCondition {
+            condition: Condition::HungeringBladeSouls,
+            stacks: Some(1),
+            duration_rounds: None,
+        },
+    ))),
+    sprite: Some(SpriteId::HungeringBlade),
+    icon: EquipmentIconId::HungeringBlade,
+    weight: 2,
+};
+
 pub const ZERO_SWORD: Weapon = Weapon {
     name: "Useless sword",
     range: WeaponRange::Melee,

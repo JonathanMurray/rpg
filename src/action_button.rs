@@ -260,6 +260,13 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
         t.technical_description
             .push(format!("|<value>+{}| |<sword>|", effect.bonus_damage));
     }
+    if let Some((condition, amount)) = effect.bonus_damage_per_self_condition {
+        t.technical_description.push(format!(
+            "|<value>+{}| |<sword>| per |<keyword>{}|",
+            amount,
+            condition.name()
+        ));
+    }
     if effect.range_bonus > 0 {
         t.technical_description
             .push(format!("+ {} range", effect.range_bonus));

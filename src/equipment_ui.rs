@@ -108,6 +108,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
     if let Some(effect) = weapon.on_damage {
         t.technical_description.push(format!("On damage: {effect}"));
+
         if let AttackHitEffect::ApplyTarget(apply_effect) = effect {
             match apply_effect {
                 ApplyEffect::Condition(apply_condition) => t.keywords.push(Keyword::Cond(

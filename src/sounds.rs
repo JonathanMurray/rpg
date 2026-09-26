@@ -44,7 +44,7 @@ impl SoundPlayer {
             (SoundId::ClickButton, 1.0, vec!["fl_low_click.ogg"]),
             (SoundId::DragEquipment, 1.0, vec!["click_2"]),
             (SoundId::DropEquipment, 1.0, vec!["click_3"]),
-            (SoundId::Explosion, 1.0, vec!["explosion"]),
+            (SoundId::Explosion, 0.6, vec!["explosion"]),
             (SoundId::ShieldBash, 1.5, vec!["fl_shield_bash.ogg"]),
             (SoundId::SweepAttack, 1.0, vec!["fl_sweep_attack.ogg"]),
             (SoundId::FireballHit, 0.8, vec!["fl_fireball_hit.ogg"]),

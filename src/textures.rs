@@ -33,6 +33,7 @@ pub enum SpriteId {
     Bow,
     Sword,
     MagicSword,
+    HungeringBlade,
     Rapier,
     Dagger,
     Shield,
@@ -69,6 +70,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
         (SpriteId::MagicSword, "magic_sword.png"),
+        (SpriteId::HungeringBlade, "hungering_blade.png"),
         (SpriteId::Rapier, "rapier.png"),
         (SpriteId::Dagger, "dagger.png"),
         (SpriteId::Shield, "shield.png"),
@@ -130,6 +132,7 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::Shield => panic!(),
         SpriteId::CharacterShadow => panic!(),
         SpriteId::MagicSword => panic!(),
+        SpriteId::HungeringBlade => panic!(),
     }
 }
 
@@ -157,6 +160,7 @@ pub enum StatusId {
     Wet,
     Poisoned,
     Treasure,
+    HungeringBladeSouls,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -282,6 +286,7 @@ pub enum EquipmentIconId {
     Dagger,
     Sword,
     MagicSword,
+    HungeringBlade,
     SmallShield,
     MediumShield,
     LeatherArmor,
@@ -933,6 +938,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::Dagger => (1, 1),
         EquipmentIconId::Sword => (0, 1),
         EquipmentIconId::MagicSword => (5, 0),
+        EquipmentIconId::HungeringBlade => (6, 0),
         EquipmentIconId::SmallShield => (4, 1),
         EquipmentIconId::MediumShield => (0, 2),
         EquipmentIconId::LeatherArmor => (2, 2),
@@ -1091,6 +1097,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::Wet => (3, 3),
         StatusId::Poisoned => (4, 3),
         StatusId::Treasure => (5, 0),
+        StatusId::HungeringBladeSouls => (5, 1),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

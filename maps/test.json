@@ -395,39 +395,6 @@
       "name": null
     },
     {
-      "type_": "Alice",
-      "pos": [
-        13,
-        26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        10,
-        22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
-        10,
-        29
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Draug",
       "pos": [
         14,
