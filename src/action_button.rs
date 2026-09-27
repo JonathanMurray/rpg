@@ -35,9 +35,9 @@ use crate::{
     util::{oscillate, COL_GOLD, COL_GREEN_2, COL_RED},
 };
 
-pub const EVASION_STR: &str = "  |<shield>| |<stat>Evasion|";
-const WILL_STR: &str = "  |<shield>| |<stat>Will|";
-const TOUGHNESS_STR: &str = "  |<shield>| |<stat>Toughness|";
+pub const EVASION_STR: &str = "|<shield>||<stat>Evasion|";
+const WILL_STR: &str = "|<shield>||<stat>Will|";
+const TOUGHNESS_STR: &str = "|<shield>||<stat>Toughness|";
 
 fn defense_str(defense_type: DefenseType) -> &'static str {
     match defense_type {
@@ -230,12 +230,12 @@ fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
     match effect {
         AttackHitEffect::ApplyTarget(apply_effect) => {
             t.technical_description
-                .push("|<faded>On damage: (target)| ".to_string());
+                .push("On damage: |<faded>(target)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
         AttackHitEffect::ApplySelf(apply_effect) => {
             t.technical_description
-                .push("|<faded>On damage: (self)| ".to_string());
+                .push("On damage: |<faded>(self)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
     }
@@ -389,24 +389,26 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         }
 
         for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-            t.technical_description.push("|<faded>Target:|".to_string());
+            t.technical_description
+                .push("|<single_target>|:".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
         for apply_effect in effect.area_on_hit.iter().flatten().flatten() {
-            t.technical_description.push("|<faded>Area:|".to_string());
+            t.technical_description
+                .push("|<multi_target>| |<radius>|:".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
 
         if effect.increased_range_tenths > 0 {
             t.technical_description.push(format!(
-                "|<value>+{}| range",
+                "|<value>+{}| |<range>| range",
                 effect.increased_range_tenths as f32 * 0.1
             ));
         }
 
         if effect.increased_radius_tenths > 0 {
             t.technical_description.push(format!(
-                "|<value>+{}| radius",
+                "|<value>+{}| |<radius>| radius",
                 effect.increased_radius_tenths as f32 * 0.1
             ));
         }
@@ -418,7 +420,7 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
 
     if enhancement.apply_on_self_per_area_target_hit.is_some() {
         t.technical_description
-            .push("|<faded>On self (per target hit):|".to_string());
+            .push("|<single_target>| self |<faded>(per target hit)|:".to_string());
         for apply_effect in enhancement
             .apply_on_self_per_area_target_hit
             .iter()
@@ -579,29 +581,23 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             reach,
             environment_effect,
         } => {
-            match reach {
-                AbilityReach::Range(range) => {
-                    t.technical_description
-                        .push(format!("|<faded>Target enemy (range {})|", range));
-                }
-                AbilityReach::MoveIntoMelee(range) => {
-                    t.technical_description
-                        .push(format!("|<faded>Engage enemy (range {})|", range));
-                }
-            }
+            let def = def_suffix(effect.defense_type());
+            let range = match reach {
+                AbilityReach::Range(range) => range,
+                AbilityReach::MoveIntoMelee(range) => range,
+            };
+            t.technical_description.push(format!(
+                "|<single_target>| {}{}",
+                range.range_with_icon(),
+                def
+            ));
             describe_ability_negative_effect(effect, &mut t);
 
             if let Some((range, acquisition, effect)) = area {
-                let targets_str = match acquisition {
-                    AreaTargetAcquisition::Enemies => "Enemies",
-                    AreaTargetAcquisition::Everyone => "EVERYONE",
-                    AreaTargetAcquisition::Allies => unreachable!(),
-                };
                 t.technical_description.push("".to_string());
-                t.technical_description.push(format!(
-                    "|<faded>{} in impact area (radius {})|",
-                    targets_str, range
-                ));
+                let def = def_suffix(effect.defense_type());
+                t.technical_description
+                    .push(format!("|<multi_target>| |<radius>| {}{}", range, def));
                 describe_ability_negative_effect(effect, &mut t);
             }
 
@@ -612,7 +608,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
 
         AbilityTarget::Ally { range, effect } => {
             t.technical_description
-                .push(format!("|<faded>Target ally (range {})|", range));
+                .push(format!("|<single_target>| {}|", range.range_with_icon()));
             describe_ability_ally_effect(effect, &mut t);
         }
 
@@ -636,22 +632,18 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                 assert!(acquisition != AreaTargetAcquisition::Everyone);
 
                 let radius_str = match shape {
-                    AreaShape::Circle(r) => match r {
-                        Range::Melee => "melee".to_string(),
-                        r => format!("radius {r}"),
-                    },
+                    AreaShape::Circle(r) => r.radius_with_icon(),
                     AreaShape::Line => "line".to_string(),
                 };
 
+                let def = def_suffix(effect.defense_type());
+                t.technical_description
+                    .push(format!("|<multi_target>| {radius_str}{def}"));
                 match effect {
                     AbilityEffect::Negative(effect) => {
-                        t.technical_description
-                            .push(format!("|<faded>Enemies ({radius_str})|"));
                         describe_ability_negative_effect(effect, &mut t);
                     }
                     AbilityEffect::Positive(effect) => {
-                        t.technical_description
-                            .push(format!("|<faded>Allies ({radius_str})|"));
                         describe_ability_ally_effect(effect, &mut t);
                     }
                 }
@@ -667,11 +659,17 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
         }
 
         AbilityTarget::Destination { range } => {
-            t.technical_description.push(format!("range {range}"));
+            t.technical_description.push(format!("|<range>| {range}"));
         }
     };
 
     t
+}
+
+fn def_suffix(defense_type: Option<DefenseType>) -> String {
+    defense_type
+        .map(|d| format!("  |<faded>[|{}|<faded>]|", defense_str(d)))
+        .unwrap_or(String::new())
 }
 
 fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
@@ -692,29 +690,33 @@ fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
 pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &mut Tooltip) {
     match area_effect.effect {
         AbilityEffect::Negative(effect) => {
+            let def = def_suffix(effect.defense_type());
             let targets_str = match area_effect.acquisition {
-                AreaTargetAcquisition::Enemies => "Enemies",
-                AreaTargetAcquisition::Everyone => "EVERYONE",
+                AreaTargetAcquisition::Enemies => "|<multi_target>|",
+                AreaTargetAcquisition::Everyone => "|<multi_target>| EVERYONE",
                 AreaTargetAcquisition::Allies => unreachable!(),
             };
-            let line = if let Some(range) = range {
+            let mut line = if let Some(range) = range {
                 match area_effect.shape {
                     AreaShape::Circle(radius) => {
                         format!(
-                            "|<faded>{} (range {}, radius {})|",
-                            targets_str, range, radius
+                            "{} {} {}",
+                            targets_str,
+                            range.range_with_icon(),
+                            radius.radius_with_icon()
                         )
                     }
-                    AreaShape::Line => format!("|<faded>{} (range {}, line)|", targets_str, range),
+                    AreaShape::Line => format!("{} {}", targets_str, range.range_with_icon()),
                 }
             } else {
                 match area_effect.shape {
                     AreaShape::Circle(radius) => {
-                        format!("|<faded>{} (radius {})|", targets_str, radius)
+                        format!("{} {}", targets_str, radius.radius_with_icon())
                     }
-                    AreaShape::Line => format!("|<faded>{} (line)|", targets_str),
+                    AreaShape::Line => format!("{}", targets_str),
                 }
             };
+            line.push_str(&def);
             t.technical_description.push(line);
             describe_ability_negative_effect(effect, t);
         }
@@ -723,16 +725,20 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
             let line = if let Some(range) = range {
                 match area_effect.shape {
                     AreaShape::Circle(radius) => {
-                        format!("|<faded>Allies (range {}, radius {})|", range, radius)
+                        format!(
+                            "|<multi_target>| {} {}",
+                            range.range_with_icon(),
+                            radius.radius_with_icon()
+                        )
                     }
-                    AreaShape::Line => format!("|<faded>Allies (range {}, line)|", range),
+                    AreaShape::Line => format!("|<multi_target>| {}", range.range_with_icon()),
                 }
             } else {
                 match area_effect.shape {
                     AreaShape::Circle(radius) => {
-                        format!("|<faded>Allies (radius {})|", radius)
+                        format!("|<multi_target>| {}", radius.radius_with_icon())
                     }
-                    AreaShape::Line => "|<faded>Allies (line)|".to_string(),
+                    AreaShape::Line => "|<multi_target>|".to_string(),
                 }
             };
             t.technical_description.push(line);
@@ -744,11 +750,6 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
 fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Tooltip) {
     match effect {
         AbilityNegativeEffect::Spell(effect) => {
-            if let Some(defense_type) = effect.defense_type {
-                t.technical_description
-                    .push(defense_str(defense_type).to_string())
-            };
-
             if let Some(ability_dmg) = effect.damage {
                 let (value, dmg_type) = match ability_dmg {
                     AbilityDamage::Fixed(n, dmg_type) => (n, dmg_type),
@@ -756,9 +757,9 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
                 };
                 let mut line = format!("  |<sword>| |<value>{}|", value);
                 match dmg_type {
-                    DamageType::Fire => line.push_str(" (fire)"),
-                    DamageType::Lightning => line.push_str(" (lightning)"),
-                    DamageType::Regular => {}
+                    DamageType::Fire => line.push_str(" |<faded>fire damage|"),
+                    DamageType::Lightning => line.push_str(" |<faded>lightning damage|"),
+                    DamageType::Regular => line.push_str(" |<faded>damage|"),
                 }
                 t.technical_description.push(line);
             }
@@ -769,9 +770,6 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
         }
 
         AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
-            t.technical_description
-                .push(defense_str(DefenseType::Evasion).to_string());
-
             let dmg_str = match ability_attack_effect.override_weapon_damage {
                 Some(override_dmg) => override_dmg.to_string(),
                 None => {
@@ -784,7 +782,7 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             };
 
             t.technical_description
-                .push(format!("  |<sword>| |<value>{dmg_str}|"));
+                .push(format!("  |<sword>| |<value>{dmg_str}| |<faded>damage|"));
             if let Some(apply_effect) = ability_attack_effect.on_hit {
                 describe_apply_effect(apply_effect, t);
             }
@@ -1061,15 +1059,18 @@ impl ActionButton {
                 *self.tooltip.borrow_mut() = if let Some(weapon) = equipped_weapon {
                     let attack_type = if weapon.is_melee() { "Melee" } else { "Ranged" };
                     let mut technical_description = vec!["|<red_dice>| |<stat>Attack|".to_string()];
-                    let range = if weapon.is_melee() {
-                        "melee".to_string()
-                    } else {
-                        format!("range {}", weapon.range.into_range())
-                    };
+                    let range = weapon.range.into_range().range_with_icon();
+
                     technical_description.push("".to_string());
-                    technical_description.push(format!("|<faded>Target ({})|", range));
-                    technical_description.push(EVASION_STR.to_string());
-                    technical_description.push(format!("  |<sword>| |<value>{}|", weapon.damage));
+                    technical_description.push(format!(
+                        "|<single_target>| {}{}",
+                        range,
+                        def_suffix(Some(DefenseType::Evasion))
+                    ));
+                    technical_description.push(format!(
+                        "  |<sword>| |<value>{}| |<faded>damage|",
+                        weapon.damage
+                    ));
 
                     let mut t = Tooltip {
                         header: format!("{} attack", attack_type /*weapon.action_point_cost*/,),

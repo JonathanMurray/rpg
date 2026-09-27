@@ -4996,6 +4996,15 @@ pub enum AbilityEffect {
     Positive(AbilityPositiveEffect),
 }
 
+impl AbilityEffect {
+    pub fn defense_type(&self) -> Option<DefenseType> {
+        match self {
+            AbilityEffect::Negative(e) => e.defense_type(),
+            AbilityEffect::Positive(..) => None,
+        }
+    }
+}
+
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct SpellNegativeEffect {
     pub defense_type: Option<DefenseType>,
@@ -5026,6 +5035,13 @@ impl AbilityNegativeEffect {
             }
         }
         None
+    }
+
+    pub fn defense_type(&self) -> Option<DefenseType> {
+        match self {
+            AbilityNegativeEffect::Spell(effect) => effect.defense_type,
+            AbilityNegativeEffect::PerformAttack(..) => Some(DefenseType::Evasion),
+        }
     }
 }
 
@@ -7695,6 +7711,24 @@ impl Range {
             Range::Ranged(range) => Range::Float(*range as f32 + n),
             Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
             Range::Float(range) => Range::Float(range + n),
+        }
+    }
+
+    pub fn range_with_icon(&self) -> String {
+        match self {
+            Range::Melee => "melee".to_string(),
+            Range::Ranged(range) => format!("|<range>| {range}"),
+            Range::ExtendableRanged(range) => format!("|<range>| {range}"),
+            Range::Float(range) => format!("|<range>| {range:.1}"),
+        }
+    }
+
+    pub fn radius_with_icon(&self) -> String {
+        match self {
+            Range::Melee => "melee".to_string(),
+            Range::Ranged(range) => format!("|<radius>| {range}"),
+            Range::ExtendableRanged(range) => format!("|<radius>| {range}"),
+            Range::Float(range) => format!("|<radius>| {range:.1}"),
         }
     }
 }

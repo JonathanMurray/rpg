@@ -24,8 +24,9 @@ use crate::{
     textures::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL, CHECKED_SYMBOL,
         CONFIRM_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL,
-        MIXED_DICE_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL,
-        SWORD_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
+        MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL, RADIUS_SYMBOL, RANGE_SYMBOL, RED_DICE_SYMBOL,
+        SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL,
+        UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
@@ -470,7 +471,10 @@ lazy_static! {
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
             ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
             ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
-            ("<single_target>", (symbol_w, &WEIGHT_SYMBOL)),
+            ("<single_target>", (symbol_w, &SINGLE_TARGET_SYMBOL)),
+            ("<multi_target>", (symbol_w, &MULTI_TARGET_SYMBOL)),
+            ("<range>", (symbol_w, &RANGE_SYMBOL)),
+            ("<radius>", (symbol_w, &RADIUS_SYMBOL)),
             ("<confirm>", (symbol_w, &CONFIRM_SYMBOL)),
             ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
             ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
