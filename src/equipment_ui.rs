@@ -122,6 +122,9 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             }
         }
     }
+    if let Some(effect) = weapon.on_kill_apply_self {
+        t.technical_description.push(format!("On kill: {effect}"));
+    }
     if weapon.bonus_melee_evasion > 0 {
         t.technical_description
             .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));

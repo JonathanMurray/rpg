@@ -2753,11 +2753,15 @@ impl CoreGame {
                     }
 
                     if defender.is_dead() {
-                        if let Some(effect) =
-                            ability_attack_effect.and_then(|e| e.on_kill_apply_self)
+                        for effect in [
+                            ability_attack_effect.and_then(|e| e.on_kill_apply_self),
+                            weapon.on_kill_apply_self,
+                        ]
+                        .iter()
+                        .flatten()
                         {
                             let (applied, log_line, _damage) = game.perform_effect_application(
-                                effect,
+                                *effect,
                                 Some(attacker),
                                 None,
                                 attacker,
@@ -2767,6 +2771,7 @@ impl CoreGame {
                             }
                             detail_lines.push(log_line);
                         }
+
                         for (name, enhancement) in enhancements {
                             if let Some(effect) = enhancement.on_kill_apply_self {
                                 let (applied, log_line, _damage) = game.perform_effect_application(
@@ -7528,6 +7533,7 @@ pub struct Weapon {
     pub on_attacked_reaction: Option<OnAttackedReaction>,
     pub bonus_melee_evasion: u32,
     pub on_damage: Option<AttackHitEffect>,
+    pub on_kill_apply_self: Option<ApplyEffect>,
     pub weight: u32,
 }
 

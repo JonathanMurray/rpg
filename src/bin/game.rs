@@ -25,9 +25,7 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE,
-    HEAL, HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR,
-    PIERCING_SHOT, SWEEP_ATTACK,
+    ARCANE_BOW, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE, HEAL, HEAL_ENERGIZE, HEALTH_POTION, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, PIERCING_SHOT, PassiveSkill, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -205,7 +203,7 @@ async fn run_demo(
                                 ButtonAction::AbilityEnhancement(HEAL_ENERGIZE),
                                 ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS),
                             ],
-                            vec![],
+                            vec![EquipmentEntry::Weapon(ARCANE_BOW)],
                             //vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
                         ),
                     ),

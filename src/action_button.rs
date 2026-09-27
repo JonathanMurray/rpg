@@ -1080,6 +1080,11 @@ impl ActionButton {
                     if let Some(effect) = weapon.on_damage {
                         describe_attack_on_damage_effect(&effect, &mut t);
                     }
+                    if let Some(effect) = weapon.on_kill_apply_self {
+                        t.technical_description
+                            .push("|<faded>On kill: (self)| ".to_string());
+                        describe_apply_effect(effect, &mut t);
+                    }
 
                     t
                 } else {

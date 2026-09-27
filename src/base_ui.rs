@@ -470,6 +470,7 @@ lazy_static! {
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
             ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
             ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
+            ("<single_target>", (symbol_w, &WEIGHT_SYMBOL)),
             ("<confirm>", (symbol_w, &CONFIRM_SYMBOL)),
             ("<stamina>", (symbol_w, &STAMINA_SYMBOL)),
             ("<stamina_small>", (9.0, &STAMINA_SMALL_SYMBOL)),
