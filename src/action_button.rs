@@ -317,7 +317,8 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
     }
 
     if let Some(effect) = effect.on_target {
-        t.technical_description.push("|<faded>Target:|".to_string());
+        t.technical_description
+            .push("|<single_target>|".to_string());
         describe_apply_effect(effect, t);
     }
 
@@ -335,11 +336,8 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
                 t.technical_description.push("Regain AP".to_string())
             }
             AttackEnhancementOnHitEffect::Target(defense_type, apply_effect) => {
-                t.technical_description.push("|<faded>Target:|".to_string());
-                if let Some(defense_type) = defense_type {
-                    t.technical_description
-                        .push(defense_str(defense_type).to_string());
-                }
+                t.technical_description
+                    .push(format!("|<single_target>|{}", def_suffix(defense_type)));
                 describe_apply_effect(apply_effect, t);
             }
         }

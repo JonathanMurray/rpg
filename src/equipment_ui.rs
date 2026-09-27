@@ -56,7 +56,8 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
             .push(format!("{} armor penetration", penetration));
     }
     if let Some(effect) = stack.arrow.on_damage_apply {
-        t.technical_description.push("Target:".to_string());
+        t.technical_description
+            .push("|<single_target>|:".to_string());
         describe_apply_effect(effect, &mut t);
     }
     if let Some(area_effect) = stack.arrow.area_effect {
@@ -109,17 +110,15 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     if let Some(effect) = weapon.on_damage {
         t.technical_description.push(format!("On damage: {effect}"));
 
-        if let AttackHitEffect::ApplyTarget(apply_effect) = effect {
-            match apply_effect {
-                ApplyEffect::Condition(apply_condition) => t.keywords.push(Keyword::Cond(
-                    apply_condition.condition,
-                    apply_condition.stacks,
-                )),
-                ApplyEffect::ConsumeCondition { condition } => {
-                    t.keywords.push(Keyword::Cond(condition, None))
-                }
-                _ => {}
+        match effect.apply_effect() {
+            ApplyEffect::Condition(apply_condition) => t.keywords.push(Keyword::Cond(
+                apply_condition.condition,
+                apply_condition.stacks,
+            )),
+            ApplyEffect::ConsumeCondition { condition } => {
+                t.keywords.push(Keyword::Cond(condition, None))
             }
+            _ => {}
         }
     }
     if let Some(effect) = weapon.on_kill_apply_self {

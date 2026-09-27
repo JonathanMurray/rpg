@@ -45,9 +45,9 @@ use crate::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
         within_range_squared, Ability, AbilityId, AbilityReach, AbilityTarget, ActionReach,
-        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AttackAction, AttackEnhancement,
-        BaseAction, Character, Goodness, MovementType, Position, TargetPrediction,
-        MOVE_DISTANCE_PER_RESOURCE,
+        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition, AttackAction,
+        AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
+        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -204,7 +204,7 @@ enum AnimationDetails {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub enum RangeIndicator {
+pub enum RangeIndicatorType {
     ActionTargetRange,
     TargetAreaEffect,
     CanReachButDisadvantage,
@@ -2292,12 +2292,18 @@ impl GameGrid {
             }
         }
 
-        if let Some((char_id, range, indicator)) = range_indicator {
+        if let Some((char_id, range, indicator, acquisition)) = range_indicator {
             let char_pos = self.characters[&char_id].pos();
             self.draw_range_indicator(char_pos, range, indicator);
 
             for character in self.characters.values() {
                 if target_within_range_squared(range.squared(), char_pos, character.pos()) {
+                    // If the range indicator belongs to an ability with target acquisition, exclude invalid targets
+                    if let Some(a) = acquisition {
+                        if !is_valid_area_target(&self.characters[&char_id], character, a) {
+                            continue;
+                        }
+                    }
                     detail_labelled_char_ids.insert(character.id());
                 }
             }
@@ -2329,20 +2335,20 @@ impl GameGrid {
                     self.draw_range_indicator(
                         self.characters[&target_id].pos(),
                         aoe_radius,
-                        RangeIndicator::TargetAreaEffect,
+                        RangeIndicatorType::TargetAreaEffect,
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
                     if let Some(hovered_id) = self.hovered_character {
                         self.draw_range_indicator(
                             self.characters[&hovered_id].pos(),
                             aoe_radius,
-                            RangeIndicator::TargetAreaEffect,
+                            RangeIndicatorType::TargetAreaEffect,
                         );
                     } else {
                         self.draw_range_indicator(
                             mouse_grid_pos,
                             aoe_radius,
-                            RangeIndicator::TargetAreaEffect,
+                            RangeIndicatorType::TargetAreaEffect,
                         );
                     }
                 }
@@ -2363,7 +2369,7 @@ impl GameGrid {
                             self.draw_range_indicator(
                                 center,
                                 radius,
-                                RangeIndicator::TargetAreaEffect,
+                                RangeIndicatorType::TargetAreaEffect,
                             );
                         }
                     }
@@ -2602,10 +2608,10 @@ impl GameGrid {
                 MouseState::RequiresEnemyTarget { .. } | MouseState::RequiresAllyTarget => {
                     if player_action_char_target.is_none() && self.hovered_character.is_none() {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((_char_id, _range, indicator)) = range_indicator {
+                        if let Some((_char_id, _range, indicator, _acquisition)) = range_indicator {
                             // TODO: is it always correct to use active_char_pos here? Can char_id not be some other character?
                             is_mouse_pos_out_of_range =
-                                matches!(indicator, RangeIndicator::CannotReach);
+                                matches!(indicator, RangeIndicatorType::CannotReach);
                         }
 
                         if is_mouse_pos_out_of_range {
@@ -2658,7 +2664,7 @@ impl GameGrid {
                         may_commit_action_with_left_click = true;
                     } else {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((char_id, range, _indicator)) = range_indicator {
+                        if let Some((char_id, range, _indicator, _acquisition)) = range_indicator {
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -2840,8 +2846,10 @@ impl GameGrid {
                             4.0,
                             true,
                         );
-                        let cannot_reach =
-                            matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
+                        let cannot_reach = matches!(
+                            range_indicator,
+                            Some((_, _, RangeIndicatorType::CannotReach, _))
+                        );
                         self.draw_target_crosshair(
                             self.characters[&self.active_character_id].pos(),
                             hovered_char.pos(),
@@ -2930,7 +2938,7 @@ impl GameGrid {
                         } else {
                             let cannot_reach = matches!(
                                 range_indicator,
-                                Some((_, _, RangeIndicator::CannotReach))
+                                Some((_, _, RangeIndicatorType::CannotReach, _))
                             );
                             self.draw_target_crosshair(
                                 active_char_pos,
@@ -3064,7 +3072,8 @@ impl GameGrid {
                         .map(|indicator| {
                             !matches!(
                                 indicator.2,
-                                RangeIndicator::CannotReach | RangeIndicator::ObstructedLineOfSight
+                                RangeIndicatorType::CannotReach
+                                    | RangeIndicatorType::ObstructedLineOfSight
                             )
                         })
                         .unwrap_or(true);
@@ -3080,8 +3089,10 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(target.id());
             }
             ActionTarget::Position(target_pos) => {
-                let cannot_reach =
-                    matches!(range_indicator, Some((_, _, RangeIndicator::CannotReach)));
+                let cannot_reach = matches!(
+                    range_indicator,
+                    Some((_, _, RangeIndicatorType::CannotReach, _))
+                );
                 self.draw_target_crosshair(
                     active_char_pos,
                     target_pos,
@@ -3551,7 +3562,12 @@ impl GameGrid {
         ui_state: &mut UiState,
         hovered_base_action: Option<(CharacterId, BaseAction)>,
         mouse_grid_pos: (i32, i32),
-    ) -> Option<(CharacterId, Range, RangeIndicator)> {
+    ) -> Option<(
+        CharacterId,
+        Range,
+        RangeIndicatorType,
+        Option<AreaTargetAcquisition>,
+    )> {
         let mut indicator = None;
 
         if let Some((char_id, base_action)) = hovered_base_action {
@@ -3560,15 +3576,25 @@ impl GameGrid {
                     BaseAction::Attack(attack) => {
                         if character.weapon(attack.hand).is_some() {
                             let range = character.attack_range(attack.hand, iter::empty());
-                            indicator = Some((char_id, range, RangeIndicator::ActionTargetRange))
+                            indicator = Some((
+                                char_id,
+                                range,
+                                RangeIndicatorType::ActionTargetRange,
+                                Some(AreaTargetAcquisition::Enemies),
+                            ))
                         }
                     }
                     BaseAction::UseAbility(ability) => {
                         let radius = ability.target.radius(&[]);
                         let range = ability.target.range(&[]);
-                        indicator = radius
-                            .or(range)
-                            .map(|range| (char_id, range, RangeIndicator::ActionTargetRange))
+                        indicator = radius.or(range).map(|range| {
+                            (
+                                char_id,
+                                range,
+                                RangeIndicatorType::ActionTargetRange,
+                                ability.target.acquisition(),
+                            )
+                        })
                     }
                     _ => {}
                 }
@@ -3626,15 +3652,20 @@ impl GameGrid {
                     };
 
                     let indicator = match (reach, obstructed_line_of_sight) {
-                        (ActionReach::No, _) => RangeIndicator::CannotReach,
-                        (_, true) => RangeIndicator::ObstructedLineOfSight,
-                        (ActionReach::Yes, _) => RangeIndicator::ActionTargetRange,
+                        (ActionReach::No, _) => RangeIndicatorType::CannotReach,
+                        (_, true) => RangeIndicatorType::ObstructedLineOfSight,
+                        (ActionReach::Yes, _) => RangeIndicatorType::ActionTargetRange,
                         (ActionReach::YesButDisadvantage(..), _) => {
-                            RangeIndicator::CanReachButDisadvantage
+                            RangeIndicatorType::CanReachButDisadvantage
                         }
                     };
 
-                    Some((self.active_character_id, range, indicator))
+                    Some((
+                        self.active_character_id,
+                        range,
+                        indicator,
+                        Some(AreaTargetAcquisition::Enemies),
+                    ))
                 }
                 ConfiguredAction::UseAbility {
                     ability,
@@ -3665,14 +3696,15 @@ impl GameGrid {
                             selected_enhancements,
                             target_pos,
                         ) {
-                            RangeIndicator::ActionTargetRange
+                            RangeIndicatorType::ActionTargetRange
                         } else {
-                            RangeIndicator::CannotReach
+                            RangeIndicatorType::CannotReach
                         };
                         Some((
                             self.active_character_id,
                             ability.target.range(selected_enhancements).unwrap(),
                             indicator,
+                            ability.target.acquisition(),
                         ))
                     } else {
                         let is_line_target = matches!(
@@ -3691,7 +3723,8 @@ impl GameGrid {
                             Some((
                                 self.active_character_id,
                                 ability.target.range(selected_enhancements).unwrap(),
-                                RangeIndicator::ActionTargetRange,
+                                RangeIndicatorType::ActionTargetRange,
+                                ability.target.acquisition(),
                             ))
                         } else if ability.requires_target() {
                             let range = ability.target.range(selected_enhancements).unwrap();
@@ -3700,14 +3733,15 @@ impl GameGrid {
                                 active_char.pos(),
                                 mouse_grid_pos,
                             ) {
-                                RangeIndicator::ActionTargetRange
+                                RangeIndicatorType::ActionTargetRange
                             } else {
-                                RangeIndicator::CannotReach
+                                RangeIndicatorType::CannotReach
                             };
                             Some((
                                 self.active_character_id,
                                 ability.target.range(selected_enhancements).unwrap(),
                                 indicator,
+                                ability.target.acquisition(),
                             ))
                         } else {
                             let radius = ability.target.radius(selected_enhancements);
@@ -3716,7 +3750,8 @@ impl GameGrid {
                                 (
                                     self.active_character_id,
                                     range,
-                                    RangeIndicator::ActionTargetRange,
+                                    RangeIndicatorType::ActionTargetRange,
+                                    ability.target.acquisition(),
                                 )
                             })
                         }
@@ -4546,16 +4581,16 @@ impl GameGrid {
         }
     }
 
-    fn draw_range_indicator(&self, origin: Position, range: Range, indicator: RangeIndicator) {
+    fn draw_range_indicator(&self, origin: Position, range: Range, indicator: RangeIndicatorType) {
         let range_ceil = (f32::from(range)).ceil() as i32;
         let range_squared = range.squared() as i32;
-        let draw_background = matches!(indicator, RangeIndicator::ActionTargetRange);
+        let draw_background = matches!(indicator, RangeIndicatorType::ActionTargetRange);
         let color = match indicator {
-            RangeIndicator::ActionTargetRange => LIGHTGRAY,
-            RangeIndicator::TargetAreaEffect => ORANGE,
-            RangeIndicator::CanReachButDisadvantage => RANGE_INDICATOR_SEMI_BAD_COLOR,
-            RangeIndicator::CannotReach => RANGE_INDICATOR_BAD_COLOR,
-            RangeIndicator::ObstructedLineOfSight => RANGE_INDICATOR_BAD_COLOR,
+            RangeIndicatorType::ActionTargetRange => LIGHTGRAY,
+            RangeIndicatorType::TargetAreaEffect => ORANGE,
+            RangeIndicatorType::CanReachButDisadvantage => RANGE_INDICATOR_SEMI_BAD_COLOR,
+            RangeIndicatorType::CannotReach => RANGE_INDICATOR_BAD_COLOR,
+            RangeIndicatorType::ObstructedLineOfSight => RANGE_INDICATOR_BAD_COLOR,
         };
         let is_cell_within =
             |x: i32, y: i32| (x - origin.0).pow(2) + (y - origin.1).pow(2) <= range_squared;

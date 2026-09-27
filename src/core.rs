@@ -4161,7 +4161,7 @@ pub fn is_valid_area_target(
     match acquisition {
         AreaTargetAcquisition::Enemies => !is_ally,
         AreaTargetAcquisition::Everyone => true,
-        AreaTargetAcquisition::Allies => unreachable!(),
+        AreaTargetAcquisition::Allies => is_ally,
     }
 }
 
@@ -4303,6 +4303,15 @@ pub enum OnHitReactionEffect {
 pub enum AttackHitEffect {
     ApplyTarget(ApplyEffect),
     ApplySelf(ApplyEffect),
+}
+
+impl AttackHitEffect {
+    pub fn apply_effect(&self) -> ApplyEffect {
+        match self {
+            AttackHitEffect::ApplyTarget(apply_effect) => *apply_effect,
+            AttackHitEffect::ApplySelf(apply_effect) => *apply_effect,
+        }
+    }
 }
 
 impl Display for AttackHitEffect {
@@ -5208,6 +5217,20 @@ impl AbilityTarget {
             }
             range
         })
+    }
+
+    pub fn acquisition(&self) -> Option<AreaTargetAcquisition> {
+        match self {
+            AbilityTarget::Enemy { .. } => Some(AreaTargetAcquisition::Enemies),
+            AbilityTarget::Ally { .. } => Some(AreaTargetAcquisition::Allies),
+            AbilityTarget::Area { range, area_effect } => Some(area_effect.acquisition),
+            AbilityTarget::Destination { range } => None,
+            AbilityTarget::None {
+                self_area,
+                self_effect,
+                environment_effect,
+            } => self_area.map(|a| a.acquisition),
+        }
     }
 }
 

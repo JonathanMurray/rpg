@@ -12,11 +12,12 @@ use crate::{
     },
     data::{
         ARCANE_BOW, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
-        CHAIN_MAIL, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW,
-        ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE,
-        EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE,
-        INSPIRE_RUTHLESS, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK,
-        SLASHING_RAPIER, SMALL_SHIELD, STAFF,
+        BARBED_ARROWS, CHAIN_MAIL, COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRUID_COAT,
+        ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
+        HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, INSPIRE_RUTHLESS, KILL, LIGHTNING_BOLT,
+        LIGHTNING_BOLT_REACH, LUNGE_ATTACK, PENETRATING_ARROWS, SLASHING_RAPIER, SMALL_SHIELD,
+        STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -624,7 +625,12 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     );
     alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(EXPLODING_ARROWS, 3)));
+    alice.arrows.set(Some(ArrowStack::new(COLD_ARROWS, 3)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(
+        PENETRATING_ARROWS,
+        3,
+    )));
     alice.learn_ability(&HEAL);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
