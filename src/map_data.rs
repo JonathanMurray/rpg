@@ -17,7 +17,7 @@ use crate::{
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, INSPIRE_RUTHLESS, KILL, LIGHTNING_BOLT,
         LIGHTNING_BOLT_REACH, LUNGE_ATTACK, PENETRATING_ARROWS, SLASHING_RAPIER, SMALL_SHIELD,
-        STAFF,
+        SPIKE_SHIELD, STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -595,7 +595,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, HUNGERING_BLADE);
-    bob.set_shield(MEDIUM_SHIELD);
+    bob.set_shield(SPIKE_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
     bob.learn_ability(&SWEEP_ATTACK);

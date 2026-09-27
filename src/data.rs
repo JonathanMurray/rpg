@@ -476,7 +476,7 @@ pub const STAFF: Weapon = Weapon {
     name: "Staff",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    damage: 5,
+    damage: 4,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: None,
@@ -765,6 +765,17 @@ pub const SMALL_SHIELD: Shield = Shield {
     weight: 2,
 };
 
+pub const SPIKE_SHIELD: Shield = Shield {
+    name: "Spike shield",
+    sprite: Some(SpriteId::SpikeShield),
+    icon: EquipmentIconId::SpikeShield,
+    evasion: 3,
+    armor: 0,
+    on_hit_reaction: None,
+    on_attacked_reaction: Some(BLOCK_2_WITH_THORNS),
+    weight: 2,
+};
+
 pub const MEDIUM_SHIELD: Shield = Shield {
     name: "Medium shield",
     sprite: Some(SpriteId::Shield),
@@ -888,6 +899,7 @@ pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
         bonus_evasion: 0,
         bonus_armor: 0,
         damage_prevention: 2,
+        thorns: 0,
     },
     required_attack_type: Some(AttackType::Melee),
     used_hand: Some(HandType::MainHand),
@@ -906,10 +918,30 @@ pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
         bonus_evasion: 0,
         bonus_armor: 0,
         damage_prevention: 3,
+        thorns: 0,
     },
     required_attack_type: None,
     used_hand: Some(HandType::OffHand),
     target: OnAttackedReactionTarget::SelfOrAdjacentAlly,
+};
+
+pub const BLOCK_2_WITH_THORNS: OnAttackedReaction = OnAttackedReaction {
+    id: OnAttackedReactionId::Block,
+    name: "Spike block 2",
+    granted_from: None,
+    description: "Protect yourself and damage the attacker |<faded>(1 attack per round)|",
+    icon: IconId::Block,
+    action_point_cost: 0,
+    stamina_cost: 1,
+    effect: OnAttackedReactionEffect {
+        bonus_evasion: 0,
+        bonus_armor: 0,
+        damage_prevention: 2,
+        thorns: 3,
+    },
+    required_attack_type: None,
+    used_hand: Some(HandType::OffHand),
+    target: OnAttackedReactionTarget::OnlySelf,
 };
 
 pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
@@ -924,6 +956,7 @@ pub const SIDE_STEP: OnAttackedReaction = OnAttackedReaction {
         bonus_evasion: 10,
         bonus_armor: 0,
         damage_prevention: 0,
+        thorns: 0,
     },
     required_attack_type: None,
     used_hand: None,

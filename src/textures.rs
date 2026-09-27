@@ -37,6 +37,7 @@ pub enum SpriteId {
     Rapier,
     Dagger,
     Shield,
+    SpikeShield,
     CharacterShadow,
 }
 
@@ -74,6 +75,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Rapier, "rapier.png"),
         (SpriteId::Dagger, "dagger.png"),
         (SpriteId::Shield, "shield.png"),
+        (SpriteId::SpikeShield, "spiked_shield.png"),
         (SpriteId::CharacterShadow, "character_shadow.png"),
     ])
     .await;
@@ -123,16 +125,8 @@ pub fn character_sprite_height(sprite_id: SpriteId) -> u32 {
         SpriteId::PinkMan => 25,
         SpriteId::AlsoWeirdOrangeMan => 25,
         SpriteId::WeirdOrangeMan => 25,
-        SpriteId::Warhammer => panic!(),
-        SpriteId::Staff => panic!(),
-        SpriteId::Bow => panic!(),
-        SpriteId::Sword => panic!(),
-        SpriteId::Rapier => panic!(),
-        SpriteId::Dagger => panic!(),
-        SpriteId::Shield => panic!(),
-        SpriteId::CharacterShadow => panic!(),
-        SpriteId::MagicSword => panic!(),
-        SpriteId::HungeringBlade => panic!(),
+
+        unhandled => panic!("undefined character sprite height: {:?}", unhandled),
     }
 }
 
@@ -288,6 +282,7 @@ pub enum EquipmentIconId {
     MagicSword,
     HungeringBlade,
     SmallShield,
+    SpikeShield,
     MediumShield,
     LeatherArmor,
     ChainMail,
@@ -940,6 +935,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::MagicSword => (5, 0),
         EquipmentIconId::HungeringBlade => (6, 0),
         EquipmentIconId::SmallShield => (4, 1),
+        EquipmentIconId::SpikeShield => (6, 1),
         EquipmentIconId::MediumShield => (0, 2),
         EquipmentIconId::LeatherArmor => (2, 2),
         EquipmentIconId::ChainMail => (1, 2),

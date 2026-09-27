@@ -2438,6 +2438,8 @@ impl CoreGame {
         let mut total_bonus_evasion = 0;
         let mut evasion_str = "".to_string();
 
+        let mut reaction_thorns = None;
+
         if let Some((reactor, reaction)) = maybe_reaction {
             if let Some(game) = game {
                 let reactor = game.characters.get(reactor);
@@ -2470,6 +2472,10 @@ impl CoreGame {
 
             if reaction.effect.damage_prevention > 0 {
                 damage_prevention = Some((reaction.name, reaction.effect.damage_prevention));
+            }
+
+            if reaction.effect.thorns > 0 {
+                reaction_thorns = Some((reaction.name, reaction.effect.thorns));
             }
         }
 
@@ -2749,6 +2755,19 @@ impl CoreGame {
                                 applied_to_self
                                     .push(ApplyEffect::LoseHealth(health_lost_to_thorns));
                             }
+                        }
+                    }
+
+                    if let Some((reaction_name, thorns)) = reaction_thorns {
+                        let health_lost_to_thorns = game.perform_losing_health(attacker, thorns);
+                        if health_lost_to_thorns > 0 {
+                            detail_lines.push(format!(
+                                "|{}| lost {} health |<faded>({})|",
+                                attacker.name_tag(),
+                                health_lost_to_thorns,
+                                reaction_name
+                            ));
+                            applied_to_self.push(ApplyEffect::LoseHealth(health_lost_to_thorns));
                         }
                     }
 
@@ -4268,6 +4287,7 @@ pub struct OnAttackedReactionEffect {
     pub bonus_evasion: u32,
     pub bonus_armor: u32,
     pub damage_prevention: u32,
+    pub thorns: u32,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]

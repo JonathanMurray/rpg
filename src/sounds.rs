@@ -87,7 +87,7 @@ impl SoundPlayer {
             (SoundId::FireCrackle, 1.0, vec!["fl_crackling_noise_2.ogg"]),
             (SoundId::Poison, 1.0, vec!["fl_poison.ogg"]),
             (SoundId::MechanicNoise, 1.0, vec!["fl_wobble.ogg"]),
-            (SoundId::SelectTarget, 1.0, vec!["fl_blip_3.ogg"]),
+            (SoundId::SelectTarget, 0.5, vec!["fl_blip_3.ogg"]),
             (SoundId::GainedAP, 1.0, vec!["fl_blip_3.ogg"]),
             (SoundId::HoverTarget, 1.0, vec!["fl_blip_short_3.ogg"]),
             (SoundId::Scale1, 0.5, vec!["fl_scale_1.ogg"]),

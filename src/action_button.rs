@@ -162,6 +162,12 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
             reaction.effect.damage_prevention
         ));
     }
+    if reaction.effect.thorns > 0 {
+        technical_description.push(format!(
+            "|<sword>| |<value>{}| damage to attacker",
+            reaction.effect.thorns
+        ));
+    }
 
     let mut header = reaction.name.to_string();
     if let Some(granted_from) = reaction.granted_from {
