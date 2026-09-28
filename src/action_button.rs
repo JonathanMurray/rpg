@@ -317,7 +317,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if effect.armor_penetration > 0 {
         t.technical_description.push(format!(
-            "|<value>{}| armor penetration",
+            "|<value>{}| |<helmet>| armor penetration",
             effect.armor_penetration
         ));
     }
@@ -784,9 +784,17 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
                     }
                 }
             };
-
             t.technical_description
                 .push(format!("  |<sword>| |<value>{dmg_str}| |<faded>damage|"));
+
+            if ability_attack_effect.damage_penalty_per_consecutive_target > 0 {
+                let penalty_str = format!(
+                    "  |<value>-{}| |<faded>damage / consecutive target|",
+                    ability_attack_effect.damage_penalty_per_consecutive_target
+                );
+                t.technical_description.push(penalty_str);
+            }
+
             if let Some(apply_effect) = ability_attack_effect.on_hit {
                 describe_apply_effect(apply_effect, t);
             }

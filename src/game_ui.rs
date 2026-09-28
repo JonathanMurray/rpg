@@ -1082,6 +1082,7 @@ impl UserInterface {
                 let active_char = self.characters.get_rc(self.active_character_id);
 
                 let prediction = predict_attack(
+                    &self.game_grid.pathfind_grid,
                     &self.characters,
                     active_char,
                     attack.hand,
@@ -1146,6 +1147,7 @@ impl UserInterface {
 
         if matches!(usability_problem, None | Some(OUT_OF_REACH)) {
             let prediction = predict_ability(
+                &self.game_grid.pathfind_grid,
                 &self.characters,
                 self.characters.get_rc(self.active_character_id),
                 ability,
@@ -1478,6 +1480,7 @@ impl UserInterface {
 
         //dbg!(&selected);
         let prediction = predict_attack(
+            &self.game_grid.pathfind_grid,
             &self.characters,
             attacker,
             *hand,

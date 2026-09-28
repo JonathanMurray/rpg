@@ -16,7 +16,7 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
-use crate::grid::ParticleShape;
+use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Liquid, Occupation, PathfindGrid};
 use crate::sounds::SoundId;
@@ -512,11 +512,13 @@ impl CoreGame {
 
                                 self.perform_spend_ap(reactor, 1).await;
 
+                                // Opportunity attack vs ranged attacker
                                 let event = Self::perform_attack(
                                     reactor,
                                     HandType::MainHand,
                                     &[],
                                     attacker,
+                                    0,
                                     None,
                                     0,
                                     ActionPerformanceMode::Real(self),
@@ -614,11 +616,13 @@ impl CoreGame {
                     })
                     .await;
 
+                    // Regular attack action
                     let event = Self::perform_attack(
                         attacker,
                         hand,
                         &enhancements,
                         defender,
+                        0,
                         reaction,
                         0,
                         ActionPerformanceMode::Real(self),
@@ -869,11 +873,13 @@ impl CoreGame {
                             })
                             .await;
 
+                            // Movement opportunity attack
                             let event = Self::perform_attack(
                                 reactor,
                                 HandType::MainHand,
                                 &[],
                                 character,
+                                0,
                                 None,
                                 0,
                                 ActionPerformanceMode::Real(self),
@@ -1473,6 +1479,7 @@ impl CoreGame {
                         enhancements,
                         effect,
                         target,
+                        0,
                         &mut detail_lines,
                         None,
                         mode,
@@ -1966,6 +1973,49 @@ impl CoreGame {
         }
     }
 
+    fn acquire_targets(
+        mode: ActionPerformanceMode<'_>,
+        actor: &Character,
+        area_pos: Position,
+        shape: AreaShape,
+        acquisition: AreaTargetAcquisition,
+    ) -> Vec<CharacterId> {
+        let grid = mode.pathfind_grid();
+        let characters = mode.characters();
+        let mut targets = vec![];
+        match shape {
+            AreaShape::Circle(radius) => {
+                for other_char in characters.iter() {
+                    if is_valid_area_target(actor, other_char, acquisition)
+                        && target_within_range_squared(
+                            (f32::from(radius)).powf(2.0),
+                            area_pos,
+                            other_char.pos(),
+                        )
+                    {
+                        targets.push(other_char.id());
+                    }
+                }
+            }
+            AreaShape::Line => {
+                // Order the targets from closest to actor to furthest away
+                line_visitor(actor.pos(), area_pos, |x, y| {
+                    if let Some(Occupation::Character(ch_id)) = grid.occupied().get(&(x, y)) {
+                        let other_char = characters.get(*ch_id);
+                        if targets.last() != Some(ch_id)
+                            && is_valid_area_target(actor, other_char, acquisition)
+                            && *ch_id != actor.id()
+                        {
+                            targets.push(*ch_id);
+                        }
+                    }
+                    false
+                });
+            }
+        }
+        targets
+    }
+
     fn perform_ability_area_enemy_effect(
         mut shape: AreaShape,
         name: &'static str,
@@ -1984,56 +2034,54 @@ impl CoreGame {
 
         Self::modify_shape_radius(&mut shape, enhancements);
 
-        for other_char in mode.characters().iter() {
-            if !is_valid_area_target(caster, other_char, acquisition) {
-                continue;
-            }
+        let targets = Self::acquire_targets(mode, caster, area_pos, shape, acquisition);
 
-            if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
-                let ability_roll = roll_instruction.perform(mode);
+        for (i, target_id) in targets.iter().enumerate() {
+            let target = mode.characters().get_rc(*target_id);
+            let ability_roll = roll_instruction.perform(mode);
 
-                let mut line = format!("|{}|", other_char.name_tag());
-                match effect {
-                    AbilityNegativeEffect::Spell(spell_enemy_effect) => {
-                        if let Some(contest) = spell_enemy_effect.defense_type {
-                            detail_lines.push("".to_string());
-                            detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
-                            let modified_roll = ability_roll.unwrap_actual_roll().1;
-                            let (def_str, def_value) = match contest {
-                                DefenseType::Will => ("Will", other_char.will()),
-                                DefenseType::Evasion => ("Evasion", other_char.evasion()),
-                                DefenseType::Toughness => ("Toughness", other_char.toughness()),
-                            };
-                            line.push_str(&format!(
-                                ": {} - {} (|<shield>|<stat>{}) = |<value>{}|",
-                                modified_roll,
-                                def_value,
-                                def_str,
-                                modified_roll - def_value as i32
-                            ));
-                        }
-                    }
-                    AbilityNegativeEffect::PerformAttack { .. } => {
-                        // The relevant details will come from perform_attack, not from here.
+            let mut line = format!("|{}|", target.name_tag());
+            match effect {
+                AbilityNegativeEffect::Spell(spell_enemy_effect) => {
+                    if let Some(contest) = spell_enemy_effect.defense_type {
+                        detail_lines.push("".to_string());
+                        detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
+                        let modified_roll = ability_roll.unwrap_actual_roll().1;
+                        let (def_str, def_value) = match contest {
+                            DefenseType::Will => ("Will", target.will()),
+                            DefenseType::Evasion => ("Evasion", target.evasion()),
+                            DefenseType::Toughness => ("Toughness", target.toughness()),
+                        };
+                        line.push_str(&format!(
+                            ": {} - {} (|<shield>|<stat>{}) = |<value>{}|",
+                            modified_roll,
+                            def_value,
+                            def_str,
+                            modified_roll - def_value as i32
+                        ));
                     }
                 }
-
-                detail_lines.push(line);
-
-                let outcome = Self::perform_ability_enemy_effect(
-                    caster,
-                    name,
-                    &ability_roll,
-                    enhancements,
-                    effect,
-                    other_char,
-                    detail_lines,
-                    Some(area_pos),
-                    mode,
-                );
-
-                target_outcomes.push((other_char.id(), outcome));
+                AbilityNegativeEffect::PerformAttack { .. } => {
+                    // The relevant details will come from perform_attack, not from here.
+                }
             }
+
+            detail_lines.push(line);
+
+            let outcome = Self::perform_ability_enemy_effect(
+                caster,
+                name,
+                &ability_roll,
+                enhancements,
+                effect,
+                target,
+                i as u32,
+                detail_lines,
+                Some(area_pos),
+                mode,
+            );
+
+            target_outcomes.push((target.id(), outcome));
         }
 
         let num_targets_hit = target_outcomes.len() as u32;
@@ -2081,6 +2129,7 @@ impl CoreGame {
         enhancements: &[AbilityEnhancement],
         enemy_effect: AbilityNegativeEffect,
         target: &Rc<Character>,
+        num_prior_targets: u32,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
@@ -2110,6 +2159,7 @@ impl CoreGame {
                     HandType::MainHand,
                     &attack_enhancement_effects,
                     target,
+                    num_prior_targets,
                     None,
                     roll_modifier,
                     mode,
@@ -2407,6 +2457,7 @@ impl CoreGame {
         hand_type: HandType,
         enhancements: &[(&'static str, AttackEnhancementEffect)],
         defender: &Rc<Character>,
+        attack_index: u32,
         maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
         ability_roll_advantage: i32,
         mode: ActionPerformanceMode,
@@ -2587,7 +2638,7 @@ impl CoreGame {
         let outcome = {
             let mut dmg_weapon_override = None;
             let mut dmg_str = "  Damage: ".to_string();
-            let mut dmg_calculation;
+            let mut dmg_calculation: i32;
 
             if let Some(e) = ability_attack_effect {
                 dmg_weapon_override = e.override_weapon_damage;
@@ -2607,6 +2658,12 @@ impl CoreGame {
                     // TODO use the ability's name instead of just "ability"
                     dmg_str.push_str(&format!(" +{} |<faded>(ability)|", bonus_dmg));
                     dmg_calculation += bonus_dmg as i32;
+                }
+
+                let penalty = e.damage_penalty_per_consecutive_target * attack_index;
+                if penalty > 0 {
+                    dmg_str.push_str(&format!(" -{} |<faded>(ability)|", penalty));
+                    dmg_calculation -= penalty as i32;
                 }
             }
 
@@ -3327,11 +3384,14 @@ pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) 
 fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
         Ordering::Less => Some(format!(
-            "Rolled {} dice with disadvantage...",
+            "|<faded>Rolled {} dice with disadvantage...|",
             advantage.abs() + 1
         )),
         Ordering::Equal => None,
-        Ordering::Greater => Some(format!("Rolled {} dice with advantage...", advantage + 1)),
+        Ordering::Greater => Some(format!(
+            "|<faded>Rolled {} dice with advantage...|",
+            advantage + 1
+        )),
     }
 }
 
@@ -3346,21 +3406,28 @@ pub enum MovementType {
 #[derive(Copy, Clone)]
 enum ActionPerformanceMode<'a> {
     Real(&'a CoreGame),
-    SimulatedRoll(u32, &'a Characters),
+    SimulatedRoll(u32, &'a PathfindGrid, &'a Characters),
 }
 
 impl ActionPerformanceMode<'_> {
+    fn pathfind_grid(&self) -> &PathfindGrid {
+        match self {
+            ActionPerformanceMode::Real(core_game) => &core_game.pathfind_grid,
+            ActionPerformanceMode::SimulatedRoll(_, pathfind_grid, _) => &pathfind_grid,
+        }
+    }
+
     fn characters(&self) -> &Characters {
         match self {
             ActionPerformanceMode::Real(core_game) => &core_game.characters,
-            ActionPerformanceMode::SimulatedRoll(_, characters) => characters,
+            ActionPerformanceMode::SimulatedRoll(_, _, characters) => characters,
         }
     }
 
     fn simulated_roll(&self) -> Option<u32> {
         match self {
             ActionPerformanceMode::Real(..) => None,
-            ActionPerformanceMode::SimulatedRoll(roll, _) => Some(*roll),
+            ActionPerformanceMode::SimulatedRoll(roll, _, _) => Some(*roll),
         }
     }
 
@@ -3435,6 +3502,7 @@ pub fn can_opportunity_attack_mover(
 }
 
 pub fn predict_ability(
+    pathfind_grid: &PathfindGrid,
     characters: &Characters,
     caster: &Rc<Character>,
     ability: &'static Ability,
@@ -3451,7 +3519,7 @@ pub fn predict_ability(
             ability,
             enhancements,
             selected_target,
-            ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
+            ActionPerformanceMode::SimulatedRoll(unmodified_roll, pathfind_grid, characters),
         ))[0];
 
         for (target_id, result) in event.affected_targets() {
@@ -3547,6 +3615,7 @@ pub fn predict_ability(
 }
 
 pub fn predict_attack(
+    pathfind_grid: &PathfindGrid,
     characters: &Characters,
     attacker: &Rc<Character>,
     hand_type: HandType,
@@ -3593,9 +3662,10 @@ pub fn predict_attack(
             hand_type,
             enhancements,
             defender,
+            0,
             reaction,
             ability_roll_modifier,
-            ActionPerformanceMode::SimulatedRoll(unmodified_roll, characters),
+            ActionPerformanceMode::SimulatedRoll(unmodified_roll, pathfind_grid, characters),
             None,
         );
 
@@ -5079,6 +5149,7 @@ pub struct AbilityAttackEffect {
     pub override_weapon_damage: Option<u32>,
     pub bonus_damage: u32,
     pub bonus_advantage: u32,
+    pub damage_penalty_per_consecutive_target: u32,
     pub on_hit: Option<ApplyEffect>,
     pub on_kill_apply_self: Option<ApplyEffect>,
 }
@@ -5089,6 +5160,7 @@ impl AbilityAttackEffect {
             override_weapon_damage: None,
             bonus_damage: 0,
             bonus_advantage: 0,
+            damage_penalty_per_consecutive_target: 0,
             on_hit: None,
             on_kill_apply_self: None,
         }

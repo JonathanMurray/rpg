@@ -527,7 +527,7 @@ pub const BOW: Weapon = Weapon {
     name: "Bow",
     range: WeaponRange::Ranged(15.5),
     action_point_cost: 3,
-    damage: 7,
+    damage: 6,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFUL_AIM),
@@ -544,7 +544,7 @@ pub const ARCANE_BOW: Weapon = Weapon {
     name: "Arcane bow",
     range: WeaponRange::Ranged(15.5),
     action_point_cost: 3,
-    damage: 7,
+    damage: 6,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Agility,
     attack_enhancement: Some(CAREFUL_AIM),
@@ -831,12 +831,13 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
 
 pub const CAREFUL_AIM: AttackEnhancement = AttackEnhancement {
     name: "Careful aim",
-    description: "Roll with |<keyword>Advantage| and gain increased |<keyword>Crit| damage",
+    description: "Roll with |<keyword>Advantage| and bypass some of the enemy's armor",
     icon: IconId::CarefulAim,
     action_point_cost: 1,
     effect: AttackEnhancementEffect {
         roll_advantage: 1,
-        improved_crit: true,
+        //improved_crit: true,
+        armor_penetration: 3,
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -1999,7 +2000,10 @@ pub const PIERCING_SHOT: Ability = Ability {
             shape: AreaShape::Line,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
-                AbilityAttackEffect::default(),
+                AbilityAttackEffect {
+                    damage_penalty_per_consecutive_target: 1,
+                    ..AbilityAttackEffect::default()
+                },
             )),
         },
     },
@@ -2445,7 +2449,7 @@ impl PassiveSkill {
         use PassiveSkill::*;
         match self {
             HardenedSkin => "|<value>+1| |<helmet>| armor",
-            WeaponProficiency => "Attacks gain |<value>+1| armor penetration",
+            WeaponProficiency => "Attacks gain |<value>+1| |<helmet>| armor penetration",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
             BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",

@@ -53,7 +53,7 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
     let penetration = stack.arrow.bonus_penetration;
     if penetration > 0 {
         t.technical_description
-            .push(format!("{} armor penetration", penetration));
+            .push(format!("{} |<helmet>| armor penetration", penetration));
     }
     if let Some(effect) = stack.arrow.on_damage_apply {
         t.technical_description
