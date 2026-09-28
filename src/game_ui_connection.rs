@@ -212,7 +212,7 @@ impl GameUserInterfaceConnection {
     }
 
     pub async fn handle_event(&self, game: &CoreGame, event: GameEvent) {
-        println!("ui handle_event({:?}", event);
+        //println!("ui handle_event({:?}", event);
         let msg = MessageFromGame::Event(Box::new(event));
 
         match self.run_ui(game, msg).await {

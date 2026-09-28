@@ -710,6 +710,12 @@ impl GameGrid {
                     0.3,
                     AnimationDetails::AttackCrosshairPreview { target_pos },
                 ));
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    0.0,
+                    1.0,
+                    AnimationDetails::SpeechBubble { text: ability.name },
+                ));
             }
         }
 
@@ -771,12 +777,11 @@ impl GameGrid {
 
             let animation_color = ability.animation_color;
             let caster_pos = actor.pos();
-            let mut duration = 0.0;
 
-            if let Some(target) = &target {
+            if target.is_some() {
                 let target_pos = target_pos.unwrap();
 
-                duration = 0.04 * distance_between(caster_pos, target_pos);
+                let duration = 0.04 * distance_between(caster_pos, target_pos);
 
                 self.add_circle_projectile_effect(
                     delay + casting_duration,
@@ -785,10 +790,14 @@ impl GameGrid {
                     caster_pos,
                     target_pos,
                 );
+
+                delay + casting_duration + duration
             } else if let Some((shape, area_pos)) = area_at {
-                duration = 0.05 * distance_between(caster_pos, area_pos);
+                let distance = distance_between(caster_pos, area_pos);
+                let duration;
                 match shape {
-                    AreaShape::Circle(range) => {
+                    AreaShape::Circle(..) => {
+                        duration = 0.05 * distance;
                         self.add_circle_projectile_effect(
                             delay + casting_duration,
                             duration,
@@ -798,25 +807,27 @@ impl GameGrid {
                         );
                     }
                     AreaShape::Line => {
+                        let visual_duration;
                         if ability.id == AbilityId::LightningBolt {
-                            duration = 0.03 * distance_between(caster_pos, area_pos);
                             let texture = LIGHTNING_BOLT_FX.get().unwrap();
+                            visual_duration = 0.03 * distance;
                             self.add_effect(
                                 caster_pos,
                                 area_pos,
                                 Effect {
                                     start_time: delay + casting_duration,
-                                    end_time: delay + casting_duration + duration,
+                                    end_time: delay + casting_duration + visual_duration,
                                     variant: EffectVariant::Fx { texture },
                                 },
                             );
                         } else {
+                            visual_duration = 0.05 * distance;
                             self.add_effect(
                                 caster_pos,
                                 area_pos,
                                 Effect {
                                     start_time: delay + casting_duration,
-                                    end_time: delay + casting_duration + duration,
+                                    end_time: delay + casting_duration + visual_duration,
                                     variant: EffectVariant::Line {
                                         color: animation_color,
                                         thickness: 10.0,
@@ -826,11 +837,15 @@ impl GameGrid {
                                 },
                             );
                         }
+                        // Targets should be affected before the line has travelled from start to end
+                        duration = visual_duration / 2.0;
                     }
                 }
-            }
 
-            delay + casting_duration + duration
+                delay + casting_duration + duration
+            } else {
+                delay + casting_duration
+            }
         };
 
         (delay, duration)

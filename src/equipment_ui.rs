@@ -97,15 +97,16 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
 fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     let mut t = Tooltip::new(weapon.name);
     t.technical_description
-        .push(format!("|<sword>| |<value>{}|", weapon.damage));
+        .push(format!("|<sword>| |<value>{}| damage", weapon.damage));
 
     if weapon.grip == WeaponGrip::TwoHanded {
-        t.technical_description.push("Two-handed".to_string());
+        t.technical_description
+            .push("|<faded>Two-handed|".to_string());
     }
 
     if weapon.range != WeaponRange::Melee {
         t.technical_description
-            .push(format!("Range: {}", weapon.range));
+            .push(format!("|<range>| {}", weapon.range));
     }
     if let Some(effect) = weapon.on_damage {
         t.technical_description.push(format!("On damage: {effect}"));
@@ -176,7 +177,7 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
 fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
     let mut t = Tooltip::new(armor.name);
     t.technical_description
-        .push(format!("|<helmet>| |<value>{}|", armor.protection));
+        .push(format!("|<helmet>| |<value>{}| armor", armor.protection));
     if let Some(limit) = armor.limit_evasion_from_agi {
         t.technical_description
             .push(format!("Max {} evasion from agi", limit));

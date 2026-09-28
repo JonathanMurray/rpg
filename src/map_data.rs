@@ -434,7 +434,7 @@ pub fn create_character(
                 SoundId::Damage,
                 PortraitId::Huldra,
                 SpriteId::Huldra,
-                Attributes::new(2, 5, 9, 5),
+                Attributes::new(2, 5, 9, 3),
                 pos,
             );
             huldra.learn_ability(&HULDRA_HEAL);

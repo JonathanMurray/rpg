@@ -384,65 +384,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
-      "pos": [
-        10,
-        19
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Draug",
       "pos": [
-        14,
-        20
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
         11,
-        28
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "SkeletonLeader",
-      "pos": [
-        13,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        17,
-        14
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Alice",
-      "pos": [
-        15,
-        24
+        19
       ],
       "health": null,
       "main_hand": null,

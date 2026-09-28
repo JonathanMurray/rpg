@@ -1,9 +1,9 @@
 use std::sync::atomic::{AtomicBool, AtomicU32};
 
 use macroquad::{
-    color::{Color, GRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, GRAY, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
     math::Rect,
-    shapes::draw_rectangle,
+    shapes::{draw_line, draw_rectangle},
     text::{Font, TextParams},
     time::{get_frame_time, get_time},
 };
@@ -191,18 +191,7 @@ pub fn draw_tooltip(
                 }
             }
         }
-        /*
-        while line.len() > line_len_limit {
-            if let Some(whitespace_i) = line[line_len_limit..].find(" ") {
-                let (left, right) = line.split_at(line_len_limit + whitespace_i);
-                physical_content_lines.push(left);
-                line = &right[1..];
-            } else {
-                // No whitespace found. We'll allow the entire line then.
-                break;
-            }
-        }
-         */
+
         physical_content_lines.push(line);
     }
 
@@ -225,8 +214,11 @@ pub fn draw_tooltip(
         .iter()
         .filter(|line| line.is_empty())
         .count();
-    let tooltip_h =
-        num_real_lines as f32 * line_h + text_margin * 2.0 + num_empty_lines as f32 * empty_line_h;
+    let header_margin = 10.0;
+    let tooltip_h = header_margin
+        + num_real_lines as f32 * line_h
+        + text_margin * 2.0
+        + num_empty_lines as f32 * empty_line_h;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -267,7 +259,7 @@ pub fn draw_tooltip(
     let tooltip_rect = Rect::new(x, y, tooltip_w, tooltip_h);
     let bg_color = match goodness {
         Goodness::Good => Color::new(0.0, 0.2, 0.0, 0.9),
-        Goodness::Neutral => Color::new(0.0, 0.0, 0.0, 0.8),
+        Goodness::Neutral => Color::new(0.1, 0.1, 0.1, 0.95),
         Goodness::Bad => Color::new(0.2, 0.0, 0.0, 0.9),
     };
     draw_rectangle(
@@ -295,7 +287,7 @@ pub fn draw_tooltip(
         ..Default::default()
     };
 
-    let mut line_y = tooltip_rect.y + text_margin * 2.0 + 5.0;
+    let mut line_y = tooltip_rect.y + text_margin * 2.0 + 8.0;
 
     let mut draw_line =
         |line: &str, color: Option<Color>, is_header: bool, status_icon: Option<StatusId>| {
@@ -322,7 +314,20 @@ pub fn draw_tooltip(
                     );
                 }
 
+                if is_header {
+                    line_y += header_margin;
+                    draw_line(
+                        text_x,
+                        line_y,
+                        tooltip_rect.right() - text_margin,
+                        line_y,
+                        1.0,
+                        Color::new(0.51, 0.51, 0.51, 0.6),
+                    );
+                }
+
                 line_y += line_h;
+
                 w
             }
         };
