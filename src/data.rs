@@ -1974,7 +1974,7 @@ pub const DASH: Ability = Ability {
     roll: None,
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Destination {
-        range: Range::Float(12.0),
+        range: Range::Float(10.0),
     },
     animation_color: RED,
     initiate_sound: None,
@@ -2023,7 +2023,7 @@ pub const FIREBALL_REACH: AbilityEnhancement = AbilityEnhancement {
     icon: IconId::Extend,
     action_point_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        increased_range_tenths: 100,
+        increased_range_tenths: 120,
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()

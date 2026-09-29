@@ -5,25 +5,25 @@ use std::{
 
 use indexmap::IndexMap;
 use macroquad::{
-    color::{Color, BLACK, DARKGRAY, GRAY, LIGHTGRAY, ORANGE, RED, WHITE, YELLOW},
+    color::{Color, BLACK, DARKGRAY, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, RED, WHITE, YELLOW},
     input::{is_key_down, KeyCode},
     math::Rect,
     shapes::{draw_line, draw_rectangle},
-    text::{measure_text, Font, TextParams},
+    text::{draw_text, measure_text, Font, TextParams},
 };
 
 use crate::{
     action_button::{
         draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
-        InternalUiEvent,
+        InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
     core::{Character, CharacterId, Characters, HandType},
-    drawing::draw_dashed_line,
-    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState},
+    drawing::{draw_dashed_line, draw_rounded_rectangle_lines},
+    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem},
     pathfind::PathfindGrid,
     sounds::{SoundId, SoundPlayer},
-    util::{plus_minus, COL_GREEN_0},
+    util::{plus_minus, COL_GOLD, COL_GREEN_0, COL_RED},
 };
 
 use crate::action_button::ActionButton;
@@ -36,6 +36,7 @@ pub struct ActivityPopup {
 
     ui_state: Rc<RefCell<UiState>>,
 
+    big_font: Font,
     font: Font,
 
     base_lines: Vec<String>,
@@ -44,7 +45,7 @@ pub struct ActivityPopup {
     next_button_id: Cell<u32>,
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
-    proceed_button_error: Option<String>,
+    usability_msg: Option<UsabilityMessage>,
     movement_cost_slider: Option<MovementCostSlider>,
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -57,8 +58,14 @@ pub struct ActivityPopup {
     pathfind_grid: Rc<PathfindGrid>,
 }
 
+struct UsabilityMessage {
+    text: String,
+    is_warning: bool,
+}
+
 impl ActivityPopup {
     pub fn new(
+        big_font: Font,
         font: Font,
         state: Rc<RefCell<UiState>>,
         characters: Characters,
@@ -83,13 +90,14 @@ impl ActivityPopup {
             characters,
             relevant_character_id: active_character_id,
             ui_state: state,
+            big_font,
             font,
             base_lines: vec![],
             additional_line: None,
             selected_choice_button_ids: Default::default(),
             choice_buttons: Default::default(),
             proceed_button,
-            proceed_button_error: None,
+            usability_msg: None,
             next_button_id: Cell::new(next_button_id),
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
@@ -115,18 +123,21 @@ impl ActivityPopup {
             return;
         }
 
-        let top_pad = 10.0;
+        let tooltip_pad = 12.0;
+        let margin_under_header = 12.0;
 
+        let detail_font_size = 16;
         let base_text_params = TextParams {
             font: Some(&self.font),
-            font_size: 16,
+            font_size: detail_font_size,
             color: WHITE,
             ..Default::default()
         };
+        let header_font_size = 24;
         let header_params = TextParams {
-            font: Some(&self.font),
-            font_size: 22,
-            color: BLACK,
+            font: Some(&self.big_font),
+            font_size: header_font_size,
+            color: YELLOW,
             ..Default::default()
         };
 
@@ -160,70 +171,79 @@ impl ActivityPopup {
             measured_lines.push((line, dimensions));
         }
 
-        let empty_line_h = 12.0;
-        let line_h = 22.0;
+        let empty_line_h = 0.0;
+        let detail_line_h = detail_font_size as f32;
+        let detail_line_margin = 7.0;
 
-        let line_margin = 8.0;
-        let mut text_content_h = top_pad + header_dimensions.offset_y;
         let mut text_content_w = 0.0;
-        for (line, dim) in &measured_lines {
-            //text_content_h += dim.height;
-            if line.is_empty() {
-                text_content_h += empty_line_h;
-            } else {
-                text_content_h += line_h;
-            }
-            //text_content_h += dim.offset_y;
+        let mut detail_text_w = 0.0;
+        let mut detail_text_h = 0.0;
+        for (i, (line, dim)) in measured_lines.iter().enumerate() {
             if dim.width > text_content_w {
                 text_content_w = dim.width;
             }
+            if i > 0 {
+                let this_line_h = if line.is_empty() {
+                    empty_line_h
+                } else {
+                    detail_line_h
+                };
+
+                if dim.width > detail_text_w {
+                    detail_text_w = dim.width;
+                }
+                detail_text_h += this_line_h;
+                if i > 1 {
+                    // spacing above this line to the previous one
+                    detail_text_h += detail_line_margin;
+                }
+            }
         }
-        //text_content_h += (measured_lines.len() - 1) as f32 * line_margin;
 
-        let height = (text_content_h + 10.0).max(74.0);
-
+        let draw_proceed_button = false;
+        /*
         let draw_proceed_button = !matches!(
             &*self.ui_state.borrow(),
             UiState::ConfiguringAction(ConfiguredAction::Move { .. })
         );
+         */
 
-        let hor_pad = 10.0;
-        let margin_between_text_and_buttons = 20.0;
+        let detail_rect_pad = 10.0;
+
+        let height: f32 = (tooltip_pad * 2.0
+            + header_dimensions.offset_y as f32
+            + margin_under_header
+            + detail_rect_pad * 2.0
+            + detail_text_h)
+            .max(74.0);
+
+        let buttons_hor_pad = 20.0;
         let button_margin = 10.0;
         let margin_between_choices_and_proceed = 15.0;
 
-        let mut width = text_content_w + margin_between_text_and_buttons;
+        let detail_rect_w = detail_text_w + detail_rect_pad * 2.0;
+
+        let mut width = tooltip_pad + detail_rect_w.max(measured_lines[0].1.width);
 
         if draw_proceed_button {
             width += self.proceed_button.size.0;
         }
 
-        for btn in self.choice_buttons.values() {
-            width += button_margin + btn.size.0;
+        if !self.choice_buttons.is_empty() {
+            width += buttons_hor_pad * 2.0;
+            for btn in self.choice_buttons.values() {
+                width += btn.size.0;
+            }
+            width += (self.choice_buttons.len() - 1) as f32 * button_margin;
+        } else {
+            width += tooltip_pad;
         }
         if !self.choice_buttons.is_empty() && draw_proceed_button {
             width += margin_between_choices_and_proceed;
         }
 
-        /*
-        let sprint_text = "AP cost:";
-        let sprint_margin = 15.0;
-        if let Some(slider) = &self.movement_cost_slider {
-            let text_dimensions = measure_text(
-                sprint_text,
-                base_text_params.font,
-                base_text_params.font_size,
-                1.0,
-            );
-            let move_config_w = slider.size().0.max(text_dimensions.width);
-            width += move_config_w + sprint_margin;
-        }
-         */
-
-        width += hor_pad * 2.0;
-
         // Prevent warning text (drawn in top-right corner) from colliding with header, when no enhancements
-        width = width.max(340.0);
+        //width = width.max(340.0);
 
         draw_rectangle(x, y - height, width, height, BG_COLOR);
 
@@ -248,85 +268,172 @@ impl ActivityPopup {
             h: height,
         };
 
-        let x0 = x + hor_pad;
-        let mut y0 = y - height + top_pad + header_dimensions.offset_y;
+        let x0 = x + tooltip_pad;
 
-        for (i, (line, dim)) in measured_lines.iter().enumerate() {
-            if i == 0 {
-                let mut params = header_params.clone();
-                /*
-                params.color = RED;
-                draw_text_rounded(line, x0 + 1.0, y0 + 1.0, params.clone());
-                 */
-                params.color = YELLOW;
-                draw_text_rounded(line, x0, y0, params.clone());
-            } else {
-                //draw_text_rounded(line, x0, y0, base_text_params.clone());
-                draw_text_with_font_tags(line, x0, y0, base_text_params.clone(), true);
-            }
+        let header_y = y - height + tooltip_pad + header_dimensions.offset_y;
+        draw_text_rounded(&measured_lines[0].0, x0, header_y, header_params.clone());
 
-            y0 += 22.0;
-        }
+        //dbg!(&measured_lines);
 
-        let mut x_btn = x0 + text_content_w + margin_between_text_and_buttons;
+        if measured_lines.len() > 1 {
+            let rect_x = x + tooltip_pad;
+            let rect_y =
+                y - height + tooltip_pad + header_dimensions.offset_y + margin_under_header;
 
-        /*
-        if let Some(slider) = &mut self.movement_cost_slider {
-            let text_dimensions = draw_text_rounded(
-                sprint_text,
-                x_btn,
-                y - height + 20.0,
-                base_text_params.clone(),
+            let rect_h = detail_text_h + detail_rect_pad * 2.0;
+            draw_rectangle(
+                rect_x,
+                rect_y,
+                detail_rect_w,
+                rect_h,
+                Color::new(1.0, 1.0, 1.0, 0.1),
             );
-
-            slider.draw(x_btn, y - slider.size().1 - 5.0);
-            let movement_config_w = slider.size().0.max(text_dimensions.width);
-            x_btn += movement_config_w + sprint_margin;
+            draw_rounded_rectangle_lines(
+                rect_x,
+                rect_y,
+                detail_rect_w,
+                rect_h,
+                1.0,
+                BG_COLOR, //Color::new(1.0, 1.0, 1.0, 0.15),
+                4.0,
+                Some((BG_COLOR, 3.0)),
+            );
+            //draw_rounded_rectangle_lines(x, y, w, h, thickness, color, inner_rounding, outer);
+            /*
+            draw_line(
+                x0,
+                rect_y + detail_rect_pad,
+                x0 + 100.0,
+                rect_y + detail_rect_pad,
+                1.0,
+                YELLOW,
+            );
+             */
+            let mut text_y = rect_y + detail_rect_pad + measured_lines[1].1.offset_y;
+            for (line, _dim) in measured_lines.iter().skip(1) {
+                //draw_line(x0, text_y, x0 + 100.0, text_y, 1.0, MAGENTA);
+                if line.is_empty() {
+                    text_y += empty_line_h + detail_line_margin;
+                } else {
+                    draw_text_with_font_tags(
+                        line,
+                        x0 + detail_rect_pad,
+                        text_y,
+                        base_text_params.clone(),
+                        true,
+                    );
+                    text_y += detail_line_h + detail_line_margin;
+                }
+            }
+            /*
+            draw_line(
+                x0,
+                rect_y + rect_h - detail_rect_pad,
+                x0 + 100.0,
+                rect_y + rect_h - detail_rect_pad,
+                1.0,
+                YELLOW,
+            );
+             */
         }
-         */
 
-        let y_btn = y - height / 2.0 - 32.0;
+        //draw_line(vert_line_x, y0+8.0, vert_line_x, y ,1.0, Color::new(0.51, 0.51, 0.51, 0.6));
 
-        let first_btn_x = x_btn;
+        let mut btn_x = x + tooltip_pad + detail_rect_w + buttons_hor_pad;
+
+        let btn_y = y - tooltip_pad - 2.0 - REGULAR_ACTION_BUTTON_SIZE.1;
+        //let y_btn = y - height / 2.0 - 32.0;
+
+        let first_btn_x = btn_x;
+
+        let configuring_action = matches!(&*self.ui_state.borrow(), UiState::ConfiguringAction(..));
+
+        if !self.choice_buttons.is_empty() && configuring_action {
+            let buttons_w = self.choice_buttons.len() as f32 * REGULAR_ACTION_BUTTON_SIZE.0
+                + (self.choice_buttons.len() - 1) as f32 * button_margin;
+
+            let label = "Enhancements:";
+            let dim = measure_text_with_font_tags(label, Some(&self.font), 16, 1.0);
+            let label_x = btn_x + buttons_w / 2.0 - dim.width / 2.0;
+
+            draw_text_with_font_tags(
+                label,
+                label_x,
+                btn_y - 15.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size: 16,
+                    color: YELLOW.with_alpha(0.7),
+                    ..Default::default()
+                },
+                true,
+            );
+            let line_y = btn_y - 7.0;
+            draw_line(
+                btn_x,
+                line_y,
+                btn_x + buttons_w,
+                line_y,
+                1.0,
+                Color::new(1.0, 1.0, 1.0, 0.3),
+            );
+        }
 
         for btn in self.choice_buttons.values() {
-            btn.draw(x_btn, y_btn);
-            x_btn += btn.size.0 + button_margin;
+            btn.draw(btn_x, btn_y);
+            btn_x += btn.size.0 + button_margin;
+        }
+
+        if let Some(usability_msg) = &self.usability_msg {
+            let font_size = 22;
+            let text_dim =
+                measure_text_with_font_tags(&usability_msg.text, Some(&self.font), font_size, 1.0);
+            let error_x = x + width - text_dim.width - 7.0;
+            let error_y = y - height - 12.0;
+            let pad = 2.0;
+            draw_rectangle(
+                error_x - pad,
+                error_y - text_dim.offset_y - pad,
+                text_dim.width + pad * 2.0,
+                text_dim.height + pad * 2.0,
+                Color::new(1.0, 1.0, 1.0, 0.7),
+            );
+            let color = if usability_msg.is_warning {
+                COL_RED
+            } else {
+                BLACK
+            };
+            draw_text_with_font_tags(
+                &usability_msg.text,
+                error_x,
+                error_y,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size,
+                    color,
+                    ..Default::default()
+                },
+                true,
+            );
         }
 
         if draw_proceed_button {
             if !self.choice_buttons.is_empty() {
-                x_btn += margin_between_choices_and_proceed;
+                btn_x += margin_between_choices_and_proceed;
             }
-
-            if let Some(error) = &self.proceed_button_error {
-                let font_size = 22;
-                let text_dim = measure_text_with_font_tags(error, Some(&self.font), font_size, 1.0);
-                draw_text_with_font_tags(
-                    error,
-                    x + width - text_dim.width - 10.0,
-                    y - height + top_pad + 15.0,
-                    TextParams {
-                        font: Some(&self.font),
-                        font_size,
-                        color: RED,
-                        ..Default::default()
-                    },
-                    true,
-                );
-            } else {
-                self.proceed_button.draw(x_btn, y_btn + 6.0);
+            if self.usability_msg.is_none() {
+                self.proceed_button.draw(btn_x, btn_y + 6.0);
             }
         }
 
-        x_btn = first_btn_x; // step back to render tooltips in the right positions
+        btn_x = first_btn_x; // step back to render tooltips in the right positions
         for btn in self.choice_buttons.values() {
             if self.hovered_choice_button_id == Some(btn.id) {
                 let detailed_tooltip = is_key_down(KeyCode::LeftAlt);
-                draw_button_tooltip(&self.font, (x_btn, y_btn), &btn.tooltip(), detailed_tooltip);
+                draw_button_tooltip(&self.font, (btn_x, btn_y), &btn.tooltip(), detailed_tooltip);
             }
 
-            x_btn += btn.size.0 + button_margin;
+            btn_x += btn.size.0 + button_margin;
         }
     }
 
@@ -682,8 +789,10 @@ impl ActivityPopup {
             UiState::ConfiguringAction(configured_action) => {
                 let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
-                lines.push("".to_string());
-                lines.extend_from_slice(&tooltip.technical_description);
+                if !tooltip.technical_description.is_empty() {
+                    //lines.push("".to_string());
+                    lines.extend_from_slice(&tooltip.technical_description);
+                }
 
                 match configured_action {
                     ConfiguredAction::Attack {
@@ -779,7 +888,7 @@ impl ActivityPopup {
             } => {
                 self.relevant_character_id = *victim_id;
                 let victim = self.characters.get(*victim_id);
-                lines.push("React (on hit)".to_string());
+                lines.push("Reaction?".to_string());
                 lines.push(format!(
                     "|<name>{}| attacked |<name>{}| for {} damage",
                     self.characters.get(*attacker_id).name,
@@ -797,7 +906,7 @@ impl ActivityPopup {
 
             UiState::ReactingToMovementAttackOpportunity { reactor, .. } => {
                 self.relevant_character_id = *reactor;
-                lines.push("React (opportunity attack)".to_string());
+                lines.push("Reaction?".to_string());
                 lines.push(format!(
                     "|<name>{}| has an attack opportunity",
                     self.characters.get(*reactor).name
@@ -813,7 +922,7 @@ impl ActivityPopup {
 
             UiState::ReactingToRangedAttackOpportunity { reactor, .. } => {
                 self.relevant_character_id = *reactor;
-                lines.push("React (opportunity attack)".to_string());
+                lines.push("Reaction?".to_string());
                 lines.push(format!(
                     "|<name>{}| has an attack opportunity",
                     self.characters.get(*reactor).name
@@ -862,20 +971,40 @@ impl ActivityPopup {
         );
 
         let mut enabled = false;
-        let mut error = None;
+        let mut usability_msg = None;
+        let mut is_usability_warning = true;
+
         if !enough_ap {
-            error = Some("Not enough AP".to_string());
+            usability_msg = Some("Not enough AP".to_string());
         } else if !enough_mana {
-            error = Some("Not enough mana".to_string());
+            usability_msg = Some("Not enough mana".to_string());
         } else if !enough_stamina {
-            error = Some("Not enough stamina".to_string());
+            usability_msg = Some("Not enough stamina".to_string());
         } else if let Some(e) = usability_problem {
-            error = Some(e.to_string());
+            if !matches!(e, UsabilityProblem::SelectDestination) {
+                is_usability_warning = matches!(
+                    e,
+                    UsabilityProblem::OutOfReach
+                        | UsabilityProblem::NoLineOfSight
+                        | UsabilityProblem::NotEnoughAp
+                );
+                usability_msg = Some(e.message().to_string());
+            }
         } else {
             enabled = true;
         }
 
-        self.proceed_button_error = error.map(|e| (format!("|<warning>| {e}")));
+        self.usability_msg = usability_msg.map(|e| {
+            let text = if is_usability_warning {
+                format!("|<warning>| {e}")
+            } else {
+                e.to_string()
+            };
+            UsabilityMessage {
+                text,
+                is_warning: is_usability_warning,
+            }
+        });
 
         self.proceed_button.enabled.set(enabled);
     }
@@ -929,6 +1058,7 @@ impl MovementCostSlider {
     }
 
     fn draw(&mut self, x: f32, y: f32) {
+        /*
         let (w, h) = (self.cell_w, self.cell_h);
 
         let pad = 2.0;
@@ -974,5 +1104,6 @@ impl MovementCostSlider {
         );
 
         //draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
+         */
     }
 }

@@ -78,7 +78,7 @@ impl SoundPlayer {
             (SoundId::SheetOpen, 0.7, vec!["fl_page_open.ogg"]),
             //(SoundId::SheetClose, 1.0, vec!["sheet_close"]),
             (SoundId::SheetClose, 0.7, vec!["fl_page_close2.ogg"]),
-            (SoundId::Burning, 1.0, vec!["fire"]),
+            (SoundId::Burning, 0.15, vec!["fire"]),
             (SoundId::Invalid, 0.3, vec!["invalid"]),
             (SoundId::EndTurn, 1.0, vec!["end_turn"]),
             (SoundId::YourTurn, 0.3, vec!["your_turn3"]),

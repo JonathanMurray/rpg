@@ -9,7 +9,7 @@ use std::{
 
 use indexmap::{map::Entry, IndexMap};
 use macroquad::{
-    color::{Color, BLACK, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
     input::mouse_wheel,
     math::{Rect, Vec2},
     miniquad::window::dpi_scale,
@@ -53,7 +53,7 @@ use crate::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
         draw_dashed_rectangle_sides,
     },
-    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UI_HEIGHT},
+    game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
     pathfind::{
         ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, TraversalType,
@@ -111,11 +111,14 @@ const RANGE_INDICATOR_SEMI_BAD_COLOR: Color = ORANGE;
 const RANGE_INDICATOR_BAD_COLOR: Color = RED;
 
 const PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.0, 1.0, 1.0, 0.8);
-const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(0.7, 0.7, 0.7, 0.8);
+const HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR: Color = Color::new(1.00, 0.80, 0.00, 0.8); // Color::new(0.7, 0.7, 0.7, 0.8);
 const ENEMYS_TARGET_CROSSHAIR_COLOR: Color = RED;
 
 const CURSOR_ERROR_COLOR: Color = Color::new(1.0, 0.8, 0.8, 1.0);
 const CURSOR_INFO_COLOR: Color = WHITE;
+
+const CROSSHAIR_ARROW_THICK: f32 = 5.0;
+const CROSSHAIR_ARROW_THIN: f32 = 4.0;
 
 #[derive(Debug, Clone)]
 pub struct TargetEffectPreview {
@@ -282,7 +285,7 @@ pub struct GameGrid {
     effects: Vec<ConcreteEffect>,
     selected_player_character_id: Option<CharacterId>,
     active_character_id: CharacterId,
-    action_usability_problem: Option<&'static str>,
+    action_usability_problem: Option<UsabilityProblem>,
 
     movement_range: f32,
 
@@ -1136,7 +1139,7 @@ impl GameGrid {
         &mut self,
         active_character_id: CharacterId,
         selected_player_character_id: Option<CharacterId>,
-        action_usability_problem: Option<&'static str>,
+        action_usability_problem: Option<UsabilityProblem>,
         elapsed: f32,
     ) {
         self.active_character_id = active_character_id;
@@ -2210,10 +2213,10 @@ impl GameGrid {
                     }
                 }
 
-                ConfiguredAction::Move { .. } => MouseState::MayInputMovement,
+                ConfiguredAction::Move { .. } => MouseState::Movement,
 
-                ConfiguredAction::ChangeEquipment { .. } => MouseState::None,
-                ConfiguredAction::UseConsumable { .. } => MouseState::None,
+                ConfiguredAction::ChangeEquipment { .. } => MouseState::ImplicitTarget,
+                ConfiguredAction::UseConsumable { .. } => MouseState::ImplicitTarget,
             },
             _ => MouseState::None,
         };
@@ -2472,8 +2475,9 @@ impl GameGrid {
                     self.draw_target_crosshair(
                         reactor.pos(),
                         target.pos(),
+                        true,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
+                        CROSSHAIR_ARROW_THICK,
                         true,
                     );
                     reaction_choice = Some("Attack");
@@ -2505,14 +2509,22 @@ impl GameGrid {
                     true,
                 );
 
-                self.draw_target_crosshair(attacker.pos(), victim.pos(), RED, 4.0, true);
+                self.draw_target_crosshair(
+                    attacker.pos(),
+                    victim.pos(),
+                    true,
+                    RED,
+                    CROSSHAIR_ARROW_THIN,
+                    true,
+                );
 
                 if *selected {
                     self.draw_target_crosshair(
                         reactor.pos(),
                         attacker.pos(),
+                        true,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
+                        CROSSHAIR_ARROW_THICK,
                         true,
                     );
                     reaction_choice = Some("Attack");
@@ -2547,8 +2559,9 @@ impl GameGrid {
                 self.draw_target_crosshair(
                     attacker.pos(),
                     defender.pos(),
+                    true,
                     Color::new(0.90, 0.16, 0.22, 0.8),
-                    7.0,
+                    CROSSHAIR_ARROW_THICK,
                     true,
                 );
                 detail_labelled_char_ids.insert(attacker.id());
@@ -2603,6 +2616,8 @@ impl GameGrid {
                 UiState::ConfiguringAction(configured_action) => match configured_action {
                     ConfiguredAction::Attack { .. } => Some("Attack"),
                     ConfiguredAction::UseAbility { ability, .. } => Some(ability.name),
+                    ConfiguredAction::ChangeEquipment { .. } => Some("Change equipment"),
+                    ConfiguredAction::UseConsumable(..) => Some("Use consumable"),
                     _ => None,
                 },
                 _ => None,
@@ -2687,35 +2702,6 @@ impl GameGrid {
                                 > range.squared();
                         }
 
-                        match shape {
-                            Some(AreaShape::Circle(..)) => {
-                                if is_mouse_pos_out_of_range {
-                                    self.draw_cursor_text(
-                                        "Out of reach",
-                                        Some(mouse_grid_pos),
-                                        CURSOR_ERROR_COLOR,
-                                    );
-                                } else {
-                                    self.draw_cursor_text(
-                                        "Select area",
-                                        Some(mouse_grid_pos),
-                                        CURSOR_INFO_COLOR,
-                                    );
-                                }
-                            }
-                            // The line graphics should be self-explanatory
-                            Some(AreaShape::Line) => {}
-                            None => {
-                                if let Some(text) = mouse_pos_target_problem {
-                                    self.draw_cursor_text(
-                                        text,
-                                        Some(mouse_grid_pos),
-                                        CURSOR_ERROR_COLOR,
-                                    );
-                                }
-                            }
-                        };
-
                         if (is_mouse_pos_out_of_range || !is_mouse_within_grid)
                             && snapped_position_target.is_none()
                         {
@@ -2726,14 +2712,45 @@ impl GameGrid {
                             self.draw_target_crosshair(
                                 self.characters[&self.active_character_id].pos(),
                                 position_target,
+                                false,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                                4.0,
+                                CROSSHAIR_ARROW_THIN,
                                 true,
                             );
                         }
+
+                        match shape {
+                            Some(AreaShape::Circle(..)) => {
+                                if is_mouse_pos_out_of_range {
+                                    self.draw_cursor_text(
+                                        "Out of reach",
+                                        Some(mouse_grid_pos),
+                                        CURSOR_ERROR_COLOR,
+                                    );
+                                } else {
+                                    self.draw_cursor_text(
+                                        "Confirm area",
+                                        Some(mouse_grid_pos),
+                                        CURSOR_INFO_COLOR,
+                                    );
+                                }
+                            }
+                            Some(AreaShape::Line) => {
+                                self.draw_cursor_text("Confirm aim", None, CURSOR_INFO_COLOR);
+                            }
+                            None => {
+                                if let Some(text) = mouse_pos_target_problem {
+                                    self.draw_cursor_text(
+                                        text,
+                                        Some(mouse_grid_pos),
+                                        CURSOR_ERROR_COLOR,
+                                    );
+                                }
+                            }
+                        };
                     }
                 }
-                MouseState::MayInputMovement => {
+                MouseState::Movement => {
                     hovered_move_route = self.determine_hovered_route_position(mouse_grid_pos);
 
                     if hovered_move_route.is_none() {
@@ -2755,7 +2772,7 @@ impl GameGrid {
 
             if may_commit_action_with_left_click {
                 if let Some(problem) = self.action_usability_problem {
-                    let problem = format!("|<warning>| {}", problem);
+                    let problem = format!("|<warning>| {}", problem.message());
                     front_cursor_text = Some((problem, CURSOR_ERROR_COLOR));
                     //self.draw_cursor_text(problem, None, CURSOR_ERROR_COLOR);
                 } else {
@@ -2868,8 +2885,9 @@ impl GameGrid {
                         self.draw_target_crosshair(
                             self.characters[&self.active_character_id].pos(),
                             hovered_char.pos(),
+                            true,
                             HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                            4.0,
+                            CROSSHAIR_ARROW_THIN,
                             !cannot_reach,
                         );
                     } else if matches!(mouse_state, MouseState::RequiresEnemyTarget { .. }) {
@@ -2958,8 +2976,9 @@ impl GameGrid {
                             self.draw_target_crosshair(
                                 active_char_pos,
                                 hovered_char.pos(),
+                                true,
                                 HOVER_PLAYERS_TARGET_CROSSHAIR_COLOR,
-                                4.0,
+                                CROSSHAIR_ARROW_THIN,
                                 !cannot_reach,
                             );
                         }
@@ -3095,8 +3114,9 @@ impl GameGrid {
                     self.draw_target_crosshair(
                         active_char_pos,
                         target_pos,
+                        true,
                         PLAYERS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
+                        CROSSHAIR_ARROW_THICK,
                         valid,
                     );
                 }
@@ -3111,8 +3131,9 @@ impl GameGrid {
                 self.draw_target_crosshair(
                     active_char_pos,
                     target_pos,
+                    false,
                     PLAYERS_TARGET_CROSSHAIR_COLOR,
-                    7.0,
+                    CROSSHAIR_ARROW_THICK,
                     !cannot_reach,
                 );
             }
@@ -3124,8 +3145,9 @@ impl GameGrid {
             self.draw_target_crosshair(
                 self.characters[&self.active_character_id].pos(),
                 target_pos,
+                true,
                 ENEMYS_TARGET_CROSSHAIR_COLOR,
-                7.0,
+                CROSSHAIR_ARROW_THICK,
                 true,
             );
         }
@@ -3149,8 +3171,9 @@ impl GameGrid {
                     self.draw_target_crosshair(
                         self.characters[&char_animation.character_id].pos(),
                         *target_pos,
+                        true,
                         ENEMYS_TARGET_CROSSHAIR_COLOR,
-                        7.0,
+                        CROSSHAIR_ARROW_THICK,
                         false,
                     );
                 }
@@ -3369,7 +3392,7 @@ impl GameGrid {
             let snapped_mouse_pos = self.grid_pos_to_screen(pos);
             (
                 snapped_mouse_pos.0 + self.cell_w / 2.0 - text_dim.width / 2.0,
-                snapped_mouse_pos.1,
+                snapped_mouse_pos.1 - 10.0,
             )
         } else {
             let mouse_pos = mouse_position();
@@ -3523,8 +3546,9 @@ impl GameGrid {
             self.draw_target_crosshair(
                 *movement_to_target.last().unwrap(),
                 target_pos,
+                true,
                 PLAYERS_TARGET_CROSSHAIR_COLOR,
-                7.0,
+                CROSSHAIR_ARROW_THICK,
                 true,
             );
             self.draw_movement_path_with_arrow(
@@ -4299,6 +4323,7 @@ impl GameGrid {
         &self,
         actor_pos: Position,
         target_pos: Position,
+        is_targetting_character: bool,
         crosshair_color: Color,
         thickness: f32,
         animated: bool,
@@ -4306,7 +4331,14 @@ impl GameGrid {
         let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
         let actor_y = self.grid_y_to_screen(actor_pos.1);
         let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0;
-        let target_y = self.grid_y_to_screen(target_pos.1);
+
+        let target_y = if is_targetting_character {
+            // show the crosshair closer to the target's chest rather than at their feet
+            self.grid_y_to_screen(target_pos.1)
+        } else {
+            self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0
+        };
+
         let depth = 2.0;
 
         let actor_vec = Vec2::new(actor_x, actor_y);
@@ -4991,7 +5023,7 @@ enum MouseState {
         range: Range,
     },
     ImplicitTarget,
-    MayInputMovement,
+    Movement,
     None,
 }
 

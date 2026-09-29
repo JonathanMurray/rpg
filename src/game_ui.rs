@@ -107,7 +107,7 @@ impl UiState {
         relevant_character: &Character,
         characters: &Characters,
         pathfind_grid: &PathfindGrid,
-    ) -> Option<&'static str> {
+    ) -> Option<UsabilityProblem> {
         match self {
             UiState::ConfiguringAction(configured_action) => {
                 configured_action.usability_problem(relevant_character, characters, pathfind_grid)
@@ -172,6 +172,37 @@ pub enum ConfiguredAction {
     UseConsumable(Option<EquipmentConsumption>),
 }
 
+#[derive(Copy, Clone, Debug)]
+pub enum UsabilityProblem {
+    OutOfReach,
+    NoLineOfSight,
+    NotEnoughAp,
+    SelectMovement,
+    SelectEnemy,
+    SelectAlly,
+    SelectArea,
+    SelectDestination,
+    DragItem,
+    SelectConsumable,
+}
+
+impl UsabilityProblem {
+    pub fn message(&self) -> &str {
+        match self {
+            UsabilityProblem::OutOfReach => "Out of reach",
+            UsabilityProblem::NoLineOfSight => "No line of sight",
+            UsabilityProblem::NotEnoughAp => "Not enough AP",
+            UsabilityProblem::SelectMovement => "Select movement",
+            UsabilityProblem::SelectEnemy => "Select an enemy",
+            UsabilityProblem::SelectAlly => "Select an ally",
+            UsabilityProblem::SelectArea => "Select an area",
+            UsabilityProblem::SelectDestination => "Select destination",
+            UsabilityProblem::DragItem => "Drag an item",
+            UsabilityProblem::SelectConsumable => "Select a consumable",
+        }
+    }
+}
+
 const OUT_OF_REACH: &str = "Out of reach";
 const NO_LINE_OF_SIGHT: &str = "No line of sight";
 
@@ -191,7 +222,7 @@ impl ConfiguredAction {
         relevant_character: &Character,
         characters: &Characters,
         pathfind_grid: &PathfindGrid,
-    ) -> Option<&'static str> {
+    ) -> Option<UsabilityProblem> {
         match self {
             ConfiguredAction::Attack {
                 target,
@@ -215,18 +246,18 @@ impl ConfiguredAction {
                                 relevant_character.pos(),
                                 target_char.pos(),
                             ) {
-                                Some(NO_LINE_OF_SIGHT)
+                                Some(UsabilityProblem::NoLineOfSight)
                             } else {
                                 None
                             }
                         } else {
-                            Some(OUT_OF_REACH)
+                            Some(UsabilityProblem::OutOfReach)
                         }
                     } else {
-                        Some("Not enough AP")
+                        Some(UsabilityProblem::NotEnoughAp)
                     }
                 }
-                None => Some("Select an enemy"),
+                None => Some(UsabilityProblem::SelectEnemy),
             },
 
             ConfiguredAction::UseAbility {
@@ -238,7 +269,7 @@ impl ConfiguredAction {
                 ActionTarget::Character(target_id, movement) => {
                     if let Some(positions) = movement {
                         if positions.is_empty() {
-                            return Some("Select movement");
+                            return Some(UsabilityProblem::SelectMovement);
                         }
                     }
                     let target_char = characters.get(*target_id);
@@ -251,12 +282,12 @@ impl ConfiguredAction {
                         if pathfind_grid
                             .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
                         {
-                            Some(NO_LINE_OF_SIGHT)
+                            Some(UsabilityProblem::NoLineOfSight)
                         } else {
                             None
                         }
                     } else {
-                        Some(OUT_OF_REACH)
+                        Some(UsabilityProblem::OutOfReach)
                     }
                 }
 
@@ -272,16 +303,18 @@ impl ConfiguredAction {
                     ) {
                         None
                     } else {
-                        Some(OUT_OF_REACH)
+                        Some(UsabilityProblem::OutOfReach)
                     }
                 }
 
+                // There is a usability problem; we will not be able to call predict_ability for example,
+                // but we don't want the usability problem to be shown as a warning text above the activity popup
                 ActionTarget::None => match ability.target {
                     AbilityTarget::None { .. } => None,
-                    AbilityTarget::Enemy { .. } => Some("Select an enemy"),
-                    AbilityTarget::Ally { .. } => Some("Select an ally"),
-                    AbilityTarget::Area { .. } => Some("Select an area"),
-                    AbilityTarget::Destination { .. } => Some("Select a destination"),
+                    AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
+                    AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
+                    AbilityTarget::Area { .. } => Some(UsabilityProblem::SelectArea),
+                    AbilityTarget::Destination { .. } => Some(UsabilityProblem::SelectDestination),
                 },
             },
 
@@ -289,11 +322,14 @@ impl ConfiguredAction {
                 selected_movement_path,
                 ..
             } => {
+                None
+                /*
                 if selected_movement_path.is_empty() {
                     Some("Select movement")
                 } else {
                     None
                 }
+                 */
             }
 
             ConfiguredAction::ChangeEquipment { drag } => {
@@ -306,7 +342,7 @@ impl ConfiguredAction {
                 ) {
                     None
                 } else {
-                    Some("Drag an item")
+                    Some(UsabilityProblem::DragItem)
                 }
             }
 
@@ -314,7 +350,7 @@ impl ConfiguredAction {
                 if consumable.is_some() {
                     None
                 } else {
-                    Some("Select a consumable")
+                    Some(UsabilityProblem::SelectConsumable)
                 }
             }
         }
@@ -615,6 +651,7 @@ impl UserInterface {
         );
 
         let activity_popup = ActivityPopup::new(
+            resources.big_font.clone(),
             resources.simple_font.clone(),
             ui_state.clone(),
             characters.clone(),
@@ -1145,7 +1182,7 @@ impl UserInterface {
             &self.game_grid.pathfind_grid,
         );
 
-        if matches!(usability_problem, None | Some(OUT_OF_REACH)) {
+        if matches!(usability_problem, None | Some(UsabilityProblem::OutOfReach)) {
             let prediction = predict_ability(
                 &self.game_grid.pathfind_grid,
                 &self.characters,

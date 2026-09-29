@@ -448,6 +448,17 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Clara",
+      "pos": [
+        12,
+        34
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

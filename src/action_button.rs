@@ -32,7 +32,7 @@ use crate::{
     pathfind::Liquid,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, COL_GOLD, COL_GREEN_2, COL_RED},
+    util::{oscillate, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
 
 pub const EVASION_STR: &str = "|<shield>||<stat>Evasion|";
@@ -175,7 +175,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     }
 
     let header = format!(
-        "{} {}",
+        "{}{}",
         header,
         cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
     );
@@ -200,7 +200,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     }
     Tooltip {
         header: format!(
-            "{} {}",
+            "{}{}",
             reaction.name,
             cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
         ),
@@ -213,7 +213,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
 fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
     let mut t = Tooltip {
         header: format!(
-            "{} {}",
+            "{}{}",
             enhancement.name,
             cost_string(
                 enhancement.action_point_cost,
@@ -353,7 +353,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
     let mut t = Tooltip {
         header: format!(
-            "{} {}",
+            "{}{}",
             enhancement.name,
             cost_string(
                 enhancement.action_point_cost,
@@ -450,7 +450,10 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
             description: Some(
                 "Move a limited distance for free every turn. Spend AP to move further.",
             ),
-            //technical_description: vec!["|<boot>||<stat>Move| + 4X".to_string()],
+            technical_description: vec![
+                "Free: |<boot>||<stat>Movement| |<range>|".to_string(),
+                "Additional: |<value>4| |<range>| per AP".to_string(),
+            ],
             ..Default::default()
         },
         BaseAction::ChangeEquipment => Tooltip {
@@ -534,7 +537,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
 
 fn ability_tooltip(ability: &Ability) -> Tooltip {
     let header = format!(
-        "{} {}",
+        "{}{}",
         ability.name,
         cost_string(
             ability.action_point_cost,
@@ -574,9 +577,8 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
             }
         };
         t.technical_description.push(s);
+        t.technical_description.push("".to_string());
     }
-
-    t.technical_description.push("".to_string());
 
     match ability.target {
         AbilityTarget::Enemy {
@@ -1314,7 +1316,7 @@ impl Drawable for ActionButton {
                     w + margin * 2.0,
                     h + margin * 2.0,
                     thickness,
-                    GREEN,
+                    COL_GREEN_3,
                     7.0,
                     outer,
                 );
@@ -1327,7 +1329,7 @@ impl Drawable for ActionButton {
                     w + margin * 2.0,
                     h + margin * 2.0,
                     4.0,
-                    GREEN,
+                    COL_GREEN_3,
                     6.4,
                 );
             }

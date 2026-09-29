@@ -96,7 +96,8 @@ pub fn draw_dashed_line_ex(
     let mut start_offset = 0.0;
 
     if animated {
-        let t = get_time() / 2.0;
+        let animation_speed = 1.5;
+        let t = get_time() * animation_speed;
         start_offset = -segment_len + (t - t.floor()) as f32 * segment_len * 2.0;
     }
 
