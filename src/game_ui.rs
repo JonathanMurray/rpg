@@ -875,7 +875,7 @@ impl UserInterface {
 
             self.set_character_sheet_shown(!outcome.clicked_close);
 
-            if outcome.changed_state {
+            if outcome.changed_state_or_drag {
                 println!("REQUESTED EQ CHANGE; new state");
                 // Maybe drag was changed, or maybe the entire state; should be fine to assume the latter
                 self.on_new_state();

@@ -352,7 +352,7 @@ impl ActivityPopup {
             let buttons_w = self.choice_buttons.len() as f32 * REGULAR_ACTION_BUTTON_SIZE.0
                 + (self.choice_buttons.len() - 1) as f32 * button_margin;
 
-            let label = "Enhancements:";
+            let label = "Extra:";
             let dim = measure_text_with_font_tags(label, Some(&self.font), 16, 1.0);
             let label_x = btn_x + buttons_w / 2.0 - dim.width / 2.0;
 

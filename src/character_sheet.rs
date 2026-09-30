@@ -227,7 +227,7 @@ impl CharacterSheet {
                 is_allowed_to_change_equipment,
             );
 
-        let mut changed_state = false;
+        let mut changed_state_or_drag = false;
 
         if outcome.equipment_drag != *self.drag.borrow() {
             *self.drag.borrow_mut() = outcome.equipment_drag;
@@ -240,15 +240,10 @@ impl CharacterSheet {
                 *ui_state = UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment {
                     drag: Rc::clone(&self.drag),
                 });
-                changed_state = true;
-            } else if matches!(
-                ui_state,
-                UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { .. })
-            ) && is_allowed_to_change_equipment
-            {
-                // Since we modified the drag that's shared (through Rc) with the UiState
-                changed_state = true;
             }
+            // We may have changed the drag that's shared (through Rc) with the UiState,
+            // or we may have enabled/disabled arrows which requires a refresh of an open activity popup
+            changed_state_or_drag = true;
         }
         if outcome.requested_consumption != requested_consumption {
             dbg!(outcome.requested_consumption, requested_consumption);
@@ -259,7 +254,7 @@ impl CharacterSheet {
                 *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
                     outcome.requested_consumption,
                 ));
-                changed_state = true;
+                changed_state_or_drag = true;
             }
         }
 
@@ -267,7 +262,7 @@ impl CharacterSheet {
 
         CharacterSheetOutcome {
             clicked_close,
-            changed_state,
+            changed_state_or_drag,
         }
     }
 
@@ -454,9 +449,10 @@ impl Drawable for MoneyText {
     }
 }
 
+#[derive(Debug)]
 pub struct CharacterSheetOutcome {
     pub clicked_close: bool,
-    pub changed_state: bool,
+    pub changed_state_or_drag: bool,
 }
 
 fn buttons_row(buttons: Vec<Element>) -> Element {

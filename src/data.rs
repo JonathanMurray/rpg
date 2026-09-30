@@ -135,8 +135,8 @@ pub const DAGGER: Weapon = Weapon {
 };
 
 pub const SLASHING: AttackEnhancement = AttackEnhancement {
-    name: "Slashing 4",
-    description: "Inflict |<keyword>Bleeding|",
+    name: "Slashing",
+    description: "Inflict |<value>4| |<keyword>Bleeding|",
     icon: IconId::Slashing,
     stamina_cost: 2,
     effect: AttackEnhancementEffect {

@@ -505,6 +505,12 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         (1, 10),
     );
     alice.set_weapon(HandType::MainHand, BOW);
+
+    // TODO
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack {
+        arrow: COLD_ARROWS,
+        quantity: 2,
+    }));
     //alice.set_weapon(HandType::MainHand, ARCANE_BOW);
     // TODO:
     //alice.set_weapon(HandType::MainHand, ZERO_BOW);

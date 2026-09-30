@@ -7991,8 +7991,8 @@ impl EquipmentSlotRole {
     pub fn is_equipped(&self) -> bool {
         use EquipmentSlotRole::*;
         match self {
-            MainHand | OffHand | Armor | Arrows => true,
-            Inventory(..) | PartyStash(..) => false,
+            MainHand | OffHand | Armor => true,
+            Inventory(..) | PartyStash(..) | Arrows => false,
         }
     }
 }
