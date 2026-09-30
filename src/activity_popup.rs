@@ -781,6 +781,7 @@ impl ActivityPopup {
 
         let mut movement_cost_slider = None;
         self.selected_choice_button_ids.clear();
+        self.hovered_choice_button_id = None;
 
         println!("on_new_state");
         //dbg!(self.ui_state.borrow());
