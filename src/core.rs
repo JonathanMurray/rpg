@@ -4254,7 +4254,7 @@ pub fn is_valid_area_target(
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ApplyEffect {
     RemoveActionPoints(u32),
     GainActionPoints(u32),
@@ -4330,7 +4330,7 @@ impl Display for ApplyEffect {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct OnAttackedReaction {
     pub id: OnAttackedReactionId,
     pub name: &'static str,
@@ -4345,14 +4345,14 @@ pub struct OnAttackedReaction {
     pub target: OnAttackedReactionTarget,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OnAttackedReactionId {
     Parry,
     SideStep,
     Block,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct OnAttackedReactionEffect {
     pub bonus_evasion: u32,
     pub bonus_armor: u32,
@@ -4360,7 +4360,7 @@ pub struct OnAttackedReactionEffect {
     pub thorns: u32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum OnAttackedReactionTarget {
     OnlySelf,
     SelfOrAdjacentAlly,
@@ -4377,7 +4377,7 @@ pub struct OnHitReaction {
     pub required_attack_type: Option<AttackType>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AttackType {
     Melee,
     Ranged,
@@ -4686,7 +4686,7 @@ struct ConditionState {
     ends_at: Option<u32>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct ApplyCondition {
     pub condition: Condition,
     pub stacks: Option<u32>,
@@ -4935,7 +4935,7 @@ impl BaseAction {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum HandType {
     MainHand,
     OffHand,
@@ -5076,7 +5076,7 @@ pub enum AbilityId {
     DraugHaunt,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum WeaponType {
     Melee,
     Ranged,
@@ -5329,7 +5329,7 @@ impl AbilityTarget {
 // TODO Merge SpellEnhancement and AttackEnhancement? (There may be AttackEnhancements that should also be
 // usable for attack abilities (like Lunge attack / Sweeping attack))
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct AttackEnhancement {
     pub name: &'static str,
     pub description: &'static str,
@@ -5395,7 +5395,7 @@ impl AbilityEnhancement {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct Fraction {
     pub num: u32,
     pub den: u32,
@@ -5407,7 +5407,7 @@ impl Fraction {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub struct AttackEnhancementEffect {
     pub roll_modifier: i32,
     pub roll_advantage: i32,
@@ -5494,13 +5494,13 @@ impl SpellEnhancementEffect {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum AttackEnhancementOnHitEffect {
     RegainActionPoint,
     Target(Option<DefenseType>, ApplyEffect),
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum DefenseType {
     Will,
     Evasion,
@@ -6617,6 +6617,14 @@ impl Character {
             .collect();
     }
 
+    pub fn inherently_known_attack_enhancements(&self) -> Vec<(String, AttackEnhancement)> {
+        let mut known = vec![];
+        for enhancement in self.known_attack_enhancements.borrow().iter() {
+            known.push(("".to_owned(), *enhancement))
+        }
+        known
+    }
+
     pub fn known_attack_enhancements(
         &self,
         attack_hand: HandType,
@@ -6704,6 +6712,14 @@ impl Character {
             && self.mana.current() >= enhancement.mana_cost
     }
 
+    pub fn inherently_known_on_attacked_reactions(&self) -> Vec<OnAttackedReaction> {
+        let mut known = vec![];
+        for reaction in self.known_attacked_reactions.borrow().iter() {
+            known.push(*reaction);
+        }
+        known
+    }
+
     pub fn known_on_attacked_reactions(&self) -> Vec<OnAttackedReaction> {
         let mut known = vec![];
         for reaction in self.known_attacked_reactions.borrow().iter() {
@@ -6772,6 +6788,14 @@ impl Character {
             Some(HandType::OffHand) => self.has_used_off_hand_reaction_this_round.set(true),
             None => {}
         }
+    }
+
+    pub fn inherently_known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {
+        let mut known = vec![];
+        for reaction in self.known_on_hit_reactions.borrow().iter() {
+            known.push(("".to_string(), *reaction));
+        }
+        known
     }
 
     pub fn known_on_hit_reactions(&self) -> Vec<(String, OnHitReaction)> {

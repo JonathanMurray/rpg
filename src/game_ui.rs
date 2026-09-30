@@ -3032,22 +3032,20 @@ fn build_character_ui(
     }
 
     let mut reaction_buttons_for_character_sheet = vec![];
-    for reaction in character.known_on_attacked_reactions() {
+    for reaction in character.inherently_known_on_attacked_reactions() {
         let btn_action = ButtonAction::OnAttackedReaction(reaction);
         let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));
         reaction_buttons_for_character_sheet.push(btn);
     }
-    for (_subtext, reaction) in character.known_on_hit_reactions() {
+    for (_subtext, reaction) in character.inherently_known_on_hit_reactions() {
         let btn_action = ButtonAction::OnHitReaction(reaction);
         let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));
         reaction_buttons_for_character_sheet.push(btn);
     }
 
-    // TODO: Only include inherently known enhancements here; not those gained from weapons (since weapons can be unequipped
-    // without the character sheet being updated)
-    for (_subtext, enhancement) in character.known_attack_enhancements(HandType::MainHand) {
+    for (_subtext, enhancement) in character.inherently_known_attack_enhancements() {
         let btn_action = ButtonAction::AttackEnhancement(enhancement);
         let btn = Rc::new(new_button(btn_action, None, true));
         hoverable_buttons.push(Rc::clone(&btn));

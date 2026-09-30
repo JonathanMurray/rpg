@@ -909,9 +909,9 @@ pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
 
 pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
-    name: "Block 3",
+    name: "Block",
     granted_from: None,
-    description: "Protect yourself or adjacent ally |<faded>(1 attack per round)|",
+    description: "Protect yourself or adjacent ally, reducing incoming attack damage by |<value>3| |<faded>(once per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,

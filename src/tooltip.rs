@@ -10,7 +10,10 @@ use macroquad::{
 
 use crate::{
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
-    core::{cond_description_with_populated_stacks, Condition, ConditionInfo, Goodness},
+    core::{
+        cond_description_with_populated_stacks, AttackEnhancement, Condition, ConditionInfo,
+        Goodness, OnAttackedReaction,
+    },
     drawing::draw_rounded_rectangle_lines,
     textures::{draw_status_icon, StatusId},
     util::screen_size,
@@ -19,6 +22,8 @@ use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Cond(Condition, Option<u32>),
+    AttackEnhancement(AttackEnhancement),
+    OnAttackedReaction(OnAttackedReaction),
     Advantage,
     Pushed,
     Graze,
@@ -30,6 +35,8 @@ impl Keyword {
     fn name(&self) -> &str {
         match self {
             Keyword::Cond(condition, amount) => condition.name(),
+            Keyword::AttackEnhancement(enhancement) => enhancement.name,
+            Keyword::OnAttackedReaction(reaction) => reaction.name,
             Keyword::Advantage => "Advantage / Disadvantage",
             Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
@@ -47,6 +54,8 @@ impl Keyword {
                     condition.description().to_string()
                 }
             },
+            Keyword::AttackEnhancement(enhancement) => enhancement.description.to_string(),
+            Keyword::OnAttackedReaction(reaction) => reaction.description.to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
                 "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
@@ -63,13 +72,15 @@ impl Keyword {
 
     fn goodness(&self) -> Goodness {
         match self {
-            Keyword::Cond(condition, amount) => {
+            Keyword::Cond(condition, _amount) => {
                 if condition.is_positive() {
                     Goodness::Good
                 } else {
                     Goodness::Bad
                 }
             }
+            Keyword::AttackEnhancement(..) => Goodness::Neutral,
+            Keyword::OnAttackedReaction(..) => Goodness::Neutral,
             Keyword::Advantage => Goodness::Neutral,
             Keyword::Pushed => Goodness::Bad,
             Keyword::Graze => Goodness::Bad,
@@ -133,7 +144,7 @@ pub fn draw_tooltip(
     };
 
     let header_status_icon = header_keyword.and_then(|keyword| match keyword {
-        Keyword::Cond(condition, amount) => Some(condition.status_icon()),
+        Keyword::Cond(condition, _amount) => Some(condition.status_icon()),
         _ => None,
     });
 
@@ -332,10 +343,9 @@ pub fn draw_tooltip(
             }
         };
 
-    let header_color = if header_keyword.is_some() {
-        ORANGE
-    } else {
-        YELLOW
+    let header_color = match header_keyword {
+        None | Some(Keyword::AttackEnhancement(..)) => YELLOW,
+        _ => ORANGE,
     };
 
     draw_line(header, Some(header_color), true, header_status_icon);

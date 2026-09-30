@@ -158,7 +158,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     }
     if reaction.effect.damage_prevention > 0 {
         technical_description.push(format!(
-            "Reduces damage by |<value>{}|",
+            "-|<value>{}| |<sword>|",
             reaction.effect.damage_prevention
         ));
     }

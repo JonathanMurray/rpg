@@ -132,10 +132,12 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description
             .push(format!("Skill: |<keyword>{}|", reaction.name));
+        t.keywords.push(Keyword::OnAttackedReaction(reaction));
     }
     if let Some(enhancement) = weapon.attack_enhancement {
         t.technical_description
             .push(format!("Skill: |<keyword>{}|", enhancement.name));
+        t.keywords.push(Keyword::AttackEnhancement(enhancement));
     }
     t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(weapon.weight));
@@ -164,6 +166,7 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
     if let Some(reaction) = shield.on_attacked_reaction {
         t.technical_description
             .push(format!("Skill: |<keyword>{}|", reaction.name));
+        t.keywords.push(Keyword::OnAttackedReaction(reaction));
     }
     if let Some(reaction) = shield.on_hit_reaction {
         t.technical_description
