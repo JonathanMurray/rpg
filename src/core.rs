@@ -713,6 +713,8 @@ impl CoreGame {
                     self.perform_spend_ap(character, 1).await;
                 }
                 character.swap_equipment_slots(from, to);
+                self.ui_handle_event(GameEvent::CharacterChangedEquipment)
+                    .await;
                 Ok(ActionOutcome::Default)
             }
 
@@ -3923,6 +3925,7 @@ pub enum GameEvent {
         character: CharacterId,
         amount: u32,
     },
+    CharacterChangedEquipment,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -6550,16 +6553,20 @@ impl Character {
             }
             BaseAction::UseAbility(ability) => self.can_use_ability(ability),
             BaseAction::Move => self.remaining_movement.get() > 1.0 || (ap > 0),
-            BaseAction::ChangeEquipment => {
-                let cost = BaseAction::ChangeEquipment.quick_point_cost() as i32;
-                self.enabled_quick_actions.get() && sta > cost || ap > cost
-            }
+            BaseAction::ChangeEquipment => self.can_change_equipment(),
             BaseAction::UseConsumable => {
                 self.has_any_consumable_in_inventory()
                     && ap >= BaseAction::UseConsumable.action_point_cost()
             }
             BaseAction::ToggleQuickActions => true,
         }
+    }
+
+    pub fn can_change_equipment(&self) -> bool {
+        let sta = self.stamina.current() as i32;
+        let ap = self.action_points.current() as i32;
+        let cost = BaseAction::ChangeEquipment.quick_point_cost() as i32;
+        self.enabled_quick_actions.get() && sta >= cost || ap >= cost
     }
 
     pub fn can_use_ability(&self, ability: &Ability) -> bool {
@@ -6918,10 +6925,12 @@ impl Character {
         res
     }
 
+    pub fn base_evasion(&self) -> u32 {
+        self.evasion_from_agility() + self.evasion_from_intellect()
+    }
+
     pub fn evasion(&self) -> u32 {
-        let mut res = 0;
-        res += self.evasion_from_agility();
-        res += self.evasion_from_intellect();
+        let mut res = self.base_evasion();
         res += self.shield().map(|shield| shield.evasion).unwrap_or(0);
 
         let conditions = self.conditions.borrow();

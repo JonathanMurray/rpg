@@ -340,7 +340,11 @@ impl ConfiguredAction {
                         ..
                     })
                 ) {
-                    None
+                    if relevant_character.can_change_equipment() {
+                        None
+                    } else {
+                        Some(UsabilityProblem::NotEnoughAp)
+                    }
                 } else {
                     Some(UsabilityProblem::DragItem)
                 }
@@ -726,10 +730,22 @@ impl UserInterface {
         let settings_rect = self.settings.last_drawn_rectangle.get();
 
         let mouse_pos = mouse_position();
+
+        let character_ui = self
+            .character_uis
+            .get(&self.player_portraits.selected_id())
+            .unwrap();
+
+        let obstructed_by_character_sheet = self.character_sheet_toggle.is_shown()
+            && character_ui
+                .character_sheet
+                .rect()
+                .contains(mouse_pos.into());
+
         let is_grid_obstructed = popup_rect.contains(mouse_pos.into())
             || target_ui_rect.contains(mouse_pos.into())
             || settings_rect.contains(mouse_pos.into())
-            || self.character_sheet_toggle.is_shown()
+            || obstructed_by_character_sheet
             || (mouse_pos.1 >= ui_y - 1.0 && mouse_pos.0 >= ui_x0 - 1.0);
         let is_grid_receptive_to_dragging = !is_grid_obstructed;
 
@@ -761,7 +777,7 @@ impl UserInterface {
         let grid_outcome = self.game_grid.draw(
             is_grid_receptive_to_dragging,
             &mut self.state.borrow_mut(),
-            is_grid_obstructed,
+            !is_grid_obstructed,
             hovered_action,
             character_ui.action_points_row.reserved_and_hovered_ap,
             false,
@@ -1356,10 +1372,10 @@ impl UserInterface {
                 ConfiguredAction::ChangeEquipment { drag } => {
                     // Clear the drag; it's shared with the character sheet equipment UI
                     *drag.borrow_mut() = None;
-                    self.character_sheet_toggle.set_shown(false);
+                    //self.character_sheet_toggle.set_shown(false);
                 }
                 ConfiguredAction::UseConsumable(..) => {
-                    self.character_sheet_toggle.set_shown(false);
+                    //self.character_sheet_toggle.set_shown(false);
                 }
                 _ => {}
             }
@@ -1972,6 +1988,9 @@ impl UserInterface {
                         self.sound_player.play(SoundId::Poison);
                     }
                 }
+            }
+            GameEvent::CharacterChangedEquipment => {
+                self.sound_player.play(SoundId::DropEquipment);
             }
         }
     }

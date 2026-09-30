@@ -87,7 +87,7 @@ async fn main() {
             &mut UiState::Idle {
                 recently_committed_action: None,
             },
-            false,
+            true,
             None,
             (0, 0),
             true,

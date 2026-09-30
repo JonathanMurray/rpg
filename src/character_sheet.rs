@@ -6,6 +6,7 @@ use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
 use macroquad::input::{
     is_mouse_button_down, is_mouse_button_pressed, mouse_position, MouseButton,
 };
+use macroquad::math::Rect;
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{measure_text, TextParams};
 use macroquad::window::{screen_height, screen_width};
@@ -21,7 +22,7 @@ use crate::drawing::draw_cross;
 use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
-use crate::stats_ui::build_character_stats_table;
+use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
 use crate::{
     action_button::ActionButton,
     base_ui::{Align, Container, ContainerScroll, Element, LayoutDirection, Style, TextLine},
@@ -34,6 +35,7 @@ pub struct CharacterSheet {
 
     equipment_changed: Rc<Cell<bool>>,
     equipment_section: Rc<RefCell<EquipmentSection>>,
+    stats_table: Rc<RefCell<CharacterStatsTable>>,
 
     container: Container,
     top_bar_h: f32,
@@ -45,6 +47,12 @@ pub struct CharacterSheet {
 pub const CHARACTER_SHEET_BG_COLOR: Color = Color::new(0.00, 0.3, 0.4, 1.00);
 
 impl CharacterSheet {
+    pub fn rect(&self) -> Rect {
+        let pos = self.screen_position.borrow();
+        let size = self.container_size();
+        Rect::new(pos.0, pos.1, size.0, size.1)
+    }
+
     pub fn new(
         font: &Font,
         character: Rc<Character>,
@@ -69,14 +77,17 @@ impl CharacterSheet {
 
         let conditions_list = Rc::new(RefCell::new(conditions_list));
 
-        let stats_table = build_character_stats_table(font, Rc::clone(&character));
+        let stats_table = Rc::new(RefCell::new(build_character_stats_table(
+            font,
+            Rc::clone(&character),
+        )));
 
         let stats_column = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             margin: 5.0,
             children: vec![
                 Element::Empty(0.0, 30.0),
-                Element::Box(Box::new(stats_table)),
+                Element::RcRefCell(stats_table.clone()),
                 Element::Empty(0.0, 10.0),
                 Element::RcRefCell(conditions_list.clone()),
             ],
@@ -158,6 +169,7 @@ impl CharacterSheet {
             equipment_changed,
 
             equipment_section,
+            stats_table,
 
             drag: Default::default(),
             conditions_list,
@@ -174,6 +186,8 @@ impl CharacterSheet {
             self.equipment_section
                 .borrow_mut()
                 .repopulate_character_equipment();
+
+            self.stats_table.borrow_mut().rebuild();
         }
 
         let (x, y) = *self.screen_position.borrow();

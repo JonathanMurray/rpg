@@ -1910,22 +1910,12 @@ impl GameGrid {
         &mut self,
         receptive_to_dragging: bool,
         ui_state: &mut UiState,
-        obstructed: bool,
+        receptive_to_input: bool,
         mut hovered_action: Option<(CharacterId, BaseAction)>,
         active_char_reserved_and_hovered_ap: (i32, i32),
         draw_control_points: bool,
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
-        // TODO
-        let receptive_to_input = !obstructed;
-
-        /*
-        let prev_inspect_target = match ui_state.players_action_target() {
-            ActionTarget::Character(char_id, _) => Some(char_id),
-            ActionTarget::Position(..) => None,
-            ActionTarget::None => self.hovered_character.or(self.hovered_character_portrait),
-        };
-         */
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 

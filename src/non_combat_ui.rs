@@ -337,6 +337,9 @@ impl NonCombatCharacterUi {
         self.equipment_section
             .borrow_mut()
             .repopulate_character_equipment();
+
+        // An equipped Shield can affect Evasion
+        self.stats_table.borrow_mut().rebuild();
     }
 
     pub fn draw_tooltips(&mut self) {
