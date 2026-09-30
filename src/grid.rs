@@ -66,8 +66,8 @@ use crate::{
         WaterType, LIGHTNING_BOLT_FX,
     },
     util::{
-        line_visitor, modify_line_len, oscillate, oscillate_loop, oscillate_square, rgb,
-        COL_BRIGHT, COL_RED, COL_RED_BRIGHT,
+        line_visitor, modify_line_len, oscillate, oscillate_loop, oscillate_square, plus_minus,
+        rgb, COL_BRIGHT, COL_RED, COL_RED_BRIGHT,
     },
 };
 use crate::{
@@ -4007,11 +4007,7 @@ impl GameGrid {
             let positive;
             if let Some(expected) = preview.prediction.expected_roll_outcome {
                 positive = expected >= 10.5;
-                let expected_str = format!(
-                    "{}{}",
-                    (expected - 10.5).round(),
-                    if positive { "^" } else { "v" }
-                );
+                let expected_str = format!("{}", plus_minus((expected - 10.5).round() as i32),);
                 outcome_text = Some(expected_str);
             } else {
                 positive = true;
@@ -5039,7 +5035,7 @@ pub fn draw_action(
     outcome_text: Option<String>,
     positive: bool,
 ) {
-    let (mut xmid, y) = mid_pos;
+    let (xmid, y) = mid_pos;
 
     let header_font_size = 16;
     let detail_font_size = 13;
@@ -5090,7 +5086,7 @@ pub fn draw_action(
 
     let outcome_w = outcome_text
         .as_ref()
-        .map(|s| measure_tiny_font(s).0 + 5.0)
+        .map(|s| measure_tiny_font(s).0)
         .unwrap_or(0.0);
 
     let outcome_margin = 3.0;
@@ -5100,7 +5096,7 @@ pub fn draw_action(
 
     let header_y = y0 + header_pad + header_dim.offset_y;
 
-    let total_w = header_w + outcome_margin + outcome_w;
+    let total_w = header_w + outcome_margin * 2.0 + outcome_w;
 
     draw_rectangle(x0, y0, total_w, header_h, Color::new(0.0, 0.0, 0.0, 0.8));
 
@@ -5113,12 +5109,27 @@ pub fn draw_action(
     );
 
     if let Some(s) = &outcome_text {
+        let outcome_x = x0 + header_w + outcome_margin;
+
+        // Draw a faded dice symbol behind the text
+        let dice_text = "<mixed_dice>";
+        let dice_dim = measure_text_with_font_tags(dice_text, None, 16, 1.0);
+        let dice_x = outcome_x + outcome_w / 2.0 - dice_dim.width / 2.0;
+        draw_text_with_font_tags(dice_text, dice_x, header_y, Default::default(), true);
+        draw_rectangle(
+            dice_x,
+            y0,
+            dice_dim.width,
+            header_h,
+            Color::new(0.0, 0.0, 0.0, 0.5),
+        );
+
         let color = if positive {
             TinyFontColor::Green
         } else {
             TinyFontColor::Red
         };
-        draw_tiny_font(s, x0 + header_w + outcome_margin, header_y, color);
+        draw_tiny_font(s, outcome_x, header_y - 1.0, color);
     }
 
     y0 += header_dim.offset_y + header_pad * 2.0 + vert_margin;

@@ -8,7 +8,10 @@ use macroquad::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::pathfind::{Liquid, TerrainType, CELLS_PER_ENTITY};
+use crate::{
+    pathfind::{Liquid, TerrainType, CELLS_PER_ENTITY},
+    util::{COL_GREEN_3, COL_RED, COL_RED_BRIGHT},
+};
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum SpriteId {
@@ -827,11 +830,11 @@ pub async fn load_and_init_texture(path: &str) -> Texture2D {
 
 async fn load_and_init_tiny_font() {
     let texture = load_and_init_texture("tiny_font.png").await;
-    replace_color(&texture, [0, 0, 0, 255], [100, 200, 100, 255]);
+    replace_color(&texture, [0, 0, 0, 255], COL_GREEN_3.into());
     TINY_FONT_GREEN_TEXTURE.get_or_init(|| texture);
 
     let texture = load_and_init_texture("tiny_font.png").await;
-    replace_color(&texture, [0, 0, 0, 255], [255, 100, 100, 255]);
+    replace_color(&texture, [0, 0, 0, 255], [255, 100, 100, 255]); //[255, 100, 100, 255]);
     TINY_FONT_RED_TEXTURE.get_or_init(|| texture);
 }
 
@@ -872,7 +875,7 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
     for ch in text.chars() {
         let hor_i = if ch.is_ascii_digit() {
             ch as u8 - b'0'
-        } else if ch == '%' {
+        } else if ch == '+' {
             10
         } else if ch == '-' {
             11
@@ -880,8 +883,10 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
             12
         } else if ch == 'v' {
             13
-        } else {
+        } else if ch == 'd' {
             14
+        } else {
+            15
         };
         draw_texture_ex(
             texture,
