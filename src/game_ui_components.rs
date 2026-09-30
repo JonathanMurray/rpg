@@ -304,6 +304,10 @@ impl CharacterSheetToggle {
         }
     }
 
+    pub fn toggle_shown(&self) {
+        self.set_shown(!self.shown.get());
+    }
+
     pub fn is_shown(&self) -> bool {
         self.shown.get()
     }
@@ -323,8 +327,8 @@ impl Drawable for CharacterSheetToggle {
         }
         self.is_hovered.set(hovered);
 
-        if (hovered && is_mouse_button_pressed(MouseButton::Left)) || is_key_pressed(KeyCode::A) {
-            self.set_shown(!self.shown.get());
+        if hovered && is_mouse_button_pressed(MouseButton::Left) {
+            self.toggle_shown();
         }
 
         if self.shown.get() {

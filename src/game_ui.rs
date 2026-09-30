@@ -866,6 +866,18 @@ impl UserInterface {
         self.target_ui
             .draw(screen_width() - self.target_ui.size().0 - 10.0, 10.0);
 
+        if is_key_pressed(KeyCode::A) {
+            self.character_sheet_toggle.toggle_shown();
+
+            if !self.character_sheet_toggle.is_shown() {
+                if let Some(button_hovered) = &self.hovered_button {
+                    if button_hovered.context == Some(ButtonContext::CharacterSheet) {
+                        self.hovered_button = None;
+                    }
+                }
+            }
+        }
+
         if self.character_sheet_toggle.is_shown() {
             let is_showing_active = self.active_character_id == selected_character_id;
 
