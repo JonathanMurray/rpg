@@ -175,9 +175,9 @@ impl CoreGame {
                 }
 
                 if !killed_by_action.is_empty() {
+                    let num_killed = killed_by_action.len() as u32;
                     let character = self.active_character();
-                    if let Some((sta, ap)) =
-                        character.maybe_gain_resources_from_reaper(killed_by_action.len() as u32)
+                    if let Some((sta, ap)) = character.maybe_gain_resources_from_reaper(num_killed)
                     {
                         if sta + ap > 0 {
                             if ap > 0 {
@@ -198,6 +198,18 @@ impl CoreGame {
                             ))
                             .await;
                         }
+                    }
+
+                    let healing_on_kill = character.healing_on_kill();
+                    if healing_on_kill > 0 {
+                        let amount =
+                            self.perform_gain_health(character, healing_on_kill * num_killed);
+
+                        self.ui_handle_event(GameEvent::CharacterGainedHealth {
+                            character: character.id(),
+                            amount,
+                        })
+                        .await;
                     }
                 }
             } else {
@@ -3926,6 +3938,10 @@ pub enum GameEvent {
         amount: u32,
     },
     CharacterChangedEquipment,
+    CharacterGainedHealth {
+        character: CharacterId,
+        amount: u32,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -4524,7 +4540,7 @@ impl Condition {
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
             BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
-            CriticalCharge => "|<value>+5| |<blue_dice>| |<stat>Spell| (passive skill).",
+            CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
@@ -6092,21 +6108,24 @@ impl Character {
         ) {
             return true;
         }
+        if equipment.slot_role() != Some(role) {
+            return false;
+        }
         match equipment {
-            EquipmentEntry::Weapon(weapon) if role == EquipmentSlotRole::MainHand => {
+            EquipmentEntry::Weapon(weapon) => {
                 weapon.grip != WeaponGrip::TwoHanded || self.off_hand.get().is_empty()
             }
-            EquipmentEntry::Shield(..) if role == EquipmentSlotRole::OffHand => {
+            EquipmentEntry::Shield(..) => {
                 if let Some(weapon) = self.weapon(HandType::MainHand) {
                     weapon.grip != WeaponGrip::TwoHanded
                 } else {
                     true
                 }
             }
-            EquipmentEntry::Armor(..) => role == EquipmentSlotRole::Armor,
-            EquipmentEntry::Arrows(..) => role == EquipmentSlotRole::Arrows,
-            EquipmentEntry::Trinket(..) => role == EquipmentSlotRole::Trinket,
-            _ => false,
+            EquipmentEntry::Armor(..)
+            | EquipmentEntry::Arrows(..)
+            | EquipmentEntry::Trinket(..) => true,
+            EquipmentEntry::Consumable(..) => false,
         }
     }
 
@@ -6554,8 +6573,19 @@ impl Character {
         matches!(self.weapon(attack.hand), Some(weapon) if ap >= weapon.action_point_cost)
     }
 
+    pub fn healing_on_kill(&self) -> u32 {
+        let mut amount = 0;
+        if let Some(armor) = self.armor_piece.get() {
+            amount += armor.equip.heal_on_kill;
+        }
+        if let Some(trinket) = self.trinket.get() {
+            amount += trinket.equip.heal_on_kill;
+        }
+
+        amount
+    }
+
     pub fn can_use_action(&self, action: BaseAction) -> bool {
-        let sta = self.stamina.current() as i32;
         let ap = self.action_points.current() as i32;
         match action {
             BaseAction::Attack(attack) => {
@@ -7685,6 +7715,7 @@ pub struct ArmorPiece {
 pub struct EquipEffect {
     pub bonus_spell_modifier: u32,
     pub thorns: u32,
+    pub heal_on_kill: u32,
 }
 
 impl EquipEffect {
@@ -7692,6 +7723,7 @@ impl EquipEffect {
         Self {
             bonus_spell_modifier: 0,
             thorns: 0,
+            heal_on_kill: 0,
         }
     }
 }
@@ -8024,6 +8056,17 @@ impl EquipmentEntry {
             EquipmentEntry::Consumable(consumable) => consumable.weight,
             EquipmentEntry::Arrows(..) => 0,
             EquipmentEntry::Trinket(..) => 0,
+        }
+    }
+
+    pub fn slot_role(&self) -> Option<EquipmentSlotRole> {
+        match self {
+            EquipmentEntry::Weapon(..) => Some(EquipmentSlotRole::MainHand),
+            EquipmentEntry::Shield(..) => Some(EquipmentSlotRole::OffHand),
+            EquipmentEntry::Armor(..) => Some(EquipmentSlotRole::Armor),
+            EquipmentEntry::Arrows(..) => Some(EquipmentSlotRole::Arrows),
+            EquipmentEntry::Trinket(..) => Some(EquipmentSlotRole::Trinket),
+            EquipmentEntry::Consumable(..) => None,
         }
     }
 }

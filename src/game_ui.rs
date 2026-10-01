@@ -1840,6 +1840,24 @@ impl UserInterface {
                 self.game_grid
                     .animate_character_lost_ap(character, 0.6, amount);
             }
+            GameEvent::CharacterGainedHealth { character, amount } => {
+                let char = self.characters.get(character);
+                self.log.add(format!(
+                    "|{}| gained |<value>{}| health |<faded>(on-kill effect)|",
+                    char.name_tag(),
+                    amount
+                ));
+
+                self.game_grid.animate_magic_sparks(character, WHITE);
+                self.game_grid.add_text_effect(
+                    char.pos(),
+                    0.0,
+                    1.5,
+                    None,
+                    format!("{}", amount),
+                    TextEffectStyle::FriendlyHeal,
+                );
+            }
             GameEvent::MovementWasInitiated {
                 character,
                 positions,

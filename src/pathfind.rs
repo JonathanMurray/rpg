@@ -519,16 +519,20 @@ impl PathfindGrid {
                             - proximity_squared.sqrt()
                             > range
                         {
+                            /*
                             println!(
                                 "Shouldn't explore neighbor {:?} (from {:?})",
                                 neighbor_pos, chart_node.position
                             );
+                             */
                             should_explore_neighbor = false;
                         } else {
+                            /*
                             println!(
                                 "Should explore neighbor {:?} (from {:?})",
                                 neighbor_pos, chart_node.position
                             );
+                             */
                         }
                     } else {
                         // Visiting this neighbor would exceed the allowed exploration range

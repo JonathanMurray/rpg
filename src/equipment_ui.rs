@@ -4,7 +4,7 @@ use std::{
 };
 
 use macroquad::{
-    color::{Color, BLACK, RED, SKYBLUE, YELLOW},
+    color::{Color, BLACK, MAGENTA, RED, SKYBLUE, YELLOW},
     input::{is_mouse_button_down, is_mouse_button_pressed, is_mouse_button_released, MouseButton},
     math::Rect,
     shapes::draw_rectangle,
@@ -85,6 +85,12 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
         t.technical_description.push(format!(
             "Deal |<value>{}| damage back to melee attackers",
             equip.thorns
+        ));
+    }
+    if equip.heal_on_kill > 0 {
+        t.technical_description.push(format!(
+            "|<faded>On kill:| |<heart>| |<value>{}| healing",
+            equip.heal_on_kill
         ));
     }
 }
@@ -452,14 +458,19 @@ impl EquipmentSection {
         let mouse_pos = (mouse_x, mouse_y);
 
         for idx in 0..self.equipment_slots.len() {
-            let slot = self.equipment_slots[idx].borrow_mut();
+            let slot = self.equipment_slots[idx].borrow();
             let rect = slot.screen_area();
             let is_hovered = rect.contains(mouse_pos.into());
 
-            let drag_validity = match drag {
-                Some(EquipmentDrag { from_idx, .. }) if from_idx != idx => {
-                    let dragged_slot = &mut self.equipment_slots[from_idx].borrow_mut();
+            let dragged_slot = drag.map(|equipment_drag| {
+                (
+                    equipment_drag.from_idx,
+                    self.equipment_slots[equipment_drag.from_idx].borrow(),
+                )
+            });
 
+            let drag_validity = match &dragged_slot {
+                Some((from_idx, dragged_slot)) if *from_idx != idx => {
                     if !is_allowed_to_change_equipment
                         && [dragged_slot, &slot]
                             .iter()
@@ -520,7 +531,7 @@ impl EquipmentSection {
                     requested_consumption = None;
                     if let Some(EquipmentDrag { from_idx, to_idx }) = &mut drag {
                         if to_idx.is_none() && *from_idx != idx {
-                            let dragged_slot = &mut self.equipment_slots[*from_idx].borrow_mut();
+                            let dragged_slot = &self.equipment_slots[*from_idx].borrow();
 
                             if drag_validity.unwrap() {
                                 let slots = [dragged_slot, &slot];
@@ -573,6 +584,12 @@ impl EquipmentSection {
                 } else if slot.content.is_some() {
                     draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
                 }
+            } else if let Some((_idx, dragged_slot)) = dragged_slot {
+                if let Some(content) = &dragged_slot.content {
+                    if content.equipment.slot_role() == Some(slot.role) {
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
+                    }
+                }
             }
         }
 
@@ -593,7 +610,6 @@ impl EquipmentSection {
                         // TODO: this can crash if trying to drag equipment on a character who's not active (which should not be allowed in the first place)
                         let texture = &slot.content.as_ref().unwrap().icon;
                         draw_eq_icon(*texture, mouse_pos.0, mouse_pos.1, Some((40.0, 40.0)));
-                        //draw_texture_ex(texture, mouse_pos.0, mouse_pos.1, WHITE, params);
                     } else {
                         println!("NOT DRAGGING ANYMORE");
                         drag = None;

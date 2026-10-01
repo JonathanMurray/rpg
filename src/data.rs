@@ -637,6 +637,16 @@ pub const ARCANE_RING: Trinket = Trinket {
     icon: EquipmentIconId::ArcaneRing,
 };
 
+pub const NECROTIC_BAND: Trinket = Trinket {
+    name: "Necrotic band",
+    sprite: None,
+    equip: EquipEffect {
+        heal_on_kill: 1,
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::NecroticBand,
+};
+
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Bad small shield",
     sprite: Some(SpriteId::Shield),
