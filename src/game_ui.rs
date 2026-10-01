@@ -3142,7 +3142,7 @@ fn build_character_ui(
         (20.0, 20.0),
         0.25,
         Style {
-            border_color: Some(WHITE),
+            border_color: Some(GRAY),
             ..Default::default()
         },
     );

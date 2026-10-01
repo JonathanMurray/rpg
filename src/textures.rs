@@ -307,6 +307,9 @@ pub enum EquipmentIconId {
     PlaceholderMainhand,
     PlaceholderArmor,
     PlaceholderArrows,
+    PlaceholderTrinket,
+
+    ArcaneRing,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -945,21 +948,23 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::LeatherArmor => (2, 2),
         EquipmentIconId::ChainMail => (1, 2),
         EquipmentIconId::Shirt => (3, 2),
-        EquipmentIconId::Robe => (3, 3),
-        EquipmentIconId::DruidCoat => (5, 3),
+        EquipmentIconId::Robe => (4, 2),
+        EquipmentIconId::DruidCoat => (6, 2),
         EquipmentIconId::PenetratingArrow => (0, 0),
         EquipmentIconId::BarbedArrow => (1, 0),
         EquipmentIconId::ColdArrow => (3, 0),
         EquipmentIconId::ExplodingArrow => (2, 0),
-        EquipmentIconId::HealthPotion => (4, 3),
+        EquipmentIconId::HealthPotion => (5, 4),
         EquipmentIconId::ManaPotion => (0, 4),
         EquipmentIconId::AdrenalinPotion => (1, 4),
         EquipmentIconId::EnergyPotion => (2, 4),
         EquipmentIconId::ArcanePotion => (3, 4),
-        EquipmentIconId::PlaceholderOffhand => (4, 2),
+        EquipmentIconId::PlaceholderArrows => (0, 3),
         EquipmentIconId::PlaceholderMainhand => (1, 3),
         EquipmentIconId::PlaceholderArmor => (2, 3),
-        EquipmentIconId::PlaceholderArrows => (0, 3),
+        EquipmentIconId::PlaceholderOffhand => (3, 3),
+        EquipmentIconId::PlaceholderTrinket => (4, 3),
+        EquipmentIconId::ArcaneRing => (0, 5),
     };
     let icon_w = 20.0;
     let icon_h = 20.0;

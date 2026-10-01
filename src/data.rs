@@ -10,8 +10,8 @@ use crate::{
         Condition, Consumable, DamageType, DefenseType, EnvironmentEffect, EquipEffect,
         EquipmentRequirement, Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect,
         OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, SpellEnhancementEffect, SpellNegativeEffect, Weapon, WeaponGrip, WeaponRange,
-        WeaponType,
+        Shield, SpellEnhancementEffect, SpellNegativeEffect, Trinket, Weapon, WeaponGrip,
+        WeaponRange, WeaponType,
     },
     grid::ParticleShape,
     pathfind::Liquid,
@@ -625,6 +625,16 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
             on_hit: Some([Some(ApplyEffect::Pushed(2)), None]),
         })),
     }),
+};
+
+pub const ARCANE_RING: Trinket = Trinket {
+    name: "Arcane ring",
+    sprite: None,
+    equip: EquipEffect {
+        bonus_spell_modifier: 2,
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::ArcaneRing,
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {

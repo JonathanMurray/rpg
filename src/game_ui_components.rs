@@ -1359,7 +1359,7 @@ impl Drawable for ResourceBar {
             }
         };
 
-        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, WHITE);
+        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, LIGHTGRAY);
 
         if self.gain_animation.is_some() {
             draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);

@@ -25,8 +25,9 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Consumable,
-        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Weapon, WeaponGrip, WeaponRange,
+        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Consumable, EquipEffect,
+        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket, Weapon, WeaponGrip,
+        WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     game_ui::draw_rectangle_lines2,
@@ -45,6 +46,7 @@ pub fn equipment_tooltip(entry: &EquipmentEntry) -> Tooltip {
         EquipmentEntry::Armor(armor) => armor_tooltip(armor),
         EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
         EquipmentEntry::Arrows(stack) => arrow_tooltip(stack),
+        EquipmentEntry::Trinket(trinket) => trinket_tooltip(trinket),
     }
 }
 
@@ -64,6 +66,27 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
         describe_area_effect(None, area_effect, &mut t);
     }
     t
+}
+
+fn trinket_tooltip(trinket: &Trinket) -> Tooltip {
+    let mut t = Tooltip::new(trinket.name);
+    describe_equip_effect(trinket.equip, &mut t);
+    t
+}
+
+fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
+    if equip.bonus_spell_modifier > 0 {
+        t.technical_description.push(format!(
+            "|<value>+{}| |<blue_dice>| |<stat>Spell| modifier",
+            equip.bonus_spell_modifier
+        ));
+    }
+    if equip.thorns > 0 {
+        t.technical_description.push(format!(
+            "Deal |<value>{}| damage back to melee attackers",
+            equip.thorns
+        ));
+    }
 }
 
 fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
@@ -185,16 +208,7 @@ fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
         t.technical_description
             .push(format!("Max {} evasion from agi", limit));
     }
-    if armor.equip.bonus_spell_modifier > 0 {
-        t.technical_description
-            .push(format!("+{} spell mod", armor.equip.bonus_spell_modifier));
-    }
-    if armor.equip.thorns > 0 {
-        t.technical_description.push(format!(
-            "Deal |<value>{}| damage back to melee attackers",
-            armor.equip.thorns
-        ));
-    }
+    describe_equip_effect(armor.equip, &mut t);
     t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(armor.weight));
     t
@@ -351,6 +365,7 @@ impl EquipmentSection {
             EquipmentSlotRole::Armor,
             EquipmentSlotRole::OffHand,
             EquipmentSlotRole::Arrows,
+            EquipmentSlotRole::Trinket,
         ];
         for (i, role) in roles.iter().enumerate() {
             self.equipment_slots[INVENTORY_SIZE + i]
@@ -686,7 +701,6 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::MainHand,
             Some((
-                //equipment_icons[&EquipmentIconId::PlaceholderMainhand].clone(),
                 EquipmentIconId::PlaceholderMainhand,
                 vec!["(Main-hand)".to_string(), placeholder_text.to_string()],
             )),
@@ -696,7 +710,6 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::Armor,
             Some((
-                //equipment_icons[&EquipmentIconId::PlaceholderArmor].clone(),
                 EquipmentIconId::PlaceholderArmor,
                 vec!["(Armor)".to_string(), placeholder_text.to_string()],
             )),
@@ -706,7 +719,6 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::OffHand,
             Some((
-                //equipment_icons[&EquipmentIconId::PlaceholderOffhand].clone(),
                 EquipmentIconId::PlaceholderOffhand,
                 vec!["(Off-hand)".to_string(), placeholder_text.to_string()],
             )),
@@ -716,9 +728,17 @@ pub fn build_equipped_section(
             None,
             EquipmentSlotRole::Arrows,
             Some((
-                //equipment_icons[&EquipmentIconId::PlaceholderArrows].clone(),
                 EquipmentIconId::PlaceholderArrows,
                 vec!["(Arrows)".to_string(), placeholder_text.to_string()],
+            )),
+        ),
+        EquipmentSlot::new(
+            font.clone(),
+            None,
+            EquipmentSlotRole::Trinket,
+            Some((
+                EquipmentIconId::PlaceholderTrinket,
+                vec!["(Trinket)".to_string(), placeholder_text.to_string()],
             )),
         ),
     ]
