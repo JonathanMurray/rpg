@@ -323,7 +323,7 @@ impl EquipmentSection {
             ..Default::default()
         });
 
-        Self {
+        let mut this = Self {
             element,
             equipment_slots,
             equipment_stats_table,
@@ -331,7 +331,9 @@ impl EquipmentSection {
             character: Rc::clone(character),
             include_stash,
             sound_player,
-        }
+        };
+        this.repopulate_character_equipment();
+        this
     }
 
     pub fn repopulate_character_equipment(&mut self) {
@@ -357,6 +359,22 @@ impl EquipmentSection {
                 .character
                 .equipment(*role)
                 .map(EquipmentSlotContent::new);
+        }
+
+        const SLOT_MAIN_HAND: usize = 0;
+        const SLOT_OFF_HAND: usize = 2;
+
+        if let Some(content) = &self.equipment_slots[INVENTORY_SIZE + SLOT_MAIN_HAND]
+            .borrow()
+            .content
+        {
+            if let EquipmentEntry::Weapon(w) = content.equipment {
+                if w.grip == WeaponGrip::TwoHanded {
+                    self.equipment_slots[INVENTORY_SIZE + SLOT_OFF_HAND]
+                        .borrow_mut()
+                        .content = Some(EquipmentSlotContent::offhand_shadow(content.equipment));
+                }
+            }
         }
 
         if self.include_stash {
@@ -438,8 +456,10 @@ impl EquipmentSection {
                             .content
                             .as_ref()
                             .map(|content| {
-                                self.character
-                                    .can_equipment_fit(content.equipment, slot.role())
+                                !content.is_off_hand_shadow
+                                    && self
+                                        .character
+                                        .can_equipment_fit(content.equipment, slot.role())
                             })
                             .unwrap_or(true);
 
@@ -447,8 +467,10 @@ impl EquipmentSection {
                             .content
                             .as_ref()
                             .map(|content| {
-                                self.character
-                                    .can_equipment_fit(content.equipment, dragged_slot.role())
+                                !content.is_off_hand_shadow
+                                    && self
+                                        .character
+                                        .can_equipment_fit(content.equipment, dragged_slot.role())
                             })
                             .unwrap_or(true);
 
@@ -470,12 +492,14 @@ impl EquipmentSection {
                     }
                 } else if is_mouse_button_pressed(MouseButton::Left) {
                     requested_consumption = None;
-                    if slot.content.is_some() {
-                        self.sound_player.play(SoundId::DragEquipment);
-                        drag = Some(EquipmentDrag {
-                            from_idx: idx,
-                            to_idx: None,
-                        });
+                    if let Some(content) = &slot.content {
+                        if !content.is_off_hand_shadow {
+                            self.sound_player.play(SoundId::DragEquipment);
+                            drag = Some(EquipmentDrag {
+                                from_idx: idx,
+                                to_idx: None,
+                            });
+                        }
                     }
                 } else if is_mouse_button_released(MouseButton::Left) {
                     requested_consumption = None;
@@ -502,6 +526,7 @@ impl EquipmentSection {
 
                                         self.character.set_equipment(entry_a, role_b);
                                     }
+
                                     self.sound_player.play(SoundId::DropEquipment);
                                     drag = None;
                                 }
@@ -701,29 +726,6 @@ pub fn build_equipped_section(
     .map(|slot| Rc::new(RefCell::new(slot)))
     .collect();
 
-    for hand in [HandType::MainHand, HandType::OffHand] {
-        if let Some(weapon) = character.weapon(hand) {
-            //let texture = equipment_icons[&weapon.icon].clone();
-            slots[0].borrow_mut().content =
-                Some(EquipmentSlotContent::new(EquipmentEntry::Weapon(weapon)));
-        }
-    }
-    if let Some(shield) = character.shield() {
-        //let texture = equipment_icons[&shield.icon].clone();
-        slots[2].borrow_mut().content =
-            Some(EquipmentSlotContent::new(EquipmentEntry::Shield(shield)));
-    }
-    if let Some(armor) = character.armor_piece.get() {
-        //let texture = equipment_icons[&armor.icon].clone();
-        slots[1].borrow_mut().content =
-            Some(EquipmentSlotContent::new(EquipmentEntry::Armor(armor)));
-    }
-    if let Some(stack) = character.arrows.get() {
-        //let texture = equipment_icons[&stack.arrow.icon].clone();
-        slots[3].borrow_mut().content =
-            Some(EquipmentSlotContent::new(EquipmentEntry::Arrows(stack)));
-    }
-
     let cloned_slots: Vec<Rc<RefCell<EquipmentSlot>>> = slots.iter().map(Rc::clone).collect();
 
     let mut rows = vec![];
@@ -882,6 +884,7 @@ pub struct EquipmentSlotContent {
     pub equipment: EquipmentEntry,
     pub icon: EquipmentIconId,
     tooltip: Tooltip,
+    is_off_hand_shadow: bool,
 }
 
 impl EquipmentSlotContent {
@@ -890,6 +893,16 @@ impl EquipmentSlotContent {
             icon: equipment.icon(),
             tooltip: equipment_tooltip(&equipment),
             equipment,
+            is_off_hand_shadow: false,
+        }
+    }
+
+    pub fn offhand_shadow(equipment: EquipmentEntry) -> Self {
+        Self {
+            icon: equipment.icon(),
+            tooltip: equipment_tooltip(&equipment),
+            equipment,
+            is_off_hand_shadow: true,
         }
     }
 }
@@ -940,6 +953,16 @@ impl Drawable for EquipmentSlot {
         if let Some(content) = &self.content {
             draw_eq_icon(content.icon, x, y, Some(self.size));
             //draw_texture_ex(&content.icon, x, y, WHITE, params);
+
+            if content.is_off_hand_shadow {
+                draw_rectangle(
+                    x,
+                    y,
+                    self.size.0,
+                    self.size.1,
+                    Color::new(0.3, 0.3, 0.3, 0.7),
+                );
+            }
 
             let quantity = match content.equipment {
                 EquipmentEntry::Arrows(arrow_stack) => Some(arrow_stack.quantity),
@@ -993,9 +1016,9 @@ impl Drawable for EquipmentSlot {
         let (mouse_x, mouse_y) = mouse_position();
         let hover =
             (x..x + self.size.0).contains(&mouse_x) && (y..y + self.size.1).contains(&mouse_y);
-        let rect = Rect::new(x, y, self.size.0, self.size.1);
-        if let Some(content) = &self.content {
-            if hover {
+        if hover {
+            let rect = Rect::new(x, y, self.size.0, self.size.1);
+            if let Some(content) = &self.content {
                 draw_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),
@@ -1005,9 +1028,7 @@ impl Drawable for EquipmentSlot {
                     &content.tooltip.keywords,
                     None,
                 );
-            }
-        } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
-            if hover {
+            } else if let Some((_texture, tooltip_lines)) = &self.placeholder {
                 draw_regular_tooltip(
                     &self.font,
                     TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),

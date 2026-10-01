@@ -267,7 +267,8 @@ pub const HUNGERING_BLADE: Weapon = Weapon {
     attack_attribute: AttackAttribute::Finesse,
     attack_enhancement: Some(AttackEnhancement {
         name: "Unleash souls",
-        description: "",
+        description:
+            "Spend your |<keyword>Captured souls| for |<value>2| additional damage per stack",
         icon: IconId::Banshee,
         action_point_cost: 0,
         mana_cost: 0,

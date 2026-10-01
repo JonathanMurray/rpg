@@ -8,7 +8,8 @@ use crate::{
     bot::BotBehaviour,
     core::{
         ArrowStack, Attributes, Bot, Character, CharacterId, CharacterKind, Condition,
-        EquipmentEntry, HandType, Party, PlayerId, Position, Shield, Weapon,
+        EquipmentEntry, EquipmentSlotRole::MainHand, HandType, Party, PlayerId, Position, Shield,
+        Weapon,
     },
     data::{
         ARCANE_BOW, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER,
@@ -505,12 +506,14 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
         (1, 10),
     );
     alice.set_weapon(HandType::MainHand, BOW);
+    alice.try_gain_equipment(EquipmentEntry::Weapon(DAGGER));
 
     // TODO
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack {
         arrow: COLD_ARROWS,
         quantity: 2,
     }));
+
     //alice.set_weapon(HandType::MainHand, ARCANE_BOW);
     // TODO:
     //alice.set_weapon(HandType::MainHand, ZERO_BOW);
@@ -550,6 +553,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability(&DASH);
     bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
+    bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
 
     bob.learn_ability(&KILL);
 
