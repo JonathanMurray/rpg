@@ -101,7 +101,7 @@ pub const STABBING: AttackEnhancement = AttackEnhancement {
 };
 
 pub const BAD_DAGGER: Weapon = Weapon {
-    name: "Bad dagger",
+    name: "Dagger",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 3,
@@ -174,7 +174,7 @@ pub const ENEMY_SLASHING: AttackEnhancement = AttackEnhancement {
 };
 
 pub const BAD_SWORD: Weapon = Weapon {
-    name: "Bad Sword",
+    name: "Sword",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 4,
@@ -345,7 +345,7 @@ const FEINT: AttackEnhancement = AttackEnhancement {
 };
 
 pub const BAD_RAPIER: Weapon = Weapon {
-    name: "Bad rapier",
+    name: "Rapier",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 5,
@@ -415,7 +415,7 @@ const ALL_IN: AttackEnhancement = AttackEnhancement {
 };
 
 pub const BAD_WAR_HAMMER: Weapon = Weapon {
-    name: "Bad war hammer",
+    name: "War hammer",
     range: WeaponRange::Melee,
     action_point_cost: 3,
     damage: 6,
@@ -491,7 +491,7 @@ pub const STAFF: Weapon = Weapon {
 };
 
 pub const BAD_BOW: Weapon = Weapon {
-    name: "Bad bow",
+    name: "Bow",
     range: WeaponRange::Ranged(15.5),
     action_point_cost: 3,
     damage: 4,
@@ -683,7 +683,7 @@ pub const BATTLEMAGE_SIGIL: Trinket = Trinket {
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {
-    name: "Bad small shield",
+    name: "Small shield",
     sprite: Some(SpriteId::Shield),
     icon: EquipmentIconId::SmallShield,
     evasion: 2,

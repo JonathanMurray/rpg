@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
+use std::ffi::IntoStringError;
 use std::fmt::Display;
 use std::rc::{Rc, Weak};
 use std::time::SystemTime;
@@ -1260,7 +1261,6 @@ impl CoreGame {
         let actor_id = actor.id();
 
         let real_game: Option<&CoreGame> = mode.real_game();
-        let simulated_roll = mode.simulated_roll();
 
         if let Some(game) = real_game {
             let mut ap_cost = ability.action_point_cost;
@@ -1291,95 +1291,26 @@ impl CoreGame {
         for i in 0..cast_n_times {
             let mut detail_lines = vec![];
 
-            let mut advantage = 0_i32;
-
-            // TODO: It's a weird mixture now where certain target types use a shared roll here but area effects
-            // roll later (using roll instruction) and simply ignore the roll that was performed here. Let's instead
-            // always just create the instruction here and defer the actual roll to later parts of the code.
             let mut roll_instruction = None;
-            let mut maybe_ability_roll = None;
 
             if let Some(roll_type) = ability.roll {
-                let (total_bonus, detail_bonuses) =
-                    actor.outgoing_ability_roll_bonus(enhancements, roll_type);
+                let outgoing_bonuses = actor.outgoing_ability_roll_bonuses(enhancements, roll_type);
 
-                advantage += total_bonus.advantage;
-
-                let unmodified_roll = simulated_roll.unwrap_or(roll_d20_with_advantage(advantage));
-
-                if let Some(description) = roll_description(advantage) {
-                    detail_lines.push(description);
-                }
-
-                let mut dice_roll_line = format!("Rolled: {}", unmodified_roll);
-                let mut roll_calculation = unmodified_roll as i32;
                 match roll_type {
                     AbilityRollType::Spell => {
-                        let mut spell_roll_bonus = 0;
-                        let modifier = actor.spell_modifier() as i32;
-                        spell_roll_bonus += modifier;
-
-                        for (name, bonus) in detail_bonuses {
-                            if let RollBonusContributor::FlatAmount(n) = bonus {
-                                spell_roll_bonus += n as i32;
-                                dice_roll_line.push_str(&format!(
-                                    " {} |<faded>({})|",
-                                    plus_minus(n),
-                                    name,
-                                ));
-                            }
-                        }
-
-                        let ability_result = unmodified_roll as i32 + spell_roll_bonus;
-
                         roll_instruction = Some(RollInstruction::RollWithSpellModifier {
-                            advantage,
-                            bonus: spell_roll_bonus,
-                        });
-
-                        maybe_ability_roll = Some(AbilityRoll::RolledWithSpellModifier {
-                            unmodified_roll,
-                            result: ability_result,
-                            line: describe_spell_roll(unmodified_roll, modifier),
+                            spell_modifier: actor.spell_modifier(),
+                            outgoing_bonuses,
                         });
                     }
                     AbilityRollType::RollAbilityWithAttackModifier => {
-                        let modifier = actor.attack_modifier(HandType::MainHand) as i32;
-                        let mut attack_roll_bonus = modifier;
-                        dice_roll_line
-                            .push_str(&format!(" +{} (|<red_dice>| |<stat>Attack|)", modifier));
-
-                        for enhancement in enhancements {
-                            if let Some(e) = enhancement.spell_effect {
-                                let bonus = e.roll_bonus;
-                                if bonus > 0 {
-                                    attack_roll_bonus += bonus as i32;
-
-                                    dice_roll_line.push_str(&format!(
-                                        " +{} |<faded>({})|",
-                                        bonus, enhancement.name,
-                                    ));
-                                }
-                            }
-                        }
-                        roll_calculation += attack_roll_bonus as i32;
-                        let ability_result = roll_calculation;
-                        dice_roll_line.push_str(&format!(" = |<value>{}|", ability_result));
-
                         roll_instruction = Some(RollInstruction::RollWithAttackModifier {
-                            advantage,
-                            bonus: attack_roll_bonus,
-                        });
-
-                        maybe_ability_roll = Some(AbilityRoll::RolledWithAttackModifier {
-                            unmodified_roll,
-                            result: ability_result,
-                            line: dice_roll_line,
+                            attack_modifier: actor.attack_modifier(HandType::MainHand),
+                            outgoing_bonuses,
                         });
                     }
-                    AbilityRollType::RollDuringAttack(bonus) => {
-                        maybe_ability_roll = Some(AbilityRoll::WillRollDuringAttack { bonus });
-                        roll_instruction = Some(RollInstruction::RollDuringAttack { bonus });
+                    AbilityRollType::RollDuringAttack(advantage) => {
+                        roll_instruction = Some(RollInstruction::RollDuringAttack { advantage });
                     }
                 };
             }
@@ -1398,6 +1329,8 @@ impl CoreGame {
                         unreachable!()
                     };
 
+                    let target = mode.characters().get_rc(*target_id);
+
                     if let Some(game) = real_game {
                         if let Some(positions) = movement {
                             if let Err(e) = game
@@ -1411,11 +1344,7 @@ impl CoreGame {
                                 dbg!(e);
                             }
                         }
-                    }
 
-                    let target = mode.characters().get_rc(*target_id);
-
-                    if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
                         assert!(!game
                             .pathfind_grid
@@ -1428,47 +1357,8 @@ impl CoreGame {
                             area_at: None,
                         })
                         .await;
-                    }
 
-                    let mut ability_roll = maybe_ability_roll.unwrap();
-
-                    let rolled = match &mut ability_roll {
-                        AbilityRoll::RolledWithSpellModifier {
-                            unmodified_roll,
-                            result,
-                            line,
-                        } => Some((result, line)),
-                        AbilityRoll::RolledWithAttackModifier {
-                            unmodified_roll,
-                            result,
-                            line,
-                        } => Some((result, line)),
-                        AbilityRoll::WillRollDuringAttack { .. } => None,
-                    };
-
-                    if let Some((result, line)) = rolled {
-                        detail_lines.push(line.clone());
-
-                        let spell_enemy_effect = effect.unwrap_spell();
-                        if let Some(contest) = spell_enemy_effect.defense_type {
-                            let (def_str, def_value) = match contest {
-                                DefenseType::Will => ("Will", target.will()),
-                                DefenseType::Evasion => ("Evasion", target.evasion()),
-                                DefenseType::Toughness => ("Toughness", target.toughness()),
-                            };
-                            let def_line = format!(
-                                "{} - {} (|<shield>|<stat>{}|) = |<value>{}|",
-                                result,
-                                def_value,
-                                def_str,
-                                *result - def_value as i32
-                            );
-                            detail_lines.push(def_line);
-                        }
-                    }
-
-                    if let Some(env_effect) = environment_effect {
-                        if let Some(game) = real_game {
+                        if let Some(env_effect) = environment_effect {
                             game.perform_environment_effect(
                                 env_effect,
                                 target.pos(),
@@ -1483,7 +1373,7 @@ impl CoreGame {
                     let outcome = Self::perform_ability_enemy_effect(
                         actor,
                         ability.name,
-                        &ability_roll,
+                        roll_instruction.as_ref().unwrap(),
                         enhancements,
                         effect,
                         target,
@@ -1501,7 +1391,7 @@ impl CoreGame {
                         let area_target_outcomes = Self::perform_ability_area_enemy_effect(
                             AreaShape::Circle(radius),
                             "AoE",
-                            roll_instruction.unwrap(),
+                            &roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             target.position.get(),
@@ -1524,21 +1414,9 @@ impl CoreGame {
                 }
 
                 AbilityTarget::Ally { range: _, effect } => {
-                    let ActionTarget::Character(target_id, _movement) = &selected_target else {
-                        unreachable!()
-                    };
+                    let target_id = selected_target.character_target_id().unwrap();
+                    let target = mode.characters().get(target_id);
 
-                    let target = mode.characters().get(*target_id);
-
-                    let ability_roll = maybe_ability_roll.unwrap();
-                    let (unmodified_roll, modified_roll, dice_roll_line) =
-                        ability_roll.unwrap_actual_roll();
-                    detail_lines.push(dice_roll_line.to_string());
-
-                    let degree_of_success = modified_roll / 10;
-                    if degree_of_success > 0 {
-                        detail_lines.push(format!("Fortune: {}", degree_of_success));
-                    }
                     if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target.pos()));
                         assert!(!game
@@ -1548,7 +1426,7 @@ impl CoreGame {
                         game.ui_handle_event(GameEvent::AbilityWasInitiated {
                             actor: actor_id,
                             ability: ability.clone(),
-                            target: Some(*target_id),
+                            target: Some(target_id),
                             area_at: None,
                         })
                         .await;
@@ -1560,11 +1438,11 @@ impl CoreGame {
                         effect,
                         target,
                         &mut detail_lines,
-                        degree_of_success as u32,
+                        roll_instruction.as_ref(),
                         mode,
                     );
 
-                    target_outcome = Some((*target_id, outcome));
+                    target_outcome = Some((target_id, outcome));
                 }
 
                 AbilityTarget::Area {
@@ -1575,9 +1453,6 @@ impl CoreGame {
 
                     if let Some(game) = real_game {
                         assert!(actor.reaches_with_ability(ability, enhancements, target_pos));
-                        // TODO:
-                        // assertion failed: !game.pathfind_grid.obstructed_line_of_sight(caster.pos(), target_pos)
-
                         if !matches!(area_effect.shape, AreaShape::Line) {
                             // Line can be aimed through obstruction, since it always extends to max range
                             assert!(
@@ -1604,7 +1479,7 @@ impl CoreGame {
 
                     let outcomes = Self::perform_ability_area_effect(
                         ability.name,
-                        roll_instruction.unwrap(),
+                        roll_instruction.as_ref().unwrap(),
                         enhancements,
                         actor,
                         target_pos,
@@ -1652,35 +1527,14 @@ impl CoreGame {
                         .await;
                     }
 
-                    if let Some(AbilityRoll::RolledWithSpellModifier {
-                        unmodified_roll,
-                        result: _,
-                        line,
-                    }) = &maybe_ability_roll
-                    {
-                        detail_lines.push(line.clone());
-                    }
-
                     if let Some(effect) = self_effect {
-                        let degree_of_success = if let Some(ability_roll) = &maybe_ability_roll {
-                            let (_unmodified_roll, modified_roll, _dice_roll_line) =
-                                ability_roll.unwrap_actual_roll();
-                            modified_roll / 10
-                        } else {
-                            0
-                        };
-
-                        if degree_of_success > 0 {
-                            detail_lines.push(format!("Fortune: {}", degree_of_success));
-                        }
-
                         let outcome = Self::perform_ability_ally_effect(
                             ability.name,
                             enhancements,
                             effect,
                             actor,
                             &mut detail_lines,
-                            degree_of_success as u32,
+                            roll_instruction.as_ref(),
                             mode,
                         );
                         target_outcome = Some((actor_id, outcome));
@@ -1689,7 +1543,7 @@ impl CoreGame {
                     if let Some(area_effect) = self_area {
                         let outcomes = Self::perform_ability_area_effect(
                             ability.name,
-                            roll_instruction.unwrap(),
+                            roll_instruction.as_ref().unwrap(),
                             enhancements,
                             actor,
                             actor.position.get(),
@@ -1749,16 +1603,21 @@ impl CoreGame {
                 game.ui_handle_event(GameEvent::AbilityResolved(resolve_event))
                     .await;
 
-                if actor
-                    .conditions
-                    .borrow_mut()
-                    .remove(&Condition::ArcaneBlessing)
-                {
-                    game.ui_handle_event(GameEvent::CharacterLostCondition {
-                        character: actor_id,
-                        condition: Condition::ArcaneBlessing,
-                    })
-                    .await;
+                if matches!(
+                    roll_instruction,
+                    Some(RollInstruction::RollWithSpellModifier { .. })
+                ) {
+                    if actor
+                        .conditions
+                        .borrow_mut()
+                        .remove(&Condition::ArcaneBlessing)
+                    {
+                        game.ui_handle_event(GameEvent::CharacterLostCondition {
+                            character: actor_id,
+                            condition: Condition::ArcaneBlessing,
+                        })
+                        .await;
+                    }
                 }
             }
         }
@@ -1799,7 +1658,7 @@ impl CoreGame {
 
     fn perform_ability_area_effect(
         name: &'static str,
-        roll_instruction: RollInstruction,
+        roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
         caster: &Rc<Character>,
         area_center: Position,
@@ -1846,7 +1705,7 @@ impl CoreGame {
         caster: &Character,
         area_pos: Position,
         detail_lines: &mut Vec<String>,
-        roll_instruction: RollInstruction,
+        roll_instruction: &RollInstruction,
         effect: AbilityPositiveEffect,
         mode: ActionPerformanceMode,
     ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
@@ -1862,35 +1721,24 @@ impl CoreGame {
             }
         }
 
-        for other_char in mode.characters().iter() {
-            if other_char.player_controlled() != caster.player_controlled() {
-                continue;
-            }
+        let targets =
+            Self::acquire_targets(mode, caster, area_pos, shape, AreaTargetAcquisition::Allies);
 
-            let ability_roll = roll_instruction.perform(mode);
+        for target_id in targets {
+            let other_char = mode.characters().get(target_id);
+            detail_lines.push(format!("|{}|", other_char.name_tag()));
 
-            let modified_roll = ability_roll.unwrap_actual_roll().1;
+            let outcome = Self::perform_ability_ally_effect(
+                name,
+                enhancements,
+                effect,
+                other_char,
+                detail_lines,
+                Some(roll_instruction),
+                mode,
+            );
 
-            let degree_of_success = modified_roll / 10;
-            if degree_of_success > 0 {
-                detail_lines.push(format!("Fortune: {}", degree_of_success));
-            }
-
-            if is_target_within_shape(caster.pos(), area_pos, shape, other_char) {
-                detail_lines.push(format!("|{}|", other_char.name_tag()));
-
-                let outcome = Self::perform_ability_ally_effect(
-                    name,
-                    enhancements,
-                    effect,
-                    other_char,
-                    detail_lines,
-                    degree_of_success as u32,
-                    mode,
-                );
-
-                target_outcomes.push((other_char.id(), outcome));
-            }
+            target_outcomes.push((other_char.id(), outcome));
         }
 
         target_outcomes
@@ -1902,12 +1750,22 @@ impl CoreGame {
         ally_effect: AbilityPositiveEffect,
         target: &Character,
         detail_lines: &mut Vec<String>,
-        degree_of_success: u32,
+        roll_instruction: Option<&RollInstruction>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
         let mut applied_effects = vec![];
 
         let real_game = mode.real_game();
+
+        let mut degree_of_success: u32 = 0;
+        if let Some(roll_instruction) = roll_instruction {
+            let ability_roll = roll_instruction.perform(mode, None, detail_lines);
+
+            degree_of_success = (ability_roll.result / 10).max(0) as u32;
+            if degree_of_success > 0 {
+                detail_lines.push(format!("Fortune: {}", degree_of_success));
+            }
+        }
 
         if ally_effect.healing > 0 {
             let mut healing = ally_effect.healing;
@@ -1972,7 +1830,7 @@ impl CoreGame {
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
                     let (applied, log_line, _damage) =
                         game.perform_effect_application(*apply_effect, None, None, target);
-                    detail_lines.push(format!("{} ({})", log_line, enhancement.name));
+                    detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
                 }
             }
         }
@@ -1993,53 +1851,10 @@ impl CoreGame {
         }
     }
 
-    fn acquire_targets(
-        mode: ActionPerformanceMode<'_>,
-        actor: &Character,
-        area_pos: Position,
-        shape: AreaShape,
-        acquisition: AreaTargetAcquisition,
-    ) -> Vec<CharacterId> {
-        let grid = mode.pathfind_grid();
-        let characters = mode.characters();
-        let mut targets = vec![];
-        match shape {
-            AreaShape::Circle(radius) => {
-                for other_char in characters.iter() {
-                    if is_valid_area_target(actor, other_char, acquisition)
-                        && target_within_range_squared(
-                            (f32::from(radius)).powf(2.0),
-                            area_pos,
-                            other_char.pos(),
-                        )
-                    {
-                        targets.push(other_char.id());
-                    }
-                }
-            }
-            AreaShape::Line => {
-                // Order the targets from closest to actor to furthest away
-                line_visitor(actor.pos(), area_pos, |x, y| {
-                    if let Some(Occupation::Character(ch_id)) = grid.occupied().get(&(x, y)) {
-                        let other_char = characters.get(*ch_id);
-                        if targets.last() != Some(ch_id)
-                            && is_valid_area_target(actor, other_char, acquisition)
-                            && *ch_id != actor.id()
-                        {
-                            targets.push(*ch_id);
-                        }
-                    }
-                    false
-                });
-            }
-        }
-        targets
-    }
-
     fn perform_ability_area_enemy_effect(
         mut shape: AreaShape,
         name: &'static str,
-        roll_instruction: RollInstruction,
+        roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
         caster: &Rc<Character>,
         area_pos: Position,
@@ -2058,40 +1873,12 @@ impl CoreGame {
 
         for (i, target_id) in targets.iter().enumerate() {
             let target = mode.characters().get_rc(*target_id);
-            let ability_roll = roll_instruction.perform(mode);
-
-            let mut line = format!("|{}|", target.name_tag());
-            match effect {
-                AbilityNegativeEffect::Spell(spell_enemy_effect) => {
-                    if let Some(contest) = spell_enemy_effect.defense_type {
-                        detail_lines.push("".to_string());
-                        detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
-                        let modified_roll = ability_roll.unwrap_actual_roll().1;
-                        let (def_str, def_value) = match contest {
-                            DefenseType::Will => ("Will", target.will()),
-                            DefenseType::Evasion => ("Evasion", target.evasion()),
-                            DefenseType::Toughness => ("Toughness", target.toughness()),
-                        };
-                        line.push_str(&format!(
-                            ": {} - {} (|<shield>|<stat>{}) = |<value>{}|",
-                            modified_roll,
-                            def_value,
-                            def_str,
-                            modified_roll - def_value as i32
-                        ));
-                    }
-                }
-                AbilityNegativeEffect::PerformAttack { .. } => {
-                    // The relevant details will come from perform_attack, not from here.
-                }
-            }
-
-            detail_lines.push(line);
-
+            detail_lines.push("".to_string());
+            detail_lines.push(format!("|{}|:", target.name_tag()));
             let outcome = Self::perform_ability_enemy_effect(
                 caster,
                 name,
-                &ability_roll,
+                roll_instruction,
                 enhancements,
                 effect,
                 target,
@@ -2100,7 +1887,6 @@ impl CoreGame {
                 Some(area_pos),
                 mode,
             );
-
             target_outcomes.push((target.id(), outcome));
         }
 
@@ -2145,7 +1931,7 @@ impl CoreGame {
     fn perform_ability_enemy_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
-        ability_roll: &AbilityRoll,
+        roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
         enemy_effect: AbilityNegativeEffect,
         target: &Rc<Character>,
@@ -2158,7 +1944,7 @@ impl CoreGame {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => Self::perform_spell_enemy_effect(
                 caster,
                 ability_name,
-                ability_roll,
+                roll_instruction,
                 enhancements,
                 spell_enemy_effect,
                 target,
@@ -2172,8 +1958,10 @@ impl CoreGame {
                     .filter_map(|e| e.attack_enhancement_effect())
                     .collect();
 
-                let roll_modifier = ability_roll.unwrap_attack_advantage_bonus();
-                caster.set_facing_toward(target.pos());
+                let advantage = roll_instruction.unwrap_roll_during_attack_advantage();
+                //caster.set_facing_toward(target.pos());
+
+                // Ability attack
                 let event: AttackedEvent = Self::perform_attack(
                     caster,
                     HandType::MainHand,
@@ -2181,7 +1969,7 @@ impl CoreGame {
                     target,
                     num_prior_targets,
                     None,
-                    roll_modifier,
+                    advantage,
                     mode,
                     Some(ability_attack_effect),
                 );
@@ -2194,7 +1982,7 @@ impl CoreGame {
     fn perform_spell_enemy_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
-        ability_roll: &AbilityRoll,
+        roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
         spell_enemy_effect: SpellNegativeEffect,
         target: &Rc<Character>,
@@ -2202,20 +1990,21 @@ impl CoreGame {
         area_center: Option<Position>,
         mode: ActionPerformanceMode,
     ) -> AbilityTargetOutcome {
-        //println!("perform_spell_enemy_effect({}) ...", ability_name);
-        //dbg!(ability_roll);
         let real_game = mode.real_game();
 
-        let hit_type = match spell_enemy_effect.defense_type {
-            Some(contest) => {
-                let defense = match contest {
-                    DefenseType::Will => target.will(),
-                    DefenseType::Evasion => target.evasion(),
-                    DefenseType::Toughness => target.toughness(),
-                };
+        //let ability_roll = roll_instruction.perform(mode, );
 
-                let (unmodified_roll, modified_roll, _) = ability_roll.unwrap_actual_roll();
-                let final_result = modified_roll - defense as i32;
+        let hit_type = match spell_enemy_effect.defense_type {
+            Some(defense_type) => {
+                let ability_roll =
+                    roll_instruction.perform(mode, Some((target, defense_type)), detail_lines);
+
+                //detail_lines.push("".to_string());
+                //detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
+
+                let (unmodified_roll, final_result) =
+                    (ability_roll.unmodified_roll, ability_roll.result);
+                //let final_result = modified_roll - def_value as i32;
 
                 if unmodified_roll == 1 {
                     detail_lines.push("  Miss |<faded>(natural 1)|".to_string());
@@ -2319,7 +2108,10 @@ impl CoreGame {
                 }
                 dmg_calculation += multiplicative_bonus_dmg;
 
-                if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+                if matches!(
+                    roll_instruction,
+                    RollInstruction::RollWithAttackModifier { .. }
+                ) {
                     // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                     if target.conditions.borrow().has(&Condition::Protected) {
                         apply_protected_bonus_against_attack(&mut dmg_str, &mut dmg_calculation);
@@ -2390,7 +2182,10 @@ impl CoreGame {
                 }
             }
 
-            if matches!(ability_roll, AbilityRoll::RolledWithAttackModifier { .. }) {
+            if matches!(
+                roll_instruction,
+                RollInstruction::RollWithAttackModifier { .. }
+            ) {
                 // Abilities that roll attack modifier against a target work like attacks w.r.t. Protected
                 if target.lose_protected() {
                     detail_lines.push(format!("|{}| lost |<keyword>Protected|", target.name_tag()));
@@ -2414,6 +2209,49 @@ impl CoreGame {
             applied_effects,
             actual_health_lost,
         }
+    }
+
+    fn acquire_targets(
+        mode: ActionPerformanceMode<'_>,
+        actor: &Character,
+        area_pos: Position,
+        shape: AreaShape,
+        acquisition: AreaTargetAcquisition,
+    ) -> Vec<CharacterId> {
+        let grid = mode.pathfind_grid();
+        let characters = mode.characters();
+        let mut targets = vec![];
+        match shape {
+            AreaShape::Circle(radius) => {
+                for other_char in characters.iter() {
+                    if is_valid_area_target(actor, other_char, acquisition)
+                        && target_within_range_squared(
+                            (f32::from(radius)).powf(2.0),
+                            area_pos,
+                            other_char.pos(),
+                        )
+                    {
+                        targets.push(other_char.id());
+                    }
+                }
+            }
+            AreaShape::Line => {
+                // Order the targets from closest to actor to furthest away
+                line_visitor(actor.pos(), area_pos, |x, y| {
+                    if let Some(Occupation::Character(ch_id)) = grid.occupied().get(&(x, y)) {
+                        let other_char = characters.get(*ch_id);
+                        if targets.last() != Some(ch_id)
+                            && is_valid_area_target(actor, other_char, acquisition)
+                            && *ch_id != actor.id()
+                        {
+                            targets.push(*ch_id);
+                        }
+                    }
+                    false
+                });
+            }
+        }
+        targets
     }
 
     fn perform_engagement(&self, actor: &Rc<Character>, target: &Rc<Character>) {
@@ -2487,6 +2325,9 @@ impl CoreGame {
             ActionPerformanceMode::Real(core_game) => Some(core_game),
             ActionPerformanceMode::SimulatedRoll(..) => None,
         };
+
+        let outgoing_attack_bonuses =
+            attacker.outgoing_attack_bonuses(hand_type, enhancements, defender);
 
         let mut attack_bonus = attack_roll_bonus(
             attacker,
@@ -3062,11 +2903,12 @@ impl CoreGame {
             if let Some(area_effect) = arrow.area_effect {
                 detail_lines.push("".to_string());
                 detail_lines.push(format!("{}:", arrow.name));
+
                 let area_target_outcomes = Self::perform_ability_area_effect(
                     arrow.name,
-                    RollInstruction::RollWithSpellModifier {
-                        advantage: attack_bonus.advantage,
-                        bonus: attack_roll_bonus,
+                    &RollInstruction::RollWithAttackModifier {
+                        attack_modifier,
+                        outgoing_bonuses: outgoing_attack_bonuses,
                     },
                     &[],
                     attacker,
@@ -3422,12 +3264,12 @@ pub fn pushed_vector(source_pos: Position, receiver_pos: Position, amount: u32) 
 fn roll_description(advantage: i32) -> Option<String> {
     match advantage.cmp(&0) {
         Ordering::Less => Some(format!(
-            "|<faded>Rolled {} dice with disadvantage...|",
+            "|<faded>Rolling {} dice with disadvantage...|",
             advantage.abs() + 1
         )),
         Ordering::Equal => None,
         Ordering::Greater => Some(format!(
-            "|<faded>Rolled {} dice with advantage...|",
+            "|<faded>Rolling {} dice with advantage...|",
             advantage + 1
         )),
     }
@@ -3781,88 +3623,129 @@ pub fn predict_attack(
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 enum RollInstruction {
-    RollWithSpellModifier { advantage: i32, bonus: i32 },
-    RollWithAttackModifier { advantage: i32, bonus: i32 },
-    RollDuringAttack { bonus: i32 },
+    RollWithSpellModifier {
+        spell_modifier: u32,
+        outgoing_bonuses: Vec<(&'static str, RollBonusContributor)>,
+    },
+    RollWithAttackModifier {
+        attack_modifier: i32,
+        outgoing_bonuses: Vec<(&'static str, RollBonusContributor)>,
+    },
+    RollDuringAttack {
+        advantage: i32,
+    },
 }
 
 impl RollInstruction {
-    fn perform(&self, mode: ActionPerformanceMode<'_>) -> AbilityRoll {
+    fn perform(
+        &self,
+        mode: ActionPerformanceMode<'_>,
+        defender: Option<(&Character, DefenseType)>,
+        detail_lines: &mut Vec<String>,
+    ) -> AbilityRoll {
+        let (modifier, modifier_description, outgoing_bonuses) = match self {
+            RollInstruction::RollWithSpellModifier {
+                spell_modifier,
+                outgoing_bonuses,
+            } => (
+                *spell_modifier as i32,
+                "(|<blue_dice>|<stat>Spell|)",
+                outgoing_bonuses,
+            ),
+            RollInstruction::RollWithAttackModifier {
+                attack_modifier,
+                outgoing_bonuses,
+            } => (
+                *attack_modifier,
+                "(|<red_dice>|<stat>Attack|)",
+                outgoing_bonuses,
+            ),
+            RollInstruction::RollDuringAttack { .. } => panic!("Should roll during attack"),
+        };
+
+        let mut advantage = 0;
+        let mut flat_bonus: i32 = modifier as i32;
+
+        let mut calculation_line = format!("+{modifier} {modifier_description}");
+
+        for (label, bonus) in outgoing_bonuses {
+            advantage += bonus.advantage();
+            flat_bonus += bonus.flat_amount();
+            if bonus.flat_amount() != 0 {
+                calculation_line.push_str(&format!(
+                    " {} |<faded>({})|",
+                    plus_minus(bonus.flat_amount()),
+                    label
+                ));
+            }
+        }
+
+        if let Some((target, defense_type)) = defender {
+            for (label, bonus) in target.incoming_ability_bonuses() {
+                advantage += bonus.advantage();
+                flat_bonus += bonus.flat_amount();
+                if bonus.flat_amount() != 0 {
+                    calculation_line.push_str(&format!(
+                        " {} |<faded>({})|",
+                        plus_minus(bonus.flat_amount()),
+                        label
+                    ));
+                }
+            }
+
+            let (def_str, def_value) = match defense_type {
+                DefenseType::Will => ("Will", target.will()),
+                DefenseType::Evasion => ("Evasion", target.evasion()),
+                DefenseType::Toughness => ("Toughness", target.toughness()),
+            };
+
+            calculation_line.push_str(&format!(" -{def_value} (|<shield>|<stat>{def_str}|)"));
+
+            flat_bonus -= def_value as i32;
+        }
+
+        let unmodified_roll = mode
+            .simulated_roll()
+            .unwrap_or(roll_d20_with_advantage(advantage));
+        let result = unmodified_roll as i32 + flat_bonus;
+
+        let mut rolled_line = format!("Rolled: |<value>{}|", unmodified_roll);
+        if advantage > 0 {
+            rolled_line.push_str(&format!(
+                " |<faded>({} dice with advantage)|",
+                advantage + 1
+            ));
+        } else if advantage < 0 {
+            rolled_line.push_str(&format!(
+                " |<faded>({} dice with disadvantage)|",
+                advantage.abs() + 1
+            ));
+        }
+        detail_lines.push(rolled_line);
+        detail_lines.push(format!(
+            "{unmodified_roll} {calculation_line} = |<value>{result}|"
+        ));
+
+        AbilityRoll {
+            unmodified_roll,
+            result,
+        }
+    }
+
+    fn unwrap_roll_during_attack_advantage(&self) -> i32 {
         match self {
-            RollInstruction::RollWithSpellModifier { advantage, bonus } => {
-                let unmodified_roll = mode
-                    .simulated_roll()
-                    .unwrap_or(roll_d20_with_advantage(*advantage));
-                let roll_line = describe_spell_roll(unmodified_roll, *bonus);
-                AbilityRoll::RolledWithSpellModifier {
-                    unmodified_roll,
-                    result: unmodified_roll as i32 + bonus,
-                    line: roll_line.clone(),
-                }
-            }
-            RollInstruction::RollWithAttackModifier { advantage, bonus } => {
-                let unmodified_roll = mode
-                    .simulated_roll()
-                    .unwrap_or(roll_d20_with_advantage(*advantage));
-                let roll_line = describe_attack_roll(unmodified_roll, *bonus);
-                AbilityRoll::RolledWithAttackModifier {
-                    unmodified_roll,
-                    result: unmodified_roll as i32 + bonus,
-                    line: roll_line.clone(),
-                }
-            }
-            RollInstruction::RollDuringAttack { bonus } => {
-                AbilityRoll::WillRollDuringAttack { bonus: *bonus }
-            }
+            RollInstruction::RollDuringAttack { advantage } => *advantage,
+            unhandled => panic!("{:?}", unhandled),
         }
     }
 }
 
 #[derive(Debug)]
-enum AbilityRoll {
-    RolledWithSpellModifier {
-        unmodified_roll: u32,
-        result: i32,
-        line: String,
-    },
-    RolledWithAttackModifier {
-        unmodified_roll: u32,
-        result: i32,
-        line: String,
-    },
-    WillRollDuringAttack {
-        bonus: i32,
-    },
-}
-
-impl AbilityRoll {
-    fn actual_roll(&self) -> Option<(u32, i32, &str)> {
-        match self {
-            AbilityRoll::RolledWithSpellModifier {
-                unmodified_roll,
-                result,
-                line,
-            } => Some((*unmodified_roll, *result, line)),
-            AbilityRoll::RolledWithAttackModifier {
-                unmodified_roll,
-                result,
-                line,
-            } => Some((*unmodified_roll, *result, line)),
-            AbilityRoll::WillRollDuringAttack { .. } => None,
-        }
-    }
-    fn unwrap_actual_roll(&self) -> (u32, i32, &str) {
-        self.actual_roll()
-            .unwrap_or_else(|| panic!("haven't rolled"))
-    }
-    fn unwrap_attack_advantage_bonus(&self) -> i32 {
-        match self {
-            AbilityRoll::WillRollDuringAttack { bonus } => *bonus,
-            unexpected => panic!("Not attack roll: {:?}", unexpected),
-        }
-    }
+struct AbilityRoll {
+    unmodified_roll: u32,
+    result: i32,
 }
 
 pub trait GameEventHandler {
@@ -4875,28 +4758,14 @@ pub enum Action {
 impl Action {
     pub fn base_action(&self) -> BaseAction {
         match self {
-            Action::Attack {
-                hand,
-                enhancements,
-                target,
-            } => BaseAction::Attack(AttackAction {
+            Action::Attack { hand, .. } => BaseAction::Attack(AttackAction {
                 hand: *hand,
                 action_point_cost: 3,
             }),
-            Action::UseAbility {
-                ability,
-                enhancements,
-                target,
-            } => BaseAction::UseAbility(ability),
-            Action::Move {
-                total_distance,
-                positions,
-                extra_cost,
-            } => BaseAction::Move,
-            Action::ChangeEquipment { from, to } => BaseAction::ChangeEquipment,
-            Action::UseConsumable {
-                inventory_equipment_index,
-            } => BaseAction::UseConsumable,
+            Action::UseAbility { ability, .. } => BaseAction::UseAbility(ability),
+            Action::Move { .. } => BaseAction::Move,
+            Action::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
+            Action::UseConsumable { .. } => BaseAction::UseConsumable,
         }
     }
 }
@@ -4916,7 +4785,7 @@ impl ActionTarget {
         }
     }
 
-    pub fn target_id(&self) -> Option<CharacterId> {
+    pub fn character_target_id(&self) -> Option<CharacterId> {
         match self {
             Self::Character(target_id, ..) => Some(*target_id),
             _ => None,
@@ -5170,13 +5039,6 @@ pub enum AbilityNegativeEffect {
 }
 
 impl AbilityNegativeEffect {
-    fn unwrap_spell(&self) -> &SpellNegativeEffect {
-        match self {
-            AbilityNegativeEffect::Spell(spell_enemy_effect) => spell_enemy_effect,
-            AbilityNegativeEffect::PerformAttack { .. } => panic!(),
-        }
-    }
-
     pub fn knockback(&self) -> Option<u32> {
         if let AbilityNegativeEffect::Spell(sne) = self {
             for effect in sne.on_hit.iter().flatten().flatten() {
@@ -5368,12 +5230,8 @@ impl AbilityTarget {
             AbilityTarget::Enemy { .. } => Some(AreaTargetAcquisition::Enemies),
             AbilityTarget::Ally { .. } => Some(AreaTargetAcquisition::Allies),
             AbilityTarget::Area { range, area_effect } => Some(area_effect.acquisition),
-            AbilityTarget::Destination { range } => None,
-            AbilityTarget::None {
-                self_area,
-                self_effect,
-                environment_effect,
-            } => self_area.map(|a| a.acquisition),
+            AbilityTarget::Destination { .. } => None,
+            AbilityTarget::None { self_area, .. } => self_area.map(|a| a.acquisition),
         }
     }
 }
@@ -7208,7 +7066,7 @@ impl Character {
     ) -> DiceRollBonus {
         let mut advantage = 0i32;
         let mut flat_amount = 0;
-        for (label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target) {
+        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target) {
             match bonus {
                 RollBonusContributor::Advantage(n) => advantage += n,
                 RollBonusContributor::FlatAmount(n) => flat_amount += n,
@@ -8046,6 +7904,20 @@ impl RollBonusContributor {
             }
             RollBonusContributor::OtherNegative => Goodness::Bad,
             RollBonusContributor::OtherPositive => Goodness::Good,
+        }
+    }
+
+    pub fn advantage(&self) -> i32 {
+        match self {
+            RollBonusContributor::Advantage(n) => *n,
+            _ => 0,
+        }
+    }
+
+    pub fn flat_amount(&self) -> i32 {
+        match self {
+            RollBonusContributor::FlatAmount(n) => *n,
+            _ => 0,
         }
     }
 }
