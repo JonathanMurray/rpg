@@ -311,6 +311,8 @@ pub enum EquipmentIconId {
 
     ArcaneRing,
     NecroticBand,
+    HuntersCharm,
+    DraugNecklace,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -967,6 +969,8 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::PlaceholderTrinket => (4, 3),
         EquipmentIconId::ArcaneRing => (0, 5),
         EquipmentIconId::NecroticBand => (1, 5),
+        EquipmentIconId::HuntersCharm => (2, 5),
+        EquipmentIconId::DraugNecklace => (3, 5),
     };
     let icon_w = 20.0;
     let icon_h = 20.0;

@@ -647,6 +647,27 @@ pub const NECROTIC_BAND: Trinket = Trinket {
     icon: EquipmentIconId::NecroticBand,
 };
 
+pub const HUNTERS_CHARM: Trinket = Trinket {
+    name: "Hunter's charm",
+    sprite: None,
+    equip: EquipEffect {
+        bonus_move_speed: 2,
+        bonus_stamina_regen: 1,
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::HuntersCharm,
+};
+
+pub const DRAUG_NECKLACE: Trinket = Trinket {
+    name: "Draug necklace",
+    sprite: None,
+    equip: EquipEffect {
+        attack_advantage_against_bleeding_target: true,
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::DraugNecklace,
+};
+
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Bad small shield",
     sprite: Some(SpriteId::Shield),

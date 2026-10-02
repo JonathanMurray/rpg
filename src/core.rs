@@ -3288,8 +3288,7 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::MainHandExertion);
         conditions.borrow_mut().remove(&Condition::OffHandExertion);
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
-        let gain_stamina = (character.stamina.max() as f32 / 4.0).ceil() as u32;
-        let gained_stamina = character.stamina.gain(gain_stamina);
+        let gained_stamina = character.regain_stamina();
         character.regain_full_free_movement();
 
         if character.player_controlled() {
@@ -4543,7 +4542,7 @@ impl Condition {
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
-            ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell|.\nDecays 1 at end of turn.",
+            ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
             HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
@@ -5805,10 +5804,9 @@ impl Character {
     }
 
     fn thorns(&self) -> u32 {
-        self.armor_piece
-            .get()
-            .map(|armor| armor.equip.thorns)
-            .unwrap_or(0)
+        let mut amount = 0;
+        self.for_equip_effects(|_name, equip| amount += equip.thorns);
+        amount
     }
 
     pub fn toggle_quick_actions(&self) {
@@ -5940,6 +5938,12 @@ impl Character {
             .add_or_remove(Condition::CriticalCharge, add);
     }
 
+    fn regain_stamina(&self) -> u32 {
+        let mut amount = (self.stamina.max() as f32 / 4.0).ceil() as u32;
+        self.for_equip_effects(|_name, equip| amount += equip.bonus_stamina_regen);
+        self.stamina.gain(amount)
+    }
+
     fn regain_full_free_movement(&self) {
         self.remaining_movement.set(self.free_movement_per_turn());
     }
@@ -6018,11 +6022,13 @@ impl Character {
     }
 
     pub fn free_movement_per_turn(&self) -> f32 {
-        let bonus = if self.has_condition(&Condition::Inspired) {
+        let mut bonus = if self.has_condition(&Condition::Inspired) {
             INSPIRED_MOVE_BONUS
         } else {
             0.0
         };
+        self.for_equip_effects(|_name, equip| bonus += equip.bonus_move_speed as f32);
+
         (self.base_free_movement.get() + bonus) * self.move_speed_modifier()
     }
 
@@ -6575,13 +6581,7 @@ impl Character {
 
     pub fn healing_on_kill(&self) -> u32 {
         let mut amount = 0;
-        if let Some(armor) = self.armor_piece.get() {
-            amount += armor.equip.heal_on_kill;
-        }
-        if let Some(trinket) = self.trinket.get() {
-            amount += trinket.equip.heal_on_kill;
-        }
-
+        self.for_equip_effects(|_name, equip| amount += equip.heal_on_kill);
         amount
     }
 
@@ -6943,15 +6943,19 @@ impl Character {
         (self.base_attributes.spirit.get() as i32).max(1) as u32
     }
 
+    fn for_equip_effects(&self, mut f: impl FnMut(&'static str, EquipEffect)) {
+        if let Some(armor) = self.armor_piece.get() {
+            f(armor.name, armor.equip);
+        }
+        if let Some(trinket) = self.trinket.get() {
+            f(trinket.name, trinket.equip);
+        }
+    }
+
     pub fn spell_modifier(&self) -> u32 {
         let mut res = self.intellect() + self.spirit();
 
-        if let Some(armor) = self.armor_piece.get() {
-            res += armor.equip.bonus_spell_modifier;
-        }
-        if let Some(trinket) = self.trinket.get() {
-            res += trinket.equip.bonus_spell_modifier;
-        }
+        self.for_equip_effects(|_name, equip| res += equip.bonus_spell_modifier);
 
         let conditions = self.conditions.borrow();
         if conditions.has(&Condition::Inspired) {
@@ -7258,6 +7262,14 @@ impl Character {
         if conditions.has(&Condition::ThrillOfBattle) {
             // applied from attack_modifer()
             bonuses.push(("Thrill of battle", RollBonusContributor::OtherPositive));
+        }
+
+        if target.is_bleeding() {
+            self.for_equip_effects(|name, equip| {
+                if equip.attack_advantage_against_bleeding_target {
+                    bonuses.push((name, RollBonusContributor::Advantage(1)));
+                }
+            });
         }
 
         bonuses
@@ -7716,6 +7728,9 @@ pub struct EquipEffect {
     pub bonus_spell_modifier: u32,
     pub thorns: u32,
     pub heal_on_kill: u32,
+    pub bonus_move_speed: u32,
+    pub bonus_stamina_regen: u32,
+    pub attack_advantage_against_bleeding_target: bool,
 }
 
 impl EquipEffect {
@@ -7724,6 +7739,9 @@ impl EquipEffect {
             bonus_spell_modifier: 0,
             thorns: 0,
             heal_on_kill: 0,
+            bonus_move_speed: 0,
+            bonus_stamina_regen: 0,
+            attack_advantage_against_bleeding_target: false,
         }
     }
 }

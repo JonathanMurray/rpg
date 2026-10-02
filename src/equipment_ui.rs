@@ -25,9 +25,9 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Consumable, EquipEffect,
-        EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket, Weapon, WeaponGrip,
-        WeaponRange,
+        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Condition, Consumable,
+        EquipEffect, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket, Weapon,
+        WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     game_ui::draw_rectangle_lines2,
@@ -92,6 +92,25 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
             "|<faded>On kill:| |<heart>| |<value>{}| healing",
             equip.heal_on_kill
         ));
+    }
+    if equip.bonus_move_speed > 0 {
+        t.technical_description.push(format!(
+            "|<value>+{}| |<boot>|<stat>Movement|",
+            equip.bonus_move_speed
+        ));
+    }
+    if equip.bonus_stamina_regen > 0 {
+        t.technical_description.push(format!(
+            "|<value>+{}| |<stamina>|<stat>Stamina| restored per turn",
+            equip.bonus_stamina_regen
+        ));
+    }
+    if equip.attack_advantage_against_bleeding_target {
+        t.technical_description.push(format!(
+            "Gain |<keyword>Advantage| on attacks against |<keyword>Bleeding| targets"
+        ));
+        t.keywords.push(Keyword::Advantage);
+        t.keywords.push(Keyword::Cond(Condition::Bleeding, None));
     }
 }
 
