@@ -19,6 +19,8 @@ pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
     // -1 => roll twice, take lowest (i.e. 1x disadvantage)
     // etc
 
+    println!("Rolling d20 with advantage {advantage_level} ...");
+
     let mut res = roll_d20();
     let additional_rolls = advantage_level.abs();
     for _ in 0..additional_rolls {
@@ -30,13 +32,16 @@ pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
             res.max(new)
         };
     }
+    dbg!(advantage_level, res);
     res
 }
 
 fn roll_d20() -> u32 {
     //if rand::rng().random_bool(0.5) {20} else {1}
     let mut rng = rand::rng();
-    rng.random_range(1..=20)
+    let result = rng.random_range(1..=20);
+    dbg!(result);
+    result
 }
 
 #[derive(Default, Copy, Clone, Debug)]

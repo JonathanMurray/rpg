@@ -373,10 +373,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Bob",
+      "type_": "Clara",
       "pos": [
-        7,
-        19
+        12,
+        33
       ],
       "health": null,
       "main_hand": null,
@@ -386,8 +386,8 @@
     {
       "type_": "Draug",
       "pos": [
-        11,
-        19
+        12,
+        30
       ],
       "health": null,
       "main_hand": null,
@@ -397,8 +397,8 @@
     {
       "type_": "Alice",
       "pos": [
-        10,
-        22
+        15,
+        33
       ],
       "health": null,
       "main_hand": null,
@@ -406,54 +406,21 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        16
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        10
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        7
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
+      "type_": "Ghoul1",
       "pos": [
         12,
-        34
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        20,
+        31
       ],
       "health": null,
       "main_hand": null,

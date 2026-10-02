@@ -787,9 +787,6 @@ impl CoreGame {
     }
 
     async fn ui_handle_event(&self, event: GameEvent) {
-        //println!("ui handle event ({:?}) ...", event);
-
-        println!("now will actually handle the event ...");
         self.user_interface.handle_event(self, event).await
     }
 
@@ -1296,20 +1293,18 @@ impl CoreGame {
 
             let mut advantage = 0_i32;
 
-            for enhancement in enhancements {
-                if let Some(e) = enhancement.spell_effect {
-                    let bonus = e.bonus_advantage;
-                    if bonus > 0 {
-                        advantage += bonus as i32;
-                    }
-                }
-            }
-
+            // TODO: It's a weird mixture now where certain target types use a shared roll here but area effects
+            // roll later (using roll instruction) and simply ignore the roll that was performed here. Let's instead
+            // always just create the instruction here and defer the actual roll to later parts of the code.
             let mut roll_instruction = None;
-
             let mut maybe_ability_roll = None;
 
             if let Some(roll_type) = ability.roll {
+                let (total_bonus, detail_bonuses) =
+                    actor.outgoing_ability_roll_bonus(enhancements, roll_type);
+
+                advantage += total_bonus.advantage;
+
                 let unmodified_roll = simulated_roll.unwrap_or(roll_d20_with_advantage(advantage));
 
                 if let Some(description) = roll_description(advantage) {
@@ -1324,18 +1319,17 @@ impl CoreGame {
                         let modifier = actor.spell_modifier() as i32;
                         spell_roll_bonus += modifier;
 
-                        for enhancement in enhancements {
-                            if let Some(e) = enhancement.spell_effect {
-                                let bonus = e.roll_bonus;
-                                if bonus > 0 {
-                                    spell_roll_bonus += bonus as i32;
-                                    dice_roll_line.push_str(&format!(
-                                        " +{} |<faded>({})|",
-                                        bonus, enhancement.name,
-                                    ));
-                                }
+                        for (name, bonus) in detail_bonuses {
+                            if let RollBonusContributor::FlatAmount(n) = bonus {
+                                spell_roll_bonus += n as i32;
+                                dice_roll_line.push_str(&format!(
+                                    " {} |<faded>({})|",
+                                    plus_minus(n),
+                                    name,
+                                ));
                             }
                         }
+
                         let ability_result = unmodified_roll as i32 + spell_roll_bonus;
 
                         roll_instruction = Some(RollInstruction::RollWithSpellModifier {
@@ -1754,6 +1748,18 @@ impl CoreGame {
             if let Some(game) = real_game {
                 game.ui_handle_event(GameEvent::AbilityResolved(resolve_event))
                     .await;
+
+                if actor
+                    .conditions
+                    .borrow_mut()
+                    .remove(&Condition::ArcaneBlessing)
+                {
+                    game.ui_handle_event(GameEvent::CharacterLostCondition {
+                        character: actor_id,
+                        condition: Condition::ArcaneBlessing,
+                    })
+                    .await;
+                }
             }
         }
 
@@ -2986,9 +2992,28 @@ impl CoreGame {
                                     None,
                                     defender,
                                 );
-                                detail_lines.push(format!("{} |<faded>({})|", log_line, arrow.name))
+                                detail_lines
+                                    .push(format!("{} |<faded>({})|", log_line, arrow.name));
+                                if let Some(applied) = applied {
+                                    applied_to_target.push(applied);
+                                }
                             }
                         }
+
+                        attacker.for_equip_effects(|name, equip| {
+                            if let Some(apply_effect) = equip.on_attack_damage_apply_self {
+                                let (applied, log_line, _damage) = game.perform_effect_application(
+                                    apply_effect,
+                                    None,
+                                    None,
+                                    attacker,
+                                );
+                                detail_lines.push(format!("{} |<faded>({})|", log_line, name));
+                                if let Some(applied) = applied {
+                                    applied_to_self.push(applied);
+                                }
+                            }
+                        });
                     }
 
                     if defender.lose_protected() {
@@ -3926,6 +3951,10 @@ pub enum GameEvent {
         character: CharacterId,
         condition: Condition,
     },
+    CharacterLostCondition {
+        character: CharacterId,
+        condition: Condition,
+    },
     CharacterReceivedKnockback {
         character: CharacterId,
     },
@@ -4141,7 +4170,7 @@ fn ability_roll_bonus(
     enhancements: &[AbilityEnhancement],
     modifier: AbilityRollType,
 ) -> DiceRollBonus {
-    let mut bonus = caster.outgoing_ability_roll_bonus(enhancements, modifier);
+    let (mut bonus, _bonuses) = caster.outgoing_ability_roll_bonus(enhancements, modifier);
     bonus.advantage += defender.incoming_ability_advantage();
     bonus
 }
@@ -4474,6 +4503,7 @@ pub enum Condition {
     Poisoned,
     Treasure,
     HungeringBladeSouls,
+    ArcaneBlessing,
 }
 
 impl Condition {
@@ -4512,6 +4542,7 @@ impl Condition {
             Poisoned => "Poisoned",
             Treasure => "Treasure",
             HungeringBladeSouls => "Captured souls",
+            ArcaneBlessing => "Arcane blessing",
         }
     }
 
@@ -4549,7 +4580,8 @@ impl Condition {
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
-            HungeringBladeSouls => "Can be unleashed to empower an attack"
+            HungeringBladeSouls => "Can be unleashed to empower an attack",
+            ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll"
         }
     }
 
@@ -4588,6 +4620,7 @@ impl Condition {
             Poisoned => false,
             Treasure => true,
             HungeringBladeSouls => true,
+            ArcaneBlessing => true,
         }
     }
 
@@ -4626,6 +4659,7 @@ impl Condition {
             Poisoned => StatusId::Poisoned,
             Treasure => StatusId::Treasure,
             HungeringBladeSouls => StatusId::HungeringBladeSouls,
+            ArcaneBlessing => StatusId::Advantage,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -5689,7 +5723,7 @@ pub struct Character {
     main_hand: Cell<Hand>,
     off_hand: Cell<Hand>,
     pub arrows: Cell<Option<ArrowStack>>,
-    trinket: Cell<Option<Trinket>>,
+    pub trinket: Cell<Option<Trinket>>,
     pub conditions: RefCell<Conditions>,
     pub action_points: NumberedResource,
     pub stamina: NumberedResource,
@@ -7146,21 +7180,24 @@ impl Character {
         &self,
         enhancements: &[AbilityEnhancement],
         modifier: AbilityRollType,
-    ) -> DiceRollBonus {
-        let mut advantage = 0i32;
+    ) -> (DiceRollBonus, Vec<(&'static str, RollBonusContributor)>) {
+        let mut total_advantage = 0i32;
         let mut flat_amount = 0;
-        for (_label, bonus) in self.outgoing_ability_roll_bonuses(enhancements, modifier) {
+        let bonuses = self.outgoing_ability_roll_bonuses(enhancements, modifier);
+        for (_label, bonus) in &bonuses {
             match bonus {
-                RollBonusContributor::Advantage(n) => advantage += n,
+                RollBonusContributor::Advantage(n) => total_advantage += n,
                 RollBonusContributor::FlatAmount(n) => flat_amount += n,
                 RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
             }
         }
 
-        DiceRollBonus {
-            advantage,
+        let summary = DiceRollBonus {
+            advantage: total_advantage,
             flat_amount,
-        }
+        };
+
+        (summary, bonuses)
     }
 
     fn outgoing_attack_roll_bonus(
@@ -7282,13 +7319,22 @@ impl Character {
     ) -> Vec<(&'static str, RollBonusContributor)> {
         let is_spell = matches!(modifier, AbilityRollType::Spell);
         let mut bonuses = vec![];
-        for enhancement in enhancements {
-            if let Some(e) = enhancement.spell_effect {
-                if e.bonus_advantage > 0 {
-                    bonuses.push((
-                        enhancement.name,
-                        RollBonusContributor::Advantage(e.bonus_advantage as i32),
-                    ));
+
+        if is_spell {
+            for enhancement in enhancements {
+                if let Some(e) = enhancement.spell_effect {
+                    if e.bonus_advantage > 0 {
+                        bonuses.push((
+                            enhancement.name,
+                            RollBonusContributor::Advantage(e.bonus_advantage as i32),
+                        ));
+                    }
+                    if e.roll_bonus > 0 {
+                        bonuses.push((
+                            enhancement.name,
+                            RollBonusContributor::FlatAmount(e.roll_bonus as i32),
+                        ));
+                    }
                 }
             }
         }
@@ -7300,6 +7346,10 @@ impl Character {
                 "Weakened",
                 RollBonusContributor::FlatAmount(-(weakened as i32)),
             ));
+        }
+
+        if is_spell && conditions.has(&Condition::ArcaneBlessing) {
+            bonuses.push(("Arcane blessing", RollBonusContributor::Advantage(1)));
         }
 
         if is_spell && conditions.has(&Condition::CriticalCharge) {
@@ -7329,7 +7379,7 @@ impl Character {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
         if conditions.has(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
+            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
         }
 
         bonuses
@@ -7731,6 +7781,7 @@ pub struct EquipEffect {
     pub bonus_move_speed: u32,
     pub bonus_stamina_regen: u32,
     pub attack_advantage_against_bleeding_target: bool,
+    pub on_attack_damage_apply_self: Option<ApplyEffect>,
 }
 
 impl EquipEffect {
@@ -7742,6 +7793,7 @@ impl EquipEffect {
             bonus_move_speed: 0,
             bonus_stamina_regen: 0,
             attack_advantage_against_bleeding_target: false,
+            on_attack_damage_apply_self: None,
         }
     }
 }

@@ -235,7 +235,6 @@ impl _GameUserInterfaceConnection {
         game: &CoreGame,
         msg_from_game: MessageFromGame,
     ) -> Result<UiOutcome, QuitEvent> {
-        println!("run_ui ...");
         let mut user_interface = self.user_interface.borrow_mut();
 
         let players_turn = game.is_players_turn();

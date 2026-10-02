@@ -112,6 +112,11 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
         t.keywords.push(Keyword::Advantage);
         t.keywords.push(Keyword::Cond(Condition::Bleeding, None));
     }
+    if let Some(apply_effect) = equip.on_attack_damage_apply_self {
+        t.technical_description
+            .push("|<faded>On attack: (self)|".to_string());
+        describe_apply_effect(apply_effect, t);
+    }
 }
 
 fn consumable_tooltip(consumable: &Consumable) -> Tooltip {

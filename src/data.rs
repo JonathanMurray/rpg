@@ -668,6 +668,20 @@ pub const DRAUG_NECKLACE: Trinket = Trinket {
     icon: EquipmentIconId::DraugNecklace,
 };
 
+pub const BATTLEMAGE_SIGIL: Trinket = Trinket {
+    name: "Battle mage sigil",
+    sprite: None,
+    equip: EquipEffect {
+        on_attack_damage_apply_self: Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::ArcaneBlessing,
+            stacks: None,
+            duration_rounds: None,
+        })),
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::BattleMageSigil,
+};
+
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Bad small shield",
     sprite: Some(SpriteId::Shield),
@@ -970,9 +984,9 @@ pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
 
 pub const BLOCK_2_WITH_THORNS: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
-    name: "Spike block 2",
+    name: "Spike block",
     granted_from: None,
-    description: "Protect yourself and damage the attacker |<faded>(1 attack per round)|",
+    description: "Protect yourself, reducing incoming attack damage by |<value>2| and dealing |<value>3| damage back to the attacker |<faded>(once per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,

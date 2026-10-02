@@ -1982,6 +1982,21 @@ impl UserInterface {
                 // Don't make this too long, as it can happen during walking
                 //self.animation_stopwatch.set_to_at_least(0.2);
             }
+            GameEvent::CharacterLostCondition {
+                character,
+                condition,
+            } => {
+                let character = self.characters.get(character);
+
+                self.game_grid.add_text_effect(
+                    character.pos(),
+                    0.0,
+                    2.0,
+                    Some(condition.status_icon()),
+                    format!("|<strikethrough>{}|", condition.name()),
+                    TextEffectStyle::HostileEffect,
+                );
+            }
             GameEvent::GameOver(type_) => {
                 let text = match type_ {
                     GameOverType::Victory => "Victory",
