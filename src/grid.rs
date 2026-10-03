@@ -671,13 +671,16 @@ impl GameGrid {
         self.hovered_character_portrait = character_id;
     }
 
-    pub fn animate_death(&mut self, character_id: CharacterId, duration: f32) {
+    pub fn animate_death(&mut self, character_id: CharacterId) -> f32 {
+        let duration = 1.5;
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             0.0,
             duration,
             AnimationDetails::Death,
         ));
+        // Need to block UI for the entire duration. Otherwise the game removes the character which cuts of the animation
+        duration
     }
 
     pub fn animate_magic_sparks(&mut self, char: CharacterId, color: Color) {
@@ -707,9 +710,9 @@ impl GameGrid {
 
         let mut delay = 0.0;
 
-        if let Some(target_pos) = target_pos {
-            // Don't show preview for player ability; they issued it and it should feel snappy.
-            if !actor.player_controlled() {
+        // Don't show preview for player ability; they issued it and it should feel snappy.
+        if !actor.player_controlled() {
+            if let Some(target_pos) = target_pos {
                 delay = 0.5;
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
@@ -717,13 +720,18 @@ impl GameGrid {
                     0.3,
                     AnimationDetails::AttackCrosshairPreview { target_pos },
                 ));
-                self.character_animations.push(CharacterAnimation::new(
-                    actor.id(),
-                    0.0,
-                    1.0,
-                    AnimationDetails::SpeechBubble { text: ability.name },
-                ));
             }
+            let text = if ability.speech != "" {
+                ability.speech
+            } else {
+                ability.name
+            };
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                0.0,
+                1.0,
+                AnimationDetails::SpeechBubble { text },
+            ));
         }
 
         let duration = match ability.animation {
@@ -1529,9 +1537,11 @@ impl GameGrid {
     }
 
     fn draw_character(&self, character: &Character) {
+        let size = self.default_entity_draw_size();
         let mut params = DrawTextureParams {
-            dest_size: Some(self.default_entity_draw_size().into()),
+            dest_size: Some(size.into()),
             flip_x: character.is_facing_east.get(),
+            //pivot: Some((size.0 / 2.0, size.1 / 2.0).into()),
             ..Default::default()
         };
 
@@ -1546,6 +1556,9 @@ impl GameGrid {
 
         let mut weapon_rotation_modifier = 0.0;
         let mut shield_offset = (0.0, 0.0);
+        let mut character_offset = (0.0, 0.0);
+
+        let mut character_crop_factor = (1.0, 1.0);
 
         let mut show_sprite = true;
         for animation in self
@@ -1554,6 +1567,7 @@ impl GameGrid {
             .filter(|a| a.character_id == character.id() && a.has_started())
         {
             let remaining = animation.remaining_duration;
+            let remaining_ratio = animation.remaining_duration_ratio();
             match &animation.kind {
                 AnimationDetails::MotionPreview { positions } => {
                     let dst = positions.last().unwrap();
@@ -1622,8 +1636,25 @@ impl GameGrid {
                     }
                 }
                 AnimationDetails::Death => {
-                    params.rotation = PI * 0.5;
+                    let max_rotation = PI * 0.5;
+                    if remaining_ratio > 0.9 {
+                        x += random_range(-6.0..6.0);
+                        y += random_range(-7.0..3.0);
+
+                        // from 0 to 1
+                        let rotation_progress = (1.0 - remaining_ratio) * 10.0;
+                        params.rotation = max_rotation * rotation_progress;
+                    } else {
+                        params.rotation = max_rotation;
+
+                        let factor = remaining_ratio.min(0.6);
+                        // Corpse sinking down into the ground/water
+                        character_crop_factor = (factor, 1.0);
+                        character_offset = ((0.8 - factor) * self.cell_w * 3.0, 0.0);
+                    };
+
                     dying = true;
+                    params.flip_x = false;
                 }
                 AnimationDetails::MagicSparks { .. } => {
                     // THis is drawn separately
@@ -1633,7 +1664,7 @@ impl GameGrid {
                 }
                 AnimationDetails::RangedAttack { toward } => {
                     // t goes from 0 to 1
-                    let t = 1.0 - animation.remaining_duration_ratio();
+                    let t = 1.0 - remaining_ratio;
 
                     let toward = Vec2::new(
                         self.grid_x_to_screen(toward.0) - self.cell_w,
@@ -1681,8 +1712,7 @@ impl GameGrid {
                     }
                 }
                 AnimationDetails::CastingSpell { .. } => {
-                    // t goes from 0 to 1
-                    let t = 1.0 - animation.remaining_duration_ratio();
+                    let t = 1.0 - remaining_ratio;
 
                     let max_levitation = self.cell_w * 0.2;
 
@@ -1696,7 +1726,7 @@ impl GameGrid {
 
                 AnimationDetails::Spinning => {
                     // t goes from 0 to 1
-                    let t = 1.0 - animation.remaining_duration_ratio();
+                    let t = 1.0 - remaining_ratio;
                     if t % 0.4 < 0.2 {
                         params.flip_x = !params.flip_x;
                     }
@@ -1711,7 +1741,7 @@ impl GameGrid {
                     with_shield,
                 } => {
                     // t goes from 0 to 1
-                    let t = 1.0 - animation.remaining_duration_ratio();
+                    let t = 1.0 - remaining_ratio;
 
                     let toward = Vec2::new(
                         self.grid_x_to_screen(toward.0) - self.cell_w,
@@ -1814,9 +1844,11 @@ impl GameGrid {
             y -= oscillate(0.25, 0.0, 2.0)
         }
 
-        if !dying {
-            y -= self.cell_w * 1.2;
-            shadow_y -= self.cell_w * 1.2;
+        if true {
+            // !dying {
+            let offset = self.cell_w * 1.2;
+            y -= offset;
+            shadow_y -= offset;
         }
 
         let standing_in_liquid = self
@@ -1824,41 +1856,51 @@ impl GameGrid {
             .is_character_in_liquid(character.pos())
             .is_some();
 
+        params.pivot = Some((x + self.cell_w * 1.5, y + self.cell_w * 2.0).into());
+
         let mut character_params = params.clone();
         if standing_in_liquid {
             let water_depth_factor = 0.125;
-            character_params.source =
-                Some(Rect::new(0.0, 0.0, 32.0, 32.0 * (1.0 - water_depth_factor)));
-            character_params.dest_size.as_mut().unwrap().y *= 1.0 - water_depth_factor;
+
+            if dying {
+                // corpse is rotated 90 degrees clockwise
+                x += self.cell_w * 0.5;
+            } else {
+                character_crop_factor = (1.0, 1.0 - water_depth_factor);
+            }
             y += water_depth_factor * self.cell_w * 3.0;
             shadow_y += water_depth_factor * self.cell_w * 1.0;
         }
+
+        /*
+        if let Some(pivot) = params.pivot {
+            draw_rectangle(pivot.x - 4.0, pivot.y - 4.0, 8.0, 8.0, MAGENTA);
+        }
+         */
 
         x = x.floor();
         y = y.floor();
         shadow_x = shadow_x.floor();
         shadow_y = shadow_y.floor();
 
-        if true {
-            // !standing_in_water {
-            draw_texture_ex(
-                &self.sprites[&SpriteId::CharacterShadow].regular,
-                shadow_x,
-                shadow_y,
-                WHITE,
-                DrawTextureParams {
-                    dest_size: Some(
-                        (
-                            self.cell_w * CELLS_PER_ENTITY as f32,
-                            self.cell_w * CELLS_PER_ENTITY as f32,
-                        )
-                            .into(),
-                    ),
-                    flip_x: character.is_facing_east.get(),
-                    ..Default::default()
-                },
-            );
-        }
+        draw_texture_ex(
+            &self.sprites[&SpriteId::CharacterShadow].regular,
+            shadow_x,
+            shadow_y,
+            WHITE,
+            DrawTextureParams {
+                dest_size: Some(
+                    (
+                        self.cell_w * CELLS_PER_ENTITY as f32,
+                        self.cell_w * CELLS_PER_ENTITY as f32,
+                    )
+                        .into(),
+                ),
+                flip_x: character.is_facing_east.get(),
+                ..Default::default()
+            },
+        );
+
         if show_sprite {
             let sprite = &self.sprites[&character.sprite];
             let texture = if self.target_effect_preview.contains_key(&character.id()) {
@@ -1871,26 +1913,56 @@ impl GameGrid {
                 &sprite.regular
             };
 
-            draw_texture_ex(texture, x, y, WHITE, character_params);
+            character_params.source = Some(Rect::new(
+                0.0,
+                0.0,
+                32.0 * character_crop_factor.0,
+                32.0 * character_crop_factor.1,
+            ));
+            character_params.dest_size.as_mut().unwrap().x *= character_crop_factor.0;
+            character_params.dest_size.as_mut().unwrap().y *= character_crop_factor.1;
+
+            draw_texture_ex(
+                texture,
+                x + character_offset.0,
+                y + character_offset.1,
+                WHITE,
+                character_params,
+            );
 
             if let Some(weapon) = character.weapon(HandType::MainHand) {
                 if let Some(texture) = weapon.sprite {
-                    let weapon_params = DrawTextureParams {
-                        rotation: params.rotation + weapon_rotation_modifier,
-                        ..params
-                    };
-                    draw_texture_ex(&self.sprites[&texture].regular, x, y, WHITE, weapon_params);
+                    let mut y_offset = 0.0;
+                    let mut rotation = params.rotation + weapon_rotation_modifier;
+                    if dying {
+                        rotation = 0.2 * PI;
+                        y_offset = self.cell_w * 1.0;
+                    }
+                    let weapon_params = DrawTextureParams { rotation, ..params };
+                    draw_texture_ex(
+                        &self.sprites[&texture].regular,
+                        x,
+                        y + y_offset,
+                        WHITE,
+                        weapon_params,
+                    );
                 }
             }
 
             if let Some(shield) = character.shield() {
                 if let Some(texture) = shield.sprite {
+                    let mut rotation = params.rotation + weapon_rotation_modifier;
+                    if dying {
+                        rotation = 0.0;
+                        shield_offset = (0.0, self.cell_w * 1.0);
+                    }
+                    let shield_params = DrawTextureParams { rotation, ..params };
                     draw_texture_ex(
                         &self.sprites[&texture].regular,
                         x + shield_offset.0,
                         y + shield_offset.1,
                         WHITE,
-                        params,
+                        shield_params,
                     );
                 }
             }

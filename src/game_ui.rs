@@ -1727,13 +1727,11 @@ impl UserInterface {
                 }
             }
             GameEvent::CharactersDying { characters } => {
-                let duration = 0.5;
-
                 let mut someone_died = false;
                 for char_id in characters {
                     let char = self.characters.get(char_id);
                     if !char.has_escaped_from_battle.get() {
-                        self.game_grid.animate_death(char_id, duration);
+                        let duration = self.game_grid.animate_death(char_id);
                         self.animation_stopwatch.set_to_at_least(duration);
                         someone_died = true;
                     }

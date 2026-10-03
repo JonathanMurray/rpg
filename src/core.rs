@@ -652,7 +652,7 @@ impl CoreGame {
                     self.on_non_ability_attack(event.clone()).await;
 
                     // in case defender turned around to react, restore their original direction
-                    defender.is_facing_east.set(defender_facing);
+                    //defender.is_facing_east.set(defender_facing);
 
                     let outcome = ActionOutcome::AttackHit {
                         victim_id: event.target,
@@ -4921,6 +4921,7 @@ pub struct AbilityChargeFx {
 pub struct Ability {
     pub id: AbilityId,
     pub name: &'static str,
+    pub speech: &'static str,
     pub description: &'static str,
     pub icon: IconId,
     pub action_point_cost: u32,

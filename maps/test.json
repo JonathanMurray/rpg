@@ -370,7 +370,9 @@
       ]
     }
   },
-  "control_points": {},
+  "control_points": {
+    "(22, 26)": "Exit"
+  },
   "characters": [
     {
       "type_": "Alice",
@@ -384,21 +386,10 @@
       "name": null
     },
     {
-      "type_": "Draug",
-      "pos": [
-        13,
-        22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Bob",
       "pos": [
         15,
-        25
+        26
       ],
       "health": null,
       "main_hand": null,
@@ -406,10 +397,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Lootgoblin",
       "pos": [
-        14,
-        19
+        19,
+        27
       ],
       "health": null,
       "main_hand": null,
@@ -417,10 +408,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Ghoul1",
       "pos": [
-        15,
-        16
+        13,
+        29
       ],
       "health": null,
       "main_hand": null,
@@ -428,10 +419,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Ogre",
       "pos": [
-        17,
-        13
+        11,
+        18
       ],
       "health": null,
       "main_hand": null,

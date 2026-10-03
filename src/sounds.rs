@@ -107,12 +107,23 @@ impl SoundPlayer {
                     "fl_damage_a4.ogg",
                 ],
             ),
+            (
+                SoundId::DamageHuldra,
+                1.0,
+                vec![
+                    "fl_damage_b1.ogg",
+                    "fl_damage_b2.ogg",
+                    "fl_damage_b3.ogg",
+                    "fl_damage_b4.ogg",
+                ],
+            ),
             (SoundId::DamageBob, 1.0, vec!["fl_damage_5.ogg"]),
             (SoundId::DamageFemale, 1.0, vec!["fl_damage_8.ogg"]),
             (SoundId::React, 1.0, vec!["fl_react.ogg"]),
             (SoundId::Victory, 1.0, vec!["fl_fanfare.ogg"]),
             (SoundId::Defeat, 1.0, vec!["fl_defeat.ogg"]),
             (SoundId::Battle, 1.0, vec!["fl_battle.ogg"]),
+            (SoundId::Laugh, 0.8, vec!["fl_laugh.ogg"]),
         ] {
             let mut sounds = vec![];
             for name in names {
@@ -253,10 +264,12 @@ pub enum SoundId {
     Scale4,
     Scale5,
     Damage,
+    DamageHuldra,
     DamageBob,
     DamageFemale,
     React,
     Victory,
     Defeat,
     Battle,
+    Laugh,
 }

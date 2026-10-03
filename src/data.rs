@@ -709,6 +709,7 @@ pub const SHIELD_BASH_KNOCKBACK: AbilityEnhancement = AbilityEnhancement {
 pub const SHIELD_BASH: Ability = Ability {
     id: AbilityId::ShieldBash,
     name: "Shield bash",
+    speech: "",
     description: "Deal |<value>3| damage and inflict |<keyword>Dazed|",
     icon: IconId::ShieldBash,
     action_point_cost: 2,
@@ -745,6 +746,7 @@ pub const SHIELD_BASH: Ability = Ability {
 pub const ENEMY_TACKLE: Ability = Ability {
     id: AbilityId::Tackle,
     name: "Tackle",
+    speech: "",
     description: "",
     icon: IconId::Tackle,
     action_point_cost: 3,
@@ -782,6 +784,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
 pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
     id: AbilityId::EnemySlashingAttack,
     name: "Slashing attack",
+    speech: "",
     description: "",
     icon: IconId::Slashing,
     action_point_cost: 3,
@@ -1047,6 +1050,7 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
     name: "Sweeping attack",
+    speech: "",
     description: "Attack all surrounding enemies",
     icon: IconId::SweepAttack,
     action_point_cost: 3,
@@ -1114,6 +1118,7 @@ pub const LUNGE_ATTACK_REACH: AbilityEnhancement = AbilityEnhancement {
 pub const LUNGE_ATTACK: Ability = Ability {
     id: AbilityId::LungeAttack,
     name: "Lunge attack",
+    speech: "",
     description: "Move to target in an unobstructed path, before attacking",
     icon: IconId::LungeAttack,
     action_point_cost: 3,
@@ -1163,6 +1168,7 @@ pub const EXECUTE_BLOODLUST: AbilityEnhancement = AbilityEnhancement {
 pub const EXECUTE: Ability = Ability {
     id: AbilityId::Execute,
     name: "Execute",
+    speech: "",
     description: "Attack with advantage, and regain |<value>2| AP if it kills",
     icon: IconId::Execute,
     action_point_cost: 3,
@@ -1194,6 +1200,7 @@ pub const EXECUTE: Ability = Ability {
 pub const ENEMY_BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
+    speech: "",
     description: "",
     icon: IconId::Brace,
     action_point_cost: 2,
@@ -1227,6 +1234,7 @@ pub const ENEMY_BRACE: Ability = Ability {
 pub const BRACE: Ability = Ability {
     id: AbilityId::Brace,
     name: "Brace",
+    speech: "",
     description: "",
     icon: IconId::Brace,
     action_point_cost: 1,
@@ -1276,6 +1284,7 @@ pub const SCREAM_SHRIEK: AbilityEnhancement = AbilityEnhancement {
 pub const SCREAM: Ability = Ability {
     id: AbilityId::Scream,
     name: "Scream",
+    speech: "",
     description: "Daze nearby enemies",
     icon: IconId::Scream,
     action_point_cost: 2,
@@ -1319,6 +1328,7 @@ pub const SCREAM: Ability = Ability {
 pub const SHACKLED_MIND: Ability = Ability {
     id: AbilityId::ShackledMind,
     name: "Shackle",
+    speech: "",
     description: "|<keyword>Slow| and |<keyword>Expose| an enemy",
     icon: IconId::ShackledMind,
     action_point_cost: 3,
@@ -1391,6 +1401,7 @@ pub const SHACKLED_MIND: Ability = Ability {
 pub const MIND_BLAST: Ability = Ability {
     id: AbilityId::MindBlast,
     name: "Mind blast",
+    speech: "",
     description: "Damage an enemy and make them lose AP",
     icon: IconId::Mindblast,
     action_point_cost: 3,
@@ -1456,6 +1467,7 @@ pub const INFLICT_WOUNDS_NECROTIC_INFLUENCE: AbilityEnhancement = AbilityEnhance
 pub const INFLICT_WOUNDS: Ability = Ability {
     id: AbilityId::InflictWounds,
     name: "Inflict wounds",
+    speech: "",
     description: "Deal damage and cause |<keyword>Bleeding| in an area",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
@@ -1497,6 +1509,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 pub const DRAUG_HAUNT: Ability = Ability {
     id: AbilityId::DraugHaunt,
     name: "Haunt",
+    speech: "",
     description: "Deal |<value>2| damage and inflict |<keyword>Dazed| to targets in an area",
     icon: IconId::DraugHaunt,
     action_point_cost: 3,
@@ -1542,6 +1555,7 @@ pub const DRAUG_HAUNT: Ability = Ability {
 pub const DRAUG_CLAW: Ability = Ability {
     id: AbilityId::DraugClaw,
     name: "Claw",
+    speech: "",
     description: "Deal |<value>4| damage and inflict |<keyword>Blinded|",
     icon: IconId::DraugClaw,
     action_point_cost: 3,
@@ -1578,6 +1592,7 @@ pub const DRAUG_CLAW: Ability = Ability {
 pub const ENEMY_ESCAPE: Ability = Ability {
     id: AbilityId::EnemyEscape,
     name: "Escape",
+    speech: "Don't mind me!",
     description: "",
     icon: IconId::Escape,
     action_point_cost: 1,
@@ -1598,13 +1613,14 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     animation_color: BROWN,
     animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
-    resolve_sound: None,
+    resolve_sound: Some(SoundId::Laugh),
     charge_fx: None,
 };
 
 pub const HULDRA_INFECT: Ability = Ability {
     id: AbilityId::HuldraInfect,
     name: "Infect",
+    speech: "",
     description: "",
     icon: IconId::NecroticInfluence,
     action_point_cost: 3,
@@ -1641,6 +1657,7 @@ pub const HULDRA_INFECT: Ability = Ability {
 pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
     id: AbilityId::HuldraInflictHorrors,
     name: "Curse",
+    speech: "",
     description: "",
     icon: IconId::Mindblast,
     action_point_cost: 2,
@@ -1677,6 +1694,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
 pub static HULDRA_HEAL: Ability = Ability {
     id: AbilityId::HuldraHeal,
     name: "Blood magic",
+    speech: "",
     description: "",
     icon: IconId::BloodMagic,
     action_point_cost: 3,
@@ -1722,6 +1740,7 @@ pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
 pub const HEAL: Ability = Ability {
     id: AbilityId::Heal,
     name: "Heal",
+    speech: "",
     description:
         "Restore target's |<heart>| health. Remove |<keyword>Bleeding| and |<keyword>Poisoned|.",
     icon: IconId::Heal,
@@ -1776,6 +1795,7 @@ pub const HEAL: Ability = Ability {
 pub const HASTE: Ability = Ability {
     id: AbilityId::Haste,
     name: "Haste",
+    speech: "",
     description: "Grant an ally bonus AP and movement",
     icon: IconId::Haste,
     action_point_cost: 2,
@@ -1836,6 +1856,7 @@ pub const INSPIRE_RUTHLESS: AbilityEnhancement = AbilityEnhancement {
 pub const INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
+    speech: "",
     description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 2,
@@ -1877,6 +1898,7 @@ pub const INSPIRE: Ability = Ability {
 pub const ENEMY_INSPIRE: Ability = Ability {
     id: AbilityId::Inspire,
     name: "Inspire",
+    speech: "",
     description: "|<keyword>Inspire| nearby allies",
     icon: IconId::Inspire,
     action_point_cost: 3,
@@ -1915,6 +1937,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
 pub const HEALING_NOVA: Ability = Ability {
     id: AbilityId::HealingNova,
     name: "Healing nova",
+    speech: "",
     description: "Restore health to nearby allies",
     icon: IconId::PlusPlus,
     action_point_cost: 3,
@@ -1949,6 +1972,7 @@ pub const HEALING_NOVA: Ability = Ability {
 pub const ENEMY_SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
+    speech: "",
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
@@ -1983,6 +2007,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
 pub const SELF_HEAL: Ability = Ability {
     id: AbilityId::SelfHeal,
     name: "Self heal",
+    speech: "",
     description: "Restore the caster's health and grants protection",
     icon: IconId::PlusPlus,
     action_point_cost: 2,
@@ -2020,6 +2045,7 @@ pub const SELF_HEAL: Ability = Ability {
 pub const HEALING_RAIN: Ability = Ability {
     id: AbilityId::HealingRain,
     name: "Healing rain",
+    speech: "",
     description: "Restore health to allies in an area",
     icon: IconId::PlusPlus,
     action_point_cost: 3,
@@ -2054,6 +2080,7 @@ pub const HEALING_RAIN: Ability = Ability {
 pub const DASH: Ability = Ability {
     id: AbilityId::Dash,
     name: "Dash",
+    speech: "",
     description:
         "Move swiftly in a straight line, without triggering opportunity attacks from enemies.",
     icon: IconId::Dash,
@@ -2064,7 +2091,7 @@ pub const DASH: Ability = Ability {
     roll: None,
     possible_enhancements: [None, None, None],
     target: AbilityTarget::Destination {
-        range: Range::Float(10.0),
+        range: Range::Float(8.0),
     },
     animation_color: RED,
     animation: AbilityAnimation::CastSpell,
@@ -2076,6 +2103,7 @@ pub const DASH: Ability = Ability {
 pub const PIERCING_SHOT: Ability = Ability {
     id: AbilityId::PiercingShot,
     name: "Piercing shot",
+    speech: "",
     description: "Attack all enemies in a line",
     icon: IconId::PiercingShot,
     action_point_cost: 3,
@@ -2155,6 +2183,7 @@ pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
 pub const FIREBALL: Ability = Ability {
     id: AbilityId::Fireball,
     name: "Fireball",
+    speech: "",
     description: "Deal fire damage to an enemy and its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 3,
@@ -2200,6 +2229,7 @@ pub const FIREBALL: Ability = Ability {
 pub const ENEMY_BURNING_ARROW: Ability = Ability {
     id: AbilityId::EnemyBurningArrow,
     name: "Burning arrow",
+    speech: "",
     description: "Deal fire damage to an enemy and its surroundings",
     icon: IconId::Fireball,
     action_point_cost: 4,
@@ -2255,6 +2285,7 @@ pub const LIGHTNING_BOLT_REACH: AbilityEnhancement = AbilityEnhancement {
 pub const LIGHTNING_BOLT: Ability = Ability {
     id: AbilityId::LightningBolt,
     name: "Lightning bolt",
+    speech: "",
     description: "Deal lightning damage in a line",
     icon: IconId::LightningBolt,
     action_point_cost: 3,
@@ -2291,6 +2322,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
 pub const KILL: Ability = Ability {
     id: AbilityId::Kill,
     name: "Kill",
+    speech: "",
     description: "Kill all enemies",
     icon: IconId::Fireball,
     action_point_cost: 1,
@@ -2326,6 +2358,7 @@ pub const KILL: Ability = Ability {
 pub const MANATEST: Ability = Ability {
     id: AbilityId::ManaTest,
     name: "Gain mana",
+    speech: "",
     description: "Gain mana",
     icon: IconId::Fireball,
     action_point_cost: 1,
@@ -2356,6 +2389,7 @@ pub const MANATEST: Ability = Ability {
 pub const POISONTEST: Ability = Ability {
     id: AbilityId::PoisonTest,
     name: "Poison",
+    speech: "",
     description: "Create poison",
     icon: IconId::Fireball,
     action_point_cost: 1,
@@ -2405,6 +2439,7 @@ pub const SEARING_LIGHT_BURN: AbilityEnhancement = AbilityEnhancement {
 pub const SEARING_LIGHT: Ability = Ability {
     id: AbilityId::SearingLight,
     name: "Searing light",
+    speech: "",
     description: "Envelops the target in blinding light",
     icon: IconId::SearingLight,
     action_point_cost: 3,

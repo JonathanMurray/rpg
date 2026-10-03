@@ -433,7 +433,7 @@ pub fn create_character(
                 //bot(BotBehaviour::Magi(Default::default()), 9.0),
                 bot(BotBehaviour::Huldra(Default::default()), 12.0),
                 "Huldra",
-                SoundId::Damage,
+                SoundId::DamageHuldra,
                 PortraitId::Huldra,
                 SpriteId::Huldra,
                 Attributes::new(2, 5, 9, 3),
