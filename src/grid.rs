@@ -76,8 +76,7 @@ use crate::{
     drawing::{draw_arrow, draw_dashed_line},
 };
 
-const BACKGROUND_COLOR: Color = rgb(12, 64, 59); // COL_GRAY; // Color::new(0.2, 0.2, 0.2, 1.0);
-                                                 //const GRID_COLOR: Color = Color::new(0.4, 0.4, 0.4, 1.0);
+const BACKGROUND_COLOR: Color = rgb(6, 32, 30); // rgb(12, 64, 59);
 
 const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.1);
 
@@ -1115,6 +1114,8 @@ impl GameGrid {
                 .find(|ch| ch.player_controlled())
                 .map(|ch| ch.id());
         }
+
+        self.character_animations.retain(|a| a.character_id != id);
     }
 
     fn routes(&self, character_id: CharacterId) -> Ref<IndexMap<(i32, i32), ChartNode>> {
@@ -1522,7 +1523,7 @@ impl GameGrid {
         }
     }
 
-    pub fn entity_draw_size(&self) -> (f32, f32) {
+    pub fn default_entity_draw_size(&self) -> (f32, f32) {
         (
             self.cell_w * CELLS_PER_ENTITY as f32,
             self.cell_w * CELLS_PER_ENTITY as f32,
@@ -1531,7 +1532,7 @@ impl GameGrid {
 
     fn draw_character(&self, character: &Character) {
         let mut params = DrawTextureParams {
-            dest_size: Some(self.entity_draw_size().into()),
+            dest_size: Some(self.default_entity_draw_size().into()),
             flip_x: character.is_facing_east.get(),
             ..Default::default()
         };
@@ -4271,7 +4272,7 @@ impl GameGrid {
                         self.grid_y_f32_to_screen(effect.destination_pos.1 + 0.5),
                     );
                     let texture_size = texture.size();
-                    let texture_draw_size = self.entity_draw_size();
+                    let texture_draw_size = self.default_entity_draw_size();
 
                     let total_dist = Vec2::from(final_to).distance(Vec2::from(from)); //+ texture_draw_size.0;
                     let total_num_textures = total_dist / texture_draw_size.0 + 0.5;

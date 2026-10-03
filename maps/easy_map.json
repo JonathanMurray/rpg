@@ -1,6 +1,6 @@
 {
   "grid_dimensions": [
-    30,
+    60,
     30
   ],
   "terrain_objects": {
@@ -25,9 +25,9 @@
     "(28, 1)": "StoneWallConvexNorthEast",
     "(28, 4)": "StoneWallConvexNorthEast",
     "(28, 7)": "StoneWallConvexNorthEast",
-    "(28, 10)": "StoneWallConvexNorthEast",
-    "(28, 13)": "StoneWallConvexNorthEast",
-    "(28, 16)": "StoneWallConvexNorthEast",
+    "(34, 4)": "StoneWallConvexNorthEast",
+    "(40, 28)": "StoneWallConvexNorthEast",
+    "(40, 1)": "StoneWallConvexNorthEast",
     "(28, 19)": "StoneWallConvexNorthEast",
     "(28, 22)": "StoneWallConvexNorthEast",
     "(28, 25)": "StoneWallConvexNorthEast",
@@ -57,7 +57,75 @@
     "(16, 7)": "StoneWallConvexNorthEast",
     "(13, 7)": "StoneWallConvexNorthEast",
     "(19, 28)": "StoneWallConvexNorthEast",
-    "(13, 4)": "StoneWallConvexNorthEast"
+    "(13, 4)": "StoneWallConvexNorthEast",
+    "(31, 19)": "StoneWallConvexNorthEast",
+    "(55, 10)": "StoneWallConvexNorthEast",
+    "(52, 22)": "StoneWallConvexNorthEast",
+    "(55, 7)": "StoneWallConvexNorthEast",
+    "(31, 7)": "StoneWallConvexNorthEast",
+    "(31, 4)": "StoneWallConvexNorthEast",
+    "(31, 1)": "StoneWallConvexNorthEast",
+    "(31, 22)": "StoneWallConvexNorthEast",
+    "(40, 25)": "StoneWallConvexNorthEast",
+    "(34, 7)": "StoneWallConvexNorthEast",
+    "(52, 1)": "StoneWallConvexNorthEast",
+    "(55, 25)": "StoneWallConvexNorthEast",
+    "(55, 13)": "StoneWallConvexNorthEast",
+    "(58, 25)": "StoneWallConvexNorthEast",
+    "(37, 4)": "StoneWallConvexNorthEast",
+    "(40, 4)": "StoneWallConvexNorthEast",
+    "(58, 28)": "StoneWallConvexNorthEast",
+    "(52, 19)": "StoneWallConvexNorthEast",
+    "(52, 16)": "StoneWallConvexNorthEast",
+    "(52, 4)": "StoneWallConvexNorthEast",
+    "(34, 22)": "StoneWallConvexNorthEast",
+    "(37, 22)": "StoneWallConvexNorthEast",
+    "(40, 22)": "StoneWallConvexNorthEast",
+    "(37, 1)": "StoneWallConvexNorthEast",
+    "(34, 25)": "StoneWallConvexNorthEast",
+    "(55, 4)": "StoneWallConvexNorthEast",
+    "(55, 28)": "StoneWallConvexNorthEast",
+    "(40, 19)": "StoneWallConvexNorthEast",
+    "(37, 19)": "StoneWallConvexNorthEast",
+    "(34, 19)": "StoneWallConvexNorthEast",
+    "(34, 28)": "StoneWallConvexNorthEast",
+    "(52, 13)": "StoneWallConvexNorthEast",
+    "(52, 10)": "StoneWallConvexNorthEast",
+    "(58, 10)": "StoneWallConvexNorthEast",
+    "(58, 13)": "StoneWallConvexNorthEast",
+    "(58, 7)": "StoneWallConvexNorthEast",
+    "(55, 22)": "StoneWallConvexNorthEast",
+    "(58, 16)": "StoneWallConvexNorthEast",
+    "(34, 1)": "StoneWallConvexNorthEast",
+    "(52, 28)": "StoneWallConvexNorthEast",
+    "(31, 25)": "StoneWallConvexNorthEast",
+    "(58, 4)": "StoneWallConvexNorthEast",
+    "(58, 1)": "StoneWallConvexNorthEast",
+    "(55, 19)": "StoneWallConvexNorthEast",
+    "(58, 19)": "StoneWallConvexNorthEast",
+    "(52, 25)": "StoneWallConvexNorthEast",
+    "(37, 25)": "StoneWallConvexNorthEast",
+    "(31, 28)": "StoneWallConvexNorthEast",
+    "(58, 22)": "StoneWallConvexNorthEast",
+    "(37, 7)": "StoneWallConvexNorthEast",
+    "(40, 7)": "StoneWallConvexNorthEast",
+    "(37, 28)": "StoneWallConvexNorthEast",
+    "(55, 16)": "StoneWallConvexNorthEast",
+    "(55, 1)": "StoneWallConvexNorthEast",
+    "(52, 7)": "StoneWallConvexNorthEast",
+    "(43, 1)": "StoneWallConvexNorthEast",
+    "(46, 1)": "StoneWallConvexNorthEast",
+    "(49, 1)": "StoneWallConvexNorthEast",
+    "(49, 4)": "StoneWallConvexNorthEast",
+    "(46, 4)": "StoneWallConvexNorthEast",
+    "(43, 4)": "StoneWallConvexNorthEast",
+    "(43, 7)": "StoneWallConvexNorthEast",
+    "(46, 7)": "StoneWallConvexNorthEast",
+    "(49, 7)": "StoneWallConvexNorthEast",
+    "(43, 28)": "StoneWallConvexNorthEast",
+    "(46, 28)": "StoneWallConvexNorthEast",
+    "(49, 28)": "StoneWallConvexNorthEast",
+    "(19, 4)": "Chest"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -135,9 +203,9 @@
     "(31, 28)": "Floor",
     "(34, 28)": "Floor",
     "(37, 28)": "Floor",
-    "(40, 28)": "Floor",
-    "(43, 28)": "Floor",
-    "(46, 28)": "Floor",
+    "(40, 28)": "Floor2",
+    "(43, 28)": "Floor2",
+    "(46, 28)": "Floor2",
     "(28, 25)": "Floor",
     "(28, 22)": "Floor",
     "(28, 19)": "Floor",
@@ -214,16 +282,61 @@
     "(16, 25)": "Floor3",
     "(16, 28)": "Floor",
     "(4, 28)": "Floor4",
-    "(7, 28)": "Floor4"
+    "(7, 28)": "Floor4",
+    "(43, 1)": "Floor2",
+    "(46, 1)": "Floor2",
+    "(49, 1)": "Floor2",
+    "(49, 4)": "Floor2",
+    "(46, 7)": "Floor2",
+    "(46, 10)": "Floor2",
+    "(49, 10)": "Floor2",
+    "(49, 13)": "Floor2",
+    "(49, 16)": "Floor2",
+    "(49, 19)": "Floor2",
+    "(49, 22)": "Floor2",
+    "(49, 25)": "Floor2",
+    "(49, 28)": "Floor2",
+    "(43, 25)": "Floor2",
+    "(43, 22)": "Floor2",
+    "(43, 19)": "Floor2",
+    "(43, 16)": "Floor2",
+    "(43, 13)": "Floor2",
+    "(43, 10)": "Floor2",
+    "(43, 7)": "Floor2",
+    "(43, 4)": "Floor2",
+    "(46, 4)": "Floor2",
+    "(46, 13)": "Floor2",
+    "(46, 16)": "Floor2",
+    "(46, 19)": "Floor2",
+    "(46, 22)": "Floor2",
+    "(46, 25)": "Floor2",
+    "(49, 7)": "Floor2",
+    "(40, 25)": "Floor2",
+    "(34, 25)": "Floor2",
+    "(34, 16)": "Floor4",
+    "(34, 13)": "Floor4",
+    "(34, 10)": "Floor4",
+    "(34, 7)": "Floor2",
+    "(34, 4)": "Floor2",
+    "(31, 10)": "Floor4",
+    "(37, 10)": "Floor4",
+    "(40, 10)": "Floor4",
+    "(31, 16)": "Floor4",
+    "(31, 13)": "Floor4",
+    "(37, 16)": "Floor4",
+    "(40, 16)": "Floor4",
+    "(40, 13)": "Floor4",
+    "(37, 13)": "Floor4",
+    "(40, 19)": "Floor4"
   },
   "decorations": {
     "(4, 1)": "WallWindow",
     "(10, 1)": "WallWindow",
-    "(28, 16)": "WallOpeningEast",
+    "(52, 19)": "WallOpeningEast",
     "(25, 1)": "WallWindow",
     "(7, 1)": "WallOpeningNorth",
     "(19, 1)": "WallWindow",
-    "(28, 10)": "WallOpeningEast",
+    "(52, 25)": "WallOpeningEast",
     "(28, 4)": "WallOpeningEast",
     "(22, 1)": "AnimalHead",
     "(13, 13)": {
@@ -249,9 +362,16 @@
         "NorthEast",
         "Water"
       ]
-    }
+    },
+    "(52, 13)": "WallOpeningEast",
+    "(40, 22)": "WallOpeningWest",
+    "(31, 7)": "SuitOfArmor",
+    "(37, 7)": "SuitOfArmor",
+    "(43, 7)": "SuitOfArmor"
   },
-  "control_points": {},
+  "control_points": {
+    "(49, 13)": "Exit"
+  },
   "characters": [
     {
       "type_": "Bob",
@@ -261,29 +381,30 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Scoundrel",
-      "name": "Scoundrel",
       "pos": [
         6,
         12
       ],
       "health": 12,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Scoundrel"
     },
     {
       "type_": "Ghoul2",
-      "name": "Wretch",
       "pos": [
         4,
         16
       ],
       "health": 8,
       "main_hand": "BadDagger",
-      "shield": null
+      "shield": null,
+      "name": "Wretch"
     },
     {
       "type_": "Alice",
@@ -293,18 +414,30 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul1",
-      "name": "Troublemaker",
       "pos": [
         20,
         15
       ],
       "health": 8,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Troublemaker"
+    },
+    {
+      "type_": "Lootgoblin",
+      "pos": [
+        23,
+        8
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

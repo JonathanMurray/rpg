@@ -7063,7 +7063,7 @@ impl Character {
         res
     }
 
-    fn get_condition_stacks(&self, condition: Condition) -> u32 {
+    pub fn get_condition_stacks(&self, condition: Condition) -> u32 {
         self.conditions.borrow().get_stacks(&condition)
     }
 

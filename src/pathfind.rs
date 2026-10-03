@@ -17,6 +17,7 @@ use crate::{
     util::line_visitor,
 };
 
+// Entities cover 3x3 cells on the grid
 pub const CELLS_PER_ENTITY: u32 = 3;
 
 #[derive(Debug, Copy, Clone)]

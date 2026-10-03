@@ -75,6 +75,13 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
 
+    for (pos, control_point) in &map_data.control_points {
+        pathfind_grid
+            .control_points
+            .borrow_mut()
+            .insert(*pos, *control_point);
+    }
+
     GameInitState {
         characters,
         active_character_id: active_char_id.unwrap(),

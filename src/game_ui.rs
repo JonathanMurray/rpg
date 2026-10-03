@@ -2131,9 +2131,16 @@ impl UserInterface {
             self.sound_player.stop(sound_id);
         }
 
-        let actor_name_tag = self.characters.get(actor).name_tag();
+        let actor = self.characters.get(actor);
+        let actor_name_tag = actor.name_tag();
         let mut line = if ability.id == AbilityId::EnemyEscape {
-            format!("|{}| escaped.", actor_name_tag)
+            let gold = actor.get_condition_stacks(Condition::Treasure);
+            let with_gold = if gold > 0 {
+                format!(" with |<value>{}| gold", gold)
+            } else {
+                "".to_string()
+            };
+            format!("|{}| escaped{}", actor_name_tag, with_gold)
         } else {
             let verb = if matches!(ability.roll, Some(AbilityRollType::Spell)) {
                 "cast"

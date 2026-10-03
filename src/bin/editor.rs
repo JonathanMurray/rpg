@@ -22,7 +22,7 @@ use rpg::core::{Character, CharacterId, HandType, Party};
 
 use rpg::game_ui::{draw_rectangle_lines2, UiState};
 use rpg::game_ui_connection::{QuitEvent, QUIT_WITH_ESCAPE};
-use rpg::grid::ControlPoint;
+use rpg::grid::{ControlPoint, GameGrid};
 use rpg::init_fight_map::GameInitState;
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::Occupation;
@@ -157,7 +157,7 @@ async fn main() {
 
         if !sidebar.hovered && !settings_hovered && !char_editor_hovered {
             if let Some(action) = sidebar.action() {
-                let entity_size = game_grid.entity_draw_size();
+                let entity_size = game_grid.default_entity_draw_size();
 
                 let rect = Rect::new(
                     snapped_mouse_screen_pos.0 - game_grid.cell_w,
@@ -368,7 +368,6 @@ async fn main() {
                             // TODO: encapsulate some of this
                             map_data.control_points.insert(pos, *control_point);
                             game_grid.control_points.insert(pos, *control_point);
-                            // TODO: Add control point to pathfind grid
                             game_grid
                                 .pathfind_grid
                                 .control_points
@@ -554,6 +553,7 @@ impl Sidebar {
             TerrainId::StoneWallConvexNorthEast,
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
+            TerrainId::Chest,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_ids
             .iter()

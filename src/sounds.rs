@@ -29,7 +29,7 @@ impl SoundPlayer {
 
         for (id, volume, names) in &[
             (SoundId::Execute, 1.6, vec!["fl_execute.ogg"]),
-            (SoundId::Coin, 0.2, vec!["coin"]),
+            (SoundId::Coin, 0.05, vec!["coin"]),
             (
                 SoundId::HoverButton,
                 1.0,
