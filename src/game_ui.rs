@@ -58,7 +58,10 @@ use crate::{
         Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
     },
-    util::{line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0, COL_RED},
+    util::{
+        line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2,
+        COL_LIGHT_BLUE, COL_RED,
+    },
 };
 use crate::{
     pathfind::PathNode,
@@ -495,7 +498,7 @@ impl CharacterUi {
             screen_height() - 140.0,
         );
 
-        let resource_bars_y = screen_height() - 110.0;
+        let resource_bars_y = screen_height() - 105.0;
         let resource_bars_x = resources_mid_x - self.resource_bars.size().0 / 2.0;
         self.resource_bars.draw(resource_bars_x, resource_bars_y);
 
@@ -596,6 +599,7 @@ impl UserInterface {
         let character_uis = build_character_uis(
             &event_queue,
             &resources.simple_font,
+            &resources.big_font,
             characters.iter(),
             sound_player.clone(),
         );
@@ -2939,6 +2943,7 @@ impl UserInterface {
 fn build_character_uis<'a>(
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
+    big_font: &Font,
     characters: impl Iterator<Item = &'a Rc<Character>>,
     sound_player: SoundPlayer,
 ) -> HashMap<u32, CharacterUi> {
@@ -2956,6 +2961,7 @@ fn build_character_uis<'a>(
         let character_ui = build_character_ui(
             event_queue,
             simple_font,
+            big_font,
             character,
             &mut next_button_id,
             Rc::clone(&character_sheet_screen_pos),
@@ -2970,6 +2976,7 @@ fn build_character_uis<'a>(
 fn build_character_ui(
     event_queue: &Rc<RefCell<Vec<InternalUiEvent>>>,
     simple_font: &Font,
+    big_font: &Font,
     character: &Rc<Character>,
     next_button_id: &mut u32,
     character_sheet_screen_pos: Rc<RefCell<(f32, f32)>>,
@@ -3159,7 +3166,7 @@ fn build_character_ui(
         ..Default::default()
     };
 
-    let resource_bars = ResourceBars::new(character, simple_font);
+    let resource_bars = ResourceBars::new(character, big_font);
 
     let action_points_row = ActionPointsRow::new(
         (20.0, 20.0),
@@ -3222,7 +3229,7 @@ impl ResourceBars {
         let stamina_bar = Rc::new(RefCell::new(LabelledResourceBar::new(
             character.stamina.current(),
             character.stamina.max(),
-            COL_GREEN_0,
+            COL_GREEN_1,
             font.clone(),
             "<stamina>",
         )));

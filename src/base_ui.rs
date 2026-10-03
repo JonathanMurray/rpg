@@ -499,10 +499,11 @@ pub fn measure_text_with_font_tags(
         if let Some(&(symbol_w, _)) = TAGS.get(part) {
             w += symbol_w;
             h = h.max(SYMBOL_H);
+            let symbol_offset = 13.0; //13.0;
             if let Some(prev_offset_y) = offset_y {
-                offset_y = Some(prev_offset_y.max(13.0));
+                offset_y = Some(prev_offset_y.max(symbol_offset));
             } else {
-                offset_y = Some(13.0);
+                offset_y = Some(symbol_offset);
             }
         } else {
             let font_size = font_size;

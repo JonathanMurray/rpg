@@ -404,6 +404,17 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        16,
+        29
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

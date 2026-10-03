@@ -67,7 +67,8 @@ use crate::{
     },
     util::{
         line_visitor, modify_line_len, oscillate, oscillate_loop, oscillate_square, plus_minus,
-        rgb, COL_BRIGHT, COL_RED, COL_RED_BRIGHT,
+        rgb, COL_BLUE, COL_BRIGHT, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3,
+        COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
     },
 };
 use crate::{
@@ -3817,12 +3818,12 @@ impl GameGrid {
         let texture_h = 32.0;
 
         let y = y - self.cell_w * 2.0;
-        let y = y + (texture_h - sprite_h as f32) / texture_h * self.cell_w;
+        let y = (y + (texture_h - sprite_h as f32) / texture_h * self.cell_w).round();
 
         let margin = 2.0;
         let health_w = (self.cell_w * CELLS_PER_ENTITY as f32 - 10.0).min(90.0);
         let mut health_h = 10.0;
-        let health_x = x + (self.cell_w - health_w) * 0.5;
+        let health_x = x + ((self.cell_w - health_w) * 0.5).round();
         let mut health_y = y - health_h;
 
         if discrete_healthbar {
@@ -3933,10 +3934,10 @@ impl GameGrid {
 
         draw_rectangle(health_x, health_y, health_w, health_h, healthbar_bg);
 
-        let current_health_w =
-            (health_w) * (character.health.current() as f32 / character.health.max() as f32);
+        let current_health_w = health_w * character.health.ratio();
         draw_rectangle(health_x, health_y, current_health_w, health_h, COL_RED);
         if !discrete_healthbar {
+            // Just some very subtle highlight
             draw_rectangle(
                 health_x + 2.0,
                 health_y + 2.0,
@@ -3944,6 +3945,29 @@ impl GameGrid {
                 health_h * 0.2,
                 COL_RED_BRIGHT,
             );
+        }
+
+        let has_mana = character.mana.max() > 0;
+        let has_stamina = character.stamina.max() > 0;
+        if !discrete_healthbar && character.player_controlled() && (has_mana || has_stamina) {
+            let bar_h = 2.0;
+            let total_h = if has_mana && has_stamina {
+                bar_h * 2.0 + 3.0
+            } else {
+                bar_h + 2.0
+            };
+            let mut bar_y = health_y + health_h;
+            draw_rectangle(health_x, bar_y, health_w, total_h, healthbar_bg);
+            bar_y += 1.0;
+            if has_stamina {
+                let current_stamina_w = (health_w - 2.0) * character.stamina.ratio();
+                draw_rectangle(health_x + 1.0, bar_y, current_stamina_w, bar_h, COL_GREEN_2);
+                bar_y += bar_h + 1.0;
+            }
+            if has_mana {
+                let current_mana_w = (health_w - 2.0) * character.mana.ratio();
+                draw_rectangle(health_x + 1.0, bar_y, current_mana_w, bar_h, COL_LIGHT_BLUE);
+            }
         }
 
         if let Some(preview) = self.target_effect_preview.get(&character.id()) {
