@@ -466,9 +466,18 @@ async fn main() {
         if is_key_pressed(KeyCode::Space) {
             println!("Running game ...");
             QUIT_WITH_ESCAPE.store(true, Ordering::SeqCst);
+
+            let active_character_id = game_grid
+                .characters
+                .values()
+                .filter(|ch| ch.player_controlled())
+                .next()
+                .unwrap()
+                .id();
+
             let init_state = GameInitState {
                 characters: game_grid.characters.values().cloned().collect(),
-                active_character_id: 0,
+                active_character_id,
                 pathfind_grid: game_grid.pathfind_grid.clone(),
                 background: game_grid.background.clone(),
                 terrain_objects: game_grid.terrain_objects.clone(),

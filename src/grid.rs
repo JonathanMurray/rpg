@@ -66,9 +66,9 @@ use crate::{
         WaterType, LIGHTNING_BOLT_FX,
     },
     util::{
-        line_visitor, modify_line_len, oscillate, oscillate_loop, oscillate_square, plus_minus,
-        rgb, COL_BLUE, COL_BRIGHT, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2, COL_GREEN_3,
-        COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
+        are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
+        oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_GREEN_0, COL_GREEN_1,
+        COL_GREEN_2, COL_GREEN_3, COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
     },
 };
 use crate::{
@@ -216,7 +216,11 @@ pub enum RangeIndicatorType {
     ObstructedLineOfSight,
 }
 
-const ZOOM_LEVELS: [f32; 3] = [64.0 / 3.0, 85.0 / 3.0, 96.0 / 3.0];
+const ZOOM_LEVELS: [f32; 3] = [
+    (64_f32 / 3.0).round(),
+    (85_f32 / 3.0).round(),
+    (96_f32 / 3.0).round(),
+];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum TextEffectStyle {
@@ -2032,6 +2036,7 @@ impl GameGrid {
         }
 
         let mut pushed_targets = vec![];
+        let mut opportunity_attackers_against_ranged_attack = vec![];
 
         if let UiState::ConfiguringAction(ConfiguredAction::Attack {
             selected_enhancements,
@@ -2045,6 +2050,15 @@ impl GameGrid {
                     selected_enhancements,
                     &mut pushed_targets,
                 );
+
+                let attacker = &self.characters[&self.active_character_id];
+                if !attacker.weapon(HandType::MainHand).unwrap().is_melee() {
+                    self.acquire_opportunity_attackers_against_ranged_attack(
+                        attacker,
+                        *target_id,
+                        &mut opportunity_attackers_against_ranged_attack,
+                    );
+                }
             }
         }
 
@@ -3156,7 +3170,7 @@ impl GameGrid {
         for char_animation in &self.character_animations {
             match &char_animation.kind {
                 AnimationDetails::SpeechBubble { text } => {
-                    self.draw_speech_bubble(text, char_animation.character_id);
+                    self.draw_speech_bubble(text, char_animation.character_id, 0.0);
                 }
                 AnimationDetails::AttackCrosshairPreview { target_pos } => {
                     self.draw_target_crosshair(
@@ -3218,6 +3232,10 @@ impl GameGrid {
             }
         }
 
+        for character_id in opportunity_attackers_against_ranged_attack {
+            self.draw_opportunity_attack_warning(character_id);
+        }
+
         self.draw_pushed_targets(&pushed_targets);
 
         self.draw_effects();
@@ -3240,6 +3258,23 @@ impl GameGrid {
         self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
         outcome
+    }
+
+    fn acquire_opportunity_attackers_against_ranged_attack(
+        &self,
+        attacker: &Character,
+        target_id: CharacterId,
+        opportunity_attackers: &mut Vec<CharacterId>,
+    ) {
+        for other_char in self.characters.values() {
+            if other_char.id() != target_id
+                && attacker.player_controlled() != other_char.player_controlled()
+                && are_entities_within_melee(attacker.pos(), other_char.pos())
+                && other_char.can_use_opportunity_attack(attacker.id())
+            {
+                opportunity_attackers.push(other_char.id());
+            }
+        }
     }
 
     fn acquire_pushed_targets_from_attack(
@@ -3479,31 +3514,38 @@ impl GameGrid {
         None
     }
 
-    fn draw_speech_bubble(&self, text: &str, character_id: CharacterId) {
-        let font_size = 20;
-        let text_dim = measure_text(text, Some(&self.big_font), font_size, 1.0);
-        let padding = 5.0;
+    fn draw_opportunity_attack_warning(&self, opportunity_attacker: CharacterId) {
+        self.draw_speech_bubble("|<warning>|", opportunity_attacker, -3.0);
+    }
+
+    fn draw_speech_bubble(&self, text: &str, character_id: CharacterId, text_y_offset: f32) {
+        let font_size = 24;
+        let text_dim = measure_text_with_font_tags(text, Some(&self.big_font), font_size, 1.0);
+        let padding = 3.0;
         let bubble_h = text_dim.height + padding * 2.0;
-        let bubble_w = (text_dim.width + padding * 2.0).max(self.cell_w * 1.5);
+        let bubble_w = (text_dim.width + padding * 2.0); //.max(self.cell_w * 1.5);
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
         let x0 = x + self.cell_w * 2.0;
         let y0 = y - self.cell_w;
+        let triangle_h = 10.0;
         let v1 = (x0 + 5.0, y0 - 5.0);
-        let v2 = (x0 + self.cell_w / 2.0, y0 - self.cell_w);
-        let v3 = (x0 + self.cell_w, y0 - self.cell_w);
+        let v2 = (x0 + 10.0, y0 - 5.0 - triangle_h);
+        let v3 = (x0 + 15.0, y0 - 5.0 - triangle_h);
         let bg_color = Color::new(0.9, 0.9, 0.9, 1.0);
         draw_triangle(v1.into(), v2.into(), v3.into(), bg_color);
-        draw_rectangle(x0, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
-        draw_text_rounded(
+        let bubble_x = x0.max(v2.0 + (v3.0 - v2.0) / 2.0 - (bubble_w / 2.0).round());
+        draw_rectangle(bubble_x, v2.1 - bubble_h, bubble_w, bubble_h, bg_color);
+        draw_text_with_font_tags(
             text,
-            x0 + bubble_w / 2.0 - text_dim.width / 2.0,
-            v2.1 - padding,
+            (bubble_x + bubble_w / 2.0 - text_dim.width / 2.0).round(),
+            v2.1 - padding + text_y_offset,
             TextParams {
                 font: Some(&self.big_font),
                 font_size,
                 color: BLACK,
                 ..Default::default()
             },
+            true,
         );
     }
 
@@ -4300,7 +4342,7 @@ impl GameGrid {
     }
 
     fn draw_overhead_question_mark(&self, reactor: &Character) {
-        self.draw_speech_bubble("?", reactor.id());
+        self.draw_speech_bubble("?", reactor.id(), 0.0);
     }
 
     fn draw_engagement_line(
@@ -4502,7 +4544,7 @@ impl GameGrid {
         self.draw_cornered_outline((x, y), Color::new(1.0, 1.0, 1.0, 0.5), 2.0, 2.0, true);
 
         for char_id in opportunity_attackers {
-            self.draw_speech_bubble("!", char_id);
+            self.draw_opportunity_attack_warning(char_id);
         }
 
         let text_color = LIGHTGRAY;

@@ -373,21 +373,10 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "Clara",
-      "pos": [
-        12,
-        33
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "SkeletonLeader",
       "pos": [
-        15,
-        16
+        12,
+        22
       ],
       "health": null,
       "main_hand": null,
@@ -406,10 +395,21 @@
       "name": null
     },
     {
+      "type_": "Alice",
+      "pos": [
+        12,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
       "type_": "Bob",
       "pos": [
-        16,
-        29
+        15,
+        24
       ],
       "health": null,
       "main_hand": null,

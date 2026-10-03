@@ -59,8 +59,8 @@ use crate::{
         KEYWORD_TOOLTIP_COUNTER,
     },
     util::{
-        line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0, COL_GREEN_1, COL_GREEN_2,
-        COL_LIGHT_BLUE, COL_RED,
+        are_entities_within_melee, line_visitor, modify_line_len, COL_BLUE, COL_DARK, COL_GREEN_0,
+        COL_GREEN_1, COL_GREEN_2, COL_LIGHT_BLUE, COL_RED,
     },
 };
 use crate::{
@@ -1148,12 +1148,12 @@ impl UserInterface {
                         .map(|e| (e.name, e.effect))
                         .collect();
 
-                let active_char = self.characters.get_rc(self.active_character_id);
+                let attacker = self.characters.get_rc(self.active_character_id);
 
                 let prediction = predict_attack(
                     &self.game_grid.pathfind_grid,
                     &self.characters,
-                    active_char,
+                    attacker,
                     attack.hand,
                     &selected_enhancement_effects,
                     target_char,
@@ -1455,14 +1455,7 @@ impl UserInterface {
                 }
             }
 
-            UiState::ReactingToAttack {
-                hand,
-                attacker,
-                defender,
-                reactor,
-                is_within_melee,
-                selected,
-            } => {
+            UiState::ReactingToAttack { reactor, .. } => {
                 is_reacting = Some(*reactor);
                 is_reacting_to_attack = true;
             }
@@ -1480,16 +1473,10 @@ impl UserInterface {
             }
 
             UiState::ChoosingAction => {
-                /*
-                self.target_ui
-                    .set_action("Select an action".to_string(), vec![], false);
-                */
-
                 self.set_allowed_to_use_action_buttons(true);
             }
 
             UiState::Idle { .. } => {
-                //self.target_ui.clear_action();
                 self.set_allowed_to_use_action_buttons(false);
             }
         }
@@ -1945,7 +1932,7 @@ impl UserInterface {
             } => {
                 let character = self.characters.get(character);
                 self.log.add(format!(
-                    "|{}| took |<value>{}| damage from {}",
+                    "|{}| took |<value>{}| damage |<faded>({})|",
                     character.name_tag(),
                     amount,
                     source.name()
