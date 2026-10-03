@@ -44,9 +44,9 @@ use crate::{
     core::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
-        within_range_squared, Ability, AbilityId, AbilityReach, AbilityTarget, ActionReach,
-        ActionTarget, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition, AttackAction,
-        AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
+        within_range_squared, Ability, AbilityAnimation, AbilityId, AbilityReach, AbilityTarget,
+        ActionReach, ActionTarget, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition,
+        AttackAction, AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
         TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
@@ -726,132 +726,125 @@ impl GameGrid {
             }
         }
 
-        let duration = if ability.id == AbilityId::SweepAttack {
-            self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
-                delay,
-                0.4,
-                AnimationDetails::Spinning,
-            ));
-            // The ability should resolve in the middle of the character's animation
-            delay + 0.2
-        } else if ability.id == AbilityId::ShieldBash {
-            self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
-                delay,
-                0.4,
-                AnimationDetails::MeleeAttack {
-                    toward: target_pos.unwrap(),
-                    with_shield: true,
-                },
-            ));
-            // The ability should resolve in the middle of the character's animation, before they retract from the target
-            delay + 0.1
-        } else if ability.id == AbilityId::LungeAttack {
-            self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
-                delay,
-                0.4,
-                AnimationDetails::MeleeAttack {
-                    toward: target_pos.unwrap(),
-                    with_shield: false,
-                },
-            ));
-            // The ability should resolve in the middle of the character's animation, before they retract from the target
-            delay + 0.1
-        } else if ability.id == AbilityId::Execute {
-            self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
-                delay,
-                0.4,
-                AnimationDetails::MeleeAttack {
-                    toward: target_pos.unwrap(),
-                    with_shield: false,
-                },
-            ));
-            // The ability should resolve in the middle of the character's animation, before they retract from the target
-            delay + 0.1
-        } else {
-            let casting_duration = 0.4;
-            self.character_animations.push(CharacterAnimation::new(
-                actor.id(),
-                delay,
-                casting_duration,
-                AnimationDetails::CastingSpell {
-                    color: ability.animation_color,
-                },
-            ));
+        let duration = match ability.animation {
+            AbilityAnimation::MeleeWeaponAttack => {
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    delay,
+                    0.4,
+                    AnimationDetails::MeleeAttack {
+                        toward: target_pos.unwrap(),
+                        with_shield: false,
+                    },
+                ));
+                // The ability should resolve in the middle of the character's animation, before they retract from the target
+                delay + 0.1
+            }
+            AbilityAnimation::ShieldAttack => {
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    delay,
+                    0.4,
+                    AnimationDetails::MeleeAttack {
+                        toward: target_pos.unwrap(),
+                        with_shield: true,
+                    },
+                ));
+                // The ability should resolve in the middle of the character's animation, before they retract from the target
+                delay + 0.1
+            }
+            AbilityAnimation::SpinAttack => {
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    delay,
+                    0.4,
+                    AnimationDetails::Spinning,
+                ));
+                // The ability should resolve in the middle of the character's animation
+                delay + 0.2
+            }
+            AbilityAnimation::CastSpell => {
+                let casting_duration = 0.4;
+                let animation_color = ability.animation_color;
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    delay,
+                    casting_duration,
+                    AnimationDetails::CastingSpell {
+                        color: animation_color,
+                    },
+                ));
 
-            let animation_color = ability.animation_color;
-            let caster_pos = actor.pos();
+                let caster_pos = actor.pos();
 
-            if target.is_some() {
-                let target_pos = target_pos.unwrap();
+                if target.is_some() {
+                    let target_pos = target_pos.unwrap();
 
-                let duration = 0.04 * distance_between(caster_pos, target_pos);
+                    let duration = 0.04 * distance_between(caster_pos, target_pos);
 
-                self.add_circle_projectile_effect(
-                    delay + casting_duration,
-                    duration,
-                    animation_color,
-                    caster_pos,
-                    target_pos,
-                );
+                    self.add_circle_projectile_effect(
+                        delay + casting_duration,
+                        duration,
+                        animation_color,
+                        caster_pos,
+                        target_pos,
+                    );
 
-                delay + casting_duration + duration
-            } else if let Some((shape, area_pos)) = area_at {
-                let distance = distance_between(caster_pos, area_pos);
-                let duration;
-                match shape {
-                    AreaShape::Circle(..) => {
-                        duration = 0.05 * distance;
-                        self.add_circle_projectile_effect(
-                            delay + casting_duration,
-                            duration,
-                            animation_color,
-                            caster_pos,
-                            area_pos,
-                        );
-                    }
-                    AreaShape::Line => {
-                        let visual_duration;
-                        if ability.id == AbilityId::LightningBolt {
-                            let texture = LIGHTNING_BOLT_FX.get().unwrap();
-                            visual_duration = 0.03 * distance;
-                            self.add_effect(
+                    delay + casting_duration + duration
+                } else if let Some((shape, area_pos)) = area_at {
+                    let distance = distance_between(caster_pos, area_pos);
+                    let duration;
+                    match shape {
+                        AreaShape::Circle(..) => {
+                            duration = 0.05 * distance;
+                            self.add_circle_projectile_effect(
+                                delay + casting_duration,
+                                duration,
+                                animation_color,
                                 caster_pos,
                                 area_pos,
-                                Effect {
-                                    start_time: delay + casting_duration,
-                                    end_time: delay + casting_duration + visual_duration,
-                                    variant: EffectVariant::Fx { texture },
-                                },
-                            );
-                        } else {
-                            visual_duration = 0.05 * distance;
-                            self.add_effect(
-                                caster_pos,
-                                area_pos,
-                                Effect {
-                                    start_time: delay + casting_duration,
-                                    end_time: delay + casting_duration + visual_duration,
-                                    variant: EffectVariant::Line {
-                                        color: animation_color,
-                                        thickness: 10.0,
-                                        end_thickness: None,
-                                        extend_gradually: true,
-                                    },
-                                },
                             );
                         }
-                        // Targets should be affected before the line has travelled from start to end
-                        duration = visual_duration / 2.0;
+                        AreaShape::Line => {
+                            let visual_duration;
+                            if ability.id == AbilityId::LightningBolt {
+                                let texture = LIGHTNING_BOLT_FX.get().unwrap();
+                                visual_duration = 0.03 * distance;
+                                self.add_effect(
+                                    caster_pos,
+                                    area_pos,
+                                    Effect {
+                                        start_time: delay + casting_duration,
+                                        end_time: delay + casting_duration + visual_duration,
+                                        variant: EffectVariant::Fx { texture },
+                                    },
+                                );
+                            } else {
+                                visual_duration = 0.05 * distance;
+                                self.add_effect(
+                                    caster_pos,
+                                    area_pos,
+                                    Effect {
+                                        start_time: delay + casting_duration,
+                                        end_time: delay + casting_duration + visual_duration,
+                                        variant: EffectVariant::Line {
+                                            color: animation_color,
+                                            thickness: 10.0,
+                                            end_thickness: None,
+                                            extend_gradually: true,
+                                        },
+                                    },
+                                );
+                            }
+                            // Targets should be affected before the line has travelled from start to end
+                            duration = visual_duration / 2.0;
+                        }
                     }
-                }
 
-                delay + casting_duration + duration
-            } else {
-                delay + casting_duration
+                    delay + casting_duration + duration
+                } else {
+                    delay + casting_duration
+                }
             }
         };
 

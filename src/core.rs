@@ -4904,6 +4904,14 @@ pub enum HandType {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+pub enum AbilityAnimation {
+    MeleeWeaponAttack,
+    ShieldAttack,
+    SpinAttack,
+    CastSpell,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct AbilityChargeFx {
     pub(crate) particle_shape: ParticleShape,
     pub(crate) sound: SoundId,
@@ -4924,6 +4932,7 @@ pub struct Ability {
     pub target: AbilityTarget,
     pub possible_enhancements: [Option<AbilityEnhancement>; 3],
     pub animation_color: Color,
+    pub animation: AbilityAnimation,
     pub initiate_sound: Option<SoundId>,
     pub resolve_sound: Option<SoundId>,
     pub charge_fx: Option<AbilityChargeFx>,

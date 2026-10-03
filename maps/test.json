@@ -373,28 +373,6 @@
   "control_points": {},
   "characters": [
     {
-      "type_": "SkeletonLeader",
-      "pos": [
-        12,
-        22
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Huldra",
-      "pos": [
-        17,
-        21
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Alice",
       "pos": [
         12,
@@ -406,10 +384,21 @@
       "name": null
     },
     {
+      "type_": "Draug",
+      "pos": [
+        13,
+        22
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
       "type_": "Bob",
       "pos": [
         15,
-        24
+        25
       ],
       "health": null,
       "main_hand": null,

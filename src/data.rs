@@ -2,10 +2,10 @@ use macroquad::color::{Color, BLACK, BLUE, BROWN, GRAY, GREEN, LIME, PURPLE, RED
 
 use crate::{
     core::{
-        Ability, AbilityAttackEffect, AbilityChargeFx, AbilityDamage, AbilityEffect,
-        AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect, AbilityReach,
-        AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
-        AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
+        Ability, AbilityAnimation, AbilityAttackEffect, AbilityChargeFx, AbilityDamage,
+        AbilityEffect, AbilityEnhancement, AbilityId, AbilityNegativeEffect, AbilityPositiveEffect,
+        AbilityReach, AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect,
+        AreaShape, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
         AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
         Condition, Consumable, DamageType, DefenseType, EnvironmentEffect, EquipEffect,
         EquipmentRequirement, Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect,
@@ -736,6 +736,7 @@ pub const SHIELD_BASH: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::ShieldAttack,
     initiate_sound: None,
     resolve_sound: Some(SoundId::ShieldBash),
     charge_fx: None,
@@ -771,6 +772,7 @@ pub const ENEMY_TACKLE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::MeleeWeaponAttack,
     roll: Some(AbilityRollType::RollAbilityWithAttackModifier),
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
@@ -804,7 +806,7 @@ pub const ENEMY_SLASHING_ATTACK: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
-
+    animation: AbilityAnimation::MeleeWeaponAttack,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: None,
@@ -1067,6 +1069,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
         environment_effect: None,
     },
     animation_color: BLACK,
+    animation: AbilityAnimation::SpinAttack,
     initiate_sound: Some(SoundId::SweepAttack),
     resolve_sound: None,
     charge_fx: Some(AbilityChargeFx {
@@ -1131,6 +1134,7 @@ pub const LUNGE_ATTACK: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::MeleeWeaponAttack,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
@@ -1177,6 +1181,7 @@ pub const EXECUTE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::MeleeWeaponAttack,
     initiate_sound: Some(SoundId::Execute),
     resolve_sound: None,
     charge_fx: Some(AbilityChargeFx {
@@ -1213,6 +1218,7 @@ pub const ENEMY_BRACE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::BuffBrace),
     charge_fx: None,
@@ -1245,6 +1251,7 @@ pub const BRACE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GRAY,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::BuffBrace),
     charge_fx: Some(AbilityChargeFx {
@@ -1300,6 +1307,7 @@ pub const SCREAM: Ability = Ability {
     possible_enhancements: [Some(SCREAM_SHRIEK), None, None],
 
     animation_color: BLUE,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
@@ -1371,6 +1379,7 @@ pub const SHACKLED_MIND: Ability = Ability {
     ],
 
     animation_color: Color::new(0.6, 0.3, 0.8, 1.00),
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: Some(AbilityChargeFx {
@@ -1418,6 +1427,7 @@ pub const MIND_BLAST: Ability = Ability {
         environment_effect: None,
     },
     animation_color: PURPLE,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: Some(AbilityChargeFx {
@@ -1475,6 +1485,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
         },
     },
     animation_color: BROWN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: Some(AbilityChargeFx {
@@ -1486,7 +1497,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
 pub const DRAUG_HAUNT: Ability = Ability {
     id: AbilityId::DraugHaunt,
     name: "Haunt",
-    description: "Deal |<value>2| damage and inflict |<keyword>Dazed|",
+    description: "Deal |<value>2| damage and inflict |<keyword>Dazed| to targets in an area",
     icon: IconId::DraugHaunt,
     action_point_cost: 3,
     mana_cost: 0,
@@ -1495,24 +1506,34 @@ pub const DRAUG_HAUNT: Ability = Ability {
 
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],
+
     target: AbilityTarget::Enemy {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
-            defense_type: Some(DefenseType::Will),
-            damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
-            on_hit: Some([
-                Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Dazed,
-                    stacks: None,
-                    duration_rounds: Some(1),
-                })),
-                None,
-            ]),
+            defense_type: None,
+            damage: None,
+            on_hit: None,
         }),
-        impact_circle: None,
+        impact_circle: Some((
+            Range::Ranged(4),
+            AreaTargetAcquisition::Enemies,
+            AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: Some(DefenseType::Will),
+                damage: Some(AbilityDamage::Dynamic(2, DamageType::Regular)),
+                on_hit: Some([
+                    Some(ApplyEffect::Condition(ApplyCondition {
+                        condition: Condition::Dazed,
+                        stacks: None,
+                        duration_rounds: Some(1),
+                    })),
+                    None,
+                ]),
+            }),
+        )),
         environment_effect: None,
     },
     animation_color: PURPLE,
+    animation: AbilityAnimation::MeleeWeaponAttack,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: None,
@@ -1548,6 +1569,7 @@ pub const DRAUG_CLAW: Ability = Ability {
         environment_effect: None,
     },
     animation_color: PURPLE,
+    animation: AbilityAnimation::MeleeWeaponAttack,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: None,
@@ -1574,6 +1596,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: BROWN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: None,
     charge_fx: None,
@@ -1609,6 +1632,7 @@ pub const HULDRA_INFECT: Ability = Ability {
         reach: AbilityReach::Range(Range::Float(15.5)),
     },
     animation_color: BROWN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: None,
@@ -1644,6 +1668,7 @@ pub const HULDRA_INFLICT_HORRORS: Ability = Ability {
         environment_effect: None,
     },
     animation_color: PURPLE,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Debuff),
     charge_fx: None,
@@ -1676,6 +1701,7 @@ pub static HULDRA_HEAL: Ability = Ability {
     },
     possible_enhancements: [None, None, None],
     animation_color: LIME,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: None,
@@ -1738,6 +1764,7 @@ pub const HEAL: Ability = Ability {
     ],
 
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Heal),
     charge_fx: Some(AbilityChargeFx {
@@ -1774,6 +1801,7 @@ pub const HASTE: Ability = Ability {
     possible_enhancements: [None, None, None],
 
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: Some(AbilityChargeFx {
@@ -1837,6 +1865,7 @@ pub const INSPIRE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: Some(AbilityChargeFx {
@@ -1877,6 +1906,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: None,
@@ -1907,6 +1937,7 @@ pub const HEALING_NOVA: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: Some(AbilityChargeFx {
@@ -1943,6 +1974,7 @@ pub const ENEMY_SELF_HEAL: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: None,
@@ -1976,6 +2008,7 @@ pub const SELF_HEAL: Ability = Ability {
         environment_effect: None,
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: Some(AbilityChargeFx {
@@ -2009,6 +2042,7 @@ pub const HEALING_RAIN: Ability = Ability {
         },
     },
     animation_color: GREEN,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: Some(SoundId::Powerup),
     charge_fx: Some(AbilityChargeFx {
@@ -2033,6 +2067,7 @@ pub const DASH: Ability = Ability {
         range: Range::Float(10.0),
     },
     animation_color: RED,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: None,
     resolve_sound: None,
     charge_fx: None,
@@ -2064,6 +2099,7 @@ pub const PIERCING_SHOT: Ability = Ability {
         },
     },
     animation_color: YELLOW,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: None, //Some(SoundId::HitArrow),
     charge_fx: Some(AbilityChargeFx {
@@ -2152,6 +2188,7 @@ pub const FIREBALL: Ability = Ability {
     ],
 
     animation_color: RED,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::FireballHit),
     charge_fx: Some(AbilityChargeFx {
@@ -2192,6 +2229,7 @@ pub const ENEMY_BURNING_ARROW: Ability = Ability {
     possible_enhancements: [None; 3],
 
     animation_color: RED,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootArrow),
     resolve_sound: Some(SoundId::FireballHit),
     charge_fx: Some(AbilityChargeFx {
@@ -2241,6 +2279,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
 
     // TODO: unique animation/sound
     animation_color: YELLOW,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::LightningHit),
     charge_fx: Some(AbilityChargeFx {
@@ -2275,6 +2314,7 @@ pub const KILL: Ability = Ability {
         environment_effect: None,
     },
     animation_color: BLACK,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
@@ -2304,6 +2344,7 @@ pub const MANATEST: Ability = Ability {
         environment_effect: None,
     },
     animation_color: BLACK,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
@@ -2333,6 +2374,7 @@ pub const POISONTEST: Ability = Ability {
         )),
     },
     animation_color: BLACK,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
@@ -2390,6 +2432,7 @@ pub const SEARING_LIGHT: Ability = Ability {
         environment_effect: None,
     },
     animation_color: YELLOW,
+    animation: AbilityAnimation::CastSpell,
     initiate_sound: Some(SoundId::ShootSpell),
     resolve_sound: Some(SoundId::Explosion),
     charge_fx: Some(AbilityChargeFx {
