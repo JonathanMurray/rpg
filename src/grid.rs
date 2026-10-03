@@ -820,7 +820,7 @@ impl GameGrid {
                                     },
                                 );
                             } else {
-                                visual_duration = 0.05 * distance;
+                                visual_duration = 0.03 * distance;
                                 self.add_effect(
                                     caster_pos,
                                     area_pos,
@@ -1024,12 +1024,17 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_character_shaking(&mut self, character_id: CharacterId, duration: f32) {
+    pub fn animate_character_shaking(
+        &mut self,
+        character_id: CharacterId,
+        start: f32,
+        duration: f32,
+    ) {
         let random_time_offset = random_range(0.0..1.0);
 
         self.character_animations.push(CharacterAnimation::new(
             character_id,
-            0.0,
+            start,
             duration,
             AnimationDetails::Shake { random_time_offset },
         ));
@@ -3240,11 +3245,12 @@ impl GameGrid {
 
         let inspect_target = match ui_state.players_action_target() {
             ActionTarget::Character(char_id, _) => Some(char_id),
-            ActionTarget::Position(..) => None,
-            ActionTarget::None => self.hovered_character.or(self.hovered_character_portrait),
+            ActionTarget::Position(..) | ActionTarget::None => {
+                self.hovered_character.or(self.hovered_character_portrait)
+            }
         };
 
-        if inspect_target != self.prev_inspect_target {
+        if inspect_target.is_some() && inspect_target != self.prev_inspect_target {
             outcome.switched_inspect_target = Some(inspect_target);
             self.prev_inspect_target = inspect_target;
         }

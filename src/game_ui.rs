@@ -16,6 +16,7 @@ use macroquad::{
     texture::draw_texture,
     window::{screen_height, screen_width},
 };
+use serde::de;
 
 use crate::{
     action_button::{
@@ -1685,7 +1686,7 @@ impl UserInterface {
                     .animate_character_initiating_ability(actor, target, &ability, area_at);
 
                 if let Some(sound_id) = ability.initiate_sound {
-                    self.sound_player.play_delayed(sound_id, delay as f64);
+                    self.sound_player.play_delayed(sound_id, delay);
                 }
 
                 self.animation_stopwatch.set_to_at_least(duration);
@@ -1952,7 +1953,7 @@ impl UserInterface {
                 );
                 if source == DamageSource::KnockbackCollision {
                     self.game_grid
-                        .animate_character_shaking(character.id(), 0.2);
+                        .animate_character_shaking(character.id(), 0.0, 0.2);
                     self.game_grid.animate_pow_effect(character.id(), 0.2);
                 }
                 self.animate_character_damage(character.id(), amount);
@@ -2109,7 +2110,8 @@ impl UserInterface {
                 },
             );
 
-            self.game_grid.animate_character_shaking(*target_id, 0.2);
+            self.game_grid
+                .animate_character_shaking(*target_id, start, 0.2);
 
             self.add_effect_for_target_outcome(outcome, start, *target_id, target_pos);
 
@@ -2230,7 +2232,7 @@ impl UserInterface {
         let animation_color = ability.animation_color;
         if let Some((target, outcome)) = &target_outcome {
             let target_pos = self.characters.get(*target).pos();
-            self.game_grid.animate_character_shaking(*target, 0.2);
+            self.game_grid.animate_character_shaking(*target, 0.0, 0.2);
             self.add_effect_for_target_outcome(outcome, 0.0, *target, target_pos);
             self.animation_stopwatch.set_to_at_least(0.3);
         }
@@ -2270,8 +2272,7 @@ impl UserInterface {
                 .animate_character_attacking(attacker, target, ranged, target_reaction);
 
         if ranged {
-            self.sound_player
-                .play_delayed(SoundId::ShootArrow, delay as f64);
+            self.sound_player.play_delayed(SoundId::ShootArrow, delay);
         }
 
         self.animation_stopwatch.set_to_at_least(duration);
@@ -2282,24 +2283,28 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        let delay = attack_index as f64 * 0.1;
+        let start_time = attack_index as f32 * 0.1;
 
         let target_pos = self.characters.get(target).pos();
         let attacker_pos = self.characters.get(attacker).pos();
 
         if event.outcome.hit_type == HitType::Miss {
-            self.sound_player.play_delayed(SoundId::AttackMiss, delay);
+            self.sound_player
+                .play_delayed(SoundId::AttackMiss, start_time);
         } else if event.outcome.damage == 0 {
             self.sound_player
-                .play_delayed(SoundId::ArmorAbsorbed, delay);
+                .play_delayed(SoundId::ArmorAbsorbed, start_time);
         } else {
             if self.characters.get(attacker).has_equipped_ranged_weapon() {
-                self.sound_player.play_delayed(SoundId::HitArrow, delay);
+                self.sound_player
+                    .play_delayed(SoundId::HitArrow, start_time);
             } else {
-                self.sound_player.play_delayed(SoundId::MeleeAttack, delay);
+                self.sound_player
+                    .play_delayed(SoundId::MeleeAttack, start_time);
             }
             if matches!(event.outcome.hit_type, HitType::Critical) {
-                self.sound_player.play_delayed(SoundId::Crit, delay + 0.02);
+                self.sound_player
+                    .play_delayed(SoundId::Crit, start_time + 0.02);
                 self.game_grid.add_text_effect(
                     target_pos,
                     0.0,
@@ -2310,7 +2315,7 @@ impl UserInterface {
                 );
             }
             self.sound_player
-                .play_delayed(self.characters.get(target).damage_sound, delay + 0.03);
+                .play_delayed(self.characters.get(target).damage_sound, start_time + 0.03);
         }
 
         let verb = match event.outcome.hit_type {
@@ -2370,12 +2375,12 @@ impl UserInterface {
         };
 
         self.game_grid
-            .add_text_effect(target_pos, 0.0, 1.5, None, impact_text, text_style);
+            .add_text_effect(target_pos, start_time, 1.5, None, impact_text, text_style);
 
         if !applied_to_target.is_empty() {
             let mut delay = 0.0;
             for apply_effect in applied_to_target {
-                if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                if self.show_applied_effect(*apply_effect, target_pos, start_time + delay) {
                     delay += 0.3;
                 }
             }
@@ -2383,18 +2388,26 @@ impl UserInterface {
         if !applied_to_self.is_empty() {
             let mut delay = 0.3;
             for apply_effect in applied_to_self {
-                if self.show_applied_effect(*apply_effect, attacker_pos, delay) {
+                if self.show_applied_effect(*apply_effect, attacker_pos, start_time + delay) {
                     delay += 0.3;
                 }
             }
         };
 
         if damage_was_dealt {
-            self.game_grid.animate_character_shaking(target, 0.2);
+            self.game_grid
+                .animate_character_shaking(target, start_time, 0.2);
         }
 
         if let Some((shape, outcomes)) = &event.area_outcomes {
-            self.add_effects_for_area_outcomes(0.0, RED, &target_pos, Some(*shape), outcomes, true);
+            self.add_effects_for_area_outcomes(
+                start_time,
+                RED,
+                &target_pos,
+                Some(*shape),
+                outcomes,
+                true,
+            );
         }
 
         let duration = if self.characters.get(attacker).player_controlled() {
@@ -2433,7 +2446,7 @@ impl UserInterface {
                         self.animate_character_damage(target, *actual_health_lost);
                         self.sound_player.play_delayed(
                             self.characters.get(target).damage_sound,
-                            start_time as f64 + 0.03,
+                            start_time + 0.03,
                         );
                         if hit_type == &HitType::Critical {
                             effects.push((
@@ -2586,7 +2599,7 @@ impl UserInterface {
         let game_speed = if self.slow_motion.get() { 0.3 } else { 1.0 };
         let elapsed = elapsed * game_speed;
 
-        self.sound_player.update();
+        self.sound_player.update(elapsed);
 
         self.set_allowed_to_use_action_buttons(
             self.player_portraits.selected_id() == self.active_character_id,

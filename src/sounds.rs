@@ -16,6 +16,7 @@ pub struct SoundPlayer {
     sounds: Rc<HashMap<SoundId, SoundContainer>>,
     pub enabled: Rc<Cell<bool>>,
     queued: Rc<RefCell<Vec<(SoundId, f64)>>>,
+    time: f64,
 }
 
 struct SoundContainer {
@@ -54,7 +55,7 @@ impl SoundPlayer {
             (SoundId::BuffBrace, 1.0, vec!["fl_buff_brace.ogg"]),
             (SoundId::Heal, 0.7, vec!["fl_heal.ogg"]),
             (SoundId::MeleeAttack, 0.3, vec!["melee_attack"]),
-            (SoundId::AttackMiss, 0.4, vec!["fl_miss.ogg"]),
+            (SoundId::AttackMiss, 0.3, vec!["fl_miss.ogg"]),
             (SoundId::Resist, 1.0, vec!["fl_resist.ogg"]),
             (SoundId::ArmorAbsorbed, 1.0, vec!["fl_armor_absorbed.ogg"]),
             //(SoundId::ShootArrow, 1.0, vec!["shoot_arrow_2"]),
@@ -98,7 +99,13 @@ impl SoundPlayer {
             (
                 SoundId::Damage,
                 1.0,
-                vec!["fl_damage_4.ogg", "fl_damage_7.ogg"],
+                vec![
+                    "fl_damage_4.ogg",
+                    "fl_damage_a1.ogg",
+                    "fl_damage_a2.ogg",
+                    "fl_damage_a3.ogg",
+                    "fl_damage_a4.ogg",
+                ],
             ),
             (SoundId::DamageBob, 1.0, vec!["fl_damage_5.ogg"]),
             (SoundId::DamageFemale, 1.0, vec!["fl_damage_8.ogg"]),
@@ -130,6 +137,7 @@ impl SoundPlayer {
             sounds: Rc::new(sounds_by_id),
             enabled: Rc::new(Cell::new(true)),
             queued: Default::default(),
+            time: 0.0,
         }
     }
 
@@ -154,24 +162,24 @@ impl SoundPlayer {
         );
     }
 
-    pub fn play_delayed(&self, sound_id: SoundId, delay: f64) {
+    pub fn play_delayed(&self, sound_id: SoundId, delay: f32) {
         if delay == 0.0 {
             self.play(sound_id);
         } else {
-            let target_time = get_time() + delay;
+            let target_time = self.time + delay as f64;
             self.queued.borrow_mut().push((sound_id, target_time));
         }
     }
 
-    pub fn update(&self) {
+    pub fn update(&mut self, elapsed: f32) {
+        self.time += elapsed as f64;
         let mut queued = self.queued.borrow_mut();
-        let t = get_time();
         for (sound_id, target_time) in queued.iter() {
-            if t >= *target_time {
+            if self.time >= *target_time {
                 self.play(*sound_id);
             }
         }
-        queued.retain(|(_sound_id, target_time)| *target_time > t);
+        queued.retain(|(_sound_id, target_time)| *target_time > self.time);
     }
 
     pub fn play_looping(&self, sound_id: SoundId) {
