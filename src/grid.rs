@@ -3067,7 +3067,7 @@ impl GameGrid {
             }
         }
 
-        if let Some(id) = self.hovered_character {
+        if let Some(id) = self.hovered_character.or(self.hovered_character_portrait) {
             if id != self.active_character_id {
                 let char = &self.characters[&id];
                 detail_labelled_char_ids.insert(char.id());

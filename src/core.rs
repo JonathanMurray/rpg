@@ -209,6 +209,7 @@ impl CoreGame {
                         self.ui_handle_event(GameEvent::CharacterGainedHealth {
                             character: character.id(),
                             amount,
+                            source: "on-kill effect",
                         })
                         .await;
                     }
@@ -328,7 +329,15 @@ impl CoreGame {
                 println!("-----------------------------------");
 
                 for character in self.characters.iter() {
-                    character.set_current_game_time(game_time);
+                    let expired_conditions = character.set_current_game_time(game_time);
+
+                    for condition in expired_conditions {
+                        self.ui_handle_event(GameEvent::CharacterLostCondition {
+                            character: character.id(),
+                            condition,
+                        })
+                        .await;
+                    }
                 }
             }
         }
@@ -757,10 +766,12 @@ impl CoreGame {
                     character.on_mana_changed();
                     detail_lines.push(format!("gained {} mana", amount));
                 }
+                let mut effect = None;
                 if let Some(apply_effect) = consumable.effect {
                     let (applied, line, _damage) =
                         self.perform_effect_application(apply_effect, None, None, character);
                     detail_lines.push(line);
+                    effect = applied;
                 }
 
                 character.set_equipment(None, slot_role);
@@ -769,6 +780,7 @@ impl CoreGame {
                     user: character.id(),
                     consumable,
                     detail_lines,
+                    effect,
                 })
                 .await;
 
@@ -1873,6 +1885,7 @@ impl CoreGame {
 
         for (i, target_id) in targets.iter().enumerate() {
             let target = mode.characters().get_rc(*target_id);
+            println!("perform ability AoE on target: {}", target.name);
             detail_lines.push("".to_string());
             detail_lines.push(format!("|{}|:", target.name_tag()));
             let outcome = Self::perform_ability_enemy_effect(
@@ -3110,17 +3123,23 @@ impl CoreGame {
         }
 
         if conditions.borrow().has(&Condition::HealthPotionRecovering) {
-            conditions
+            let lost_condition = conditions
                 .borrow_mut()
                 .lose_stacks(&Condition::HealthPotionRecovering, 1);
-            let health_gained = self.perform_gain_health(character, 2);
-            // TODO Make this show on grid
-            self.log(format!(
-                "  |{}| gained {} health (healing potion)",
-                character.name_tag(),
-                health_gained
-            ))
+            let gained = self.perform_gain_health(character, 2);
+            self.ui_handle_event(GameEvent::CharacterGainedHealth {
+                character: character.id(),
+                amount: gained,
+                source: "healing potion",
+            })
             .await;
+            if lost_condition {
+                self.ui_handle_event(GameEvent::CharacterLostCondition {
+                    character: character.id(),
+                    condition: Condition::HealthPotionRecovering,
+                })
+                .await;
+            }
         }
 
         if conditions.borrow_mut().remove(&Condition::Weakened) {
@@ -3810,6 +3829,7 @@ pub enum GameEvent {
         user: CharacterId,
         consumable: Consumable,
         detail_lines: Vec<String>,
+        effect: Option<ApplyEffect>,
     },
     CharactersDying {
         characters: Vec<CharacterId>,
@@ -3852,6 +3872,7 @@ pub enum GameEvent {
     CharacterGainedHealth {
         character: CharacterId,
         amount: u32,
+        source: &'static str,
     },
 }
 
@@ -4241,7 +4262,7 @@ impl Display for ApplyEffect {
             ApplyEffect::GainActionPoints(n) => f.write_fmt(format_args!("+{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
             ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
-            ApplyEffect::LoseHealth(n) => f.write_fmt(format_args!("-{n}")),
+            ApplyEffect::LoseHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
@@ -4666,13 +4687,22 @@ impl Conditions {
         );
     }
 
-    fn maybe_expire(&mut self, game_time: u32) {
+    fn remove_expired(&mut self, game_time: u32) -> Vec<Condition> {
+        let mut expired = vec![];
         self.map.retain(|condition, state| {
-            state
+            let retain = state
                 .ends_at
                 .map(|ends_at| ends_at > game_time)
-                .unwrap_or(true)
+                .unwrap_or(true);
+
+            if !retain {
+                expired.push(*condition);
+            }
+
+            retain
         });
+
+        expired
     }
 
     pub fn add_or_remove(&mut self, condition: Condition, add: bool) {
@@ -5771,9 +5801,9 @@ impl Character {
         self.known_passive_skills.borrow_mut().push(passive);
     }
 
-    fn set_current_game_time(&self, game_time: u32) {
+    fn set_current_game_time(&self, game_time: u32) -> Vec<Condition> {
         self.current_game_time.set(game_time);
-        self.conditions.borrow_mut().maybe_expire(game_time);
+        self.conditions.borrow_mut().remove_expired(game_time)
     }
 
     pub fn party_money(&self) -> u32 {
@@ -7376,14 +7406,13 @@ impl Character {
 }
 
 fn is_target_flanked(attacker_pos: Position, target: &Character) -> bool {
-    /*
     println!(
         "Check if target {} (pos={:?}) is flanked, from attacker pos {:?} ...",
         target.name,
         target.pos(),
         attacker_pos
     );
-     */
+
     let target_is_immune_to_flanking = target.knows_passive(PassiveSkill::ThrillOfBattle);
 
     if target_is_immune_to_flanking {
@@ -7407,8 +7436,9 @@ fn are_flanking_target(attacker: Position, melee_engager: Position, target: Posi
     // TODO: this panicked, when using Sweeping attack, after moving to a cell where an enemy had just died (?).
     if (dx, dy) == (0, 0) {
         panic!(
-            "Invalid dx,dy: {:?}. Engager={:?}, target={:?}",
+            "Invalid dx,dy: {:?}. Attacker={:?}, Engager={:?}, Target={:?}",
             (dx, dy),
+            attacker,
             melee_engager,
             target
         );

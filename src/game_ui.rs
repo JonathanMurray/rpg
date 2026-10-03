@@ -508,7 +508,7 @@ impl CharacterUi {
         } else if self.health_bar.borrow().hovered.get() {
             Some((
                 "Health |<heart>|",
-                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>10%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string(),
+                vec!["If this reaches |<value>0|, you die.".to_string(), "".to_string(), "|<value>25%| of missing |<heart>| is restored after combat. (Max |<heart>| is affected by |<stat>Strength|.)".to_string(),
                 "Being |<heart>| < 20% causes |<keyword>Near-death|.".to_string()],
                 vec![Keyword::Cond(Condition::NearDeath, None)]
             ))
@@ -643,7 +643,7 @@ impl UserInterface {
         let character_portraits = TopCharacterPortraits::new(
             &game.characters,
             game.active_character_id,
-            resources.simple_font.clone(),
+            resources.big_font.clone(),
             //decorative_font.clone(),
             ui_resources.portrait_textures.clone(),
         );
@@ -1493,8 +1493,6 @@ impl UserInterface {
         if let Some(reactor) = is_reacting {
             self.sound_player.play(SoundId::ChooseReaction);
 
-            //self.target_ui
-            //    .set_action("Reaction!".to_string(), vec![], false);
             self.set_allowed_to_use_action_buttons(false);
             self.player_portraits.set_selected_id(reactor);
 
@@ -1720,7 +1718,9 @@ impl UserInterface {
                 user,
                 consumable,
                 detail_lines,
+                effect,
             } => {
+                let actor = self.characters.get(user);
                 self.sound_player.play(SoundId::Powerup);
                 self.log.add_with_details(
                     format!(
@@ -1730,6 +1730,9 @@ impl UserInterface {
                     ),
                     &detail_lines,
                 );
+                if let Some(applied) = effect {
+                    self.show_applied_effect(applied, actor.pos(), 0.0);
+                }
             }
             GameEvent::CharactersDying { characters } => {
                 let duration = 0.5;
@@ -1840,12 +1843,17 @@ impl UserInterface {
                 self.game_grid
                     .animate_character_lost_ap(character, 0.6, amount);
             }
-            GameEvent::CharacterGainedHealth { character, amount } => {
+            GameEvent::CharacterGainedHealth {
+                character,
+                amount,
+                source,
+            } => {
                 let char = self.characters.get(character);
                 self.log.add(format!(
-                    "|{}| gained |<value>{}| health |<faded>(on-kill effect)|",
+                    "|{}| gained |<value>{}| health |<faded>({})|",
                     char.name_tag(),
-                    amount
+                    amount,
+                    source
                 ));
 
                 self.game_grid.animate_magic_sparks(character, WHITE);
@@ -2359,64 +2367,26 @@ impl UserInterface {
                 damage,
                 hit_type: HitType::Critical,
                 ..
-            } => (format!("{}!", damage), TextEffectStyle::HostileCrit),
+            } => (format!("{}", damage), TextEffectStyle::HostileCrit),
         };
 
         self.game_grid
             .add_text_effect(target_pos, 0.0, 1.5, None, impact_text, text_style);
 
         if !applied_to_target.is_empty() {
-            let mut s = String::new();
-            let mut texture = None;
+            let mut delay = 0.0;
             for apply_effect in applied_to_target {
-                if matches!(apply_effect, ApplyEffect::Pushed(..)) {
-                    // No text needed - the character is shown being pushed
-                    continue;
+                if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                    delay += 0.3;
                 }
-
-                if let ApplyEffect::Condition(condition) = apply_effect {
-                    texture = Some(condition.condition.status_icon());
-                }
-                s.push_str(&format!("{} ", apply_effect));
             }
-            self.game_grid.add_text_effect(
-                target_pos,
-                0.0,
-                2.0,
-                texture,
-                s,
-                TextEffectStyle::HostileEffect,
-            );
         };
         if !applied_to_self.is_empty() {
             let mut delay = 0.3;
             for apply_effect in applied_to_self {
-                let mut s = String::new();
-                let mut texture = None;
-                if let ApplyEffect::Condition(condition) = apply_effect {
-                    texture = Some(condition.condition.status_icon());
+                if self.show_applied_effect(*apply_effect, attacker_pos, delay) {
+                    delay += 0.3;
                 }
-                if let ApplyEffect::LoseHealth(amount) = *apply_effect {
-                    self.game_grid.add_text_effect(
-                        attacker_pos,
-                        0.0,
-                        1.5,
-                        texture,
-                        format!("{}", amount),
-                        TextEffectStyle::HostileHit,
-                    );
-                } else {
-                    s.push_str(&format!("{} ", apply_effect));
-                }
-                self.game_grid.add_text_effect(
-                    attacker_pos,
-                    delay,
-                    2.0,
-                    texture,
-                    s,
-                    TextEffectStyle::FriendlyEffect,
-                );
-                delay += 0.5;
             }
         };
 
@@ -2511,42 +2481,22 @@ impl UserInterface {
                 }
 
                 if !applied_effects.is_empty() {
+                    let mut delay = 0.0;
                     for apply_effect in applied_effects {
-                        if matches!(apply_effect, ApplyEffect::Pushed(..)) {
-                            // No text needed - the character is shown being pushed
-                            continue;
+                        if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                            delay += 0.3;
                         }
-                        let mut s = String::new();
-                        let mut texture = None;
-                        if let ApplyEffect::Condition(condition) = *apply_effect {
-                            texture = Some(condition.condition.status_icon());
-                        }
-                        s.push_str(&format!("{} ", apply_effect));
-                        effects.push((
-                            texture,
-                            s.trim().into(),
-                            TextEffectStyle::HostileEffect,
-                            2.0,
-                        ));
                     }
                 };
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
                 dbg!(applied_effects);
                 self.game_grid.animate_magic_sparks(target, WHITE);
+                let mut delay = 0.0;
                 for apply_effect in applied_effects {
-                    let mut s = String::new();
-                    let mut texture = None;
-                    if let ApplyEffect::Condition(condition) = *apply_effect {
-                        texture = Some(condition.condition.status_icon());
+                    if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                        delay += 0.3;
                     }
-                    s.push_str(&format!("{} ", apply_effect));
-                    let style = if matches!(apply_effect, ApplyEffect::GainHealth(..)) {
-                        TextEffectStyle::FriendlyHeal
-                    } else {
-                        TextEffectStyle::FriendlyEffect
-                    };
-                    effects.push((texture, s.trim().into(), style, 2.0))
                 }
             }
             AbilityTargetOutcome::AttackedEnemy(..) => {
@@ -2566,6 +2516,45 @@ impl UserInterface {
             );
             effect_start_time += 0.35;
         }
+    }
+
+    fn show_applied_effect(
+        &mut self,
+        applied_effect: ApplyEffect,
+        pos: Position,
+        start_time: f32,
+    ) -> bool {
+        let mut s = String::new();
+        let mut texture = None;
+        if let ApplyEffect::Condition(condition) = applied_effect {
+            texture = Some(condition.condition.status_icon());
+        }
+        s.push_str(&format!("{} ", applied_effect));
+        let style = match applied_effect {
+            ApplyEffect::RemoveActionPoints(_) => Some(TextEffectStyle::HostileEffect),
+            ApplyEffect::GainActionPoints(_) => Some(TextEffectStyle::FriendlyEffect),
+            // TODO not always hostile though?
+            ApplyEffect::Condition(apply_condition) => Some(TextEffectStyle::HostileEffect),
+            ApplyEffect::LoseHealth(_) => Some(TextEffectStyle::HostileHit),
+            ApplyEffect::GainHealth(_) => Some(TextEffectStyle::FriendlyHeal),
+            ApplyEffect::GainStamina(_) => Some(TextEffectStyle::FriendlyEffect),
+            ApplyEffect::GainMana(_) => Some(TextEffectStyle::FriendlyEffect),
+            ApplyEffect::PerBleeding {
+                damage,
+                caster_healing_percentage,
+            } => Some(TextEffectStyle::FriendlyHeal),
+            ApplyEffect::ConsumeCondition { condition } => Some(TextEffectStyle::FriendlyEffect),
+            // The character is shown physically being pushed, instead
+            ApplyEffect::Pushed(_) => None,
+            ApplyEffect::Escape => Some(TextEffectStyle::FriendlyEffect),
+        };
+
+        if let Some(style) = style {
+            self.game_grid
+                .add_text_effect(pos, start_time, 2.0, texture, s.trim(), style);
+        }
+
+        style.is_some()
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {

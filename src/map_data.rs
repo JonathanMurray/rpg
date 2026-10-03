@@ -12,13 +12,14 @@ use crate::{
         Weapon,
     },
     data::{
-        ARCANE_BOW, ARCANE_RING, BAD_BOW, BAD_DAGGER, BAD_RAPIER, BAD_SMALL_SHIELD, BAD_SWORD,
-        BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, CHAIN_MAIL, COLD_ARROWS, DASH, DRAUG_CLAW,
-        DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT, ENEMY_BRACE, ENEMY_BURNING_ARROW, ENEMY_ESCAPE,
-        ENEMY_INSPIRE, ENEMY_TACKLE, ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST,
-        HEALING_NOVA, HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM,
-        INSPIRE_RUTHLESS, KILL, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
-        PENETRATING_ARROWS, SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, STAFF,
+        ADRENALIN_POTION, ARCANE_BOW, ARCANE_RING, BAD_BOW, BAD_DAGGER, BAD_RAPIER,
+        BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, CHAIN_MAIL,
+        COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT, ENEMY_BRACE,
+        ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
+        HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
+        LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND, PENETRATING_ARROWS,
+        SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Liquid, Occupation, PathfindGrid},
@@ -553,7 +554,6 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability(&DASH);
     bob.learn_ability(&SHIELD_BASH);
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
-    bob.try_gain_equipment(EquipmentEntry::Weapon(BOW));
 
     bob.learn_ability(&KILL);
 
@@ -619,7 +619,10 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     // TODO
     bob.learn_ability(&KILL);
     //bob.learn_attack_enhancement(EMPOWER);
+    bob.health.lose(10);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
     bob
 }
 

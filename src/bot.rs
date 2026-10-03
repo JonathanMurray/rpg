@@ -61,7 +61,7 @@ impl DraugBehaviour {
         let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
         let target = Rc::clone(target);
 
-        let candidates = candidate_actions(bot);
+        let candidates = candidate_ability_actions(bot);
 
         let action = candidates[0];
         let action = match action {
@@ -188,7 +188,13 @@ impl FighterBehaviour {
         let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
         let target = Rc::clone(target);
 
-        let candidates = candidate_actions(bot);
+        let mut candidates = candidate_ability_actions(bot);
+
+        if rand::random_bool(0.7) {
+            candidates.insert(0, BotAction::Attack);
+        } else {
+            candidates.push(BotAction::Attack);
+        }
 
         let action = candidates[0];
         let action = match action {
@@ -407,6 +413,8 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
     }
 
     if let Some(path) = path_to_goal {
+        return convert_path_to_move_action(bot, path);
+        /*
         if path.total_distance <= bot.remaining_movement.get() {
             println!("BOT MOVING PATH: {:?}", path);
             return convert_path_to_move_action(bot, path);
@@ -418,6 +426,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
             // even though we cannot reach the goal.
             path_to_goal = Some(path);
         }
+         */
     } else {
         println!("bot's goal didn't involve movement");
     }
@@ -492,11 +501,9 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
     None
 }
 
-fn candidate_actions(bot: &Character) -> Vec<BotAction> {
+fn candidate_ability_actions(bot: &Character) -> Vec<BotAction> {
     let mut candidates = vec![];
-    if bot.weapon(HandType::MainHand).is_some() {
-        candidates.push(BotAction::Attack);
-    }
+
     dbg!(&bot.name);
     //for a in bot.usable_abilities() {
     for a in bot.known_abilities() {
@@ -511,6 +518,7 @@ fn candidate_actions(bot: &Character) -> Vec<BotAction> {
         candidates.push(candidate);
         //}
     }
+
     CustomShuffle::shuffle(&mut candidates);
     candidates
 }

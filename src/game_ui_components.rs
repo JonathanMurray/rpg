@@ -73,17 +73,7 @@ impl TopCharacterPortraits {
 
         let row = Container {
             layout_dir: LayoutDirection::Horizontal,
-            //margin: 2.0,
             children: elements,
-            /*
-            style: Style {
-                padding: 2.0,
-                background_color: Some(Color::new(0.0, 0.0, 0.0, 0.5)),
-                border_color: Some(BLACK),
-                //background_color: Some(Color::new(0.4, 0.3, 0.2, 1.0)),
-                ..Default::default()
-            },
-             */
             ..Default::default()
         };
 
@@ -167,6 +157,7 @@ struct TopCharacterPortrait {
     character: Rc<Character>,
     texture_size: Rc<RefCell<(f32, f32)>>,
     is_hovered: Cell<bool>,
+    font: Font,
 }
 
 impl TopCharacterPortrait {
@@ -186,6 +177,7 @@ impl TopCharacterPortrait {
             character: character.clone(),
             texture_size,
             is_hovered: Cell::new(false),
+            font,
         }
     }
 }
@@ -256,6 +248,28 @@ impl Drawable for TopCharacterPortrait {
                 y0 + damage_h,
                 3.0,
                 Color::new(0.6, 0.0, 0.0, 0.6),
+            );
+        }
+
+        if self.character.is_part_of_active_group.get() && !self.character.player_controlled() {
+            let font_size = 12;
+            let font_scale = 1.3;
+            let dim = measure_text(
+                &self.character.name,
+                Some(&self.font),
+                font_size,
+                font_scale,
+            );
+            draw_text_rounded(
+                &self.character.name,
+                x + w / 2.0 - dim.width / 2.0,
+                y + h + 24.0,
+                TextParams {
+                    font: Some(&self.font),
+                    font_size,
+                    font_scale,
+                    ..Default::default()
+                },
             );
         }
 

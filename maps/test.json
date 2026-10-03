@@ -384,43 +384,10 @@
       "name": null
     },
     {
-      "type_": "Draug",
-      "pos": [
-        12,
-        30
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Alice",
+      "type_": "SkeletonLeader",
       "pos": [
         15,
-        33
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        12,
-        25
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        20,
-        31
+        16
       ],
       "health": null,
       "main_hand": null,
