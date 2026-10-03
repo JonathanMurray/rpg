@@ -393,6 +393,17 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Huldra",
+      "pos": [
+        17,
+        21
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

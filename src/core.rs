@@ -178,8 +178,7 @@ impl CoreGame {
                 if !killed_by_action.is_empty() {
                     let num_killed = killed_by_action.len() as u32;
                     let character = self.active_character();
-                    if let Some((sta, ap)) = character.maybe_gain_resources_from_reaper(num_killed)
-                    {
+                    if let Some((sta, ap)) = character.maybe_gain_resources_from_reaper() {
                         if sta + ap > 0 {
                             if ap > 0 {
                                 self.ui_handle_event(GameEvent::CharacterGainedAP {
@@ -856,60 +855,62 @@ impl CoreGame {
             }
 
             for other_char in self.characters.iter() {
-                if can_opportunity_attack_mover(
+                if is_moving_out_of_enemy_range(
                     character,
                     character.pos(),
                     new_position,
                     other_char,
                 ) {
-                    // Movement opportunity attack
-                    if movement_type == MovementType::Regular {
-                        let reactor = other_char;
+                    if other_char.can_use_opportunity_attack(character.id()) {
+                        // Movement opportunity attack
+                        if movement_type == MovementType::Regular {
+                            let reactor = other_char;
 
-                        let chooses_to_use_opportunity_attack = self
-                            .user_interface
-                            .choose_movement_opportunity_attack(
-                                self,
-                                reactor.id(),
-                                character.id(),
-                                (character.pos(), new_position),
-                            )
-                            .await?;
+                            let chooses_to_use_opportunity_attack = self
+                                .user_interface
+                                .choose_movement_opportunity_attack(
+                                    self,
+                                    reactor.id(),
+                                    character.id(),
+                                    (character.pos(), new_position),
+                                )
+                                .await?;
 
-                        dbg!(chooses_to_use_opportunity_attack);
+                            dbg!(chooses_to_use_opportunity_attack);
 
-                        if chooses_to_use_opportunity_attack {
-                            reactor.set_facing_toward(character.pos());
+                            if chooses_to_use_opportunity_attack {
+                                reactor.set_facing_toward(character.pos());
 
-                            self.ui_handle_event(
-                                GameEvent::CharacterReactedWithOpportunityAttack {
-                                    reactor: reactor.id(),
-                                },
-                            )
-                            .await;
+                                self.ui_handle_event(
+                                    GameEvent::CharacterReactedWithOpportunityAttack {
+                                        reactor: reactor.id(),
+                                    },
+                                )
+                                .await;
 
-                            self.perform_spend_ap(reactor, 1).await;
+                                self.perform_spend_ap(reactor, 1).await;
 
-                            self.ui_handle_event(GameEvent::AttackWasInitiated {
-                                actor: reactor.id(),
-                                target: character.id(),
-                                target_reaction: None,
-                            })
-                            .await;
+                                self.ui_handle_event(GameEvent::AttackWasInitiated {
+                                    actor: reactor.id(),
+                                    target: character.id(),
+                                    target_reaction: None,
+                                })
+                                .await;
 
-                            // Movement opportunity attack
-                            let event = Self::perform_attack(
-                                reactor,
-                                HandType::MainHand,
-                                &[],
-                                character,
-                                0,
-                                None,
-                                0,
-                                ActionPerformanceMode::Real(self),
-                                None,
-                            );
-                            self.on_non_ability_attack(event).await;
+                                // Movement opportunity attack
+                                let event = Self::perform_attack(
+                                    reactor,
+                                    HandType::MainHand,
+                                    &[],
+                                    character,
+                                    0,
+                                    None,
+                                    0,
+                                    ActionPerformanceMode::Real(self),
+                                    None,
+                                );
+                                self.on_non_ability_attack(event).await;
+                            }
                         }
                     }
 
@@ -3393,11 +3394,21 @@ pub fn can_opportunity_attack_mover(
     new_position: Position,
     other_char: &Character,
 ) -> bool {
+    is_moving_out_of_enemy_range(mover, old_position, new_position, other_char)
+        && other_char.can_use_opportunity_attack(mover.id())
+}
+
+pub fn is_moving_out_of_enemy_range(
+    mover: &Character,
+    old_position: Position,
+    new_position: Position,
+    other_char: &Character,
+) -> bool {
     let unfriendly = other_char.player_controlled() != mover.player_controlled();
     let leaving_melee = within_meele(old_position, other_char.pos())
         && !within_meele(new_position, other_char.pos());
 
-    unfriendly && leaving_melee && other_char.can_use_opportunity_attack(mover.id())
+    unfriendly && leaving_melee
 }
 
 pub fn predict_ability(
@@ -5892,15 +5903,14 @@ impl Character {
         self.remaining_movement.set(remaining + distance);
     }
 
-    fn maybe_gain_resources_from_reaper(&self, num_killed: u32) -> Option<(u32, u32)> {
+    fn maybe_gain_resources_from_reaper(&self) -> Option<(u32, u32)> {
         println!("MAYBE GAIN FROM REAPER");
         if self.knows_passive(PassiveSkill::Reaper) {
             println!("YES GAIN FROM REAPER");
-            let sta = self.stamina.gain(num_killed);
-            let ap = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
-                0
+            let (sta, ap) = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
+                (0, 0)
             } else {
-                self.action_points.gain(2)
+                (self.action_points.gain(2), self.stamina.gain(2))
             };
             self.receive_condition(Condition::ReaperApCooldown, None, None);
             Some((sta, ap))

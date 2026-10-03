@@ -40,8 +40,7 @@ impl LootgoblinBehaviour {
         };
 
         BotGoal {
-            action: (action, None),
-            fallback_actions: vec![],
+            actions: vec![(action, None)],
         }
     }
 }
@@ -63,20 +62,20 @@ impl DraugBehaviour {
 
         let candidates = candidate_ability_actions(bot);
 
-        let action = candidates[0];
-        let action = match action {
-            BotAction::Attack => (action, Some(target)),
-            BotAction::SingleEnemyTarget(..) => (action, Some(target)),
-            // TODO should not only target self
-            BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
-            BotAction::NonTarget(..) => (action, None),
-            BotAction::MoveTo(..) => (action, None),
-        };
-
-        BotGoal {
-            action,
-            fallback_actions: candidates,
+        let mut actions = vec![];
+        for action in candidates {
+            let action = match action {
+                BotAction::Attack => (action, Some(target.clone())),
+                BotAction::SingleEnemyTarget(..) => (action, Some(target.clone())),
+                // TODO should not only target self
+                BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
+                BotAction::NonTarget(..) => (action, None),
+                BotAction::MoveTo(..) => (action, None),
+            };
+            actions.push(action);
         }
+
+        BotGoal { actions }
     }
 }
 
@@ -144,8 +143,8 @@ impl HuldraBehaviour {
         }
 
         let goal = BotGoal {
-            action,
-            fallback_actions: vec![inflict_wounds, heal],
+            actions: vec![action],
+            //fallback_actions: vec![inflict_wounds, heal],
         };
 
         let chosen_action = pursue_goal(game, goal.clone());
@@ -157,8 +156,10 @@ impl HuldraBehaviour {
                 }
                 Action::Move { .. } => {
                     // We probably chose movement to get into range, so we should stick to the same action
-                    self.saved_goal
-                        .set(Some((goal.action.0, goal.action.1.map(|ch| ch.id()))));
+                    self.saved_goal.set(Some((
+                        goal.actions[0].0,
+                        goal.actions[0].1.as_ref().map(|ch| ch.id()),
+                    )));
                 }
                 _ => {}
             }
@@ -196,20 +197,20 @@ impl FighterBehaviour {
             candidates.push(BotAction::Attack);
         }
 
-        let action = candidates[0];
-        let action = match action {
-            BotAction::Attack => (action, Some(target)),
-            BotAction::SingleEnemyTarget(..) => (action, Some(target)),
-            // TODO should not only target self
-            BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
-            BotAction::NonTarget(..) => (action, None),
-            BotAction::MoveTo(..) => (action, None),
-        };
-
-        BotGoal {
-            action,
-            fallback_actions: candidates,
+        let mut actions = vec![];
+        for action in candidates {
+            let action = match action {
+                BotAction::Attack => (action, Some(target.clone())),
+                BotAction::SingleEnemyTarget(..) => (action, Some(target.clone())),
+                // TODO should not only target self
+                BotAction::SingleFriendlyTarget(..) => (action, Some(Rc::clone(bot))),
+                BotAction::NonTarget(..) => (action, None),
+                BotAction::MoveTo(..) => (action, None),
+            };
+            actions.push(action);
         }
+
+        BotGoal { actions }
     }
 }
 
@@ -313,22 +314,21 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
 
 #[derive(Clone)]
 struct BotGoal {
-    action: (BotAction, Option<Rc<Character>>),
-    fallback_actions: Vec<BotAction>,
+    actions: Vec<(BotAction, Option<Rc<Character>>)>,
 }
 
 impl std::fmt::Debug for BotGoal {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("BotGoal")
-            .field(
+        let mut debug_struct = f.debug_struct("BotGoal");
+        let mut s = &mut debug_struct;
+        for a in &self.actions {
+            s = s.field(
                 "action",
-                &(
-                    self.action.0,
-                    self.action.1.as_ref().map(|ch| (&ch.name, ch.id())),
-                ),
-            )
-            .field("fallback_actions", &self.fallback_actions)
-            .finish()
+                &(a.0, a.1.as_ref().map(|ch| (ch.name.clone(), ch.id()))),
+            );
+        }
+
+        s.finish()
     }
 }
 
@@ -342,93 +342,83 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
     println!("bot AP: {}", bot.action_points.current());
 
     dbg!(("bot goal: {:?}", &goal));
-    let mut path_to_goal;
 
-    match goal.action {
-        (BotAction::Attack, goal_target) => {
-            let goal_target = goal_target.as_ref().unwrap();
-            if bot.can_attack(bot.attack_action().unwrap())
-                && attack_reaches(bot, goal_target, &game.pathfind_grid)
-            {
-                println!("bot attacks target");
-                return Some(attack_action(bot, goal_target));
+    for a in &goal.actions {
+        match a {
+            (BotAction::Attack, goal_target) => {
+                let goal_target = goal_target.as_ref().unwrap();
+                if bot.can_attack(bot.attack_action().unwrap())
+                    && attack_reaches(bot, goal_target, &game.pathfind_grid)
+                {
+                    println!("bot attacks target");
+                    return Some(attack_action(bot, goal_target));
+                }
+                let weapon_range = bot.attack_weapon_range().unwrap().into_range();
+                if let Some(path) = find_path(game, bot, &goal_target, weapon_range) {
+                    return convert_path_to_move_action(bot, path);
+                }
             }
-            let weapon_range = bot.attack_weapon_range().unwrap().into_range();
-            path_to_goal = find_path(game, bot, &goal_target, weapon_range);
-        }
-        (BotAction::SingleEnemyTarget(ability), goal_target) => {
-            let goal_target = goal_target.as_ref().unwrap();
-            if may_use(bot, ability, Some(goal_target))
-                && bot.can_use_ability(ability)
-                && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
-            {
-                println!("bot uses ability on player");
-                return Some(simple_targetted_ability_action(ability, goal_target));
-            } else {
-                println!("-------");
-                println!("Bot cannot use ability or doesn't reach target");
-                dbg!(ability.target.range(&[]));
-                dbg!(bot.pos());
-                dbg!(goal_target.pos());
-                dbg!(distance_between(bot.pos(), goal_target.pos()));
-                dbg!(sq_distance_between(bot.pos(), goal_target.pos()));
-                println!("-------");
+            (BotAction::SingleEnemyTarget(ability), goal_target) => {
+                let goal_target = goal_target.as_ref().unwrap();
+                if may_use(bot, ability, Some(goal_target))
+                    && bot.can_use_ability(ability)
+                    && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
+                {
+                    println!("bot uses ability on player");
+                    return Some(simple_targetted_ability_action(ability, goal_target));
+                } else {
+                    println!("-------");
+                    println!("Bot cannot use ability or doesn't reach target");
+                    dbg!(ability.target.range(&[]));
+                    dbg!(bot.pos());
+                    dbg!(goal_target.pos());
+                    dbg!(distance_between(bot.pos(), goal_target.pos()));
+                    dbg!(sq_distance_between(bot.pos(), goal_target.pos()));
+                    println!("-------");
+                }
+                let range = ability.target.range(&[]).unwrap();
+                if let Some(path) = find_path(game, bot, &goal_target, range) {
+                    return convert_path_to_move_action(bot, path);
+                }
             }
-            let range = ability.target.range(&[]).unwrap();
-            path_to_goal = find_path(game, bot, &goal_target, range);
-        }
-        (BotAction::NonTarget(ability), _) => {
-            if may_use(bot, ability, None) && bot.can_use_ability(ability) {
-                return Some(Action::UseAbility {
-                    ability,
-                    enhancements: vec![],
-                    target: ActionTarget::None,
-                });
+            (BotAction::NonTarget(ability), _) => {
+                if may_use(bot, ability, None) && bot.can_use_ability(ability) {
+                    return Some(Action::UseAbility {
+                        ability,
+                        enhancements: vec![],
+                        target: ActionTarget::None,
+                    });
+                }
             }
-            path_to_goal = None;
-        }
-        (BotAction::SingleFriendlyTarget(ability), goal_target) => {
-            let goal_target = goal_target.as_ref().unwrap();
-            if may_use(bot, ability, Some(goal_target))
-                && bot.can_use_ability(ability)
-                && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
-            {
-                println!("bot uses ability on some bot");
-                return Some(simple_targetted_ability_action(ability, goal_target));
+            (BotAction::SingleFriendlyTarget(ability), goal_target) => {
+                let goal_target = goal_target.as_ref().unwrap();
+                if may_use(bot, ability, Some(goal_target))
+                    && bot.can_use_ability(ability)
+                    && ability_reaches(bot, goal_target, ability, &game.pathfind_grid)
+                {
+                    println!("bot uses ability on some bot");
+                    return Some(simple_targetted_ability_action(ability, goal_target));
+                }
+                let range = ability.target.range(&[]).unwrap();
+                if let Some(path) = find_path(game, bot, &goal_target, range) {
+                    return convert_path_to_move_action(bot, path);
+                }
             }
-            let range = ability.target.range(&[]).unwrap();
-            path_to_goal = find_path(game, bot, &goal_target, range);
+            (BotAction::MoveTo(pos), _) => {
+                let path = game.pathfind_grid.find_shortest_path_to_proximity(
+                    bot.id(),
+                    bot.pos(),
+                    *pos,
+                    0.0,
+                    EXPLORATION_RANGE,
+                    true,
+                    TraversalType::SlowedDownByLiquid,
+                );
+                if let Some(path) = path {
+                    return convert_path_to_move_action(bot, path);
+                }
+            }
         }
-        (BotAction::MoveTo(pos), _) => {
-            path_to_goal = game.pathfind_grid.find_shortest_path_to_proximity(
-                bot.id(),
-                bot.pos(),
-                pos,
-                0.0,
-                EXPLORATION_RANGE,
-                true,
-                TraversalType::SlowedDownByLiquid,
-            )
-        }
-    }
-
-    if let Some(path) = path_to_goal {
-        return convert_path_to_move_action(bot, path);
-        /*
-        if path.total_distance <= bot.remaining_movement.get() {
-            println!("BOT MOVING PATH: {:?}", path);
-            return convert_path_to_move_action(bot, path);
-        } else {
-            println!(
-                "Bot will not reach goal this turn; look for other things to do before moving"
-            );
-            // Restore it in case no fallback action gets taken; then we'll want to start moving
-            // even though we cannot reach the goal.
-            path_to_goal = Some(path);
-        }
-         */
-    } else {
-        println!("bot's goal didn't involve movement");
     }
 
     let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
@@ -437,7 +427,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
     let mut bot_chars: Vec<&Rc<Character>> = game.enemies().collect();
     bot_chars.shuffle();
 
-    for action in goal.fallback_actions {
+    for (action, _target) in &goal.actions {
         match action {
             BotAction::Attack => {
                 if bot.can_attack(bot.attack_action().unwrap()) {
@@ -487,12 +477,6 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                 panic!("MoveTo shouldn't be used as a fallback action");
             }
         }
-    }
-
-    if let Some(path) = path_to_goal {
-        println!("No fallback action was taken. Let's move then.");
-        println!("BOT MOVING PATH: {:?}", path);
-        return convert_path_to_move_action(bot, path);
     }
 
     println!("No bot action");

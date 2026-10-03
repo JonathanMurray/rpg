@@ -1889,7 +1889,8 @@ impl UserInterface {
                 let mover = self.characters.get(character);
 
                 let base_duration = if self.faster_movement.get() {
-                    0.07
+                    //0.07
+                    0.04
                 } else {
                     0.14
                 };

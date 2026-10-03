@@ -2507,7 +2507,7 @@ impl PassiveSkill {
             HardenedSkin => "|<value>+1| |<helmet>| armor",
             WeaponProficiency => "Attacks gain |<value>+1| |<helmet>| armor penetration",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
-            Reaper => "On kill: gain |<value>1| |<stamina>| stamina, |<value>2| AP (max 2 AP per turn)",
+            Reaper => "On kill: gain |<value>2| |<stamina>| stamina, |<value>2| AP (once per turn)",
             BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",
             ThrillOfBattle => "|<value>+3| |<mixed_dice>||<stat>Attack/Spell|, while adjacent to more than one enemy. Immune to |<keyword>Flanked|.",
             Honorless => "Attacks deal |<value>+1| damage against |<keyword>Flanked| targets",

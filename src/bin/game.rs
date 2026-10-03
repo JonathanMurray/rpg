@@ -176,7 +176,7 @@ async fn run_demo(
                         PlayerId::Bob,
                         CharacterGrowth::of(
                             vec![ButtonAction::Action(BaseAction::UseAbility(&SWEEP_ATTACK))],
-                            vec![EquipmentEntry::Consumable(ENERGY_POTION)],
+                            vec![EquipmentEntry::Consumable(HEALTH_POTION)],
                         ),
                     ),
                     (
@@ -233,7 +233,7 @@ async fn run_demo(
                         PlayerId::Bob,
                         CharacterGrowth::of(
                             vec![ButtonAction::Passive(PassiveSkill::Reaper)],
-                            vec![EquipmentEntry::Consumable(HEALTH_POTION)],
+                            vec![EquipmentEntry::Consumable(ENERGY_POTION)],
                         ),
                     ),
                 ],
