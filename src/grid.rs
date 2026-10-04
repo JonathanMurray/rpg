@@ -392,8 +392,8 @@ impl GameGrid {
     pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
-            if let Some(surface) = terrain_id.surface() {
-                self.pathfind_grid.set_surface(pos, Some(surface));
+            if let Some((surface, size)) = terrain_id.surface() {
+                self.pathfind_grid.set_surface(pos, Some(surface), size);
             }
             self.auto_tile();
             true
@@ -405,8 +405,8 @@ impl GameGrid {
     /// Should only be called from editor; not from in-game!
     pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
         if let Some(terrain_id) = self.decorations.get(&pos) {
-            if terrain_id.is_surface() {
-                self.pathfind_grid.set_surface(pos, None);
+            if let Some((_surface, size)) = terrain_id.surface() {
+                self.pathfind_grid.set_surface(pos, None, size);
             }
             self.decorations.swap_remove(&pos);
             self.auto_tile();
@@ -444,8 +444,8 @@ impl GameGrid {
         for pos in positions {
             match self.decorations.entry(pos) {
                 Entry::Occupied(mut e) => {
-                    let terrain_id = e.get();
-                    match (terrain_id, from_surface) {
+                    let existing_terrain_id = e.get();
+                    match (existing_terrain_id, from_surface) {
                         (TerrainId::NewWater(orientation, LiquidType::Water), Surface::Water) => {
                             e.insert(TerrainId::NewWater(
                                 *orientation,
@@ -468,6 +468,18 @@ impl GameGrid {
                 }
             }
         }
+    }
+
+    pub fn set_surface(&mut self, position: Position, surface: Surface) {
+        assert_eq!(self.decorations.get(&position), None);
+        let terrain_id = match surface {
+            // TODO set correct liquid orientation somehow
+            Surface::Water => TerrainId::NewWater(WaterOrientation::Center, LiquidType::Water),
+            Surface::Poison => TerrainId::NewWater(WaterOrientation::Center, LiquidType::Poison),
+            //Surface::Spikes => TerrainId::Spikes,
+            Surface::Spikes => TerrainId::SpikesSingleCell,
+        };
+        self.decorations.insert(position, terrain_id);
     }
 
     pub fn auto_tile(&mut self) {
@@ -1853,7 +1865,7 @@ impl GameGrid {
 
         let standing_in_liquid = self
             .pathfind_grid
-            .is_character_on_surface(character.pos())
+            .surface(character.pos())
             .map(|s| s.is_liquid())
             .unwrap_or(false);
 
@@ -2701,15 +2713,15 @@ impl GameGrid {
             };
 
             if let Some(surface) = self.pathfind_grid.surface(mouse_grid_pos) {
-                if mouse_state == MouseState::None && self.hovered_character.is_none() {
-                    self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
-                    let text = match surface {
-                        Surface::Water => "|<info>| water",
-                        Surface::Poison => "|<warning>| poison",
-                        Surface::Spikes => "|<warning>| spikes",
-                    };
-                    self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
-                }
+                //if mouse_state == MouseState::None && self.hovered_character.is_none() {
+                self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
+                let text = match surface {
+                    Surface::Water => "|<info>| water",
+                    Surface::Poison => "|<warning>| poison",
+                    Surface::Spikes => "|<warning>| spikes",
+                };
+                self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
+                //}
             }
 
             let mut hovered_move_route = None;

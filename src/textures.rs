@@ -9,7 +9,7 @@ use macroquad::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    pathfind::{Surface, TerrainType, CELLS_PER_ENTITY},
+    pathfind::{Surface, SurfaceBrushSize, TerrainType, CELLS_PER_ENTITY},
     util::{COL_GREEN_3, COL_RED, COL_RED_BRIGHT},
 };
 
@@ -163,6 +163,8 @@ pub enum StatusId {
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum IconId {
+    Undefined,
+
     Fireball,
     SearingLight,
     MeleeAttack,
@@ -477,6 +479,7 @@ pub enum TerrainId {
     Floor3,
     Floor4,
     Spikes,
+    SpikesSingleCell,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -546,13 +549,17 @@ impl TerrainId {
     }
 
     pub fn is_surface(&self) -> bool {
-        matches!(self, TerrainId::NewWater(..) | TerrainId::Spikes)
+        matches!(
+            self,
+            TerrainId::NewWater(..) | TerrainId::Spikes | TerrainId::SpikesSingleCell
+        )
     }
 
-    pub fn surface(&self) -> Option<Surface> {
+    pub fn surface(&self) -> Option<(Surface, SurfaceBrushSize)> {
         match self {
-            TerrainId::NewWater(..) => Some(Surface::Water),
-            TerrainId::Spikes => Some(Surface::Spikes),
+            TerrainId::NewWater(..) => Some((Surface::Water, SurfaceBrushSize::ThreeByThree)),
+            TerrainId::Spikes => Some((Surface::Spikes, SurfaceBrushSize::ThreeByThree)),
+            TerrainId::SpikesSingleCell => Some((Surface::Spikes, SurfaceBrushSize::SingleCell)),
             _ => None,
         }
     }
@@ -731,6 +738,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::AnimalHead => (5, 7),
         TerrainId::FoodPlate => (6, 5),
         TerrainId::Spikes => (1, 10),
+        TerrainId::SpikesSingleCell => (1, 11),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => (2, 1),
@@ -992,6 +1000,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
 
 fn icon_cell(icon: IconId) -> (i32, i32) {
     match icon {
+        IconId::Undefined => (1, 3),
         IconId::Fireball => (0, 1),
         IconId::SearingLight => (2, 1),
         IconId::MeleeAttack => (6, 8),

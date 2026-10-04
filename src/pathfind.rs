@@ -10,9 +10,8 @@ use indexmap::IndexMap;
 
 use crate::{
     core::{
-        distance_between, sq_distance_between, within_range_squared, CharacterId,
-        GameEvent::SurfaceWasConverted, Position, CENTER_MELEE_RANGE_SQUARED,
-        MOVE_COST_FACTOR_IN_LIQUID,
+        distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
+        CENTER_MELEE_RANGE_SQUARED, MOVE_COST_FACTOR_IN_LIQUID,
     },
     grid::ControlPoint,
     util::line_visitor,
@@ -51,6 +50,12 @@ pub enum Surface {
     Water,
     Poison,
     Spikes,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum SurfaceBrushSize {
+    ThreeByThree,
+    SingleCell,
 }
 
 impl Surface {
@@ -174,7 +179,7 @@ impl PathfindGrid {
         self.occupied.borrow().keys().copied().collect()
     }
 
-    pub fn occupied(&self) -> Ref<HashMap<Position, Occupation>> {
+    pub fn occupied(&self) -> Ref<'_, HashMap<Position, Occupation>> {
         self.occupied.borrow()
     }
 
@@ -182,10 +187,14 @@ impl PathfindGrid {
         self.control_points.borrow()
     }
 
-    pub fn set_surface(&self, pos: Position, value: Option<Surface>) {
+    pub fn set_surface(&self, pos: Position, value: Option<Surface>, size: SurfaceBrushSize) {
         let mut surfaces = self.surfaces.borrow_mut();
-        for x in pos.0 - 1..=pos.0 + 1 {
-            for y in pos.1 - 1..=pos.1 + 1 {
+        let d = match size {
+            SurfaceBrushSize::ThreeByThree => 1,
+            SurfaceBrushSize::SingleCell => 0,
+        };
+        for x in pos.0 - d..=pos.0 + d {
+            for y in pos.1 - d..=pos.1 + d {
                 if let Some(surface) = value {
                     if surfaces.get(&(x, y)) == Some(&surface) {
                         println!("WARN: {:?} is already marked as {:?}", pos, surface);
@@ -204,10 +213,6 @@ impl PathfindGrid {
 
     pub fn surface(&self, pos: Position) -> Option<Surface> {
         self.surfaces.borrow().get(&pos).copied()
-    }
-
-    pub fn is_character_on_surface(&self, pos: Position) -> Option<Surface> {
-        return self.surfaces.borrow().get(&pos).copied();
     }
 
     pub fn set_occupied(&self, pos: Position, occupation: Option<Occupation>) {

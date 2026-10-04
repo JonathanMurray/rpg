@@ -4,6 +4,7 @@ use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet};
 use std::ffi::IntoStringError;
 use std::fmt::Display;
+use std::pin::Pin;
 use std::rc::{Rc, Weak};
 use std::time::SystemTime;
 
@@ -19,7 +20,7 @@ use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
 use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface};
+use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
@@ -534,7 +535,9 @@ impl CoreGame {
                                 self.perform_spend_ap(reactor, 1).await;
 
                                 // Opportunity attack vs ranged attacker
-                                let event = Self::perform_attack(
+                                // Need box pin to avoid
+                                // error[E0733]: recursion in an async fn requires boxing
+                                let event = Box::pin(Self::perform_attack(
                                     reactor,
                                     HandType::MainHand,
                                     &[],
@@ -544,7 +547,8 @@ impl CoreGame {
                                     0,
                                     ActionPerformanceMode::Real(self),
                                     None,
-                                );
+                                ))
+                                .await;
 
                                 self.on_non_ability_attack(event).await;
                             }
@@ -648,7 +652,8 @@ impl CoreGame {
                         0,
                         ActionPerformanceMode::Real(self),
                         None,
-                    );
+                    )
+                    .await;
                     self.on_non_ability_attack(event.clone()).await;
 
                     // in case defender turned around to react, restore their original direction
@@ -908,7 +913,8 @@ impl CoreGame {
                                     0,
                                     ActionPerformanceMode::Real(self),
                                     None,
-                                );
+                                )
+                                .await;
                                 self.on_non_ability_attack(event).await;
                             }
                         }
@@ -937,7 +943,7 @@ impl CoreGame {
                 character.set_facing_toward(new_position);
             }
 
-            let new_surface = self.pathfind_grid.is_character_on_surface(new_position);
+            let new_surface = self.pathfind_grid.surface(new_position);
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
@@ -950,7 +956,7 @@ impl CoreGame {
             .await;
 
             if character.is_swamp_dweller() {
-                let prev_surface = self.pathfind_grid.is_character_on_surface(character.pos());
+                let prev_surface = self.pathfind_grid.surface(character.pos());
                 if new_surface.is_none() && prev_surface == Some(Surface::Poison) {
                     self.handle_swamp_dweller_left_poison(character).await;
                 }
@@ -971,7 +977,7 @@ impl CoreGame {
             character.set_position(new_position);
 
             if character.is_swamp_dweller() {
-                let surface = self.pathfind_grid.is_character_on_surface(character.pos());
+                let surface = self.pathfind_grid.surface(character.pos());
                 if surface == Some(Surface::Water) {
                     self.perform_environment_effect(
                         EnvironmentEffect::ConvertSurface(Surface::Water, Surface::Poison),
@@ -1024,7 +1030,7 @@ impl CoreGame {
 
     async fn handle_character_standing_on_surface(&self, character: &Character, game_time: u32) {
         //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
-        if let Some(surface) = self.pathfind_grid.is_character_on_surface(character.pos()) {
+        if let Some(surface) = self.pathfind_grid.surface(character.pos()) {
             if surface.is_liquid() && !character.has_condition(&Condition::Wet) {
                 character.receive_condition(
                     Condition::Wet,
@@ -1411,7 +1417,8 @@ impl CoreGame {
                         &mut detail_lines,
                         None,
                         mode,
-                    );
+                    )
+                    .await;
                     target_outcome = Some((*target_id, outcome));
 
                     if let Some((radius, acquisition, area_effect)) = impact_circle {
@@ -1429,7 +1436,8 @@ impl CoreGame {
                             area_effect,
                             acquisition,
                             mode,
-                        );
+                        )
+                        .await;
 
                         let shape = &mut AreaShape::Circle(radius);
                         Self::modify_shape_radius(shape, enhancements);
@@ -1472,7 +1480,7 @@ impl CoreGame {
                         mode,
                     );
 
-                    target_outcome = Some((target_id, outcome));
+                    target_outcome = Some((target_id, Box::new(outcome)));
                 }
 
                 AbilityTarget::Area {
@@ -1516,7 +1524,8 @@ impl CoreGame {
                         area_effect,
                         &mut detail_lines,
                         mode,
-                    );
+                    )
+                    .await;
 
                     area_outcome = Some(AbilityAreaOutcome {
                         center: target_pos,
@@ -1567,7 +1576,7 @@ impl CoreGame {
                             roll_instruction.as_ref(),
                             mode,
                         );
-                        target_outcome = Some((actor_id, outcome));
+                        target_outcome = Some((actor_id, Box::new(outcome)));
                     }
 
                     if let Some(area_effect) = self_area {
@@ -1580,7 +1589,8 @@ impl CoreGame {
                             area_effect,
                             &mut detail_lines,
                             mode,
-                        );
+                        )
+                        .await;
                         area_outcome = Some(AbilityAreaOutcome {
                             center: actor.position.get(),
                             targets: outcomes,
@@ -1606,13 +1616,13 @@ impl CoreGame {
             }
 
             if let Some((target_id, outcome)) = &target_outcome {
-                if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+                if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
                     enemies_hit.push(*target_id);
                 }
             }
             if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
                 for (target_id, outcome) in targets {
-                    if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+                    if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
                         enemies_hit.push(*target_id);
                     }
                 }
@@ -1677,16 +1687,65 @@ impl CoreGame {
                     })
                     .await;
 
-                    for char in self.characters.iter() {
-                        self.handle_character_standing_on_surface(char, self.current_time())
-                            .await;
+                    self.handle_characters_standing_on_surface().await;
+                }
+            }
+            EnvironmentEffect::CreateSurface(new_surface, shape) => {
+                let radius: f32 = match shape {
+                    AreaShape::Circle(range) => range,
+                    AreaShape::Line => todo!(),
+                }
+                .into();
+
+                println!(
+                    "will attempt to create surface at {:?}: {:?} {:?}",
+                    position, new_surface, shape
+                );
+                let sq_radius = radius.powf(2.0);
+                let r = radius.ceil() as i32;
+                let mut positions = vec![];
+                for x in position.0 - r..=position.0 + r {
+                    for y in position.1 - r..=position.1 + r {
+                        if sq_distance_between(position, (x, y)) > sq_radius {
+                            continue;
+                        }
+
+                        let existing_surface = self.pathfind_grid.surface((x, y));
+                        let occupation = self.pathfind_grid.occupied().get(&(x, y)).copied();
+                        if existing_surface.is_none()
+                            && !matches!(occupation, Some(Occupation::Terrain(..)))
+                        {
+                            self.pathfind_grid.set_surface(
+                                (x, y),
+                                Some(new_surface),
+                                SurfaceBrushSize::SingleCell,
+                            );
+                            positions.push((x, y));
+                        }
                     }
                 }
+
+                detail_lines.push(format!("  Created |<keyword>{}|", new_surface.name()));
+
+                self.ui_handle_event(GameEvent::SurfaceWasCreated {
+                    positions,
+                    surface: new_surface,
+                })
+                .await;
+
+                self.handle_characters_standing_on_surface().await;
             }
         }
     }
 
-    fn perform_ability_area_effect(
+    async fn handle_characters_standing_on_surface(&self) {
+        for char in self.characters.iter() {
+            self.handle_character_standing_on_surface(char, self.current_time())
+                .await;
+        }
+    }
+
+    async fn perform_ability_area_effect(
         name: &'static str,
         roll_instruction: &RollInstruction,
         enhancements: &[AbilityEnhancement],
@@ -1694,21 +1753,24 @@ impl CoreGame {
         area_center: Position,
         area_effect: AreaEffect,
         detail_lines: &mut Vec<String>,
-        mode: ActionPerformanceMode,
-    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
-        match area_effect.effect {
-            AbilityEffect::Negative(effect) => Self::perform_ability_area_enemy_effect(
-                area_effect.shape,
-                name,
-                roll_instruction,
-                enhancements,
-                caster,
-                area_center,
-                detail_lines,
-                effect,
-                area_effect.acquisition,
-                mode,
-            ),
+        mode: ActionPerformanceMode<'_>,
+    ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
+        let outcomes = match area_effect.effect {
+            AbilityEffect::Negative(effect) => {
+                Self::perform_ability_area_enemy_effect(
+                    area_effect.shape,
+                    name,
+                    roll_instruction,
+                    enhancements,
+                    caster,
+                    area_center,
+                    detail_lines,
+                    effect,
+                    area_effect.acquisition,
+                    mode,
+                )
+                .await
+            }
 
             AbilityEffect::Positive(effect) => {
                 assert!(area_effect.acquisition == AreaTargetAcquisition::Allies);
@@ -1725,7 +1787,20 @@ impl CoreGame {
                     mode,
                 )
             }
+        };
+
+        if let Some(surface) = area_effect.create_surface {
+            if let Some(game) = mode.real_game() {
+                game.perform_environment_effect(
+                    EnvironmentEffect::CreateSurface(surface, area_effect.shape),
+                    area_center,
+                    detail_lines,
+                )
+                .await;
+            }
         }
+
+        outcomes
     }
 
     fn perform_ability_area_ally_effect(
@@ -1738,7 +1813,7 @@ impl CoreGame {
         roll_instruction: &RollInstruction,
         effect: AbilityPositiveEffect,
         mode: ActionPerformanceMode,
-    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
+    ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
         let mut target_outcomes = vec![];
 
         for enhancement in enhancements {
@@ -1768,7 +1843,7 @@ impl CoreGame {
                 mode,
             );
 
-            target_outcomes.push((other_char.id(), outcome));
+            target_outcomes.push((other_char.id(), Box::new(outcome)));
         }
 
         target_outcomes
@@ -1881,7 +1956,7 @@ impl CoreGame {
         }
     }
 
-    fn perform_ability_area_enemy_effect(
+    async fn perform_ability_area_enemy_effect(
         mut shape: AreaShape,
         name: &'static str,
         roll_instruction: &RollInstruction,
@@ -1892,7 +1967,7 @@ impl CoreGame {
         effect: AbilityNegativeEffect,
         acquisition: AreaTargetAcquisition,
         mode: ActionPerformanceMode<'_>,
-    ) -> Vec<(CharacterId, AbilityTargetOutcome)> {
+    ) -> Vec<(CharacterId, Box<AbilityTargetOutcome>)> {
         assert!(acquisition != AreaTargetAcquisition::Allies);
 
         let mut target_outcomes = vec![];
@@ -1917,7 +1992,8 @@ impl CoreGame {
                 detail_lines,
                 Some(area_pos),
                 mode,
-            );
+            )
+            .await;
             target_outcomes.push((target.id(), outcome));
         }
 
@@ -1950,7 +2026,7 @@ impl CoreGame {
 
                         target_outcomes.push((
                             caster.id(),
-                            AbilityTargetOutcome::AffectedAlly { applied_effects },
+                            Box::new(AbilityTargetOutcome::AffectedAlly { applied_effects }),
                         ));
                     }
                 }
@@ -1959,7 +2035,7 @@ impl CoreGame {
         target_outcomes
     }
 
-    fn perform_ability_enemy_effect(
+    async fn perform_ability_enemy_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
         roll_instruction: &RollInstruction,
@@ -1969,9 +2045,9 @@ impl CoreGame {
         num_prior_targets: u32,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
-        mode: ActionPerformanceMode,
-    ) -> AbilityTargetOutcome {
-        match enemy_effect {
+        mode: ActionPerformanceMode<'_>,
+    ) -> Box<AbilityTargetOutcome> {
+        let outcome = match enemy_effect {
             AbilityNegativeEffect::Spell(spell_enemy_effect) => Self::perform_spell_enemy_effect(
                 caster,
                 ability_name,
@@ -1993,7 +2069,7 @@ impl CoreGame {
                 //caster.set_facing_toward(target.pos());
 
                 // Ability attack
-                let event: AttackedEvent = Self::perform_attack(
+                let event = Self::perform_attack(
                     caster,
                     HandType::MainHand,
                     &attack_enhancement_effects,
@@ -2003,11 +2079,14 @@ impl CoreGame {
                     advantage,
                     mode,
                     Some(ability_attack_effect),
-                );
+                )
+                .await;
 
                 AbilityTargetOutcome::AttackedEnemy(event)
             }
-        }
+        };
+
+        Box::new(outcome)
     }
 
     fn perform_spell_enemy_effect(
@@ -2341,7 +2420,7 @@ impl CoreGame {
         self.ui_handle_event(GameEvent::LogLine(line.into())).await;
     }
 
-    fn perform_attack(
+    async fn perform_attack(
         attacker: &Rc<Character>,
         hand_type: HandType,
         enhancements: &[(&'static str, AttackEnhancementEffect)],
@@ -2349,7 +2428,7 @@ impl CoreGame {
         attack_index: u32,
         maybe_reaction: Option<(CharacterId, OnAttackedReaction)>,
         ability_roll_advantage: i32,
-        mode: ActionPerformanceMode,
+        mode: ActionPerformanceMode<'_>,
         ability_attack_effect: Option<AbilityAttackEffect>,
     ) -> AttackedEvent {
         let game = match mode {
@@ -2935,7 +3014,9 @@ impl CoreGame {
                 detail_lines.push("".to_string());
                 detail_lines.push(format!("{}:", arrow.name));
 
-                let area_target_outcomes = Self::perform_ability_area_effect(
+                // Need box pin to avoid
+                // error[E0733]: recursion in an async fn requires boxing
+                let area_target_outcomes = Box::pin(Self::perform_ability_area_effect(
                     arrow.name,
                     &RollInstruction::RollWithAttackModifier {
                         attack_modifier,
@@ -2947,18 +3028,20 @@ impl CoreGame {
                     area_effect,
                     &mut detail_lines,
                     mode,
-                );
+                ))
+                .await;
                 area_outcomes = Some((area_effect.shape, area_target_outcomes));
             }
         }
 
-        AttackedEvent {
+        let attacked_event = AttackedEvent {
             attacker: attacker.id(),
             target: defender.id(),
             outcome,
             detail_lines,
             area_outcomes,
-        }
+        };
+        attacked_event
     }
 
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
@@ -3584,7 +3667,7 @@ pub fn predict_attack(
     // (like checking wall collisions for ranged attacks?)
     // Exclude natural miss and natural crit in prediction
     for unmodified_roll in 2..=19 {
-        let event = CoreGame::perform_attack(
+        let event = pollster::FutureExt::block_on(CoreGame::perform_attack(
             attacker,
             hand_type,
             enhancements,
@@ -3594,16 +3677,16 @@ pub fn predict_attack(
             ability_roll_modifier,
             ActionPerformanceMode::SimulatedRoll(unmodified_roll, pathfind_grid, characters),
             None,
-        );
+        ));
 
         let AttackOutcome {
             damage, hit_type, ..
         } = event.outcome;
 
         if area_targets.is_empty() {
-            if let Some((shape, outcomes)) = event.area_outcomes {
+            if let Some((shape, outcomes)) = &event.area_outcomes {
                 for (target_id, _) in outcomes {
-                    area_targets.push(target_id);
+                    area_targets.push(*target_id);
                 }
             }
         }
@@ -3816,6 +3899,10 @@ pub enum GameEvent {
         from: Surface,
         to: Surface,
     },
+    SurfaceWasCreated {
+        positions: Vec<Position>,
+        surface: Surface,
+    },
     MovementWasInitiated {
         character: CharacterId,
         positions: Vec<Position>,
@@ -3924,7 +4011,7 @@ impl DamageSource {
 #[derive(Debug, Clone)]
 pub struct AbilityResolvedEvent {
     pub actor: CharacterId,
-    pub target_outcome: Option<(CharacterId, AbilityTargetOutcome)>,
+    pub target_outcome: Option<(CharacterId, Box<AbilityTargetOutcome>)>,
     pub area_outcome: Option<AbilityAreaOutcome>,
     pub ability: &'static Ability,
     pub detail_lines: Vec<String>,
@@ -3933,24 +4020,24 @@ pub struct AbilityResolvedEvent {
 #[derive(Debug, Clone)]
 pub struct AbilityAreaOutcome {
     pub center: Position,
-    pub targets: Vec<(CharacterId, AbilityTargetOutcome)>,
+    pub targets: Vec<(CharacterId, Box<AbilityTargetOutcome>)>,
     pub shape: AreaShape,
 }
 
 impl AbilityResolvedEvent {
     fn enemies_hit(&self, result: &mut Vec<CharacterId>) {
         if let Some((target_id, outcome)) = &self.target_outcome {
-            if matches!(outcome, AbilityTargetOutcome::HitEnemy { .. }) {
+            if matches!(outcome.as_ref(), AbilityTargetOutcome::HitEnemy { .. }) {
                 result.push(*target_id);
             }
-            if matches!(outcome, AbilityTargetOutcome::AttackedEnemy { .. }) {
+            if matches!(outcome.as_ref(), AbilityTargetOutcome::AttackedEnemy { .. }) {
                 result.push(*target_id);
             }
         }
         if let Some(AbilityAreaOutcome { targets, .. }) = &self.area_outcome {
             for (target_id, outcome) in targets {
                 if matches!(
-                    outcome,
+                    outcome.as_ref(),
                     AbilityTargetOutcome::HitEnemy { .. } | AbilityTargetOutcome::AttackedEnemy(..)
                 ) {
                     result.push(*target_id);
@@ -4006,7 +4093,7 @@ pub struct AttackedEvent {
     pub target: CharacterId,
     pub outcome: AttackOutcome,
     pub detail_lines: Vec<String>,
-    pub area_outcomes: Option<(AreaShape, Vec<(CharacterId, AbilityTargetOutcome)>)>,
+    pub area_outcomes: Option<(AreaShape, Vec<(CharacterId, Box<AbilityTargetOutcome>)>)>,
 }
 
 #[derive(Debug, Clone)]
@@ -5041,6 +5128,7 @@ pub enum AbilityId {
     MindBlast,
     InflictWounds,
     Dash,
+    Spikes,
     PiercingShot,
     Heal,
     HealingNova,
@@ -5055,7 +5143,7 @@ pub enum AbilityId {
 
     Kill,
     ManaTest,
-    PoisonTest,
+    SpikeTest,
 
     EnemyBurningArrow,
     EnemySlashingAttack,
@@ -5203,6 +5291,7 @@ pub enum AbilityTarget {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EnvironmentEffect {
     ConvertSurface(Surface, Surface),
+    CreateSurface(Surface, AreaShape),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5210,6 +5299,7 @@ pub struct AreaEffect {
     pub shape: AreaShape,
     pub acquisition: AreaTargetAcquisition,
     pub effect: AbilityEffect,
+    pub create_surface: Option<Surface>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

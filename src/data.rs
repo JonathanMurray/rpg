@@ -618,6 +618,7 @@ pub const EXPLODING_ARROWS: Arrow = Arrow {
     on_damage_apply: None,
     area_effect: Some(AreaEffect {
         shape: AreaShape::Circle(Range::Melee),
+        create_surface: None,
         acquisition: AreaTargetAcquisition::Everyone,
         effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Toughness),
@@ -1064,6 +1065,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
         self_area: Some(AreaEffect {
             // Melee
             shape: AreaShape::Circle(Range::Float(2.5)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
                 AbilityAttackEffect::default(),
@@ -1296,6 +1298,7 @@ pub const SCREAM: Ability = Ability {
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Ranged(7)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Will),
@@ -1481,6 +1484,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
         range: Range::Float(7.5),
         area_effect: AreaEffect {
             shape: AreaShape::Circle(Range::Float(2.5)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -1869,6 +1873,7 @@ pub const INSPIRE: Ability = Ability {
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Float(12.5)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
@@ -1911,6 +1916,7 @@ pub const ENEMY_INSPIRE: Ability = Ability {
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Float(12.5)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 0,
@@ -1950,6 +1956,7 @@ pub const HEALING_NOVA: Ability = Ability {
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Ranged(12)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -2060,6 +2067,7 @@ pub const HEALING_RAIN: Ability = Ability {
         area_effect: AreaEffect {
             //shape: AreaShape::Circle(Range::Float(5.5)),
             shape: AreaShape::Line,
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Allies,
             effect: AbilityEffect::Positive(AbilityPositiveEffect {
                 healing: 1,
@@ -2075,6 +2083,41 @@ pub const HEALING_RAIN: Ability = Ability {
         particle_shape: ParticleShape::Circle,
         sound: SoundId::MechanicNoise,
     }),
+};
+
+pub const SPIKES: Ability = Ability {
+    id: AbilityId::Spikes,
+    name: "Spike trap",
+    speech: "",
+    description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them",
+    icon: IconId::Undefined,
+    action_point_cost: 0,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None, None, None],
+
+    target: AbilityTarget::Area {
+        range: Range::Float(5.5),
+        area_effect: AreaEffect {
+            shape: AreaShape::Circle(Range::Float(2.5)),
+            acquisition: AreaTargetAcquisition::Everyone,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: None,
+                damage: Some(AbilityDamage::Fixed(1, DamageType::Regular)),
+                on_hit: None,
+            })),
+            create_surface: Some(Surface::Spikes),
+        },
+    },
+    animation_color: GRAY,
+    animation: AbilityAnimation::CastSpell,
+    //TODO
+    initiate_sound: Some(SoundId::AttackMiss),
+    //TODO
+    resolve_sound: Some(SoundId::Crit),
+    charge_fx: None,
 };
 
 pub const DASH: Ability = Ability {
@@ -2117,6 +2160,7 @@ pub const PIERCING_SHOT: Ability = Ability {
         range: Range::Float(15.5),
         area_effect: AreaEffect {
             shape: AreaShape::Line,
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
                 AbilityAttackEffect {
@@ -2298,6 +2342,7 @@ pub const LIGHTNING_BOLT: Ability = Ability {
         range: Range::Float(12.0),
         area_effect: AreaEffect {
             shape: AreaShape::Line,
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Everyone,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: Some(DefenseType::Toughness),
@@ -2335,6 +2380,7 @@ pub const KILL: Ability = Ability {
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             shape: AreaShape::Circle(Range::Ranged(50)),
+            create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
                 defense_type: None,
@@ -2386,11 +2432,11 @@ pub const MANATEST: Ability = Ability {
     }),
 };
 
-pub const POISONTEST: Ability = Ability {
-    id: AbilityId::PoisonTest,
-    name: "Poison",
+pub const SPIKETEST: Ability = Ability {
+    id: AbilityId::SpikeTest,
+    name: "Self spike",
     speech: "",
-    description: "Create poison",
+    description: "",
     icon: IconId::Fireball,
     action_point_cost: 1,
     mana_cost: 0,
@@ -2402,9 +2448,9 @@ pub const POISONTEST: Ability = Ability {
     target: AbilityTarget::None {
         self_area: None,
         self_effect: None,
-        environment_effect: Some(EnvironmentEffect::ConvertSurface(
-            Surface::Water,
-            Surface::Poison,
+        environment_effect: Some(EnvironmentEffect::CreateSurface(
+            Surface::Spikes,
+            AreaShape::Circle(Range::Melee),
         )),
     },
     animation_color: BLACK,

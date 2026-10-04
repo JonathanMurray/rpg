@@ -632,6 +632,7 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                 shape,
                 acquisition,
                 effect,
+                create_surface,
             }) = self_area
             {
                 // There's no use-case for this yet (?)
@@ -652,6 +653,10 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
                     AbilityEffect::Positive(effect) => {
                         describe_ability_ally_effect(effect, &mut t);
                     }
+                }
+
+                if let Some(surface) = create_surface {
+                    describe_create_surface(surface, &mut t);
                 }
             }
 
@@ -686,13 +691,26 @@ fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
                 from.name(),
                 to.name()
             ));
-            if [from, to].contains(&Surface::Poison) {
-                t.keywords.push(Keyword::Cond(Condition::Poisoned, None));
-            }
             if [from, to].contains(&Surface::Water) {
                 t.keywords.push(Keyword::Cond(Condition::Wet, None));
             }
+            if [from, to].contains(&Surface::Poison) {
+                t.keywords.push(Keyword::Cond(Condition::Poisoned, None));
+            }
         }
+        EnvironmentEffect::CreateSurface(surface, _shape) => {
+            describe_create_surface(surface, t);
+        }
+    }
+}
+
+fn describe_create_surface(surface: Surface, t: &mut Tooltip) {
+    t.technical_description
+        .push(format!("  Creates surface: |<keyword>{}|", surface.name()));
+    match surface {
+        Surface::Water => t.keywords.push(Keyword::Cond(Condition::Wet, None)),
+        Surface::Poison => t.keywords.push(Keyword::Cond(Condition::Poisoned, None)),
+        Surface::Spikes => t.keywords.push(Keyword::Spikes),
     }
 }
 
@@ -753,6 +771,10 @@ pub fn describe_area_effect(range: Option<Range>, area_effect: AreaEffect, t: &m
             t.technical_description.push(line);
             describe_ability_ally_effect(effect, t);
         }
+    }
+
+    if let Some(surface) = area_effect.create_surface {
+        describe_create_surface(surface, t);
     }
 }
 

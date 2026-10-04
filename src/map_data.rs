@@ -19,7 +19,7 @@ use crate::{
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
         LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND, PENETRATING_ARROWS,
-        SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, STAFF,
+        SLASHING_RAPIER, SMALL_SHIELD, SPIKES, SPIKETEST, SPIKE_SHIELD, STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -57,8 +57,8 @@ pub fn create_game_grid(
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
     for (pos, terrain_id) in &map_data.decorations {
-        if let Some(surface) = terrain_id.surface() {
-            pathfind_grid.set_surface(*pos, Some(surface));
+        if let Some((surface, size)) = terrain_id.surface() {
+            pathfind_grid.set_surface(*pos, Some(surface), size);
         }
     }
     for (pos, control_point) in &map_data.control_points {
@@ -530,6 +530,11 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.armor_piece.set(Some(SHIRT));
     alice.learn_ability(&DASH);
     alice.learn_ability(&INSPIRE);
+
+    //TODO
+    alice.learn_ability(&SPIKES);
+    alice.learn_ability(&SPIKETEST);
+    //alice.learn_ability(&PIERCING_SHOT);
     //alice.learn_ability_enhancement(INSPIRE_RUTHLESS);
 
     // TODO
@@ -648,6 +653,8 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_passive(PassiveSkill::WeaponProficiency);
     alice.learn_ability(&PIERCING_SHOT);
+    alice.learn_ability(&SPIKES);
+    alice.learn_ability(&INFLICT_WOUNDS);
 
     alice
 }

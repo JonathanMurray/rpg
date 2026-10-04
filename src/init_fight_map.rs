@@ -66,8 +66,8 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     );
 
     for (pos, terrain_id) in &map_data.decorations {
-        if let Some(surface) = terrain_id.surface() {
-            pathfind_grid.set_surface(*pos, Some(surface));
+        if let Some((surface, size)) = terrain_id.surface() {
+            pathfind_grid.set_surface(*pos, Some(surface), size);
         }
     }
 

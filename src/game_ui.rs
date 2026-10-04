@@ -2022,6 +2022,11 @@ impl UserInterface {
                     Surface::Spikes => {}
                 }
             }
+            GameEvent::SurfaceWasCreated { positions, surface } => {
+                for pos in positions {
+                    self.game_grid.set_surface(pos, surface);
+                }
+            }
             GameEvent::CharacterChangedEquipment => {
                 self.sound_player.play(SoundId::DropEquipment);
             }
@@ -2056,7 +2061,7 @@ impl UserInterface {
         animation_color: Color,
         area_center_pos: &(i32, i32),
         shape: Option<AreaShape>,
-        outcomes: &[(CharacterId, AbilityTargetOutcome)],
+        outcomes: &[(CharacterId, Box<AbilityTargetOutcome>)],
         show_area_circle: bool,
     ) {
         let area_duration = 1.5;
@@ -2123,7 +2128,7 @@ impl UserInterface {
     fn handle_ability_resolved(
         &mut self,
         actor: CharacterId,
-        target_outcome: Option<(u32, AbilityTargetOutcome)>,
+        target_outcome: Option<(u32, Box<AbilityTargetOutcome>)>,
         area_outcome: Option<AbilityAreaOutcome>,
         ability: &'static Ability,
         mut detail_lines: Vec<String>,
@@ -2160,7 +2165,7 @@ impl UserInterface {
 
         let mut missed = false;
         if let Some((target, outcome)) = &target_outcome {
-            match outcome {
+            match outcome.as_ref() {
                 AbilityTargetOutcome::HitEnemy {
                     damage,
                     hit_type,
@@ -2204,7 +2209,7 @@ impl UserInterface {
 
         if let Some(AbilityAreaOutcome { targets, .. }) = &area_outcome {
             for (_, outcome) in targets {
-                if let AbilityTargetOutcome::AttackedEnemy(attacked_event) = &outcome {
+                if let AbilityTargetOutcome::AttackedEnemy(attacked_event) = &outcome.as_ref() {
                     attacks.push(attacked_event);
                 }
             }

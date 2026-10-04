@@ -580,6 +580,7 @@ impl Sidebar {
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
             TerrainId::Spikes,
+            TerrainId::SpikesSingleCell,
             TerrainId::NewWater(WaterOrientation::NorthEast, LiquidType::Water),
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations

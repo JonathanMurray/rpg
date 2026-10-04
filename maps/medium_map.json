@@ -267,8 +267,21 @@
     "(34, 29)": "WallOpeningEast",
     "(29, 25)": "Torch",
     "(32, 25)": "Torch",
-    "(16, 30)": "Spikes",
-    "(12, 30)": "Spikes"
+    "(16, 30)": "SpikesSingleCell",
+    "(13, 29)": "SpikesSingleCell",
+    "(15, 30)": "SpikesSingleCell",
+    "(13, 31)": "SpikesSingleCell",
+    "(15, 29)": "SpikesSingleCell",
+    "(15, 31)": "SpikesSingleCell",
+    "(16, 29)": "SpikesSingleCell",
+    "(14, 29)": "SpikesSingleCell",
+    "(16, 31)": "SpikesSingleCell",
+    "(13, 30)": "SpikesSingleCell",
+    "(12, 30)": "SpikesSingleCell",
+    "(12, 29)": "SpikesSingleCell",
+    "(12, 31)": "SpikesSingleCell",
+    "(14, 31)": "SpikesSingleCell",
+    "(14, 30)": "SpikesSingleCell"
   },
   "control_points": {},
   "characters": [
@@ -286,8 +299,8 @@
     {
       "type_": "Alice",
       "pos": [
-        5,
-        23
+        8,
+        24
       ],
       "health": null,
       "main_hand": null,

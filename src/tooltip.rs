@@ -22,6 +22,7 @@ use crate::{
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum Keyword {
     Cond(Condition, Option<u32>),
+    Spikes,
     AttackEnhancement(AttackEnhancement),
     OnAttackedReaction(OnAttackedReaction),
     Advantage,
@@ -42,6 +43,7 @@ impl Keyword {
             Keyword::Graze => "Graze",
             Keyword::Crit => "Crit",
             Keyword::Flanked => "Flanked",
+            Keyword::Spikes => "spikes (surface)",
         }
     }
 
@@ -67,6 +69,7 @@ impl Keyword {
                 "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers).".to_string()
             }
             Keyword::Flanked => "|<keyword>Advantage| on incoming attacks.".to_string(),
+            Keyword::Spikes => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
         }
     }
 
@@ -86,6 +89,7 @@ impl Keyword {
             Keyword::Graze => Goodness::Bad,
             Keyword::Crit => Goodness::Good,
             Keyword::Flanked => Goodness::Bad,
+            Keyword::Spikes => Goodness::Bad,
         }
     }
 }
