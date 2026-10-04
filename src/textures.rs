@@ -9,7 +9,7 @@ use macroquad::{
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    pathfind::{Liquid, TerrainType, CELLS_PER_ENTITY},
+    pathfind::{Surface, TerrainType, CELLS_PER_ENTITY},
     util::{COL_GREEN_3, COL_RED, COL_RED_BRIGHT},
 };
 
@@ -451,16 +451,17 @@ pub enum WaterOrientation {
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
-pub enum WaterType {
+pub enum LiquidType {
     Water,
     Poison,
 }
 
-impl From<Liquid> for WaterType {
-    fn from(liquid: Liquid) -> Self {
-        match liquid {
-            Liquid::Water => Self::Water,
-            Liquid::Poison => Self::Poison,
+impl LiquidType {
+    pub fn from_surface(surface: Surface) -> Option<Self> {
+        match surface {
+            Surface::Water => Some(Self::Water),
+            Surface::Poison => Some(Self::Poison),
+            Surface::Spikes => None,
         }
     }
 }
@@ -517,7 +518,7 @@ pub enum TerrainId {
     Torch,
     FoodPlate,
 
-    NewWater(WaterOrientation, WaterType),
+    NewWater(WaterOrientation, LiquidType),
 
     Water,
     WaterBeachNorth,
@@ -541,6 +542,18 @@ impl TerrainId {
         match self {
             TerrainId::NewWater(..) => true,
             _ => false,
+        }
+    }
+
+    pub fn is_surface(&self) -> bool {
+        matches!(self, TerrainId::NewWater(..) | TerrainId::Spikes)
+    }
+
+    pub fn surface(&self) -> Option<Surface> {
+        match self {
+            TerrainId::NewWater(..) => Some(Surface::Water),
+            TerrainId::Spikes => Some(Surface::Spikes),
+            _ => None,
         }
     }
 
@@ -614,7 +627,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Floor3 => (0, 11),
         TerrainId::Floor4 => (1, 9),
         TerrainId::NewWater(orientation, type_) => {
-            is_poison = type_ == WaterType::Poison;
+            is_poison = type_ == LiquidType::Poison;
             match orientation {
                 WaterOrientation::NorthWestInverted => (9, 9),
                 WaterOrientation::NorthEastInverted => {

@@ -14,7 +14,7 @@ use crate::{
         WeaponRange, WeaponType,
     },
     grid::ParticleShape,
-    pathfind::Liquid,
+    pathfind::Surface,
     sounds::SoundId,
     textures::{EquipmentIconId, IconId, SpriteId},
     tooltip::Keyword,
@@ -2402,9 +2402,9 @@ pub const POISONTEST: Ability = Ability {
     target: AbilityTarget::None {
         self_area: None,
         self_effect: None,
-        environment_effect: Some(EnvironmentEffect::ConvertLiquid(
-            Liquid::Water,
-            Liquid::Poison,
+        environment_effect: Some(EnvironmentEffect::ConvertSurface(
+            Surface::Water,
+            Surface::Poison,
         )),
     },
     animation_color: BLACK,

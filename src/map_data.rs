@@ -22,7 +22,7 @@ use crate::{
         SLASHING_RAPIER, SMALL_SHIELD, SPIKE_SHIELD, STAFF,
     },
     grid::{ControlPoint, GameGrid},
-    pathfind::{Liquid, Occupation, PathfindGrid},
+    pathfind::{Occupation, PathfindGrid, Surface},
     resources::GameResources,
     sounds::{SoundId, SoundPlayer},
     textures::{PortraitId, SpriteId, TerrainId},
@@ -57,8 +57,8 @@ pub fn create_game_grid(
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
     for (pos, terrain_id) in &map_data.decorations {
-        if terrain_id.is_new_water() {
-            pathfind_grid.set_liquid(*pos, Some(Liquid::Water));
+        if let Some(surface) = terrain_id.surface() {
+            pathfind_grid.set_surface(*pos, Some(surface));
         }
     }
     for (pos, control_point) in &map_data.control_points {

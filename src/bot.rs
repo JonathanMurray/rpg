@@ -412,7 +412,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                     0.0,
                     EXPLORATION_RANGE,
                     true,
-                    TraversalType::SlowedDownByLiquid,
+                    TraversalType::SlowedDownBySurface,
                 );
                 if let Some(path) = path {
                     return convert_path_to_move_action(bot, path);
@@ -533,7 +533,7 @@ fn find_path(
         proximity_squared,
         EXPLORATION_RANGE,
         true,
-        TraversalType::SlowedDownByLiquid,
+        TraversalType::SlowedDownBySurface,
     )
 }
 

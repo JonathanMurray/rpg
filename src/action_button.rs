@@ -29,7 +29,7 @@ use crate::{
     data::PassiveSkill,
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
-    pathfind::Liquid,
+    pathfind::Surface,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{oscillate, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
@@ -680,13 +680,16 @@ fn def_suffix(defense_type: Option<DefenseType>) -> String {
 
 fn describe_environment_effect(env_effect: EnvironmentEffect, t: &mut Tooltip) {
     match env_effect {
-        EnvironmentEffect::ConvertLiquid(from, to) => {
-            t.technical_description
-                .push(format!("  Surrounding {} becomes {}", from, to));
-            if [from, to].contains(&Liquid::Poison) {
+        EnvironmentEffect::ConvertSurface(from, to) => {
+            t.technical_description.push(format!(
+                "  Surrounding {} becomes {}",
+                from.name(),
+                to.name()
+            ));
+            if [from, to].contains(&Surface::Poison) {
                 t.keywords.push(Keyword::Cond(Condition::Poisoned, None));
             }
-            if [from, to].contains(&Liquid::Water) {
+            if [from, to].contains(&Surface::Water) {
                 t.keywords.push(Keyword::Cond(Condition::Wet, None));
             }
         }

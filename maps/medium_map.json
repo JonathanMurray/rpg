@@ -266,7 +266,9 @@
     "(14, 26)": "WallFlag",
     "(34, 29)": "WallOpeningEast",
     "(29, 25)": "Torch",
-    "(32, 25)": "Torch"
+    "(32, 25)": "Torch",
+    "(16, 30)": "Spikes",
+    "(12, 30)": "Spikes"
   },
   "control_points": {},
   "characters": [

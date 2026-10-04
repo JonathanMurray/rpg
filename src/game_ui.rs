@@ -49,7 +49,7 @@ use crate::{
         TargetEffectPreview, TextEffectStyle,
     },
     init_fight_map::GameInitState,
-    pathfind::{Liquid, Occupation, PathfindGrid, TerrainType},
+    pathfind::{Occupation, PathfindGrid, Surface, TerrainType},
     resources::{GameResources, UiResources},
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
@@ -1874,7 +1874,7 @@ impl UserInterface {
                 to,
                 movement_type,
                 step_idx,
-                liquid,
+                surface,
             } => {
                 let mover = self.characters.get(character);
 
@@ -1904,9 +1904,9 @@ impl UserInterface {
                     }
 
                     if movement_type == MovementType::AbilityEngage {
-                        // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by liquid
+                        // Ability engage (e.g. lunge attack) should appear faster than regular movement, and is not slowed down by special surface
                         duration *= 0.7;
-                    } else if liquid.is_some() && movement_type != MovementType::KnockedBack {
+                    } else if surface.is_some() && movement_type != MovementType::KnockedBack {
                         duration *= MOVE_COST_FACTOR_IN_LIQUID;
                     }
                 }
@@ -1916,7 +1916,7 @@ impl UserInterface {
                 if movement_type == MovementType::Dash {
                     self.sound_player.play(SoundId::Dash);
                 } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
-                    if liquid.is_some() {
+                    if surface.map(|s| s.is_liquid()).unwrap_or(false) {
                         self.sound_player.play(SoundId::WalkWater);
                     } else {
                         self.sound_player.play(SoundId::Walk);
@@ -1955,7 +1955,7 @@ impl UserInterface {
                     self.game_grid.animate_pow_effect(character.id(), 0.2);
                 }
                 self.animate_character_damage(character.id(), amount);
-                self.animation_stopwatch.set_to_at_least(0.15);
+                //self.animation_stopwatch.set_to_at_least(0.15);
             }
             GameEvent::CharacterReceivedCondition {
                 character,
@@ -2008,17 +2008,18 @@ impl UserInterface {
                 self.banner.set(text, 2.5);
                 self.animation_stopwatch.set_to_at_least(3.0);
             }
-            GameEvent::LiquidWasConverted {
+            GameEvent::SurfaceWasConverted {
                 positions,
                 from,
                 to,
             } => {
-                self.game_grid.convert_liquid(positions, from, to);
+                self.game_grid.convert_surface(positions, from, to);
                 match to {
-                    Liquid::Water => {}
-                    Liquid::Poison => {
+                    Surface::Water => {}
+                    Surface::Poison => {
                         self.sound_player.play(SoundId::Poison);
                     }
+                    Surface::Spikes => {}
                 }
             }
             GameEvent::CharacterChangedEquipment => {

@@ -8,7 +8,7 @@ use crate::{
     core::{Character, CharacterId, PlayerId, Position},
     grid::ControlPoint,
     map_data::{create_character, CharacterType, MapData},
-    pathfind::{Liquid, Occupation, PathfindGrid},
+    pathfind::{Occupation, PathfindGrid, Surface},
     textures::TerrainId,
 };
 
@@ -66,8 +66,8 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     );
 
     for (pos, terrain_id) in &map_data.decorations {
-        if terrain_id.is_new_water() {
-            pathfind_grid.set_liquid(*pos, Some(Liquid::Water));
+        if let Some(surface) = terrain_id.surface() {
+            pathfind_grid.set_surface(*pos, Some(surface));
         }
     }
 

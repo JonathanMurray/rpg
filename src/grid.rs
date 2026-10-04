@@ -56,14 +56,14 @@ use crate::{
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
     pathfind::{
-        ChartNode, Liquid, Occupation, PathNode, PathfindGrid, TerrainType, TraversalType,
+        ChartNode, Occupation, PathNode, PathfindGrid, Surface, TerrainType, TraversalType,
         CELLS_PER_ENTITY,
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
         character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
-        EffectId, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor, WaterOrientation,
-        WaterType, LIGHTNING_BOLT_FX,
+        EffectId, LiquidType, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor,
+        WaterOrientation, LIGHTNING_BOLT_FX,
     },
     util::{
         are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
@@ -392,8 +392,8 @@ impl GameGrid {
     pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
-            if terrain_id.is_new_water() {
-                self.pathfind_grid.set_liquid(pos, Some(Liquid::Water));
+            if let Some(surface) = terrain_id.surface() {
+                self.pathfind_grid.set_surface(pos, Some(surface));
             }
             self.auto_tile();
             true
@@ -405,8 +405,8 @@ impl GameGrid {
     /// Should only be called from editor; not from in-game!
     pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
         if let Some(terrain_id) = self.decorations.get(&pos) {
-            if terrain_id.is_new_water() {
-                self.pathfind_grid.set_liquid(pos, None);
+            if terrain_id.is_surface() {
+                self.pathfind_grid.set_surface(pos, None);
             }
             self.decorations.swap_remove(&pos);
             self.auto_tile();
@@ -435,36 +435,36 @@ impl GameGrid {
         }
     }
 
-    pub fn convert_liquid(
+    pub fn convert_surface(
         &mut self,
         positions: Vec<Position>,
-        from_liquid: Liquid,
-        to_liquid: Liquid,
+        from_surface: Surface,
+        to_surface: Surface,
     ) {
         for pos in positions {
             match self.decorations.entry(pos) {
                 Entry::Occupied(mut e) => {
                     let terrain_id = e.get();
-                    match (terrain_id, from_liquid) {
-                        (TerrainId::NewWater(orientation, WaterType::Water), Liquid::Water) => {
+                    match (terrain_id, from_surface) {
+                        (TerrainId::NewWater(orientation, LiquidType::Water), Surface::Water) => {
                             e.insert(TerrainId::NewWater(
                                 *orientation,
-                                WaterType::from(to_liquid),
+                                LiquidType::from_surface(to_surface).unwrap(),
                             ));
                         }
-                        (TerrainId::NewWater(orientation, WaterType::Poison), Liquid::Poison) => {
+                        (TerrainId::NewWater(orientation, LiquidType::Poison), Surface::Poison) => {
                             e.insert(TerrainId::NewWater(
                                 *orientation,
-                                WaterType::from(to_liquid),
+                                LiquidType::from_surface(to_surface).unwrap(),
                             ));
                         }
                         _ => {
-                            println!("WARN: is not {:?}, pos: {:?}", from_liquid, pos);
+                            println!("WARN: is not {:?}, pos: {:?}", from_surface, pos);
                         }
                     }
                 }
                 Entry::Vacant(..) => {
-                    println!("Can't convert nothing to {:?}, pos: {:?}", to_liquid, pos);
+                    println!("Can't convert nothing to {:?}, pos: {:?}", to_surface, pos);
                 }
             }
         }
@@ -612,7 +612,7 @@ impl GameGrid {
                     }
                 };
 
-                terrain_id = TerrainId::NewWater(orientation, WaterType::Water);
+                terrain_id = TerrainId::NewWater(orientation, LiquidType::Water);
             }
             new_map.insert(*pos, terrain_id);
         }
@@ -1139,7 +1139,7 @@ impl GameGrid {
             pos,
             exploration_range,
             None,
-            TraversalType::SlowedDownByLiquid,
+            TraversalType::SlowedDownBySurface,
         );
 
         //dbg!(routes.len());
@@ -1853,8 +1853,9 @@ impl GameGrid {
 
         let standing_in_liquid = self
             .pathfind_grid
-            .is_character_in_liquid(character.pos())
-            .is_some();
+            .is_character_on_surface(character.pos())
+            .map(|s| s.is_liquid())
+            .unwrap_or(false);
 
         params.pivot = Some((x + self.cell_w * 1.5, y + self.cell_w * 2.0).into());
 
@@ -2699,10 +2700,15 @@ impl GameGrid {
                 _ => None,
             };
 
-            if let Some(liquid) = self.pathfind_grid.liquid(mouse_grid_pos) {
+            if let Some(surface) = self.pathfind_grid.surface(mouse_grid_pos) {
                 if mouse_state == MouseState::None && self.hovered_character.is_none() {
                     self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
-                    self.draw_cursor_text(format!("|<info>| {}", liquid), None, CURSOR_INFO_COLOR);
+                    let text = match surface {
+                        Surface::Water => "|<info>| water",
+                        Surface::Poison => "|<warning>| poison",
+                        Surface::Spikes => "|<warning>| spikes",
+                    };
+                    self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
                 }
             }
 
@@ -3680,10 +3686,10 @@ impl GameGrid {
             target_pos,
             f32::from(move_range),
             false,
-            // Actions that move toward a target ignore slow movement speed in liquids.
+            // Actions that move toward a target ignore slow movement speed on special surfaces.
             // If they didn't, we couldn't assume that the ability's range covered a circle
             // around the caster. Let's not deal with that right now.
-            TraversalType::NotSlowedDownByLiquid,
+            TraversalType::NotSlowedDownBySurface,
         );
 
         /*
@@ -4583,25 +4589,25 @@ impl GameGrid {
         {
             for w in path.windows(2) {
                 let mover = self.characters.get(&self.active_character_id).unwrap();
-                let mut dangerous = false;
+                let mut threatened_cell = false;
                 for other_char in self.characters.values() {
                     if can_opportunity_attack_mover(mover, w[0].position, w[1].position, other_char)
                     {
                         opportunity_attackers.push(other_char.id());
-                        dangerous = true;
+                        threatened_cell = true;
                     }
                 }
-                movement_path.push((&w[1], dangerous));
+                movement_path.push((&w[1], threatened_cell));
             }
         }
 
         self.draw_movement_path_with_arrow(
             movement_path
                 .iter()
-                .map(|(node, dangerous)| MovementPathNode {
+                .map(|(node, threatened_cell)| MovementPathNode {
                     pos: node.position,
-                    difficult_terrain: node.difficult_terrain,
-                    dangerous: *dangerous,
+                    difficult_terrain: node.surface.is_some(),
+                    dangerous: *threatened_cell || node.surface == Some(Surface::Spikes),
                 }),
             HOVER_MOVEMENT_ARROW_COLOR,
         );

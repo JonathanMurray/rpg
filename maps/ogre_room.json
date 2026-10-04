@@ -721,8 +721,8 @@
     {
       "type_": "Bob",
       "pos": [
-        16,
-        34
+        15,
+        10
       ],
       "health": null,
       "main_hand": null,

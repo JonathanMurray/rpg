@@ -19,7 +19,7 @@ use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
 use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
-use crate::pathfind::{Collision, Liquid, Occupation, PathfindGrid};
+use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface};
 use crate::sounds::SoundId;
 use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
@@ -72,13 +72,13 @@ impl CoreGame {
         for character in self.characters.iter() {
             character.on_battle_start();
             // The condition's duration is set relative to the character's turn index, so that it affects each character
-            // equally long, after they move out of a liquid.
+            // equally long, after they move out of a surface.
             let char_game_time = if character.player_controlled() {
                 0
             } else {
                 character.index_in_round.get().unwrap()
             };
-            self.handle_character_standing_in_liquid(character, char_game_time)
+            self.handle_character_standing_on_surface(character, char_game_time)
                 .await;
         }
         for player_char in self.player_characters() {
@@ -112,7 +112,7 @@ impl CoreGame {
                 return Ok(());
             }
 
-            self.handle_character_standing_in_liquid(self.active_character(), self.current_time())
+            self.handle_character_standing_on_surface(self.active_character(), self.current_time())
                 .await;
 
             let action_or_character_change = self.user_interface.select_action(&self).await?;
@@ -937,7 +937,7 @@ impl CoreGame {
                 character.set_facing_toward(new_position);
             }
 
-            let new_liquid = self.pathfind_grid.is_character_in_liquid(new_position);
+            let new_surface = self.pathfind_grid.is_character_on_surface(new_position);
 
             self.ui_handle_event(GameEvent::Moved {
                 character: id,
@@ -945,24 +945,36 @@ impl CoreGame {
                 to: new_position,
                 movement_type,
                 step_idx,
-                liquid: new_liquid,
+                surface: new_surface,
             })
             .await;
 
             if character.is_swamp_dweller() {
-                let prev_liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
-                if new_liquid.is_none() && prev_liquid == Some(Liquid::Poison) {
+                let prev_surface = self.pathfind_grid.is_character_on_surface(character.pos());
+                if new_surface.is_none() && prev_surface == Some(Surface::Poison) {
                     self.handle_swamp_dweller_left_poison(character).await;
                 }
+            }
+
+            if new_surface == Some(Surface::Spikes) {
+                // TODO
+                let health_lost = self.perform_losing_health(character, 1);
+                self.ui_handle_event(GameEvent::CharacterTookDamage {
+                    character: character.id(),
+                    amount: health_lost,
+                    source: DamageSource::Spikes,
+                })
+                .await;
+                //character.receive_condition(Condition::Bleeding, Some(1), None);
             }
 
             character.set_position(new_position);
 
             if character.is_swamp_dweller() {
-                let liquid = self.pathfind_grid.is_character_in_liquid(character.pos());
-                if liquid == Some(Liquid::Water) {
+                let surface = self.pathfind_grid.is_character_on_surface(character.pos());
+                if surface == Some(Surface::Water) {
                     self.perform_environment_effect(
-                        EnvironmentEffect::ConvertLiquid(Liquid::Water, Liquid::Poison),
+                        EnvironmentEffect::ConvertSurface(Surface::Water, Surface::Poison),
                         character.pos(),
                         &mut vec![],
                     )
@@ -970,7 +982,7 @@ impl CoreGame {
                 }
             }
 
-            self.handle_character_standing_in_liquid(character, self.current_time())
+            self.handle_character_standing_on_surface(character, self.current_time())
                 .await;
 
             step_idx += 1;
@@ -982,23 +994,27 @@ impl CoreGame {
     }
 
     async fn handle_swamp_dweller_left_poison(&self, character: &Rc<Character>) {
-        let mut liquid_area = vec![];
-        self.pathfind_grid
-            .traverse_liquid_cells(character.pos(), Liquid::Poison, None, |x, y| {
-                liquid_area.push((x, y));
-            });
+        let mut poison_area = vec![];
+        self.pathfind_grid.traverse_surface_cells(
+            character.pos(),
+            Surface::Poison,
+            None,
+            |x, y| {
+                poison_area.push((x, y));
+            },
+        );
 
         let still_poisonous = self.characters.iter().any(|other| {
             other.id() != character.id()
                 && other.is_swamp_dweller()
-                && liquid_area.contains(&other.pos())
+                && poison_area.contains(&other.pos())
         });
 
         dbg!(still_poisonous);
 
         if !still_poisonous {
             self.perform_environment_effect(
-                EnvironmentEffect::ConvertLiquid(Liquid::Poison, Liquid::Water),
+                EnvironmentEffect::ConvertSurface(Surface::Poison, Surface::Water),
                 character.pos(),
                 &mut vec![],
             )
@@ -1006,10 +1022,10 @@ impl CoreGame {
         }
     }
 
-    async fn handle_character_standing_in_liquid(&self, character: &Character, game_time: u32) {
+    async fn handle_character_standing_on_surface(&self, character: &Character, game_time: u32) {
         //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
-        if let Some(liquid) = self.pathfind_grid.is_character_in_liquid(character.pos()) {
-            if !character.has_condition(&Condition::Wet) {
+        if let Some(surface) = self.pathfind_grid.is_character_on_surface(character.pos()) {
+            if surface.is_liquid() && !character.has_condition(&Condition::Wet) {
                 character.receive_condition(
                     Condition::Wet,
                     None,
@@ -1021,9 +1037,9 @@ impl CoreGame {
                 })
                 .await;
             }
-            match liquid {
-                Liquid::Water => {}
-                Liquid::Poison => {
+            match surface {
+                Surface::Water => {}
+                Surface::Poison => {
                     if !character.has_condition(&Condition::Poisoned)
                         && !character.is_swamp_dweller()
                     {
@@ -1039,6 +1055,7 @@ impl CoreGame {
                         .await;
                     }
                 }
+                Surface::Spikes => {}
             }
         }
     }
@@ -1645,15 +1662,15 @@ impl CoreGame {
         detail_lines: &mut Vec<String>,
     ) {
         match env_effect {
-            EnvironmentEffect::ConvertLiquid(from, to) => {
+            EnvironmentEffect::ConvertSurface(from, to) => {
                 let mut positions = vec![];
                 self.pathfind_grid
-                    .traverse_liquid_cells(position, from, Some(to), |x, y| {
+                    .traverse_surface_cells(position, from, Some(to), |x, y| {
                         positions.push((x, y));
                     });
                 if !positions.is_empty() {
-                    detail_lines.push(format!("  {} was turned to {}", from, to));
-                    self.ui_handle_event(GameEvent::LiquidWasConverted {
+                    detail_lines.push(format!("  {} was turned to {}", from.name(), to.name()));
+                    self.ui_handle_event(GameEvent::SurfaceWasConverted {
                         positions,
                         from,
                         to,
@@ -1661,7 +1678,7 @@ impl CoreGame {
                     .await;
 
                     for char in self.characters.iter() {
-                        self.handle_character_standing_in_liquid(char, self.current_time())
+                        self.handle_character_standing_on_surface(char, self.current_time())
                             .await;
                     }
                 }
@@ -3794,10 +3811,10 @@ pub enum GameEvent {
     PlayerGainedMoney {
         amount: u32,
     },
-    LiquidWasConverted {
+    SurfaceWasConverted {
         positions: Vec<Position>,
-        from: Liquid,
-        to: Liquid,
+        from: Surface,
+        to: Surface,
     },
     MovementWasInitiated {
         character: CharacterId,
@@ -3809,7 +3826,7 @@ pub enum GameEvent {
         to: Position,
         movement_type: MovementType,
         step_idx: u32,
-        liquid: Option<Liquid>,
+        surface: Option<Surface>,
     },
     CharacterReactedToAttacked {
         reactor: CharacterId,
@@ -3891,6 +3908,7 @@ pub enum GameEvent {
 pub enum DamageSource {
     Condition(Condition),
     KnockbackCollision,
+    Spikes,
 }
 
 impl DamageSource {
@@ -3898,6 +3916,7 @@ impl DamageSource {
         match self {
             DamageSource::Condition(condition) => condition.name(),
             DamageSource::KnockbackCollision => "Collision",
+            DamageSource::Spikes => "Spikes",
         }
     }
 }
@@ -5183,7 +5202,7 @@ pub enum AbilityTarget {
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum EnvironmentEffect {
-    ConvertLiquid(Liquid, Liquid),
+    ConvertSurface(Surface, Surface),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

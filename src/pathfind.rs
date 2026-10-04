@@ -10,8 +10,9 @@ use indexmap::IndexMap;
 
 use crate::{
     core::{
-        distance_between, sq_distance_between, within_range_squared, CharacterId, Position,
-        CENTER_MELEE_RANGE_SQUARED, MOVE_COST_FACTOR_IN_LIQUID,
+        distance_between, sq_distance_between, within_range_squared, CharacterId,
+        GameEvent::SurfaceWasConverted, Position, CENTER_MELEE_RANGE_SQUARED,
+        MOVE_COST_FACTOR_IN_LIQUID,
     },
     grid::ControlPoint,
     util::line_visitor,
@@ -46,16 +47,22 @@ pub struct Target {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
-pub enum Liquid {
+pub enum Surface {
     Water,
     Poison,
+    Spikes,
 }
 
-impl Display for Liquid {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Surface {
+    pub fn is_liquid(&self) -> bool {
+        matches!(self, Surface::Water | Surface::Poison)
+    }
+
+    pub fn name(&self) -> &'static str {
         match self {
-            Liquid::Water => f.write_str("water"),
-            Liquid::Poison => f.write_str("poison"),
+            Surface::Water => "water",
+            Surface::Poison => "poison",
+            Surface::Spikes => "spikes",
         }
     }
 }
@@ -63,7 +70,7 @@ impl Display for Liquid {
 pub struct PathfindGrid {
     dimensions: (u32, u32),
     occupied: RefCell<HashMap<Position, Occupation>>,
-    liquids: RefCell<HashMap<Position, Liquid>>,
+    surfaces: RefCell<HashMap<Position, Surface>>,
     pub control_points: RefCell<HashMap<Position, ControlPoint>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
@@ -106,13 +113,13 @@ pub struct Path {
 pub struct PathNode {
     pub distance_from_start: f32,
     pub position: Position,
-    pub difficult_terrain: bool,
+    pub surface: Option<Surface>,
 }
 
 #[derive(Debug, PartialEq)]
 pub enum TraversalType {
-    SlowedDownByLiquid,
-    NotSlowedDownByLiquid,
+    SlowedDownBySurface,
+    NotSlowedDownBySurface,
 }
 
 impl PathfindGrid {
@@ -120,7 +127,7 @@ impl PathfindGrid {
         Self {
             dimensions,
             occupied: Default::default(),
-            liquids: Default::default(),
+            surfaces: Default::default(),
             control_points: Default::default(),
             cache_key: Default::default(),
             cached_exploration_chart: Default::default(),
@@ -128,14 +135,14 @@ impl PathfindGrid {
         }
     }
 
-    pub fn traverse_liquid_cells(
+    pub fn traverse_surface_cells(
         &self,
         start_pos: Position,
-        liquid_type: Liquid,
-        convert_to: Option<Liquid>,
+        surface_type: Surface,
+        convert_to: Option<Surface>,
         mut visitor: impl FnMut(i32, i32),
     ) {
-        if self.liquids.borrow().get(&start_pos) != Some(&liquid_type) {
+        if self.surfaces.borrow().get(&start_pos) != Some(&surface_type) {
             return;
         }
 
@@ -146,14 +153,14 @@ impl PathfindGrid {
         while let Some(pos) = next.pop_front() {
             visitor(pos.0, pos.1);
             if let Some(convert_to) = convert_to {
-                self.liquids.borrow_mut().insert(pos, convert_to);
+                self.surfaces.borrow_mut().insert(pos, convert_to);
             }
             seen.insert(pos);
             for x in [pos.0 - 1, pos.0, pos.0 + 1] {
                 for y in [pos.1 - 1, pos.1, pos.1 + 1] {
                     if (x, y) != pos
                         && !seen.contains(&(x, y))
-                        && self.liquids.borrow().get(&(x, y)) == Some(&liquid_type)
+                        && self.surfaces.borrow().get(&(x, y)) == Some(&surface_type)
                     {
                         seen.insert((x, y));
                         next.push_back((x, y));
@@ -175,32 +182,32 @@ impl PathfindGrid {
         self.control_points.borrow()
     }
 
-    pub fn set_liquid(&self, pos: Position, value: Option<Liquid>) {
-        let mut liquids = self.liquids.borrow_mut();
+    pub fn set_surface(&self, pos: Position, value: Option<Surface>) {
+        let mut surfaces = self.surfaces.borrow_mut();
         for x in pos.0 - 1..=pos.0 + 1 {
             for y in pos.1 - 1..=pos.1 + 1 {
-                if let Some(liquid) = value {
-                    if liquids.get(&(x, y)) == Some(&liquid) {
-                        println!("WARN: {:?} is already marked as {:?}", pos, liquid);
+                if let Some(surface) = value {
+                    if surfaces.get(&(x, y)) == Some(&surface) {
+                        println!("WARN: {:?} is already marked as {:?}", pos, surface);
                     }
-                    liquids.insert((x, y), liquid);
+                    surfaces.insert((x, y), surface);
                 } else {
-                    if liquids.get(&(x, y)) != Some(&Liquid::Water) {
+                    if surfaces.get(&(x, y)) != Some(&Surface::Water) {
                         println!("WARN: Cannot unmark {:?} as water. It's not marked", pos);
                     }
 
-                    liquids.remove(&(x, y));
+                    surfaces.remove(&(x, y));
                 }
             }
         }
     }
 
-    pub fn liquid(&self, pos: Position) -> Option<Liquid> {
-        self.liquids.borrow().get(&pos).copied()
+    pub fn surface(&self, pos: Position) -> Option<Surface> {
+        self.surfaces.borrow().get(&pos).copied()
     }
 
-    pub fn is_character_in_liquid(&self, pos: Position) -> Option<Liquid> {
-        return self.liquids.borrow().get(&pos).copied();
+    pub fn is_character_on_surface(&self, pos: Position) -> Option<Surface> {
+        return self.surfaces.borrow().get(&pos).copied();
     }
 
     pub fn set_occupied(&self, pos: Position, occupation: Option<Occupation>) {
@@ -473,8 +480,8 @@ impl PathfindGrid {
                         } else {
                             1.0
                         };
-                        if traversal_type == TraversalType::SlowedDownByLiquid
-                            && self.liquids.borrow().contains_key(&(x0, y0))
+                        if traversal_type == TraversalType::SlowedDownBySurface
+                            && self.surfaces.borrow().contains_key(&(x0, y0))
                         {
                             local_cost *= MOVE_COST_FACTOR_IN_LIQUID;
                         }
@@ -720,11 +727,11 @@ impl PathfindGrid {
         let positions = positions
             .into_iter()
             .map(|(dist, pos)| {
-                let difficult_terrain = self.liquids.borrow().contains_key(&pos);
+                let surface = self.surfaces.borrow().get(&pos).copied();
                 PathNode {
                     distance_from_start: dist,
                     position: pos,
-                    difficult_terrain,
+                    surface,
                 }
             })
             .collect();
