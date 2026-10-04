@@ -338,7 +338,7 @@
     "(19, 1)": "WallWindow",
     "(52, 25)": "WallOpeningEast",
     "(28, 4)": "WallOpeningEast",
-    "(22, 1)": "AnimalHead",
+    "(22, 1)": "HangingWeapons",
     "(13, 13)": {
       "NewWater": [
         "NorthEast",
@@ -367,7 +367,8 @@
     "(40, 22)": "WallOpeningWest",
     "(31, 7)": "SuitOfArmor",
     "(37, 7)": "SuitOfArmor",
-    "(43, 7)": "SuitOfArmor"
+    "(43, 7)": "SuitOfArmor",
+    "(48, 7)": "HangingWeapons2"
   },
   "control_points": {
     "(49, 13)": "Exit"

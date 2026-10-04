@@ -475,6 +475,7 @@ pub enum TerrainId {
     Floor2,
     Floor3,
     Floor4,
+    Spikes,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -496,6 +497,10 @@ pub enum TerrainId {
     Table,
 
     BookShelf,
+    WineShelf,
+    Barrel,
+    HangingWeapons,
+    HangingWeapons2,
     WallPainting,
     WallPainting2,
     WallFlag,
@@ -509,6 +514,8 @@ pub enum TerrainId {
     WallWindow,
     SuitOfArmor,
     AnimalHead,
+    Torch,
+    FoodPlate,
 
     NewWater(WaterOrientation, WaterType),
 
@@ -594,12 +601,6 @@ pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: 
 pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     let (w, h) = (32.0, 32.0);
 
-    let src_margin = 2.0;
-    //let dst_margin = src_margin * cell_w / 32.0;
-    let mut top_margin = false;
-    let mut right_margin = false;
-    let mut bot_margin = false;
-    let mut left_margin = false;
     let mut rotation = 0.0;
     let mut is_poison = false;
     let (mut col, mut row) = match terrain_id {
@@ -697,10 +698,15 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::Table => (2, 7),
 
         TerrainId::BookShelf => (2, 6),
+        TerrainId::WineShelf => (7, 5),
+        TerrainId::Barrel => (8, 5),
+        TerrainId::HangingWeapons => (9, 5),
+        TerrainId::HangingWeapons2 => (9, 4),
         TerrainId::WallPainting => (3, 6),
         TerrainId::WallPainting2 => (5, 5),
         TerrainId::WallFlag => (4, 6),
         TerrainId::WallWindow => (7, 6),
+        TerrainId::Torch => (8, 6),
         TerrainId::Mat => (4, 8),
         TerrainId::Cauldron => (5, 8),
         TerrainId::Cauldron2 => (6, 8),
@@ -710,24 +716,14 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::WallOpeningWest => (6, 7),
         TerrainId::SuitOfArmor => (4, 7),
         TerrainId::AnimalHead => (5, 7),
+        TerrainId::FoodPlate => (6, 5),
+        TerrainId::Spikes => (1, 10),
 
         TerrainId::Water => (2, 3),
-        TerrainId::WaterBeachNorth => {
-            top_margin = true;
-            (2, 1)
-        }
-        TerrainId::WaterBeachEast => {
-            right_margin = true;
-            (4, 3)
-        }
-        TerrainId::WaterBeachSouth => {
-            bot_margin = true;
-            (2, 4)
-        }
-        TerrainId::WaterBeachWest => {
-            left_margin = true;
-            (1, 3)
-        }
+        TerrainId::WaterBeachNorth => (2, 1),
+        TerrainId::WaterBeachEast => (4, 3),
+        TerrainId::WaterBeachSouth => (2, 4),
+        TerrainId::WaterBeachWest => (1, 3),
 
         TerrainId::WaterBeachNorthEast => (4, 1),
         TerrainId::WaterBeachSouthEast => (4, 4),
@@ -739,16 +735,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::WaterBeachSouthWestNorth => (0, 2),
         TerrainId::WaterBeachWestNorthEast => (3, 0),
 
-        TerrainId::WaterBeachWestEast => {
-            left_margin = true;
-            right_margin = true;
-            (6, 1)
-        }
-        TerrainId::WaterBeachNorthSouth => {
-            top_margin = true;
-            bot_margin = true;
-            (6, 3)
-        }
+        TerrainId::WaterBeachWestEast => (6, 1),
+        TerrainId::WaterBeachNorthSouth => (6, 3),
     };
 
     let t = get_time();
@@ -776,9 +764,14 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         (col, row) = (3, 7);
     }
 
-    // cauldron bubbles
+    // animate cauldron bubbles
     if (t * 0.6) % (t * 0.6).floor() < 0.5 && (col, row) == (6, 8) {
         (col, row) = (7, 8);
+    }
+
+    // animate torch fire
+    if (t * 0.6) % (t * 0.6).floor() < 0.5 && (col, row) == (8, 6) {
+        (col, row) = (9, 6);
     }
 
     let src_sides = [
@@ -788,22 +781,6 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         row as f32 * h + h,
     ];
 
-    /*
-    if top_margin {
-        src_sides[1] -= src_margin;
-        y -= dst_margin;
-    }
-    if right_margin {
-        src_sides[2] += src_margin;
-    }
-    if bot_margin {
-        src_sides[3] += src_margin;
-    }
-    if left_margin {
-        src_sides[0] -= src_margin;
-        x -= dst_margin;
-    }
-     */
     let src_rect = Rect::new(
         src_sides[0],
         src_sides[1],
@@ -1000,11 +977,8 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
     );
 }
 
-pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
-    let x = x.floor();
-    let y = y.floor();
-    let texture = ICONS_TEXTURE.get().unwrap();
-    let (col, row): (i32, i32) = match icon {
+fn icon_cell(icon: IconId) -> (i32, i32) {
+    match icon {
         IconId::Fireball => (0, 1),
         IconId::SearingLight => (2, 1),
         IconId::MeleeAttack => (6, 8),
@@ -1064,7 +1038,14 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
         IconId::WeaponProficiency => (2, 0),
         IconId::CriticalCharge => (1, 0),
         IconId::Reaper => (0, 0),
-    };
+    }
+}
+
+pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
+    let x = x.floor();
+    let y = y.floor();
+    let texture = ICONS_TEXTURE.get().unwrap();
+    let (col, row) = icon_cell(icon);
     let icon_w = 30.0;
     let icon_h = 24.0;
     let dest_size = dest_size

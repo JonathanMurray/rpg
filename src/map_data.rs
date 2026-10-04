@@ -415,7 +415,7 @@ pub fn create_character(
             let ogre = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Ogre",
-                SoundId::Damage,
+                SoundId::DamageOgre,
                 PortraitId::Ogre,
                 SpriteId::Ogre,
                 Attributes::new(9, 4, 3, 1),

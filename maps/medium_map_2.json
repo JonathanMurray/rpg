@@ -625,8 +625,10 @@
     "(55, 1)": "WallFlag",
     "(49, 1)": "WallFlag",
     "(43, 1)": "WallFlag",
-    "(37, 1)": "WallFlag"
+    "(37, 1)": "WallFlag",
+    "(34, 34)": "Torch"
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Bob",
@@ -636,7 +638,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Alice",
@@ -646,7 +649,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Clara",
@@ -656,7 +660,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul1",
@@ -666,7 +671,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul1",
@@ -676,7 +682,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul2",
@@ -686,7 +693,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul2",
@@ -696,7 +704,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul2",
@@ -706,7 +715,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul2",
@@ -716,7 +726,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "SkeletonLeader",
@@ -726,7 +737,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Ghoul1",
@@ -736,7 +748,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     }
   ]
 }

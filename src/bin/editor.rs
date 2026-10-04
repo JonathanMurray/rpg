@@ -563,16 +563,23 @@ impl Sidebar {
 
         let decorations = [
             TerrainId::BookShelf,
+            TerrainId::WineShelf,
+            TerrainId::Barrel,
+            TerrainId::HangingWeapons,
+            TerrainId::HangingWeapons2,
             TerrainId::WallPainting,
             TerrainId::WallPainting2,
             TerrainId::WallFlag,
             TerrainId::WallWindow,
+            TerrainId::Torch,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
             TerrainId::WallOpeningWest,
             TerrainId::Mat,
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
+            TerrainId::FoodPlate,
+            TerrainId::Spikes,
             TerrainId::NewWater(WaterOrientation::NorthEast, WaterType::Water),
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations

@@ -1,7 +1,7 @@
 {
   "grid_dimensions": [
-    30,
-    30
+    36,
+    36
   ],
   "terrain_objects": {
     "(28, 19)": "StoneWallConvexNorthEast",
@@ -29,14 +29,14 @@
     "(28, 13)": "StoneWallConvexNorthEast",
     "(1, 25)": "StoneWallConvexNorthEast",
     "(1, 28)": "StoneWallConvexNorthEast",
-    "(10, 22)": "StoneWallConvexNorthEast",
-    "(13, 22)": "StoneWallConvexNorthEast",
-    "(13, 25)": "StoneWallConvexNorthEast",
+    "(31, 10)": "StoneWallConvexNorthEast",
+    "(31, 13)": "StoneWallConvexNorthEast",
+    "(31, 22)": "StoneWallConvexNorthEast",
     "(25, 10)": "StoneWallConvexNorthEast",
-    "(10, 25)": "StoneWallConvexNorthEast",
+    "(31, 25)": "StoneWallConvexNorthEast",
     "(25, 13)": "StoneWallConvexNorthEast",
     "(4, 10)": "StoneWallConvexNorthEast",
-    "(28, 28)": "StoneWallConvexNorthEast",
+    "(11, 26)": "StoneWallConvexNorthEast",
     "(7, 10)": "StoneWallConvexNorthEast",
     "(28, 25)": "StoneWallConvexNorthEast",
     "(25, 1)": "StoneWallConvexNorthEast",
@@ -46,8 +46,40 @@
     "(13, 13)": "StoneWallConvexNorthEast",
     "(13, 10)": "StoneWallConvexNorthEast",
     "(10, 10)": "StoneWallConvexNorthEast",
-    "(16, 25)": "StoneWallConvexNorthEast",
-    "(16, 22)": "StoneWallConvexNorthEast"
+    "(31, 19)": "StoneWallConvexNorthEast",
+    "(31, 16)": "StoneWallConvexNorthEast",
+    "(1, 31)": "StoneWallConvexNorthEast",
+    "(34, 13)": "StoneWallConvexNorthEast",
+    "(31, 7)": "StoneWallConvexNorthEast",
+    "(31, 1)": "StoneWallConvexNorthEast",
+    "(31, 4)": "StoneWallConvexNorthEast",
+    "(34, 1)": "StoneWallConvexNorthEast",
+    "(34, 4)": "StoneWallConvexNorthEast",
+    "(34, 7)": "StoneWallConvexNorthEast",
+    "(34, 10)": "StoneWallConvexNorthEast",
+    "(14, 26)": "StoneWallConvexNorthEast",
+    "(28, 34)": "StoneWallConvexNorthEast",
+    "(25, 34)": "StoneWallConvexNorthEast",
+    "(22, 34)": "StoneWallConvexNorthEast",
+    "(19, 34)": "StoneWallConvexNorthEast",
+    "(16, 34)": "StoneWallConvexNorthEast",
+    "(13, 34)": "StoneWallConvexNorthEast",
+    "(10, 34)": "StoneWallConvexNorthEast",
+    "(7, 34)": "StoneWallConvexNorthEast",
+    "(4, 34)": "StoneWallConvexNorthEast",
+    "(1, 34)": "StoneWallConvexNorthEast",
+    "(31, 34)": "StoneWallConvexNorthEast",
+    "(34, 34)": "StoneWallConvexNorthEast",
+    "(17, 26)": "StoneWallConvexNorthEast",
+    "(17, 23)": "StoneWallConvexNorthEast",
+    "(14, 23)": "StoneWallConvexNorthEast",
+    "(11, 23)": "StoneWallConvexNorthEast",
+    "(34, 25)": "StoneWallConvexNorthEast",
+    "(34, 22)": "StoneWallConvexNorthEast",
+    "(34, 19)": "StoneWallConvexNorthEast",
+    "(34, 16)": "StoneWallConvexNorthEast",
+    "(34, 31)": "StoneWallConvexNorthEast",
+    "(34, 28)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -119,10 +151,10 @@
     "(7, 7)": "Floor",
     "(10, 7)": "Floor",
     "(19, 28)": "Floor",
-    "(22, 28)": "Floor",
+    "(22, 28)": "Floor4",
     "(25, 28)": "Floor",
-    "(28, 28)": "Floor",
-    "(31, 28)": "Floor",
+    "(28, 28)": "Floor3",
+    "(31, 28)": "Floor3",
     "(34, 28)": "Floor",
     "(37, 28)": "Floor",
     "(40, 28)": "Floor",
@@ -145,7 +177,7 @@
     "(4, 4)": "Floor",
     "(7, 4)": "Floor",
     "(10, 4)": "Floor",
-    "(13, 4)": "Floor",
+    "(13, 4)": "Floor4",
     "(16, 4)": "Floor",
     "(19, 4)": "Floor",
     "(22, 4)": "Floor",
@@ -169,7 +201,7 @@
     "(10, 22)": "Floor",
     "(13, 22)": "Floor",
     "(16, 22)": "Floor",
-    "(19, 22)": "Floor",
+    "(19, 22)": "Floor4",
     "(22, 22)": "Floor",
     "(22, 19)": "Floor",
     "(19, 19)": "Floor",
@@ -196,7 +228,7 @@
     "(10, 10)": "Floor",
     "(13, 10)": "Floor",
     "(16, 10)": "Floor",
-    "(19, 10)": "Floor",
+    "(19, 10)": "Floor4",
     "(22, 10)": "Floor",
     "(22, 7)": "Floor",
     "(10, 25)": "Floor",
@@ -204,7 +236,17 @@
     "(16, 25)": "Floor",
     "(16, 28)": "Floor",
     "(4, 28)": "Floor4",
-    "(7, 28)": "Floor4"
+    "(7, 28)": "Floor4",
+    "(4, 31)": "Floor",
+    "(7, 31)": "Floor",
+    "(10, 31)": "Floor",
+    "(13, 31)": "Floor4",
+    "(16, 31)": "Floor",
+    "(19, 31)": "Floor",
+    "(22, 31)": "Floor",
+    "(25, 31)": "Floor",
+    "(31, 31)": "Floor3",
+    "(28, 31)": "Floor3"
   },
   "decorations": {
     "(16, 1)": "BookShelf",
@@ -220,8 +262,13 @@
     "(22, 1)": "WallWindow",
     "(10, 1)": "WallWindow",
     "(13, 1)": "BookShelf",
-    "(1, 22)": "WallOpeningWest"
+    "(1, 22)": "WallOpeningWest",
+    "(14, 26)": "WallFlag",
+    "(34, 29)": "WallOpeningEast",
+    "(29, 25)": "Torch",
+    "(32, 25)": "Torch"
   },
+  "control_points": {},
   "characters": [
     {
       "type_": "Bob",
@@ -231,7 +278,8 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Alice",
@@ -241,62 +289,63 @@
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": null
     },
     {
       "type_": "Skeleton",
-      "name": "Guardian",
       "pos": [
         19,
         19
       ],
       "health": 31,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Guardian"
     },
     {
       "type_": "Ghoul2",
-      "name": "Wretch",
       "pos": [
         5,
         6
       ],
       "health": 9,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Wretch"
     },
     {
       "type_": "Ghoul2",
-      "name": "Wretch",
       "pos": [
         8,
         4
       ],
       "health": 8,
       "main_hand": "BadDagger",
-      "shield": null
+      "shield": null,
+      "name": "Wretch"
     },
     {
       "type_": "Scoundrel",
-      "name": "Scoundrel",
       "pos": [
         23,
         5
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Scoundrel"
     },
     {
       "type_": "Ghoul1",
-      "name": "Troublemaker",
       "pos": [
         24,
         17
       ],
       "health": null,
       "main_hand": null,
-      "shield": null
+      "shield": null,
+      "name": "Troublemaker"
     }
   ]
 }
