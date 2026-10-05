@@ -192,6 +192,11 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             .push(format!("Skill: |<keyword>{}|", enhancement.name));
         t.keywords.push(Keyword::AttackEnhancement(enhancement));
     }
+    if weapon.is_melee() {
+        t.technical_description
+            .push("Skill: |<keyword>Opportunity attack|".to_string());
+        t.keywords.push(Keyword::OpportunityAttack);
+    }
     t.technical_description.push("".to_string());
     t.technical_description.push(weight_str(weapon.weight));
 

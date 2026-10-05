@@ -973,7 +973,7 @@ pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Block",
     granted_from: None,
-    description: "Protect yourself or adjacent ally, reducing incoming attack damage by |<value>3| |<faded>(once per round)|",
+    description: "Protect yourself or adjacent ally, preventing |<value>3| attack damage |<faded>(once per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
@@ -992,7 +992,7 @@ pub const BLOCK_2_WITH_THORNS: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Spike block",
     granted_from: None,
-    description: "Protect yourself, reducing incoming attack damage by |<value>2| and dealing |<value>3| damage back to the attacker |<faded>(once per round)|",
+    description: "Protect yourself, preventing |<value>2| damage and dealing |<value>3| damage back to the attacker |<faded>(once per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
@@ -2208,18 +2208,11 @@ pub const FIREBALL_MASSIVE: AbilityEnhancement = AbilityEnhancement {
 pub const FIREBALL_INFERNO: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::Fireball,
     name: "Inferno",
-    description: "Targets hit by the impact start burning",
+    description: "",
     icon: IconId::Inferno,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
-        area_on_hit: Some([
-            Some(ApplyEffect::Condition(ApplyCondition {
-                condition: Condition::Burning,
-                stacks: Some(3),
-                duration_rounds: None,
-            })),
-            None,
-        ]),
+        area_create_surface: Some(Surface::Fire),
         ..SpellEnhancementEffect::default()
     }),
     ..AbilityEnhancement::default()
@@ -2669,7 +2662,7 @@ impl PassiveSkill {
             Vigilant => "Can opportunity attack an adjacent enemy even if you are not engaging them",
             UnbridledRage => "End of turn: gain +1 |<keyword>Ferocity|",
             SwampDweller => "Immune to |<keyword>Poison|. While standing in water, the water is |<keyword>Poisonous|.",
-            Slasher => "When dealing damage with an attack, it also inflicts |<keyword>Bleeding|.",
+            Slasher => "Inflicts |<keyword>Bleeding| when dealing attack damage.",
         }
     }
 

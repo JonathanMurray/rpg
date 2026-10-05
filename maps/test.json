@@ -261,24 +261,9 @@
         "Water"
       ]
     },
-    "(13, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(19, 23)": "FireSurfaceSingleCell",
+    "(17, 25)": "FireSurfaceSingleCell",
+    "(18, 26)": "FireSurfaceSingleCell",
     "(13, 31)": {
       "NewWater": [
         "NorthEast",
@@ -303,66 +288,16 @@
         "Water"
       ]
     },
-    "(13, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 19)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 22)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 25)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(17, 24)": "FireSurfaceSingleCell",
+    "(17, 26)": "FireSurfaceSingleCell",
+    "(19, 21)": "FireSurfaceSingleCell",
+    "(19, 25)": "FireSurfaceSingleCell",
+    "(19, 24)": "FireSurfaceSingleCell",
+    "(18, 24)": "FireSurfaceSingleCell",
+    "(18, 25)": "FireSurfaceSingleCell",
+    "(19, 26)": "FireSurfaceSingleCell",
+    "(17, 23)": "FireSurfaceSingleCell",
+    "(18, 23)": "FireSurfaceSingleCell",
     "(10, 28)": {
       "NewWater": [
         "NorthEast",
@@ -373,20 +308,7 @@
     "(18, 22)": "FireSurfaceSingleCell",
     "(18, 21)": "FireSurfaceSingleCell",
     "(17, 21)": "FireSurfaceSingleCell",
-    "(19, 22)": "FireSurfaceSingleCell",
-    "(19, 21)": "FireSurfaceSingleCell",
-    "(19, 23)": "FireSurfaceSingleCell",
-    "(18, 23)": "FireSurfaceSingleCell",
-    "(17, 23)": "FireSurfaceSingleCell",
-    "(17, 24)": "FireSurfaceSingleCell",
-    "(18, 24)": "FireSurfaceSingleCell",
-    "(19, 24)": "FireSurfaceSingleCell",
-    "(19, 25)": "FireSurfaceSingleCell",
-    "(18, 25)": "FireSurfaceSingleCell",
-    "(17, 25)": "FireSurfaceSingleCell",
-    "(17, 26)": "FireSurfaceSingleCell",
-    "(18, 26)": "FireSurfaceSingleCell",
-    "(19, 26)": "FireSurfaceSingleCell"
+    "(19, 22)": "FireSurfaceSingleCell"
   },
   "control_points": {
     "(22, 26)": "Exit"
@@ -395,8 +317,8 @@
     {
       "type_": "Bob",
       "pos": [
-        16,
-        24
+        25,
+        34
       ],
       "health": null,
       "main_hand": null,
@@ -408,6 +330,28 @@
       "pos": [
         11,
         18
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Skeleton",
+      "pos": [
+        14,
+        17
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        11,
+        15
       ],
       "health": null,
       "main_hand": null,

@@ -45,7 +45,7 @@ pub struct Target {
     proximity_squared: f32,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum Surface {
     Water,
     Poison,

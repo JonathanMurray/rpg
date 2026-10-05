@@ -1780,22 +1780,24 @@ impl UserInterface {
                     }
                 }
             }
-            GameEvent::PlayerCharacterEndedTheirTurn {
-                gained_ap,
-                gained_stamina: _,
-            } => {
-                let character_ui = self
-                    .character_uis
-                    .get_mut(&self.active_character_id)
-                    .unwrap();
-                let duration = gained_ap as f32 * 0.07;
-                character_ui
-                    .action_points_row
-                    .animate_gain(gained_ap, duration);
+            GameEvent::CharacterEndedTheirTurn { gained_ap } => {
+                if self.active_character().player_controlled() {
+                    let character_ui = self
+                        .character_uis
+                        .get_mut(&self.active_character_id)
+                        .unwrap();
+                    let duration = gained_ap as f32 * 0.07;
+                    character_ui
+                        .action_points_row
+                        .animate_gain(gained_ap, duration);
 
-                character_ui.stamina_bar.borrow_mut().animate_gain(duration);
+                    character_ui.stamina_bar.borrow_mut().animate_gain(duration);
 
-                self.animation_stopwatch.set_to_at_least(duration + 0.2);
+                    self.animation_stopwatch.set_to_at_least(duration + 0.2);
+                } else {
+                    // Slight pause after bot ends their turn
+                    self.animation_stopwatch.set_to_at_least(0.5);
+                }
             }
             GameEvent::NewActiveCharacter { new_active } => {
                 let was_players_turn = self.active_character().player_controlled();
@@ -2286,7 +2288,7 @@ impl UserInterface {
         let target = event.target;
         let detail_lines = &event.detail_lines;
 
-        let start_time = attack_index as f32 * 0.1;
+        let start_time = attack_index as f32 * 0.13;
 
         let target_pos = self.characters.get(target).pos();
         let attacker_pos = self.characters.get(attacker).pos();
@@ -2549,16 +2551,13 @@ impl UserInterface {
             ApplyEffect::RemoveActionPoints(_) => Some(TextEffectStyle::HostileEffect),
             ApplyEffect::GainActionPoints(_) => Some(TextEffectStyle::FriendlyEffect),
             // TODO not always hostile though?
-            ApplyEffect::Condition(apply_condition) => Some(TextEffectStyle::HostileEffect),
+            ApplyEffect::Condition(..) => Some(TextEffectStyle::HostileEffect),
             ApplyEffect::LoseHealth(_) => Some(TextEffectStyle::HostileHit),
             ApplyEffect::GainHealth(_) => Some(TextEffectStyle::FriendlyHeal),
             ApplyEffect::GainStamina(_) => Some(TextEffectStyle::FriendlyEffect),
             ApplyEffect::GainMana(_) => Some(TextEffectStyle::FriendlyEffect),
-            ApplyEffect::PerBleeding {
-                damage,
-                caster_healing_percentage,
-            } => Some(TextEffectStyle::FriendlyHeal),
-            ApplyEffect::ConsumeCondition { condition } => Some(TextEffectStyle::FriendlyEffect),
+            ApplyEffect::PerBleeding { .. } => Some(TextEffectStyle::FriendlyHeal),
+            ApplyEffect::ConsumeCondition { .. } => Some(TextEffectStyle::FriendlyEffect),
             // The character is shown physically being pushed, instead
             ApplyEffect::Pushed(_) => None,
             ApplyEffect::Escape => Some(TextEffectStyle::FriendlyEffect),

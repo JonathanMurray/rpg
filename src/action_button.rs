@@ -402,6 +402,9 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
                 .push("|<multi_target>| |<radius>|:".to_string());
             describe_apply_effect(*apply_effect, &mut t);
         }
+        if let Some(surface) = effect.area_create_surface {
+            describe_create_surface(surface, &mut t);
+        }
 
         if effect.increased_range_tenths > 0 {
             t.technical_description.push(format!(

@@ -521,41 +521,8 @@ impl CoreGame {
                             dbg!(chooses_to_use_opportunity_attack);
 
                             if chooses_to_use_opportunity_attack {
-                                reactor.set_facing_toward(attacker.pos());
-
-                                self.ui_handle_event(
-                                    GameEvent::CharacterReactedWithOpportunityAttack {
-                                        reactor: reactor.id(),
-                                    },
-                                )
-                                .await;
-
-                                self.ui_handle_event(GameEvent::AttackWasInitiated {
-                                    actor: reactor.id(),
-                                    target: attacker.id(),
-                                    target_reaction: None,
-                                })
-                                .await;
-
-                                self.perform_spend_ap(reactor, 1).await;
-
                                 // Opportunity attack vs ranged attacker
-                                // Need box pin to avoid
-                                // error[E0733]: recursion in an async fn requires boxing
-                                let event = Box::pin(Self::perform_attack(
-                                    reactor,
-                                    HandType::MainHand,
-                                    &[],
-                                    attacker,
-                                    0,
-                                    None,
-                                    0,
-                                    ActionPerformanceMode::Real(self),
-                                    None,
-                                ))
-                                .await;
-
-                                self.on_non_ability_attack(event).await;
+                                self.perform_opportunity_attack(reactor, attacker).await;
                             }
                         }
                     }
@@ -889,38 +856,8 @@ impl CoreGame {
                             dbg!(chooses_to_use_opportunity_attack);
 
                             if chooses_to_use_opportunity_attack {
-                                reactor.set_facing_toward(character.pos());
-
-                                self.ui_handle_event(
-                                    GameEvent::CharacterReactedWithOpportunityAttack {
-                                        reactor: reactor.id(),
-                                    },
-                                )
-                                .await;
-
-                                self.perform_spend_ap(reactor, 1).await;
-
-                                self.ui_handle_event(GameEvent::AttackWasInitiated {
-                                    actor: reactor.id(),
-                                    target: character.id(),
-                                    target_reaction: None,
-                                })
-                                .await;
-
                                 // Movement opportunity attack
-                                let event = Self::perform_attack(
-                                    reactor,
-                                    HandType::MainHand,
-                                    &[],
-                                    character,
-                                    0,
-                                    None,
-                                    0,
-                                    ActionPerformanceMode::Real(self),
-                                    None,
-                                )
-                                .await;
-                                self.on_non_ability_attack(event).await;
+                                self.perform_opportunity_attack(reactor, character).await;
                             }
                         }
                     }
@@ -999,6 +936,39 @@ impl CoreGame {
         self.on_character_positions_changed();
 
         Ok(())
+    }
+
+    async fn perform_opportunity_attack(&self, reactor: &Rc<Character>, target: &Rc<Character>) {
+        reactor.set_facing_toward(target.pos());
+
+        self.ui_handle_event(GameEvent::CharacterReactedWithOpportunityAttack {
+            reactor: reactor.id(),
+        })
+        .await;
+
+        self.perform_spend_ap(reactor, 1).await;
+
+        self.ui_handle_event(GameEvent::AttackWasInitiated {
+            actor: reactor.id(),
+            target: target.id(),
+            target_reaction: None,
+        })
+        .await;
+
+        // Movement opportunity attack
+        let event = Self::perform_attack(
+            reactor,
+            HandType::MainHand,
+            &[],
+            target,
+            0,
+            None,
+            0,
+            ActionPerformanceMode::Real(self),
+            None,
+        )
+        .await;
+        self.on_non_ability_attack(event).await;
     }
 
     async fn on_enter_or_start_turn_in_fire_surface(&self, character: &Character) {
@@ -2050,6 +2020,17 @@ impl CoreGame {
                             caster.id(),
                             Box::new(AbilityTargetOutcome::AffectedAlly { applied_effects }),
                         ));
+                    }
+                }
+
+                if let Some(spell_enhancement_effect) = enhancement.spell_effect {
+                    if let Some(surface) = spell_enhancement_effect.area_create_surface {
+                        game.perform_environment_effect(
+                            EnvironmentEffect::CreateSurface(surface, shape),
+                            area_pos,
+                            detail_lines,
+                        )
+                        .await;
                     }
                 }
             }
@@ -3314,16 +3295,11 @@ impl CoreGame {
         conditions.borrow_mut().remove(&Condition::MainHandExertion);
         conditions.borrow_mut().remove(&Condition::OffHandExertion);
         conditions.borrow_mut().remove(&Condition::ReaperApCooldown);
-        let gained_stamina = character.regain_stamina();
+        character.regain_stamina();
         character.regain_full_free_movement();
 
-        if character.player_controlled() {
-            self.ui_handle_event(GameEvent::PlayerCharacterEndedTheirTurn {
-                gained_ap,
-                gained_stamina,
-            })
+        self.ui_handle_event(GameEvent::CharacterEndedTheirTurn { gained_ap })
             .await;
-        }
     }
 }
 
@@ -3992,9 +3968,8 @@ pub enum GameEvent {
         characters: Vec<CharacterId>,
         new_active: Option<CharacterId>,
     },
-    PlayerCharacterEndedTheirTurn {
+    CharacterEndedTheirTurn {
         gained_ap: u32,
-        gained_stamina: u32,
     },
     NewActiveCharacter {
         new_active: CharacterId,
@@ -5585,6 +5560,7 @@ pub struct SpellEnhancementEffect {
     pub cast_twice: bool,
     pub target_on_hit: Option<[Option<ApplyEffect>; 2]>,
     pub area_on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub area_create_surface: Option<Surface>,
     pub increased_range_tenths: u32,
     pub increased_radius_tenths: u32,
 }
@@ -5600,6 +5576,7 @@ impl SpellEnhancementEffect {
             cast_twice: false,
             target_on_hit: None,
             area_on_hit: None,
+            area_create_surface: None,
             increased_range_tenths: 0,
             increased_radius_tenths: 0,
         }

@@ -25,6 +25,7 @@ pub enum Keyword {
     Spikes,
     AttackEnhancement(AttackEnhancement),
     OnAttackedReaction(OnAttackedReaction),
+    OpportunityAttack,
     Advantage,
     Pushed,
     Graze,
@@ -35,9 +36,10 @@ pub enum Keyword {
 impl Keyword {
     fn name(&self) -> &str {
         match self {
-            Keyword::Cond(condition, amount) => condition.name(),
+            Keyword::Cond(condition, _amount) => condition.name(),
             Keyword::AttackEnhancement(enhancement) => enhancement.name,
             Keyword::OnAttackedReaction(reaction) => reaction.name,
+            Keyword::OpportunityAttack => "Opportunity attack",
             Keyword::Advantage => "Advantage / Disadvantage",
             Keyword::Pushed => "Pushed",
             Keyword::Graze => "Graze",
@@ -58,6 +60,7 @@ impl Keyword {
             },
             Keyword::AttackEnhancement(enhancement) => format!("|<faded>(attack enhancement)|\n{}",enhancement.description),
             Keyword::OnAttackedReaction(reaction) => format!("|<faded>(reaction)|\n{}", reaction.description),
+            Keyword::OpportunityAttack => "|<faded>(reaction)|\nAttack an enemy that drops their guard".to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
                 "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
@@ -84,6 +87,7 @@ impl Keyword {
             }
             Keyword::AttackEnhancement(..) => Goodness::Neutral,
             Keyword::OnAttackedReaction(..) => Goodness::Neutral,
+            Keyword::OpportunityAttack => Goodness::Neutral,
             Keyword::Advantage => Goodness::Neutral,
             Keyword::Pushed => Goodness::Bad,
             Keyword::Graze => Goodness::Bad,
@@ -348,7 +352,12 @@ pub fn draw_tooltip(
         };
 
     let header_color = match header_keyword {
-        None | Some(Keyword::AttackEnhancement(..)) => YELLOW,
+        None
+        | Some(
+            Keyword::AttackEnhancement(..)
+            | Keyword::OnAttackedReaction(..)
+            | Keyword::OpportunityAttack,
+        ) => YELLOW,
         _ => ORANGE,
     };
 

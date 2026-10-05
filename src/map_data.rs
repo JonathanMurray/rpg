@@ -626,6 +626,9 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     // TODO
     //bob.learn_ability(&KILL);
     bob.learn_ability(&FIREBALL);
+    bob.learn_ability_enhancement(FIREBALL_INFERNO);
+    bob.learn_ability_enhancement(FIREBALL_MASSIVE);
+    bob.learn_ability_enhancement(FIREBALL_REACH);
     //bob.learn_attack_enhancement(EMPOWER);
     bob.health.lose(10);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
