@@ -175,11 +175,7 @@ async fn main() {
                             rect.h,
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
-                        game_grid.draw_terrain(
-                            *terrain_id,
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                        );
+                        game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
                     }
                     EditorAction::PlaceTerrain(terrain_id) => {
                         draw_rectangle(
@@ -189,11 +185,7 @@ async fn main() {
                             rect.h,
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
-                        game_grid.draw_terrain(
-                            *terrain_id,
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                        );
+                        game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
                     }
 
                     EditorAction::PlaceDecoration(terrain_id) => {
@@ -204,11 +196,7 @@ async fn main() {
                             rect.h,
                             Color::new(0.0, 0.0, 0.0, 0.3),
                         );
-                        game_grid.draw_terrain(
-                            *terrain_id,
-                            snapped_mouse_screen_pos.0,
-                            snapped_mouse_screen_pos.1,
-                        );
+                        game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
                     }
 
                     EditorAction::PlaceCharacter(id) => {
@@ -581,6 +569,7 @@ impl Sidebar {
             TerrainId::FoodPlate,
             TerrainId::Spikes,
             TerrainId::SpikesSingleCell,
+            TerrainId::FireSurfaceSingleCell,
             TerrainId::NewWater(WaterOrientation::NorthEast, LiquidType::Water),
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
@@ -778,7 +767,7 @@ impl Sidebar {
     }
 
     fn draw_terrain_icon(&self, icon_w: f32, x: f32, y: f32, terrain_id: &TerrainId) {
-        let (rotation, rect) = terrain_atlas_area(*terrain_id);
+        let (rotation, rect) = terrain_atlas_area(*terrain_id, (x, y));
         draw_texture_ex(
             &self.terrain_atlas,
             x,

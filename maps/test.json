@@ -368,50 +368,35 @@
         "NorthEast",
         "Water"
       ]
-    }
+    },
+    "(17, 22)": "FireSurfaceSingleCell",
+    "(18, 22)": "FireSurfaceSingleCell",
+    "(18, 21)": "FireSurfaceSingleCell",
+    "(17, 21)": "FireSurfaceSingleCell",
+    "(19, 22)": "FireSurfaceSingleCell",
+    "(19, 21)": "FireSurfaceSingleCell",
+    "(19, 23)": "FireSurfaceSingleCell",
+    "(18, 23)": "FireSurfaceSingleCell",
+    "(17, 23)": "FireSurfaceSingleCell",
+    "(17, 24)": "FireSurfaceSingleCell",
+    "(18, 24)": "FireSurfaceSingleCell",
+    "(19, 24)": "FireSurfaceSingleCell",
+    "(19, 25)": "FireSurfaceSingleCell",
+    "(18, 25)": "FireSurfaceSingleCell",
+    "(17, 25)": "FireSurfaceSingleCell",
+    "(17, 26)": "FireSurfaceSingleCell",
+    "(18, 26)": "FireSurfaceSingleCell",
+    "(19, 26)": "FireSurfaceSingleCell"
   },
   "control_points": {
     "(22, 26)": "Exit"
   },
   "characters": [
     {
-      "type_": "Alice",
-      "pos": [
-        12,
-        25
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Bob",
       "pos": [
-        15,
-        26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Lootgoblin",
-      "pos": [
-        19,
-        27
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        13,
-        29
+        16,
+        24
       ],
       "health": null,
       "main_hand": null,

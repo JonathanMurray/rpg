@@ -50,6 +50,7 @@ pub enum Surface {
     Water,
     Poison,
     Spikes,
+    Fire,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -68,6 +69,7 @@ impl Surface {
             Surface::Water => "water",
             Surface::Poison => "poison",
             Surface::Spikes => "spikes",
+            Surface::Fire => "fire",
         }
     }
 }
@@ -201,8 +203,11 @@ impl PathfindGrid {
                     }
                     surfaces.insert((x, y), surface);
                 } else {
-                    if surfaces.get(&(x, y)) != Some(&Surface::Water) {
-                        println!("WARN: Cannot unmark {:?} as water. It's not marked", pos);
+                    if surfaces.get(&(x, y)).is_none() {
+                        println!(
+                            "WARN: Cannot unmark {:?} as a surface. It's not marked",
+                            pos
+                        );
                     }
 
                     surfaces.remove(&(x, y));

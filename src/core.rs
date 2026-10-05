@@ -10,6 +10,7 @@ use std::time::SystemTime;
 
 use indexmap::IndexMap;
 use macroquad::color::Color;
+use macroquad::miniquad::CompareFunc::Always;
 use macroquad::miniquad::CursorIcon::Move;
 use rand::Rng;
 
@@ -83,7 +84,7 @@ impl CoreGame {
                 .await;
         }
         for player_char in self.player_characters() {
-            player_char.is_part_of_active_group.set(true);
+            self.set_character_part_of_active_group(player_char).await;
         }
         self.on_character_positions_changed();
 
@@ -204,7 +205,7 @@ impl CoreGame {
                     let healing_on_kill = character.healing_on_kill();
                     if healing_on_kill > 0 {
                         let amount =
-                            self.perform_gain_health(character, healing_on_kill * num_killed);
+                            self.character_gain_health(character, healing_on_kill * num_killed);
 
                         self.ui_handle_event(GameEvent::CharacterGainedHealth {
                             character: character.id(),
@@ -219,12 +220,12 @@ impl CoreGame {
                 let name_tag = self.active_character().name_tag();
                 self.log(format!("|{}| ended their turn", name_tag)).await;
 
-                self.perform_end_of_turn_character().await;
-                //let prev_index_in_round = self.active_character().index_in_round.unwrap();
+                self.perform_end_of_turn_active_character().await;
                 self.active_character().is_part_of_active_group.set(false);
-                self.active_character_id = self.characters.next_id();
-                self.active_character().is_part_of_active_group.set(true);
                 println!("active char ended their turn");
+                self.active_character_id = self.characters.next_id();
+                self.set_character_part_of_active_group(self.active_character())
+                    .await;
 
                 self.notify_ui_of_new_active_char().await;
 
@@ -247,7 +248,6 @@ impl CoreGame {
                     .has_taken_a_turn_this_round
                     .set(true);
                 self.active_character_id = self.characters.next_id();
-                dbg!(self.active_character_id);
             }
 
             for ch in self.characters.iter() {
@@ -314,7 +314,7 @@ impl CoreGame {
                     if self.active_character().player_controlled() {
                         // Player chars can act "simultaneously"
                         for player_char in self.player_characters() {
-                            player_char.is_part_of_active_group.set(true);
+                            self.set_character_part_of_active_group(player_char).await;
                         }
                     }
 
@@ -340,6 +340,16 @@ impl CoreGame {
                     }
                 }
             }
+        }
+    }
+
+    async fn set_character_part_of_active_group(&self, character: &Character) {
+        let was_already = character.is_part_of_active_group.get();
+        if !was_already {
+            character.is_part_of_active_group.set(true);
+            self.perform_start_of_turn_character(character).await;
+        } else {
+            println!("({} was already part of active group)", character.name);
         }
     }
 
@@ -408,13 +418,8 @@ impl CoreGame {
                 }
                 let dmg = total_collision_dmg as u32;
                 if dmg > 0 {
-                    self.perform_losing_health(ch, dmg);
-                    self.ui_handle_event(GameEvent::CharacterTookDamage {
-                        character: ch.id(),
-                        amount: dmg,
-                        source: DamageSource::KnockbackCollision,
-                    })
-                    .await;
+                    self.perform_losing_health(ch, dmg, DamageSource::KnockbackCollision)
+                        .await;
                 }
             }
         }
@@ -762,7 +767,7 @@ impl CoreGame {
                 let mut detail_lines = vec![];
 
                 if consumable.health_gain > 0 {
-                    let amount = self.perform_gain_health(character, consumable.health_gain);
+                    let amount = self.character_gain_health(character, consumable.health_gain);
                     detail_lines.push(format!("gained {} health", amount));
                 }
                 if consumable.mana_gain > 0 {
@@ -773,7 +778,7 @@ impl CoreGame {
                 let mut effect = None;
                 if let Some(apply_effect) = consumable.effect {
                     let (applied, line, _damage) =
-                        self.perform_effect_application(apply_effect, None, None, character);
+                        self.do_apply_effect(apply_effect, None, None, character);
                     detail_lines.push(line);
                     effect = applied;
                 }
@@ -955,23 +960,20 @@ impl CoreGame {
             })
             .await;
 
+            let prev_surface = self.pathfind_grid.surface(character.pos());
             if character.is_swamp_dweller() {
-                let prev_surface = self.pathfind_grid.surface(character.pos());
                 if new_surface.is_none() && prev_surface == Some(Surface::Poison) {
                     self.handle_swamp_dweller_left_poison(character).await;
                 }
             }
 
             if new_surface == Some(Surface::Spikes) {
-                // TODO
-                let health_lost = self.perform_losing_health(character, 1);
-                self.ui_handle_event(GameEvent::CharacterTookDamage {
-                    character: character.id(),
-                    amount: health_lost,
-                    source: DamageSource::Spikes,
-                })
-                .await;
-                //character.receive_condition(Condition::Bleeding, Some(1), None);
+                self.perform_losing_health(character, 1, DamageSource::SpikesSurface)
+                    .await;
+            }
+
+            if new_surface == Some(Surface::Fire) && prev_surface != Some(Surface::Fire) {
+                self.on_enter_or_start_turn_in_fire_surface(character).await;
             }
 
             character.set_position(new_position);
@@ -997,6 +999,38 @@ impl CoreGame {
         self.on_character_positions_changed();
 
         Ok(())
+    }
+
+    async fn on_enter_or_start_turn_in_fire_surface(&self, character: &Character) {
+        // TODO maybe take less immediate damage if character was wet, and emit visual steam effect
+        self.perform_losing_health(character, 2, DamageSource::FireSurface)
+            .await;
+        self.perform_character_receive_condition(
+            character,
+            ApplyCondition {
+                condition: Condition::Burning,
+                stacks: Some(2),
+                duration_rounds: None,
+            },
+        )
+        .await;
+        character.lose_condition(Condition::Wet);
+    }
+
+    async fn perform_character_receive_condition(
+        &self,
+        character: &Character,
+        apply_condition: ApplyCondition,
+    ) {
+        let ends_at = apply_condition
+            .duration_rounds
+            .map(|rounds| self.current_time() + (rounds * self.round_length));
+        character.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
+        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+            character: character.id(),
+            condition: apply_condition.condition,
+        })
+        .await;
     }
 
     async fn handle_swamp_dweller_left_poison(&self, character: &Rc<Character>) {
@@ -1032,36 +1066,29 @@ impl CoreGame {
         //println!("HANDLE CHAR LIQUID {} t={}", character.name, game_time);
         if let Some(surface) = self.pathfind_grid.surface(character.pos()) {
             if surface.is_liquid() && !character.has_condition(&Condition::Wet) {
-                character.receive_condition(
-                    Condition::Wet,
-                    None,
-                    Some(game_time + self.round_length),
-                );
-                self.ui_handle_event(GameEvent::CharacterReceivedCondition {
-                    character: character.id(),
-                    condition: Condition::Wet,
-                })
+                self.perform_character_receive_condition(
+                    character,
+                    ApplyCondition {
+                        condition: Condition::Wet,
+                        stacks: None,
+                        duration_rounds: Some(1),
+                    },
+                )
                 .await;
+                character.lose_condition(Condition::Burning);
             }
-            match surface {
-                Surface::Water => {}
-                Surface::Poison => {
-                    if !character.has_condition(&Condition::Poisoned)
-                        && !character.is_swamp_dweller()
-                    {
-                        character.receive_condition(
-                            Condition::Poisoned,
-                            None,
-                            Some(game_time + self.round_length),
-                        );
-                        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
-                            character: character.id(),
+            if surface == Surface::Poison {
+                if !character.has_condition(&Condition::Poisoned) && !character.is_swamp_dweller() {
+                    self.perform_character_receive_condition(
+                        character,
+                        ApplyCondition {
                             condition: Condition::Poisoned,
-                        })
-                        .await;
-                    }
+                            stacks: None,
+                            duration_rounds: Some(1),
+                        },
+                    )
+                    .await;
                 }
-                Surface::Spikes => {}
             }
         }
     }
@@ -1091,7 +1118,7 @@ impl CoreGame {
         }
     }
 
-    fn perform_effect_application_according_to_hit_type_and_target(
+    fn do_apply_effect_according_to_hit_type_and_target(
         &self,
         hit_type: HitType,
         mut effect: ApplyEffect,
@@ -1109,7 +1136,7 @@ impl CoreGame {
             format!("|<keyword>{}| was skipped", effect)
         } else {
             let (applied, log_line, damage) =
-                self.perform_effect_application(effect, giver, area_center, receiver);
+                self.do_apply_effect(effect, giver, area_center, receiver);
             if let Some(applied) = applied {
                 applied_effects.push(applied);
             }
@@ -1124,7 +1151,7 @@ impl CoreGame {
         }
     }
 
-    fn perform_effect_application(
+    fn do_apply_effect(
         &self,
         effect: ApplyEffect,
         giver: Option<&Character>,
@@ -1156,7 +1183,7 @@ impl CoreGame {
             }
             ApplyEffect::LoseHealth(n) => {
                 //let lost = receiver.health.lose(n);
-                let lost = self.perform_losing_health(receiver, n);
+                let lost = self.character_lose_health(receiver, n);
                 actual_effect = Some(ApplyEffect::GainHealth(lost));
                 format!("  |{}| lost {} health", receiver.name_tag(), lost)
             }
@@ -1167,7 +1194,7 @@ impl CoreGame {
             }
             e @ ApplyEffect::Condition(apply_condition) => {
                 actual_effect = Some(e);
-                self.perform_receive_condition(apply_condition, receiver)
+                self.apply_condition_on_character(apply_condition, receiver)
             }
             e @ ApplyEffect::PerBleeding {
                 damage,
@@ -1180,9 +1207,9 @@ impl CoreGame {
                     .get(&Condition::Bleeding)
                     .map(|state| state.stacks.unwrap())
                     .unwrap_or(0);
-                damage_dealt = self.perform_losing_health(receiver, damage * stacks);
+                damage_dealt = self.character_lose_health(receiver, damage * stacks);
                 let healing_amount = damage_dealt * caster_healing_percentage / 100;
-                self.perform_gain_health(giver.unwrap(), healing_amount);
+                self.character_gain_health(giver.unwrap(), healing_amount);
                 format!(
                     "  |{}| lost {} health. |{}| was healed for {}",
                     receiver.name_tag(),
@@ -1254,7 +1281,7 @@ impl CoreGame {
         self.round_index * self.round_length + t_in_round
     }
 
-    fn perform_receive_condition(
+    fn apply_condition_on_character(
         &self,
         apply_condition: ApplyCondition,
         receiver: &Character,
@@ -1864,7 +1891,7 @@ impl CoreGame {
 
         let mut degree_of_success: u32 = 0;
         if let Some(roll_instruction) = roll_instruction {
-            let ability_roll = roll_instruction.perform(mode, None, detail_lines);
+            let ability_roll = roll_instruction.execute(mode, None, detail_lines);
 
             degree_of_success = (ability_roll.result / 10).max(0) as u32;
             if degree_of_success > 0 {
@@ -1885,7 +1912,7 @@ impl CoreGame {
             detail_lines.push(line);
 
             if let Some(game) = real_game {
-                let health_gained = game.perform_gain_health(target, healing);
+                let health_gained = game.character_gain_health(target, healing);
                 detail_lines.push(format!(
                     "  |{}| was healed for {}",
                     target.name_tag(),
@@ -1922,8 +1949,7 @@ impl CoreGame {
                     ApplyEffect::Escape => {}
                 }
 
-                let (applied, log_line, _damage) =
-                    game.perform_effect_application(effect, None, None, target);
+                let (applied, log_line, _damage) = game.do_apply_effect(effect, None, None, target);
                 if let Some(applied) = applied {
                     applied_effects.push(applied);
                     detail_lines.push(log_line);
@@ -1934,7 +1960,7 @@ impl CoreGame {
                 let effect = enhancement.spell_effect.unwrap();
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
                     let (applied, log_line, _damage) =
-                        game.perform_effect_application(*apply_effect, None, None, target);
+                        game.do_apply_effect(*apply_effect, None, None, target);
                     detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
                 }
             }
@@ -2012,12 +2038,8 @@ impl CoreGame {
                     if num_targets_hit > 0 {
                         apply_effect.multiply(num_targets_hit);
 
-                        let (applied, _line, _damage) = game.perform_effect_application(
-                            apply_effect,
-                            Some(caster),
-                            None,
-                            caster,
-                        );
+                        let (applied, _line, _damage) =
+                            game.do_apply_effect(apply_effect, Some(caster), None, caster);
 
                         let mut applied_effects = vec![];
                         if let Some(applied) = applied {
@@ -2107,7 +2129,7 @@ impl CoreGame {
         let hit_type = match spell_enemy_effect.defense_type {
             Some(defense_type) => {
                 let ability_roll =
-                    roll_instruction.perform(mode, Some((target, defense_type)), detail_lines);
+                    roll_instruction.execute(mode, Some((target, defense_type)), detail_lines);
 
                 //detail_lines.push("".to_string());
                 //detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
@@ -2232,7 +2254,7 @@ impl CoreGame {
             let damage = dmg_calculation.max(0) as u32;
 
             if let Some(game) = real_game {
-                actual_health_lost += game.perform_losing_health(target, damage);
+                actual_health_lost += game.character_lose_health(target, damage);
                 dmg_str.push_str(&format!(" = |<value>{damage}|"));
                 detail_lines.push(dmg_str);
             }
@@ -2254,7 +2276,7 @@ impl CoreGame {
                 .copied()
                 .flatten()
             {
-                let log_line = game.perform_effect_application_according_to_hit_type_and_target(
+                let log_line = game.do_apply_effect_according_to_hit_type_and_target(
                     hit_type,
                     effect,
                     Some(caster),
@@ -2276,18 +2298,17 @@ impl CoreGame {
                     e.target_on_hit
                 };
                 for effect in effects.iter().flatten().flatten().copied() {
-                    let log_line = game
-                        .perform_effect_application_according_to_hit_type_and_target(
-                            hit_type,
-                            effect,
-                            Some(caster),
-                            area_center,
-                            target,
-                            &mut applied_effects,
-                            &mut damage_from_effects,
-                            &mut actual_health_lost,
-                            Some(enhancement.name),
-                        );
+                    let log_line = game.do_apply_effect_according_to_hit_type_and_target(
+                        hit_type,
+                        effect,
+                        Some(caster),
+                        area_center,
+                        target,
+                        &mut applied_effects,
+                        &mut damage_from_effects,
+                        &mut actual_health_lost,
+                        Some(enhancement.name),
+                    );
                     detail_lines.push(log_line);
                 }
             }
@@ -2302,7 +2323,7 @@ impl CoreGame {
                 }
 
                 if are_entities_within_melee(caster.pos(), target.pos()) {
-                    game.perform_engagement(caster, target);
+                    game.update_engagement(caster, target);
                 }
             }
         }
@@ -2364,7 +2385,7 @@ impl CoreGame {
         targets
     }
 
-    fn perform_engagement(&self, actor: &Rc<Character>, target: &Rc<Character>) {
+    fn update_engagement(&self, actor: &Rc<Character>, target: &Rc<Character>) {
         if let Some(previously_engaged) = actor.engagement_target.take() {
             self.characters
                 .get(previously_engaged)
@@ -2404,13 +2425,13 @@ impl CoreGame {
         }
     }
 
-    fn perform_losing_health(&self, character: &Character, amount: u32) -> u32 {
+    fn character_lose_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_lost = character.health.lose(amount);
         character.on_health_changed();
         amount_lost
     }
 
-    fn perform_gain_health(&self, character: &Character, amount: u32) -> u32 {
+    fn character_gain_health(&self, character: &Character, amount: u32) -> u32 {
         let amount_gained = character.health.gain(amount);
         character.on_health_changed();
         amount_gained
@@ -2653,7 +2674,7 @@ impl CoreGame {
                     dmg_calculation += bonus_dmg as i32;
 
                     if game.is_some() {
-                        attacker.conditions.borrow_mut().remove(&condition);
+                        attacker.lose_condition(condition);
                     }
                 }
                 if effect.improved_graze {
@@ -2766,14 +2787,14 @@ impl CoreGame {
                 if let Some(game) = game {
                     dmg_str.push_str(&format!(" = |<value>{damage}|"));
                     detail_lines.push(dmg_str);
-                    actual_health_lost = game.perform_losing_health(defender, damage);
+                    actual_health_lost = game.character_lose_health(defender, damage);
 
                     if weapon.is_melee() {
                         let defender_thorns = defender.thorns();
                         if defender_thorns > 0 {
                             // TODO: How is this shown to player?
                             let health_lost_to_thorns =
-                                game.perform_losing_health(attacker, defender_thorns);
+                                game.character_lose_health(attacker, defender_thorns);
                             if health_lost_to_thorns > 0 {
                                 detail_lines.push(format!(
                                     "|{}| lost {} health |<faded>(thorns)|",
@@ -2787,7 +2808,7 @@ impl CoreGame {
                     }
 
                     if let Some((reaction_name, thorns)) = reaction_thorns {
-                        let health_lost_to_thorns = game.perform_losing_health(attacker, thorns);
+                        let health_lost_to_thorns = game.character_lose_health(attacker, thorns);
                         if health_lost_to_thorns > 0 {
                             detail_lines.push(format!(
                                 "|{}| lost {} health |<faded>({})|",
@@ -2807,12 +2828,8 @@ impl CoreGame {
                         .iter()
                         .flatten()
                         {
-                            let (applied, log_line, _damage) = game.perform_effect_application(
-                                *effect,
-                                Some(attacker),
-                                None,
-                                attacker,
-                            );
+                            let (applied, log_line, _damage) =
+                                game.do_apply_effect(*effect, Some(attacker), None, attacker);
                             if let Some(applied) = applied {
                                 applied_to_self.push(applied);
                             }
@@ -2821,12 +2838,8 @@ impl CoreGame {
 
                         for (name, enhancement) in enhancements {
                             if let Some(effect) = enhancement.on_kill_apply_self {
-                                let (applied, log_line, _damage) = game.perform_effect_application(
-                                    effect,
-                                    Some(attacker),
-                                    None,
-                                    attacker,
-                                );
+                                let (applied, log_line, _damage) =
+                                    game.do_apply_effect(effect, Some(attacker), None, attacker);
                                 if let Some(applied) = applied {
                                     applied_to_self.push(applied);
                                 }
@@ -2837,7 +2850,7 @@ impl CoreGame {
 
                     if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
                         let (applied, log_line, _damage) =
-                            game.perform_effect_application(effect, Some(attacker), None, defender);
+                            game.do_apply_effect(effect, Some(attacker), None, defender);
                         detail_lines.push(log_line);
                     }
 
@@ -2845,13 +2858,12 @@ impl CoreGame {
                         if let Some(effect) = weapon.on_damage {
                             match effect {
                                 AttackHitEffect::ApplyTarget(effect) => {
-                                    let (applied, log_line, _damage) = game
-                                        .perform_effect_application(
-                                            effect,
-                                            Some(attacker),
-                                            None,
-                                            defender,
-                                        );
+                                    let (applied, log_line, _damage) = game.do_apply_effect(
+                                        effect,
+                                        Some(attacker),
+                                        None,
+                                        defender,
+                                    );
                                     if let Some(applied) = applied {
                                         applied_to_target.push(applied);
                                     }
@@ -2859,13 +2871,12 @@ impl CoreGame {
                                         .push(format!("{} |<faded>({})|", log_line, weapon.name))
                                 }
                                 AttackHitEffect::ApplySelf(effect) => {
-                                    let (applied, log_line, _damage) = game
-                                        .perform_effect_application(
-                                            effect,
-                                            Some(attacker),
-                                            None,
-                                            attacker,
-                                        );
+                                    let (applied, log_line, _damage) = game.do_apply_effect(
+                                        effect,
+                                        Some(attacker),
+                                        None,
+                                        attacker,
+                                    );
                                     if let Some(applied) = applied {
                                         applied_to_self.push(applied);
                                     }
@@ -2903,7 +2914,7 @@ impl CoreGame {
                                             "Resist".to_string()
                                         } else {
                                             let (applied, log_line, _damage) = game
-                                                .perform_effect_application(
+                                                .do_apply_effect(
                                                     apply_effect,
                                                     Some(attacker),
                                                     None,
@@ -2923,7 +2934,7 @@ impl CoreGame {
                             if let Some((x, condition)) = effect.inflict_x_condition_per_damage {
                                 //*condition.stacks().unwrap() = damage;
                                 let stacks = (damage * x.num) / x.den;
-                                let line = game.perform_receive_condition(
+                                let line = game.apply_condition_on_character(
                                     ApplyCondition {
                                         condition,
                                         stacks: Some(stacks),
@@ -2937,7 +2948,7 @@ impl CoreGame {
 
                         if let Some(arrow) = used_arrow {
                             if let Some(apply_effect) = arrow.on_damage_apply {
-                                let (applied, log_line, _damage) = game.perform_effect_application(
+                                let (applied, log_line, _damage) = game.do_apply_effect(
                                     apply_effect,
                                     Some(attacker),
                                     None,
@@ -2953,12 +2964,8 @@ impl CoreGame {
 
                         attacker.for_equip_effects(|name, equip| {
                             if let Some(apply_effect) = equip.on_attack_damage_apply_self {
-                                let (applied, log_line, _damage) = game.perform_effect_application(
-                                    apply_effect,
-                                    None,
-                                    None,
-                                    attacker,
-                                );
+                                let (applied, log_line, _damage) =
+                                    game.do_apply_effect(apply_effect, None, None, attacker);
                                 detail_lines.push(format!("{} |<faded>({})|", log_line, name));
                                 if let Some(applied) = applied {
                                     applied_to_self.push(applied);
@@ -2999,13 +3006,13 @@ impl CoreGame {
             for (name, effect) in enhancements {
                 if let Some(effect) = effect.on_target {
                     let (_applied, log_line, _damage) =
-                        game.perform_effect_application(effect, Some(attacker), None, defender);
+                        game.do_apply_effect(effect, Some(attacker), None, defender);
                     detail_lines.push(format!("{} ({})", log_line, name));
                 }
             }
 
             if weapon.is_melee() {
-                game.perform_engagement(attacker, defender);
+                game.update_engagement(attacker, defender);
             }
         }
 
@@ -3067,7 +3074,15 @@ impl CoreGame {
                 .await;
 
                 let reactor = self.characters.get(reactor_id);
-                reactor.receive_condition(raging, None, None);
+                self.perform_character_receive_condition(
+                    reactor,
+                    ApplyCondition {
+                        condition: raging,
+                        stacks: None,
+                        duration_rounds: None,
+                    },
+                )
+                .await;
             }
             OnHitReactionEffect::ShieldBash => {
                 let mut lines = vec![];
@@ -3100,7 +3115,7 @@ impl CoreGame {
                     };
 
                     if let Some((condition, duration)) = condition {
-                        let (_applied, log_line, _damage) = self.perform_effect_application(
+                        let (_applied, log_line, _damage) = self.do_apply_effect(
                             ApplyEffect::Condition(ApplyCondition {
                                 condition,
                                 stacks: None,
@@ -3133,7 +3148,31 @@ impl CoreGame {
         }
     }
 
-    async fn perform_end_of_turn_character(&mut self) {
+    async fn perform_losing_health(
+        &self,
+        character: &Character,
+        amount: u32,
+        source: DamageSource,
+    ) {
+        let lost = self.character_lose_health(character, amount);
+        self.ui_handle_event(GameEvent::CharacterTookDamage {
+            character: character.id(),
+            amount: lost,
+            source,
+        })
+        .await;
+    }
+
+    async fn perform_start_of_turn_character(&self, character: &Character) {
+        //println!("START OF TURN: {}", character.name);
+
+        let surface = self.pathfind_grid.surface(character.pos());
+        if surface == Some(Surface::Fire) {
+            self.on_enter_or_start_turn_in_fire_surface(character).await;
+        }
+    }
+
+    async fn perform_end_of_turn_active_character(&self) {
         let character = self.active_character();
         character.has_taken_a_turn_this_round.set(true);
         let name_tag = character.name_tag();
@@ -3141,24 +3180,21 @@ impl CoreGame {
 
         if conditions.borrow().has(&Condition::Poisoned) {
             let amount = (character.health.current() as f32 / 10.0).ceil() as u32;
-            let damage = self.perform_losing_health(character, amount);
-            self.ui_handle_event(GameEvent::CharacterTookDamage {
-                character: character.id(),
-                amount: damage,
-                source: DamageSource::Condition(Condition::Poisoned),
-            })
+            self.perform_losing_health(
+                character,
+                amount,
+                DamageSource::Condition(Condition::Poisoned),
+            )
             .await;
         }
 
         let bleed_stacks = conditions.borrow().get_stacks(&Condition::Bleeding);
         if bleed_stacks > 0 {
-            //let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
-            let damage = self.perform_losing_health(character, bleed_stacks);
-            self.ui_handle_event(GameEvent::CharacterTookDamage {
-                character: character.id(),
-                amount: damage,
-                source: DamageSource::Condition(Condition::Bleeding),
-            })
+            self.perform_losing_health(
+                character,
+                bleed_stacks,
+                DamageSource::Condition(Condition::Bleeding),
+            )
             .await;
             let decay = (bleed_stacks as f32 / 2.0).ceil() as u32;
             if conditions
@@ -3171,12 +3207,11 @@ impl CoreGame {
 
         let burn_stacks = conditions.borrow().get_stacks(&Condition::Burning);
         if burn_stacks > 0 {
-            let damage = self.perform_losing_health(character, burn_stacks);
-            self.ui_handle_event(GameEvent::CharacterTookDamage {
-                character: character.id(),
-                amount: damage,
-                source: DamageSource::Condition(Condition::Burning),
-            })
+            self.perform_losing_health(
+                character,
+                burn_stacks,
+                DamageSource::Condition(Condition::Burning),
+            )
             .await;
             conditions.borrow_mut().remove(&Condition::Burning);
 
@@ -3208,13 +3243,15 @@ impl CoreGame {
                         };
                         if stacks > 0 {
                             num_receivers += 1;
-                            let burning = Condition::Burning;
-                            self.ui_handle_event(GameEvent::CharacterReceivedCondition {
-                                character: other.id(),
-                                condition: burning,
-                            })
+                            self.perform_character_receive_condition(
+                                other,
+                                ApplyCondition {
+                                    condition: Condition::Burning,
+                                    stacks: Some(stacks),
+                                    duration_rounds: None,
+                                },
+                            )
                             .await;
-                            other.receive_condition(burning, Some(stacks), None);
                         }
                     }
                     self.log(format!("The fire spread to {} other(s)", num_receivers))
@@ -3227,7 +3264,7 @@ impl CoreGame {
             let lost_condition = conditions
                 .borrow_mut()
                 .lose_stacks(&Condition::HealthPotionRecovering, 1);
-            let gained = self.perform_gain_health(character, 2);
+            let gained = self.character_gain_health(character, 2);
             self.ui_handle_event(GameEvent::CharacterGainedHealth {
                 character: character.id(),
                 amount: gained,
@@ -3259,12 +3296,14 @@ impl CoreGame {
         }
 
         if character.knows_passive(PassiveSkill::UnbridledRage) {
-            let condition = Condition::Ferocity;
-            character.receive_condition(condition, Some(1), None);
-            self.ui_handle_event(GameEvent::CharacterReceivedCondition {
-                character: character.id(),
-                condition,
-            })
+            self.perform_character_receive_condition(
+                character,
+                ApplyCondition {
+                    condition: Condition::Ferocity,
+                    stacks: Some(1),
+                    duration_rounds: None,
+                },
+            )
             .await;
         }
 
@@ -3769,7 +3808,7 @@ enum RollInstruction {
 }
 
 impl RollInstruction {
-    fn perform(
+    fn execute(
         &self,
         mode: ActionPerformanceMode<'_>,
         defender: Option<(&Character, DefenseType)>,
@@ -3995,7 +4034,8 @@ pub enum GameEvent {
 pub enum DamageSource {
     Condition(Condition),
     KnockbackCollision,
-    Spikes,
+    SpikesSurface,
+    FireSurface,
 }
 
 impl DamageSource {
@@ -4003,7 +4043,8 @@ impl DamageSource {
         match self {
             DamageSource::Condition(condition) => condition.name(),
             DamageSource::KnockbackCollision => "Collision",
-            DamageSource::Spikes => "Spikes",
+            DamageSource::SpikesSurface => "Spikes",
+            DamageSource::FireSurface => "Fire",
         }
     }
 }
@@ -5142,6 +5183,7 @@ pub enum AbilityId {
     Execute,
 
     Kill,
+    KillSelf,
     ManaTest,
     SpikeTest,
 
@@ -5964,16 +6006,16 @@ impl Character {
         if has_blood_rage_passive && health_ratio <= 0.5 {
             self.conditions.borrow_mut().add(Condition::BloodRage);
         } else {
-            self.conditions.borrow_mut().remove(&Condition::BloodRage);
+            self.lose_condition(Condition::BloodRage);
         }
         if !has_blood_rage_passive && health_ratio < 0.2 {
             self.conditions.borrow_mut().add(Condition::NearDeath);
         } else {
-            self.conditions.borrow_mut().remove(&Condition::NearDeath);
+            self.lose_condition(Condition::NearDeath);
         }
 
         if self.health.current() == 0 {
-            self.conditions.borrow_mut().remove(&Condition::NearDeath);
+            self.lose_condition(Condition::NearDeath);
             self.conditions.borrow_mut().add(Condition::Dead);
         }
     }
@@ -6187,11 +6229,11 @@ impl Character {
     }
 
     fn lose_protected(&self) -> bool {
-        self.conditions.borrow_mut().remove(&Condition::Protected)
+        self.lose_condition(Condition::Protected)
     }
 
     fn lose_distracted(&self) -> bool {
-        self.conditions.borrow_mut().remove(&Condition::Distracted)
+        self.lose_condition(Condition::Distracted)
     }
 
     pub fn equipment_weight(&self) -> u32 {
@@ -7478,6 +7520,10 @@ impl Character {
 
     pub fn is_bleeding(&self) -> bool {
         self.conditions.borrow().get(&Condition::Bleeding).is_some()
+    }
+
+    pub fn lose_condition(&self, condition: Condition) -> bool {
+        self.conditions.borrow_mut().remove(&condition)
     }
 
     pub fn receive_condition(

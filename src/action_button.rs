@@ -711,6 +711,7 @@ fn describe_create_surface(surface: Surface, t: &mut Tooltip) {
         Surface::Water => t.keywords.push(Keyword::Cond(Condition::Wet, None)),
         Surface::Poison => t.keywords.push(Keyword::Cond(Condition::Poisoned, None)),
         Surface::Spikes => t.keywords.push(Keyword::Spikes),
+        Surface::Fire => t.keywords.push(Keyword::Cond(Condition::Burning, None)),
     }
 }
 

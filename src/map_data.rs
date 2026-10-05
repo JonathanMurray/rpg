@@ -18,8 +18,9 @@ use crate::{
         ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
-        LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND, PENETRATING_ARROWS,
-        SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF,
+        KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
+        PENETRATING_ARROWS, SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP,
+        STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -561,6 +562,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     bob.learn_ability_enhancement(SHIELD_BASH_KNOCKBACK);
 
     bob.learn_ability(&KILL);
+    //    bob.learn_ability(&KILL_SELF);
 
     // TODO
 
@@ -606,7 +608,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         SoundId::DamageBob,
         PortraitId::Bob,
         SpriteId::Bob,
-        Attributes::new(5, 3, 3, 3),
+        Attributes::new(5, 3, 3, 5),
         (2, 10),
     );
     bob.set_weapon(HandType::MainHand, HUNGERING_BLADE);
@@ -622,7 +624,8 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.learn_ability(&INSPIRE);
     bob.learn_attack_enhancement(SMITE);
     // TODO
-    bob.learn_ability(&KILL);
+    //bob.learn_ability(&KILL);
+    bob.learn_ability(&FIREBALL);
     //bob.learn_attack_enhancement(EMPOWER);
     bob.health.lose(10);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));

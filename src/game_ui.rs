@@ -1967,6 +1967,9 @@ impl UserInterface {
                     Condition::Ferocity => {
                         self.sound_player.play(SoundId::Execute);
                     }
+                    Condition::Burning => {
+                        self.sound_player.play(SoundId::Burning);
+                    }
                     _ => {}
                 }
 
@@ -2014,12 +2017,8 @@ impl UserInterface {
                 to,
             } => {
                 self.game_grid.convert_surface(positions, from, to);
-                match to {
-                    Surface::Water => {}
-                    Surface::Poison => {
-                        self.sound_player.play(SoundId::Poison);
-                    }
-                    Surface::Spikes => {}
+                if matches!(to, Surface::Poison) {
+                    self.sound_player.play(SoundId::Poison);
                 }
             }
             GameEvent::SurfaceWasCreated { positions, surface } => {

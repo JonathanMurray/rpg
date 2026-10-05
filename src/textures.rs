@@ -464,7 +464,7 @@ impl LiquidType {
         match surface {
             Surface::Water => Some(Self::Water),
             Surface::Poison => Some(Self::Poison),
-            Surface::Spikes => None,
+            Surface::Spikes | Surface::Fire => None,
         }
     }
 }
@@ -481,6 +481,7 @@ pub enum TerrainId {
     Floor4,
     Spikes,
     SpikesSingleCell,
+    FireSurfaceSingleCell,
 
     StoneWall,
     StoneWallConcaveNorthWest,
@@ -561,6 +562,7 @@ impl TerrainId {
             TerrainId::NewWater(..) => Some((Surface::Water, SurfaceBrushSize::ThreeByThree)),
             TerrainId::Spikes => Some((Surface::Spikes, SurfaceBrushSize::ThreeByThree)),
             TerrainId::SpikesSingleCell => Some((Surface::Spikes, SurfaceBrushSize::SingleCell)),
+            TerrainId::FireSurfaceSingleCell => Some((Surface::Fire, SurfaceBrushSize::SingleCell)),
             _ => None,
         }
     }
@@ -594,9 +596,15 @@ impl TerrainId {
     }
 }
 
-pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: f32, y: f32) {
-    let (rotation, src_rect) = terrain_atlas_area(terrain_id);
+pub fn draw_terrain(
+    texture: &Texture2D,
+    terrain_id: TerrainId,
+    cell_w: f32,
+    screen_pos: (f32, f32),
+) {
+    let (rotation, src_rect) = terrain_atlas_area(terrain_id, screen_pos);
     let (w, h) = (32.0, 32.0);
+    let (x, y) = screen_pos;
     let src_rect_size = src_rect.size();
     let dst_size = (
         cell_w * src_rect_size.x / w * CELLS_PER_ENTITY as f32,
@@ -619,7 +627,7 @@ pub fn draw_terrain(texture: &Texture2D, terrain_id: TerrainId, cell_w: f32, x: 
     );
 }
 
-pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
+pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32, Rect) {
     let (w, h) = (32.0, 32.0);
 
     let mut rotation = 0.0;
@@ -740,6 +748,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
         TerrainId::FoodPlate => (6, 5),
         TerrainId::Spikes => (1, 10),
         TerrainId::SpikesSingleCell => (1, 11),
+        TerrainId::FireSurfaceSingleCell => (9, 3),
 
         TerrainId::Water => (2, 3),
         TerrainId::WaterBeachNorth => (2, 1),
@@ -794,6 +803,13 @@ pub fn terrain_atlas_area(terrain_id: TerrainId) -> (f32, Rect) {
     // animate torch fire
     if (t * 0.6) % (t * 0.6).floor() < 0.5 && (col, row) == (8, 6) {
         (col, row) = (9, 6);
+    }
+
+    // animate fire surface
+    if (col, row) == (9, 3) {
+        if (t * 0.8) % (t * 0.8).floor() < 0.5 {
+            (col, row) = (10, 3);
+        }
     }
 
     let src_sides = [

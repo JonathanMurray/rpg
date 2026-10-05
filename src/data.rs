@@ -2401,6 +2401,37 @@ pub const KILL: Ability = Ability {
     }),
 };
 
+pub const KILL_SELF: Ability = Ability {
+    id: AbilityId::KillSelf,
+    name: "Kill self",
+    speech: "",
+    description: "Kill self",
+    icon: IconId::Fireball,
+    action_point_cost: 4,
+    mana_cost: 0,
+    stamina_cost: 0,
+    requirement: None,
+
+    roll: Some(AbilityRollType::Spell),
+    possible_enhancements: [None; 3],
+    target: AbilityTarget::None {
+        self_area: None,
+        self_effect: Some(AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([Some(ApplyEffect::LoseHealth(99)), None]),
+        }),
+        environment_effect: None,
+    },
+    animation_color: BLACK,
+    animation: AbilityAnimation::CastSpell,
+    initiate_sound: Some(SoundId::ShootSpell),
+    resolve_sound: Some(SoundId::Explosion),
+    charge_fx: Some(AbilityChargeFx {
+        particle_shape: ParticleShape::Circle,
+        sound: SoundId::MechanicNoise,
+    }),
+};
+
 pub const MANATEST: Ability = Ability {
     id: AbilityId::ManaTest,
     name: "Gain mana",

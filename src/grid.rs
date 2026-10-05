@@ -476,8 +476,8 @@ impl GameGrid {
             // TODO set correct liquid orientation somehow
             Surface::Water => TerrainId::NewWater(WaterOrientation::Center, LiquidType::Water),
             Surface::Poison => TerrainId::NewWater(WaterOrientation::Center, LiquidType::Poison),
-            //Surface::Spikes => TerrainId::Spikes,
             Surface::Spikes => TerrainId::SpikesSingleCell,
+            Surface::Fire => TerrainId::FireSurfaceSingleCell,
         };
         self.decorations.insert(position, terrain_id);
     }
@@ -1467,7 +1467,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.background.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, x0, y0);
+                        self.draw_terrain(*terrain_id, (x0, y0));
                     }
                 }
             }
@@ -1481,7 +1481,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.terrain_objects.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, x0, y0);
+                        self.draw_terrain(*terrain_id, (x0, y0));
                     }
                 }
             }
@@ -1495,7 +1495,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(terrain_id) = self.decorations.get(&(col, row)) {
-                        self.draw_terrain(*terrain_id, x0, y0);
+                        self.draw_terrain(*terrain_id, (x0, y0));
                     }
                 }
             }
@@ -1509,8 +1509,8 @@ impl GameGrid {
         }
     }
 
-    pub fn draw_terrain(&mut self, terrain_id: TerrainId, x: f32, y: f32) {
-        draw_terrain(&self.terrain_atlas, terrain_id, self.cell_w, x, y);
+    pub fn draw_terrain(&mut self, terrain_id: TerrainId, screen_pos: (f32, f32)) {
+        draw_terrain(&self.terrain_atlas, terrain_id, self.cell_w, screen_pos);
     }
 
     pub fn draw_debug_cells(&self) {
@@ -1863,11 +1863,9 @@ impl GameGrid {
             shadow_y -= offset;
         }
 
-        let standing_in_liquid = self
-            .pathfind_grid
-            .surface(character.pos())
-            .map(|s| s.is_liquid())
-            .unwrap_or(false);
+        let standing_on_surface = self.pathfind_grid.surface(character.pos());
+
+        let standing_in_liquid = standing_on_surface.map(|s| s.is_liquid()).unwrap_or(false);
 
         params.pivot = Some((x + self.cell_w * 1.5, y + self.cell_w * 2.0).into());
 
@@ -1883,6 +1881,13 @@ impl GameGrid {
             }
             y += water_depth_factor * self.cell_w * 3.0;
             shadow_y += water_depth_factor * self.cell_w * 1.0;
+        }
+
+        if standing_on_surface == Some(Surface::Fire) {
+            // Hide feet in the fire
+            if !dying {
+                character_crop_factor = (1.0, 0.8);
+            }
         }
 
         /*
@@ -2714,14 +2719,16 @@ impl GameGrid {
 
             if let Some(surface) = self.pathfind_grid.surface(mouse_grid_pos) {
                 //if mouse_state == MouseState::None && self.hovered_character.is_none() {
-                self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
-                let text = match surface {
-                    Surface::Water => "|<info>| water",
-                    Surface::Poison => "|<warning>| poison",
-                    Surface::Spikes => "|<warning>| spikes",
-                };
-                self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
-                //}
+                if self.hovered_character.is_none() {
+                    self.draw_cell_outline(mouse_grid_pos, WHITE, 0.0, 1.0);
+                    let text = match surface {
+                        Surface::Water => "|<info>| water",
+                        Surface::Poison => "|<warning>| poison",
+                        Surface::Spikes => "|<warning>| spikes",
+                        Surface::Fire => "|<warning>| fire",
+                    };
+                    self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
+                }
             }
 
             let mut hovered_move_route = None;
