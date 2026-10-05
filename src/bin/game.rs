@@ -27,7 +27,7 @@ use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, Player
 use rpg::data::{
     PassiveSkill, ARCANE_BOW, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS,
     FIREBALL_MASSIVE, HEAL, HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS,
-    LEATHER_ARMOR, PIERCING_SHOT, SWEEP_ATTACK,
+    LEATHER_ARMOR, PIERCING_SHOT, SPIKETEST, SPIKE_TRAP, SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -218,7 +218,10 @@ async fn run_demo(
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![ButtonAction::Action(BaseAction::UseAbility(&PIERCING_SHOT))],
+                            vec![
+                                ButtonAction::Action(BaseAction::UseAbility(&PIERCING_SHOT)),
+                                ButtonAction::Action(BaseAction::UseAbility(&SPIKE_TRAP)),
+                            ],
                             vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
                         ),
                     ),

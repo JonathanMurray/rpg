@@ -213,6 +213,7 @@ pub enum IconId {
     Feint,
     Heal,
     BloodMagic,
+    SpikeTrap,
 
     Inferno,
     Energize,
@@ -1005,6 +1006,7 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
         IconId::SearingLight => (2, 1),
         IconId::MeleeAttack => (6, 8),
         IconId::RangedAttack => (6, 7),
+        IconId::SpikeTrap => (6, 6),
         IconId::PiercingShot => (7, 7),
         IconId::Block => (8, 7),
         IconId::Brace => (5, 2),

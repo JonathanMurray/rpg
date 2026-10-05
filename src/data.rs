@@ -2085,15 +2085,15 @@ pub const HEALING_RAIN: Ability = Ability {
     }),
 };
 
-pub const SPIKES: Ability = Ability {
+pub const SPIKE_TRAP: Ability = Ability {
     id: AbilityId::Spikes,
     name: "Spike trap",
     speech: "",
     description: "Throw sharp |<keyword>spikes| on the ground, slowing and damaging anyone that steps over them",
-    icon: IconId::Undefined,
-    action_point_cost: 0,
+    icon: IconId::SpikeTrap,
+    action_point_cost: 2,
     mana_cost: 0,
-    stamina_cost: 0,
+    stamina_cost: 2,
     requirement: None,
     roll: Some(AbilityRollType::Spell),
     possible_enhancements: [None, None, None],

@@ -19,7 +19,7 @@ use crate::{
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
         LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND, PENETRATING_ARROWS,
-        SLASHING_RAPIER, SMALL_SHIELD, SPIKES, SPIKETEST, SPIKE_SHIELD, STAFF,
+        SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -532,8 +532,8 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
     alice.learn_ability(&INSPIRE);
 
     //TODO
-    alice.learn_ability(&SPIKES);
-    alice.learn_ability(&SPIKETEST);
+    //alice.learn_ability(&SPIKES);
+    //alice.learn_ability(&SPIKETEST);
     //alice.learn_ability(&PIERCING_SHOT);
     //alice.learn_ability_enhancement(INSPIRE_RUTHLESS);
 
@@ -653,7 +653,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.learn_attack_enhancement(CRIPPLING_SHOT);
     alice.learn_passive(PassiveSkill::WeaponProficiency);
     alice.learn_ability(&PIERCING_SHOT);
-    alice.learn_ability(&SPIKES);
+    alice.learn_ability(&SPIKE_TRAP);
     alice.learn_ability(&INFLICT_WOUNDS);
 
     alice

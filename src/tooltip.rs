@@ -56,8 +56,8 @@ impl Keyword {
                     condition.description().to_string()
                 }
             },
-            Keyword::AttackEnhancement(enhancement) => enhancement.description.to_string(),
-            Keyword::OnAttackedReaction(reaction) => reaction.description.to_string(),
+            Keyword::AttackEnhancement(enhancement) => format!("|<faded>(attack enhancement)|\n{}",enhancement.description),
+            Keyword::OnAttackedReaction(reaction) => format!("|<faded>(reaction)|\n{}", reaction.description),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
                 "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
