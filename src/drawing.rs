@@ -1,5 +1,6 @@
 use macroquad::{
     color::{Color, GREEN, MAGENTA},
+    math::Rect,
     shapes::{draw_circle_lines, draw_line, draw_rectangle, draw_triangle},
     time::get_time,
 };
@@ -236,10 +237,7 @@ pub fn draw_cornered_rectangle_lines(
 }
 
 pub fn draw_dashed_rectangle_sides(
-    x: f32,
-    y: f32,
-    w: f32,
-    h: f32,
+    rect: Rect,
     thickness: f32,
     color: Color,
     segment_len: f32,
@@ -250,8 +248,8 @@ pub fn draw_dashed_rectangle_sides(
 ) {
     if left {
         draw_dashed_line(
-            (x, y),
-            (x, y + h),
+            (rect.left(), rect.top()),
+            (rect.left(), rect.bottom()),
             thickness,
             color,
             segment_len,
@@ -261,8 +259,8 @@ pub fn draw_dashed_rectangle_sides(
     }
     if right {
         draw_dashed_line(
-            (x + w, y),
-            (x + w, y + h),
+            (rect.right(), rect.top()),
+            (rect.right(), rect.bottom()),
             thickness,
             color,
             segment_len,
@@ -272,8 +270,8 @@ pub fn draw_dashed_rectangle_sides(
     }
     if top {
         draw_dashed_line(
-            (x, y),
-            (x + w, y),
+            (rect.left(), rect.top()),
+            (rect.right(), rect.top()),
             thickness,
             color,
             segment_len,
@@ -283,13 +281,64 @@ pub fn draw_dashed_rectangle_sides(
     }
     if bottom {
         draw_dashed_line(
-            (x, y + h),
-            (x + w, y + h),
+            (rect.left(), rect.bottom()),
+            (rect.right(), rect.bottom()),
             thickness,
             color,
             segment_len,
             None,
             false,
+        );
+    }
+}
+
+pub fn draw_rectangle_sides(
+    rect: Rect,
+    thickness: f32,
+    color: Color,
+    left: bool,
+    right: bool,
+    top: bool,
+    bottom: bool,
+) {
+    if left {
+        draw_line(
+            rect.left(),
+            rect.top(),
+            rect.left(),
+            rect.bottom(),
+            thickness,
+            color,
+        );
+    }
+    if right {
+        draw_line(
+            rect.right(),
+            rect.top(),
+            rect.right(),
+            rect.bottom(),
+            thickness,
+            color,
+        );
+    }
+    if top {
+        draw_line(
+            rect.left(),
+            rect.top(),
+            rect.right(),
+            rect.top(),
+            thickness,
+            color,
+        );
+    }
+    if bottom {
+        draw_line(
+            rect.left(),
+            rect.bottom(),
+            rect.right(),
+            rect.bottom(),
+            thickness,
+            color,
         );
     }
 }

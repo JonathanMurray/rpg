@@ -20,13 +20,13 @@ use crate::{
 // Entities cover 3x3 cells on the grid
 pub const CELLS_PER_ENTITY: u32 = 3;
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum Occupation {
     Character(CharacterId),
     Terrain(TerrainType),
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TerrainType {
     Tall,
     Low,

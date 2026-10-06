@@ -13,7 +13,7 @@
     "(1, 10)": "StoneWallConvexNorthEast",
     "(1, 7)": "StoneWallConvexNorthEast",
     "(1, 4)": "StoneWallConvexNorthEast",
-    "(1, 1)": "StoneWallConvexNorthEast",
+    "(19, 29)": "StoneWallConvexNorthEast",
     "(4, 1)": "StoneWallConvexNorthEast",
     "(7, 1)": "StoneWallConvexNorthEast",
     "(10, 1)": "StoneWallConvexNorthEast",
@@ -51,7 +51,9 @@
     "(4, 22)": "StoneWallConvexNorthEast",
     "(4, 25)": "StoneWallConvexNorthEast",
     "(7, 25)": "StoneWallConvexNorthEast",
-    "(7, 22)": "StoneWallConvexNorthEast"
+    "(7, 22)": "StoneWallConvexNorthEast",
+    "(16, 29)": "StoneWallConvexNorthEast",
+    "(25, 32)": "Cauldron2"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -264,12 +266,7 @@
     "(19, 23)": "FireSurfaceSingleCell",
     "(17, 25)": "FireSurfaceSingleCell",
     "(18, 26)": "FireSurfaceSingleCell",
-    "(13, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(19, 22)": "FireSurfaceSingleCell",
     "(4, 31)": {
       "NewWater": [
         "NorthEast",
@@ -282,12 +279,7 @@
         "Water"
       ]
     },
-    "(10, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(17, 21)": "FireSurfaceSingleCell",
     "(17, 24)": "FireSurfaceSingleCell",
     "(17, 26)": "FireSurfaceSingleCell",
     "(19, 21)": "FireSurfaceSingleCell",
@@ -298,17 +290,9 @@
     "(19, 26)": "FireSurfaceSingleCell",
     "(17, 23)": "FireSurfaceSingleCell",
     "(18, 23)": "FireSurfaceSingleCell",
-    "(10, 28)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(17, 22)": "FireSurfaceSingleCell",
-    "(18, 22)": "FireSurfaceSingleCell",
     "(18, 21)": "FireSurfaceSingleCell",
-    "(17, 21)": "FireSurfaceSingleCell",
-    "(19, 22)": "FireSurfaceSingleCell"
+    "(17, 22)": "FireSurfaceSingleCell",
+    "(18, 22)": "FireSurfaceSingleCell"
   },
   "control_points": {
     "(22, 26)": "Exit"
@@ -317,8 +301,8 @@
     {
       "type_": "Bob",
       "pos": [
-        25,
-        34
+        18,
+        33
       ],
       "health": null,
       "main_hand": null,
@@ -352,6 +336,17 @@
       "pos": [
         11,
         15
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        21,
+        33
       ],
       "health": null,
       "main_hand": null,

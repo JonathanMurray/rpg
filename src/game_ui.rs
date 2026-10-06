@@ -176,7 +176,7 @@ pub enum ConfiguredAction {
     UseConsumable(Option<EquipmentConsumption>),
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum UsabilityProblem {
     OutOfReach,
     NoLineOfSight,
@@ -206,9 +206,6 @@ impl UsabilityProblem {
         }
     }
 }
-
-const OUT_OF_REACH: &str = "Out of reach";
-const NO_LINE_OF_SIGHT: &str = "No line of sight";
 
 impl ConfiguredAction {
     fn has_target(&self) -> bool {
@@ -305,7 +302,13 @@ impl ConfiguredAction {
                         selected_enhancements,
                         *target_pos,
                     ) {
-                        None
+                        if pathfind_grid
+                            .obstructed_line_of_sight(relevant_character.pos(), *target_pos)
+                        {
+                            Some(UsabilityProblem::NoLineOfSight)
+                        } else {
+                            None
+                        }
                     } else {
                         Some(UsabilityProblem::OutOfReach)
                     }
@@ -2839,10 +2842,6 @@ impl UserInterface {
     }
 
     fn commit_player_action(&mut self) -> PlayerChose {
-        // Action button is highlighted while the action is being configured in the popup. That should be cleared now.
-        // TODO shouldn't we rather change the state, and rely on refresh_selected_action_button to clear this?
-        //self.set_selected_action(None);
-
         match &*self.state.borrow() {
             UiState::ConfiguringAction(configured_action) => {
                 let action = match &configured_action {

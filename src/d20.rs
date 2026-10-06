@@ -32,7 +32,6 @@ pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
             res.max(new)
         };
     }
-    dbg!(advantage_level, res);
     res
 }
 
@@ -40,7 +39,6 @@ fn roll_d20() -> u32 {
     //if rand::rng().random_bool(0.5) {20} else {1}
     let mut rng = rand::rng();
     let result = rng.random_range(1..=20);
-    dbg!(result);
     result
 }
 

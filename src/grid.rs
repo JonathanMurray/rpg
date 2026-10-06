@@ -51,7 +51,7 @@ use crate::{
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
-        draw_dashed_rectangle_sides,
+        draw_dashed_rectangle_sides, draw_rectangle_sides,
     },
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
@@ -78,7 +78,8 @@ use crate::{
 
 const BACKGROUND_COLOR: Color = rgb(6, 32, 30); // rgb(12, 64, 59);
 
-const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.1);
+const CELL_OCCUPIED_COLOR: Color = Color::new(0.9, 0.1, 0.2, 0.15);
+const BORDER_OCCUPIED_COLOR: Color = Color::new(0.9, 0.7, 0.7, 0.8);
 
 //const MOVEMENT_PREVIEW_GRID_OUTLINE_COLOR: Color = Color::new(0.9, 0.9, 0.9, 0.15);
 const MOVEMENT_ARROW_COLOR: Color = Color::new(1.0, 0.63, 0.0, 1.0);
@@ -2172,7 +2173,7 @@ impl GameGrid {
             }
 
             if let Some(base_push_amount) = ability_knockback {
-                self.draw_filled_occupied_cells();
+                self.draw_occupation(OccupationFilter::Any);
 
                 if let ActionTarget::Character(target_id, _movement) = target {
                     let target = &self.characters[target_id];
@@ -2358,13 +2359,18 @@ impl GameGrid {
 
         for character in self.characters.values() {
             if character.id() == self.active_character_id {
-                self.draw_character_highlight(character.id(), ACTIVE_CHARACTER_COLOR, WHITE, 3.0);
+                self.draw_character_highlight(
+                    character.id(),
+                    ACTIVE_CHARACTER_COLOR,
+                    Some(WHITE),
+                    3.0,
+                );
             } else if should_highlight_character_occupations {
                 self.draw_character_highlight(
                     character.id(),
                     CELL_OCCUPIED_COLOR,
-                    Color::new(0.9, 0.7, 0.7, 0.4),
-                    self.cell_w * 0.1,
+                    None, //BORDER_OCCUPIED_COLOR,
+                    self.cell_w * 0.2,
                 );
             }
 
@@ -2873,13 +2879,14 @@ impl GameGrid {
 
             if may_commit_action_with_left_click {
                 if let Some(problem) = self.action_usability_problem {
+                    if problem == UsabilityProblem::NoLineOfSight {
+                        self.draw_occupation(OccupationFilter::TallTerrain);
+                    }
                     let problem = format!("|<warning>| {}", problem.message());
                     front_cursor_text = Some((problem, CURSOR_ERROR_COLOR));
-                    //self.draw_cursor_text(problem, None, CURSOR_ERROR_COLOR);
                 } else {
                     let text = format!("|<confirm>|{}", committable_action_name.unwrap());
                     front_cursor_text = Some((text, CURSOR_INFO_COLOR));
-                    //self.draw_cursor_text(text, None, CURSOR_INFO_COLOR);
 
                     if pressed_left_mouse {
                         println!("Committed action with left click");
@@ -3480,13 +3487,17 @@ impl GameGrid {
             matches!(occupation, Some(Occupation::Terrain(TerrainType::Tall)))
         };
 
+        dbg!(from, to);
+
         line_visitor(from, to, |x, y| {
+            dbg!((x, y));
             let obstructed = obstructs(self.pathfind_grid.occupied().get(&(x, y)));
 
             let color = if obstructed {
                 Color::new(1.0, 0.4, 0.4, 0.55)
             } else {
-                Color::new(1.0, 1.0, 1.0, 0.15)
+                //Color::new(1.0, 1.0, 1.0, 0.15)
+                Color::new(1.0, 1.0, 1.0, 0.4)
             };
             self.fill_cell((x, y), color, 0.0);
             if obstructed {
@@ -3497,6 +3508,7 @@ impl GameGrid {
                 false
             }
         });
+        println!("---------------------");
 
         end
     }
@@ -4252,7 +4264,7 @@ impl GameGrid {
         &self,
         character_id: CharacterId,
         bg_color: Color,
-        border_color: Color,
+        border_color: Option<Color>,
         margin: f32,
     ) {
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
@@ -4263,7 +4275,9 @@ impl GameGrid {
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
         );
         draw_rectangle(rect.0, rect.1, rect.2, rect.3, bg_color);
-        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, border_color);
+        if let Some(c) = border_color {
+            draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, c);
+        }
     }
 
     fn draw_circular_character_highlight(
@@ -4577,22 +4591,41 @@ impl GameGrid {
             )
         };
 
-        self.draw_filled_occupied_cells();
         self.draw_move_range_indicator(
             character,
             character.remaining_movement.get(),
             extended_range,
         );
+        self.draw_occupation(OccupationFilter::CharactersExcept(character_id));
     }
 
-    fn draw_filled_occupied_cells(&self) {
-        for (pos, occupation) in self.pathfind_grid.occupied().iter() {
-            let draw_occupation = match occupation {
-                Occupation::Character(id) => *id != self.active_character_id,
-                Occupation::Terrain { .. } => false,
-            };
-            if draw_occupation {
-                self.fill_cell(*pos, CELL_OCCUPIED_COLOR, 1.0);
+    fn draw_occupation(&self, filter: OccupationFilter) {
+        let matching = |x, y| {
+            let occupation = self.pathfind_grid.occupied().get(&(x, y)).copied();
+            match filter {
+                OccupationFilter::TallTerrain => {
+                    occupation == Some(Occupation::Terrain(TerrainType::Tall))
+                }
+                OccupationFilter::CharactersExcept(ch_id) => {
+                    matches!(occupation, Some(Occupation::Character(other_id)) if ch_id != other_id)
+                }
+                OccupationFilter::Any => occupation.is_some(),
+            }
+        };
+
+        let (w, h) = self.pathfind_grid.dimensions();
+        for y in 0..(h - 1) as i32 {
+            for x in 0..(w - 1) as i32 {
+                self.draw_borders(
+                    (x, y),
+                    false,
+                    matching(x, y) != matching(x + 1, y),
+                    false,
+                    matching(x, y) != matching(x, y + 1),
+                    2.0,
+                    BORDER_OCCUPIED_COLOR,
+                    DrawBorder::Line,
+                );
             }
         }
     }
@@ -4749,28 +4782,28 @@ impl GameGrid {
 
                 if within_inner(x, y) {
                     self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
-                    self.draw_dashed_borders(
-                        x,
-                        y,
+                    self.draw_borders(
+                        (x, y),
                         !within_inner(x - 1, y),
                         !within_inner(x + 1, y),
                         !within_inner(x, y - 1),
                         !within_inner(x, y + 1),
                         thickness,
                         MOVE_RANGE_COLOR,
+                        DrawBorder::Dashed,
                     );
                 } else if extended_range.is_some() && within_outer(x, y) {
                     self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
                     //self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
-                    self.draw_dashed_borders(
-                        x,
-                        y,
+                    self.draw_borders(
+                        (x, y),
                         !within_outer(x - 1, y),
                         !within_outer(x + 1, y),
                         !within_outer(x, y - 1),
                         !within_outer(x, y + 1),
-                        thickness,
+                        2.0,
                         MOVE_RANGE_EXTENDED_COLOR,
+                        DrawBorder::Line,
                     );
                 }
             }
@@ -4803,50 +4836,54 @@ impl GameGrid {
                         thickness = 1.0;
                     }
 
-                    self.draw_dashed_borders(
-                        x,
-                        y,
+                    self.draw_borders(
+                        (x, y),
                         !is_cell_within(x - 1, y),
                         !is_cell_within(x + 1, y),
                         !is_cell_within(x, y - 1),
                         !is_cell_within(x, y + 1),
                         thickness,
                         color,
+                        DrawBorder::Dashed,
                     );
                 }
             }
         }
     }
 
-    fn draw_dashed_borders(
+    fn draw_borders(
         &self,
-        x: i32,
-        y: i32,
+        pos: Position,
         left: bool,
         right: bool,
         top: bool,
         bottom: bool,
         thickness: f32,
         color: Color,
+        border_type: DrawBorder,
     ) {
-        let segment_len = 12.0;
-
-        let (x, y) = self.grid_pos_to_screen((x, y));
+        let (x, y) = self.grid_pos_to_screen(pos);
         let (w, h) = (self.cell_w, self.cell_w);
+        let rect = Rect::new(x, y, w, h);
 
-        draw_dashed_rectangle_sides(
-            x,
-            y,
-            w,
-            h,
-            thickness,
-            color,
-            segment_len,
-            left,
-            right,
-            top,
-            bottom,
-        );
+        match border_type {
+            DrawBorder::Dashed => {
+                let segment_len = 12.0;
+                draw_dashed_rectangle_sides(
+                    rect,
+                    thickness,
+                    color,
+                    segment_len,
+                    left,
+                    right,
+                    top,
+                    bottom,
+                );
+            }
+            DrawBorder::Line => {
+                draw_rectangle_sides(rect, thickness, color, left, right, top, bottom);
+            }
+        }
     }
 
     fn pan_camera(&self, dx: f32, dy: f32) {
@@ -4880,14 +4917,15 @@ struct MovementPathNode {
     dangerous: bool,
 }
 
-fn chance_to_perc_str(chance: f32) -> String {
-    let mut perc = chance * 100.0;
-    if perc > 99.0 && perc < 100.0 {
-        perc = 99.0;
-    } else if perc < 1.0 && perc > 0.0 {
-        perc = 1.0;
-    }
-    format!("{}%", perc.round() as u32)
+enum OccupationFilter {
+    TallTerrain,
+    Any,
+    CharactersExcept(CharacterId),
+}
+
+enum DrawBorder {
+    Dashed,
+    Line,
 }
 
 #[derive(Debug, Default)]
