@@ -162,6 +162,7 @@ impl CharacterAnimation {
 
 #[derive(Debug, Clone)]
 enum AnimationDetails {
+    Text(TextGraphics),
     Motion {
         from: Position,
         to: Position,
@@ -291,10 +292,12 @@ pub struct GameGrid {
     //routes: IndexMap<Position, ChartNode>,
     pub characters: HashMap<CharacterId, Rc<Character>>,
 
-    ability_character_animation: Option<ParticleGroup>,
-    target_effect_preview: HashMap<CharacterId, TargetEffectPreview>,
+    ability_cast_particle_group: Option<ParticleGroup>,
+    target_effect_previews: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
     anticipating_character: Option<CharacterId>,
+    effects: Vec<ConcreteEffect>,
+
     pub grid_dimensions: (u32, u32),
     pub position_on_screen: (f32, f32),
 
@@ -302,7 +305,6 @@ pub struct GameGrid {
     camera_position: (Cell<f32>, Cell<f32>),
     dragging_camera_from: Option<(f32, f32)>,
 
-    effects: Vec<ConcreteEffect>,
     selected_player_character_id: Option<CharacterId>,
     active_character_id: CharacterId,
     action_usability_problem: Option<UsabilityProblem>,
@@ -369,8 +371,8 @@ impl GameGrid {
             cell_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
-            ability_character_animation: Default::default(),
-            target_effect_preview: Default::default(),
+            ability_cast_particle_group: Default::default(),
+            target_effect_previews: Default::default(),
             character_animations: Default::default(),
             anticipating_character: None,
             big_font,
@@ -648,12 +650,12 @@ impl GameGrid {
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
-        self.target_effect_preview
+        self.target_effect_previews
             .insert(preview.character_id, preview);
     }
 
     pub fn clear_target_effect_previews(&mut self) {
-        self.target_effect_preview.clear();
+        self.target_effect_previews.clear();
     }
 
     pub fn set_character_anticipation(&mut self, anticipating_character: Option<u32>) {
@@ -1197,7 +1199,7 @@ impl GameGrid {
         self.character_animations
             .retain(|a| a.remaining_duration > 0.0);
 
-        if let Some(particle_group) = &mut self.ability_character_animation {
+        if let Some(particle_group) = &mut self.ability_cast_particle_group {
             let mut rng = rand::rng();
             let mut fresh_count = 0;
             for particle in &mut particle_group.particles {
@@ -1263,7 +1265,7 @@ impl GameGrid {
 
     pub fn add_text_effect(
         &mut self,
-        position: Position,
+        character_id: CharacterId,
         start_time: f32,
         text_effect: TextEffect,
     ) -> bool {
@@ -1295,7 +1297,7 @@ impl GameGrid {
                     ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
                 };
 
-                self._add_text_effect(position, start_time, 2.0, texture, s.trim(), style);
+                self._add_text_effect(character_id, start_time, 2.0, texture, s.trim(), style);
             }
             TextEffect::Effect {
                 text,
@@ -1307,7 +1309,7 @@ impl GameGrid {
                 } else {
                     TextEffectStyle::NegativeEffect
                 };
-                self._add_text_effect(position, start_time, 2.0, icon, text, style);
+                self._add_text_effect(character_id, start_time, 2.0, icon, text, style);
             }
             TextEffect::ReceiveCondition(condition) => {
                 let style = if condition.is_positive() {
@@ -1316,7 +1318,7 @@ impl GameGrid {
                     TextEffectStyle::NegativeEffect
                 };
                 self._add_text_effect(
-                    position,
+                    character_id,
                     start_time,
                     2.0,
                     Some(condition.status_icon()),
@@ -1326,7 +1328,7 @@ impl GameGrid {
             }
             TextEffect::LoseCondition(condition) => {
                 self._add_text_effect(
-                    position,
+                    character_id,
                     0.0,
                     2.0,
                     Some(condition.status_icon()),
@@ -1336,7 +1338,7 @@ impl GameGrid {
             }
             TextEffect::Heal(amount) => {
                 self._add_text_effect(
-                    position,
+                    character_id,
                     start_time,
                     2.0,
                     None,
@@ -1346,7 +1348,7 @@ impl GameGrid {
             }
             TextEffect::Miss => {
                 self._add_text_effect(
-                    position,
+                    character_id,
                     start_time,
                     2.0,
                     None,
@@ -1356,7 +1358,7 @@ impl GameGrid {
             }
             TextEffect::ReactionExclamation => {
                 self._add_text_effect(
-                    position,
+                    character_id,
                     start_time,
                     1.0,
                     None,
@@ -1376,11 +1378,11 @@ impl GameGrid {
                     HitType::Strong => TextEffectStyle::StrongHit,
                     HitType::Critical => TextEffectStyle::StrongHit,
                 };
-                self._add_text_effect(position, start_time, 2.0, None, text, style);
+                self._add_text_effect(character_id, start_time, 2.0, None, text, style);
 
                 if hit_type == HitType::Critical {
                     self._add_text_effect(
-                        position,
+                        character_id,
                         start_time,
                         1.5,
                         None,
@@ -1396,7 +1398,7 @@ impl GameGrid {
 
     fn _add_text_effect(
         &mut self,
-        position: Position,
+        character_id: CharacterId,
         start_time: f32,
         duration: f32,
         status_texture: Option<StatusId>,
@@ -1404,12 +1406,8 @@ impl GameGrid {
         style: TextEffectStyle,
     ) {
         let text = text.into();
-        let mut pos = (position.0 as f32, position.1 as f32);
 
         let mut rng = rand::rng();
-        let dx = rng.random_range(-0.3..=0.3);
-        let dy = rng.random_range(-0.3..=0.3);
-        pos = (pos.0 + dx, pos.1 + dy);
 
         let mut font = &self.big_font;
         let mut font_size = 28;
@@ -1462,27 +1460,28 @@ impl GameGrid {
             None
         };
 
-        let effect = ConcreteEffect {
-            age: 0.0,
-            start_time,
-            end_time: start_time + duration,
-            source_pos: pos,
-            destination_pos: pos,
-            variant: EffectVariant::At(
-                EffectPosition::Source,
-                EffectGraphics::Text(TextGraphics {
-                    status_texture,
-                    text,
-                    font: font.clone(),
-                    font_size,
-                    color,
-                    movement: random_movement,
-                    background,
-                }),
-            ),
+        let random_offset = if rise_indefinitely {
+            (rng.random_range(-0.3..=0.3), rng.random_range(-0.3..=0.3))
+        } else {
+            (0.0, 0.0)
         };
 
-        self.effects.push(effect);
+        let animation = CharacterAnimation::new(
+            character_id,
+            start_time,
+            duration,
+            AnimationDetails::Text(TextGraphics {
+                status_texture,
+                text,
+                font: font.clone(),
+                font_size,
+                color,
+                start_offset: random_offset,
+                movement: random_movement,
+                background,
+            }),
+        );
+        self.character_animations.push(animation);
     }
 
     pub fn add_effect(&mut self, source: Position, destination: Position, effect: Effect) {
@@ -1730,6 +1729,7 @@ impl GameGrid {
             let remaining = animation.remaining_duration;
             let remaining_ratio = animation.remaining_duration_ratio();
             match &animation.kind {
+                AnimationDetails::Text(text_graphics) => {}
                 AnimationDetails::MotionPreview { positions } => {
                     let dst = positions.last().unwrap();
                     let color = Color::new(1.0, 1.0, 1.0, 0.5);
@@ -1818,7 +1818,7 @@ impl GameGrid {
                     params.flip_x = false;
                 }
                 AnimationDetails::MagicSparks { .. } => {
-                    // THis is drawn separately
+                    // This is drawn separately
                 }
                 AnimationDetails::AttackCrosshairPreview { .. } => {
                     // This is drawn separately, after all the characters
@@ -2070,7 +2070,7 @@ impl GameGrid {
 
         if show_sprite {
             let sprite = &self.sprites[&character.sprite];
-            let texture = if self.target_effect_preview.contains_key(&character.id()) {
+            let texture = if self.target_effect_previews.contains_key(&character.id()) {
                 &sprite.red_highlight
             } else if self.hovered_character.or(self.hovered_character_portrait)
                 == Some(character.id())
@@ -2346,12 +2346,12 @@ impl GameGrid {
 
         if let Some(ability) = is_casting {
             if self
-                .ability_character_animation
+                .ability_cast_particle_group
                 .as_ref()
                 .map(|group| group.ability_id != ability.id)
                 .unwrap_or(true)
             {
-                self.ability_character_animation = Some(ParticleGroup {
+                self.ability_cast_particle_group = Some(ParticleGroup {
                     ability_id: ability.id,
                     character_id: self.active_character_id,
                     particles: vec![],
@@ -2360,7 +2360,7 @@ impl GameGrid {
                 });
             }
         } else {
-            self.ability_character_animation = None;
+            self.ability_cast_particle_group = None;
         }
 
         let mouse_state = match ui_state {
@@ -2512,7 +2512,7 @@ impl GameGrid {
             {
                 self.draw_character_highlight(character);
             }
-            if self.target_effect_preview.contains_key(&character.id()) {
+            if self.target_effect_previews.contains_key(&character.id()) {
                 self.draw_circular_character_highlight(
                     character.id(),
                     CHARACTER_DAMAGE_PREVIEW_COLOR,
@@ -2529,7 +2529,7 @@ impl GameGrid {
             }
         }
 
-        if let Some(group) = &self.ability_character_animation {
+        if let Some(group) = &self.ability_cast_particle_group {
             for particle in &group.particles {
                 let x = self.grid_x_f32_to_screen(particle.x);
                 let y = self.grid_y_f32_to_screen(particle.y);
@@ -3414,70 +3414,7 @@ impl GameGrid {
             }
         }
 
-        for char_animation in &self.character_animations {
-            match &char_animation.kind {
-                AnimationDetails::SpeechBubble { text } => {
-                    self.draw_speech_bubble(text, char_animation.character_id, 0.0);
-                }
-                AnimationDetails::AttackCrosshairPreview { target_pos } => {
-                    self.draw_target_crosshair(
-                        self.characters[&char_animation.character_id].pos(),
-                        *target_pos,
-                        true,
-                        ENEMYS_TARGET_CROSSHAIR_COLOR,
-                        CROSSHAIR_ARROW_THICK,
-                        false,
-                    );
-                }
-                AnimationDetails::MagicSparks { particles, color } => {
-                    let pos =
-                        self.character_screen_pos(&self.characters[&char_animation.character_id]);
-                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
-                    let remaining_ratio = char_animation.remaining_duration_ratio();
-                    let num_particles = ((1.0 - remaining_ratio.max(0.5)) * 20.0) as usize;
-                    let mut particles = particles.borrow_mut();
-                    for i in particles.len()..=num_particles {
-                        particles.push((
-                            rand::random_range(-1.0..1.0),
-                            -0.25 * (i as f32) + rand::random_range(-0.35..0.35),
-                        ));
-                    }
-                    for (i, p) in particles.iter().enumerate() {
-                        let w = self.cell_w * 0.3;
-                        let h = self.cell_w * 0.3;
-                        let mut color = *color;
-                        color.a = 1.2 - 2.0 * (1.0 - remaining_ratio) + 0.02 * i as f32;
-                        draw_rectangle(
-                            pos.0 + p.0 * self.cell_w - w / 2.0,
-                            pos.1 + p.1 * self.cell_w - h / 2.0,
-                            w,
-                            h,
-                            color,
-                        );
-                    }
-                }
-                AnimationDetails::CastingSpell { color } => {
-                    let pos =
-                        self.character_screen_pos(&self.characters[&char_animation.character_id]);
-                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
-                    let t = 1.0 - char_animation.remaining_duration_ratio();
-                    let max_r = 3.0 * self.cell_w;
-                    let expand = 0.7;
-                    let implode = 0.1;
-                    if t < expand {
-                        let r = max_r * (t / expand).powf(1.5);
-                        draw_circle_lines(pos.0, pos.1, r, 3.0, *color);
-                    } else {
-                        let r = (max_r - max_r * (t - expand) / (implode)).max(0.0);
-                        draw_circle_lines(pos.0, pos.1, r, 5.0, *color);
-                        draw_circle_lines(pos.0, pos.1, r * 1.2, 4.0, *color);
-                        draw_circle_lines(pos.0, pos.1, r * 1.4, 3.0, *color);
-                        draw_circle(pos.0, pos.1, r * 1.4, color.with_alpha(0.3));
-                    };
-                }
-                _ => {}
-            }
-        }
+        self.draw_character_animations();
 
         for character_id in opportunity_attackers_against_ranged_attack {
             self.draw_opportunity_attack_warning(character_id);
@@ -3506,6 +3443,109 @@ impl GameGrid {
         self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
         outcome
+    }
+
+    fn draw_character_animations(&self) {
+        // Static text effects on the same character should rise up and allow space for newer ones
+        // so we need to track how many there currently are per character
+        let mut static_text_counts: HashMap<CharacterId, u32> = Default::default();
+        for animation in &self.character_animations {
+            if animation.has_started() {
+                if let AnimationDetails::Text(TextGraphics { movement: None, .. }) = animation.kind
+                {
+                    *static_text_counts
+                        .entry(animation.character_id)
+                        .or_insert(0) += 1;
+                }
+            }
+        }
+
+        for animation in &self.character_animations {
+            if !animation.has_started() {
+                continue;
+            }
+            match &animation.kind {
+                AnimationDetails::SpeechBubble { text } => {
+                    self.draw_speech_bubble(text, animation.character_id, 0.0);
+                }
+                AnimationDetails::AttackCrosshairPreview { target_pos } => {
+                    self.draw_target_crosshair(
+                        self.characters[&animation.character_id].pos(),
+                        *target_pos,
+                        true,
+                        ENEMYS_TARGET_CROSSHAIR_COLOR,
+                        CROSSHAIR_ARROW_THICK,
+                        false,
+                    );
+                }
+                AnimationDetails::MagicSparks { particles, color } => {
+                    let pos = self.character_screen_pos(&self.characters[&animation.character_id]);
+                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let remaining_ratio = animation.remaining_duration_ratio();
+                    let num_particles = ((1.0 - remaining_ratio.max(0.5)) * 20.0) as usize;
+                    let mut particles = particles.borrow_mut();
+                    for i in particles.len()..=num_particles {
+                        particles.push((
+                            rand::random_range(-1.0..1.0),
+                            -0.25 * (i as f32) + rand::random_range(-0.35..0.35),
+                        ));
+                    }
+                    for (i, p) in particles.iter().enumerate() {
+                        let w = self.cell_w * 0.3;
+                        let h = self.cell_w * 0.3;
+                        let mut color = *color;
+                        color.a = 1.2 - 2.0 * (1.0 - remaining_ratio) + 0.02 * i as f32;
+                        draw_rectangle(
+                            pos.0 + p.0 * self.cell_w - w / 2.0,
+                            pos.1 + p.1 * self.cell_w - h / 2.0,
+                            w,
+                            h,
+                            color,
+                        );
+                    }
+                }
+                AnimationDetails::CastingSpell { color } => {
+                    let pos = self.character_screen_pos(&self.characters[&animation.character_id]);
+                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let t = 1.0 - animation.remaining_duration_ratio();
+                    let max_r = 3.0 * self.cell_w;
+                    let expand = 0.7;
+                    let implode = 0.1;
+                    if t < expand {
+                        let r = max_r * (t / expand).powf(1.5);
+                        draw_circle_lines(pos.0, pos.1, r, 3.0, *color);
+                    } else {
+                        let r = (max_r - max_r * (t - expand) / (implode)).max(0.0);
+                        draw_circle_lines(pos.0, pos.1, r, 5.0, *color);
+                        draw_circle_lines(pos.0, pos.1, r * 1.2, 4.0, *color);
+                        draw_circle_lines(pos.0, pos.1, r * 1.4, 3.0, *color);
+                        draw_circle(pos.0, pos.1, r * 1.4, color.with_alpha(0.3));
+                    };
+                }
+                AnimationDetails::Text(text_graphics) => {
+                    let mut pos =
+                        self.character_screen_pos(&self.characters[&animation.character_id]);
+
+                    // Let older static texts rise up and allow space for newer ones appearing from below
+                    if text_graphics.movement.is_none() {
+                        let remaining =
+                            static_text_counts.get_mut(&animation.character_id).unwrap();
+                        *remaining -= 1;
+                        let y_offset = 20.0 * (*remaining as f32);
+                        pos = (pos.0, pos.1 - y_offset);
+                    }
+
+                    draw_text_graphics(
+                        pos,
+                        text_graphics,
+                        self.cell_w,
+                        animation.duration,
+                        animation.remaining_duration,
+                    );
+                }
+                _ => {}
+            }
+        }
     }
 
     fn acquire_opportunity_attackers_against_ranged_attack(
@@ -4263,7 +4303,7 @@ impl GameGrid {
             }
         }
 
-        if let Some(preview) = self.target_effect_preview.get(&character.id()) {
+        if let Some(preview) = self.target_effect_previews.get(&character.id()) {
             let damage = preview.prediction.damage;
             if let Some(damage) = damage {
                 assert!(damage.min <= damage.max, "Invalid interval: {:?}", damage);
@@ -5176,17 +5216,18 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(TextGraphics),
+    //Text(TextGraphics),
     Texture(Texture2D),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct TextGraphics {
     status_texture: Option<StatusId>,
     text: String,
     font: Font,
     font_size: u16,
     color: Color,
+    start_offset: (f32, f32),
     movement: Option<(f32, f32)>,
     background: bool,
 }
@@ -5275,112 +5316,131 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(TextGraphics {
-                status_texture,
-                text,
-                font,
-                font_size,
-                color,
-                movement,
-                background,
-            }) => {
-                //let font_size = 20;
-                //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
-                let text_dimensions =
-                    measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
-
-                let quick_rise_duration = 0.15;
-                let grow_duration = 0.1;
-                let alive_age = effect.age - effect.start_time;
-                let font_scale = if alive_age < grow_duration {
-                    0.5 + 0.5 * alive_age / grow_duration
-                } else {
-                    1.0
-                };
-
-                let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
-
-                let slow_move_duration = 0.7;
-                let movement_factor = if t < slow_move_duration {
-                    (t / slow_move_duration).powf(0.3)
-                } else {
-                    1.0
-                };
-
-                if let Some(movement) = movement {
-                    x0 += movement_factor * movement.0;
-                }
-
-                let y_offset = if let Some(movement) = movement {
-                    movement_factor * movement.1
-                } else if t < quick_rise_duration {
-                    cell_w + (t / quick_rise_duration).sqrt() * cell_w
-                } else {
-                    cell_w * 2.0
-                };
-
-                let y0 = y - cell_w - y_offset;
-
-                let remaining = effect.end_time - effect.age;
-                let fade_duration = 0.3;
-                let alpha = if remaining < fade_duration {
-                    remaining / fade_duration
-                } else {
-                    1.0
-                };
-
-                let status_w = 20.0;
-                if let Some(texture) = status_texture {
-                    let status_x = x0 - status_w - 3.0;
-                    let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
-                    draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
-                    draw_status_icon(*texture, status_x, status_y, Some((status_w, status_w)));
-                    draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
-                }
-
-                if *background {
-                    let margin = 3.0;
-                    //dbg!(text);
-                    let text_dim =
-                        measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
-                    draw_rectangle(
-                        x0 - margin,
-                        y0 - text_dim.offset_y - margin,
-                        text_dim.width + margin * 2.0,
-                        text_dim.height + margin * 2.0,
-                        Color::new(0.0, 0.0, 0.0, alpha.min(0.7)),
-                    );
-                }
-
-                // First draw shadow
-                let mut text_params = TextParams {
-                    font: Some(font),
-                    font_size: *font_size,
-                    font_scale,
-                    color: Color::new(0.0, 0.0, 0.0, alpha),
-                    ..Default::default()
-                };
-                draw_text_with_font_tags(text, x0 + 2.0, y0 + 2.0, text_params.clone(), false);
-
-                // Then the regular text
-                text_params.color = *color;
-
-                let flash_duration = 0.3;
-                if alive_age < flash_duration {
-                    let flash_amount = (flash_duration - alive_age) / flash_duration;
-                    text_params.color.r += flash_amount;
-                    text_params.color.g += flash_amount;
-                    text_params.color.b += flash_amount;
-                }
-
-                text_params.color.a = alpha;
-                draw_text_with_font_tags(text, x0, y0, text_params, true);
-            }
             EffectGraphics::Texture(texture) => {
                 draw_texture(texture, x, y, WHITE);
             }
         }
     }
+}
+
+fn draw_text_graphics(
+    pos: (f32, f32),
+    text_graphics: &TextGraphics,
+    cell_w: f32,
+    duration: f32,
+    remaining_duration: f32,
+) {
+    if remaining_duration > duration {
+        // Shouldn't be shown yet
+        return;
+    }
+
+    let TextGraphics {
+        status_texture,
+        text,
+        font,
+        font_size,
+        color,
+        start_offset,
+        movement,
+        background,
+    } = text_graphics;
+
+    let x = pos.0 + start_offset.0;
+    let y = pos.1 + start_offset.1;
+
+    //let font_size = 20;
+    //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
+    let text_dimensions = measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
+
+    let quick_rise_duration = 0.15;
+    let grow_duration = 0.1;
+
+    let t = (1.0 - (remaining_duration / duration)).max(0.0);
+    let alive_age = (duration - remaining_duration).max(0.0);
+    let font_scale = if alive_age < grow_duration {
+        0.5 + 0.5 * alive_age / grow_duration
+    } else {
+        1.0
+    };
+
+    let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
+
+    let slow_move_duration = 0.7;
+    let movement_factor = if t < slow_move_duration {
+        (t / slow_move_duration).powf(0.3)
+    } else {
+        1.0
+    };
+
+    if let Some(movement) = movement {
+        x0 += movement_factor * movement.0;
+    }
+
+    let y_offset = if let Some(movement) = movement {
+        movement_factor * movement.1
+    } else if t < quick_rise_duration {
+        cell_w + (t / quick_rise_duration).sqrt() * cell_w
+    } else {
+        cell_w * 2.0
+    };
+
+    let y0 = y - cell_w - y_offset;
+
+    //let remaining = effect.end_time - effect.age;
+    let remaining = remaining_duration;
+    let fade_duration = 0.3;
+    let alpha = if remaining < fade_duration {
+        remaining / fade_duration
+    } else {
+        1.0
+    };
+
+    let status_w = 20.0;
+    if let Some(texture) = status_texture {
+        let status_x = x0 - status_w - 3.0;
+        let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
+        draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
+        draw_status_icon(*texture, status_x, status_y, Some((status_w, status_w)));
+        draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
+    }
+
+    if *background {
+        let margin = 3.0;
+        //dbg!(text);
+        let text_dim = measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
+        draw_rectangle(
+            x0 - margin,
+            y0 - text_dim.offset_y - margin,
+            text_dim.width + margin * 2.0,
+            text_dim.height + margin * 2.0,
+            Color::new(0.0, 0.0, 0.0, alpha.min(0.7)),
+        );
+    }
+
+    // First draw shadow
+    let mut text_params = TextParams {
+        font: Some(font),
+        font_size: *font_size,
+        font_scale,
+        color: Color::new(0.0, 0.0, 0.0, alpha),
+        ..Default::default()
+    };
+    draw_text_with_font_tags(text, x0 + 2.0, y0 + 2.0, text_params.clone(), false);
+
+    // Then the regular text
+    text_params.color = *color;
+
+    let flash_duration = 0.3;
+    if alive_age < flash_duration {
+        let flash_amount = (flash_duration - alive_age) / flash_duration;
+        text_params.color.r += flash_amount;
+        text_params.color.g += flash_amount;
+        text_params.color.b += flash_amount;
+    }
+
+    text_params.color.a = alpha;
+    draw_text_with_font_tags(text, x0, y0, text_params, true);
 }
 
 #[derive(PartialEq, Debug)]

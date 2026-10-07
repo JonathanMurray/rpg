@@ -385,6 +385,39 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        14,
+        14
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        17,
+        14
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        17,
+        11
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

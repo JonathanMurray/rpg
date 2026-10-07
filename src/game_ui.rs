@@ -1611,8 +1611,7 @@ impl UserInterface {
                 self.log.add(line);
             }
             GameEvent::CharacterReactedToAttacked { reactor } => {
-                let reactor_pos = self.characters.get(reactor).pos();
-                self.animate_reaction(reactor_pos);
+                self.animate_reaction(reactor);
             }
             GameEvent::CharacterReactedWithOpportunityAttack { reactor } => {
                 let reactor = self.characters.get(reactor);
@@ -1621,7 +1620,7 @@ impl UserInterface {
                     "|{}| made an opportunity attack:",
                     reactor.name_tag()
                 ));
-                self.animate_reaction(reactor.pos());
+                self.animate_reaction(reactor.id());
             }
             GameEvent::CharacterReactedToHit {
                 main_line,
@@ -1635,7 +1634,7 @@ impl UserInterface {
 
                 if let Some(condition) = outcome.received_condition {
                     self.game_grid.add_text_effect(
-                        reactor_pos,
+                        reactor,
                         0.0,
                         TextEffect::ReceiveCondition(condition),
                     );
@@ -1645,13 +1644,16 @@ impl UserInterface {
                 if let Some(offensive) = outcome.offensive {
                     if let Some((condition, _duration)) = offensive.inflicted_condition {
                         self.game_grid.add_text_effect(
-                            attacker_pos,
+                            self.active_character_id,
                             0.0,
                             TextEffect::ReceiveCondition(condition),
                         );
                     } else {
-                        self.game_grid
-                            .add_text_effect(attacker_pos, 0.0, TextEffect::Miss);
+                        self.game_grid.add_text_effect(
+                            self.active_character_id,
+                            0.0,
+                            TextEffect::Miss,
+                        );
                     }
                 }
                 self.animation_stopwatch.set_to_at_least(0.5);
@@ -1714,7 +1716,7 @@ impl UserInterface {
                     &detail_lines,
                 );
                 if let Some(applied) = effect {
-                    self.show_applied_effect(applied, actor.pos(), 0.0);
+                    self.show_applied_effect(applied, actor.id(), 0.0);
                 }
             }
             GameEvent::CharactersDying { characters } => {
@@ -1761,7 +1763,7 @@ impl UserInterface {
                 for char in self.characters.iter() {
                     if char.player_controlled() {
                         self.game_grid.add_text_effect(
-                            char.pos(),
+                            char.id(),
                             0.0,
                             TextEffect::Effect {
                                 text: "Treasure".to_string(),
@@ -1812,9 +1814,8 @@ impl UserInterface {
             }
             GameEvent::CharacterReceivedKnockback { character } => {}
             GameEvent::CharacterGainedAP { character, amount } => {
-                let char = self.characters.get(character);
                 self.game_grid.add_text_effect(
-                    char.pos(),
+                    character,
                     0.0,
                     TextEffect::ApplyEffect(ApplyEffect::GainActionPoints(amount)),
                 );
@@ -1840,7 +1841,7 @@ impl UserInterface {
 
                 self.game_grid.animate_magic_sparks(character, WHITE);
                 self.game_grid
-                    .add_text_effect(char.pos(), 0.0, TextEffect::Heal(amount));
+                    .add_text_effect(character, 0.0, TextEffect::Heal(amount));
             }
             GameEvent::MovementWasInitiated {
                 character,
@@ -1928,7 +1929,7 @@ impl UserInterface {
                 self.sound_player.play_delayed(character.damage_sound, 0.03);
 
                 self.game_grid.add_text_effect(
-                    character.pos(),
+                    character.id(),
                     0.0,
                     TextEffect::HitDamage(amount, HitType::Regular),
                 );
@@ -1947,8 +1948,6 @@ impl UserInterface {
                 character,
                 condition,
             } => {
-                let character = self.characters.get(character);
-
                 match condition {
                     Condition::Ferocity => {
                         self.sound_player.play(SoundId::Execute);
@@ -1960,7 +1959,7 @@ impl UserInterface {
                 }
 
                 self.game_grid.add_text_effect(
-                    character.pos(),
+                    character,
                     0.0,
                     TextEffect::ReceiveCondition(condition),
                 );
@@ -1972,10 +1971,8 @@ impl UserInterface {
                 character,
                 condition,
             } => {
-                let character = self.characters.get(character);
-
                 self.game_grid.add_text_effect(
-                    character.pos(),
+                    character,
                     0.0,
                     TextEffect::LoseCondition(condition),
                 );
@@ -2013,9 +2010,9 @@ impl UserInterface {
         }
     }
 
-    fn animate_reaction(&mut self, reactor_pos: Position) {
+    fn animate_reaction(&mut self, reactor: CharacterId) {
         self.game_grid
-            .add_text_effect(reactor_pos, 0.0, TextEffect::ReactionExclamation);
+            .add_text_effect(reactor, 0.0, TextEffect::ReactionExclamation);
         self.sound_player.play(SoundId::React);
         self.animation_stopwatch.set_to_at_least(0.5);
     }
@@ -2322,7 +2319,7 @@ impl UserInterface {
         self.log.add_with_details(line, detail_lines);
 
         self.game_grid.add_text_effect(
-            target_pos,
+            target,
             start_time,
             TextEffect::HitDamage(event.outcome.damage, event.outcome.hit_type),
         );
@@ -2330,7 +2327,7 @@ impl UserInterface {
         if !applied_to_target.is_empty() {
             let mut delay = 0.0;
             for apply_effect in applied_to_target {
-                if self.show_applied_effect(*apply_effect, target_pos, start_time + delay) {
+                if self.show_applied_effect(*apply_effect, target, start_time + delay) {
                     delay += 0.3;
                 }
             }
@@ -2338,7 +2335,7 @@ impl UserInterface {
         if !applied_to_self.is_empty() {
             let mut delay = 0.3;
             for apply_effect in applied_to_self {
-                if self.show_applied_effect(*apply_effect, attacker_pos, start_time + delay) {
+                if self.show_applied_effect(*apply_effect, attacker, start_time + delay) {
                     delay += 0.3;
                 }
             }
@@ -2378,7 +2375,7 @@ impl UserInterface {
         target_pos: (i32, i32),
     ) {
         //let mut effects = vec![];
-        let mut effects2 = vec![];
+        let mut effects = vec![];
 
         match &outcome {
             AbilityTargetOutcome::HitEnemy {
@@ -2391,7 +2388,7 @@ impl UserInterface {
                 self.game_grid.animate_magic_sparks(target, RED);
 
                 if let Some(dmg) = damage {
-                    effects2.push(TextEffect::HitDamage(*dmg, *hit_type));
+                    effects.push(TextEffect::HitDamage(*dmg, *hit_type));
                     if hit_type == &HitType::Miss {
                         //effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
                     } else {
@@ -2402,24 +2399,23 @@ impl UserInterface {
                         );
                     }
                 } else if applied_effects.is_empty() {
-                    println!("warn: target outcome had neither damage nor applied effect - is that expected?");
+                    effects.push(TextEffect::Miss);
                 }
 
                 if !applied_effects.is_empty() {
                     let mut delay = 0.0;
                     for apply_effect in applied_effects {
-                        if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                        if self.show_applied_effect(*apply_effect, target, delay) {
                             delay += 0.3;
                         }
                     }
                 };
             }
             AbilityTargetOutcome::AffectedAlly { applied_effects } => {
-                dbg!(applied_effects);
                 self.game_grid.animate_magic_sparks(target, WHITE);
                 let mut delay = 0.0;
                 for apply_effect in applied_effects {
-                    if self.show_applied_effect(*apply_effect, target_pos, delay) {
+                    if self.show_applied_effect(*apply_effect, target, delay) {
                         delay += 0.3;
                     }
                 }
@@ -2430,9 +2426,9 @@ impl UserInterface {
         };
 
         let mut effect_start_time = start_time;
-        for effect in effects2 {
+        for effect in effects {
             self.game_grid
-                .add_text_effect(target_pos, effect_start_time, effect);
+                .add_text_effect(target, effect_start_time, effect);
             effect_start_time += 0.35;
         }
     }
@@ -2440,11 +2436,14 @@ impl UserInterface {
     fn show_applied_effect(
         &mut self,
         applied_effect: ApplyEffect,
-        pos: Position,
+        character_id: CharacterId,
         start_time: f32,
     ) -> bool {
-        self.game_grid
-            .add_text_effect(pos, start_time, TextEffect::ApplyEffect(applied_effect))
+        self.game_grid.add_text_effect(
+            character_id,
+            start_time,
+            TextEffect::ApplyEffect(applied_effect),
+        )
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {
