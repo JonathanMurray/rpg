@@ -343,9 +343,9 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Clara",
       "pos": [
-        21,
+        13,
         33
       ],
       "health": null,

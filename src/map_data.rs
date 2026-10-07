@@ -140,6 +140,10 @@ impl MapData {
         }
         map_data.terrain_objects.retain(|_pos, t| !t.is_new_water());
 
+        for ch in &mut map_data.characters {
+            ch.pos = (ch.pos.0, ch.pos.1);
+        }
+
         Self {
             grid_dimensions: map_data.grid_dimensions,
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),

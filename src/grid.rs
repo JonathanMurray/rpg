@@ -210,7 +210,7 @@ enum AnimationDetails {
 #[derive(Debug, Copy, Clone)]
 pub enum RangeIndicatorType {
     ActionTargetRange,
-    TargetAreaEffect,
+    TargetAreaEffect(bool),
     CanReachButDisadvantage,
     CannotReach,
     ObstructedLineOfSight,
@@ -2119,10 +2119,12 @@ impl GameGrid {
         let range_indicator =
             self.determine_range_indicator(ui_state, hovered_action, mouse_grid_pos);
 
+        let mut should_highlight_character_occupations = false;
         if let Some((char_id, BaseAction::Move)) = hovered_action {
             self.draw_movement_path_background(char_id);
         } else if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = ui_state {
             self.draw_movement_path_background(self.active_character_id);
+            should_highlight_character_occupations = true;
         }
 
         let mut pushed_targets = vec![];
@@ -2173,7 +2175,7 @@ impl GameGrid {
             }
 
             if let Some(base_push_amount) = ability_knockback {
-                self.draw_occupation(OccupationFilter::Any);
+                self.draw_occupation(OccupationFilter::Terrain);
 
                 if let ActionTarget::Character(target_id, _movement) = target {
                     let target = &self.characters[target_id];
@@ -2213,7 +2215,6 @@ impl GameGrid {
             self.ability_character_animation = None;
         }
 
-        let mut should_highlight_character_occupations = false;
         let mouse_state = match ui_state {
             UiState::ChoosingAction => MouseState::None,
 
@@ -2357,23 +2358,12 @@ impl GameGrid {
             should_highlight_character_occupations = true;
         }
 
+        // First draw character background layer
         for character in self.characters.values() {
-            if character.id() == self.active_character_id {
-                self.draw_character_highlight(
-                    character.id(),
-                    ACTIVE_CHARACTER_COLOR,
-                    Some(WHITE),
-                    3.0,
-                );
-            } else if should_highlight_character_occupations {
-                self.draw_character_highlight(
-                    character.id(),
-                    CELL_OCCUPIED_COLOR,
-                    None, //BORDER_OCCUPIED_COLOR,
-                    self.cell_w * 0.2,
-                );
+            if character.id() == self.active_character_id || should_highlight_character_occupations
+            {
+                self.draw_character_highlight(character);
             }
-
             if self.target_effect_preview.contains_key(&character.id()) {
                 self.draw_circular_character_highlight(
                     character.id(),
@@ -2381,9 +2371,11 @@ impl GameGrid {
                     self.cell_w * 0.25,
                 );
             }
+        }
 
+        // Then draw character foreground layer
+        for character in self.characters.values() {
             self.draw_character(character);
-
             if is_key_down(KeyCode::LeftAlt) {
                 detail_labelled_char_ids.insert(character.id());
             }
@@ -2453,28 +2445,30 @@ impl GameGrid {
                     self.draw_range_indicator(
                         self.characters[&target_id].pos(),
                         aoe_radius,
-                        RangeIndicatorType::TargetAreaEffect,
+                        RangeIndicatorType::TargetAreaEffect(true),
                     );
                 } else if is_mouse_within_grid && receptive_to_input {
                     if let Some(hovered_id) = self.hovered_character {
                         self.draw_range_indicator(
                             self.characters[&hovered_id].pos(),
                             aoe_radius,
-                            RangeIndicatorType::TargetAreaEffect,
+                            RangeIndicatorType::TargetAreaEffect(false),
                         );
                     } else {
                         self.draw_range_indicator(
                             mouse_grid_pos,
                             aoe_radius,
-                            RangeIndicatorType::TargetAreaEffect,
+                            RangeIndicatorType::TargetAreaEffect(false),
                         );
                     }
                 }
             }
 
             MouseState::RequiresPositionTarget { shape, range } => {
+                let mut has_valid_target = false;
                 let point = if let ActionTarget::Position(pos) = ui_state.players_action_target() {
                     //println!("players_action_target = {:?}", pos);
+                    has_valid_target = true;
                     Some(pos)
                 } else if is_mouse_within_grid && receptive_to_input {
                     Some(mouse_grid_pos)
@@ -2487,7 +2481,7 @@ impl GameGrid {
                             self.draw_range_indicator(
                                 center,
                                 radius,
-                                RangeIndicatorType::TargetAreaEffect,
+                                RangeIndicatorType::TargetAreaEffect(has_valid_target),
                             );
                         }
                     }
@@ -2498,6 +2492,7 @@ impl GameGrid {
                                 &self.characters[&self.active_character_id],
                                 to,
                                 false,
+                                has_valid_target,
                             );
                             snapped_position_target = Some(end);
                         }
@@ -2509,6 +2504,7 @@ impl GameGrid {
                                 &self.characters[&self.active_character_id],
                                 to,
                                 true,
+                                has_valid_target,
                             );
                             snapped_position_target = Some(end);
                             if self
@@ -3465,6 +3461,7 @@ impl GameGrid {
         actor: &Character,
         mut to: Position,
         dash: bool,
+        locked_target: bool,
     ) -> Position {
         let from = actor.pos();
 
@@ -3487,17 +3484,15 @@ impl GameGrid {
             matches!(occupation, Some(Occupation::Terrain(TerrainType::Tall)))
         };
 
-        dbg!(from, to);
-
         line_visitor(from, to, |x, y| {
-            dbg!((x, y));
             let obstructed = obstructs(self.pathfind_grid.occupied().get(&(x, y)));
 
             let color = if obstructed {
                 Color::new(1.0, 0.4, 0.4, 0.55)
-            } else {
-                //Color::new(1.0, 1.0, 1.0, 0.15)
+            } else if locked_target {
                 Color::new(1.0, 1.0, 1.0, 0.4)
+            } else {
+                Color::new(1.0, 1.0, 1.0, 0.15)
             };
             self.fill_cell((x, y), color, 0.0);
             if obstructed {
@@ -3508,7 +3503,6 @@ impl GameGrid {
                 false
             }
         });
-        println!("---------------------");
 
         end
     }
@@ -4260,14 +4254,28 @@ impl GameGrid {
         }
     }
 
-    fn draw_character_highlight(
-        &self,
-        character_id: CharacterId,
-        bg_color: Color,
-        border_color: Option<Color>,
-        margin: f32,
-    ) {
-        let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
+    fn draw_character_highlight(&self, character: &Character) {
+        let (x, y) = self.character_screen_pos(character);
+        let is_active_char = self.active_character_id == character.id();
+        let bg_color;
+        let border_color;
+        let margin;
+
+        if is_active_char {
+            bg_color = ACTIVE_CHARACTER_COLOR;
+            border_color = WHITE;
+            margin = 3.0;
+        } else {
+            if character.player_controlled() {
+                bg_color = COL_GREEN_0.with_alpha(0.2);
+                border_color = COL_GREEN_2.with_alpha(0.8);
+            } else {
+                bg_color = CELL_OCCUPIED_COLOR;
+                border_color = BORDER_OCCUPIED_COLOR;
+            }
+            margin = self.cell_w * 0.1;
+        }
+
         let rect = (
             x - self.cell_w + margin,
             y - self.cell_w + margin,
@@ -4275,9 +4283,37 @@ impl GameGrid {
             self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
         );
         draw_rectangle(rect.0, rect.1, rect.2, rect.3, bg_color);
-        if let Some(c) = border_color {
-            draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, c);
+
+        // Draw diagonals
+        if !is_active_char {
+            let margin = margin + 1.0;
+            let x0 = x - self.cell_w + margin;
+            let y0 = y - self.cell_w + margin;
+            let n = 4;
+            let w = (self.cell_w * CELLS_PER_ENTITY as f32) - margin * 2.0;
+            let draw_diagonal = |from: (i32, i32), to: (i32, i32)| {
+                draw_line(
+                    (x0 + w * (from.0 as f32 / n as f32)).round(),
+                    (y0 + w * (from.1 as f32 / n as f32)).round(),
+                    (x0 + w * (to.0 as f32 / n as f32)).round(),
+                    (y0 + w * (to.1 as f32 / n as f32)).round(),
+                    3.0,
+                    Color::new(1.0, 1.0, 1.0, 0.3),
+                );
+            };
+            for i in 0..n {
+                let from = (i, 0);
+                let to = (0, i);
+                draw_diagonal(from, to);
+            }
+            for i in 0..n {
+                let from = (n, i);
+                let to = (i, n);
+                draw_diagonal(from, to);
+            }
         }
+
+        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, border_color);
     }
 
     fn draw_circular_character_highlight(
@@ -4596,7 +4632,6 @@ impl GameGrid {
             character.remaining_movement.get(),
             extended_range,
         );
-        self.draw_occupation(OccupationFilter::CharactersExcept(character_id));
     }
 
     fn draw_occupation(&self, filter: OccupationFilter) {
@@ -4610,6 +4645,7 @@ impl GameGrid {
                     matches!(occupation, Some(Occupation::Character(other_id)) if ch_id != other_id)
                 }
                 OccupationFilter::Any => occupation.is_some(),
+                OccupationFilter::Terrain => matches!(occupation, Some(Occupation::Terrain(..))),
             }
         };
 
@@ -4816,7 +4852,7 @@ impl GameGrid {
         let draw_background = matches!(indicator, RangeIndicatorType::ActionTargetRange);
         let color = match indicator {
             RangeIndicatorType::ActionTargetRange => LIGHTGRAY,
-            RangeIndicatorType::TargetAreaEffect => ORANGE,
+            RangeIndicatorType::TargetAreaEffect(..) => ORANGE,
             RangeIndicatorType::CanReachButDisadvantage => RANGE_INDICATOR_SEMI_BAD_COLOR,
             RangeIndicatorType::CannotReach => RANGE_INDICATOR_BAD_COLOR,
             RangeIndicatorType::ObstructedLineOfSight => RANGE_INDICATOR_BAD_COLOR,
@@ -4834,6 +4870,8 @@ impl GameGrid {
                     if draw_background {
                         self.fill_cell((x, y), ACTION_RANGE_INDICATOR_BACKGROUND, 0.0);
                         thickness = 1.0;
+                    } else if matches!(indicator, RangeIndicatorType::TargetAreaEffect(true)) {
+                        thickness = 3.0;
                     }
 
                     self.draw_borders(
@@ -4920,6 +4958,7 @@ struct MovementPathNode {
 enum OccupationFilter {
     TallTerrain,
     Any,
+    Terrain,
     CharactersExcept(CharacterId),
 }
 

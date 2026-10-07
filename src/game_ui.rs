@@ -1960,7 +1960,10 @@ impl UserInterface {
                     self.game_grid.animate_pow_effect(character.id(), 0.2);
                 }
                 self.animate_character_damage(character.id(), amount);
-                //self.animation_stopwatch.set_to_at_least(0.15);
+
+                if source == DamageSource::KnockbackCollision {
+                    self.animation_stopwatch.set_to_at_least(0.15);
+                }
             }
             GameEvent::CharacterReceivedCondition {
                 character,
