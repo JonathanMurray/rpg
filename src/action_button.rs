@@ -479,7 +479,7 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
 
 pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     match effect {
-        ApplyEffect::RemoveActionPoints(n) => t
+        ApplyEffect::LoseActionPoints(n) => t
             .technical_description
             .push(format!("  Lose |<value>{}| AP", n)),
         ApplyEffect::GainActionPoints(n) => t
@@ -511,16 +511,8 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
                 apply_condition.stacks,
             ));
         }
-        ApplyEffect::PerBleeding {
-            damage,
-            caster_healing_percentage,
-        } => {
-            t.technical_description.push(format!(
-                "  {} damage per stack of Bleeding. Caster heals for {}% of the damage dealt.",
-                damage, caster_healing_percentage
-            ));
-        }
-        ApplyEffect::ConsumeCondition { condition } => {
+
+        ApplyEffect::LoseCondition { condition } => {
             let line = format!("  Removes |<keyword>{}|", condition.name());
 
             t.technical_description.push(line);

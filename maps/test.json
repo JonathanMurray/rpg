@@ -299,17 +299,6 @@
   },
   "characters": [
     {
-      "type_": "Bob",
-      "pos": [
-        18,
-        33
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Ogre",
       "pos": [
         11,
@@ -345,8 +334,52 @@
     {
       "type_": "Clara",
       "pos": [
-        13,
-        33
+        12,
+        27
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        12,
+        23
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        11,
+        12
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        11,
+        9
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        11,
+        6
       ],
       "health": null,
       "main_hand": null,

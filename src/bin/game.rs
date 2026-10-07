@@ -25,9 +25,10 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, ARCANE_BOW, BARBED_ARROWS, CRIPPLING_SHOT, ENERGY_POTION, EXPLODING_ARROWS,
-    FIREBALL_MASSIVE, HEAL, HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS,
-    LEATHER_ARMOR, PIERCING_SHOT, SPIKETEST, SPIKE_TRAP, SWEEP_ATTACK,
+    PassiveSkill, ARCANE_BOW, BARBED_ARROWS, CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION,
+    EXPLODING_ARROWS, FIREBALL_MASSIVE, HEAL, HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE,
+    INSPIRE_RUTHLESS, LEATHER_ARMOR, NECROTIC_BAND, PIERCING_SHOT, SPIKETEST, SPIKE_TRAP,
+    SWEEP_ATTACK,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -196,7 +197,13 @@ async fn run_demo(
                 vec![
                     (
                         PlayerId::Bob,
-                        CharacterGrowth::of(vec![], vec![EquipmentEntry::Weapon(HUNGERING_BLADE)]),
+                        CharacterGrowth::of(
+                            vec![],
+                            vec![
+                                EquipmentEntry::Weapon(HUNGERING_BLADE),
+                                EquipmentEntry::Trinket(NECROTIC_BAND),
+                            ],
+                        ),
                     ),
                     (
                         PlayerId::Alice,

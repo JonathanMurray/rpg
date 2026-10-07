@@ -169,7 +169,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
                 apply_condition.condition,
                 apply_condition.stacks,
             )),
-            ApplyEffect::ConsumeCondition { condition } => {
+            ApplyEffect::LoseCondition { condition } => {
                 t.keywords.push(Keyword::Cond(condition, None))
             }
             _ => {}

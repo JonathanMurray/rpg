@@ -884,7 +884,7 @@ pub const OVERWHELMING: AttackEnhancement = AttackEnhancement {
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             Some(DefenseType::Toughness),
-            ApplyEffect::RemoveActionPoints(2),
+            ApplyEffect::LoseActionPoints(2),
         )),
         ..AttackEnhancementEffect::default()
     },
@@ -1093,7 +1093,7 @@ pub const LUNGE_ATTACK_HEAVY_IMPACT: AbilityEnhancement = AbilityEnhancement {
     attack_effect: Some(AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             Some(DefenseType::Toughness),
-            ApplyEffect::RemoveActionPoints(1),
+            ApplyEffect::LoseActionPoints(1),
         )),
         ..AttackEnhancementEffect::default()
     }),
@@ -1435,7 +1435,7 @@ pub const MIND_BLAST: Ability = Ability {
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Will),
             damage: Some(AbilityDamage::Fixed(4, DamageType::Regular)),
-            on_hit: Some([Some(ApplyEffect::RemoveActionPoints(1)), None]),
+            on_hit: Some([Some(ApplyEffect::LoseActionPoints(1)), None]),
         }),
         impact_circle: None,
         environment_effect: None,
@@ -1732,7 +1732,7 @@ pub static HULDRA_HEAL: Ability = Ability {
 pub const HEAL_ENERGIZE: AbilityEnhancement = AbilityEnhancement {
     ability_id: AbilityId::Heal,
     name: "Energize",
-    description: "",
+    description: "Also restore |<value>4| |<stamina>| stamina",
     icon: IconId::Energize,
     mana_cost: 1,
     spell_effect: Some(SpellEnhancementEffect {
@@ -1759,10 +1759,10 @@ pub const HEAL: Ability = Ability {
         effect: AbilityPositiveEffect {
             healing: 5,
             apply: Some([
-                Some(ApplyEffect::ConsumeCondition {
+                Some(ApplyEffect::LoseCondition {
                     condition: Condition::Bleeding,
                 }),
-                Some(ApplyEffect::ConsumeCondition {
+                Some(ApplyEffect::LoseCondition {
                     condition: Condition::Poisoned,
                 }),
             ]),

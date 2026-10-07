@@ -185,6 +185,7 @@ impl CoreGame {
                             if ap > 0 {
                                 self.ui_handle_event(GameEvent::CharacterGainedAP {
                                     character: character.id(),
+                                    amount: ap,
                                 })
                                 .await;
                             }
@@ -1130,9 +1131,9 @@ impl CoreGame {
         let mut damage_dealt = 0;
         let mut actual_effect = None;
         let line = match effect {
-            ApplyEffect::RemoveActionPoints(n) => {
+            ApplyEffect::LoseActionPoints(n) => {
                 let lost = receiver.action_points.lose(n);
-                actual_effect = Some(ApplyEffect::RemoveActionPoints(lost));
+                actual_effect = Some(ApplyEffect::LoseActionPoints(lost));
                 format!("  |{}| lost {} AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainActionPoints(n) => {
@@ -1165,29 +1166,8 @@ impl CoreGame {
                 actual_effect = Some(e);
                 self.apply_condition_on_character(apply_condition, receiver)
             }
-            e @ ApplyEffect::PerBleeding {
-                damage,
-                caster_healing_percentage,
-            } => {
-                actual_effect = Some(e);
-                let stacks = receiver
-                    .conditions
-                    .borrow()
-                    .get(&Condition::Bleeding)
-                    .map(|state| state.stacks.unwrap())
-                    .unwrap_or(0);
-                damage_dealt = self.character_lose_health(receiver, damage * stacks);
-                let healing_amount = damage_dealt * caster_healing_percentage / 100;
-                self.character_gain_health(giver.unwrap(), healing_amount);
-                format!(
-                    "  |{}| lost {} health. |{}| was healed for {}",
-                    receiver.name_tag(),
-                    damage_dealt,
-                    giver.unwrap().name_tag(),
-                    healing_amount
-                )
-            }
-            e @ ApplyEffect::ConsumeCondition { condition } => {
+
+            e @ ApplyEffect::LoseCondition { condition } => {
                 let prev_stacks = receiver.get_condition_stacks(condition);
                 let did_clear = receiver.clear_condition(condition);
                 let mut line = "".to_string();
@@ -1899,7 +1879,7 @@ impl CoreGame {
 
             for mut effect in effects {
                 match effect {
-                    ApplyEffect::RemoveActionPoints(ref mut n) => *n += degree_of_success,
+                    ApplyEffect::LoseActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainActionPoints(ref mut n) => *n += degree_of_success,
                     ApplyEffect::LoseHealth(ref mut n) => *n += degree_of_success,
                     ApplyEffect::GainHealth(ref mut n) => *n += degree_of_success,
@@ -1912,8 +1892,7 @@ impl CoreGame {
                         }
                          */
                     }
-                    ApplyEffect::PerBleeding { .. } => {}
-                    ApplyEffect::ConsumeCondition { .. } => {}
+                    ApplyEffect::LoseCondition { .. } => {}
                     ApplyEffect::Pushed { .. } => {}
                     ApplyEffect::Escape => {}
                 }
@@ -3334,7 +3313,7 @@ fn modify_effect_by_hit_type(
     reduced_to_nothing: &mut bool,
 ) {
     match effect {
-        ApplyEffect::RemoveActionPoints(ref mut n) => {
+        ApplyEffect::LoseActionPoints(ref mut n) => {
             modify_stacks_by_hit_type(n, hit_type, reduced_to_nothing);
         }
         ApplyEffect::GainActionPoints(ref mut n) => {
@@ -3360,8 +3339,7 @@ fn modify_effect_by_hit_type(
                 modify_stacks_by_hit_type(rounds, hit_type, reduced_to_nothing);
             }
         }
-        ApplyEffect::PerBleeding { .. } => {}
-        ApplyEffect::ConsumeCondition { .. } => {}
+        ApplyEffect::LoseCondition { .. } => {}
         ApplyEffect::Pushed(amount) => {
             if hit_type == HitType::Miss {
                 *amount = 0;
@@ -3993,6 +3971,7 @@ pub enum GameEvent {
     },
     CharacterGainedAP {
         character: CharacterId,
+        amount: u32,
     },
     CharacterLostAP {
         character: CharacterId,
@@ -4341,30 +4320,22 @@ pub fn is_valid_area_target(
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
 pub enum ApplyEffect {
-    RemoveActionPoints(u32),
+    LoseActionPoints(u32),
     GainActionPoints(u32),
-    Condition(ApplyCondition),
-
     LoseHealth(u32),
     GainHealth(u32),
     GainStamina(u32),
     GainMana(u32),
-    PerBleeding {
-        damage: u32,
-        caster_healing_percentage: u32,
-    },
-    ConsumeCondition {
-        condition: Condition,
-    },
+    Condition(ApplyCondition),
+    LoseCondition { condition: Condition },
     Pushed(u32),
-
     Escape,
 }
 
 impl ApplyEffect {
     fn multiply(&mut self, factor: u32) {
         match self {
-            ApplyEffect::RemoveActionPoints(n) => *n *= factor,
+            ApplyEffect::LoseActionPoints(n) => *n *= factor,
             ApplyEffect::GainActionPoints(n) => *n *= factor,
             ApplyEffect::Condition(apply_condition) => {
                 if let Some(rounds) = &mut apply_condition.duration_rounds {
@@ -4378,11 +4349,7 @@ impl ApplyEffect {
             ApplyEffect::GainHealth(n) => *n *= factor,
             ApplyEffect::GainStamina(n) => *n *= factor,
             ApplyEffect::GainMana(n) => *n *= factor,
-            ApplyEffect::PerBleeding {
-                damage,
-                caster_healing_percentage,
-            } => todo!(),
-            ApplyEffect::ConsumeCondition { condition } => todo!(),
+            ApplyEffect::LoseCondition { condition } => todo!(),
             ApplyEffect::Pushed(n) => *n *= factor,
             ApplyEffect::Escape => {}
         }
@@ -4392,7 +4359,7 @@ impl ApplyEffect {
 impl Display for ApplyEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApplyEffect::RemoveActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
+            ApplyEffect::LoseActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
             ApplyEffect::GainActionPoints(n) => f.write_fmt(format_args!("+{n} AP")),
             ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
             ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
@@ -4401,12 +4368,7 @@ impl Display for ApplyEffect {
             ApplyEffect::Condition(apply_condition) => {
                 f.write_fmt(format_args!("{}", apply_condition.condition.name()))
             }
-            ApplyEffect::PerBleeding { damage, .. } => {
-                f.write_fmt(format_args!("{} damage per Bleeding", damage))?;
-
-                Ok(())
-            }
-            ApplyEffect::ConsumeCondition { condition } => {
+            ApplyEffect::LoseCondition { condition } => {
                 f.write_fmt(format_args!("|<strikethrough>{}|", condition.name()))
             }
             ApplyEffect::Pushed(distance) => f.write_fmt(format_args!("{distance}")),

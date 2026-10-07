@@ -45,9 +45,9 @@ use crate::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
         within_range_squared, Ability, AbilityAnimation, AbilityId, AbilityReach, AbilityTarget,
-        ActionReach, ActionTarget, ApplyEffect, AreaEffect, AreaShape, AreaTargetAcquisition,
-        AttackAction, AttackEnhancement, BaseAction, Character, Goodness, MovementType, Position,
-        TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        ActionReach, ActionTarget, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
+        AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction, Character, Condition,
+        Goodness, HitType, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -223,16 +223,31 @@ const ZOOM_LEVELS: [f32; 3] = [
 ];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
-pub enum TextEffectStyle {
-    FriendlyEffect,
-    FriendlyHeal,
+enum TextEffectStyle {
+    PositiveEffect,
+    Heal,
     Miss,
     ReactionExclamation,
-    HostileEffect,
-    HostileGraze,
-    HostileHit,
-    HostileCrit,
+    NegativeEffect,
+    WeakHit,
+    RegularHit,
+    StrongHit,
     CriticalHitLabel,
+}
+
+pub enum TextEffect {
+    ApplyEffect(ApplyEffect),
+    ReceiveCondition(Condition),
+    LoseCondition(Condition),
+    Effect {
+        text: String,
+        icon: Option<StatusId>,
+        positive: bool,
+    },
+    Heal(u32),
+    Miss,
+    ReactionExclamation,
+    HitDamage(u32, HitType),
 }
 
 struct ParticleGroup {
@@ -1250,6 +1265,139 @@ impl GameGrid {
         &mut self,
         position: Position,
         start_time: f32,
+        text_effect: TextEffect,
+    ) -> bool {
+        match text_effect {
+            TextEffect::ApplyEffect(applied_effect) => {
+                let mut s = String::new();
+                let mut texture = None;
+                if let ApplyEffect::Condition(condition) = applied_effect {
+                    texture = Some(condition.condition.status_icon());
+                }
+                s.push_str(&format!("{} ", applied_effect));
+                let style = match applied_effect {
+                    ApplyEffect::Pushed(_) => return false,
+                    ApplyEffect::LoseActionPoints(_) => TextEffectStyle::NegativeEffect,
+                    ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
+                    ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
+                        if condition.is_positive() {
+                            TextEffectStyle::PositiveEffect
+                        } else {
+                            TextEffectStyle::NegativeEffect
+                        }
+                    }
+                    ApplyEffect::LoseHealth(_) => TextEffectStyle::RegularHit,
+                    ApplyEffect::GainHealth(_) => TextEffectStyle::Heal,
+                    ApplyEffect::GainStamina(_) => TextEffectStyle::PositiveEffect,
+                    ApplyEffect::GainMana(_) => TextEffectStyle::PositiveEffect,
+                    ApplyEffect::LoseCondition { .. } => TextEffectStyle::PositiveEffect,
+                    // The character is shown physically being pushed, instead
+                    ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
+                };
+
+                self._add_text_effect(position, start_time, 2.0, texture, s.trim(), style);
+            }
+            TextEffect::Effect {
+                text,
+                icon,
+                positive,
+            } => {
+                let style = if positive {
+                    TextEffectStyle::PositiveEffect
+                } else {
+                    TextEffectStyle::NegativeEffect
+                };
+                self._add_text_effect(position, start_time, 2.0, icon, text, style);
+            }
+            TextEffect::ReceiveCondition(condition) => {
+                let style = if condition.is_positive() {
+                    TextEffectStyle::PositiveEffect
+                } else {
+                    TextEffectStyle::NegativeEffect
+                };
+                self._add_text_effect(
+                    position,
+                    start_time,
+                    2.0,
+                    Some(condition.status_icon()),
+                    condition.name().to_string(),
+                    style,
+                );
+            }
+            TextEffect::LoseCondition(condition) => {
+                self._add_text_effect(
+                    position,
+                    0.0,
+                    2.0,
+                    Some(condition.status_icon()),
+                    format!("|<strikethrough>{}|", condition.name()),
+                    TextEffectStyle::NegativeEffect,
+                );
+            }
+            TextEffect::Heal(amount) => {
+                self._add_text_effect(
+                    position,
+                    start_time,
+                    2.0,
+                    None,
+                    amount.to_string(),
+                    TextEffectStyle::Heal,
+                );
+            }
+            TextEffect::Miss => {
+                self._add_text_effect(
+                    position,
+                    start_time,
+                    2.0,
+                    None,
+                    "Miss!",
+                    TextEffectStyle::Miss,
+                );
+            }
+            TextEffect::ReactionExclamation => {
+                self._add_text_effect(
+                    position,
+                    start_time,
+                    1.0,
+                    None,
+                    "!".to_string(),
+                    TextEffectStyle::ReactionExclamation,
+                );
+            }
+            TextEffect::HitDamage(amount, hit_type) => {
+                let mut text = amount.to_string();
+                let style = match hit_type {
+                    HitType::Miss => {
+                        text = "Miss!".to_string();
+                        TextEffectStyle::Miss
+                    }
+                    HitType::Weak => TextEffectStyle::WeakHit,
+                    HitType::Regular => TextEffectStyle::RegularHit,
+                    HitType::Strong => TextEffectStyle::StrongHit,
+                    HitType::Critical => TextEffectStyle::StrongHit,
+                };
+                self._add_text_effect(position, start_time, 2.0, None, text, style);
+
+                if hit_type == HitType::Critical {
+                    self._add_text_effect(
+                        position,
+                        start_time,
+                        1.5,
+                        None,
+                        "Critical Hit!",
+                        TextEffectStyle::CriticalHitLabel,
+                    );
+                }
+            }
+        }
+
+        true
+    }
+
+    fn _add_text_effect(
+        &mut self,
+        position: Position,
+        start_time: f32,
         duration: f32,
         status_texture: Option<StatusId>,
         text: impl Into<String>,
@@ -1268,7 +1416,7 @@ impl GameGrid {
         let mut rise_indefinitely = true;
         let mut background = false;
         let color = match style {
-            TextEffectStyle::FriendlyEffect => {
+            TextEffectStyle::PositiveEffect => {
                 font = &self.simple_font;
                 font_size = 16;
                 rise_indefinitely = false;
@@ -1276,8 +1424,7 @@ impl GameGrid {
                 WHITE
                 //Color::new(0.8, 1.0, 0.8, 1.0)
             }
-            TextEffectStyle::FriendlyHeal => GREEN,
-            TextEffectStyle::HostileEffect => {
+            TextEffectStyle::NegativeEffect => {
                 font = &self.simple_font;
                 font_size = 16;
                 rise_indefinitely = false;
@@ -1285,6 +1432,7 @@ impl GameGrid {
                 WHITE
                 //Color::new(1.0, 0.8, 0.8, 1.0)
             }
+            TextEffectStyle::Heal => GREEN,
             TextEffectStyle::Miss => {
                 font_size = 24;
                 rise_indefinitely = false;
@@ -1300,9 +1448,9 @@ impl GameGrid {
                 rise_indefinitely = false;
                 RED
             }
-            TextEffectStyle::HostileGraze => LIGHTGRAY,
-            TextEffectStyle::HostileHit => rgb(201, 226, 118),
-            TextEffectStyle::HostileCrit => rgb(201, 226, 118),
+            TextEffectStyle::WeakHit => LIGHTGRAY,
+            TextEffectStyle::RegularHit => rgb(201, 226, 118),
+            TextEffectStyle::StrongHit => rgb(201, 226, 118),
         };
 
         let random_movement = if rise_indefinitely {
@@ -1318,9 +1466,11 @@ impl GameGrid {
             age: 0.0,
             start_time,
             end_time: start_time + duration,
+            source_pos: pos,
+            destination_pos: pos,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Text(TextEffect {
+                EffectGraphics::Text(TextGraphics {
                     status_texture,
                     text,
                     font: font.clone(),
@@ -1330,8 +1480,6 @@ impl GameGrid {
                     background,
                 }),
             ),
-            source_pos: pos,
-            destination_pos: pos,
         };
 
         self.effects.push(effect);
@@ -4420,11 +4568,6 @@ impl GameGrid {
                     let texture_size = texture.size();
                     let texture_draw_size = self.default_entity_draw_size();
 
-                    let total_dist = Vec2::from(final_to).distance(Vec2::from(from)); //+ texture_draw_size.0;
-                    let total_num_textures = total_dist / texture_draw_size.0 + 0.5;
-                    let total_num_textures_trunc = (total_num_textures).trunc() as usize;
-                    let total_last_partial_texture_w = total_num_textures.fract();
-
                     let to = (
                         from.0 + (final_to.0 - from.0) * t,
                         from.1 + (final_to.1 - from.1) * t,
@@ -4434,8 +4577,6 @@ impl GameGrid {
                     let num_textures = dist / texture_draw_size.0 + 0.5;
                     let num_textures_trunc = (num_textures).floor() as usize;
                     let last_partial_texture_w = num_textures.fract();
-
-                    // dbg!(total_num_textures_trunc, last_partial_texture_w, num_textures_trunc);
 
                     let rotation = -(to.0 - from.0).atan2(to.1 - from.1) + 0.5 * PI;
 
@@ -4451,8 +4592,6 @@ impl GameGrid {
                             Vec2::from(final_to),
                             texture_draw_size.0 * i as f32 + osc_offset,
                         );
-                        //dbg!(i, from, to, texture_draw_size.0, pos, final_to);
-                        //println!("--");
                         let mut params = params.clone();
                         if i == num_textures_trunc {
                             params.source = Some(Rect::new(
@@ -4481,8 +4620,6 @@ impl GameGrid {
                             params,
                         );
                     }
-
-                    //draw_texture_ex(texture, to.0, to.1, WHITE, params);
                 }
             }
         }
@@ -5039,12 +5176,12 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Text(TextEffect),
+    Text(TextGraphics),
     Texture(Texture2D),
 }
 
 #[derive(Debug)]
-pub struct TextEffect {
+pub struct TextGraphics {
     status_texture: Option<StatusId>,
     text: String,
     font: Font,
@@ -5138,7 +5275,7 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Text(TextEffect {
+            EffectGraphics::Text(TextGraphics {
                 status_texture,
                 text,
                 font,
@@ -5154,9 +5291,9 @@ impl EffectGraphics {
 
                 let quick_rise_duration = 0.15;
                 let grow_duration = 0.1;
-
-                let font_scale = if effect.age < grow_duration {
-                    0.5 + 0.5 * effect.age / grow_duration
+                let alive_age = effect.age - effect.start_time;
+                let font_scale = if alive_age < grow_duration {
+                    0.5 + 0.5 * alive_age / grow_duration
                 } else {
                     1.0
                 };
@@ -5227,6 +5364,15 @@ impl EffectGraphics {
 
                 // Then the regular text
                 text_params.color = *color;
+
+                let flash_duration = 0.3;
+                if alive_age < flash_duration {
+                    let flash_amount = (flash_duration - alive_age) / flash_duration;
+                    text_params.color.r += flash_amount;
+                    text_params.color.g += flash_amount;
+                    text_params.color.b += flash_amount;
+                }
+
                 text_params.color.a = alpha;
                 draw_text_with_font_tags(text, x0, y0, text_params, true);
             }

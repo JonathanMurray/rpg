@@ -46,7 +46,7 @@ use crate::{
     },
     grid::{
         Effect, EffectGraphics, EffectPosition, EffectVariant, GameGrid, GridOutcome, NewState,
-        TargetEffectPreview, TextEffectStyle,
+        TargetEffectPreview, TextEffect,
     },
     init_fight_map::GameInitState,
     pathfind::{Occupation, PathfindGrid, Surface, TerrainType},
@@ -1637,10 +1637,7 @@ impl UserInterface {
                     self.game_grid.add_text_effect(
                         reactor_pos,
                         0.0,
-                        1.0,
-                        None,
-                        condition.name().to_string(),
-                        TextEffectStyle::HostileHit,
+                        TextEffect::ReceiveCondition(condition),
                     );
                 }
 
@@ -1650,20 +1647,11 @@ impl UserInterface {
                         self.game_grid.add_text_effect(
                             attacker_pos,
                             0.0,
-                            1.0,
-                            None,
-                            condition.name().to_string(),
-                            TextEffectStyle::HostileHit,
+                            TextEffect::ReceiveCondition(condition),
                         );
                     } else {
-                        self.game_grid.add_text_effect(
-                            attacker_pos,
-                            0.0,
-                            1.5,
-                            None,
-                            "Miss!".to_string(),
-                            TextEffectStyle::Miss,
-                        );
+                        self.game_grid
+                            .add_text_effect(attacker_pos, 0.0, TextEffect::Miss);
                     }
                 }
                 self.animation_stopwatch.set_to_at_least(0.5);
@@ -1775,10 +1763,11 @@ impl UserInterface {
                         self.game_grid.add_text_effect(
                             char.pos(),
                             0.0,
-                            1.0,
-                            Some(StatusId::Treasure),
-                            "Treasure".to_string(),
-                            TextEffectStyle::FriendlyEffect,
+                            TextEffect::Effect {
+                                text: "Treasure".to_string(),
+                                icon: Some(StatusId::Treasure),
+                                positive: true,
+                            },
                         );
                     }
                 }
@@ -1822,16 +1811,14 @@ impl UserInterface {
                 }
             }
             GameEvent::CharacterReceivedKnockback { character } => {}
-            GameEvent::CharacterGainedAP { character } => {
+            GameEvent::CharacterGainedAP { character, amount } => {
                 let char = self.characters.get(character);
                 self.game_grid.add_text_effect(
                     char.pos(),
                     0.0,
-                    1.5,
-                    None,
-                    "+AP",
-                    TextEffectStyle::FriendlyEffect,
+                    TextEffect::ApplyEffect(ApplyEffect::GainActionPoints(amount)),
                 );
+
                 self.sound_player.play(SoundId::GainedAP);
             }
             GameEvent::CharacterLostAP { character, amount } => {
@@ -1852,14 +1839,8 @@ impl UserInterface {
                 ));
 
                 self.game_grid.animate_magic_sparks(character, WHITE);
-                self.game_grid.add_text_effect(
-                    char.pos(),
-                    0.0,
-                    1.5,
-                    None,
-                    format!("{}", amount),
-                    TextEffectStyle::FriendlyHeal,
-                );
+                self.game_grid
+                    .add_text_effect(char.pos(), 0.0, TextEffect::Heal(amount));
             }
             GameEvent::MovementWasInitiated {
                 character,
@@ -1887,7 +1868,7 @@ impl UserInterface {
                     //0.07
                     0.04
                 } else {
-                    0.14
+                    0.10
                 };
 
                 let mut duration = base_duration;
@@ -1949,10 +1930,7 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    1.5,
-                    None,
-                    format!("{}", amount),
-                    TextEffectStyle::HostileHit,
+                    TextEffect::HitDamage(amount, HitType::Regular),
                 );
                 if source == DamageSource::KnockbackCollision {
                     self.game_grid
@@ -1984,11 +1962,9 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    2.0,
-                    Some(condition.status_icon()),
-                    condition.name().to_string(),
-                    TextEffectStyle::HostileEffect,
+                    TextEffect::ReceiveCondition(condition),
                 );
+
                 // Don't make this too long, as it can happen during walking
                 //self.animation_stopwatch.set_to_at_least(0.2);
             }
@@ -2001,10 +1977,7 @@ impl UserInterface {
                 self.game_grid.add_text_effect(
                     character.pos(),
                     0.0,
-                    2.0,
-                    Some(condition.status_icon()),
-                    format!("|<strikethrough>{}|", condition.name()),
-                    TextEffectStyle::HostileEffect,
+                    TextEffect::LoseCondition(condition),
                 );
             }
             GameEvent::GameOver(type_) => {
@@ -2041,14 +2014,8 @@ impl UserInterface {
     }
 
     fn animate_reaction(&mut self, reactor_pos: Position) {
-        self.game_grid.add_text_effect(
-            reactor_pos,
-            0.0,
-            1.0,
-            None,
-            "!".to_string(),
-            TextEffectStyle::ReactionExclamation,
-        );
+        self.game_grid
+            .add_text_effect(reactor_pos, 0.0, TextEffect::ReactionExclamation);
         self.sound_player.play(SoundId::React);
         self.animation_stopwatch.set_to_at_least(0.5);
     }
@@ -2316,14 +2283,6 @@ impl UserInterface {
             if matches!(event.outcome.hit_type, HitType::Critical) {
                 self.sound_player
                     .play_delayed(SoundId::Crit, start_time + 0.02);
-                self.game_grid.add_text_effect(
-                    target_pos,
-                    0.0,
-                    1.5,
-                    None,
-                    "Critical Hit!",
-                    TextEffectStyle::CriticalHitLabel,
-                );
             }
             self.sound_player
                 .play_delayed(self.characters.get(target).damage_sound, start_time + 0.03);
@@ -2362,31 +2321,11 @@ impl UserInterface {
 
         self.log.add_with_details(line, detail_lines);
 
-        let (impact_text, text_style) = match event.outcome {
-            AttackOutcome {
-                damage,
-                hit_type: HitType::Miss,
-                ..
-            } => ("Miss!".to_string(), TextEffectStyle::Miss),
-            AttackOutcome {
-                damage,
-                hit_type: HitType::Weak,
-                ..
-            } => (format!("{}", damage), TextEffectStyle::HostileGraze),
-            AttackOutcome {
-                damage,
-                hit_type: HitType::Regular | HitType::Strong,
-                ..
-            } => (format!("{}", damage), TextEffectStyle::HostileHit),
-            AttackOutcome {
-                damage,
-                hit_type: HitType::Critical,
-                ..
-            } => (format!("{}", damage), TextEffectStyle::HostileCrit),
-        };
-
-        self.game_grid
-            .add_text_effect(target_pos, start_time, 1.5, None, impact_text, text_style);
+        self.game_grid.add_text_effect(
+            target_pos,
+            start_time,
+            TextEffect::HitDamage(event.outcome.damage, event.outcome.hit_type),
+        );
 
         if !applied_to_target.is_empty() {
             let mut delay = 0.0;
@@ -2438,7 +2377,8 @@ impl UserInterface {
         target: CharacterId,
         target_pos: (i32, i32),
     ) {
-        let mut effects = vec![];
+        //let mut effects = vec![];
+        let mut effects2 = vec![];
 
         match &outcome {
             AbilityTargetOutcome::HitEnemy {
@@ -2451,56 +2391,18 @@ impl UserInterface {
                 self.game_grid.animate_magic_sparks(target, RED);
 
                 if let Some(dmg) = damage {
+                    effects2.push(TextEffect::HitDamage(*dmg, *hit_type));
                     if hit_type == &HitType::Miss {
-                        effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
+                        //effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
                     } else {
                         self.animate_character_damage(target, *actual_health_lost);
                         self.sound_player.play_delayed(
                             self.characters.get(target).damage_sound,
                             start_time + 0.03,
                         );
-                        if hit_type == &HitType::Critical {
-                            effects.push((
-                                None,
-                                "Critical Hit!".to_string(),
-                                TextEffectStyle::CriticalHitLabel,
-                                1.5,
-                            ));
-                            effects.push((
-                                None,
-                                format!("{}", dmg),
-                                TextEffectStyle::HostileCrit,
-                                1.5,
-                            ));
-                        } else {
-                            effects.push((
-                                None,
-                                format!("{}", dmg),
-                                TextEffectStyle::HostileHit,
-                                1.5,
-                            ));
-                        }
                     }
                 } else if applied_effects.is_empty() {
-                    let effect = match hit_type {
-                        HitType::Miss => (None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5),
-                        HitType::Weak => (
-                            None,
-                            "Graze".to_string(),
-                            TextEffectStyle::HostileGraze,
-                            1.0,
-                        ),
-                        HitType::Regular | HitType::Strong => {
-                            (None, "Hit".to_string(), TextEffectStyle::HostileHit, 1.0)
-                        }
-                        HitType::Critical => (
-                            None,
-                            "Critical Hit!".to_string(),
-                            TextEffectStyle::CriticalHitLabel,
-                            1.5,
-                        ),
-                    };
-                    effects.push(effect);
+                    println!("warn: target outcome had neither damage nor applied effect - is that expected?");
                 }
 
                 if !applied_effects.is_empty() {
@@ -2528,15 +2430,9 @@ impl UserInterface {
         };
 
         let mut effect_start_time = start_time;
-        for (texture, target_text, style, duration) in effects {
-            self.game_grid.add_text_effect(
-                target_pos,
-                effect_start_time,
-                duration,
-                texture,
-                target_text,
-                style,
-            );
+        for effect in effects2 {
+            self.game_grid
+                .add_text_effect(target_pos, effect_start_time, effect);
             effect_start_time += 0.35;
         }
     }
@@ -2547,34 +2443,8 @@ impl UserInterface {
         pos: Position,
         start_time: f32,
     ) -> bool {
-        let mut s = String::new();
-        let mut texture = None;
-        if let ApplyEffect::Condition(condition) = applied_effect {
-            texture = Some(condition.condition.status_icon());
-        }
-        s.push_str(&format!("{} ", applied_effect));
-        let style = match applied_effect {
-            ApplyEffect::RemoveActionPoints(_) => Some(TextEffectStyle::HostileEffect),
-            ApplyEffect::GainActionPoints(_) => Some(TextEffectStyle::FriendlyEffect),
-            // TODO not always hostile though?
-            ApplyEffect::Condition(..) => Some(TextEffectStyle::HostileEffect),
-            ApplyEffect::LoseHealth(_) => Some(TextEffectStyle::HostileHit),
-            ApplyEffect::GainHealth(_) => Some(TextEffectStyle::FriendlyHeal),
-            ApplyEffect::GainStamina(_) => Some(TextEffectStyle::FriendlyEffect),
-            ApplyEffect::GainMana(_) => Some(TextEffectStyle::FriendlyEffect),
-            ApplyEffect::PerBleeding { .. } => Some(TextEffectStyle::FriendlyHeal),
-            ApplyEffect::ConsumeCondition { .. } => Some(TextEffectStyle::FriendlyEffect),
-            // The character is shown physically being pushed, instead
-            ApplyEffect::Pushed(_) => None,
-            ApplyEffect::Escape => Some(TextEffectStyle::FriendlyEffect),
-        };
-
-        if let Some(style) = style {
-            self.game_grid
-                .add_text_effect(pos, start_time, 2.0, texture, s.trim(), style);
-        }
-
-        style.is_some()
+        self.game_grid
+            .add_text_effect(pos, start_time, TextEffect::ApplyEffect(applied_effect))
     }
 
     fn set_new_active_character_id(&mut self, new_active_id: CharacterId) {
