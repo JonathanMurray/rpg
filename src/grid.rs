@@ -5216,7 +5216,6 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    //Text(TextGraphics),
     Texture(Texture2D),
 }
 

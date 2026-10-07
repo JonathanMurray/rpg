@@ -1909,7 +1909,10 @@ impl CoreGame {
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
                     let (applied, log_line, _damage) =
                         game.do_apply_effect(*apply_effect, None, None, target);
-                    detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
+                    if let Some(applied) = applied {
+                        applied_effects.push(applied);
+                        detail_lines.push(format!("{} |<faded>({})|", log_line, enhancement.name));
+                    }
                 }
             }
         }
