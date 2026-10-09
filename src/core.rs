@@ -19,7 +19,6 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
-use crate::grid::TextEffect::ReceiveCondition;
 use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
@@ -184,23 +183,21 @@ impl CoreGame {
                     if let Some((sta, ap)) = character.maybe_gain_resources_from_reaper() {
                         if sta + ap > 0 {
                             if ap > 0 {
-                                self.ui_handle_event(GameEvent::CharacterGainedAP {
+                                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                                     character: character.id(),
-                                    amount: ap,
+                                    applied_effect: ApplyEffect::GainActionPoints(ap),
+                                    source: "Reaper",
                                 })
                                 .await;
                             }
-                            let gain_str = match (sta, ap) {
-                                (0, _) => format!("{ap} AP"),
-                                (_, 0) => format!("{sta} stamina"),
-                                _ => format!("{sta} stamina, {ap} AP"),
-                            };
-                            self.log(format!(
-                                "|{}| gained {} |<faded>(Reaper)|",
-                                character.name_tag(),
-                                gain_str
-                            ))
-                            .await;
+                            if sta > 0 {
+                                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                                    character: character.id(),
+                                    applied_effect: ApplyEffect::GainStamina(sta),
+                                    source: "Reaper",
+                                })
+                                .await;
+                            }
                         }
                     }
 
@@ -209,9 +206,9 @@ impl CoreGame {
                         let amount =
                             self.character_gain_health(character, healing_on_kill * num_killed);
 
-                        self.ui_handle_event(GameEvent::CharacterGainedHealth {
+                        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
-                            amount,
+                            applied_effect: ApplyEffect::GainHealth(amount),
                             source: "on-kill effect",
                         })
                         .await;
@@ -334,9 +331,10 @@ impl CoreGame {
                     let expired_conditions = character.set_current_game_time(game_time);
 
                     for condition in expired_conditions {
-                        self.ui_handle_event(GameEvent::CharacterLostCondition {
+                        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: character.id(),
-                            condition,
+                            applied_effect: ApplyEffect::LoseCondition { condition },
+                            source: "",
                         })
                         .await;
                     }
@@ -400,10 +398,6 @@ impl CoreGame {
         let total_collision_dmg = original_distance - positions.len();
 
         if positions.len() > 1 {
-            self.ui_handle_event(GameEvent::CharacterReceivedKnockback {
-                character: character.id(),
-            })
-            .await;
             self.perform_movement(character.id(), positions, MovementType::KnockedBack)
                 .await?;
         }
@@ -761,20 +755,12 @@ impl CoreGame {
                     unexpected => unreachable!("Not consumable: {:?}", unexpected),
                 };
 
-                let mut detail_lines = vec![];
+                //let mut detail_lines = vec![];
 
-                if consumable.health_gain > 0 {
-                    let amount = self.character_gain_health(character, consumable.health_gain);
-                    detail_lines.push(format!("gained {} health", amount));
-                }
-                if consumable.mana_gain > 0 {
-                    let amount = character.gain_mana(consumable.mana_gain);
-                    detail_lines.push(format!("gained {} mana", amount));
-                }
                 let mut effect = None;
                 if let Some(apply_effect) = consumable.effect {
                     let (applied, line) = self.do_apply_effect(apply_effect, None, None, character);
-                    detail_lines.push(line);
+                    //detail_lines.push(line);
                     effect = applied;
                 }
 
@@ -783,10 +769,17 @@ impl CoreGame {
                 self.ui_handle_event(GameEvent::ConsumableWasUsed {
                     user: character.id(),
                     consumable,
-                    detail_lines,
-                    effect,
                 })
                 .await;
+
+                if let Some(applied_effect) = effect {
+                    self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                        character: character.id(),
+                        applied_effect,
+                        source: consumable.name,
+                    })
+                    .await;
+                }
 
                 Ok(ActionOutcome::Default)
             }
@@ -796,9 +789,10 @@ impl CoreGame {
     async fn perform_spend_ap(&self, character: &Character, amount: u32) {
         character.action_points.spend(amount);
 
-        self.ui_handle_event(GameEvent::CharacterLostAP {
+        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
-            amount,
+            applied_effect: ApplyEffect::LoseActionPoints(amount),
+            source: "",
         })
         .await;
     }
@@ -1024,9 +1018,10 @@ impl CoreGame {
             .duration_rounds
             .map(|rounds| self.current_time() + (rounds * self.round_length));
         character.receive_condition(apply_condition.condition, apply_condition.stacks, ends_at);
-        self.ui_handle_event(GameEvent::CharacterReceivedCondition {
+        self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
             character: character.id(),
-            condition: apply_condition.condition,
+            applied_effect: ApplyEffect::Condition(apply_condition),
+            source: "",
         })
         .await;
     }
@@ -1652,9 +1647,12 @@ impl CoreGame {
                     Some(RollInstruction::RollWithSpellModifier { .. })
                 ) {
                     if actor.lose_condition(Condition::ArcaneBlessing) {
-                        game.ui_handle_event(GameEvent::CharacterLostCondition {
+                        game.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                             character: actor_id,
-                            condition: Condition::ArcaneBlessing,
+                            applied_effect: ApplyEffect::LoseCondition {
+                                condition: Condition::ArcaneBlessing,
+                            },
+                            source: "",
                         })
                         .await;
                     }
@@ -3234,7 +3232,14 @@ impl CoreGame {
                 .borrow_mut()
                 .lose_stacks(&Condition::Bleeding, decay)
             {
-                self.log(format!("|{}| stopped Bleeding", name_tag)).await;
+                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                    character: character.id(),
+                    applied_effect: ApplyEffect::LoseCondition {
+                        condition: Condition::Bleeding,
+                    },
+                    source: "",
+                })
+                .await;
             }
         }
 
@@ -3298,16 +3303,20 @@ impl CoreGame {
                 .borrow_mut()
                 .lose_stacks(&Condition::HealthPotionRecovering, 1);
             let gained = self.character_gain_health(character, 2);
-            self.ui_handle_event(GameEvent::CharacterGainedHealth {
+
+            self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
-                amount: gained,
+                applied_effect: ApplyEffect::GainHealth(gained),
                 source: "healing potion",
             })
             .await;
             if lost_condition {
-                self.ui_handle_event(GameEvent::CharacterLostCondition {
+                self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                     character: character.id(),
-                    condition: Condition::HealthPotionRecovering,
+                    applied_effect: ApplyEffect::LoseCondition {
+                        condition: Condition::HealthPotionRecovering,
+                    },
+                    source: "",
                 })
                 .await;
             }
@@ -4009,8 +4018,6 @@ pub enum GameEvent {
     ConsumableWasUsed {
         user: CharacterId,
         consumable: Consumable,
-        detail_lines: Vec<String>,
-        effect: Option<ApplyEffect>,
     },
     CharactersDying {
         characters: Vec<CharacterId>,
@@ -4035,31 +4042,7 @@ pub enum GameEvent {
         applied_effect: ApplyEffect,
         source: &'static str,
     },
-    CharacterReceivedCondition {
-        character: CharacterId,
-        condition: Condition,
-    },
-    CharacterLostCondition {
-        character: CharacterId,
-        condition: Condition,
-    },
-    CharacterReceivedKnockback {
-        character: CharacterId,
-    },
-    CharacterGainedAP {
-        character: CharacterId,
-        amount: u32,
-    },
-    CharacterLostAP {
-        character: CharacterId,
-        amount: u32,
-    },
     CharacterChangedEquipment,
-    CharacterGainedHealth {
-        character: CharacterId,
-        amount: u32,
-        source: &'static str,
-    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -6093,13 +6076,11 @@ impl Character {
     }
 
     fn maybe_gain_resources_from_reaper(&self) -> Option<(u32, u32)> {
-        println!("MAYBE GAIN FROM REAPER");
         if self.knows_passive(PassiveSkill::Reaper) {
-            println!("YES GAIN FROM REAPER");
             let (sta, ap) = if self.conditions.borrow().has(&Condition::ReaperApCooldown) {
                 (0, 0)
             } else {
-                (self.action_points.gain(2), self.stamina.gain(2))
+                (self.stamina.gain(2), self.action_points.gain(2))
             };
             self.receive_condition(Condition::ReaperApCooldown, None, None);
             Some((sta, ap))
@@ -8191,8 +8172,6 @@ impl ArrowStack {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Consumable {
     pub name: &'static str,
-    pub health_gain: u32,
-    pub mana_gain: u32,
     pub effect: Option<ApplyEffect>,
     pub icon: EquipmentIconId,
     pub weight: u32,
@@ -8202,8 +8181,6 @@ impl Consumable {
     pub const fn default() -> Self {
         Self {
             name: "",
-            health_gain: 0,
-            mana_gain: 0,
             effect: None,
             icon: EquipmentIconId::Undefined,
             weight: 0,

@@ -98,6 +98,7 @@ pub async fn run_transition_loop(
                     EquipmentEntry::Weapon(weapon) => char.set_weapon(HandType::MainHand, weapon),
                     EquipmentEntry::Shield(shield) => char.set_shield(shield),
                     EquipmentEntry::Armor(armor_piece) => char.armor_piece.set(Some(armor_piece)),
+                    EquipmentEntry::Trinket(trinket) => char.trinket.set(Some(trinket)),
                     _ => {
                         let gained = char.try_gain_equipment(*new_eq);
                         if !gained {

@@ -292,23 +292,84 @@
     "(18, 23)": "FireSurfaceSingleCell",
     "(18, 21)": "FireSurfaceSingleCell",
     "(17, 22)": "FireSurfaceSingleCell",
-    "(18, 22)": "FireSurfaceSingleCell"
+    "(18, 22)": "FireSurfaceSingleCell",
+    "(7, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(13, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(10, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    }
   },
   "control_points": {
     "(22, 26)": "Exit"
   },
   "characters": [
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        10,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
     {
       "type_": "Alice",
       "pos": [
@@ -321,21 +382,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
+      "type_": "Enslaved",
       "pos": [
-        15,
-        21
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        12,
-        25
+        8,
+        9
       ],
       "health": null,
       "main_hand": null,

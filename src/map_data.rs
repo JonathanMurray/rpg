@@ -652,11 +652,14 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.set_weapon(HandType::MainHand, DAGGER);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(COLD_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)));
-    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3)));
+
+    alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(ENERGY_POTION));
 
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
-    alice.try_gain_equipment(EquipmentEntry::Trinket(SAPHIRE));
     alice.trinket.set(Some(RUBY));
     alice.learn_ability(&HEAL);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
@@ -665,6 +668,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.learn_ability(&PIERCING_SHOT);
     alice.learn_ability(&SPIKE_TRAP);
     alice.learn_ability(&INFLICT_WOUNDS);
+    alice.learn_passive(PassiveSkill::Reaper);
 
     alice.receive_condition(Condition::Ferocity, Some(3), None);
 

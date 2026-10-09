@@ -239,7 +239,6 @@ enum TextEffectStyle {
 pub enum TextEffect {
     ApplyEffect(ApplyEffect),
     ReceiveCondition(Condition),
-    LoseCondition(Condition),
     Effect {
         text: String,
         icon: Option<StatusId>,
@@ -482,7 +481,7 @@ impl GameGrid {
                     }
                 }
                 Entry::Vacant(..) => {
-                    println!("Can't convert nothing to {:?}, pos: {:?}", to_surface, pos);
+                    //println!("Can't convert nothing to {:?}, pos: {:?}", to_surface, pos);
                 }
             }
         }
@@ -1279,7 +1278,7 @@ impl GameGrid {
                 s.push_str(&format!("{} ", applied_effect));
                 let style = match applied_effect {
                     ApplyEffect::Pushed(_) => return false,
-                    ApplyEffect::LoseActionPoints(_) => TextEffectStyle::NegativeEffect,
+                    ApplyEffect::LoseActionPoints(_) => return false,
                     ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
                         if condition.is_positive() {
@@ -1293,7 +1292,6 @@ impl GameGrid {
                     ApplyEffect::GainStamina(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::GainMana(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::LoseCondition { .. } => TextEffectStyle::PositiveEffect,
-                    // The character is shown physically being pushed, instead
                     ApplyEffect::Escape => TextEffectStyle::PositiveEffect,
                 };
 
@@ -1326,16 +1324,7 @@ impl GameGrid {
                     style,
                 );
             }
-            TextEffect::LoseCondition(condition) => {
-                self._add_text_effect(
-                    character_id,
-                    0.0,
-                    2.0,
-                    Some(condition.status_icon()),
-                    format!("|<strikethrough>{}|", condition.name()),
-                    TextEffectStyle::NegativeEffect,
-                );
-            }
+
             TextEffect::Heal(amount) => {
                 self._add_text_effect(
                     character_id,

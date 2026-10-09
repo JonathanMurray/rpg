@@ -1630,8 +1630,6 @@ impl UserInterface {
             } => {
                 self.log.add_with_details(main_line, &detail_lines);
 
-                let reactor_pos = self.characters.get(reactor).pos();
-
                 if let Some(condition) = outcome.received_condition {
                     self.game_grid.add_text_effect(
                         reactor,
@@ -1640,7 +1638,6 @@ impl UserInterface {
                     );
                 }
 
-                let attacker_pos = self.active_character().pos();
                 if let Some(offensive) = outcome.offensive {
                     if let Some((condition, _duration)) = offensive.inflicted_condition {
                         self.game_grid.add_text_effect(
@@ -1699,25 +1696,13 @@ impl UserInterface {
                     detail_lines,
                 );
             }
-            GameEvent::ConsumableWasUsed {
-                user,
-                consumable,
-                detail_lines,
-                effect,
-            } => {
-                let actor = self.characters.get(user);
+            GameEvent::ConsumableWasUsed { user, consumable } => {
                 self.sound_player.play(SoundId::Powerup);
-                self.log.add_with_details(
-                    format!(
-                        "|{}| used {}",
-                        self.characters.get(user).name_tag(),
-                        consumable.name
-                    ),
-                    &detail_lines,
-                );
-                if let Some(applied) = effect {
-                    self.show_applied_effect(applied, actor.id(), 0.0);
-                }
+                self.log.add(format!(
+                    "|{}| used {}",
+                    self.characters.get(user).name_tag(),
+                    consumable.name
+                ));
             }
             GameEvent::CharactersDying { characters } => {
                 let mut someone_died = false;
@@ -1812,37 +1797,7 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.6);
                 }
             }
-            GameEvent::CharacterReceivedKnockback { character } => {}
-            GameEvent::CharacterGainedAP { character, amount } => {
-                self.game_grid.add_text_effect(
-                    character,
-                    0.0,
-                    TextEffect::ApplyEffect(ApplyEffect::GainActionPoints(amount)),
-                );
 
-                self.sound_player.play(SoundId::GainedAP);
-            }
-            GameEvent::CharacterLostAP { character, amount } => {
-                self.game_grid
-                    .animate_character_lost_ap(character, 0.6, amount);
-            }
-            GameEvent::CharacterGainedHealth {
-                character,
-                amount,
-                source,
-            } => {
-                let char = self.characters.get(character);
-                self.log.add(format!(
-                    "|{}| gained |<value>{}| health |<faded>({})|",
-                    char.name_tag(),
-                    amount,
-                    source
-                ));
-
-                self.game_grid.animate_magic_sparks(character, WHITE);
-                self.game_grid
-                    .add_text_effect(character, 0.0, TextEffect::Heal(amount));
-            }
             GameEvent::MovementWasInitiated {
                 character,
                 positions,
@@ -1951,56 +1906,52 @@ impl UserInterface {
             } => {
                 let name_tag = self.characters.get(character).name_tag();
                 let verb_phrase = match applied_effect {
-                    ApplyEffect::LoseActionPoints(n) => format!("lost {n} AP"),
-                    ApplyEffect::GainActionPoints(_) => todo!(),
+                    ApplyEffect::LoseActionPoints(n) => {
+                        self.game_grid.animate_character_lost_ap(character, 0.6, n);
+                        "".to_string()
+                    }
+                    ApplyEffect::GainActionPoints(n) => {
+                        self.sound_player.play(SoundId::GainedAP);
+                        format!("gained {n} AP")
+                    }
                     ApplyEffect::LoseHealth(_) => todo!(),
-                    ApplyEffect::GainHealth(_) => todo!(),
-                    ApplyEffect::GainStamina(_) => todo!(),
+                    ApplyEffect::GainHealth(n) => {
+                        self.game_grid.animate_magic_sparks(character, WHITE);
+                        self.game_grid
+                            .add_text_effect(character, 0.0, TextEffect::Heal(n));
+
+                        format!("gained |<value>{}| health", n,)
+                    }
+                    ApplyEffect::GainStamina(n) => format!("gained {n} stamina"),
                     ApplyEffect::GainMana(n) => format!("gained {n} mana"),
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
-                        format!("received |<keyword>{}|", condition.name())
+                        match condition {
+                            Condition::Ferocity => {
+                                self.sound_player.play(SoundId::Execute);
+                            }
+                            Condition::Burning => {
+                                self.sound_player.play(SoundId::Burning);
+                            }
+                            _ => {}
+                        }
+
+                        format!("received condition: |<keyword>{}|", condition.name())
                     }
-                    ApplyEffect::LoseCondition { .. } => todo!(),
+                    ApplyEffect::LoseCondition { condition } => {
+                        format!("lost condition: |<keyword>{}|", condition.name())
+                    }
                     ApplyEffect::Pushed(_) => todo!(),
                     ApplyEffect::Escape => todo!(),
                 };
-                self.log
-                    .add(format!("|{name_tag}| {verb_phrase} |<faded>({source})|"));
 
-                self.show_applied_effect(applied_effect, character, 0.0);
-            }
-            GameEvent::CharacterReceivedCondition {
-                character,
-                condition,
-            } => {
-                match condition {
-                    Condition::Ferocity => {
-                        self.sound_player.play(SoundId::Execute);
-                    }
-                    Condition::Burning => {
-                        self.sound_player.play(SoundId::Burning);
-                    }
-                    _ => {}
+                if !verb_phrase.is_empty() {
+                    self.log.add_with_details(
+                        format!("|{name_tag}| {verb_phrase}"),
+                        &[format!("|<faded>Source: {source}|")],
+                    );
                 }
 
-                self.game_grid.add_text_effect(
-                    character,
-                    0.0,
-                    TextEffect::ReceiveCondition(condition),
-                );
-
-                // Don't make this too long, as it can happen during walking
-                //self.animation_stopwatch.set_to_at_least(0.2);
-            }
-            GameEvent::CharacterLostCondition {
-                character,
-                condition,
-            } => {
-                self.game_grid.add_text_effect(
-                    character,
-                    0.0,
-                    TextEffect::LoseCondition(condition),
-                );
+                self.show_applied_effect(applied_effect, character, 0.0);
             }
             GameEvent::GameOver(type_) => {
                 let text = match type_ {

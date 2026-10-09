@@ -147,18 +147,6 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
 fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let mut t = Tooltip::new(consumable.name);
 
-    if consumable.health_gain > 0 {
-        t.technical_description.push(format!(
-            "|<heart>| |<value>{}| healing",
-            consumable.health_gain
-        ));
-    }
-    if consumable.mana_gain > 0 {
-        t.technical_description.push(format!(
-            "Restores |<value>{}| |<mana>|",
-            consumable.mana_gain
-        ));
-    }
     if let Some(apply_effect) = consumable.effect {
         t.technical_description.push("|<faded>Self:|".to_string());
         describe_apply_effect(apply_effect, &mut t);

@@ -1537,7 +1537,7 @@ pub const INFLICT_WOUNDS: Ability = Ability {
                 on_hit: Some([
                     Some(ApplyEffect::Condition(ApplyCondition {
                         condition: Condition::Bleeding,
-                        stacks: Some(5),
+                        stacks: Some(1), //Some(5),
                         duration_rounds: None,
                     })),
                     None,
@@ -2605,7 +2605,7 @@ pub const HEALTH_POTION: Consumable = Consumable {
 pub const MANA_POTION: Consumable = Consumable {
     name: "Mana potion",
     icon: EquipmentIconId::ManaPotion,
-    mana_gain: 5,
+    effect: Some(ApplyEffect::GainMana(5)),
     ..Consumable::default()
 };
 
