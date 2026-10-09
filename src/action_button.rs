@@ -236,12 +236,12 @@ fn describe_attack_on_damage_effect(effect: &AttackHitEffect, t: &mut Tooltip) {
     match effect {
         AttackHitEffect::ApplyTarget(apply_effect) => {
             t.technical_description
-                .push("On damage: |<faded>(target)| ".to_string());
+                .push("On damage: |<single_target> |<faded>(target)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
         AttackHitEffect::ApplySelf(apply_effect) => {
             t.technical_description
-                .push("On damage: |<faded>(self)| ".to_string());
+                .push("On damage: |<single_target>| |<faded>(self)| ".to_string());
             describe_apply_effect(*apply_effect, t)
         }
     }
@@ -469,11 +469,13 @@ fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
             description: Some("Use a consumable from your inventory (e.g. a potion)."),
             ..Default::default()
         },
+        /*
         BaseAction::ToggleQuickActions => Tooltip {
             header: "Quick actions".to_string(),
             description: Some("Spend stamina |<stamina>| on inventory management, instead of AP."),
             ..Default::default()
         },
+         */
     }
 }
 
@@ -990,11 +992,14 @@ impl ActionButton {
             None
         };
 
+        /*
         let activated = if matches!(action, ButtonAction::Action(BaseAction::ToggleQuickActions)) {
             Some(character.as_ref().unwrap().enabled_quick_actions.get())
         } else {
             None
         };
+         */
+        let activated = None;
 
         Self {
             id,
@@ -1150,6 +1155,7 @@ impl ActionButton {
             }
         }
 
+        /*
         if let ButtonAction::Action(BaseAction::ToggleQuickActions) = self.action {
             let quick_actions = Some(self.character.as_ref().unwrap().enabled_quick_actions.get());
             if self.tooltip_is_based_on_quick_actions.get() != quick_actions {
@@ -1162,6 +1168,7 @@ impl ActionButton {
                 self.tooltip_is_based_on_quick_actions.set(quick_actions);
             }
         }
+         */
 
         self.tooltip.borrow()
     }
@@ -1469,7 +1476,7 @@ impl ButtonAction {
                 BaseAction::Move => "Move",
                 BaseAction::ChangeEquipment => "Change equipment",
                 BaseAction::UseConsumable => "Use consumable",
-                BaseAction::ToggleQuickActions => "Quick actions",
+                //BaseAction::ToggleQuickActions => "Quick actions",
             },
             ButtonAction::OnAttackedReaction(reaction) => reaction.name,
             ButtonAction::OnHitReaction(reaction) => reaction.name,
@@ -1505,7 +1512,7 @@ impl ButtonAction {
                 BaseAction::Move => IconId::Move,
                 BaseAction::ChangeEquipment => IconId::Equip,
                 BaseAction::UseConsumable => IconId::UseConsumable,
-                BaseAction::ToggleQuickActions => IconId::QuickActions,
+                //BaseAction::ToggleQuickActions => IconId::QuickActions,
             },
             ButtonAction::AttackEnhancement(enhancement) => enhancement.icon,
             ButtonAction::AbilityEnhancement(enhancement) => enhancement.icon,

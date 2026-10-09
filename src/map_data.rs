@@ -634,7 +634,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.health.lose(10);
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
-    bob.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    bob.try_gain_equipment(EquipmentEntry::Trinket(RUBY));
     bob.trinket.set(Some(SAPHIRE));
     bob
 }

@@ -387,7 +387,7 @@ impl ConfiguredAction {
                 drag: Rc::new(RefCell::new(None)),
             }),
             BaseAction::UseConsumable => Some(Self::UseConsumable(None)),
-            BaseAction::ToggleQuickActions => None,
+            //BaseAction::ToggleQuickActions => None,
         }
     }
 
@@ -2588,13 +2588,15 @@ impl UserInterface {
             );
 
             if may_choose_action && self.active_character().can_use_action(base_action) {
-                if base_action == BaseAction::ToggleQuickActions {
+                /*if base_action == BaseAction::ToggleQuickActions {
                     assert!(player_choice.is_none());
                     println!("Toggling quick actions");
                     self.active_character().toggle_quick_actions();
                     // Movement range/speed is affected by either stamina or AP, depending on 'quick actions'
                     self.game_grid.update_move_speed(self.active_character_id);
-                } else if let Some(s) = ConfiguredAction::from_base_action(base_action) {
+                } else
+                 */
+                if let Some(s) = ConfiguredAction::from_base_action(base_action) {
                     let already_configuring_it = match &*self.state.borrow() {
                         UiState::ConfiguringAction(configured_action) => configured_action == &s,
                         _ => false,
@@ -2865,7 +2867,7 @@ fn build_character_ui(
     let mut basic_buttons = vec![];
     let mut change_eq_btn = None;
     let mut use_consumable_btn = None;
-    let mut toggle_quick_btn = None;
+    //let mut toggle_quick_btn = None;
     let mut ability_buttons = vec![];
 
     let mut attack_button_for_character_sheet = None;
@@ -2941,10 +2943,11 @@ fn build_character_ui(
             }
             BaseAction::UseConsumable => {
                 use_consumable_btn = Some(btn);
-            }
-            BaseAction::ToggleQuickActions => {
-                toggle_quick_btn = Some(btn);
-            }
+            } /*
+              BaseAction::ToggleQuickActions => {
+                  toggle_quick_btn = Some(btn);
+              }
+               */
         }
     }
 
@@ -3001,10 +3004,10 @@ fn build_character_ui(
         },
         ..Default::default()
     };
-    while buttons.len() < 7 {
+    while buttons.len() < 8 {
         buttons.push(Element::Rect(button_placeholder.clone()));
     }
-    buttons.push(Element::Rc(toggle_quick_btn.unwrap()));
+    //buttons.push(Element::Rc(toggle_quick_btn.unwrap()));
     buttons.push(Element::Rc(change_eq_btn.unwrap()));
     buttons.push(Element::Rc(use_consumable_btn.unwrap()));
 
@@ -3129,7 +3132,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
             BaseAction::Move => "MOVE".to_string(),
             BaseAction::ChangeEquipment => "CHANGING_EQUIPMENT".to_string(),
             BaseAction::UseConsumable => "USING_CONSUMABLE".to_string(),
-            BaseAction::ToggleQuickActions => "TOGGLE_QUICK_ACTIONS".to_string(),
+            //BaseAction::ToggleQuickActions => "TOGGLE_QUICK_ACTIONS".to_string(),
         },
 
         _ => unreachable!(),

@@ -371,10 +371,10 @@
   },
   "characters": [
     {
-      "type_": "Alice",
+      "type_": "Bob",
       "pos": [
-        12,
-        22
+        13,
+        23
       ],
       "health": null,
       "main_hand": null,
@@ -382,10 +382,21 @@
       "name": null
     },
     {
-      "type_": "Enslaved",
+      "type_": "Skeleton",
       "pos": [
-        8,
-        9
+        14,
+        20
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        20,
+        21
       ],
       "health": null,
       "main_hand": null,

@@ -129,14 +129,12 @@ impl TargetUi {
                 },
             );
             action_points_row.current_ap = char.action_points.current();
-            let mut health_bar = ResourceBar::horizontal(char.health.max(), COL_RED, (80.0, 10.0));
-            health_bar.current = char.health.current();
 
             let health_text = TextLine::new(
                 format!("|<heart>| {}/{}", char.health.current(), char.health.max()),
-                16,
+                12,
                 WHITE,
-                Some(self.simple_font.clone()),
+                Some(self.big_font.clone()),
             );
             let mut resource_texts = vec![Element::Text(health_text)];
 
@@ -145,9 +143,9 @@ impl TargetUi {
                     if stat.max() > 0 {
                         let text = TextLine::new(
                             format!("|{}| {}/{}", icon, stat.current(), stat.max()),
-                            16,
+                            12,
                             WHITE,
-                            Some(self.simple_font.clone()),
+                            Some(self.big_font.clone()),
                         );
                         resource_texts.push(Element::Text(text));
                     }
@@ -169,7 +167,8 @@ impl TargetUi {
                 },
                 children: vec![Element::Texture(
                     self.portrait_textures[&char.portrait].clone(),
-                    None, //Some((64.0, 80.0)),
+                    Some((64.0, 80.0)),
+                    //None, //Some((64.0, 80.0)),
                 )],
                 ..Default::default()
             });

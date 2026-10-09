@@ -148,7 +148,8 @@ fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
     let mut t = Tooltip::new(consumable.name);
 
     if let Some(apply_effect) = consumable.effect {
-        t.technical_description.push("|<faded>Self:|".to_string());
+        t.technical_description
+            .push("|<single_target>| |<faded>(self):|".to_string());
         describe_apply_effect(apply_effect, &mut t);
     }
     //lines.push("<Right-click to use>".to_string());
@@ -174,6 +175,10 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
         t.technical_description
             .push(format!("|<range>| {}", weapon.range));
     }
+    if weapon.bonus_melee_evasion > 0 {
+        t.technical_description
+            .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
+    }
     if let Some(effect) = weapon.on_damage {
         t.technical_description.push(format!("On damage: {effect}"));
 
@@ -191,10 +196,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     if let Some(effect) = weapon.on_kill_apply_self {
         t.technical_description.push(format!("On kill: {effect}"));
     }
-    if weapon.bonus_melee_evasion > 0 {
-        t.technical_description
-            .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
-    }
+
     if let Some(reaction) = weapon.on_attacked_reaction {
         t.technical_description
             .push(format!("Skill: |<keyword>{}|", reaction.name));

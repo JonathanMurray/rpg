@@ -289,6 +289,8 @@ impl EnemyTargetSelection {
             println!("bot sticks with current target: {:?}", self.current_target);
         }
 
+        target_id = 2; // TODO
+
         (player_chars, target_id)
     }
 }

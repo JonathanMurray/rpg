@@ -860,6 +860,12 @@ impl CoreGame {
                     new_position,
                     other_char,
                 ) {
+                    // Mover disengages before going out of range; otherwise if other char chooses to attack
+                    // the mover will weirdly stop to face the attacker, due to engagers generally facing
+                    // eachother
+                    character.set_not_engaging(other_char.id());
+                    other_char.set_not_engaged_by(character.id());
+
                     if other_char.can_use_opportunity_attack(character.id()) {
                         // Movement opportunity attack
                         if movement_type == MovementType::Regular {
@@ -884,10 +890,13 @@ impl CoreGame {
                         }
                     }
 
+                    // Need to remove any engagement that may have been caused by opportunity attack
                     character.set_not_engaging(other_char.id());
-                    character.set_not_engaged_by(other_char.id());
-                    other_char.set_not_engaging(character.id());
                     other_char.set_not_engaged_by(character.id());
+
+                    // Both characters are now out of range, and neither is engaging
+                    other_char.set_not_engaging(character.id());
+                    character.set_not_engaged_by(other_char.id());
                 }
             }
 
@@ -4992,7 +5001,7 @@ pub enum BaseAction {
     Move,
     ChangeEquipment,
     UseConsumable,
-    ToggleQuickActions,
+    //ToggleQuickActions,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -5009,7 +5018,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
-            BaseAction::ToggleQuickActions => 0,
+            //BaseAction::ToggleQuickActions => 0,
         }
     }
 
@@ -5020,7 +5029,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
             BaseAction::UseConsumable => 1,
-            BaseAction::ToggleQuickActions => 0,
+            //  BaseAction::ToggleQuickActions => 0,
         }
     }
 
@@ -5031,7 +5040,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
-            BaseAction::ToggleQuickActions => 0,
+            // BaseAction::ToggleQuickActions => 0,
         }
     }
 
@@ -5042,7 +5051,7 @@ impl BaseAction {
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 0,
             BaseAction::UseConsumable => 0,
-            BaseAction::ToggleQuickActions => 0,
+            // BaseAction::ToggleQuickActions => 0,
         }
     }
 }
@@ -5881,7 +5890,7 @@ impl Character {
                     // the action point cost is populated (later) by the equipped weapon
                     action_point_cost: 0,
                 }),
-                BaseAction::ToggleQuickActions,
+                //BaseAction::ToggleQuickActions,
                 BaseAction::ChangeEquipment,
                 BaseAction::UseConsumable,
             ]),
@@ -6699,8 +6708,7 @@ impl Character {
             BaseAction::UseConsumable => {
                 self.has_any_consumable_in_inventory()
                     && ap >= BaseAction::UseConsumable.action_point_cost()
-            }
-            BaseAction::ToggleQuickActions => true,
+            } //BaseAction::ToggleQuickActions => true,
         }
     }
 
@@ -6736,7 +6744,7 @@ impl Character {
                 ap as i32 >= BaseAction::ChangeEquipment.action_point_cost()
             }
             BaseAction::UseConsumable => ap as i32 >= BaseAction::UseConsumable.action_point_cost(),
-            BaseAction::ToggleQuickActions => true,
+            //BaseAction::ToggleQuickActions => true,
         }
     }
 

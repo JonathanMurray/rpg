@@ -2358,6 +2358,7 @@ impl GameGrid {
             UiState::ConfiguringAction(base_action) => match base_action {
                 ConfiguredAction::Attack {
                     selected_enhancements,
+                    target,
                     ..
                 } => {
                     let mut area_radius = None;
@@ -2374,6 +2375,10 @@ impl GameGrid {
                                 area_radius = Some(range);
                             }
                         }
+                    }
+
+                    if target.is_none() {
+                        should_highlight_character_occupations = true;
                     }
 
                     MouseState::RequiresEnemyTarget {
@@ -2411,9 +2416,9 @@ impl GameGrid {
                             let mut area_radius = None;
                             if let Some((radius, _acquisition, _effect)) = impact_area {
                                 area_radius = Some(radius.plusf(increased_radius));
-                                if *target == ActionTarget::None {
-                                    should_highlight_character_occupations = true;
-                                }
+                            }
+                            if *target == ActionTarget::None {
+                                should_highlight_character_occupations = true;
                             }
                             let mut move_into_melee = None;
                             if let AbilityReach::MoveIntoMelee(range) = reach {
@@ -2442,7 +2447,7 @@ impl GameGrid {
                             }
                             MouseState::RequiresPositionTarget { shape: None, range }
                         }
-                        AbilityTarget::None { .. } => MouseState::ImplicitTarget,
+                        AbilityTarget::None { self_area, .. } => MouseState::ImplicitTarget,
                     }
                 }
 
@@ -4229,7 +4234,9 @@ impl GameGrid {
                 box_x + box_w / 2.0 - (condition_infos.len() as f32 * status_w) / 2.0;
             for info in condition_infos {
                 let texture = info.condition.status_icon();
-                draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
+                //let status_bg = BLACK;
+                let status_bg = Color::new(0.0, 0.0, 0.0, 0.6);
+                draw_rectangle(status_x, status_y, status_w, status_w, status_bg);
                 draw_status_icon(texture, status_x, status_y, Some((status_w, status_w)));
                 draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
                 /*
