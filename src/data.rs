@@ -7,11 +7,11 @@ use crate::{
         AbilityReach, AbilityRollType, AbilityTarget, ApplyCondition, ApplyEffect, AreaEffect,
         AreaShape, AreaTargetAcquisition, ArmorPiece, Arrow, AttackAttribute, AttackEnhancement,
         AttackEnhancementEffect, AttackEnhancementOnHitEffect, AttackHitEffect, AttackType,
-        Condition, Consumable, DamageType, DefenseType, EnvironmentEffect, EquipEffect,
-        EquipmentRequirement, Fraction, HandType, OnAttackedReaction, OnAttackedReactionEffect,
-        OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction, OnHitReactionEffect, Range,
-        Shield, SpellEnhancementEffect, SpellNegativeEffect, Trinket, Weapon, WeaponGrip,
-        WeaponRange, WeaponType,
+        Circumstance, Condition, Consumable, DamageType, DefenseType, EnvironmentEffect,
+        EquipEffect, EquipmentRequirement, Fraction, HandType, OnAttackedReaction,
+        OnAttackedReactionEffect, OnAttackedReactionId, OnAttackedReactionTarget, OnHitReaction,
+        OnHitReactionEffect, Range, Shield, SpellEnhancementEffect, SpellNegativeEffect, Trinket,
+        Weapon, WeaponGrip, WeaponRange, WeaponType,
     },
     grid::ParticleShape,
     pathfind::Surface,
@@ -697,8 +697,8 @@ pub const ASSASSINS_VIAL: Trinket = Trinket {
     icon: EquipmentIconId::AssassinsVial,
 };
 
-pub const MANA_STONE: Trinket = Trinket {
-    name: "Saphire stone",
+pub const SAPHIRE: Trinket = Trinket {
+    name: "Saphire",
     sprite: None,
     equip: EquipEffect {
         start_of_turn_apply_self: Some(ApplyEffect::Condition(ApplyCondition {
@@ -708,7 +708,24 @@ pub const MANA_STONE: Trinket = Trinket {
         })),
         ..EquipEffect::default()
     },
-    icon: EquipmentIconId::ManaStone,
+    icon: EquipmentIconId::Saphire,
+};
+
+pub const RUBY: Trinket = Trinket {
+    name: "Ruby",
+    sprite: None,
+    equip: EquipEffect {
+        start_of_turn_maybe_apply_self: Some((
+            Circumstance::AdjacentToMultipleEnemies,
+            ApplyEffect::Condition(ApplyCondition {
+                condition: Condition::Ruthless,
+                stacks: Some(1),
+                duration_rounds: None,
+            }),
+        )),
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::Ruby,
 };
 
 pub const BAD_SMALL_SHIELD: Shield = Shield {

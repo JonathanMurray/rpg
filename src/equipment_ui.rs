@@ -25,9 +25,9 @@ use crate::{
     },
     character_sheet::MoneyText,
     core::{
-        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Condition, Consumable,
-        EquipEffect, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket, Weapon,
-        WeaponGrip, WeaponRange,
+        ApplyEffect, ArmorPiece, ArrowStack, AttackHitEffect, Character, Circumstance, Condition,
+        Consumable, EquipEffect, EquipmentEntry, EquipmentSlotRole, HandType, Shield, Trinket,
+        Weapon, WeaponGrip, WeaponRange,
     },
     drawing::{draw_dashed_line, draw_dashed_rectangle_lines},
     game_ui::draw_rectangle_lines2,
@@ -124,7 +124,22 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
     }
     if let Some(apply_effect) = equip.start_of_turn_apply_self {
         t.technical_description
-            .push("|<faded>Start of turn: (self)".to_string());
+            .push("|<faded>Start of turn:".to_string());
+        t.technical_description
+            .push("|<single_target>| |<faded>(self):|".to_string());
+        describe_apply_effect(apply_effect, t);
+    }
+    if let Some((circumstance, apply_effect)) = equip.start_of_turn_maybe_apply_self {
+        match circumstance {
+            Circumstance::AdjacentToMultipleEnemies => {
+                t.technical_description.push(
+                    "|<faded>Start of turn, if adjacent to multiple enemies||<multi_target>|:"
+                        .to_string(),
+                );
+                t.technical_description
+                    .push("|<single_target>| |<faded>(self):|".to_string());
+            }
+        }
         describe_apply_effect(apply_effect, t);
     }
 }

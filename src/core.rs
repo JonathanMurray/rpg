@@ -669,8 +669,10 @@ impl CoreGame {
                     self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                         character: actor.id(),
                         applied_effect: ApplyEffect::GainMana(amount),
+                        source: "Spell Finesse",
                     })
                     .await;
+                    actor.lose_condition(Condition::SpellFinesse);
                 }
 
                 let ability_resolved_events = Self::perform_ability(
@@ -1089,6 +1091,24 @@ impl CoreGame {
         }
     }
 
+    fn calculate_num_adjacent_enemies(&self, character: &Character) -> u32 {
+        let mut positions = vec![];
+        for char in self.characters.iter() {
+            positions.push((char.pos(), char.player_controlled()));
+        }
+
+        let mut num_adjacent_enemies = 0;
+        for (pos, player_controlled) in &positions {
+            if *player_controlled != character.player_controlled()
+                && are_entities_within_melee(*pos, character.pos())
+            {
+                num_adjacent_enemies += 1;
+            }
+        }
+
+        num_adjacent_enemies
+    }
+
     fn on_character_positions_changed(&self) {
         let mut positions = vec![];
         for character in self.characters.iter() {
@@ -1122,8 +1142,6 @@ impl CoreGame {
         area_center: Option<Position>,
         receiver: &Character,
         applied_effects: &mut Vec<ApplyEffect>,
-        damage_from_effects: &mut u32,
-        actual_health_lost: &mut u32,
         name: Option<&'static str>,
     ) -> String {
         let mut reduced_to_nothing = false;
@@ -1633,11 +1651,7 @@ impl CoreGame {
                     roll_instruction,
                     Some(RollInstruction::RollWithSpellModifier { .. })
                 ) {
-                    if actor
-                        .conditions
-                        .borrow_mut()
-                        .remove(&Condition::ArcaneBlessing)
-                    {
+                    if actor.lose_condition(Condition::ArcaneBlessing) {
                         game.ui_handle_event(GameEvent::CharacterLostCondition {
                             character: actor_id,
                             condition: Condition::ArcaneBlessing,
@@ -2255,8 +2269,6 @@ impl CoreGame {
                     area_center,
                     target,
                     &mut applied_effects,
-                    &mut damage_from_effects,
-                    &mut actual_health_lost,
                     None,
                 );
                 detail_lines.push(log_line);
@@ -2277,8 +2289,6 @@ impl CoreGame {
                         area_center,
                         target,
                         &mut applied_effects,
-                        &mut damage_from_effects,
-                        &mut actual_health_lost,
                         Some(enhancement.name),
                     );
                     detail_lines.push(log_line);
@@ -3156,21 +3166,40 @@ impl CoreGame {
             self.on_enter_or_start_turn_in_fire_surface(character).await;
         }
         let mut applied_to_self = vec![];
-        character.for_equip_effects(|_name, equip| {
+        character.for_equip_effects(|name, equip| {
             dbg!(equip.start_of_turn_apply_self);
             if let Some(apply_effect) = equip.start_of_turn_apply_self {
                 let (applied, _line) =
                     self.do_apply_effect(apply_effect, Some(character), None, character);
 
                 if let Some(applied) = applied {
-                    applied_to_self.push(applied);
+                    applied_to_self.push((name, applied));
+                }
+            }
+            if let Some((circumstance, apply_effect)) = equip.start_of_turn_maybe_apply_self {
+                match circumstance {
+                    Circumstance::AdjacentToMultipleEnemies => {
+                        if self.calculate_num_adjacent_enemies(character) >= 2 {
+                            let (applied, _line) = self.do_apply_effect(
+                                apply_effect,
+                                Some(character),
+                                None,
+                                character,
+                            );
+
+                            if let Some(applied) = applied {
+                                applied_to_self.push((name, applied));
+                            }
+                        }
+                    }
                 }
             }
         });
-        for applied in applied_to_self {
+        for (name, applied) in applied_to_self {
             self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
                 character: character.id(),
                 applied_effect: applied,
+                source: name,
             })
             .await;
         }
@@ -4004,6 +4033,7 @@ pub enum GameEvent {
     CharacterEffectWasApplied {
         character: CharacterId,
         applied_effect: ApplyEffect,
+        source: &'static str,
     },
     CharacterReceivedCondition {
         character: CharacterId,
@@ -4396,7 +4426,7 @@ impl ApplyEffect {
             ApplyEffect::GainHealth(n) => *n *= factor,
             ApplyEffect::GainStamina(n) => *n *= factor,
             ApplyEffect::GainMana(n) => *n *= factor,
-            ApplyEffect::LoseCondition { condition } => todo!(),
+            ApplyEffect::LoseCondition { .. } => todo!(),
             ApplyEffect::Pushed(n) => *n *= factor,
             ApplyEffect::Escape => {}
         }
@@ -4631,7 +4661,7 @@ impl Condition {
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
             ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
-            SpellFinesse => "Next time mana is spent on a spell enhancement, regain |<value>1| |<mana>| mana"
+            SpellFinesse => "After spending mana on a spell enhancement, regain |<value>1| |<mana>| mana"
         }
     }
 
@@ -4704,7 +4734,7 @@ impl Condition {
             ReaperApCooldown => StatusId::ReaperApCooldown,
             BloodRage => StatusId::Rage,
             Raging => StatusId::Rage,
-            Ferocity => StatusId::Rage,
+            Ferocity => StatusId::Blade,
             Ruthless => StatusId::Rage,
             Wet => StatusId::Wet,
             Poisoned => StatusId::Poisoned,
@@ -7845,6 +7875,7 @@ pub struct EquipEffect {
     pub on_attack_damage_apply_self: Option<ApplyEffect>,
     pub on_attack_damage_apply: Option<ApplyEffect>,
     pub start_of_turn_apply_self: Option<ApplyEffect>,
+    pub start_of_turn_maybe_apply_self: Option<(Circumstance, ApplyEffect)>,
 }
 
 impl EquipEffect {
@@ -7859,8 +7890,14 @@ impl EquipEffect {
             on_attack_damage_apply_self: None,
             on_attack_damage_apply: None,
             start_of_turn_apply_self: None,
+            start_of_turn_maybe_apply_self: None,
         }
     }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq)]
+pub enum Circumstance {
+    AdjacentToMultipleEnemies,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]

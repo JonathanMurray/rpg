@@ -4169,7 +4169,7 @@ impl GameGrid {
         let text_dimensions = measure_text(&header, Some(&self.big_font), font_size, 1.0);
         let text_pad = 2.0;
         let box_w = text_dimensions.width + text_pad * 2.0;
-        let status_w = 10.0;
+        let status_w = 20.0; // 10.0
         let box_h = text_dimensions.height + text_pad * 2.0;
 
         let condition_infos = character.condition_infos();

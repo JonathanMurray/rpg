@@ -319,6 +319,28 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        15,
+        21
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        12,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }

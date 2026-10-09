@@ -31,11 +31,11 @@ use crate::{
     core::{
         distance_between, predict_ability, predict_attack, Ability, AbilityAreaOutcome,
         AbilityEnhancement, AbilityId, AbilityResolvedEvent, AbilityRollType, AbilityTarget,
-        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyEffect, AreaEffect,
-        AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect, AttackOutcome,
-        AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition, CoreGame,
-        DamageSource, GameEvent, GameOverType, HandType, HitType, MovementType, OnAttackedReaction,
-        OnHitReaction, Position, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
+        AbilityTargetOutcome, Action, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
+        AreaEffect, AreaShape, AttackAction, AttackEnhancement, AttackEnhancementEffect,
+        AttackOutcome, AttackedEvent, BaseAction, Character, CharacterId, Characters, Condition,
+        CoreGame, DamageSource, GameEvent, GameOverType, HandType, HitType, MovementType,
+        OnAttackedReaction, OnHitReaction, Position, TargetPrediction, MOVE_COST_FACTOR_IN_LIQUID,
     },
     data::INSPIRE,
     drawing::draw_dashed_line_ex,
@@ -1947,7 +1947,26 @@ impl UserInterface {
             GameEvent::CharacterEffectWasApplied {
                 character,
                 applied_effect,
+                source,
             } => {
+                let name_tag = self.characters.get(character).name_tag();
+                let verb_phrase = match applied_effect {
+                    ApplyEffect::LoseActionPoints(n) => format!("lost {n} AP"),
+                    ApplyEffect::GainActionPoints(_) => todo!(),
+                    ApplyEffect::LoseHealth(_) => todo!(),
+                    ApplyEffect::GainHealth(_) => todo!(),
+                    ApplyEffect::GainStamina(_) => todo!(),
+                    ApplyEffect::GainMana(n) => format!("gained {n} mana"),
+                    ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
+                        format!("received |<keyword>{}|", condition.name())
+                    }
+                    ApplyEffect::LoseCondition { .. } => todo!(),
+                    ApplyEffect::Pushed(_) => todo!(),
+                    ApplyEffect::Escape => todo!(),
+                };
+                self.log
+                    .add(format!("|{name_tag}| {verb_phrase} |<faded>({source})|"));
+
                 self.show_applied_effect(applied_effect, character, 0.0);
             }
             GameEvent::CharacterReceivedCondition {
