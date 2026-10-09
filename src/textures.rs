@@ -159,6 +159,7 @@ pub enum StatusId {
     Treasure,
     HungeringBladeSouls,
     Advantage,
+    Mana,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -318,6 +319,8 @@ pub enum EquipmentIconId {
     HuntersCharm,
     DraugNecklace,
     BattleMageSigil,
+    AssassinsVial,
+    ManaStone,
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
@@ -991,6 +994,8 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::HuntersCharm => (2, 5),
         EquipmentIconId::DraugNecklace => (3, 5),
         EquipmentIconId::BattleMageSigil => (4, 5),
+        EquipmentIconId::AssassinsVial => (5, 5),
+        EquipmentIconId::ManaStone => (6, 5),
     };
     let icon_w = 20.0;
     let icon_h = 20.0;
@@ -1137,6 +1142,7 @@ pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32
         StatusId::Treasure => (5, 0),
         StatusId::HungeringBladeSouls => (5, 1),
         StatusId::Advantage => (5, 2),
+        StatusId::Mana => (5, 3),
     };
     let icon_w = 10.0;
     let dest_size = dest_size

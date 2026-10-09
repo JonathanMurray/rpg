@@ -19,6 +19,7 @@ use crate::d20::{probability_of_d20_reaching, roll_d20_with_advantage, DiceRollB
 
 use crate::data::PassiveSkill;
 use crate::game_ui_connection::{ActionOrSwitchTo, GameUserInterfaceConnection, QuitEvent};
+use crate::grid::TextEffect::ReceiveCondition;
 use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
@@ -644,9 +645,36 @@ impl CoreGame {
                 enhancements,
                 target,
             } => {
-                let caster = self.characters.get_rc(self.active_character_id);
+                let actor = self.characters.get_rc(self.active_character_id);
+
+                let mut ap_cost = ability.action_point_cost;
+
+                actor.spend_mana(ability.mana_cost);
+                actor.stamina.spend(ability.stamina_cost);
+                let mut spent_mana_on_enhancements = false;
+                for enhancement in &enhancements {
+                    ap_cost += enhancement.action_point_cost;
+                    if enhancement.mana_cost > 0 {
+                        actor.spend_mana(enhancement.mana_cost);
+                        spent_mana_on_enhancements = true;
+                    }
+                    actor.stamina.spend(enhancement.stamina_cost);
+                }
+
+                self.perform_spend_ap(actor, ap_cost).await;
+
+                if actor.has_condition(&Condition::SpellFinesse) && spent_mana_on_enhancements {
+                    let amount = 1;
+                    actor.gain_mana(amount);
+                    self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                        character: actor.id(),
+                        applied_effect: ApplyEffect::GainMana(amount),
+                    })
+                    .await;
+                }
+
                 let ability_resolved_events = Self::perform_ability(
-                    caster,
+                    actor,
                     ability,
                     &enhancements,
                     &target,
@@ -738,14 +766,12 @@ impl CoreGame {
                     detail_lines.push(format!("gained {} health", amount));
                 }
                 if consumable.mana_gain > 0 {
-                    let amount = character.mana.gain(consumable.mana_gain);
-                    character.on_mana_changed();
+                    let amount = character.gain_mana(consumable.mana_gain);
                     detail_lines.push(format!("gained {} mana", amount));
                 }
                 let mut effect = None;
                 if let Some(apply_effect) = consumable.effect {
-                    let (applied, line, _damage) =
-                        self.do_apply_effect(apply_effect, None, None, character);
+                    let (applied, line) = self.do_apply_effect(apply_effect, None, None, character);
                     detail_lines.push(line);
                     effect = applied;
                 }
@@ -1105,13 +1131,12 @@ impl CoreGame {
         if reduced_to_nothing {
             format!("|<keyword>{}| was skipped", effect)
         } else {
-            let (applied, log_line, damage) =
-                self.do_apply_effect(effect, giver, area_center, receiver);
+            let (applied, log_line) = self.do_apply_effect(effect, giver, area_center, receiver);
             if let Some(applied) = applied {
                 applied_effects.push(applied);
             }
-            *damage_from_effects += damage;
-            *actual_health_lost += damage;
+            //*damage_from_effects += damage;
+            // *actual_health_lost += damage;
 
             if let Some(name) = name {
                 format!("{} |<faded>({})|", log_line, name)
@@ -1127,8 +1152,7 @@ impl CoreGame {
         giver: Option<&Character>,
         area_center: Option<Position>,
         receiver: &Character,
-    ) -> (Option<ApplyEffect>, String, u32) {
-        let mut damage_dealt = 0;
+    ) -> (Option<ApplyEffect>, String) {
         let mut actual_effect = None;
         let line = match effect {
             ApplyEffect::LoseActionPoints(n) => {
@@ -1147,7 +1171,7 @@ impl CoreGame {
                 format!("  |{}| gained {} stamina", receiver.name_tag(), gained)
             }
             ApplyEffect::GainMana(n) => {
-                let gained = receiver.mana.gain(n);
+                let gained = receiver.gain_mana(n);
                 actual_effect = Some(ApplyEffect::GainMana(gained));
                 format!("  |{}| gained {} mana", receiver.name_tag(), gained)
             }
@@ -1215,7 +1239,7 @@ impl CoreGame {
             }
         };
 
-        (actual_effect, line, damage_dealt)
+        (actual_effect, line)
     }
 
     fn current_time(&self) -> u32 {
@@ -1273,20 +1297,6 @@ impl CoreGame {
         let actor_id = actor.id();
 
         let real_game: Option<&CoreGame> = mode.real_game();
-
-        if let Some(game) = real_game {
-            let mut ap_cost = ability.action_point_cost;
-
-            actor.spend_mana(ability.mana_cost);
-            actor.stamina.spend(ability.stamina_cost);
-            for enhancement in enhancements {
-                ap_cost += enhancement.action_point_cost;
-                actor.spend_mana(enhancement.mana_cost);
-                actor.stamina.spend(enhancement.stamina_cost);
-            }
-
-            game.perform_spend_ap(actor, ap_cost).await;
-        }
 
         let mut enemies_hit = vec![];
         let mut ability_resolved_events = vec![];
@@ -1897,7 +1907,7 @@ impl CoreGame {
                     ApplyEffect::Escape => {}
                 }
 
-                let (applied, log_line, _damage) = game.do_apply_effect(effect, None, None, target);
+                let (applied, log_line) = game.do_apply_effect(effect, None, None, target);
                 if let Some(applied) = applied {
                     applied_effects.push(applied);
                     detail_lines.push(log_line);
@@ -1907,7 +1917,7 @@ impl CoreGame {
             for enhancement in enhancements {
                 let effect = enhancement.spell_effect.unwrap();
                 for apply_effect in effect.target_on_hit.iter().flatten().flatten() {
-                    let (applied, log_line, _damage) =
+                    let (applied, log_line) =
                         game.do_apply_effect(*apply_effect, None, None, target);
                     if let Some(applied) = applied {
                         applied_effects.push(applied);
@@ -1989,7 +1999,7 @@ impl CoreGame {
                     if num_targets_hit > 0 {
                         apply_effect.multiply(num_targets_hit);
 
-                        let (applied, _line, _damage) =
+                        let (applied, _line) =
                             game.do_apply_effect(apply_effect, Some(caster), None, caster);
 
                         let mut applied_effects = vec![];
@@ -2792,7 +2802,7 @@ impl CoreGame {
                         .iter()
                         .flatten()
                         {
-                            let (applied, log_line, _damage) =
+                            let (applied, log_line) =
                                 game.do_apply_effect(*effect, Some(attacker), None, attacker);
                             if let Some(applied) = applied {
                                 applied_to_self.push(applied);
@@ -2802,7 +2812,7 @@ impl CoreGame {
 
                         for (name, enhancement) in enhancements {
                             if let Some(effect) = enhancement.on_kill_apply_self {
-                                let (applied, log_line, _damage) =
+                                let (applied, log_line) =
                                     game.do_apply_effect(effect, Some(attacker), None, attacker);
                                 if let Some(applied) = applied {
                                     applied_to_self.push(applied);
@@ -2813,7 +2823,7 @@ impl CoreGame {
                     }
 
                     if let Some(effect) = ability_attack_effect.and_then(|e| e.on_hit) {
-                        let (applied, log_line, _damage) =
+                        let (applied, log_line) =
                             game.do_apply_effect(effect, Some(attacker), None, defender);
                         detail_lines.push(log_line);
                     }
@@ -2822,7 +2832,7 @@ impl CoreGame {
                         if let Some(effect) = weapon.on_damage {
                             match effect {
                                 AttackHitEffect::ApplyTarget(effect) => {
-                                    let (applied, log_line, _damage) = game.do_apply_effect(
+                                    let (applied, log_line) = game.do_apply_effect(
                                         effect,
                                         Some(attacker),
                                         None,
@@ -2835,7 +2845,7 @@ impl CoreGame {
                                         .push(format!("{} |<faded>({})|", log_line, weapon.name))
                                 }
                                 AttackHitEffect::ApplySelf(effect) => {
-                                    let (applied, log_line, _damage) = game.do_apply_effect(
+                                    let (applied, log_line) = game.do_apply_effect(
                                         effect,
                                         Some(attacker),
                                         None,
@@ -2877,13 +2887,12 @@ impl CoreGame {
                                         if resist {
                                             "Resist".to_string()
                                         } else {
-                                            let (applied, log_line, _damage) = game
-                                                .do_apply_effect(
-                                                    apply_effect,
-                                                    Some(attacker),
-                                                    None,
-                                                    defender,
-                                                );
+                                            let (applied, log_line) = game.do_apply_effect(
+                                                apply_effect,
+                                                Some(attacker),
+                                                None,
+                                                defender,
+                                            );
                                             if let Some(apply_effect) = applied {
                                                 applied_to_target.push(apply_effect);
                                             }
@@ -2912,7 +2921,7 @@ impl CoreGame {
 
                         if let Some(arrow) = used_arrow {
                             if let Some(apply_effect) = arrow.on_damage_apply {
-                                let (applied, log_line, _damage) = game.do_apply_effect(
+                                let (applied, log_line) = game.do_apply_effect(
                                     apply_effect,
                                     Some(attacker),
                                     None,
@@ -2928,11 +2937,23 @@ impl CoreGame {
 
                         attacker.for_equip_effects(|name, equip| {
                             if let Some(apply_effect) = equip.on_attack_damage_apply_self {
-                                let (applied, log_line, _damage) =
+                                let (applied, log_line) =
                                     game.do_apply_effect(apply_effect, None, None, attacker);
                                 detail_lines.push(format!("{} |<faded>({})|", log_line, name));
                                 if let Some(applied) = applied {
                                     applied_to_self.push(applied);
+                                }
+                            }
+                            if let Some(apply_effect) = equip.on_attack_damage_apply {
+                                let (applied, log_line) = game.do_apply_effect(
+                                    apply_effect,
+                                    Some(attacker),
+                                    None,
+                                    defender,
+                                );
+                                detail_lines.push(format!("{} |<faded>({})|", log_line, name));
+                                if let Some(applied) = applied {
+                                    applied_to_target.push(applied);
                                 }
                             }
                         });
@@ -2969,7 +2990,7 @@ impl CoreGame {
 
             for (name, effect) in enhancements {
                 if let Some(effect) = effect.on_target {
-                    let (_applied, log_line, _damage) =
+                    let (_applied, log_line) =
                         game.do_apply_effect(effect, Some(attacker), None, defender);
                     detail_lines.push(format!("{} ({})", log_line, name));
                 }
@@ -3079,7 +3100,7 @@ impl CoreGame {
                     };
 
                     if let Some((condition, duration)) = condition {
-                        let (_applied, log_line, _damage) = self.do_apply_effect(
+                        let (_applied, log_line) = self.do_apply_effect(
                             ApplyEffect::Condition(ApplyCondition {
                                 condition,
                                 stacks: None,
@@ -3133,6 +3154,25 @@ impl CoreGame {
         let surface = self.pathfind_grid.surface(character.pos());
         if surface == Some(Surface::Fire) {
             self.on_enter_or_start_turn_in_fire_surface(character).await;
+        }
+        let mut applied_to_self = vec![];
+        character.for_equip_effects(|_name, equip| {
+            dbg!(equip.start_of_turn_apply_self);
+            if let Some(apply_effect) = equip.start_of_turn_apply_self {
+                let (applied, _line) =
+                    self.do_apply_effect(apply_effect, Some(character), None, character);
+
+                if let Some(applied) = applied {
+                    applied_to_self.push(applied);
+                }
+            }
+        });
+        for applied in applied_to_self {
+            self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
+                character: character.id(),
+                applied_effect: applied,
+            })
+            .await;
         }
     }
 
@@ -3961,6 +4001,10 @@ pub enum GameEvent {
         amount: u32,
         source: DamageSource,
     },
+    CharacterEffectWasApplied {
+        character: CharacterId,
+        applied_effect: ApplyEffect,
+    },
     CharacterReceivedCondition {
         character: CharacterId,
         condition: Condition,
@@ -4507,6 +4551,7 @@ pub enum Condition {
     Treasure,
     HungeringBladeSouls,
     ArcaneBlessing,
+    SpellFinesse,
 }
 
 impl Condition {
@@ -4546,6 +4591,7 @@ impl Condition {
             Treasure => "Treasure",
             HungeringBladeSouls => "Captured souls",
             ArcaneBlessing => "Arcane blessing",
+            SpellFinesse => "Spell finesse",
         }
     }
 
@@ -4571,7 +4617,7 @@ impl Condition {
             Encumbered => "|<value>-x| |<shield>|<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
             NearDeath => "|<value>-1| AP regen.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < 20% health)",
             Dead => "This character is dead.",
-            ReaperApCooldown => "Can not gain more AP from Reaper this turn.",
+            ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
             BloodRage => "|<value>+3| |<red_dice>| |<stat>Attack| (passive skill).",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell| (passive skill).",
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
@@ -4584,7 +4630,8 @@ impl Condition {
             Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
-            ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll"
+            ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
+            SpellFinesse => "Next time mana is spent on a spell enhancement, regain |<value>1| |<mana>| mana"
         }
     }
 
@@ -4624,6 +4671,7 @@ impl Condition {
             Treasure => true,
             HungeringBladeSouls => true,
             ArcaneBlessing => true,
+            SpellFinesse => true,
         }
     }
 
@@ -4663,6 +4711,7 @@ impl Condition {
             Treasure => StatusId::Treasure,
             HungeringBladeSouls => StatusId::HungeringBladeSouls,
             ArcaneBlessing => StatusId::Advantage,
+            SpellFinesse => StatusId::Mana,
             _ => {
                 if self.is_positive() {
                     StatusId::PlaceholderPositive
@@ -5966,6 +6015,12 @@ impl Character {
     fn spend_mana(&self, amount: u32) {
         self.mana.spend(amount);
         self.on_mana_changed();
+    }
+
+    fn gain_mana(&self, amount: u32) -> u32 {
+        let gained = self.mana.gain(amount);
+        self.on_mana_changed();
+        gained
     }
 
     fn on_mana_changed(&self) {
@@ -7788,6 +7843,8 @@ pub struct EquipEffect {
     pub bonus_stamina_regen: u32,
     pub attack_advantage_against_bleeding_target: bool,
     pub on_attack_damage_apply_self: Option<ApplyEffect>,
+    pub on_attack_damage_apply: Option<ApplyEffect>,
+    pub start_of_turn_apply_self: Option<ApplyEffect>,
 }
 
 impl EquipEffect {
@@ -7800,6 +7857,8 @@ impl EquipEffect {
             bonus_stamina_regen: 0,
             attack_advantage_against_bleeding_target: false,
             on_attack_damage_apply_self: None,
+            on_attack_damage_apply: None,
+            start_of_turn_apply_self: None,
         }
     }
 }

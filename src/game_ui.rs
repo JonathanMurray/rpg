@@ -1944,6 +1944,12 @@ impl UserInterface {
                     self.animation_stopwatch.set_to_at_least(0.15);
                 }
             }
+            GameEvent::CharacterEffectWasApplied {
+                character,
+                applied_effect,
+            } => {
+                self.show_applied_effect(applied_effect, character, 0.0);
+            }
             GameEvent::CharacterReceivedCondition {
                 character,
                 condition,

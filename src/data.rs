@@ -683,6 +683,34 @@ pub const BATTLEMAGE_SIGIL: Trinket = Trinket {
     icon: EquipmentIconId::BattleMageSigil,
 };
 
+pub const ASSASSINS_VIAL: Trinket = Trinket {
+    name: "Assassin's vial",
+    sprite: None,
+    equip: EquipEffect {
+        on_attack_damage_apply: Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::Poisoned,
+            stacks: None,
+            duration_rounds: Some(2),
+        })),
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::AssassinsVial,
+};
+
+pub const MANA_STONE: Trinket = Trinket {
+    name: "Saphire stone",
+    sprite: None,
+    equip: EquipEffect {
+        start_of_turn_apply_self: Some(ApplyEffect::Condition(ApplyCondition {
+            condition: Condition::SpellFinesse,
+            stacks: Some(1),
+            duration_rounds: None,
+        })),
+        ..EquipEffect::default()
+    },
+    icon: EquipmentIconId::ManaStone,
+};
+
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),

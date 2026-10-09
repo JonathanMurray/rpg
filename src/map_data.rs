@@ -12,13 +12,13 @@ use crate::{
         Weapon,
     },
     data::{
-        ADRENALIN_POTION, ARCANE_BOW, ARCANE_RING, BAD_BOW, BAD_DAGGER, BAD_RAPIER,
+        ADRENALIN_POTION, ARCANE_BOW, ARCANE_RING, ASSASSINS_VIAL, BAD_BOW, BAD_DAGGER, BAD_RAPIER,
         BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, CHAIN_MAIL,
         COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT, ENEMY_BRACE,
         ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
-        KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
+        KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, MANA_STONE, NECROTIC_BAND,
         PENETRATING_ARROWS, SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP,
         STAFF,
     },
@@ -635,6 +635,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
     bob.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
     bob.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    bob.trinket.set(Some(MANA_STONE));
     bob
 }
 
@@ -654,7 +655,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3)));
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
-    alice.trinket.set(Some(BATTLEMAGE_SIGIL));
+    alice.trinket.set(Some(MANA_STONE));
     alice.learn_ability(&HEAL);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);

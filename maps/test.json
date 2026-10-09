@@ -299,20 +299,9 @@
   },
   "characters": [
     {
-      "type_": "Ogre",
+      "type_": "Ghoul2",
       "pos": [
-        11,
-        18
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Skeleton",
-      "pos": [
-        14,
+        10,
         17
       ],
       "health": null,
@@ -321,98 +310,10 @@
       "name": null
     },
     {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        15
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
+      "type_": "Alice",
       "pos": [
         12,
-        27
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        12,
-        23
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        12
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        9
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        11,
-        6
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        14,
-        14
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        17,
-        14
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        17,
-        11
+        22
       ],
       "health": null,
       "main_hand": null,
