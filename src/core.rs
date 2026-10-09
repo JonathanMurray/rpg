@@ -23,7 +23,7 @@ use crate::grid::{GameGrid, ParticleShape};
 use crate::init_fight_map::GameInitState;
 use crate::pathfind::{Collision, Occupation, PathfindGrid, Surface, SurfaceBrushSize};
 use crate::sounds::SoundId;
-use crate::textures::{EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
+use crate::textures::{EffectId, EquipmentIconId, IconId, PortraitId, SpriteId, StatusId};
 use crate::tooltip::Keyword;
 use crate::util::{are_entities_within_melee, line_visitor, plus_minus, CustomShuffle};
 
@@ -1180,12 +1180,12 @@ impl CoreGame {
             ApplyEffect::LoseActionPoints(n) => {
                 let lost = receiver.action_points.lose(n);
                 actual_effect = Some(ApplyEffect::LoseActionPoints(lost));
-                format!("  |{}| lost {} AP", receiver.name_tag(), n)
+                format!("  |{}| lost {} |<ap>| AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainActionPoints(n) => {
                 let gained = receiver.action_points.gain(n);
                 actual_effect = Some(ApplyEffect::GainActionPoints(gained));
-                format!("  |{}| gained {} AP", receiver.name_tag(), n)
+                format!("  |{}| gained {} |<ap>| AP", receiver.name_tag(), n)
             }
             ApplyEffect::GainStamina(n) => {
                 let gained = receiver.stamina.gain(n);
@@ -2487,7 +2487,7 @@ impl CoreGame {
             let bonus_evasion = reaction.effect.bonus_evasion;
             if bonus_evasion > 0 {
                 total_bonus_evasion += bonus_evasion;
-                evasion_str.push_str(&format!("+{} ({})", bonus_evasion, reaction.name));
+                evasion_str.push_str(&format!("+{} |<faded>({})|", bonus_evasion, reaction.name));
             }
 
             let bonus_armor = reaction.effect.bonus_armor;
@@ -2519,7 +2519,7 @@ impl CoreGame {
             if attacker_weapon.is_melee() && weapon.bonus_melee_evasion > 0 {
                 total_bonus_evasion += weapon.bonus_melee_evasion;
                 evasion_str.push_str(&format!(
-                    "+{} ({})",
+                    "+{} |<faded>({})|",
                     weapon.bonus_melee_evasion, weapon.name
                 ));
             }
@@ -2636,11 +2636,11 @@ impl CoreGame {
             }
 
             if let Some(e) = ability_attack_effect {
-                let bonus_dmg = e.bonus_damage;
-                if bonus_dmg > 0 {
+                let dmg_delta = e.damage_delta;
+                if dmg_delta != 0 {
                     // TODO use the ability's name instead of just "ability"
-                    dmg_str.push_str(&format!(" +{} |<faded>(ability)|", bonus_dmg));
-                    dmg_calculation += bonus_dmg as i32;
+                    dmg_str.push_str(&format!(" {} |<faded>(ability)|", plus_minus(dmg_delta)));
+                    dmg_calculation += dmg_delta as i32;
                 }
 
                 let penalty = e.damage_penalty_per_consecutive_target * attack_index;
@@ -2757,6 +2757,7 @@ impl CoreGame {
                     hit_type,
                     applied_to_target: vec![],
                     applied_to_self: vec![],
+                    visual_effect: None,
                 }
             } else {
                 if let Some((name, amount)) = damage_prevention {
@@ -2774,6 +2775,7 @@ impl CoreGame {
 
                 let mut applied_to_target = vec![];
                 let mut applied_to_self = vec![];
+                let mut visual_effect = None;
 
                 if let Some(game) = game {
                     dmg_str.push_str(&format!(" = |<value>{damage}|"));
@@ -2934,6 +2936,10 @@ impl CoreGame {
                                 );
                                 detail_lines.push(format!("{} |<faded>({})|", line, name))
                             }
+
+                            if let Some(effect_id) = effect.visual_effect {
+                                visual_effect = Some(effect_id);
+                            }
                         }
 
                         if let Some(arrow) = used_arrow {
@@ -2995,6 +3001,7 @@ impl CoreGame {
                     hit_type,
                     applied_to_target,
                     applied_to_self,
+                    visual_effect,
                 }
             }
         };
@@ -3043,14 +3050,13 @@ impl CoreGame {
             }
         }
 
-        let attacked_event = AttackedEvent {
+        AttackedEvent {
             attacker: attacker.id(),
             target: defender.id(),
             outcome,
             detail_lines,
             area_outcomes,
-        };
-        attacked_event
+        }
     }
 
     async fn perform_on_hit_reaction(&mut self, reactor_id: CharacterId, reaction: OnHitReaction) {
@@ -4054,12 +4060,13 @@ pub enum GameEvent {
     CharacterChangedEquipment,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub enum DamageSource {
     Condition(Condition),
     KnockbackCollision,
     SpikesSurface,
     FireSurface,
+    Ability(&'static Ability),
 }
 
 impl DamageSource {
@@ -4069,6 +4076,7 @@ impl DamageSource {
             DamageSource::KnockbackCollision => "Collision",
             DamageSource::SpikesSurface => "Spikes",
             DamageSource::FireSurface => "Fire",
+            DamageSource::Ability(ability) => ability.name,
         }
     }
 }
@@ -4168,6 +4176,7 @@ pub struct AttackOutcome {
     pub hit_type: HitType,
     pub applied_to_target: Vec<ApplyEffect>,
     pub applied_to_self: Vec<ApplyEffect>,
+    pub visual_effect: Option<EffectId>,
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -4428,9 +4437,24 @@ impl ApplyEffect {
 impl Display for ApplyEffect {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            ApplyEffect::LoseActionPoints(n) => f.write_fmt(format_args!("-{n} AP")),
-            ApplyEffect::GainActionPoints(n) => f.write_fmt(format_args!("+{n} AP")),
-            ApplyEffect::GainStamina(n) => f.write_fmt(format_args!("{n} |<stamina>|")),
+            ApplyEffect::LoseActionPoints(n) => {
+                for _ in 0..*n {
+                    f.write_str("|<lose_ap>|")?;
+                }
+                Ok(())
+            }
+            ApplyEffect::GainActionPoints(n) => {
+                for _ in 0..*n {
+                    f.write_str("|<ap>|")?;
+                }
+                Ok(())
+            }
+            ApplyEffect::GainStamina(n) => {
+                for _ in 0..*n {
+                    f.write_str("|<stamina>|")?;
+                }
+                Ok(())
+            }
             ApplyEffect::GainMana(n) => f.write_fmt(format_args!("{n} |<mana>|")),
             ApplyEffect::LoseHealth(n) => f.write_fmt(format_args!("{n}")),
             ApplyEffect::GainHealth(n) => f.write_fmt(format_args!("{n}")),
@@ -4625,7 +4649,7 @@ impl Condition {
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
-            Inspired => "|<value>+3| |<boot>|<stat>Movement|.\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
+            Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
             Exposed => "|<value>-3| to all |<shield>| defenses.\n|<value>-50%| |<helmet>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes at most |<value>1| damage from the next attack.",
@@ -5273,7 +5297,7 @@ impl AbilityNegativeEffect {
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityAttackEffect {
     pub override_weapon_damage: Option<u32>,
-    pub bonus_damage: u32,
+    pub damage_delta: i32,
     pub bonus_advantage: u32,
     pub damage_penalty_per_consecutive_target: u32,
     pub on_hit: Option<ApplyEffect>,
@@ -5284,7 +5308,7 @@ impl AbilityAttackEffect {
     pub const fn default() -> Self {
         Self {
             override_weapon_damage: None,
-            bonus_damage: 0,
+            damage_delta: 0,
             bonus_advantage: 0,
             damage_penalty_per_consecutive_target: 0,
             on_hit: None,
@@ -5557,6 +5581,8 @@ pub struct AttackEnhancementEffect {
 
     pub improved_graze: bool,
     pub improved_crit: bool,
+
+    pub visual_effect: Option<EffectId>,
 }
 
 impl AttackEnhancementEffect {
@@ -5578,6 +5604,7 @@ impl AttackEnhancementEffect {
             consume_equipped_arrow: false,
             improved_graze: false,
             improved_crit: false,
+            visual_effect: None,
         }
     }
 }

@@ -32,7 +32,7 @@ use crate::{
     pathfind::Surface,
     textures::{draw_icon, IconId},
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
-    util::{oscillate, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
+    util::{oscillate, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
 
 pub const EVASION_STR: &str = "|<shield>||<stat>Evasion|";
@@ -802,15 +802,18 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
             let dmg_str = match ability_attack_effect.override_weapon_damage {
                 Some(override_dmg) => override_dmg.to_string(),
                 None => {
-                    if ability_attack_effect.bonus_damage > 0 {
-                        format!("weapon + {}", ability_attack_effect.bonus_damage)
+                    if ability_attack_effect.damage_delta != 0 {
+                        format!(
+                            "|<faded>weapon damage| |<value>{}|",
+                            plus_minus(ability_attack_effect.damage_delta)
+                        )
                     } else {
-                        "weapon".to_string()
+                        "|<faded>weapon damage|".to_string()
                     }
                 }
             };
             t.technical_description
-                .push(format!("  |<sword>| |<value>{dmg_str}| |<faded>damage|"));
+                .push(format!("  |<sword>| {dmg_str}"));
 
             if ability_attack_effect.damage_penalty_per_consecutive_target > 0 {
                 let penalty_str = format!(

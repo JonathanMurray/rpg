@@ -263,48 +263,6 @@
         "Water"
       ]
     },
-    "(19, 23)": "FireSurfaceSingleCell",
-    "(17, 25)": "FireSurfaceSingleCell",
-    "(18, 26)": "FireSurfaceSingleCell",
-    "(19, 22)": "FireSurfaceSingleCell",
-    "(4, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 31)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(17, 21)": "FireSurfaceSingleCell",
-    "(17, 24)": "FireSurfaceSingleCell",
-    "(17, 26)": "FireSurfaceSingleCell",
-    "(19, 21)": "FireSurfaceSingleCell",
-    "(19, 25)": "FireSurfaceSingleCell",
-    "(19, 24)": "FireSurfaceSingleCell",
-    "(18, 24)": "FireSurfaceSingleCell",
-    "(18, 25)": "FireSurfaceSingleCell",
-    "(19, 26)": "FireSurfaceSingleCell",
-    "(17, 23)": "FireSurfaceSingleCell",
-    "(18, 23)": "FireSurfaceSingleCell",
-    "(18, 21)": "FireSurfaceSingleCell",
-    "(17, 22)": "FireSurfaceSingleCell",
-    "(18, 22)": "FireSurfaceSingleCell",
-    "(7, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
     "(10, 13)": {
       "NewWater": [
         "NorthEast",
@@ -317,13 +275,7 @@
         "Water"
       ]
     },
-    "(16, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 13)": {
+    "(10, 16)": {
       "NewWater": [
         "NorthEast",
         "Water"
@@ -335,19 +287,31 @@
         "Water"
       ]
     },
-    "(22, 16)": {
+    "(4, 31)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(19, 16)": {
+    "(7, 31)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(16, 16)": {
+    "(7, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(16, 13)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 13)": {
       "NewWater": [
         "NorthEast",
         "Water"
@@ -359,7 +323,25 @@
         "Water"
       ]
     },
-    "(10, 16)": {
+    "(16, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(22, 16)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(19, 13)": {
       "NewWater": [
         "NorthEast",
         "Water"
@@ -382,10 +364,10 @@
       "name": null
     },
     {
-      "type_": "Skeleton",
+      "type_": "Ogre",
       "pos": [
-        14,
-        20
+        16,
+        23
       ],
       "health": null,
       "main_hand": null,
@@ -393,10 +375,10 @@
       "name": null
     },
     {
-      "type_": "Alice",
+      "type_": "Ghoul1",
       "pos": [
-        20,
-        21
+        14,
+        26
       ],
       "health": null,
       "main_hand": null,

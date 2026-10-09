@@ -63,7 +63,7 @@ impl Keyword {
             Keyword::OpportunityAttack => "|<faded>(reaction)|\nAttack an enemy that drops their guard".to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
             Keyword::Pushed => {
-                "Distance: |<value>x|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
+                "Distance: |<value>x| |<faded>(affected by target's |<stat>Toughness|<faded>)|\nOn collision: take |<value>1| damage per remaining distance.".to_string()
             }
             Keyword::Graze => {
                 "|<value>-50%| damage or effectiveness.\nTriggers when |<mixed_dice>| outcome is |<value>5| or lower.".to_string()

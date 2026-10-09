@@ -61,9 +61,9 @@ use crate::{
     },
     sounds::{SoundId, SoundPlayer},
     textures::{
-        character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, measure_tiny_font,
-        EffectId, LiquidType, Sprite, SpriteId, StatusId, TerrainId, TinyFontColor,
-        WaterOrientation, LIGHTNING_BOLT_FX,
+        character_sprite_height, draw_status_icon, draw_terrain, draw_tiny_font, effect_atlas_rect,
+        measure_tiny_font, EffectId, LiquidType, Sprite, SpriteId, StatusId, TerrainId,
+        TinyFontColor, WaterOrientation, EFFECTS_TEXTURE, LIGHTNING_BOLT_FX,
     },
     util::{
         are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
@@ -1077,9 +1077,12 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_pow_effect(&mut self, character_id: CharacterId, duration: f32) {
+    pub fn animate_effect(&mut self, character_id: CharacterId, duration: f32, effect: EffectId) {
         let pos = self.characters.get(&character_id).unwrap().pos();
-        let pos = (pos.0 as f32, pos.1 as f32);
+        let pos = (pos.0 as f32, pos.1 as f32 - 0.5);
+        let texture = EFFECTS_TEXTURE.get().unwrap();
+
+        let rect = effect_atlas_rect(effect);
         self.effects.push(ConcreteEffect {
             age: 0.0,
             start_time: 0.0,
@@ -1088,21 +1091,17 @@ impl GameGrid {
             destination_pos: pos,
             variant: EffectVariant::At(
                 EffectPosition::Source,
-                EffectGraphics::Texture(self.effect_textures[&EffectId::Pow].clone()),
+                EffectGraphics::Texture(texture.clone(), Some(rect)),
             ),
         });
     }
 
-    pub fn animate_character_lost_ap(
-        &mut self,
-        character_id: CharacterId,
-        duration: f32,
-        amount: u32,
-    ) {
+    pub fn animate_character_lost_ap(&mut self, character_id: CharacterId, amount: u32) {
+        println!("animate char lost ap: {}, {}", character_id, amount);
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             0.0,
-            duration,
+            0.8,
             AnimationDetails::ApLost { amount },
         ));
     }
@@ -1278,7 +1277,15 @@ impl GameGrid {
                 s.push_str(&format!("{} ", applied_effect));
                 let style = match applied_effect {
                     ApplyEffect::Pushed(_) => return false,
-                    ApplyEffect::LoseActionPoints(_) => return false,
+                    ApplyEffect::LoseActionPoints(_) => {
+                        if self.active_character_id == character_id {
+                            // When active character "loses" AP, they're most likely just spending it.
+                            // That shouldn't show up as a text effect on the grid
+                            return false;
+                        }
+
+                        TextEffectStyle::NegativeEffect
+                    }
                     ApplyEffect::GainActionPoints(_) => TextEffectStyle::PositiveEffect,
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
                         if condition.is_positive() {
@@ -4134,11 +4141,21 @@ impl GameGrid {
         detailed: bool,
         active_char_reserved_and_hovered_ap: (i32, i32),
     ) {
+        let mut ap_lost_animation = None;
+        for animation in &self.character_animations {
+            if animation.character_id == character.id() {
+                if let AnimationDetails::ApLost { amount } = animation.kind {
+                    ap_lost_animation = Some((animation, amount));
+                }
+            }
+        }
+
         let discrete_healthbar = !detailed;
         let draw_action_points = (character.player_controlled()
             && !character.has_taken_a_turn_this_round.get())
             || self.active_character_id == character.id()
-            || self.hovered_character.or(self.hovered_character_portrait) == Some(character.id());
+            || self.hovered_character.or(self.hovered_character_portrait) == Some(character.id())
+            || ap_lost_animation.is_some();
 
         let (x, y) = self.character_screen_pos(character);
         let sprite_h = character_sprite_height(character.sprite);
@@ -4185,16 +4202,13 @@ impl GameGrid {
             if character.id() == self.active_character_id {
                 action_points_row.reserved_and_hovered_ap = active_char_reserved_and_hovered_ap;
             }
-            for animation in &self.character_animations {
-                if animation.character_id == character.id() {
-                    if let AnimationDetails::ApLost { amount } = animation.kind {
-                        action_points_row.animate_lost(
-                            amount,
-                            animation.duration - animation.remaining_duration,
-                            animation.duration,
-                        );
-                    }
-                }
+
+            if let Some((animation, amount)) = ap_lost_animation {
+                action_points_row.animate_lost(
+                    amount,
+                    animation.duration - animation.remaining_duration,
+                    animation.duration,
+                );
             }
             action_points_row.padding = 1.0;
             action_points_row.current_ap = character.action_points.current();
@@ -5212,7 +5226,7 @@ pub enum EffectGraphics {
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
     },
-    Texture(Texture2D),
+    Texture(Texture2D, Option<Rect>),
 }
 
 #[derive(Debug, Clone)]
@@ -5311,8 +5325,17 @@ impl EffectGraphics {
                     );
                 }
             }
-            EffectGraphics::Texture(texture) => {
-                draw_texture(texture, x, y, WHITE);
+            EffectGraphics::Texture(texture, source) => {
+                draw_texture_ex(
+                    texture,
+                    x,
+                    y,
+                    WHITE,
+                    DrawTextureParams {
+                        source: *source,
+                        ..Default::default()
+                    },
+                );
             }
         }
     }
@@ -5346,7 +5369,6 @@ fn draw_text_graphics(
 
     //let font_size = 20;
     //let text_dimensions = measure_text(text, Some(font), font_size, 1.0);
-    let text_dimensions = measure_text_with_font_tags(text, Some(font), *font_size, 1.0);
 
     let quick_rise_duration = 0.15;
     let grow_duration = 0.1;
@@ -5359,7 +5381,9 @@ fn draw_text_graphics(
         1.0
     };
 
-    let mut x0 = x + cell_w / 2.0 - text_dimensions.width * font_scale / 2.0;
+    let text_dim = measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
+
+    let mut x0 = x + cell_w / 2.0 - text_dim.width * font_scale / 2.0;
 
     let slow_move_duration = 0.7;
     let movement_factor = if t < slow_move_duration {
@@ -5394,7 +5418,7 @@ fn draw_text_graphics(
     let status_w = 20.0;
     if let Some(texture) = status_texture {
         let status_x = x0 - status_w - 3.0;
-        let status_y = y0 - text_dimensions.offset_y / 2.0 - status_w / 2.0;
+        let status_y = y0 - text_dim.offset_y / 2.0 - status_w / 2.0;
         draw_rectangle(status_x, status_y, status_w, status_w, BLACK);
         draw_status_icon(*texture, status_x, status_y, Some((status_w, status_w)));
         draw_rectangle_lines2(status_x, status_y, status_w, status_w, 1.0, GRAY);
@@ -5403,7 +5427,6 @@ fn draw_text_graphics(
     if *background {
         let margin = 3.0;
         //dbg!(text);
-        let text_dim = measure_text_with_font_tags(text, Some(font), *font_size, font_scale);
         draw_rectangle(
             x0 - margin,
             y0 - text_dim.offset_y - margin,

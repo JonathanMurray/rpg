@@ -20,7 +20,7 @@ use crate::{
         HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
         KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
         PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD,
-        SPIKE_TRAP, STAFF,
+        SPIKE_TRAP, STAFF, WAR_HAMMER,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -615,8 +615,8 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 3, 5),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, HUNGERING_BLADE);
-    bob.set_shield(SPIKE_SHIELD);
+    bob.set_weapon(HandType::MainHand, WAR_HAMMER);
+    //bob.set_shield(SPIKE_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
     bob.learn_ability(&SWEEP_ATTACK);

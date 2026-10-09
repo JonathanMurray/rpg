@@ -89,7 +89,7 @@ impl SoundPlayer {
             (SoundId::Poison, 1.0, vec!["fl_poison.ogg"]),
             (SoundId::MechanicNoise, 1.0, vec!["fl_wobble.ogg"]),
             (SoundId::SelectTarget, 0.5, vec!["fl_blip_3.ogg"]),
-            (SoundId::GainedAP, 1.0, vec!["fl_blip_3.ogg"]),
+            (SoundId::GainedAP, 1.0, vec!["fl_scale_4.ogg"]), //vec!["fl_blip_3.ogg"]),
             (SoundId::HoverTarget, 1.0, vec!["fl_blip_short_3.ogg"]),
             (SoundId::Scale1, 0.5, vec!["fl_scale_1.ogg"]),
             (SoundId::Scale2, 0.5, vec!["fl_scale_2.ogg"]),

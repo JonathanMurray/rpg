@@ -16,7 +16,7 @@ use crate::{
     grid::ParticleShape,
     pathfind::Surface,
     sounds::SoundId,
-    textures::{EquipmentIconId, IconId, SpriteId},
+    textures::{EffectId, EquipmentIconId, IconId, SpriteId},
     tooltip::Keyword,
 };
 
@@ -401,14 +401,19 @@ pub const RAPIER: Weapon = Weapon {
     weight: 2,
 };
 
-const ALL_IN: AttackEnhancement = AttackEnhancement {
-    name: "All-in",
-    description: "Deal additional damage and bypass target's armor",
-    icon: IconId::AllIn,
-    action_point_cost: 1,
+const BONK: AttackEnhancement = AttackEnhancement {
+    name: "Bonk",
+    description: "Target loses |<value>1| AP",
+    icon: IconId::Bonk,
+    //action_point_cost: 1,
+    stamina_cost: 1,
     effect: AttackEnhancementEffect {
-        bonus_damage: 1,
-        armor_penetration: 2,
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            None,
+            ApplyEffect::LoseActionPoints(1),
+        )),
+        bonus_damage: 3, //TODO
+        visual_effect: Some(EffectId::Bonk),
         ..AttackEnhancementEffect::default()
     },
     ..AttackEnhancement::default()
@@ -421,7 +426,7 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
     damage: 6,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
-    attack_enhancement: Some(ALL_IN),
+    attack_enhancement: Some(BONK),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -435,11 +440,10 @@ pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
     action_point_cost: 3,
-    // Note: sword held in 2h deals the same as this
-    damage: 8,
+    damage: 7,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
-    attack_enhancement: Some(ALL_IN),
+    attack_enhancement: Some(BONK),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: None,
@@ -457,7 +461,7 @@ pub const BONE_CRUSHER: Weapon = Weapon {
     damage: 8,
     grip: WeaponGrip::TwoHanded,
     attack_attribute: AttackAttribute::Strength,
-    attack_enhancement: Some(ALL_IN),
+    attack_enhancement: Some(BONK),
     on_attacked_reaction: None,
     bonus_melee_evasion: 3,
     on_damage: Some(AttackHitEffect::ApplyTarget(ApplyEffect::Condition(
@@ -1113,7 +1117,10 @@ pub const SWEEP_ATTACK: Ability = Ability {
             create_surface: None,
             acquisition: AreaTargetAcquisition::Enemies,
             effect: AbilityEffect::Negative(AbilityNegativeEffect::PerformAttack(
-                AbilityAttackEffect::default(),
+                AbilityAttackEffect {
+                    damage_delta: -1,
+                    ..AbilityAttackEffect::default()
+                },
             )),
         }),
         self_effect: None,
@@ -1791,7 +1798,7 @@ pub const HEAL: Ability = Ability {
     name: "Heal",
     speech: "",
     description:
-        "Restore target's |<heart>| health. Remove |<keyword>Bleeding| and |<keyword>Poisoned|.",
+        "Heal ally for |<value>5| |<heart>|, and remove |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Heal,
     action_point_cost: 2,
     mana_cost: 1,

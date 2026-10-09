@@ -301,7 +301,7 @@ impl TargetUi {
                 let mut stats_text = String::new(); //format!("|<boot>| {:.1}", char.free_movement_per_turn());
                 if char.weapon(HandType::MainHand).is_some() {
                     stats_text.push_str(&format!(
-                        "   |<sword>| {}   |<red_dice>| {}",
+                        "|<sword>| {}   |<red_dice>| {}",
                         char.weapon_damage_str(HandType::MainHand),
                         plus_minus(char.attack_modifier(HandType::MainHand)),
                     ));
@@ -314,9 +314,9 @@ impl TargetUi {
 
                 let stats_line = Element::Text(TextLine::new(
                     stats_text,
-                    16,
+                    12,
                     WHITE,
-                    Some(self.simple_font.clone()),
+                    Some(self.big_font.clone()),
                 ));
                 centered_items.push(Element::Empty(1.0, 12.0));
                 centered_items.push(stats_line);

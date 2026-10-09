@@ -194,7 +194,7 @@ pub enum IconId {
     SpellAdvantage,
     Banshee,
     Dualcast,
-    AllIn,
+    Bonk,
     Plus,
     PlusPlus,
     QuickActions,
@@ -238,6 +238,8 @@ pub enum IconId {
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum EffectId {
     Pow,
+    Zap,
+    Bonk,
 }
 
 pub async fn load_all_effects() -> HashMap<EffectId, Texture2D> {
@@ -952,6 +954,9 @@ pub async fn load_and_init_static() {
     let eq_icon_atlas = load_and_init_texture("equipment_icons.png").await;
     EQUIPMENT_ICONS_TEXTURE.get_or_init(|| eq_icon_atlas);
 
+    let effects_atlas = load_and_init_texture("effects.png").await;
+    EFFECTS_TEXTURE.get_or_init(|| effects_atlas);
+
     let lightning_bolt_fx = load_and_init_texture("fx_lightning_bolt.png").await;
     LIGHTNING_BOLT_FX.get_or_init(|| lightning_bolt_fx);
 }
@@ -1057,7 +1062,7 @@ fn icon_cell(icon: IconId) -> (i32, i32) {
         IconId::SpellAdvantage => (3, 1),
         IconId::Banshee => (0, 2),
         IconId::Dualcast => (1, 2),
-        IconId::AllIn => (4, 7),
+        IconId::Bonk => (4, 7),
         IconId::Plus => (4, 9),
         IconId::PlusPlus => (5, 9),
         IconId::QuickActions => (8, 9),
@@ -1116,6 +1121,18 @@ pub fn draw_icon(icon: IconId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
             ..Default::default()
         },
     );
+}
+
+pub fn effect_atlas_rect(effect: EffectId) -> Rect {
+    let (col, row) = match effect {
+        EffectId::Pow => (0, 0),
+        EffectId::Zap => (1, 0),
+        EffectId::Bonk => (0, 1),
+    };
+    let icon_w = 32.0;
+    let icon_h = 32.0;
+
+    Rect::new(col as f32 * icon_w, row as f32 * icon_h, icon_w, icon_h)
 }
 
 pub fn draw_status_icon(status: StatusId, x: f32, y: f32, dest_size: Option<(f32, f32)>) {
@@ -1196,6 +1213,8 @@ async fn load_and_init_font_symbols() {
     ALT_KEY_SYMBOL.get_or_init(|| symbol(2, 0));
     WARNING_SYMBOL.get_or_init(|| symbol(3, 0));
     INFO_SYMBOL.get_or_init(|| symbol(4, 1));
+    AP_SYMBOL.get_or_init(|| symbol(5, 1));
+    LOSE_AP_SYMBOL.get_or_init(|| symbol(6, 1));
     HEART_SYMBOL.get_or_init(|| symbol(0, 1));
     STAMINA_SYMBOL.get_or_init(|| symbol(1, 1));
     STAMINA_SMALL_SYMBOL.get_or_init(|| symbol(1, 3));
@@ -1232,6 +1251,8 @@ pub static SHIELD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static ALT_KEY_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WARNING_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static INFO_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static AP_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static LOSE_AP_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HEART_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static STAMINA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
@@ -1253,6 +1274,7 @@ pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

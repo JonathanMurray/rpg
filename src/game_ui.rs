@@ -54,7 +54,7 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{StatusId, UI_TEXTURE},
+    textures::{EffectId, StatusId, UI_TEXTURE},
     tooltip::{
         Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
@@ -1888,12 +1888,8 @@ impl UserInterface {
                     0.0,
                     TextEffect::HitDamage(amount, HitType::Regular),
                 );
-                if source == DamageSource::KnockbackCollision {
-                    self.game_grid
-                        .animate_character_shaking(character.id(), 0.0, 0.2);
-                    self.game_grid.animate_pow_effect(character.id(), 0.2);
-                }
-                self.animate_character_damage(character.id(), amount);
+
+                self.animate_character_damage(character.id(), amount, Some(source));
 
                 if source == DamageSource::KnockbackCollision {
                     self.animation_stopwatch.set_to_at_least(0.15);
@@ -1906,35 +1902,17 @@ impl UserInterface {
             } => {
                 let name_tag = self.characters.get(character).name_tag();
                 let verb_phrase = match applied_effect {
-                    ApplyEffect::LoseActionPoints(n) => {
-                        self.game_grid.animate_character_lost_ap(character, 0.6, n);
-                        "".to_string()
-                    }
+                    ApplyEffect::LoseActionPoints(n) => "".to_string(),
                     ApplyEffect::GainActionPoints(n) => {
-                        self.sound_player.play(SoundId::GainedAP);
                         format!("gained {n} AP")
                     }
                     ApplyEffect::LoseHealth(_) => todo!(),
                     ApplyEffect::GainHealth(n) => {
-                        self.game_grid.animate_magic_sparks(character, WHITE);
-                        self.game_grid
-                            .add_text_effect(character, 0.0, TextEffect::Heal(n));
-
                         format!("gained |<value>{}| health", n,)
                     }
                     ApplyEffect::GainStamina(n) => format!("gained {n} stamina"),
                     ApplyEffect::GainMana(n) => format!("gained {n} mana"),
                     ApplyEffect::Condition(ApplyCondition { condition, .. }) => {
-                        match condition {
-                            Condition::Ferocity => {
-                                self.sound_player.play(SoundId::Execute);
-                            }
-                            Condition::Burning => {
-                                self.sound_player.play(SoundId::Burning);
-                            }
-                            _ => {}
-                        }
-
                         format!("received condition: |<keyword>{}|", condition.name())
                     }
                     ApplyEffect::LoseCondition { condition } => {
@@ -1993,12 +1971,35 @@ impl UserInterface {
         self.animation_stopwatch.set_to_at_least(0.5);
     }
 
-    fn animate_character_damage(&mut self, character_id: CharacterId, actual_health_lost: u32) {
+    fn animate_character_damage(
+        &mut self,
+        character_id: CharacterId,
+        actual_health_lost: u32,
+        source: Option<DamageSource>,
+    ) {
         if actual_health_lost > 0 {
             let prev_health =
                 self.characters.get(character_id).health.current() + actual_health_lost;
             self.game_grid
                 .animate_character_health_change(character_id, prev_health, 0.9);
+
+            if let Some(source) = source {
+                match source {
+                    DamageSource::KnockbackCollision => {
+                        self.game_grid
+                            .animate_character_shaking(character_id, 0.0, 0.2);
+                        self.game_grid
+                            .animate_effect(character_id, 0.5, EffectId::Pow);
+                    }
+                    DamageSource::Ability(ability) => {
+                        if ability.id == AbilityId::LightningBolt {
+                            self.game_grid
+                                .animate_effect(character_id, 0.5, EffectId::Zap);
+                        }
+                    }
+                    _ => {}
+                }
+            }
         }
     }
 
@@ -2010,6 +2011,7 @@ impl UserInterface {
         shape: Option<AreaShape>,
         outcomes: &[(CharacterId, Box<AbilityTargetOutcome>)],
         show_area_circle: bool,
+        ability: Option<&'static Ability>,
     ) {
         let area_duration = 1.5;
 
@@ -2064,7 +2066,7 @@ impl UserInterface {
             self.game_grid
                 .animate_character_shaking(*target_id, start, 0.2);
 
-            self.add_effect_for_target_outcome(outcome, start, *target_id, target_pos);
+            self.add_effect_for_target_outcome(outcome, start, *target_id, ability);
 
             self.animation_stopwatch.set_to_at_least(start_time + 0.3);
 
@@ -2182,9 +2184,8 @@ impl UserInterface {
 
         let animation_color = ability.animation_color;
         if let Some((target, outcome)) = &target_outcome {
-            let target_pos = self.characters.get(*target).pos();
             self.game_grid.animate_character_shaking(*target, 0.0, 0.2);
-            self.add_effect_for_target_outcome(outcome, 0.0, *target, target_pos);
+            self.add_effect_for_target_outcome(outcome, 0.0, *target, Some(ability));
             self.animation_stopwatch.set_to_at_least(0.3);
         }
 
@@ -2202,6 +2203,7 @@ impl UserInterface {
                 Some(*shape),
                 targets,
                 show_area_circle,
+                Some(ability),
             );
         }
 
@@ -2237,7 +2239,6 @@ impl UserInterface {
         let start_time = attack_index as f32 * 0.13;
 
         let target_pos = self.characters.get(target).pos();
-        let attacker_pos = self.characters.get(attacker).pos();
 
         if event.outcome.hit_type == HitType::Miss {
             self.sound_player
@@ -2285,7 +2286,7 @@ impl UserInterface {
                 ..
             } => {
                 if hit_type != HitType::Miss {
-                    self.animate_character_damage(target, actual_health_lost);
+                    self.animate_character_damage(target, actual_health_lost, None);
                     damage_was_dealt = damage > 0;
                     line.push_str(&format!(" (|<value>{}| damage)", damage))
                 }
@@ -2316,6 +2317,9 @@ impl UserInterface {
                 }
             }
         };
+        if let Some(effect_id) = event.outcome.visual_effect {
+            self.game_grid.animate_effect(target, 0.5, effect_id);
+        }
 
         if damage_was_dealt {
             self.game_grid
@@ -2330,6 +2334,7 @@ impl UserInterface {
                 Some(*shape),
                 outcomes,
                 true,
+                None,
             );
         }
 
@@ -2348,7 +2353,7 @@ impl UserInterface {
         outcome: &AbilityTargetOutcome,
         start_time: f32,
         target: CharacterId,
-        target_pos: (i32, i32),
+        ability: Option<&'static Ability>,
     ) {
         //let mut effects = vec![];
         let mut effects = vec![];
@@ -2368,7 +2373,8 @@ impl UserInterface {
                     if hit_type == &HitType::Miss {
                         //effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
                     } else {
-                        self.animate_character_damage(target, *actual_health_lost);
+                        let damage_source = ability.map(|a| DamageSource::Ability(a));
+                        self.animate_character_damage(target, *actual_health_lost, damage_source);
                         self.sound_player.play_delayed(
                             self.characters.get(target).damage_sound,
                             start_time + 0.03,
@@ -2415,6 +2421,33 @@ impl UserInterface {
         character_id: CharacterId,
         start_time: f32,
     ) -> bool {
+        match applied_effect {
+            ApplyEffect::LoseActionPoints(n) => {
+                self.game_grid.animate_character_lost_ap(character_id, n);
+            }
+            ApplyEffect::GainActionPoints(n) => {
+                self.sound_player.play(SoundId::GainedAP);
+            }
+            ApplyEffect::LoseHealth(_) => {}
+            ApplyEffect::GainHealth(..) => {
+                self.game_grid.animate_magic_sparks(character_id, WHITE);
+            }
+            ApplyEffect::GainStamina(n) => {}
+            ApplyEffect::GainMana(n) => {}
+            ApplyEffect::Condition(ApplyCondition { condition, .. }) => match condition {
+                Condition::Ferocity => {
+                    self.sound_player.play(SoundId::Execute);
+                }
+                Condition::Burning => {
+                    self.sound_player.play(SoundId::Burning);
+                }
+                _ => {}
+            },
+            ApplyEffect::LoseCondition { .. } => {}
+            ApplyEffect::Pushed(_) => {}
+            ApplyEffect::Escape => {}
+        };
+
         self.game_grid.add_text_effect(
             character_id,
             start_time,
