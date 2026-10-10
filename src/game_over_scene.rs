@@ -8,17 +8,9 @@ use macroquad::{
     window::{clear_background, next_frame, screen_height, screen_width},
 };
 
-use crate::{
-    base_ui::draw_text_rounded,
-    resources::{GameResources, UiResources},
-    util::rgb,
-};
+use crate::{base_ui::draw_text_rounded, resources::GameResources, util::rgb};
 
-pub async fn run_game_over_scene(
-    resources: &GameResources,
-    ui_resources: &UiResources,
-    header: &'static str,
-) {
+pub async fn run_game_over_scene(resources: &GameResources, header: &'static str) {
     let simple_font = &resources.simple_font;
 
     let x_mid = screen_width() / 2.0;

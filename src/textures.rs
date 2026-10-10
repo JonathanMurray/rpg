@@ -4,7 +4,7 @@ use macroquad::{
     color::WHITE,
     math::Rect,
     miniquad::StencilFaceState,
-    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Texture2D},
+    texture::{draw_texture_ex, load_texture, DrawTextureParams, FilterMode, Image, Texture2D},
     time::get_time,
 };
 use serde::{Deserialize, Serialize};
@@ -266,23 +266,57 @@ pub enum PortraitId {
     Ogre,
 }
 
-pub async fn load_all_portraits() -> HashMap<PortraitId, Texture2D> {
-    load_and_init_textures(vec![
-        (PortraitId::Alice, "portrait_alice.png"),
-        (PortraitId::Bob, "portrait_bob.png"),
-        (PortraitId::Clara, "portrait_clara.png"),
-        (PortraitId::Skeleton, "portrait_skeleton.png"),
-        (PortraitId::Magi, "portrait_magi.png"),
-        (PortraitId::Draug, "portrait_draug.png"),
-        (PortraitId::Huldra, "portrait_huldra.png"),
-        (PortraitId::Ghoul, "portrait_ghoul.png"),
-        (PortraitId::Scoundrel, "portrait_scoundrel.png"),
-        (PortraitId::Lootgoblin, "portrait_lootgoblin.png"),
-        (PortraitId::Pyromaniac, "portrait_pyromaniac.png"),
-        (PortraitId::Enslaved, "portrait_enslaved.png"),
-        (PortraitId::Ogre, "portrait_ogre.png"),
-    ])
-    .await
+fn portrait_cell(portrait: PortraitId) -> (i32, i32) {
+    match portrait {
+        PortraitId::Skeleton => (0, 0),
+        PortraitId::Alice => (0, 3),
+        PortraitId::Bob => (3, 2),
+        PortraitId::Clara => (2, 2),
+        PortraitId::Draug => (2, 0),
+        PortraitId::Magi => (1, 0),
+        PortraitId::Huldra => (3, 0),
+        PortraitId::Ghoul => (0, 1),
+        PortraitId::Scoundrel => (1, 1),
+        PortraitId::Lootgoblin => (2, 1),
+        PortraitId::Pyromaniac => (3, 1),
+        PortraitId::Enslaved => (0, 2),
+        PortraitId::Ogre => (1, 2),
+    }
+}
+
+const PORTRAIT_SRC_SIZE: (f32, f32) = (32.0, 40.0);
+
+pub fn portrait_texture(portrait: PortraitId) -> Texture2D {
+    let texture = PORTRAITS_TEXTURE.get().unwrap();
+    let (col, row) = portrait_cell(portrait);
+    let w = PORTRAIT_SRC_SIZE.0;
+    let h = PORTRAIT_SRC_SIZE.1;
+
+    let rect = Rect::new(col as f32 * w, row as f32 * h, w, h);
+    let texture = Texture2D::from_image(&texture.get_texture_data().sub_image(rect));
+    texture.set_filter(FilterMode::Nearest);
+    texture
+}
+
+pub fn draw_portrait(pos: (f32, f32), portrait: PortraitId, dest_size: Option<(f32, f32)>) {
+    let x = pos.0.floor();
+    let y = pos.1.floor();
+    let texture = PORTRAITS_TEXTURE.get().unwrap();
+    let (col, row) = portrait_cell(portrait);
+    let w = PORTRAIT_SRC_SIZE.0;
+    let h = PORTRAIT_SRC_SIZE.1;
+    let dest_size = dest_size.map(|s| s.into()).unwrap_or((w, h).into());
+    draw_texture_ex(
+        texture,
+        x,
+        y,
+        WHITE,
+        DrawTextureParams {
+            dest_size: Some(dest_size),
+            source: Some(Rect::new(col as f32 * w, row as f32 * h, w, h)),
+            ..Default::default()
+        },
+    );
 }
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
@@ -960,6 +994,9 @@ pub async fn load_and_init_static() {
     let effects_atlas = load_and_init_texture("effects.png").await;
     EFFECTS_TEXTURE.get_or_init(|| effects_atlas);
 
+    let effects_atlas = load_and_init_texture("portraits.png").await;
+    PORTRAITS_TEXTURE.get_or_init(|| effects_atlas);
+
     let lightning_bolt_fx = load_and_init_texture("fx_lightning_bolt.png").await;
     LIGHTNING_BOLT_FX.get_or_init(|| lightning_bolt_fx);
 }
@@ -1281,6 +1318,7 @@ pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static PORTRAITS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static UI_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ARROW_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

@@ -22,7 +22,10 @@ use crate::{
     drawing::{draw_cross, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
-    textures::{PortraitId, PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE},
+    textures::{
+        draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
+        PORTRAIT_ENEMY_BG_TEXTURE,
+    },
     util::oscillate,
 };
 use crate::{
@@ -47,24 +50,17 @@ pub struct TopCharacterPortraits {
 }
 
 impl TopCharacterPortraits {
-    pub fn new(
-        characters: &Characters,
-        active_id: CharacterId,
-        font: Font,
-        portrait_textures: HashMap<PortraitId, Texture2D>,
-    ) -> Self {
+    pub fn new(characters: &Characters, active_id: CharacterId, font: Font) -> Self {
         let mut portraits: HashMap<CharacterId, Rc<RefCell<TopCharacterPortrait>>> =
             Default::default();
 
         let mut elements = vec![];
 
         for character in characters.iter() {
-            let texture = portrait_textures[&character.portrait].clone();
-
             let portrait = Rc::new(RefCell::new(TopCharacterPortrait::new(
                 character,
                 font.clone(),
-                texture,
+                character.portrait,
             )));
             let cloned = Rc::downgrade(&portrait);
             portraits.insert(character.id(), portrait);
@@ -161,8 +157,10 @@ struct TopCharacterPortrait {
 }
 
 impl TopCharacterPortrait {
-    fn new(character: &Rc<Character>, font: Font, texture: Texture2D) -> Self {
+    fn new(character: &Rc<Character>, font: Font, portrait: PortraitId) -> Self {
         let texture_size = Rc::new(RefCell::new((64.0, 80.0)));
+
+        let texture = portrait_texture(portrait);
 
         let container = Container {
             children: vec![Element::ResizableTexture(texture, texture_size.clone())],
@@ -384,7 +382,6 @@ impl PlayerPortraits {
         selected_id: CharacterId,
         active_id: CharacterId,
         font: Font,
-        portrait_textures: HashMap<PortraitId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let mut portraits: IndexMap<CharacterId, Rc<RefCell<PlayerCharacterPortrait>>> =
@@ -392,14 +389,12 @@ impl PlayerPortraits {
 
         for character in characters.iter() {
             if character.player_controlled() {
-                let texture = portrait_textures.get(&character.portrait).unwrap().clone();
-
                 portraits.insert(
                     character.id(),
                     Rc::new(RefCell::new(PlayerCharacterPortrait::new(
                         character,
                         font.clone(),
-                        texture,
+                        character.portrait,
                         sound_player.clone(),
                     ))),
                 );
@@ -577,7 +572,7 @@ pub struct PlayerCharacterPortrait {
     is_character_active: Cell<bool>,
     is_character_reacting: Cell<bool>,
     has_been_clicked: Cell<bool>,
-    texture: Texture2D,
+    portrait: PortraitId,
     status_column: Element,
     status_rects: Vec<Rc<RefCell<Rectangle>>>,
     done_text: TextLine,
@@ -596,7 +591,7 @@ impl PlayerCharacterPortrait {
     pub fn new(
         character: &Rc<Character>,
         font: Font,
-        texture: Texture2D,
+        portrait: PortraitId,
         sound_player: SoundPlayer,
     ) -> Self {
         let mut text = TextLine::new(&character.name, 20, WHITE, Some(font.clone()));
@@ -638,7 +633,7 @@ impl PlayerCharacterPortrait {
             is_character_active: Cell::new(false),
             is_character_reacting: Cell::new(false),
             has_been_clicked: Cell::new(false),
-            texture,
+            portrait,
             status_column,
             status_rects,
             done_text,
@@ -686,11 +681,7 @@ impl Drawable for PlayerCharacterPortrait {
         draw_texture(PORTRAIT_BG_TEXTURE.get().unwrap(), x, y, WHITE);
         self.last_drawn_rect.set(Rect::new(x, y, w, h));
 
-        let params = DrawTextureParams {
-            dest_size: Some((w, h).into()),
-            ..Default::default()
-        };
-        draw_texture_ex(&self.texture, x, y, WHITE, params);
+        draw_portrait((x, y), self.portrait, Some((w, h)));
 
         if self.character.is_dead() {
             draw_rectangle(x, y, w, h, Color::new(0.6, 0.0, 0.0, 0.5));

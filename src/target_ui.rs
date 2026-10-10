@@ -23,7 +23,7 @@ use crate::{
     conditions_ui::ConditionsList,
     core::{AbilityRollType, BaseAction, Character, CharacterId, HandType},
     game_ui_components::{ActionPointsRow, ResourceBar},
-    textures::PortraitId,
+    textures::{portrait_texture, PortraitId},
     util::{plus_minus, COL_RED},
 };
 
@@ -40,16 +40,11 @@ pub struct TargetUi {
     button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     hovered_btn: RefCell<Option<(u32, (f32, f32))>>,
     buttons: HashMap<u32, Rc<RefCell<ActionButton>>>,
-    portrait_textures: HashMap<PortraitId, Texture2D>,
     pub last_drawn_rectangle: Cell<Rect>,
 }
 
 impl TargetUi {
-    pub fn new(
-        big_font: Font,
-        simple_font: Font,
-        portrait_textures: HashMap<PortraitId, Texture2D>,
-    ) -> Self {
+    pub fn new(big_font: Font, simple_font: Font) -> Self {
         Self {
             target: Default::default(),
             big_font,
@@ -59,7 +54,6 @@ impl TargetUi {
             button_events: Default::default(),
             hovered_btn: Default::default(),
             buttons: Default::default(),
-            portrait_textures,
             last_drawn_rectangle: Default::default(),
         }
     }
@@ -166,7 +160,7 @@ impl TargetUi {
                     ..Default::default()
                 },
                 children: vec![Element::Texture(
-                    self.portrait_textures[&char.portrait].clone(),
+                    portrait_texture(char.portrait),
                     Some((64.0, 80.0)),
                     //None, //Some((64.0, 80.0)),
                 )],

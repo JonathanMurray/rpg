@@ -12,8 +12,8 @@ use crate::{
     init_fight_map::GameInitState,
     sounds::SoundPlayer,
     textures::{
-        load_all_effects, load_all_portraits, load_all_sprites, load_and_init_texture, EffectId,
-        PortraitId, Sprite, SpriteId,
+        load_all_effects, load_all_sprites, load_and_init_texture, EffectId, PortraitId, Sprite,
+        SpriteId,
     },
 };
 
@@ -61,38 +61,14 @@ impl GameResources {
     }
 }
 
-#[derive(Clone)]
-pub struct UiResources {
-    pub portrait_textures: HashMap<PortraitId, Texture2D>,
-}
-
-impl UiResources {
-    pub async fn load() -> Self {
-        //let equipment_icons = load_all_equipment_icons().await;
-        let portrait_textures = load_all_portraits().await;
-
-        Self {
-            //equipment_icons,
-            portrait_textures,
-        }
-    }
-}
-
 pub fn init_core_game(
     resources: GameResources,
-    ui_resources: UiResources,
     sound_player: SoundPlayer,
     init_state: GameInitState,
 ) -> CoreGame {
     let mut game_ui = GameUserInterfaceConnection::uninitialized();
     let core_game = CoreGame::new(game_ui.clone(), &init_state);
-    let gfx_user_interface = UserInterface::new(
-        &core_game,
-        resources,
-        ui_resources,
-        init_state,
-        sound_player,
-    );
+    let gfx_user_interface = UserInterface::new(&core_game, resources, init_state, sound_player);
     game_ui.init(gfx_user_interface);
     core_game
 }

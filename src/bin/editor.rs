@@ -26,7 +26,7 @@ use rpg::grid::{ControlPoint, GameGrid};
 use rpg::init_fight_map::GameInitState;
 use rpg::map_data::{create_character, create_game_grid, CharacterData, CharacterType, MapData};
 use rpg::pathfind::Occupation;
-use rpg::resources::{init_core_game, GameResources, UiResources};
+use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::{
     load_and_init_static, terrain_atlas_area, LiquidType, Sprite, SpriteId, TerrainId,
@@ -48,7 +48,6 @@ async fn main() {
     set_window_position(100, 100);
 
     let resources = GameResources::load().await;
-    let ui_resources = UiResources::load().await;
     load_and_init_static().await;
 
     let mut map_data = MapData::load_from_file(&filepath);
@@ -471,12 +470,7 @@ async fn main() {
                 decorations: game_grid.decorations.clone(),
                 control_points: game_grid.control_points.clone(),
             };
-            let core_game = init_core_game(
-                resources.clone(),
-                ui_resources.clone(),
-                sound_player.clone(),
-                init_state,
-            );
+            let core_game = init_core_game(resources.clone(), sound_player.clone(), init_state);
             match core_game.run().await {
                 Ok(_chars) => println!("Game ended naturally"),
                 Err(QuitEvent) => println!("User quit from game"),

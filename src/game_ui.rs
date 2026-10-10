@@ -50,7 +50,7 @@ use crate::{
     },
     init_fight_map::GameInitState,
     pathfind::{Occupation, PathfindGrid, Surface, TerrainType},
-    resources::{GameResources, UiResources},
+    resources::GameResources,
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
@@ -591,7 +591,6 @@ impl UserInterface {
     pub fn new(
         game: &CoreGame,
         resources: GameResources,
-        ui_resources: UiResources,
         init_state: GameInitState,
         sound_player: SoundPlayer,
     ) -> Self {
@@ -641,7 +640,6 @@ impl UserInterface {
             first_player_character_id,
             active_character_id,
             resources.simple_font.clone(),
-            ui_resources.portrait_textures.clone(),
             sound_player.clone(),
         );
 
@@ -653,14 +651,9 @@ impl UserInterface {
             game.active_character_id,
             resources.big_font.clone(),
             //decorative_font.clone(),
-            ui_resources.portrait_textures.clone(),
         );
 
-        let target_ui = TargetUi::new(
-            resources.big_font.clone(),
-            resources.simple_font.clone(),
-            ui_resources.portrait_textures.clone(),
-        );
+        let target_ui = TargetUi::new(resources.big_font.clone(), resources.simple_font.clone());
 
         let activity_popup = ActivityPopup::new(
             resources.big_font.clone(),

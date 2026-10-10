@@ -36,7 +36,7 @@ use crate::data::{
 };
 use crate::drawing::{draw_dashed_line, draw_dashed_rectangle_lines};
 use crate::game_ui::draw_rectangle_lines2;
-use crate::textures::{draw_icon, load_all_portraits, load_and_init_static, PortraitId};
+use crate::textures::{draw_icon, draw_portrait, load_and_init_static, PortraitId};
 use crate::tooltip::{draw_tooltip, Side, TooltipPositionPreference};
 use serde::{Deserialize, Serialize};
 
@@ -67,8 +67,6 @@ pub async fn run_editor() {
     let font = load_font(font_path).await;
 
     load_and_init_static().await;
-
-    let portraits = load_all_portraits().await;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -418,7 +416,7 @@ pub async fn run_editor() {
             let y = mid.1 + node.borrow().pos().1 as f32 * cell_w;
             match node.borrow().content {
                 NodeContent::Origin => {
-                    draw_origin_node(&portraits, cell_w, origin_r, x, y);
+                    draw_origin_node(cell_w, origin_r, x, y);
                 }
                 NodeContent::Attr(attribute) => {
                     draw_attr_node(attr_r, x, y, attribute);
@@ -540,8 +538,6 @@ fn draw_edge(mid: (f32, f32), cell_w: f32, from: &Node, to: &Node, thickness: f3
 pub async fn run_skill_tree_scene() {
     let font_path = "delicatus/Delicatus.ttf"; // <-- not bad! very thin and readable
     let font = load_font(font_path).await;
-
-    let portraits = load_all_portraits().await;
 
     let (screen_w, screen_h) = screen_size();
 
@@ -697,21 +693,11 @@ pub async fn run_skill_tree_scene() {
             let y = mid.1 + node.pos().1 as f32 * cell_w;
             match node.content {
                 NodeContent::Origin => {
-                    let texture = &portraits[&PortraitId::Alice];
                     let x = x - icon_w / 2.0;
                     let y = y - icon_w / 2.0;
                     draw_rectangle(x, y, cell_w, cell_w, DARKGRAY);
 
-                    draw_texture_ex(
-                        texture,
-                        x,
-                        y,
-                        WHITE,
-                        DrawTextureParams {
-                            dest_size: Some((cell_w, cell_w).into()),
-                            ..Default::default()
-                        },
-                    );
+                    draw_portrait((x, y), PortraitId::Alice, Some((cell_w, cell_w)));
 
                     draw_rectangle_lines2(x, y, icon_w, icon_w, 5.0, WHITE);
                 }
@@ -863,16 +849,10 @@ fn draw_attr_node(attr_r: f32, x: f32, y: f32, attribute: Attribute) {
     draw_circle(x, y, attr_r, color);
 }
 
-fn draw_origin_node(
-    portraits: &HashMap<PortraitId, Texture2D>,
-    cell_w: f32,
-    origin_r: f32,
-    x: f32,
-    y: f32,
-) {
+fn draw_origin_node(cell_w: f32, origin_r: f32, x: f32, y: f32) {
     draw_circle(x, y, origin_r, DARKGRAY);
     draw_circle_lines(x, y, origin_r, 1.0, LIGHTGRAY);
-    let texture = &portraits[&PortraitId::Alice];
+    //let texture = &portraits[&PortraitId::Alice];
 }
 
 fn draw_grid_lines(mid: (f32, f32), cell_w: f32, min_x: i32, max_x: i32, min_y: i32, max_y: i32) {

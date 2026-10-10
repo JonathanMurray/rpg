@@ -23,7 +23,7 @@ use crate::{
     equipment_ui::EquipmentSlot,
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
-    resources::{GameResources, UiResources},
+    resources::GameResources,
     sounds::{SoundId, SoundPlayer},
     textures::UI_ARROW_TEXTURE,
     tooltip::handle_keyword_tooltip_end_of_frame,
@@ -64,7 +64,6 @@ impl CharacterGrowth {
 pub async fn run_transition_loop(
     mut player_characters: Vec<(Rc<Character>, CharacterGrowth)>,
     resources: &GameResources,
-    ui_resources: &UiResources,
     party: &Party,
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
@@ -144,7 +143,6 @@ pub async fn run_transition_loop(
 
     let characters: Vec<(Rc<Character>, CharacterGrowth)> = player_characters;
 
-    let portrait_textures = &ui_resources.portrait_textures;
     let simple_font = &resources.simple_font;
     let big_font = &resources.big_font;
     let event_queue = Rc::new(RefCell::new(vec![]));
@@ -158,11 +156,10 @@ pub async fn run_transition_loop(
         for (char, growth) in &characters {
             let resources_bars = ResourceBars::new(char, big_font);
 
-            let texture = portrait_textures[&char.portrait].clone();
             let portrait = PlayerCharacterPortrait::new(
                 char,
                 simple_font.clone(),
-                texture,
+                char.portrait,
                 sound_player.clone(),
             );
             let name = Element::Text(TextLine::new(&char.name, 18, WHITE, Some(big_font.clone())));

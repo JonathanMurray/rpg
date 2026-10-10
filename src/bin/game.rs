@@ -33,7 +33,7 @@ use rpg::data::{
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
 use rpg::map_data::{make_high_alice, make_high_bob, make_low_level_party, make_medium_clara};
-use rpg::resources::{init_core_game, GameResources, UiResources};
+use rpg::resources::{init_core_game, GameResources};
 use rpg::sounds::SoundPlayer;
 use rpg::textures::load_and_init_static;
 use rpg::transition_scene::{run_transition_loop, CharacterGrowth};
@@ -89,20 +89,14 @@ async fn main() {
     dbg!(get_time());
 
     let resources = GameResources::load().await;
-    let ui_resources = UiResources::load().await;
     load_and_init_static().await;
 
     let sound_player = SoundPlayer::new().await;
 
-    run_demo(&resources, &ui_resources, sound_player, fight_id).await;
+    run_demo(&resources, sound_player, fight_id).await;
 }
 
-async fn run_demo(
-    resources: &GameResources,
-    ui_resources: &UiResources,
-    sound_player: SoundPlayer,
-    fight_id: Option<FightId>,
-) {
+async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id: Option<FightId>) {
     loop {
         let (party, player_characters) = make_low_level_party();
         let mut player_characters: Vec<Rc<Character>> =
@@ -114,7 +108,6 @@ async fn run_demo(
                 resources.clone(),
                 &player_characters,
                 *fight_id,
-                ui_resources.clone(),
                 sound_player.clone(),
             )
             .await;
@@ -232,7 +225,6 @@ async fn run_demo(
                 resources.clone(),
                 &player_characters,
                 fight,
-                ui_resources.clone(),
                 sound_player.clone(),
             )
             .await;
@@ -240,13 +232,12 @@ async fn run_demo(
             if player_characters.iter().all(|ch| ch.is_dead()) {
                 run_game_over_scene(
                     resources,
-                    ui_resources,
                     "Your party has perished! Try again, or submit a balancing complaint!",
                 )
                 .await;
                 break;
             } else if demo_sequence.peek().is_none() {
-                run_game_over_scene(resources, ui_resources, "You have completed the demo!").await;
+                run_game_over_scene(resources, "You have completed the demo!").await;
                 break;
             }
 
@@ -254,7 +245,6 @@ async fn run_demo(
                 player_characters,
                 growths.into_iter().collect(),
                 resources,
-                ui_resources,
                 &party,
                 sound_player.clone(),
             )
@@ -297,19 +287,17 @@ async fn grow_players(
     player_characters: Vec<Rc<Character>>,
     growths: HashMap<PlayerId, CharacterGrowth>,
     resources: &GameResources,
-    ui_resources: &UiResources,
     party: &Rc<Party>,
     sound_player: SoundPlayer,
 ) -> Vec<Rc<Character>> {
     let player_growths = build_player_growths(player_characters, growths, party);
-    run_transition_loop(player_growths, resources, ui_resources, party, sound_player).await
+    run_transition_loop(player_growths, resources, party, sound_player).await
 }
 
 async fn run_fight_loop(
     resources: GameResources,
     player_characters: &[Rc<Character>],
     fight_id: FightId,
-    ui_resources: UiResources,
     sound_player: SoundPlayer,
 ) {
     let player_characters: Vec<Rc<Character>> = player_characters
@@ -319,7 +307,7 @@ async fn run_fight_loop(
         .collect();
     let init_state = init_fight_map(player_characters, fight_id);
     dbg!(&init_state.active_character_id);
-    let core_game = init_core_game(resources, ui_resources, sound_player, init_state);
+    let core_game = init_core_game(resources, sound_player, init_state);
     // Run one quick frame, so that the core game doesn't think that much time has elapsed on the very first frame
     next_frame().await;
     next_frame().await;
