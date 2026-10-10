@@ -389,6 +389,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                         ability,
                         enhancements: vec![],
                         target: ActionTarget::None,
+                        equipment_index_to_consume: None,
                     });
                 }
             }
@@ -460,6 +461,7 @@ fn pursue_goal(game: &CoreGame, goal: BotGoal) -> Option<Action> {
                         ability,
                         enhancements: vec![],
                         target: ActionTarget::None,
+                        equipment_index_to_consume: None,
                     });
                 }
             }
@@ -585,6 +587,7 @@ fn simple_targetted_ability_action(ability: &'static Ability, target: &Character
         ability,
         enhancements: vec![],
         target: ActionTarget::Character(target.id(), None),
+        equipment_index_to_consume: None,
     }
 }
 

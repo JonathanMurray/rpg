@@ -20,8 +20,9 @@ use serde::de;
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ActionButton, ButtonAction, ButtonContext, ButtonHovered,
-        ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR, REGULAR_ACTION_BUTTON_SIZE,
+        draw_button_tooltip, ActionButton, ActionTooltip, ButtonAction, ButtonContext,
+        ButtonHovered, ButtonSelected, InternalUiEvent, ACTION_BUTTON_BG_COLOR,
+        REGULAR_ACTION_BUTTON_SIZE,
     },
     activity_popup::{ActivityPopup, ActivityPopupOutcome},
     banner::Banner,
@@ -164,6 +165,7 @@ pub enum ConfiguredAction {
         ability: &'static Ability,
         selected_enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
+        equipment_idx_to_consume: Option<usize>,
     },
     Move {
         // Including the actor's current location, going all the way to the destination.
@@ -173,7 +175,7 @@ pub enum ConfiguredAction {
     ChangeEquipment {
         drag: Rc<RefCell<Option<EquipmentDrag>>>,
     },
-    UseConsumable(Option<EquipmentConsumption>),
+    SelectConsumableFromInventory,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -207,6 +209,74 @@ impl UsabilityProblem {
     }
 }
 
+fn ability_usability_problem(
+    relevant_character: &Character,
+    characters: &Characters,
+    pathfind_grid: &PathfindGrid,
+    ability: &'static Ability,
+    target: &ActionTarget,
+    selected_enhancements: &[AbilityEnhancement],
+) -> Option<UsabilityProblem> {
+    if !relevant_character.can_use_ability(ability) {
+        // TODO There could be other explanations!
+        return Some(UsabilityProblem::NotEnoughAp);
+    }
+
+    match target {
+        ActionTarget::Character(target_id, movement) => {
+            if let Some(positions) = movement {
+                if positions.is_empty() {
+                    return Some(UsabilityProblem::SelectMovement);
+                }
+            }
+            let target_char = characters.get(*target_id);
+
+            if relevant_character.reaches_with_ability(
+                ability,
+                selected_enhancements,
+                target_char.position.get(),
+            ) {
+                if pathfind_grid
+                    .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
+                {
+                    Some(UsabilityProblem::NoLineOfSight)
+                } else {
+                    None
+                }
+            } else {
+                Some(UsabilityProblem::OutOfReach)
+            }
+        }
+
+        ActionTarget::Position(target_pos) => {
+            assert!(matches!(
+                ability.target,
+                AbilityTarget::Area { .. } | AbilityTarget::Destination { .. }
+            ));
+            if relevant_character.reaches_with_ability(ability, selected_enhancements, *target_pos)
+            {
+                if pathfind_grid.obstructed_line_of_sight(relevant_character.pos(), *target_pos) {
+                    Some(UsabilityProblem::NoLineOfSight)
+                } else {
+                    None
+                }
+            } else {
+                Some(UsabilityProblem::OutOfReach)
+            }
+        }
+
+        // There is a usability problem; we will not be able to call predict_ability for example,
+        // but we don't want the usability problem to be shown as a warning text above the activity popup
+        ActionTarget::None => match ability.target {
+            AbilityTarget::None { .. } => None,
+            AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
+            AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
+            AbilityTarget::Area { .. } => Some(UsabilityProblem::SelectArea),
+            AbilityTarget::Destination { .. } => Some(UsabilityProblem::SelectDestination),
+        },
+    }
+}
+
 impl ConfiguredAction {
     fn has_target(&self) -> bool {
         match self {
@@ -214,7 +284,7 @@ impl ConfiguredAction {
             ConfiguredAction::UseAbility { target, .. } => !matches!(target, ActionTarget::None),
             ConfiguredAction::Move { .. } => false,
             ConfiguredAction::ChangeEquipment { .. } => false,
-            ConfiguredAction::UseConsumable(..) => false,
+            ConfiguredAction::SelectConsumableFromInventory { .. } => false,
         }
     }
 
@@ -266,65 +336,14 @@ impl ConfiguredAction {
                 ability,
                 selected_enhancements,
                 ..
-            } => match target {
-                ActionTarget::Character(target_id, movement) => {
-                    if let Some(positions) = movement {
-                        if positions.is_empty() {
-                            return Some(UsabilityProblem::SelectMovement);
-                        }
-                    }
-                    let target_char = characters.get(*target_id);
-
-                    if relevant_character.reaches_with_ability(
-                        ability,
-                        selected_enhancements,
-                        target_char.position.get(),
-                    ) {
-                        if pathfind_grid
-                            .obstructed_line_of_sight(relevant_character.pos(), target_char.pos())
-                        {
-                            Some(UsabilityProblem::NoLineOfSight)
-                        } else {
-                            None
-                        }
-                    } else {
-                        Some(UsabilityProblem::OutOfReach)
-                    }
-                }
-
-                ActionTarget::Position(target_pos) => {
-                    assert!(matches!(
-                        ability.target,
-                        AbilityTarget::Area { .. } | AbilityTarget::Destination { .. }
-                    ));
-                    if relevant_character.reaches_with_ability(
-                        ability,
-                        selected_enhancements,
-                        *target_pos,
-                    ) {
-                        if pathfind_grid
-                            .obstructed_line_of_sight(relevant_character.pos(), *target_pos)
-                        {
-                            Some(UsabilityProblem::NoLineOfSight)
-                        } else {
-                            None
-                        }
-                    } else {
-                        Some(UsabilityProblem::OutOfReach)
-                    }
-                }
-
-                // There is a usability problem; we will not be able to call predict_ability for example,
-                // but we don't want the usability problem to be shown as a warning text above the activity popup
-                ActionTarget::None => match ability.target {
-                    AbilityTarget::None { .. } => None,
-                    AbilityTarget::Enemy { .. } => Some(UsabilityProblem::SelectEnemy),
-                    AbilityTarget::Ally { .. } => Some(UsabilityProblem::SelectAlly),
-                    AbilityTarget::Area { .. } => Some(UsabilityProblem::SelectArea),
-                    AbilityTarget::Destination { .. } => Some(UsabilityProblem::SelectDestination),
-                },
-            },
-
+            } => ability_usability_problem(
+                relevant_character,
+                characters,
+                pathfind_grid,
+                ability,
+                target,
+                selected_enhancements,
+            ),
             ConfiguredAction::Move {
                 selected_movement_path,
                 ..
@@ -357,12 +376,9 @@ impl ConfiguredAction {
                 }
             }
 
-            ConfiguredAction::UseConsumable(consumable) => {
-                if consumable.is_some() {
-                    None
-                } else {
-                    Some(UsabilityProblem::SelectConsumable)
-                }
+            ConfiguredAction::SelectConsumableFromInventory { .. } => {
+                // As soon as the player chooses a consumable, the UI switches to ConfiguredAction::UseAbility
+                Some(UsabilityProblem::SelectConsumable)
             }
         }
     }
@@ -378,6 +394,7 @@ impl ConfiguredAction {
                 ability,
                 selected_enhancements: vec![],
                 target: ActionTarget::None,
+                equipment_idx_to_consume: None,
             }),
             BaseAction::Move => Some(Self::Move {
                 cost: 0,
@@ -386,23 +403,41 @@ impl ConfiguredAction {
             BaseAction::ChangeEquipment => Some(Self::ChangeEquipment {
                 drag: Rc::new(RefCell::new(None)),
             }),
-            BaseAction::UseConsumable => Some(Self::UseConsumable(None)),
-            //BaseAction::ToggleQuickActions => None,
+            BaseAction::UseConsumable => Some(Self::SelectConsumableFromInventory {}),
         }
     }
 
     pub fn base_action(&self) -> BaseAction {
         match self {
             ConfiguredAction::Attack { attack, .. } => BaseAction::Attack(*attack),
-            ConfiguredAction::UseAbility { ability, .. } => BaseAction::UseAbility(ability),
+            ConfiguredAction::UseAbility {
+                ability,
+                equipment_idx_to_consume,
+                ..
+            } => {
+                if equipment_idx_to_consume.is_some() {
+                    // This configured ability comes from using a consumble, so the "use consumable" button should highlight
+                    // in the UI. There's no other dedicated button for the ability
+                    BaseAction::UseConsumable
+                } else {
+                    BaseAction::UseAbility(ability)
+                }
+            }
             ConfiguredAction::Move { .. } => BaseAction::Move,
             ConfiguredAction::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
-            ConfiguredAction::UseConsumable { .. } => BaseAction::UseConsumable,
+            ConfiguredAction::SelectConsumableFromInventory { .. } => BaseAction::UseConsumable,
         }
     }
 
-    pub fn base_action_point_cost(&self) -> i32 {
-        self.base_action().action_point_cost()
+    pub fn base_ap_cost(&self) -> i32 {
+        match self {
+            ConfiguredAction::UseAbility {
+                ability,
+                equipment_idx_to_consume: Some(..),
+                ..
+            } => ability.action_point_cost as i32,
+            _ => self.base_action().action_point_cost(),
+        }
     }
 
     pub fn enhanced_action_point_cost(&self) -> u32 {
@@ -432,7 +467,7 @@ impl ConfiguredAction {
             }
             ConfiguredAction::Move { cost: ap_cost, .. } => *ap_cost,
             ConfiguredAction::ChangeEquipment { .. } => 1,
-            ConfiguredAction::UseConsumable { .. } => 1,
+            ConfiguredAction::SelectConsumableFromInventory { .. } => 0,
         }
     }
 
@@ -917,7 +952,7 @@ impl UserInterface {
             let mut should_cancel_action = false;
             if matches!(
                 *self.state.borrow(),
-                UiState::ConfiguringAction(ConfiguredAction::UseConsumable(None))
+                UiState::ConfiguringAction(ConfiguredAction::SelectConsumableFromInventory)
             ) {
                 should_cancel_action = true;
             } else if let UiState::ConfiguringAction(ConfiguredAction::ChangeEquipment { drag }) =
@@ -1198,6 +1233,7 @@ impl UserInterface {
             ability,
             selected_enhancements,
             target,
+            ..
         } = configured_action
         else {
             panic!()
@@ -1240,6 +1276,7 @@ impl UserInterface {
             ability,
             selected_enhancements,
             target,
+            ..
         } = configured_action
         else {
             panic!()
@@ -1291,7 +1328,7 @@ impl UserInterface {
             .tracked_action_buttons
             .values()
         {
-            let base_action = match btn.action {
+            let base_action = match btn.action_tooltip.action {
                 ButtonAction::Action(base_action) => base_action,
                 _ => unreachable!(),
             };
@@ -1375,9 +1412,7 @@ impl UserInterface {
                     *drag.borrow_mut() = None;
                     //self.character_sheet_toggle.set_shown(false);
                 }
-                ConfiguredAction::UseConsumable(..) => {
-                    //self.character_sheet_toggle.set_shown(false);
-                }
+
                 _ => {}
             }
         }
@@ -1395,7 +1430,7 @@ impl UserInterface {
 
         self.game_grid.clear_target_effect_previews();
 
-        let mut relevant_action_button = None;
+        let mut relevant_tooltip = None;
 
         let mut is_reacting = None;
         let mut is_reacting_to_attack = false;
@@ -1421,13 +1456,32 @@ impl UserInterface {
                 }
                  */
 
-                relevant_action_button = self.character_uis[&self.active_character_id]
-                    .tracked_action_buttons
-                    .get(&button_action_id(ButtonAction::Action(
-                        configured_action.base_action(),
-                    )))
-                    .cloned();
-                assert!(relevant_action_button.is_some(), "{:?}", configured_action);
+                let tooltip = if let ConfiguredAction::UseAbility {
+                    ability,
+                    equipment_idx_to_consume: Some(blah),
+                    ..
+                } = configured_action
+                {
+                    // When the configured ability comes from the "use consumable" base action (that button in the UI)
+                    // we have to build a new tooltip here on-the-fly instead of relying on the one tracked by the button.
+                    // The "use consumable" button's UI doesn't have any knowledge of the ability, so using that one would
+                    // give a useless tooltip
+                    Rc::new(ActionTooltip::new(
+                        ButtonAction::Action(BaseAction::UseAbility(*ability)),
+                        None,
+                    ))
+                } else {
+                    let action_button = self.character_uis[&self.active_character_id]
+                        .tracked_action_buttons
+                        .get(&button_action_id(ButtonAction::Action(
+                            configured_action.base_action(),
+                        )))
+                        .unwrap();
+
+                    action_button.action_tooltip.clone()
+                };
+
+                relevant_tooltip = Some(tooltip);
 
                 if let ConfiguredAction::Attack {
                     selected_enhancements,
@@ -1500,7 +1554,7 @@ impl UserInterface {
         self.player_portraits.set_reacting_character(is_reacting);
 
         self.activity_popup
-            .on_new_state(self.active_character_id, relevant_action_button);
+            .on_new_state(self.active_character_id, relevant_tooltip.as_deref());
 
         self.maybe_refresh_equipment_state();
 
@@ -1571,19 +1625,12 @@ impl UserInterface {
                 }
             }
 
-            UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) => {
-                //self.target_ui
-                //  .set_action("Use consumable".to_string(), vec![], false);
-
-                if let Some(consumption) = consumption {
-                    self.activity_popup.additional_line =
-                        Some(format!("Use {}", consumption.consumable.name));
-                } else {
-                    self.activity_popup.additional_line = Some(
-                        "Select a consumable in your inventory by right-clicking it".to_string(),
-                    );
-                    self.set_character_sheet_shown(true);
-                }
+            UiState::ConfiguringAction(ConfiguredAction::SelectConsumableFromInventory {
+                ..
+            }) => {
+                self.activity_popup.additional_line =
+                    Some("Select a consumable in your inventory by right-clicking it".to_string());
+                self.set_character_sheet_shown(true);
             }
 
             _ => {}
@@ -1690,9 +1737,9 @@ impl UserInterface {
                 );
             }
             GameEvent::ConsumableWasUsed { user, consumable } => {
-                self.sound_player.play(SoundId::Powerup);
+                //self.sound_player.play(SoundId::Powerup);
                 self.log.add(format!(
-                    "|{}| used {}",
+                    "|{}| lost item: {}",
                     self.characters.get(user).name_tag(),
                     consumable.name
                 ));
@@ -2592,12 +2639,15 @@ impl UserInterface {
             if let Some((keycode, _font)) = btn.hotkey.borrow().as_ref() {
                 if is_key_pressed(*keycode) {
                     if btn.enabled.get() {
-                        match btn.action {
+                        match btn.action_tooltip.action {
                             ButtonAction::Action(base_action) => {
                                 self.sound_player.play(SoundId::ClickButton);
                                 action_button_clicked = Some(base_action)
                             }
-                            _ => unreachable!("button clicked via hotkey: {:?}", btn.action),
+                            _ => unreachable!(
+                                "button clicked via hotkey: {:?}",
+                                btn.action_tooltip.action
+                            ),
                         }
                     } else {
                         invalid_action = true;
@@ -2744,10 +2794,12 @@ impl UserInterface {
                         ability,
                         selected_enhancements,
                         target,
+                        equipment_idx_to_consume,
                     } => Some(Action::UseAbility {
                         ability,
                         enhancements: selected_enhancements.clone(),
                         target: target.clone(),
+                        equipment_index_to_consume: *equipment_idx_to_consume,
                     }),
                     &ConfiguredAction::Move {
                         cost,
@@ -2778,9 +2830,9 @@ impl UserInterface {
 
                         Some(Action::ChangeEquipment { from, to })
                     }
-                    &ConfiguredAction::UseConsumable(consumption) => Some(Action::UseConsumable {
-                        inventory_equipment_index: consumption.unwrap().equipment_idx,
-                    }),
+                    &ConfiguredAction::SelectConsumableFromInventory { .. } => {
+                        unreachable!("This is not a committable action. After consumable has been selected, we transition to UseAbility");
+                    }
                 };
                 PlayerChose::Action(action.map(Box::new))
             }

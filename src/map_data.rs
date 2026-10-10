@@ -18,9 +18,9 @@ use crate::{
         ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
         ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS, HEALING_NOVA,
         HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS,
-        KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
-        PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD,
-        SPIKE_TRAP, STAFF, WAR_HAMMER,
+        KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE, LUNGE_ATTACK,
+        MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER,
+        SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF, TOXIC_GRENADE, WAR_HAMMER,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -32,9 +32,9 @@ use crate::{
 use crate::data::{
     PassiveSkill, ARCANE_POTION, BOW, CRIPPLING_SHOT, DAGGER, EXPLODING_ARROWS, FIREBALL,
     FIREBALL_INFERNO, FIREBALL_MASSIVE, FIREBALL_REACH, HEAL, HEALTH_POTION, HEAL_ENERGIZE,
-    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MANA_POTION,
-    MEDIUM_SHIELD, PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE,
-    SWEEP_ATTACK, SWORD,
+    INFLICT_WOUNDS, INFLICT_WOUNDS_NECROTIC_INFLUENCE, INSPIRE, LEATHER_ARMOR, MEDIUM_SHIELD,
+    PIERCING_SHOT, SHACKLED_MIND, SHIELD_BASH, SHIELD_BASH_KNOCKBACK, SHIRT, SMITE, SWEEP_ATTACK,
+    SWORD,
 };
 
 pub fn create_game_grid(
@@ -649,17 +649,17 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, BOW);
+    alice.set_weapon(HandType::MainHand, HUNGERING_BLADE);
+    alice.set_shield(SMALL_SHIELD);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(FIRE_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(FIRE_ARROWS, 2)));
 
-    alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(ADRENALIN_POTION));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
-    alice.try_gain_equipment(EquipmentEntry::Consumable(ENERGY_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(TOXIC_GRENADE));
+    alice.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
 
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
     alice.trinket.set(Some(ASSASSINS_VIAL));
@@ -725,5 +725,6 @@ fn make_high_clara(party: &Rc<Party>) -> Character {
 
     clara.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     clara.try_gain_equipment(EquipmentEntry::Consumable(ARCANE_POTION));
+    clara.try_gain_equipment(EquipmentEntry::Consumable(LIQUID_FIRE));
     clara
 }

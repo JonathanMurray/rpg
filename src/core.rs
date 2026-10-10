@@ -638,6 +638,7 @@ impl CoreGame {
                 ability,
                 enhancements,
                 target,
+                equipment_index_to_consume,
             } => {
                 let actor = self.characters.get_rc(self.active_character_id);
 
@@ -697,6 +698,21 @@ impl CoreGame {
                         victim_ids: enemies_hit,
                     }
                 };
+
+                if let Some(idx) = equipment_index_to_consume {
+                    let slot_role = EquipmentSlotRole::Inventory(idx);
+                    let consumable = match actor.equipment(slot_role).unwrap() {
+                        EquipmentEntry::Consumable(consumable) => consumable,
+                        unexpected => unreachable!("Not consumable: {:?}", unexpected),
+                    };
+                    actor.set_equipment(None, slot_role);
+                    self.ui_handle_event(GameEvent::ConsumableWasUsed {
+                        user: actor.id(),
+                        consumable,
+                    })
+                    .await;
+                }
+
                 Ok(outcome)
             }
 
@@ -737,50 +753,6 @@ impl CoreGame {
                 character.swap_equipment_slots(from, to);
                 self.ui_handle_event(GameEvent::CharacterChangedEquipment)
                     .await;
-                Ok(ActionOutcome::Default)
-            }
-
-            Action::UseConsumable {
-                inventory_equipment_index,
-            } => {
-                let character = self.active_character();
-                if character.enabled_quick_actions.get() {
-                    character.stamina.spend(1);
-                } else {
-                    self.perform_spend_ap(character, 1).await;
-                }
-                let slot_role = EquipmentSlotRole::Inventory(inventory_equipment_index);
-                let consumable = match character.equipment(slot_role).unwrap() {
-                    EquipmentEntry::Consumable(consumable) => consumable,
-                    unexpected => unreachable!("Not consumable: {:?}", unexpected),
-                };
-
-                //let mut detail_lines = vec![];
-
-                let mut effect = None;
-                if let Some(apply_effect) = consumable.effect {
-                    let (applied, line) = self.do_apply_effect(apply_effect, None, None, character);
-                    //detail_lines.push(line);
-                    effect = applied;
-                }
-
-                character.set_equipment(None, slot_role);
-
-                self.ui_handle_event(GameEvent::ConsumableWasUsed {
-                    user: character.id(),
-                    consumable,
-                })
-                .await;
-
-                if let Some(applied_effect) = effect {
-                    self.ui_handle_event(GameEvent::CharacterEffectWasApplied {
-                        character: character.id(),
-                        applied_effect,
-                        source: consumable.name,
-                    })
-                    .await;
-                }
-
                 Ok(ActionOutcome::Default)
             }
         }
@@ -1388,9 +1360,7 @@ impl CoreGame {
                     environment_effect,
                     ..
                 } => {
-                    let ActionTarget::Character(target_id, movement) = &selected_target else {
-                        unreachable!()
-                    };
+                    let (target_id, movement) = selected_target.unwrap_character();
 
                     let target = mode.characters().get_rc(*target_id);
 
@@ -4992,6 +4962,7 @@ pub enum Action {
         ability: &'static Ability,
         enhancements: Vec<AbilityEnhancement>,
         target: ActionTarget,
+        equipment_index_to_consume: Option<usize>,
     },
     Move {
         total_distance: f32,
@@ -5002,9 +4973,6 @@ pub enum Action {
     ChangeEquipment {
         from: EquipmentSlotRole,
         to: EquipmentSlotRole,
-    },
-    UseConsumable {
-        inventory_equipment_index: usize,
     },
 }
 
@@ -5018,7 +4986,6 @@ impl Action {
             Action::UseAbility { ability, .. } => BaseAction::UseAbility(ability),
             Action::Move { .. } => BaseAction::Move,
             Action::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
-            Action::UseConsumable { .. } => BaseAction::UseConsumable,
         }
     }
 }
@@ -5042,6 +5009,13 @@ impl ActionTarget {
         match self {
             Self::Character(target_id, ..) => Some(*target_id),
             _ => None,
+        }
+    }
+
+    pub fn unwrap_character(&self) -> (&CharacterId, &Option<Vec<Position>>) {
+        match self {
+            Self::Character(ch_id, pos) => (ch_id, pos),
+            unexpected => panic!("Not character target: {:?}", unexpected),
         }
     }
 }
@@ -5081,7 +5055,7 @@ impl BaseAction {
             BaseAction::UseAbility(..) => 0,
             BaseAction::Move => 0,
             BaseAction::ChangeEquipment => 1,
-            BaseAction::UseConsumable => 1,
+            BaseAction::UseConsumable => 0,
             //  BaseAction::ToggleQuickActions => 0,
         }
     }
@@ -5254,6 +5228,13 @@ pub enum AbilityId {
     SearingLight,
     Execute,
 
+    Grenade,
+    ManaPotion,
+    HealthPotion,
+    AdrenalinPotion,
+    EnergyPotion,
+    ArcanePotion,
+
     Kill,
     KillSelf,
     ManaTest,
@@ -5380,6 +5361,7 @@ pub enum AbilityDamage {
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub struct AbilityPositiveEffect {
+    // TODO: remove healing - can be expressed by ApplyEffect instead
     pub healing: u32,
     pub apply: Option<[Option<ApplyEffect>; 2]>,
 }
@@ -8247,20 +8229,9 @@ impl ArrowStack {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Consumable {
     pub name: &'static str,
-    pub effect: Option<ApplyEffect>,
     pub icon: EquipmentIconId,
     pub weight: u32,
-}
-
-impl Consumable {
-    pub const fn default() -> Self {
-        Self {
-            name: "",
-            effect: None,
-            icon: EquipmentIconId::Undefined,
-            weight: 0,
-        }
-    }
+    pub ability: &'static Ability,
 }
 
 impl EquipmentEntry {
@@ -8269,9 +8240,9 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.name,
             EquipmentEntry::Shield(shield) => shield.name,
             EquipmentEntry::Armor(armor) => armor.name,
-            EquipmentEntry::Consumable(consumable) => consumable.name,
             EquipmentEntry::Arrows(stack) => stack.arrow.name,
             EquipmentEntry::Trinket(trinket) => trinket.name,
+            EquipmentEntry::Consumable(consumable) => consumable.name,
         }
     }
 
@@ -8280,9 +8251,9 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.icon,
             EquipmentEntry::Shield(shield) => shield.icon,
             EquipmentEntry::Armor(armor) => armor.icon,
-            EquipmentEntry::Consumable(consumable) => consumable.icon,
             EquipmentEntry::Arrows(stack) => stack.arrow.icon,
             EquipmentEntry::Trinket(trinket) => trinket.icon,
+            EquipmentEntry::Consumable(consumable) => consumable.icon,
         }
     }
 
@@ -8291,9 +8262,9 @@ impl EquipmentEntry {
             EquipmentEntry::Weapon(weapon) => weapon.weight,
             EquipmentEntry::Shield(shield) => shield.weight,
             EquipmentEntry::Armor(armor) => armor.weight,
-            EquipmentEntry::Consumable(consumable) => consumable.weight,
             EquipmentEntry::Arrows(..) => 0,
             EquipmentEntry::Trinket(..) => 0,
+            EquipmentEntry::Consumable(consumable) => consumable.weight,
         }
     }
 

@@ -761,6 +761,15 @@ impl GameGrid {
                 1.0,
                 AnimationDetails::SpeechBubble { text },
             ));
+        } else if ability.speech != "" {
+            self.character_animations.push(CharacterAnimation::new(
+                actor.id(),
+                0.0,
+                1.0,
+                AnimationDetails::SpeechBubble {
+                    text: ability.speech,
+                },
+            ));
         }
 
         let duration = match ability.animation {
@@ -2398,6 +2407,7 @@ impl GameGrid {
                     ability,
                     selected_enhancements,
                     target,
+                    ..
                 } => {
                     let mut increased_radius_tenths = 0;
                     let mut increased_range_tenths = 0;
@@ -2461,7 +2471,9 @@ impl GameGrid {
                 ConfiguredAction::Move { .. } => MouseState::Movement,
 
                 ConfiguredAction::ChangeEquipment { .. } => MouseState::ImplicitTarget,
-                ConfiguredAction::UseConsumable { .. } => MouseState::ImplicitTarget,
+                ConfiguredAction::SelectConsumableFromInventory { .. } => {
+                    MouseState::ImplicitTarget
+                }
             },
             _ => MouseState::None,
         };
@@ -2862,7 +2874,9 @@ impl GameGrid {
                     ConfiguredAction::Attack { .. } => Some("Attack"),
                     ConfiguredAction::UseAbility { ability, .. } => Some(ability.name),
                     ConfiguredAction::ChangeEquipment { .. } => Some("Change equipment"),
-                    ConfiguredAction::UseConsumable(..) => Some("Use consumable"),
+                    ConfiguredAction::SelectConsumableFromInventory { .. } => {
+                        Some("Use consumable")
+                    }
                     _ => None,
                 },
                 _ => None,
@@ -4035,6 +4049,7 @@ impl GameGrid {
                     ability,
                     selected_enhancements,
                     target,
+                    ..
                 } => {
                     let target_pos = match target {
                         ActionTarget::Character(target_char_id, _movement) => {

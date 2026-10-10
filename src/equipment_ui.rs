@@ -18,7 +18,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{describe_apply_effect, describe_area_effect, Tooltip},
+    action_button::{ability_tooltip, describe_apply_effect, describe_area_effect, Tooltip},
     base_ui::{
         draw_text_rounded, table, Align, Container, Drawable, Element, LayoutDirection, Style,
         TableCell, TableStyle, TextLine,
@@ -33,7 +33,9 @@ use crate::{
     game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
     textures::{draw_eq_icon, EquipmentIconId},
-    tooltip::{draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference},
+    tooltip::{
+        cost_string, draw_regular_tooltip, draw_tooltip, Keyword, Side, TooltipPositionPreference,
+    },
 };
 
 const INVENTORY_SIZE: usize = 6;
@@ -44,9 +46,9 @@ pub fn equipment_tooltip(entry: &EquipmentEntry) -> Tooltip {
         EquipmentEntry::Weapon(weapon) => weapon_tooltip(weapon),
         EquipmentEntry::Shield(shield) => shield_tooltip(shield),
         EquipmentEntry::Armor(armor) => armor_tooltip(armor),
-        EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
         EquipmentEntry::Arrows(stack) => arrow_tooltip(stack),
         EquipmentEntry::Trinket(trinket) => trinket_tooltip(trinket),
+        EquipmentEntry::Consumable(consumable) => consumable_tooltip(consumable),
     }
 }
 
@@ -72,6 +74,18 @@ fn trinket_tooltip(trinket: &Trinket) -> Tooltip {
     let mut t = Tooltip::new(trinket.name);
     describe_equip_effect(trinket.equip, &mut t);
     t
+}
+
+fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
+    let a = consumable.ability;
+    let mut tooltip = ability_tooltip(a, None);
+    let line = format!(
+        "|<faded>Use item|{} :",
+        cost_string(a.action_point_cost, a.stamina_cost, a.mana_cost,)
+    );
+    tooltip.technical_description.insert(0, line);
+    tooltip.technical_description.insert(1, "".to_string());
+    tooltip
 }
 
 fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
@@ -142,23 +156,6 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
         }
         describe_apply_effect(apply_effect, t);
     }
-}
-
-fn consumable_tooltip(consumable: &Consumable) -> Tooltip {
-    let mut t = Tooltip::new(consumable.name);
-
-    if let Some(apply_effect) = consumable.effect {
-        t.technical_description
-            .push("|<single_target>| |<faded>(self):|".to_string());
-        describe_apply_effect(apply_effect, &mut t);
-    }
-    //lines.push("<Right-click to use>".to_string());
-    if consumable.weight > 0 {
-        t.technical_description.push("".to_string());
-        t.technical_description.push(weight_str(consumable.weight));
-    }
-
-    t
 }
 
 fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
@@ -277,7 +274,6 @@ pub struct EquipmentDrag {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct EquipmentConsumption {
     pub equipment_idx: usize,
-    pub consumable: Consumable,
 }
 
 pub struct EquipmentSection {
@@ -553,11 +549,9 @@ impl EquipmentSection {
             if is_hovered {
                 if is_mouse_button_pressed(MouseButton::Right) {
                     if let Some(content) = &slot.content {
-                        if let EquipmentEntry::Consumable(consumable) = content.equipment {
-                            requested_consumption = Some(EquipmentConsumption {
-                                equipment_idx: idx,
-                                consumable,
-                            });
+                        if let EquipmentEntry::Consumable(..) = content.equipment {
+                            requested_consumption =
+                                Some(EquipmentConsumption { equipment_idx: idx });
                         }
                     }
                 } else if is_mouse_button_pressed(MouseButton::Left) {

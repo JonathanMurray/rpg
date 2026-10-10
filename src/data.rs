@@ -755,6 +755,90 @@ pub const RUBY: Trinket = Trinket {
     icon: EquipmentIconId::Ruby,
 };
 
+pub const LIQUID_FIRE: Consumable = Consumable {
+    name: "Liquid fire",
+    icon: EquipmentIconId::LiquidFire,
+    weight: 0,
+    ability: &LIQUID_FIRE_ABILITY,
+};
+
+pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
+    AbilityId::Grenade,
+    "Liquid fire",
+    AbilityTarget::Area {
+        range: Range::Tenths(135),
+        area_effect: AreaEffect {
+            shape: AreaShape::Circle(Range::Melee),
+            acquisition: AreaTargetAcquisition::Everyone,
+            effect: AbilityEffect::Negative(AbilityNegativeEffect::Spell(SpellNegativeEffect {
+                defense_type: None,
+                damage: Some(AbilityDamage::Fixed(2, DamageType::Fire)),
+                on_hit: None,
+                environment_effect: None,
+            })),
+            create_surface: Some(Surface::Fire),
+        },
+    },
+);
+
+pub const TOXIC_GRENADE: Consumable = Consumable {
+    name: "Toxic grenade",
+    icon: EquipmentIconId::ToxicGrenade,
+    weight: 0,
+    ability: &TOXIC_GRENADE_ABILITY,
+};
+
+pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
+    AbilityId::Grenade,
+    "Toxic grenade",
+    AbilityTarget::Enemy {
+        reach: AbilityReach::Range(Range::f32(13.5)),
+        effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
+            defense_type: Some(DefenseType::Evasion),
+            damage: Some(AbilityDamage::Fixed(3, DamageType::Regular)),
+            on_hit: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Poisoned,
+                    stacks: None,
+                    duration_rounds: Some(2),
+                })),
+                None,
+            ]),
+            ..SpellNegativeEffect::default()
+        }),
+        impact_circle: None,
+        environment_effect: None,
+    },
+);
+
+const fn grenade_ability(id: AbilityId, name: &'static str, target: AbilityTarget) -> Ability {
+    Ability {
+        id,
+        name,
+        speech: "Take this!",
+        description: "",
+        icon: IconId::Undefined,
+        action_point_cost: 2,
+        mana_cost: 0,
+        stamina_cost: 0,
+        requirement: None,
+
+        roll: Some(AbilityRollType::Spell),
+        possible_enhancements: [None, None, None],
+        target: target,
+        animation_color: PURPLE,
+        animation: AbilityAnimation::CastSpell,
+        // TODO: Throw sound effect
+        initiate_sound: Some(SoundId::ShootSpell),
+        // TODO: crushed bottle sound effect
+        resolve_sound: Some(SoundId::Debuff),
+        charge_fx: Some(AbilityChargeFx {
+            particle_shape: ParticleShape::Circle,
+            sound: SoundId::MechanicNoise,
+        }),
+    }
+}
+
 pub const BAD_SMALL_SHIELD: Shield = Shield {
     name: "Small shield",
     sprite: Some(SpriteId::Shield),
@@ -2632,48 +2716,124 @@ pub const SEARING_LIGHT: Ability = Ability {
 pub const HEALTH_POTION: Consumable = Consumable {
     name: "Health potion",
     icon: EquipmentIconId::HealthPotion,
-    effect: Some(ApplyEffect::Condition(ApplyCondition {
-        condition: Condition::HealthPotionRecovering,
-        stacks: Some(4),
-        duration_rounds: None,
-    })),
-    ..Consumable::default()
+    weight: 0,
+    ability: &potion_ability(
+        AbilityId::HealthPotion,
+        "Health potion",
+        AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::HealthPotionRecovering,
+                    stacks: Some(4),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
+        },
+    ),
 };
 
 pub const MANA_POTION: Consumable = Consumable {
     name: "Mana potion",
     icon: EquipmentIconId::ManaPotion,
-    effect: Some(ApplyEffect::GainMana(5)),
-    ..Consumable::default()
+    weight: 0,
+    ability: &potion_ability(
+        AbilityId::ManaPotion,
+        "Mana potion",
+        AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([Some(ApplyEffect::GainMana(5)), None]),
+        },
+    ),
 };
 
+const fn potion_ability(
+    id: AbilityId,
+    name: &'static str,
+    self_effect: AbilityPositiveEffect,
+) -> Ability {
+    Ability {
+        id,
+        name,
+        speech: "",
+        description: "",
+        icon: IconId::Undefined,
+        action_point_cost: 1,
+        mana_cost: 0,
+        stamina_cost: 0,
+        requirement: None,
+
+        roll: None,
+        possible_enhancements: [None, None, None],
+        target: AbilityTarget::None {
+            self_area: None,
+            self_effect: Some(self_effect),
+            environment_effect: None,
+        },
+
+        animation_color: PURPLE,
+        animation: AbilityAnimation::CastSpell,
+        initiate_sound: None,
+        resolve_sound: Some(SoundId::Powerup),
+        charge_fx: None,
+    }
+}
+
 pub const ADRENALIN_POTION: Consumable = Consumable {
-    name: "Adrenalin potion",
+    name: "Adrenaline potion",
     icon: EquipmentIconId::AdrenalinPotion,
-    effect: Some(ApplyEffect::Condition(ApplyCondition {
-        condition: Condition::Adrenalin,
-        stacks: None,
-        duration_rounds: Some(3),
-    })),
-    ..Consumable::default()
+    weight: 0,
+    ability: &potion_ability(
+        AbilityId::AdrenalinPotion,
+        "Adrenaline potion    ",
+        AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::Adrenalin,
+                    stacks: None,
+                    duration_rounds: Some(3),
+                })),
+                None,
+            ]),
+        },
+    ),
 };
 
 pub const ENERGY_POTION: Consumable = Consumable {
     name: "Energy potion",
     icon: EquipmentIconId::EnergyPotion,
-    effect: Some(ApplyEffect::GainStamina(10)),
-    ..Consumable::default()
+    weight: 0,
+    ability: &potion_ability(
+        AbilityId::EnergyPotion,
+        "Energy potion",
+        AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([Some(ApplyEffect::GainStamina(10)), None]),
+        },
+    ),
 };
 
 pub const ARCANE_POTION: Consumable = Consumable {
     name: "Arcane potion",
     icon: EquipmentIconId::ArcanePotion,
-    effect: Some(ApplyEffect::Condition(ApplyCondition {
-        condition: Condition::ArcaneSurge,
-        stacks: Some(3),
-        duration_rounds: None,
-    })),
-    ..Consumable::default()
+    weight: 0,
+    ability: &potion_ability(
+        AbilityId::ArcanePotion,
+        "Arcane potion",
+        AbilityPositiveEffect {
+            healing: 0,
+            apply: Some([
+                Some(ApplyEffect::Condition(ApplyCondition {
+                    condition: Condition::ArcaneSurge,
+                    stacks: Some(3),
+                    duration_rounds: None,
+                })),
+                None,
+            ]),
+        },
+    ),
 };
 
 #[derive(Debug, Copy, Clone, PartialEq)]

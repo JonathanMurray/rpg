@@ -14,8 +14,8 @@ use macroquad::{
 
 use crate::{
     action_button::{
-        draw_button_tooltip, ButtonAction, ButtonHovered, ButtonSelected, EventSender,
-        InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE,
+        draw_button_tooltip, ActionTooltip, ButtonAction, ButtonHovered, ButtonSelected,
+        EventSender, InternalUiEvent, REGULAR_ACTION_BUTTON_SIZE,
     },
     base_ui::{draw_text_rounded, draw_text_with_font_tags, measure_text_with_font_tags, Drawable},
     core::{Character, CharacterId, Characters, HandType},
@@ -485,7 +485,7 @@ impl ActivityPopup {
                         .choice_buttons
                         .values()
                         .filter(|btn| btn.selected.get() == ButtonSelected::Yes)
-                        .map(|btn| btn.action)
+                        .map(|btn| btn.action_tooltip.action)
                         .collect();
 
                     match &mut *self.ui_state.borrow_mut() {
@@ -583,7 +583,7 @@ impl ActivityPopup {
     fn selected_choices(&self) -> impl Iterator<Item = &ButtonAction> {
         self.selected_choice_button_ids
             .iter()
-            .map(|id| &self.choice_buttons[id].action)
+            .map(|id| &self.choice_buttons[id].action_tooltip.action)
     }
 
     // TODO get rid of this?
@@ -646,7 +646,7 @@ impl ActivityPopup {
 
         let mut reserved_from_action = base_action
             .as_ref()
-            .map(|action| action.base_action_point_cost())
+            .map(|action| action.base_ap_cost())
             .unwrap_or(0);
 
         if !enabled_quick_actions {
@@ -669,7 +669,10 @@ impl ActivityPopup {
         let mut additional_hovered_from_choices = 0;
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                let action_point_cost = self.choice_buttons[&id].action.action_point_cost();
+                let action_point_cost = self.choice_buttons[&id]
+                    .action_tooltip
+                    .action
+                    .action_point_cost();
                 additional_hovered_from_choices += action_point_cost;
 
                 if self.are_choice_buttons_mutually_exclusive() {
@@ -702,7 +705,7 @@ impl ActivityPopup {
         }
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                mana += self.choice_buttons[&id].action.mana_cost()
+                mana += self.choice_buttons[&id].action_tooltip.action.mana_cost()
             }
         }
         mana
@@ -738,7 +741,10 @@ impl ActivityPopup {
         }
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                sta += self.choice_buttons[&id].action.stamina_cost();
+                sta += self.choice_buttons[&id]
+                    .action_tooltip
+                    .action
+                    .stamina_cost();
             }
         }
         sta
@@ -778,7 +784,7 @@ impl ActivityPopup {
     pub fn on_new_state(
         &mut self,
         active_character_id: CharacterId,
-        relevant_action_button: Option<Rc<ActionButton>>,
+        tooltip: Option<&ActionTooltip>,
     ) {
         self.relevant_character_id = active_character_id;
 
@@ -794,7 +800,7 @@ impl ActivityPopup {
 
         match &mut *self.ui_state.borrow_mut() {
             UiState::ConfiguringAction(configured_action) => {
-                let tooltip = relevant_action_button.as_ref().unwrap().tooltip();
+                let tooltip = tooltip.as_ref().unwrap().tooltip();
                 lines.push(tooltip.header.to_string());
                 if !tooltip.technical_description.is_empty() {
                     //lines.push("".to_string());
@@ -849,7 +855,7 @@ impl ActivityPopup {
                     }
 
                     ConfiguredAction::ChangeEquipment { .. } => {}
-                    ConfiguredAction::UseConsumable { .. } => {}
+                    ConfiguredAction::SelectConsumableFromInventory { .. } => {}
                 }
             }
 

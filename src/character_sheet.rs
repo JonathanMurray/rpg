@@ -1,4 +1,5 @@
 use std::cell::{Cell, RefCell};
+use std::process::id;
 use std::rc::Rc;
 
 use macroquad::color::{DARKBLUE, DARKGRAY, SKYBLUE};
@@ -17,9 +18,9 @@ use macroquad::{
 
 use crate::base_ui::{draw_text_rounded, Drawable};
 use crate::conditions_ui::ConditionsList;
-use crate::core::EquipmentSlotRole;
+use crate::core::{ActionTarget, EquipmentEntry, EquipmentSlotRole};
 use crate::drawing::draw_cross;
-use crate::equipment_ui::{EquipmentDrag, EquipmentSection};
+use crate::equipment_ui::{EquipmentConsumption, EquipmentDrag, EquipmentSection};
 use crate::game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState};
 use crate::sounds::SoundPlayer;
 use crate::stats_ui::{build_character_stats_table, CharacterStatsTable};
@@ -227,9 +228,16 @@ impl CharacterSheet {
             UiState::ConfiguringAction(..) | UiState::ChoosingAction
         );
 
-        let mut requested_consumption = None;
-        if let UiState::ConfiguringAction(ConfiguredAction::UseConsumable(consumption)) = ui_state {
-            requested_consumption = *consumption
+        let mut requested_consume_equipment = None;
+
+        if let UiState::ConfiguringAction(ConfiguredAction::UseAbility {
+            equipment_idx_to_consume: Some(idx),
+            ..
+        }) = ui_state
+        {
+            requested_consume_equipment = Some(EquipmentConsumption {
+                equipment_idx: *idx,
+            });
         };
 
         let outcome = self
@@ -237,7 +245,7 @@ impl CharacterSheet {
             .borrow_mut()
             .handle_equipment_drag_and_consumption(
                 *self.drag.borrow(),
-                requested_consumption,
+                requested_consume_equipment,
                 is_allowed_to_change_equipment,
             );
 
@@ -259,15 +267,39 @@ impl CharacterSheet {
             // or we may have enabled/disabled arrows which requires a refresh of an open activity popup
             changed_state_or_drag = true;
         }
-        if outcome.requested_consumption != requested_consumption {
-            dbg!(outcome.requested_consumption, requested_consumption);
+        if outcome.requested_consumption != requested_consume_equipment {
+            dbg!(outcome.requested_consumption, requested_consume_equipment);
             *self.drag.borrow_mut() = None;
             if outcome.requested_consumption.is_some() && is_allowed_to_use_consumable
                 || outcome.requested_consumption.is_none()
             {
-                *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseConsumable(
-                    outcome.requested_consumption,
-                ));
+                if let Some(consumption) = outcome.requested_consumption {
+                    println!(
+                        "Character sheet changed the UI state to 'use ability from equipment'"
+                    );
+                    let idx = consumption.equipment_idx;
+                    let equipment_entry = self.equipment_section.borrow().equipment_slots[idx]
+                        .borrow()
+                        .content
+                        .as_ref()
+                        .unwrap()
+                        .equipment;
+                    let ability = match equipment_entry {
+                        EquipmentEntry::Consumable(consumable) => consumable.ability,
+                        unexpected => panic!("Unexpected: {:?}", unexpected),
+                    };
+
+                    *ui_state = UiState::ConfiguringAction(ConfiguredAction::UseAbility {
+                        ability,
+                        selected_enhancements: vec![],
+                        target: ActionTarget::None,
+                        equipment_idx_to_consume: Some(idx),
+                    });
+                } else {
+                    *ui_state =
+                        UiState::ConfiguringAction(ConfiguredAction::SelectConsumableFromInventory);
+                }
+
                 changed_state_or_drag = true;
             }
         }
@@ -387,7 +419,7 @@ pub fn build_spell_book(
     }
 
     for (ability_btn, enhancement_buttons) in ability_buttons.into_iter() {
-        let ability = ability_btn.action.unwrap_ability();
+        let ability = ability_btn.action_tooltip.action.unwrap_ability();
         spell_book.children.push(Element::Text(TextLine::new(
             ability.name,
             16,

@@ -313,7 +313,7 @@ impl RewardSelectionUi {
                 );
             }
 
-            let text = btn.action_button.action.name();
+            let text = btn.action_button.action_tooltip.action.name();
             let font_size = 18;
             let text_dim = measure_text(text, Some(&self.font), font_size, 1.0);
             draw_text_rounded(
@@ -612,10 +612,9 @@ pub async fn run_victory_loop(
                     dbg!(selected_learnings.len());
                     dbg!(reward_selection_uis.len());
                     for ui in &reward_selection_uis {
-                        let learning: Option<Learning> = ui
-                            .selected_btn
-                            .as_ref()
-                            .map(|btn| action_to_reward_choice(btn.action_button.action));
+                        let learning: Option<Learning> = ui.selected_btn.as_ref().map(|btn| {
+                            action_to_reward_choice(btn.action_button.action_tooltip.action)
+                        });
                         selected_learnings.push(learning);
                     }
                     dbg!(selected_learnings.len());

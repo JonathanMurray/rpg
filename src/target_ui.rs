@@ -62,7 +62,7 @@ impl TargetUi {
         let hovered_btn = *self.hovered_btn.borrow();
         hovered_btn.map(|(btn_id, _)| {
             let btn = self.buttons.get(&btn_id).unwrap();
-            btn.borrow().action
+            btn.borrow().action_tooltip.action
         })
     }
 
@@ -280,7 +280,7 @@ impl TargetUi {
             let mut centered_items = vec![
                 Element::Text(name_text_line),
                 portrait,
-                Element::Empty(1.0, 4.0),
+                Element::Empty(1.0, 8.0),
                 Element::Container(resource_row),
                 Element::Empty(1.0, 4.0),
                 Element::Box(Box::new(action_points_row)),

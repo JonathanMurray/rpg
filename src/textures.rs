@@ -349,6 +349,8 @@ pub enum EquipmentIconId {
     AdrenalinPotion,
     EnergyPotion,
     ArcanePotion,
+    ToxicGrenade,
+    LiquidFire,
 
     PlaceholderOffhand,
     PlaceholderMainhand,
@@ -1030,6 +1032,8 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::ColdArrow => (3, 0),
         EquipmentIconId::ExplodingArrow => (7, 0),
         EquipmentIconId::HealthPotion => (5, 4),
+        EquipmentIconId::ToxicGrenade => (6, 4),
+        EquipmentIconId::LiquidFire => (7, 4),
         EquipmentIconId::ManaPotion => (0, 4),
         EquipmentIconId::AdrenalinPotion => (1, 4),
         EquipmentIconId::EnergyPotion => (2, 4),

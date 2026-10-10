@@ -9,12 +9,14 @@ use macroquad::{
 };
 
 use crate::{
+    action_button,
     base_ui::{draw_text_with_font_tags, measure_text_with_font_tags},
     core::{
         cond_description_with_populated_stacks, AttackEnhancement, Condition, ConditionInfo,
         Goodness, OnAttackedReaction,
     },
     drawing::draw_rounded_rectangle_lines,
+    game_ui_components::ActionPointsRow,
     textures::{draw_status_icon, StatusId},
     util::screen_size,
 };
@@ -110,26 +112,27 @@ impl Keyword {
     }
 }
 
-fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+pub fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     let mut s = String::new();
+
     if action_points > 0 {
-        s.push_str(&format!("{action_points} AP"));
+        s.push_str(&format!("|<faded>{action_points}| |<ap>|"));
     }
     if stamina > 0 {
         if !s.is_empty() {
             s.push_str(", ");
         }
-        s.push_str(&format!("{stamina} stamina"));
+        s.push_str(&format!("|<faded>{stamina}| |<stamina>|"));
     }
     if mana > 0 {
         if !s.is_empty() {
             s.push_str(", ");
         }
-        s.push_str(&format!("{mana} mana"));
+        s.push_str(&format!("|<faded>{mana}| |<mana>|"));
     }
 
     if !s.is_empty() {
-        s = format!(" |<faded>({s})|");
+        s = format!(" |<faded>(|{s}|<faded>)|");
     }
     s
 }

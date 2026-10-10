@@ -177,7 +177,7 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
     let header = format!(
         "{}{}",
         header,
-        cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+        empty_cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
     );
 
     Tooltip {
@@ -202,7 +202,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
         header: format!(
             "{}{}",
             reaction.name,
-            cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+            empty_cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
         ),
         description: Some(reaction.description),
         technical_description,
@@ -215,7 +215,7 @@ fn attack_enhancement_tooltip(enhancement: &AttackEnhancement) -> Tooltip {
         header: format!(
             "{}{}",
             enhancement.name,
-            cost_string(
+            empty_cost_string(
                 enhancement.action_point_cost,
                 enhancement.stamina_cost,
                 enhancement.mana_cost
@@ -357,7 +357,7 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
         header: format!(
             "{}{}",
             enhancement.name,
-            cost_string(
+            empty_cost_string(
                 enhancement.action_point_cost,
                 enhancement.stamina_cost,
                 enhancement.mana_cost
@@ -502,7 +502,10 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
             .technical_description
             .push(format!("  Heal for |<value>{}| |<heart>|", n)),
         ApplyEffect::Condition(apply_condition) => {
-            let mut line = format!("  Gain |<keyword>{}|", apply_condition.condition.name());
+            let mut line = format!(
+                "  Gain condition: |<keyword>{}|",
+                apply_condition.condition.name()
+            );
             if let Some(stacks) = apply_condition.stacks {
                 line.push_str(&format!(" x |<value>{}|", stacks));
             }
@@ -534,11 +537,11 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     }
 }
 
-fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tooltip {
+pub fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tooltip {
     let header = format!(
         "{}{}",
         ability.name,
-        cost_string(
+        empty_cost_string(
             ability.action_point_cost,
             ability.stamina_cost,
             ability.mana_cost
@@ -627,7 +630,8 @@ fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tooltip 
             environment_effect,
         } => {
             if let Some(effect) = self_effect {
-                t.technical_description.push("|<faded>Self|".to_string());
+                t.technical_description
+                    .push("|<single_target>| |<faded>(self):|".to_string());
                 describe_ability_ally_effect(effect, &mut t);
             }
 
@@ -868,202 +872,24 @@ pub enum ButtonContext {
     CharacterSheet,
 }
 
-pub struct ActionButton {
-    pub id: u32,
-    pub action: ButtonAction,
-    original_size: (f32, f32),
-    pub size: (f32, f32),
-    original_texture_draw_size: (f32, f32),
-    pub texture_draw_size: (f32, f32),
-    style: Style,
-    pub hover_border_color: Color,
-    ap_row: Container,
-    hovered: Cell<bool>,
-
-    // Enabled = can be used
-    pub enabled: Cell<bool>,
-
-    // Selected = the player has the button selected; the action is being configured
-    pub selected: Cell<ButtonSelected>,
-
-    // Activated = the button represents a state that can be toggled on and off
-    pub activated: Cell<Option<bool>>,
-
-    pub event_sender: Option<EventSender>,
-    clicked_effect_until: Cell<Option<f64>>,
-    icon: IconId,
+#[derive(Debug)]
+pub struct ActionTooltip {
     tooltip: RefCell<Tooltip>,
+    pub action: ButtonAction,
     character: Option<Rc<Character>>,
     tooltip_is_based_on_equipped_weapon: Cell<Option<Weapon>>,
     tooltip_is_based_on_equipped_shield: Cell<Option<Shield>>,
-    tooltip_is_based_on_quick_actions: Cell<Option<bool>>,
-    pub hotkey: RefCell<Option<(KeyCode, Font)>>,
-    pub context: Option<ButtonContext>,
-    ap_color: Rc<Cell<Color>>,
-    parent_bg_color: Option<Color>,
-    bottom_resource_text: Option<Element>,
 }
 
-pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
-pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
-pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.6, 0.5, 0.4, 1.0);
-
-impl ActionButton {
-    pub fn new(
-        action: ButtonAction,
-        event_queue: Option<Rc<RefCell<Vec<InternalUiEvent>>>>,
-        id: u32,
-        character: Option<Rc<Character>>,
-        font: &Font,
-    ) -> Self {
-        let mana_points = action.mana_cost();
-        let stamina_points = action.stamina_cost();
-        let action_points = action.action_point_cost();
-        let quick_points = action.quick_point_cost();
-        let icon: IconId = action.icon(character.as_deref());
-        let tooltip = button_action_tooltip(&action, character.as_deref());
-
-        let (size, texture_draw_size) = match action {
-            ButtonAction::Proceed | ButtonAction::Passive(..) => {
-                ((REGULAR_ACTION_BUTTON_SIZE.0, 52.0), (60.0, 48.0))
-            }
-            _ => (REGULAR_ACTION_BUTTON_SIZE, (60.0, 48.0)),
-        };
-
-        let mut style = Style {
-            border_color: Some(LIGHTGRAY),
-            ..Default::default()
-        };
-        match action {
-            ButtonAction::Action(..) => {}
-            ButtonAction::Passive(..) => {
-                style.border_inner_rounding = Some(8.0);
-                style.border_outer_rounding = Some((BLACK, 7.0));
-            }
-            _ => {
-                style.border_inner_rounding = Some(5.0);
-                style.border_outer_rounding = Some((BLACK, 4.0));
-            }
-        }
-
-        let hover_border_color = YELLOW;
-
-        let r = 2.5;
-        let mut ap_circles = vec![];
-
-        let ap_color = Rc::new(Cell::new(COL_GOLD));
-
-        for _ in 0..action_points {
-            ap_circles.push(Element::Circle(Circle {
-                r,
-                color: Rc::clone(&ap_color),
-            }))
-        }
-
-        for _ in 0..quick_points {
-            ap_circles.push(Element::Circle(Circle {
-                r,
-                color: Rc::new(Cell::new(COL_GREEN_2)),
-            }))
-        }
-
-        let mut bottom_resource_text = "".to_string();
-
-        if mana_points > 0 {
-            bottom_resource_text.push_str(&"|<mana_small>|".repeat(mana_points as usize));
-        }
-        if stamina_points > 0 {
-            bottom_resource_text.push_str(&"|<stamina_small>|".repeat(stamina_points as usize));
-        }
-        if action.costs_arrow() {
-            bottom_resource_text.push_str("Item");
-        }
-
-        let padding = if ap_circles.is_empty() { 0.0 } else { 4.0 };
-        let ap_row = Container {
-            children: ap_circles,
-            margin: 4.0,
-            layout_dir: LayoutDirection::Horizontal,
-            align: Align::Center,
-            style: Style {
-                padding,
-                bg_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
-                ..Default::default()
-            },
-            ..Default::default()
-        };
-
-        let bottom_resource_text = if !bottom_resource_text.is_empty() {
-            Some(Element::Text(TextLine::new(
-                bottom_resource_text,
-                16,
-                WHITE,
-                Some(font.clone()),
-            )))
-        } else {
-            None
-        };
-
-        /*
-        let activated = if matches!(action, ButtonAction::Action(BaseAction::ToggleQuickActions)) {
-            Some(character.as_ref().unwrap().enabled_quick_actions.get())
-        } else {
-            None
-        };
-         */
-        let activated = None;
-
-        Self {
-            id,
+impl ActionTooltip {
+    pub fn new(action: ButtonAction, character: Option<Rc<Character>>) -> Self {
+        ActionTooltip {
             action,
-            original_size: size,
-            size,
-            original_texture_draw_size: texture_draw_size,
-            texture_draw_size,
-            style,
-            hover_border_color,
-            ap_row,
-            bottom_resource_text,
-            hovered: Cell::new(false),
-            enabled: Cell::new(true),
-            selected: Cell::new(ButtonSelected::No),
-            activated: Cell::new(activated),
-            event_sender: event_queue.map(|queue| EventSender { queue }),
-            clicked_effect_until: Default::default(),
-            icon,
-            tooltip: RefCell::new(tooltip),
+            tooltip: RefCell::new(button_action_tooltip(&action, character.as_deref())),
             character,
             tooltip_is_based_on_equipped_weapon: Default::default(),
             tooltip_is_based_on_equipped_shield: Default::default(),
-            tooltip_is_based_on_quick_actions: Default::default(),
-            hotkey: RefCell::new(None),
-            context: None,
-            ap_color,
-            parent_bg_color: None,
         }
-    }
-
-    pub fn set_parent_bg_color(&mut self, color: Color) {
-        self.parent_bg_color = Some(color);
-        if let Some((rounding_color, _width)) = &mut self.style.border_outer_rounding {
-            *rounding_color = color;
-        }
-    }
-
-    pub fn set_has_enough_ap(&self, has_enough_ap: bool) {
-        let color = if has_enough_ap { COL_GOLD } else { COL_RED };
-        self.ap_color.set(color);
-    }
-
-    pub fn change_scale(&mut self, scale_factor: f32) {
-        self.texture_draw_size = (
-            self.original_texture_draw_size.0 * scale_factor,
-            self.original_texture_draw_size.1 * scale_factor,
-        );
-        self.size = (
-            self.original_size.0 * scale_factor,
-            self.original_size.1 * scale_factor,
-        );
     }
 
     pub fn tooltip(&self) -> Ref<'_, Tooltip> {
@@ -1190,6 +1016,202 @@ impl ActionButton {
 
         self.tooltip.borrow()
     }
+}
+
+pub struct ActionButton {
+    pub id: u32,
+
+    original_size: (f32, f32),
+    pub size: (f32, f32),
+    original_texture_draw_size: (f32, f32),
+    pub texture_draw_size: (f32, f32),
+    style: Style,
+    pub hover_border_color: Color,
+    ap_row: Container,
+    hovered: Cell<bool>,
+
+    // Enabled = can be used
+    pub enabled: Cell<bool>,
+
+    // Selected = the player has the button selected; the action is being configured
+    pub selected: Cell<ButtonSelected>,
+
+    // Activated = the button represents a state that can be toggled on and off
+    pub activated: Cell<Option<bool>>,
+
+    pub event_sender: Option<EventSender>,
+    clicked_effect_until: Cell<Option<f64>>,
+    icon: IconId,
+
+    pub action_tooltip: Rc<ActionTooltip>,
+
+    pub hotkey: RefCell<Option<(KeyCode, Font)>>,
+    pub context: Option<ButtonContext>,
+    ap_color: Rc<Cell<Color>>,
+    parent_bg_color: Option<Color>,
+    bottom_resource_text: Option<Element>,
+}
+
+pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
+pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
+pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.6, 0.5, 0.4, 1.0);
+
+impl ActionButton {
+    pub fn new(
+        action: ButtonAction,
+        event_queue: Option<Rc<RefCell<Vec<InternalUiEvent>>>>,
+        id: u32,
+        character: Option<Rc<Character>>,
+        font: &Font,
+    ) -> Self {
+        let mana_points = action.mana_cost();
+        let stamina_points = action.stamina_cost();
+        let action_points = action.action_point_cost();
+        let quick_points = action.quick_point_cost();
+        let icon: IconId = action.icon(character.as_deref());
+
+        let (size, texture_draw_size) = match action {
+            ButtonAction::Proceed | ButtonAction::Passive(..) => {
+                ((REGULAR_ACTION_BUTTON_SIZE.0, 52.0), (60.0, 48.0))
+            }
+            _ => (REGULAR_ACTION_BUTTON_SIZE, (60.0, 48.0)),
+        };
+
+        let mut style = Style {
+            border_color: Some(LIGHTGRAY),
+            ..Default::default()
+        };
+        match action {
+            ButtonAction::Action(..) => {}
+            ButtonAction::Passive(..) => {
+                style.border_inner_rounding = Some(8.0);
+                style.border_outer_rounding = Some((BLACK, 7.0));
+            }
+            _ => {
+                style.border_inner_rounding = Some(5.0);
+                style.border_outer_rounding = Some((BLACK, 4.0));
+            }
+        }
+
+        let hover_border_color = YELLOW;
+
+        let r = 2.5;
+        let mut ap_circles = vec![];
+
+        let ap_color = Rc::new(Cell::new(COL_GOLD));
+
+        for _ in 0..action_points {
+            ap_circles.push(Element::Circle(Circle {
+                r,
+                color: Rc::clone(&ap_color),
+            }))
+        }
+
+        for _ in 0..quick_points {
+            ap_circles.push(Element::Circle(Circle {
+                r,
+                color: Rc::new(Cell::new(COL_GREEN_2)),
+            }))
+        }
+
+        let mut bottom_resource_text = "".to_string();
+
+        if mana_points > 0 {
+            bottom_resource_text.push_str(&"|<mana_small>|".repeat(mana_points as usize));
+        }
+        if stamina_points > 0 {
+            bottom_resource_text.push_str(&"|<stamina_small>|".repeat(stamina_points as usize));
+        }
+        if action.costs_arrow() {
+            bottom_resource_text.push_str("Item");
+        }
+
+        let padding = if ap_circles.is_empty() { 0.0 } else { 4.0 };
+        let ap_row = Container {
+            children: ap_circles,
+            margin: 4.0,
+            layout_dir: LayoutDirection::Horizontal,
+            align: Align::Center,
+            style: Style {
+                padding,
+                bg_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+
+        let bottom_resource_text = if !bottom_resource_text.is_empty() {
+            Some(Element::Text(TextLine::new(
+                bottom_resource_text,
+                16,
+                WHITE,
+                Some(font.clone()),
+            )))
+        } else {
+            None
+        };
+
+        /*
+        let activated = if matches!(action, ButtonAction::Action(BaseAction::ToggleQuickActions)) {
+            Some(character.as_ref().unwrap().enabled_quick_actions.get())
+        } else {
+            None
+        };
+         */
+        let activated = None;
+
+        Self {
+            id,
+            original_size: size,
+            size,
+            original_texture_draw_size: texture_draw_size,
+            texture_draw_size,
+            style,
+            hover_border_color,
+            ap_row,
+            bottom_resource_text,
+            hovered: Cell::new(false),
+            enabled: Cell::new(true),
+            selected: Cell::new(ButtonSelected::No),
+            activated: Cell::new(activated),
+            event_sender: event_queue.map(|queue| EventSender { queue }),
+            clicked_effect_until: Default::default(),
+            icon,
+
+            action_tooltip: Rc::new(ActionTooltip::new(action, character)),
+            hotkey: RefCell::new(None),
+            context: None,
+            ap_color,
+            parent_bg_color: None,
+        }
+    }
+
+    pub fn set_parent_bg_color(&mut self, color: Color) {
+        self.parent_bg_color = Some(color);
+        if let Some((rounding_color, _width)) = &mut self.style.border_outer_rounding {
+            *rounding_color = color;
+        }
+    }
+
+    pub fn set_has_enough_ap(&self, has_enough_ap: bool) {
+        let color = if has_enough_ap { COL_GOLD } else { COL_RED };
+        self.ap_color.set(color);
+    }
+
+    pub fn change_scale(&mut self, scale_factor: f32) {
+        self.texture_draw_size = (
+            self.original_texture_draw_size.0 * scale_factor,
+            self.original_texture_draw_size.1 * scale_factor,
+        );
+        self.size = (
+            self.original_size.0 * scale_factor,
+            self.original_size.1 * scale_factor,
+        );
+    }
+
+    pub fn tooltip(&self) -> Ref<'_, Tooltip> {
+        self.action_tooltip.tooltip()
+    }
 
     pub fn toggle_selected(&self) {
         match self.selected.get() {
@@ -1216,7 +1238,7 @@ impl ActionButton {
                 // Since this button has become hidden, it's no longer hovered
                 event_sender.send(InternalUiEvent::ButtonHovered(ButtonHovered {
                     id: self.id,
-                    action: self.action,
+                    action: self.action_tooltip.action,
                     hovered_pos: None,
                     context: self.context,
                 }));
@@ -1249,7 +1271,10 @@ fn check_ability_requirement(character: &Character, ability: &Ability) -> Option
     }
 }
 
-fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+fn empty_cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+    // TODO let's try without showing cost in tooltip
+    "".to_string()
+    /*
     let mut s = String::new();
     if action_points > 0 {
         s.push_str(&format!("{action_points} AP"));
@@ -1270,8 +1295,8 @@ fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     if !s.is_empty() {
         s = format!("({s})");
     }
-    // TODO let's try without showing cost in tooltip
-    "".to_string()
+     */
+
     //s
 }
 
@@ -1292,7 +1317,7 @@ impl Drawable for ActionButton {
             if let Some(event_sender) = &self.event_sender {
                 event_sender.send(InternalUiEvent::ButtonHovered(ButtonHovered {
                     id: self.id,
-                    action: self.action,
+                    action: self.action_tooltip.action,
                     hovered_pos: if hovered { Some((x, y)) } else { None },
                     context: self.context,
                 }));
@@ -1311,8 +1336,12 @@ impl Drawable for ActionButton {
             draw_rectangle(x, y, w, h, Color::new(0.2, 0.0, 0.0, 0.5));
         }
 
-        let icon: IconId = if matches!(self.action, ButtonAction::Action(BaseAction::Attack(..))) {
+        let icon: IconId = if matches!(
+            self.action_tooltip.action,
+            ButtonAction::Action(BaseAction::Attack(..))
+        ) {
             if self
+                .action_tooltip
                 .character
                 .as_ref()
                 .unwrap()
@@ -1373,7 +1402,7 @@ impl Drawable for ActionButton {
             ButtonSelected::Yes => {
                 let margin = 1.0;
                 let mut outer = None;
-                if !matches!(self.action, ButtonAction::Action(..)) {
+                if !matches!(self.action_tooltip.action, ButtonAction::Action(..)) {
                     if let Some(color) = self.parent_bg_color {
                         outer = Some((color, 5.0));
                     }
@@ -1416,7 +1445,7 @@ impl Drawable for ActionButton {
                     if self.enabled.get() {
                         event_sender.send(InternalUiEvent::ButtonClicked {
                             id: self.id,
-                            action: self.action,
+                            action: self.action_tooltip.action,
                             context: self.context,
                         });
                     } else {

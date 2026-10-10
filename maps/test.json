@@ -353,39 +353,6 @@
   },
   "characters": [
     {
-      "type_": "Bob",
-      "pos": [
-        10,
-        17
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ogre",
-      "pos": [
-        16,
-        23
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        16,
-        26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Enslaved",
       "pos": [
         16,

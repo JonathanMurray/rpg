@@ -19,7 +19,7 @@ pub fn roll_d20_with_advantage(advantage_level: i32) -> u32 {
     // -1 => roll twice, take lowest (i.e. 1x disadvantage)
     // etc
 
-    println!("Rolling d20 with advantage {advantage_level} ...");
+    //println!("Rolling d20 with advantage {advantage_level} ...");
 
     let mut res = roll_d20();
     let additional_rolls = advantage_level.abs();
