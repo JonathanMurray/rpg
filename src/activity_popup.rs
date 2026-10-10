@@ -451,6 +451,7 @@ impl ActivityPopup {
         let mut changed_on_attacked_reaction = false;
         let mut changed_ability_enhancements = false;
         let mut changed_attack_enhancements = false;
+        let mut clicked_invalid = false;
         for event in self.choice_button_events.borrow_mut().drain(..) {
             match event {
                 InternalUiEvent::ButtonHovered(ButtonHovered {
@@ -542,7 +543,9 @@ impl ActivityPopup {
                     }
                 }
 
-                InternalUiEvent::ButtonInvalidClicked { .. } => {}
+                InternalUiEvent::ButtonInvalidClicked { .. } => {
+                    clicked_invalid = true;
+                }
             };
         }
 
@@ -569,6 +572,9 @@ impl ActivityPopup {
                     slider.selected_i,
                 ));
             }
+        }
+        if clicked_invalid {
+            return Some(ActivityPopupOutcome::ClickedInvalid);
         }
 
         None
@@ -1017,6 +1023,7 @@ pub enum ActivityPopupOutcome {
     ChangedAttackEnhancements,
     ChangedMovementSprint(u32),
     ChangedReaction,
+    ClickedInvalid,
 }
 
 struct MovementCostSlider {

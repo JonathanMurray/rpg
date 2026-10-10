@@ -405,14 +405,13 @@ const BONK: AttackEnhancement = AttackEnhancement {
     name: "Bonk",
     description: "Target loses |<value>1| AP",
     icon: IconId::Bonk,
-    //action_point_cost: 1,
     stamina_cost: 1,
     effect: AttackEnhancementEffect {
         on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
             None,
             ApplyEffect::LoseActionPoints(1),
         )),
-        bonus_damage: 3, //TODO
+        //bonus_damage: 3, //TODO
         visual_effect: Some(EffectId::Bonk),
         ..AttackEnhancementEffect::default()
     },

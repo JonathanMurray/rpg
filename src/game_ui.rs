@@ -2521,24 +2521,28 @@ impl UserInterface {
         let popup_outcome = self.activity_popup.update();
 
         let mut player_choice = None;
-        match popup_outcome {
-            Some(ActivityPopupOutcome::ClickedProceed) => {
-                player_choice = Some(self.commit_player_action());
+        if let Some(outcome) = popup_outcome {
+            match outcome {
+                ActivityPopupOutcome::ClickedProceed => {
+                    player_choice = Some(self.commit_player_action());
+                }
+                ActivityPopupOutcome::ChangedAbilityEnhancements => {
+                    // TODO update hit chance?
+                    self.refresh_use_ability_state();
+                }
+                ActivityPopupOutcome::ChangedAttackEnhancements => {
+                    self.refresh_attack_state();
+                }
+                ActivityPopupOutcome::ChangedMovementSprint(_sprint_usage) => {
+                    self.game_grid.update_move_speed(self.active_character_id);
+                }
+                ActivityPopupOutcome::ChangedReaction => {
+                    self.refresh_reaction_state();
+                }
+                ActivityPopupOutcome::ClickedInvalid => {
+                    self.on_invalid_action_clicked();
+                }
             }
-            Some(ActivityPopupOutcome::ChangedAbilityEnhancements) => {
-                // TODO update hit chance?
-                self.refresh_use_ability_state();
-            }
-            Some(ActivityPopupOutcome::ChangedAttackEnhancements) => {
-                self.refresh_attack_state();
-            }
-            Some(ActivityPopupOutcome::ChangedMovementSprint(_sprint_usage)) => {
-                self.game_grid.update_move_speed(self.active_character_id);
-            }
-            Some(ActivityPopupOutcome::ChangedReaction) => {
-                self.refresh_reaction_state();
-            }
-            None => {}
         }
 
         let mut action_button_clicked = None;
