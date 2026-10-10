@@ -742,7 +742,7 @@ pub async fn run_skill_tree_scene() {
                 }) => {
                     if let Some(pos) = hovered_pos {
                         let rect = Rect::new(pos.0, pos.1, cell_w, cell_w);
-                        let tooltip = button_action_tooltip(&button_action);
+                        let tooltip = button_action_tooltip(&button_action, None);
                         draw_tooltip(
                             &font,
                             TooltipPositionPreference::RelativeToRect(rect, Side::Bottom),

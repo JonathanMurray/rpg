@@ -369,7 +369,7 @@ impl _GameUserInterfaceConnection {
 
             if get_keys_pressed().contains(&KeyCode::Space) {
                 DEBUG.fetch_not(Ordering::SeqCst);
-                dbg!(DEBUG.load(Ordering::SeqCst));
+                //dbg!(DEBUG.load(Ordering::SeqCst));
             }
 
             if DEBUG.load(Ordering::Relaxed) {

@@ -10,9 +10,7 @@ use macroquad::{
 };
 
 use crate::{
-    action_button::{
-        button_action_tooltip, draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent,
-    },
+    action_button::{draw_button_tooltip, ActionButton, ButtonAction, InternalUiEvent},
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },

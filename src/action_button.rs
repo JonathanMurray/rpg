@@ -92,9 +92,9 @@ impl Tooltip {
     }
 }
 
-pub fn button_action_tooltip(action: &ButtonAction) -> Tooltip {
+pub fn button_action_tooltip(action: &ButtonAction, character: Option<&Character>) -> Tooltip {
     let mut tooltip = match action {
-        ButtonAction::Action(base_action) => base_action_tooltip(base_action),
+        ButtonAction::Action(base_action) => base_action_tooltip(base_action, character),
         ButtonAction::AttackEnhancement(enhancement) => attack_enhancement_tooltip(enhancement),
         ButtonAction::AbilityEnhancement(enhancement) => ability_enhancement_tooltip(enhancement),
         ButtonAction::OnAttackedReaction(reaction) => on_attacked_reaction_tooltip(reaction),
@@ -441,13 +441,13 @@ fn ability_enhancement_tooltip(enhancement: &AbilityEnhancement) -> Tooltip {
     t
 }
 
-fn base_action_tooltip(base_action: &BaseAction) -> Tooltip {
+fn base_action_tooltip(base_action: &BaseAction, character: Option<&Character>) -> Tooltip {
     match base_action {
         BaseAction::Attack { .. } => Tooltip {
             header: "No weapon equipped".to_string(), // This is replaced on-the-fly if needed
             ..Default::default()
         },
-        BaseAction::UseAbility(ability) => ability_tooltip(ability),
+        BaseAction::UseAbility(ability) => ability_tooltip(ability, character),
         BaseAction::Move => Tooltip {
             header: "Move".to_string(),
             description: Some(
@@ -532,7 +532,7 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     }
 }
 
-fn ability_tooltip(ability: &Ability) -> Tooltip {
+fn ability_tooltip(ability: &Ability, character: Option<&Character>) -> Tooltip {
     let header = format!(
         "{}{}",
         ability.name,
@@ -575,6 +575,10 @@ fn ability_tooltip(ability: &Ability) -> Tooltip {
         };
         t.technical_description.push(s);
         t.technical_description.push("".to_string());
+
+        if let Some(ch) = character {
+            t.error = check_ability_requirement(ch, ability);
+        }
     }
 
     match ability.target {
@@ -912,7 +916,7 @@ impl ActionButton {
         let action_points = action.action_point_cost();
         let quick_points = action.quick_point_cost();
         let icon: IconId = action.icon(character.as_deref());
-        let tooltip = button_action_tooltip(&action);
+        let tooltip = button_action_tooltip(&action, character.as_deref());
 
         let (size, texture_draw_size) = match action {
             ButtonAction::Proceed | ButtonAction::Passive(..) => {
@@ -1075,6 +1079,27 @@ impl ActionButton {
                     self.tooltip_is_based_on_equipped_weapon
                         .set(equipped_weapon);
                 }
+            } else if ability.requires_ranged_weapon() {
+                let equipped_weapon = match &self.character {
+                    Some(ch) => ch.weapon(HandType::MainHand),
+                    None => None,
+                };
+
+                if self.tooltip_is_based_on_equipped_weapon.get() != equipped_weapon {
+                    if self
+                        .character
+                        .as_ref()
+                        .unwrap()
+                        .has_equipped_ranged_weapon()
+                    {
+                        self.tooltip.borrow_mut().error = None;
+                    } else {
+                        self.tooltip.borrow_mut().error = Some("Requires ranged weapon!");
+                    }
+
+                    self.tooltip_is_based_on_equipped_weapon
+                        .set(equipped_weapon);
+                }
             } else if ability.requires_shield() {
                 let equipped_shield = match &self.character {
                     Some(ch) => ch.shield(),
@@ -1192,6 +1217,30 @@ impl ActionButton {
                 }));
             }
         }
+    }
+}
+
+fn check_ability_requirement(character: &Character, ability: &Ability) -> Option<&'static str> {
+    if ability.requires_melee_weapon() {
+        if character.has_equipped_melee_weapon() {
+            None
+        } else {
+            Some("Requires melee weapon!")
+        }
+    } else if ability.requires_ranged_weapon() {
+        if character.has_equipped_ranged_weapon() {
+            None
+        } else {
+            Some("Requires ranged weapon!")
+        }
+    } else if ability.requires_shield() {
+        if character.shield().is_some() {
+            None
+        } else {
+            Some("Requires shield")
+        }
+    } else {
+        None
     }
 }
 

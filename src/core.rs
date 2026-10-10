@@ -3180,7 +3180,7 @@ impl CoreGame {
         }
         let mut applied_to_self = vec![];
         character.for_equip_effects(|name, equip| {
-            dbg!(equip.start_of_turn_apply_self);
+            //dbg!(equip.start_of_turn_apply_self);
             if let Some(apply_effect) = equip.start_of_turn_apply_self {
                 let (applied, _line) =
                     self.do_apply_effect(apply_effect, Some(character), None, character);
@@ -4645,7 +4645,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
-            Blinded => "<keyword>Disadvantage| on actions.\nAutomatically |<keyword>Flanked| when attacked.",
+            Blinded => "|<keyword>Disadvantage| on actions.\n|<keyword>Advantage| on incoming attacks (|<keyword>Flanked|).",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
@@ -4771,7 +4771,7 @@ impl Condition {
     pub const fn related_keywords(&self) -> [Option<Keyword>; 2] {
         use Condition::*;
         match self {
-            Blinded => [Some(Keyword::Flanked), None],
+            //Blinded => [Some(Keyword::Flanked), None],
             NearDeath => [Some(Keyword::Advantage), None],
             _ => [None, None],
         }
@@ -5127,6 +5127,13 @@ impl Ability {
         matches!(
             self.requirement,
             Some(EquipmentRequirement::Weapon(WeaponType::Melee))
+        )
+    }
+
+    pub fn requires_ranged_weapon(&self) -> bool {
+        matches!(
+            self.requirement,
+            Some(EquipmentRequirement::Weapon(WeaponType::Ranged))
         )
     }
 
@@ -6143,15 +6150,16 @@ impl Character {
 
     pub fn move_speed_modifier(&self) -> f32 {
         let mut modifier = 1.0;
-        if self.conditions.borrow().has(&Condition::Hindered) {
+        if self.has_condition(&Condition::Hindered) {
             modifier -= 0.5;
         }
-        if self.conditions.borrow().has(&Condition::Slowed) {
+        if self.has_condition(&Condition::Slowed) {
             modifier -= 0.25;
         }
-        if self.conditions.borrow().has(&Condition::Hastened) {
+        if self.has_condition(&Condition::Hastened) {
             modifier += 0.25;
         }
+
         modifier
     }
 
@@ -6752,6 +6760,9 @@ impl Character {
             return false;
         }
         if ability.requires_melee_weapon() && !self.has_equipped_melee_weapon() {
+            return false;
+        }
+        if ability.requires_ranged_weapon() && !self.has_equipped_ranged_weapon() {
             return false;
         }
         ap >= ability.action_point_cost

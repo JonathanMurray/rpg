@@ -1624,12 +1624,12 @@ pub const DRAUG_CLAW: Ability = Ability {
         reach: AbilityReach::Range(Range::Melee),
         effect: AbilityNegativeEffect::Spell(SpellNegativeEffect {
             defense_type: Some(DefenseType::Evasion),
-            damage: Some(AbilityDamage::Dynamic(4, DamageType::Regular)),
+            damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Blinded,
-                    stacks: None,
-                    duration_rounds: Some(1),
+                    condition: Condition::Bleeding,
+                    stacks: Some(2),
+                    duration_rounds: None,
                 })),
                 None,
             ]),

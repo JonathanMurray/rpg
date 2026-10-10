@@ -92,8 +92,8 @@ impl TopCharacterPortraits {
             portrait.borrow_mut().strong_highlight = false;
         }
         self.active_id = id;
-        dbg!(id);
-        dbg!(self.portraits.keys());
+        //dbg!(id);
+        //dbg!(self.portraits.keys());
         self.portraits[&self.active_id]
             .borrow_mut()
             .strong_highlight = true;

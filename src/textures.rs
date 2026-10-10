@@ -279,7 +279,7 @@ fn portrait_cell(portrait: PortraitId) -> (i32, i32) {
         PortraitId::Scoundrel => (1, 1),
         PortraitId::Lootgoblin => (2, 1),
         PortraitId::Pyromaniac => (3, 1),
-        PortraitId::Enslaved => (0, 2),
+        PortraitId::Enslaved => (1, 3),
         PortraitId::Ogre => (1, 2),
     }
 }
