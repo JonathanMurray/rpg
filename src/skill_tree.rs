@@ -200,7 +200,7 @@ pub async fn run_editor() {
             layout_dir: LayoutDirection::Horizontal,
             margin: 10.0,
             style: Style {
-                background_color: Some(Color::new(0.1, 0.1, 0.1, 1.0)),
+                bg_color: Some(Color::new(0.1, 0.1, 0.1, 1.0)),
                 padding: 5.0,
                 ..Default::default()
             },
@@ -275,7 +275,7 @@ pub async fn run_editor() {
         layout_dir: LayoutDirection::Vertical,
         margin: 10.0,
         style: Style {
-            background_color: Some(Color::new(0.1, 0.1, 0.1, 1.0)),
+            bg_color: Some(Color::new(0.1, 0.1, 0.1, 1.0)),
             border_color: Some(LIGHTGRAY),
             padding: 5.0,
             ..Default::default()

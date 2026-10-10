@@ -675,7 +675,8 @@ impl Rectangle {
 
 #[derive(Default, Copy, Clone, Debug)]
 pub struct Style {
-    pub background_color: Option<Color>,
+    pub bg_color: Option<Color>,
+    pub fg_color: Option<Color>,
     pub border_color: Option<Color>,
     pub border_inner_rounding: Option<f32>,
     pub border_outer_rounding: Option<(Color, f32)>,
@@ -690,12 +691,15 @@ impl Style {
     }
 
     pub fn draw_background(&self, x: f32, y: f32, size: (f32, f32)) {
-        if let Some(color) = self.background_color {
+        if let Some(color) = self.bg_color {
             draw_rectangle(x, y, size.0, size.1, color);
         }
     }
 
     pub fn draw_foreground(&self, x: f32, y: f32, size: (f32, f32)) {
+        if let Some(color) = self.fg_color {
+            draw_rectangle(x, y, size.0, size.1, color);
+        }
         if let Some(color) = self.border_color {
             let thickness = self.border_width.unwrap_or(1.0);
             if let Some(rounding) = self.border_inner_rounding {
@@ -1253,7 +1257,7 @@ pub fn table(
         layout_dir: LayoutDirection::Horizontal,
         style: Style {
             border_color: style.outer_border_color,
-            background_color: style.background_color,
+            bg_color: style.background_color,
             ..Default::default()
         },
         border_between_children: style.inner_border_color,

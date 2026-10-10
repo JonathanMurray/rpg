@@ -284,7 +284,7 @@ impl NonCombatCharacterUi {
         let bottom_panel = Element::Container(Container {
             layout_dir: LayoutDirection::Horizontal,
             style: Style {
-                background_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
+                bg_color: Some(Color::new(0.00, 0.3, 0.4, 1.00)),
                 padding: 10.0,
                 ..Default::default()
             },

@@ -54,9 +54,9 @@ use crate::{
     settings::build_settings,
     sounds::{SoundId, SoundPlayer},
     target_ui::TargetUi,
-    textures::{EffectId, StatusId, UI_TEXTURE},
+    textures::{EffectId, StatusId, UI_BG_TEXTURE},
     tooltip::{
-        Keyword, DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
+        handle_keyword_tooltip_end_of_frame, Keyword, DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME,
         KEYWORD_TOOLTIP_COUNTER,
     },
     util::{
@@ -723,8 +723,6 @@ impl UserInterface {
     }
 
     pub fn draw(&mut self) -> Option<PlayerChose> {
-        DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
-
         let ui_y = screen_height() - UI_HEIGHT;
 
         let ui_x0 =
@@ -804,7 +802,12 @@ impl UserInterface {
         //draw_line(ui_x0, ui_y, ui_x0, screen_height(), 1.0, ORANGE);
         //draw_line(ui_x1, ui_y, ui_x1, screen_height(), 1.0, ORANGE);
 
-        draw_texture(UI_TEXTURE.get().unwrap(), ui_x0 - 10.0, ui_y - 10.0, WHITE);
+        draw_texture(
+            UI_BG_TEXTURE.get().unwrap(),
+            ui_x0 - 10.0,
+            ui_y - 10.0,
+            WHITE,
+        );
 
         self.activity_popup.draw(ui_x0 + 64.0, ui_y - 1.0);
 
@@ -959,10 +962,7 @@ impl UserInterface {
 
         self.banner.draw(&self.big_font);
 
-        let keyword_tooltip =
-            DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.load(std::sync::atomic::Ordering::Relaxed);
-        DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME
-            .store(keyword_tooltip, std::sync::atomic::Ordering::Relaxed);
+        handle_keyword_tooltip_end_of_frame();
 
         player_chose
     }
@@ -3036,7 +3036,7 @@ fn build_character_ui(
         size: REGULAR_ACTION_BUTTON_SIZE,
         style: Style {
             border_color: Some(GRAY),
-            background_color: Some(ACTION_BUTTON_BG_COLOR),
+            bg_color: Some(ACTION_BUTTON_BG_COLOR),
             ..Default::default()
         },
         ..Default::default()
@@ -3055,7 +3055,7 @@ fn build_character_ui(
         margin: 0.0,
         children: vec![button_row],
         style: Style {
-            background_color: Some(buttons_row_bg),
+            bg_color: Some(buttons_row_bg),
             padding: 2.0,
             ..Default::default()
         },

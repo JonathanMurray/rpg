@@ -1233,7 +1233,10 @@ async fn load_and_init_font_symbols() {
 
 async fn load_and_init_ui_textures() {
     let texture = load_and_init_texture("user_interface.png").await;
-    UI_TEXTURE.get_or_init(|| texture);
+    UI_BG_TEXTURE.get_or_init(|| texture);
+
+    let texture = load_and_init_texture("ui_arrow.png").await;
+    UI_ARROW_TEXTURE.get_or_init(|| texture);
 
     let texture = load_and_init_texture("portrait_bg.png").await;
     PORTRAIT_BG_TEXTURE.get_or_init(|| texture);
@@ -1276,7 +1279,8 @@ pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EQUIPMENT_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static EFFECTS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
-pub static UI_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static UI_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static UI_ARROW_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_ENEMY_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 

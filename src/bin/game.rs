@@ -94,21 +94,6 @@ async fn main() {
 
     let sound_player = SoundPlayer::new().await;
 
-    // TODO
-    /*
-       let (party, chars) = make_high_level_party();
-       let player_characters: Vec<Rc<Character>> = chars.into_iter().map(|ch| Rc::new(ch)).collect();
-       run_fight_loop(
-           resources.clone(),
-           &player_characters,
-           FightId::EliteHuldra,
-           ui_resources.clone(),
-           sound_player.clone(),
-       )
-       .await;
-    */
-    // TODO
-
     run_demo(&resources, &ui_resources, sound_player, fight_id).await;
 }
 
@@ -136,30 +121,20 @@ async fn run_demo(
             return;
         }
 
-        //player_characters.push(Rc::new(make_medium_clara(&party)));
-
         // TODO
         /*
-           player_characters = grow_players(
-               player_characters,
-               vec![
-                   (
-                       PlayerId::Alice,
-                       CharacterGrowth::of(
-                           vec![ButtonAction::Action(BaseAction::UseAbility(PIERCING_SHOT))],
-                           vec![],
-                       ),
+           run_transition_loop(
+               vec![(
+                   player_characters[0].clone(),
+                   CharacterGrowth::of(
+                       vec![
+                           ButtonAction::AttackEnhancement(CRIPPLING_SHOT),
+                           ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS),
+                           //ButtonAction::Action(BaseAction::UseAbility(&HEAL)),
+                       ],
+                       vec![EquipmentEntry::Weapon(ARCANE_BOW)],
                    ),
-                   (
-                       PlayerId::Bob,
-                       CharacterGrowth::of(
-                           vec![ButtonAction::Passive(PassiveSkill::Reaper)],
-                           vec![EquipmentEntry::Armor(LEATHER_ARMOR)],
-                       ),
-                   ),
-               ]
-               .into_iter()
-               .collect(),
+               )],
                resources,
                ui_resources,
                &party,
@@ -167,7 +142,6 @@ async fn run_demo(
            )
            .await;
         */
-        // -------------------------
 
         let mut demo_sequence = [
             (

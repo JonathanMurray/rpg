@@ -4195,7 +4195,7 @@ impl GameGrid {
                 (10.0, 10.0),
                 0.2,
                 Style {
-                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+                    bg_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
                     ..Default::default()
                 },
             );

@@ -162,7 +162,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         layout_dir: LayoutDirection::Vertical,
         align: Align::Center,
         style: Style {
-            background_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
+            bg_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
             padding: 2.0,
             ..Default::default()
         },

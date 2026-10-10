@@ -817,7 +817,7 @@ fn build_character_editor(big_font: &Font, simple_font: &Font, char: &Character)
         border_between_children: Some(LIGHTGRAY),
         margin: 40.0,
         style: Style {
-            background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+            bg_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
             padding: 15.0,
             ..Default::default()
         },
@@ -925,7 +925,7 @@ fn build_settings(
         border_between_children: Some(LIGHTGRAY),
         margin: 40.0,
         style: Style {
-            background_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
+            bg_color: Some(Color::new(0.0, 0.0, 0.0, 0.7)),
             padding: 15.0,
             ..Default::default()
         },

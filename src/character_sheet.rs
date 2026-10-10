@@ -105,7 +105,7 @@ impl CharacterSheet {
             layout_dir: LayoutDirection::Horizontal,
             margin: 15.0,
             style: Style {
-                background_color: Some(CHARACTER_SHEET_BG_COLOR),
+                bg_color: Some(CHARACTER_SHEET_BG_COLOR),
                 padding: 10.0,
                 border_color: Some(BLACK),
                 border_inner_rounding: Some(5.0),
@@ -143,7 +143,7 @@ impl CharacterSheet {
             margin: 8.0,
             style: Style {
                 padding: 3.0,
-                background_color: Some(BLACK),
+                bg_color: Some(BLACK),
                 ..Default::default()
             },
             children: vec![

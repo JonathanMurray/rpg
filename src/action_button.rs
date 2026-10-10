@@ -978,7 +978,7 @@ impl ActionButton {
             align: Align::Center,
             style: Style {
                 padding,
-                background_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
+                bg_color: Some(Color::new(0.1, 0.1, 0.1, 0.9)),
                 ..Default::default()
             },
             ..Default::default()
@@ -1057,7 +1057,7 @@ impl ActionButton {
         );
     }
 
-    pub fn tooltip(&self) -> Ref<Tooltip> {
+    pub fn tooltip(&self) -> Ref<'_, Tooltip> {
         if let ButtonAction::Action(BaseAction::UseAbility(ability)) = self.action {
             if ability.requires_melee_weapon() {
                 let equipped_weapon = match &self.character {
@@ -1157,21 +1157,6 @@ impl ActionButton {
                     .set(equipped_weapon);
             }
         }
-
-        /*
-        if let ButtonAction::Action(BaseAction::ToggleQuickActions) = self.action {
-            let quick_actions = Some(self.character.as_ref().unwrap().enabled_quick_actions.get());
-            if self.tooltip_is_based_on_quick_actions.get() != quick_actions {
-                let technical_descr = if quick_actions.unwrap() {
-                    vec!["|<checked>|".to_string()]
-                } else {
-                    vec!["|<unchecked>|".to_string()]
-                };
-                self.tooltip.borrow_mut().technical_description = technical_descr;
-                self.tooltip_is_based_on_quick_actions.set(quick_actions);
-            }
-        }
-         */
 
         self.tooltip.borrow()
     }

@@ -608,7 +608,7 @@ impl PlayerCharacterPortrait {
             let rect = Rc::new(RefCell::new(Rectangle {
                 size: (STATUS_ICON_W, STATUS_ICON_W),
                 style: Style {
-                    background_color: Some(BLACK),
+                    bg_color: Some(BLACK),
                     ..Default::default()
                 },
                 ..Default::default()
@@ -621,7 +621,7 @@ impl PlayerCharacterPortrait {
             layout_dir: LayoutDirection::Vertical,
             margin: 1.0,
             style: Style {
-                background_color: Some(Color::new(0.2, 0.2, 0.2, 1.0)),
+                bg_color: Some(Color::new(0.2, 0.2, 0.2, 1.0)),
                 padding: 2.0,
                 ..Default::default()
             },
@@ -663,14 +663,14 @@ impl PlayerCharacterPortrait {
         for (i, status_rect) in self.status_rects.iter().enumerate() {
             match statuses.get(i) {
                 Some(info) => {
-                    status_rect.borrow_mut().style.background_color = Some(BLACK);
+                    status_rect.borrow_mut().style.bg_color = Some(BLACK);
                     status_rect.borrow_mut().texture = Some(info.condition.status_icon());
                     if status_rect.borrow().has_been_hovered.take() {
                         self.hovered_status_rect.set(Some((i, *info)));
                     }
                 }
                 None => {
-                    status_rect.borrow_mut().style.background_color = Some(BLACK);
+                    status_rect.borrow_mut().style.bg_color = Some(BLACK);
                     status_rect.borrow_mut().texture = None;
                 }
             };
@@ -871,7 +871,7 @@ impl Log {
                 max_height: Some(h),
                 style: Style {
                     border_color: Some(GRAY),
-                    background_color: Some(Color::new(0.0, 0.0, 0.0, 0.85)),
+                    bg_color: Some(Color::new(0.0, 0.0, 0.0, 0.85)),
                     padding: 5.0,
                     ..Default::default()
                 },
@@ -915,7 +915,7 @@ impl Log {
                 layout_dir: LayoutDirection::Vertical,
                 margin: 0.0,
                 style: Style {
-                    background_color: Some(BLACK),
+                    bg_color: Some(BLACK),
                     padding: 5.0,
                     border_color: Some(COL_GOLD),
                     ..Default::default()

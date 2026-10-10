@@ -1003,7 +1003,7 @@ impl EquipmentSlot {
         Self {
             font,
             style: Style {
-                background_color: Some(SKYBLUE),
+                bg_color: Some(SKYBLUE),
                 border_color: Some(GRAY),
                 border_width: Some(2.0),
                 ..Default::default()

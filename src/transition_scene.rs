@@ -1,7 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, rc::Rc, vec};
 
 use macroquad::{
-    color::{DARKGRAY, GRAY, LIGHTGRAY, WHITE, YELLOW},
+    color::{Color, DARKGRAY, GRAY, LIGHTGRAY, RED, WHITE, YELLOW},
     input::{is_key_pressed, is_mouse_button_pressed, mouse_position, MouseButton},
     math::Rect,
     shapes::draw_rectangle,
@@ -16,12 +16,17 @@ use crate::{
     base_ui::{
         draw_text_rounded, Align, Container, Drawable, Element, LayoutDirection, Style, TextLine,
     },
-    core::{BaseAction, Character, EquipmentEntry, EquipmentSlotRole, HandType, Party, PlayerId},
+    core::{
+        Ability, BaseAction, Character, EquipmentEntry, EquipmentSlotRole, HandType, Party,
+        PlayerId,
+    },
     equipment_ui::EquipmentSlot,
     game_ui::ResourceBars,
     game_ui_components::PlayerCharacterPortrait,
     resources::{GameResources, UiResources},
-    sounds::SoundPlayer,
+    sounds::{SoundId, SoundPlayer},
+    textures::UI_ARROW_TEXTURE,
+    tooltip::handle_keyword_tooltip_end_of_frame,
 };
 
 pub struct CharacterGrowth {
@@ -146,6 +151,8 @@ pub async fn run_transition_loop(
 
     let mut next_btn_id = 0;
 
+    let mut hoverable_buttons = vec![];
+
     {
         let mut children = vec![];
         for (char, growth) in &characters {
@@ -185,22 +192,75 @@ pub async fn run_transition_loop(
             let mut char_sections = vec![Element::Container(portrait_section)];
 
             if !growth.new_skills.is_empty() {
-                let mut buttons = vec![];
+                let mut button_cols = vec![];
                 for action in &growth.new_skills {
-                    let btn = ActionButton::new(
+                    let mut col_children = vec![];
+
+                    let parent_action = match action {
+                        ButtonAction::AbilityEnhancement(enhancement) => {
+                            let ability: &'static Ability = char
+                                .known_abilities()
+                                .iter()
+                                .filter(|a| a.id == enhancement.ability_id)
+                                .next()
+                                .unwrap();
+                            Some(ButtonAction::Action(BaseAction::UseAbility(ability)))
+                        }
+                        ButtonAction::AttackEnhancement(..) => Some(ButtonAction::Action(
+                            BaseAction::Attack(char.attack_action().unwrap()),
+                        )),
+                        _ => None,
+                    };
+
+                    if let Some(action) = parent_action {
+                        let parent_btn = Rc::new(ActionButton::new(
+                            action,
+                            Some(Rc::clone(&event_queue)),
+                            next_btn_id,
+                            Some(Rc::clone(char)),
+                            simple_font,
+                        ));
+                        hoverable_buttons.push(Rc::clone(&parent_btn));
+                        next_btn_id += 1;
+
+                        col_children.push(Element::Container(Container {
+                            children: vec![Element::Rc(parent_btn)],
+                            style: Style {
+                                fg_color: Some(Color::new(0.0, 0.0, 0.0, 0.5)),
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }));
+                        col_children.push(Element::Texture(
+                            UI_ARROW_TEXTURE.get().unwrap().clone(),
+                            None,
+                        ));
+                    }
+
+                    let btn = Rc::new(ActionButton::new(
                         *action,
                         Some(Rc::clone(&event_queue)),
                         next_btn_id,
                         Some(Rc::clone(char)),
                         simple_font,
-                    );
+                    ));
+                    hoverable_buttons.push(Rc::clone(&btn));
                     next_btn_id += 1;
-                    buttons.push(Element::boxed(btn));
+                    col_children.push(Element::Rc(btn));
+
+                    let col = Container {
+                        layout_dir: LayoutDirection::Vertical,
+                        margin: 5.0,
+                        children: col_children,
+                        align: Align::Center,
+                        ..Default::default()
+                    };
+                    button_cols.push(Element::Container(col));
                 }
                 let buttons_row = Container {
                     layout_dir: LayoutDirection::Horizontal,
-                    margin: 5.0,
-                    children: buttons,
+                    margin: 10.0,
+                    children: button_cols,
                     ..Default::default()
                 };
                 let header = if growth.new_skills.len() == 1 {
@@ -312,6 +372,7 @@ pub async fn run_transition_loop(
             for event in event_queue.borrow_mut().drain(..) {
                 if let InternalUiEvent::ButtonHovered(hover_event) = event {
                     if hover_event.hovered_pos.is_some() {
+                        sound_player.play(SoundId::HoverButton);
                         hovered_btn = Some(hover_event);
                     } else if let Some(prev_hovered_button) = &hovered_btn {
                         if prev_hovered_button.id == hover_event.id {
@@ -321,9 +382,15 @@ pub async fn run_transition_loop(
                 }
             }
 
-            if let Some(btn) = &hovered_btn {
-                let tooltip = button_action_tooltip(&btn.action);
-                draw_button_tooltip(simple_font, btn.hovered_pos.unwrap(), &tooltip, true);
+            if let Some(hovered) = &hovered_btn {
+                let btn = hoverable_buttons
+                    .iter()
+                    .filter(|btn| btn.id == hovered.id)
+                    .next()
+                    .unwrap();
+                //let tooltip = button_action_tooltip(&hovered.action);
+                let tooltip = btn.tooltip();
+                draw_button_tooltip(simple_font, hovered.hovered_pos.unwrap(), &tooltip, true);
             }
 
             let text = "Continue";
@@ -361,6 +428,8 @@ pub async fn run_transition_loop(
             if is_key_pressed(macroquad::input::KeyCode::Space) {
                 break;
             }
+
+            handle_keyword_tooltip_end_of_frame();
 
             next_frame().await;
         }

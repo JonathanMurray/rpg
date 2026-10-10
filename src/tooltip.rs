@@ -413,8 +413,9 @@ pub fn draw_tooltip(
         }
         let elapsed_ms = (get_frame_time() * 1000.0) as u32;
 
-        if KEYWORD_TOOLTIP_COUNTER.fetch_add(elapsed_ms, std::sync::atomic::Ordering::Relaxed) > 200
-        {
+        let shown_for =
+            KEYWORD_TOOLTIP_COUNTER.fetch_add(elapsed_ms, std::sync::atomic::Ordering::Relaxed);
+        if shown_for > 200 {
             draw_keyword_tooltips_relative_to_rect(font, has_keywords, tooltip_rect);
         }
     }
@@ -425,6 +426,12 @@ pub fn draw_tooltip(
 pub static DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME: AtomicBool = AtomicBool::new(false);
 pub static DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME: AtomicBool = AtomicBool::new(false);
 pub static KEYWORD_TOOLTIP_COUNTER: AtomicU32 = AtomicU32::new(0);
+
+pub fn handle_keyword_tooltip_end_of_frame() {
+    let did_draw = DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.load(std::sync::atomic::Ordering::Relaxed);
+    DID_DRAW_KEYWORD_TOOLTIP_LAST_FRAME.store(did_draw, std::sync::atomic::Ordering::Relaxed);
+    DID_DRAW_KEYWORD_TOOLTIP_THIS_FRAME.store(false, std::sync::atomic::Ordering::Relaxed);
+}
 
 pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword], mut rect: Rect) {
     for (i, keyword) in keywords.iter().enumerate() {

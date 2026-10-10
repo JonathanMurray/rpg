@@ -155,7 +155,7 @@ impl RewardSelectionUi {
         let attribute_selection_card = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             style: Style {
-                background_color: Some(card_color),
+                bg_color: Some(card_color),
                 padding: 20.0,
                 ..Default::default()
             },

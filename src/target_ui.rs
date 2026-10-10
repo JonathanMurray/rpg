@@ -123,7 +123,7 @@ impl TargetUi {
                 (16.0, 16.0),
                 0.25,
                 Style {
-                    background_color: Some(BLACK),
+                    bg_color: Some(BLACK),
                     border_color: Some(WHITE),
                     ..Default::default()
                 },
@@ -161,7 +161,7 @@ impl TargetUi {
 
             let portrait = Element::Container(Container {
                 style: Style {
-                    background_color: Some(Color::new(0.5, 0.5, 0.5, 0.3)),
+                    bg_color: Some(Color::new(0.5, 0.5, 0.5, 0.3)),
                     border_color: Some(LIGHTGRAY),
                     ..Default::default()
                 },
@@ -184,7 +184,7 @@ impl TargetUi {
                 layout_dir: LayoutDirection::Vertical,
                 align: Align::Center,
                 style: Style {
-                    background_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
+                    bg_color: Some(Color::new(1.0, 1.0, 1.0, 0.1)),
                     padding: 2.0,
                     ..Default::default()
                 },
@@ -354,7 +354,7 @@ impl TargetUi {
                 children: rows,
                 margin: 15.0,
                 style: Style {
-                    background_color: Some(BG_COLOR),
+                    bg_color: Some(BG_COLOR),
                     border_color: Some(LIGHTGRAY),
                     border_inner_rounding: Some(6.0),
                     padding: 10.0,
