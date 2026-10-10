@@ -34,18 +34,30 @@ pub enum Keyword {
 }
 
 impl Keyword {
-    fn name(&self) -> &str {
+    fn name(&self) -> String {
         match self {
-            Keyword::Cond(condition, _amount) => condition.name(),
-            Keyword::AttackEnhancement(enhancement) => enhancement.name,
-            Keyword::OnAttackedReaction(reaction) => reaction.name,
-            Keyword::OpportunityAttack => "Opportunity attack",
-            Keyword::Advantage => "Advantage / Disadvantage",
-            Keyword::Pushed => "Pushed",
-            Keyword::Graze => "Graze",
-            Keyword::Crit => "Crit",
-            Keyword::Flanked => "Flanked",
-            Keyword::Spikes => "spikes (surface)",
+            Keyword::Cond(condition, _amount) => condition.name().to_string(),
+            Keyword::AttackEnhancement(enhancement) => format!(
+                "{}{}",
+                enhancement.name,
+                cost_string(
+                    enhancement.action_point_cost,
+                    enhancement.stamina_cost,
+                    enhancement.mana_cost
+                )
+            ),
+            Keyword::OnAttackedReaction(reaction) => format!(
+                "{}{}",
+                reaction.name,
+                cost_string(reaction.action_point_cost, reaction.stamina_cost, 0)
+            ),
+            Keyword::OpportunityAttack => format!("Opportunity attack{}", cost_string(1, 0, 0)),
+            Keyword::Advantage => "Advantage / Disadvantage".to_string(),
+            Keyword::Pushed => "Pushed".to_string(),
+            Keyword::Graze => "Graze".to_string(),
+            Keyword::Crit => "Crit".to_string(),
+            Keyword::Flanked => "Flanked".to_string(),
+            Keyword::Spikes => "spikes (surface)".to_string(),
         }
     }
 
@@ -58,7 +70,7 @@ impl Keyword {
                     condition.description().to_string()
                 }
             },
-            Keyword::AttackEnhancement(enhancement) => format!("|<faded>(attack enhancement)|\n{}",enhancement.description),
+            Keyword::AttackEnhancement(enhancement) => format!("|<faded>(attack enhancement)|\n{}",  enhancement.description),
             Keyword::OnAttackedReaction(reaction) => format!("|<faded>(reaction)|\n{}", reaction.description),
             Keyword::OpportunityAttack => "|<faded>(reaction)|\nAttack an enemy that drops their guard".to_string(),
             Keyword::Advantage => "Roll extra dice and take the highest / lowest result".to_string(),
@@ -96,6 +108,30 @@ impl Keyword {
             Keyword::Spikes => Goodness::Bad,
         }
     }
+}
+
+fn cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
+    let mut s = String::new();
+    if action_points > 0 {
+        s.push_str(&format!("{action_points} AP"));
+    }
+    if stamina > 0 {
+        if !s.is_empty() {
+            s.push_str(", ");
+        }
+        s.push_str(&format!("{stamina} stamina"));
+    }
+    if mana > 0 {
+        if !s.is_empty() {
+            s.push_str(", ");
+        }
+        s.push_str(&format!("{mana} mana"));
+    }
+
+    if !s.is_empty() {
+        s = format!(" |<faded>({s})|");
+    }
+    s
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
@@ -402,7 +438,7 @@ pub fn draw_keyword_tooltips_relative_to_rect(font: &Font, keywords: &[Keyword],
         rect = draw_tooltip(
             font,
             pos_preference,
-            keyword.name(),
+            &keyword.name(),
             None,
             &content_lines,
             &[],
@@ -420,7 +456,7 @@ pub fn draw_keyword_tooltips(font: &Font, keywords: &[Keyword], x: f32, mut y: f
         let rect = draw_tooltip(
             font,
             TooltipPositionPreference::At((x, y)),
-            keyword.name(),
+            &keyword.name(),
             None,
             &content_lines,
             &[],

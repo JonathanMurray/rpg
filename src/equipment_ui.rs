@@ -204,7 +204,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
     }
     if let Some(enhancement) = weapon.attack_enhancement {
         t.technical_description
-            .push(format!("Skill: |<keyword>{}|", enhancement.name));
+            .push(format!("Skill: |<keyword>{}|", enhancement.name,));
         t.keywords.push(Keyword::AttackEnhancement(enhancement));
     }
     if weapon.is_melee() {
