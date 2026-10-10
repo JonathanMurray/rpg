@@ -458,7 +458,7 @@ pub fn create_character(
                 "Enslaved",
                 SoundId::Damage,
                 PortraitId::Enslaved,
-                SpriteId::Skeleton2,
+                SpriteId::Enslaved,
                 Attributes::new(5, 5, 2, 1),
                 pos,
             );

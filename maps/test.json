@@ -384,6 +384,17 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        16,
+        19
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }
