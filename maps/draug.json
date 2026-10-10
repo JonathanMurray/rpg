@@ -749,11 +749,13 @@
     "(60, 13)": "Barrel",
     "(23, 7)": "HangingWeapons",
     "(32, 7)": "HangingWeapons",
-    "(32, 19)": "Barrel",
+    "(46, 34)": "WallOpeningNorth",
     "(33, 19)": "Barrel",
     "(44, 1)": "Barrel",
     "(58, 5)": "WallOpeningEast",
-    "(46, 34)": "WallOpeningNorth"
+    "(32, 19)": "HangingWeapons",
+    "(34, 19)": "Barrel",
+    "(58, 13)": "Barrel"
   },
   "control_points": {
     "(55, 5)": "Exit"

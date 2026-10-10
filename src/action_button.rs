@@ -342,8 +342,10 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
                 t.technical_description.push("Regain AP".to_string())
             }
             AttackEnhancementOnHitEffect::Target(defense_type, apply_effect) => {
-                t.technical_description
-                    .push(format!("|<single_target>|{}", def_suffix(defense_type)));
+                t.technical_description.push(format!(
+                    "|<single_target>| |<faded>(target)| {}",
+                    def_suffix(defense_type)
+                ));
                 describe_apply_effect(apply_effect, t);
             }
         }
@@ -483,24 +485,24 @@ pub fn describe_apply_effect(effect: ApplyEffect, t: &mut Tooltip) {
     match effect {
         ApplyEffect::LoseActionPoints(n) => t
             .technical_description
-            .push(format!("  Lose |<value>{}| AP", n)),
+            .push(format!("  Lose |<value>{}| |<ap>| AP", n)),
         ApplyEffect::GainActionPoints(n) => t
             .technical_description
-            .push(format!("  Gain |<value>{}| AP", n)),
+            .push(format!("  Gain |<value>{}| |<ap>| AP", n)),
         ApplyEffect::GainStamina(n) => t
             .technical_description
-            .push(format!("  |<stamina>| |<value>{}| stamina", n)),
+            .push(format!("  Restore |<value>{}| |<stamina>| stamina", n)),
         ApplyEffect::GainMana(n) => t
             .technical_description
-            .push(format!("  |<mana>| |<value>{}| mana", n)),
+            .push(format!("  Restore |<value>{}| |<mana>| mana", n)),
         ApplyEffect::LoseHealth(n) => t
             .technical_description
             .push(format!("  Lose |<value>{}| |<heart>| health", n)),
         ApplyEffect::GainHealth(n) => t
             .technical_description
-            .push(format!("  |<heart>| |<value>{}| healing", n)),
+            .push(format!("  Heal for |<value>{}| |<heart>|", n)),
         ApplyEffect::Condition(apply_condition) => {
-            let mut line = format!("  |<keyword>{}|", apply_condition.condition.name());
+            let mut line = format!("  Gain |<keyword>{}|", apply_condition.condition.name());
             if let Some(stacks) = apply_condition.stacks {
                 line.push_str(&format!(" x |<value>{}|", stacks));
             }
@@ -799,6 +801,9 @@ fn describe_ability_negative_effect(effect: AbilityNegativeEffect, t: &mut Toolt
 
             for apply_effect in effect.on_hit.unwrap_or_default().iter().flatten() {
                 describe_apply_effect(*apply_effect, t);
+            }
+            if let Some(environment_effect) = effect.environment_effect {
+                describe_environment_effect(environment_effect, t);
             }
         }
 

@@ -940,8 +940,11 @@ impl CoreGame {
                     .await;
             }
 
-            if new_surface == Some(Surface::Fire) && prev_surface != Some(Surface::Fire) {
-                self.on_enter_or_start_turn_in_fire_surface(character).await;
+            if let Some(surface) = new_surface {
+                if prev_surface != new_surface {
+                    self.on_enter_or_start_turn_in_surface(character, surface)
+                        .await;
+                }
             }
 
             character.set_position(new_position);
@@ -1002,20 +1005,36 @@ impl CoreGame {
         self.on_non_ability_attack(event).await;
     }
 
-    async fn on_enter_or_start_turn_in_fire_surface(&self, character: &Character) {
-        // TODO maybe take less immediate damage if character was wet, and emit visual steam effect
-        self.perform_losing_health(character, 2, DamageSource::FireSurface)
-            .await;
-        self.perform_character_receive_condition(
-            character,
-            ApplyCondition {
-                condition: Condition::Burning,
-                stacks: Some(2),
-                duration_rounds: None,
-            },
-        )
-        .await;
-        character.lose_condition(Condition::Wet);
+    async fn on_enter_or_start_turn_in_surface(&self, character: &Character, surface: Surface) {
+        match surface {
+            Surface::Fire => {
+                // TODO maybe take less immediate damage if character was wet, and emit visual steam effect
+                self.perform_losing_health(character, 2, DamageSource::FireSurface)
+                    .await;
+                self.perform_character_receive_condition(
+                    character,
+                    ApplyCondition {
+                        condition: Condition::Burning,
+                        stacks: Some(2),
+                        duration_rounds: None,
+                    },
+                )
+                .await;
+                character.lose_condition(Condition::Wet);
+            }
+            Surface::Spikes => {
+                self.perform_character_receive_condition(
+                    character,
+                    ApplyCondition {
+                        condition: Condition::Bleeding,
+                        stacks: Some(1),
+                        duration_rounds: None,
+                    },
+                )
+                .await;
+            }
+            _ => {}
+        }
     }
 
     async fn perform_character_receive_condition(
@@ -1829,7 +1848,7 @@ impl CoreGame {
                 let AreaShape::Circle(radius) = &mut shape else {
                     panic!()
                 };
-                *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+                *radius = radius.plus_tenths(e.increased_radius_tenths);
             }
         }
 
@@ -1958,7 +1977,8 @@ impl CoreGame {
                     let AreaShape::Circle(radius) = shape else {
                         panic!()
                     };
-                    *radius = radius.plusf(e.increased_radius_tenths as f32 * 0.1);
+
+                    *radius = radius.plus_tenths(e.increased_radius_tenths);
                 }
             }
         }
@@ -2063,17 +2083,20 @@ impl CoreGame {
         mode: ActionPerformanceMode<'_>,
     ) -> Box<AbilityTargetOutcome> {
         let outcome = match enemy_effect {
-            AbilityNegativeEffect::Spell(spell_enemy_effect) => Self::perform_spell_enemy_effect(
-                caster,
-                ability_name,
-                roll_instruction,
-                enhancements,
-                spell_enemy_effect,
-                target,
-                detail_lines,
-                area_center,
-                mode,
-            ),
+            AbilityNegativeEffect::Spell(spell_enemy_effect) => {
+                Self::perform_spell_enemy_effect(
+                    caster,
+                    ability_name,
+                    roll_instruction,
+                    enhancements,
+                    spell_enemy_effect,
+                    target,
+                    detail_lines,
+                    area_center,
+                    mode,
+                )
+                .await
+            }
             AbilityNegativeEffect::PerformAttack(ability_attack_effect) => {
                 let attack_enhancement_effects: Vec<(&str, AttackEnhancementEffect)> = enhancements
                     .iter()
@@ -2104,7 +2127,7 @@ impl CoreGame {
         Box::new(outcome)
     }
 
-    fn perform_spell_enemy_effect(
+    async fn perform_spell_enemy_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
         roll_instruction: &RollInstruction,
@@ -2113,7 +2136,7 @@ impl CoreGame {
         target: &Rc<Character>,
         detail_lines: &mut Vec<String>,
         area_center: Option<Position>,
-        mode: ActionPerformanceMode,
+        mode: ActionPerformanceMode<'_>,
     ) -> AbilityTargetOutcome {
         let real_game = mode.real_game();
 
@@ -2279,6 +2302,11 @@ impl CoreGame {
                     None,
                 );
                 detail_lines.push(log_line);
+            }
+
+            if let Some(e) = spell_enemy_effect.environment_effect {
+                game.perform_environment_effect(e, target.pos(), detail_lines)
+                    .await;
             }
 
             for enhancement in enhancements {
@@ -3175,8 +3203,9 @@ impl CoreGame {
         //println!("START OF TURN: {}", character.name);
 
         let surface = self.pathfind_grid.surface(character.pos());
-        if surface == Some(Surface::Fire) {
-            self.on_enter_or_start_turn_in_fire_surface(character).await;
+        if let Some(surface) = surface {
+            self.on_enter_or_start_turn_in_surface(character, surface)
+                .await;
         }
         let mut applied_to_self = vec![];
         character.for_equip_effects(|name, equip| {
@@ -4669,7 +4698,7 @@ impl Condition {
             ThrillOfBattle => "|<value>+5| |<mixed_dice>| |<stat>Attack/Spell| (passive skill).",
             Adrenalin => "|<value>+1| AP per turn.",
             ArcaneSurge => "|<value>+x| |<blue_dice>| |<stat>Spell| per remaining turn",
-            HealthPotionRecovering => "End of turn: |<heart>| heal |<value>2|",
+            HealthPotionRecovering => "End of turn: heal |<value>2| |<heart>|",
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
@@ -5273,6 +5302,18 @@ pub struct SpellNegativeEffect {
     pub defense_type: Option<DefenseType>,
     pub damage: Option<AbilityDamage>,
     pub on_hit: Option<[Option<ApplyEffect>; 2]>,
+    pub environment_effect: Option<EnvironmentEffect>,
+}
+
+impl SpellNegativeEffect {
+    pub const fn default() -> Self {
+        Self {
+            defense_type: None,
+            damage: None,
+            on_hit: None,
+            environment_effect: None,
+        }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq, Hash)]
@@ -5373,7 +5414,7 @@ pub enum AbilityTarget {
     },
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum EnvironmentEffect {
     ConvertSurface(Surface, Surface),
     CreateSurface(Surface, AreaShape),
@@ -5387,7 +5428,7 @@ pub struct AreaEffect {
     pub create_surface: Option<Surface>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum AreaShape {
     Circle(Range),
     Line,
@@ -5449,7 +5490,7 @@ impl AbilityTarget {
             for enhancement in enhancements {
                 if let Some(e) = enhancement.spell_effect {
                     if e.increased_radius_tenths > 0 {
-                        range = range.plusf(e.increased_radius_tenths as f32 * 0.1);
+                        range = range.plus_tenths(e.increased_radius_tenths);
                     }
                 }
             }
@@ -5462,7 +5503,7 @@ impl AbilityTarget {
             for enhancement in enhancements {
                 if let Some(e) = enhancement.spell_effect {
                     if e.increased_range_tenths > 0 {
-                        range = range.plusf(e.increased_range_tenths as f32 * 0.1);
+                        range = range.plus_tenths(e.increased_range_tenths);
                     }
                 }
             }
@@ -6838,8 +6879,8 @@ impl Character {
                 known.push((
                     arrows.arrow.name.to_string(),
                     AttackEnhancement {
-                        name: "Use special arrow",
-                        description: arrows.arrow.name,
+                        name: arrows.arrow.name,
+                        description: arrows.arrow.description,
                         icon: IconId::RangedAttack,
                         weapon_requirement: Some(WeaponType::Ranged),
                         effect: AttackEnhancementEffect {
@@ -7961,7 +8002,7 @@ impl Weapon {
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Arrow {
     pub name: &'static str,
-    pub sprite: Option<SpriteId>,
+    pub description: &'static str,
     pub icon: EquipmentIconId,
     pub bonus_penetration: u32,
     pub on_damage_apply: Option<ApplyEffect>,
@@ -8048,48 +8089,46 @@ impl WeaponRange {
     pub fn into_range(self) -> Range {
         match self {
             Self::Melee => Range::Melee,
-            Self::Ranged(r) => Range::Float(r),
+            Self::Ranged(r) => Range::f32(r),
         }
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
+#[derive(Debug, Copy, Clone, PartialEq, Hash)]
 pub enum Range {
     Melee,
-    Ranged(u32),
-    ExtendableRanged(u32),
-    Float(f32),
+    Tenths(u32),
 }
 
 impl Display for Range {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Range::Melee => f.write_str("melee"),
-            Range::Ranged(range) => f.write_str(&range.to_string()),
-            Range::ExtendableRanged(range) => {
-                f.write_fmt(format_args!("{} ({})", range, range * 2))
-            }
-            Range::Float(range) => f.write_fmt(format_args!("{:.1}", range)),
+            Range::Tenths(range) => f.write_fmt(format_args!("{:.1}", (*range as f32 / 10.0))),
         }
     }
 }
 
 impl Range {
+    pub const fn f32(f: f32) -> Self {
+        Self::Tenths((f * 10.0).floor() as u32)
+    }
+
+    pub const fn of(u: u32) -> Self {
+        Self::Tenths(u * 10)
+    }
+
     pub fn squared(&self) -> f32 {
         match self {
             Range::Melee => TOUCHING_MELEE_RANGE_SQUARED,
-            Range::Ranged(range) => range.pow(2) as f32,
-            Range::ExtendableRanged(range) => range.pow(2) as f32,
-            Range::Float(range) => range.powf(2.0),
+            Range::Tenths(tenths) => (*tenths as f32 / 10.0).powf(2.0),
         }
     }
 
     pub fn center_to_center_squared(&self) -> f32 {
         let range = match self {
             Range::Melee => return CENTER_MELEE_RANGE_SQUARED,
-            Range::Ranged(range) => *range as f32,
-            Range::ExtendableRanged(range) => *range as f32,
-            Range::Float(range) => *range,
+            Range::Tenths(range) => *range as f32,
         };
 
         // Add sqrt(2.0) to reach one extra diagonal cell, i.e. to the center cell of the target (?)
@@ -8098,37 +8137,29 @@ impl Range {
 
     pub fn plus(&self, n: u32) -> Range {
         match self {
-            Range::Melee => Range::Float(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n as f32),
-            Range::Ranged(range) => Range::Ranged(range + n),
-            Range::ExtendableRanged(range) => Range::Ranged(range + n),
-            Range::Float(range) => Range::Float(range + n as f32),
+            Range::Melee => Range::f32(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n as f32),
+            Range::Tenths(tenths) => Range::Tenths(tenths + n * 10),
         }
     }
 
-    pub fn plusf(&self, n: f32) -> Range {
+    pub fn plus_tenths(&self, n: u32) -> Range {
         match self {
-            Range::Melee => Range::Float(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n),
-            Range::Ranged(range) => Range::Float(*range as f32 + n),
-            Range::ExtendableRanged(range) => Range::Float(*range as f32 + n),
-            Range::Float(range) => Range::Float(range + n),
+            Range::Melee => Range::f32(TOUCHING_MELEE_RANGE_SQUARED.sqrt() + n as f32 * 10.0),
+            Range::Tenths(tenths) => Range::Tenths(tenths + n),
         }
     }
 
     pub fn range_with_icon(&self) -> String {
         match self {
             Range::Melee => "melee".to_string(),
-            Range::Ranged(range) => format!("|<range>| {range}"),
-            Range::ExtendableRanged(range) => format!("|<range>| {range}"),
-            Range::Float(range) => format!("|<range>| {range:.1}"),
+            Range::Tenths(..) => format!("|<range>| {:.1}", f32::from(*self)),
         }
     }
 
     pub fn radius_with_icon(&self) -> String {
         match self {
             Range::Melee => "melee".to_string(),
-            Range::Ranged(range) => format!("|<radius>| {range}"),
-            Range::ExtendableRanged(range) => format!("|<radius>| {range}"),
-            Range::Float(range) => format!("|<radius>| {range:.1}"),
+            Range::Tenths(..) => format!("|<radius>| {:.1}", f32::from(*self)),
         }
     }
 }
@@ -8137,9 +8168,7 @@ impl From<Range> for f32 {
     fn from(range: Range) -> Self {
         match range {
             Range::Melee => TOUCHING_MELEE_RANGE_SQUARED.sqrt(),
-            Range::Ranged(r) => r as f32,
-            Range::ExtendableRanged(r) => r as f32,
-            Range::Float(f) => f,
+            Range::Tenths(tenths) => tenths as f32 / 10.0,
         }
     }
 }

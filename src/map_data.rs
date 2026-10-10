@@ -16,9 +16,9 @@ use crate::{
         BAD_SMALL_SHIELD, BAD_SWORD, BAD_WAR_HAMMER, BARBED_ARROWS, BATTLEMAGE_SIGIL, CHAIN_MAIL,
         COLD_ARROWS, DASH, DRAUG_CLAW, DRAUG_HAUNT, DRAUG_NECKLACE, DRUID_COAT, ENEMY_BRACE,
         ENEMY_BURNING_ARROW, ENEMY_ESCAPE, ENEMY_INSPIRE, ENEMY_TACKLE, ENERGY_POTION,
-        ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, HEALING_NOVA, HEALING_RAIN,
-        HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS, KILL,
-        KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
+        ENSLAVED_RAPIER, ENSLAVED_SWORD, EXECUTE, EXECUTE_BLOODLUST, FIRE_ARROWS, HEALING_NOVA,
+        HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS,
+        KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LUNGE_ATTACK, NECROTIC_BAND,
         PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER, SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD,
         SPIKE_TRAP, STAFF, WAR_HAMMER,
     },
@@ -516,7 +516,7 @@ pub fn make_low_level_party() -> (Rc<Party>, Vec<Character>) {
 
     // TODO
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack {
-        arrow: COLD_ARROWS,
+        arrow: FIRE_ARROWS,
         quantity: 2,
     }));
 
@@ -649,9 +649,11 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, DAGGER);
+    alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
-    alice.arrows.set(Some(ArrowStack::new(COLD_ARROWS, 3)));
+    alice.arrows.set(Some(ArrowStack::new(FIRE_ARROWS, 3)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2)));
+    alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(FIRE_ARROWS, 2)));
 
     alice.try_gain_equipment(EquipmentEntry::Consumable(MANA_POTION));
     alice.try_gain_equipment(EquipmentEntry::Consumable(HEALTH_POTION));
@@ -660,7 +662,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.try_gain_equipment(EquipmentEntry::Consumable(ENERGY_POTION));
 
     //alice.try_gain_equipment(EquipmentEntry::Trinket(BATTLEMAGE_SIGIL));
-    alice.trinket.set(Some(RUBY));
+    alice.trinket.set(Some(ASSASSINS_VIAL));
     alice.learn_ability(&HEAL);
     alice.learn_ability_enhancement(HEAL_ENERGIZE);
     alice.learn_attack_enhancement(CRIPPLING_SHOT);

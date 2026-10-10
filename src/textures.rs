@@ -340,6 +340,7 @@ pub enum EquipmentIconId {
     DruidCoat,
     PenetratingArrow,
     BarbedArrow,
+    FireArrow,
     ColdArrow,
     ExplodingArrow,
 
@@ -1025,8 +1026,9 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::DruidCoat => (6, 2),
         EquipmentIconId::PenetratingArrow => (0, 0),
         EquipmentIconId::BarbedArrow => (1, 0),
+        EquipmentIconId::FireArrow => (2, 0),
         EquipmentIconId::ColdArrow => (3, 0),
-        EquipmentIconId::ExplodingArrow => (2, 0),
+        EquipmentIconId::ExplodingArrow => (7, 0),
         EquipmentIconId::HealthPotion => (5, 4),
         EquipmentIconId::ManaPotion => (0, 4),
         EquipmentIconId::AdrenalinPotion => (1, 4),

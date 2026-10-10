@@ -59,7 +59,7 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
     }
     if let Some(effect) = stack.arrow.on_damage_apply {
         t.technical_description
-            .push("|<single_target>|:".to_string());
+            .push("|<single_target>| |<faded>(target):|".to_string());
         describe_apply_effect(effect, &mut t);
     }
     if let Some(area_effect) = stack.arrow.area_effect {
@@ -119,7 +119,7 @@ fn describe_equip_effect(equip: EquipEffect, t: &mut Tooltip) {
     }
     if let Some(apply_effect) = equip.on_attack_damage_apply {
         t.technical_description
-            .push("|<faded>On attack:|".to_string());
+            .push("|<faded>On attack:| |<single_target>| |<faded>(target)|".to_string());
         describe_apply_effect(apply_effect, t);
     }
     if let Some(apply_effect) = equip.start_of_turn_apply_self {

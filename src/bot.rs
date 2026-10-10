@@ -524,9 +524,7 @@ fn find_path(
         // in a way that was completely unsound and resulted in an overestimation of the action's range
         // in certain cases which meant: the bot moved to a location where it thought it would reach, but
         // then it didn't reach.
-        Range::Ranged(r) => r.pow(2) as f32,
-        Range::ExtendableRanged(r) => r.pow(2) as f32,
-        Range::Float(r) => r.powf(2.0),
+        Range::Tenths(tenths) => (tenths as f32 / 10.0).powf(2.0),
     };
     game.pathfind_grid.find_shortest_path_to_proximity(
         bot.id(),

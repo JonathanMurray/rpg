@@ -1252,15 +1252,15 @@ impl UserInterface {
         {
             if area_effect.shape == AreaShape::Line {
                 if let ActionTarget::Position(pos) = target {
-                    let mut increased_range = 0.0;
+                    let mut increased_range_tenths = 0;
                     for effect in selected_enhancements.iter().filter_map(|e| e.spell_effect) {
                         if effect.increased_range_tenths > 0 {
-                            increased_range += effect.increased_range_tenths as f32 * 0.1;
+                            increased_range_tenths += effect.increased_range_tenths;
                         }
                     }
 
-                    if increased_range > 0.0 {
-                        range = range.plusf(increased_range);
+                    if increased_range_tenths > 0 {
+                        range = range.plus_tenths(increased_range_tenths);
                     }
 
                     let from = self.active_character().pos();

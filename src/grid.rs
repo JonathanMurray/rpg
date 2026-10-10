@@ -2399,18 +2399,18 @@ impl GameGrid {
                     selected_enhancements,
                     target,
                 } => {
-                    let mut increased_radius = 0.0;
-                    let mut increased_range = 0.0;
+                    let mut increased_radius_tenths = 0;
+                    let mut increased_range_tenths = 0;
 
                     for effect in selected_enhancements.iter().filter_map(|e| e.spell_effect) {
                         if effect.increased_radius_tenths > 0 {
-                            increased_radius =
-                                increased_radius + effect.increased_radius_tenths as f32 * 0.1;
+                            increased_radius_tenths =
+                                increased_radius_tenths + effect.increased_radius_tenths;
                         }
 
                         if effect.increased_range_tenths > 0 {
-                            increased_range =
-                                increased_range + effect.increased_range_tenths as f32 * 0.1;
+                            increased_range_tenths =
+                                increased_range_tenths + effect.increased_range_tenths;
                         }
                     }
 
@@ -2422,14 +2422,14 @@ impl GameGrid {
                         } => {
                             let mut area_radius = None;
                             if let Some((radius, _acquisition, _effect)) = impact_area {
-                                area_radius = Some(radius.plusf(increased_radius));
+                                area_radius = Some(radius.plus_tenths(increased_radius_tenths));
                             }
                             if *target == ActionTarget::None {
                                 should_highlight_character_occupations = true;
                             }
                             let mut move_into_melee = None;
                             if let AbilityReach::MoveIntoMelee(range) = reach {
-                                move_into_melee = Some(range.plusf(increased_range));
+                                move_into_melee = Some(range.plus_tenths(increased_range_tenths));
                             }
 
                             MouseState::RequiresEnemyTarget {
@@ -2445,7 +2445,7 @@ impl GameGrid {
 
                             MouseState::RequiresPositionTarget {
                                 shape: Some(area_effect.shape),
-                                range: range.plusf(increased_range),
+                                range: range.plus_tenths(increased_range_tenths),
                             }
                         }
                         AbilityTarget::Destination { range } => {
