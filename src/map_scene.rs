@@ -82,7 +82,7 @@ impl MapScene {
 
         let mut nodes = [
             Node::new((0, 0), None),
-            Node::new((1, 0), Some(MapChoice::Fight(FightId::EasyCluster))),
+            Node::new((1, 0), Some(MapChoice::Fight(FightId::Easy))),
             Node::new((1, 1), Some(MapChoice::Fight(FightId::EasyPair))),
             Node::new((2, 0), Some(MapChoice::Fight(FightId::Medium))),
             Node::new((2, 1), Some(MapChoice::Fight(FightId::EasyRiver))),
@@ -93,7 +93,7 @@ impl MapScene {
             Node::new((4, 0), Some(MapChoice::Rest)),
             Node::new((4, 1), Some(MapChoice::Chest(generate_chest_content()))),
             Node::new((5, 0), Some(MapChoice::Fight(FightId::EasySurrounded))),
-            Node::new((6, 0), Some(MapChoice::Fight(FightId::EliteHuldra))),
+            Node::new((6, 0), Some(MapChoice::Fight(FightId::Huldra))),
         ];
 
         let edges: HashMap<usize, Vec<usize>> = [
@@ -138,7 +138,7 @@ impl MapScene {
                 };
                 node.texture = match choice {
                     MapChoice::Rest => Some(rest_texture.clone()),
-                    MapChoice::Fight(FightId::EliteOgre | FightId::EliteHuldra) => {
+                    MapChoice::Fight(FightId::EliteOgre | FightId::Huldra) => {
                         Some(fight_elite_texture.clone())
                     }
                     MapChoice::Fight(..) => Some(fight_texture.clone()),

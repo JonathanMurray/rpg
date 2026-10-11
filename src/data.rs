@@ -1206,6 +1206,22 @@ pub const SWEEP_ATTACK_PRECISE: AbilityEnhancement = AbilityEnhancement {
     }),
     ..AbilityEnhancement::default()
 };
+pub const SWEEP_ATTACK_PUSH: AbilityEnhancement = AbilityEnhancement {
+    ability_id: AbilityId::SweepAttack,
+    name: "Push",
+    description: "|<keyword>Push| targets away from you",
+    icon: IconId::Extend,
+    stamina_cost: 1,
+    attack_effect: Some(AttackEnhancementEffect {
+        on_damage_effect: Some(AttackEnhancementOnHitEffect::Target(
+            None,
+            ApplyEffect::Pushed(2),
+        )),
+        ..AttackEnhancementEffect::default()
+    }),
+    ..AbilityEnhancement::default()
+};
+
 pub const SWEEP_ATTACK: Ability = Ability {
     id: AbilityId::SweepAttack,
     name: "Sweeping attack",
@@ -1218,7 +1234,7 @@ pub const SWEEP_ATTACK: Ability = Ability {
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),
-    possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), None, None],
+    possible_enhancements: [Some(SWEEP_ATTACK_PRECISE), Some(SWEEP_ATTACK_PUSH), None],
     target: AbilityTarget::None {
         self_area: Some(AreaEffect {
             // Melee

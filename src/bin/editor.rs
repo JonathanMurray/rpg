@@ -10,11 +10,11 @@ use macroquad::input::{
     KeyCode, MouseButton,
 };
 use macroquad::math::Rect;
-use macroquad::miniquad::window::set_window_position;
+use macroquad::miniquad::window::{screen_size, set_window_position};
 use macroquad::shapes::draw_rectangle;
 use macroquad::text::{draw_text, draw_text_ex, measure_text, Font, TextParams};
 use macroquad::texture::{draw_texture_ex, DrawTextureParams, Texture2D};
-use macroquad::window::{next_frame, screen_height};
+use macroquad::window::{next_frame, request_new_screen_size, screen_height, set_fullscreen};
 use macroquad::window::{screen_width, Conf};
 
 use rpg::base_ui::{Align, Checkbox, Container, Element, LayoutDirection, Style, TextLine};
@@ -44,8 +44,14 @@ async fn main() {
             .nth(1)
             .unwrap_or(DEFAULT_FILENAME.to_string());
 
-    // Without this, the window seems to start on a random position on the screen, sometimes with the bottom obscured
-    set_window_position(100, 100);
+    set_fullscreen(true);
+    // Give the backend enough time to enter fullscreen, so that we can determine monitor resolution
+    for _ in 0..2 {
+        next_frame().await;
+    }
+    let monitor_size = screen_size();
+    set_fullscreen(false);
+    request_new_screen_size(monitor_size.0 - 50.0, monitor_size.1 - 100.0);
 
     let resources = GameResources::load().await;
     load_and_init_static().await;
@@ -578,6 +584,7 @@ impl Sidebar {
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
+            TerrainId::TombStone,
         ];
         let mut terrain_actions: Vec<EditorAction> = terrain_objects
             .iter()
@@ -586,6 +593,8 @@ impl Sidebar {
         terrain_actions.push(EditorAction::EraseTerrain);
 
         let decorations = [
+            TerrainId::GroundBorderEast,
+            TerrainId::GroundBorderNorth,
             TerrainId::BookShelf,
             TerrainId::WineShelf,
             TerrainId::Barrel,
@@ -595,6 +604,7 @@ impl Sidebar {
             TerrainId::WallPainting2,
             TerrainId::WallFlag,
             TerrainId::WallWindow,
+            TerrainId::WallWindow2,
             TerrainId::Torch,
             TerrainId::Lantern,
             TerrainId::WallPlant,
@@ -681,7 +691,7 @@ impl Sidebar {
                 }
             }
 
-            let cols = 5;
+            let cols = 7;
             let rows = (actions.len() as f32 / cols as f32).ceil() as u32;
             let margin = 4.0;
             let pad = 10.0;
@@ -1043,9 +1053,9 @@ fn window_conf() -> Conf {
         window_width: 1600,
         //window_height: 960,
         window_height: 1200,
-        high_dpi: true,
+        high_dpi: false,
 
-        window_resizable: false,
+        window_resizable: true,
         ..Default::default()
     }
 }

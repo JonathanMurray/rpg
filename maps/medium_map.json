@@ -153,8 +153,8 @@
     "(19, 28)": "Floor",
     "(22, 28)": "Floor4",
     "(25, 28)": "Floor",
-    "(28, 28)": "Floor3",
-    "(31, 28)": "Floor3",
+    "(28, 28)": "Floor4",
+    "(31, 28)": "Floor6",
     "(34, 28)": "Floor",
     "(37, 28)": "Floor",
     "(40, 28)": "Floor",
@@ -245,12 +245,12 @@
     "(19, 31)": "Floor",
     "(22, 31)": "Floor",
     "(25, 31)": "Floor",
-    "(31, 31)": "Floor3",
-    "(28, 31)": "Floor3"
+    "(31, 31)": "Floor5",
+    "(28, 31)": "Floor4"
   },
   "decorations": {
     "(16, 1)": "BookShelf",
-    "(4, 13)": "WallPainting",
+    "(26, 13)": "Barrel",
     "(28, 19)": "WallOpeningEast",
     "(10, 13)": "WallPainting2",
     "(7, 6)": "Mat",
@@ -266,11 +266,17 @@
     "(14, 26)": "WallFlag",
     "(34, 29)": "WallOpeningEast",
     "(29, 25)": "Torch",
-    "(32, 25)": "Torch"
-
+    "(32, 25)": "Torch",
+    "(28, 31)": "GroundBorderEast",
+    "(25, 13)": "Barrel",
+    "(6, 13)": "WallPainting",
+    "(4, 5)": "FoodPlate",
+    "(6, 4)": "FoodPlate",
+    "(28, 28)": "GroundBorderEast",
+    "(23, 29)": "FloorDrain"
   },
   "surfaces": {
-        "(16, 30)": "SpikesSingleCell",
+    "(16, 30)": "SpikesSingleCell",
     "(13, 29)": "SpikesSingleCell",
     "(15, 30)": "SpikesSingleCell",
     "(13, 31)": "SpikesSingleCell",

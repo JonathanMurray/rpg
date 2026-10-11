@@ -25,10 +25,10 @@ use rpg::action_button::ButtonAction;
 use rpg::core::{ArrowStack, BaseAction, Character, EquipmentEntry, Party, PlayerId};
 
 use rpg::data::{
-    PassiveSkill, ARCANE_BOW, BARBED_ARROWS, CRIPPLING_SHOT, DRAUG_NECKLACE, ENERGY_POTION,
-    EXPLODING_ARROWS, FIREBALL_MASSIVE, HEAL, HEALTH_POTION, HEAL_ENERGIZE, HUNGERING_BLADE,
-    INSPIRE_RUTHLESS, LEATHER_ARMOR, NECROTIC_BAND, PIERCING_SHOT, SPIKETEST, SPIKE_TRAP,
-    SWEEP_ATTACK,
+    PassiveSkill, ARCANE_BOW, ARCANE_POTION, BARBED_ARROWS, BATTLEMAGE_SIGIL, CRIPPLING_SHOT,
+    DRAUG_NECKLACE, ENERGY_POTION, EXPLODING_ARROWS, FIREBALL_MASSIVE, HEAL, HEALTH_POTION,
+    HEAL_ENERGIZE, HUNGERING_BLADE, INSPIRE_RUTHLESS, LEATHER_ARMOR, MANA_POTION, NECROTIC_BAND,
+    PIERCING_SHOT, SPIKETEST, SPIKE_TRAP, SWEEP_ATTACK, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
 };
 use rpg::game_over_scene::run_game_over_scene;
 use rpg::init_fight_map::{init_fight_map, FightId};
@@ -138,7 +138,7 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
 
         let mut demo_sequence = [
             (
-                FightId::EasyCluster,
+                FightId::Easy,
                 vec![
                     (
                         PlayerId::Bob,
@@ -164,21 +164,12 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                 vec![
                     (
                         PlayerId::Bob,
-                        CharacterGrowth::of(
-                            vec![],
-                            vec![
-                                EquipmentEntry::Weapon(HUNGERING_BLADE),
-                                EquipmentEntry::Trinket(NECROTIC_BAND),
-                            ],
-                        ),
+                        CharacterGrowth::of(vec![], vec![EquipmentEntry::Trinket(NECROTIC_BAND)]),
                     ),
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
-                            vec![
-                                ButtonAction::AbilityEnhancement(HEAL_ENERGIZE),
-                                ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS),
-                            ],
+                            vec![ButtonAction::AbilityEnhancement(INSPIRE_RUTHLESS)],
                             vec![EquipmentEntry::Weapon(ARCANE_BOW)],
                             //vec![EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 3))],
                         ),
@@ -187,35 +178,70 @@ async fn run_demo(resources: &GameResources, sound_player: SoundPlayer, fight_id
                 ],
             ),
             (
-                FightId::EliteHuldra,
+                FightId::Huldra,
                 vec![
                     (
                         PlayerId::Alice,
                         CharacterGrowth::of(
                             vec![
                                 ButtonAction::Action(BaseAction::UseAbility(&PIERCING_SHOT)),
-                                ButtonAction::Action(BaseAction::UseAbility(&SPIKE_TRAP)),
+                                //ButtonAction::Action(BaseAction::UseAbility(&SPIKE_TRAP)),
                             ],
-                            vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
+                            vec![],
                         ),
                     ),
                     (
                         PlayerId::Clara,
                         CharacterGrowth::of(
                             vec![ButtonAction::AbilityEnhancement(FIREBALL_MASSIVE)],
-                            vec![],
+                            vec![EquipmentEntry::Consumable(ARCANE_POTION)],
                         ),
                     ),
                     (
                         PlayerId::Bob,
                         CharacterGrowth::of(
-                            vec![ButtonAction::Passive(PassiveSkill::Reaper)],
-                            vec![EquipmentEntry::Consumable(ENERGY_POTION)],
+                            vec![],
+                            vec![
+                                EquipmentEntry::Weapon(HUNGERING_BLADE),
+                                EquipmentEntry::Consumable(TOXIC_GRENADE),
+                            ],
                         ),
                     ),
                 ],
             ),
-            (FightId::VerticalSliceNew, vec![]),
+            (
+                FightId::Draug,
+                vec![
+                    (
+                        PlayerId::Alice,
+                        CharacterGrowth::of(
+                            vec![ButtonAction::AbilityEnhancement(HEAL_ENERGIZE)],
+                            vec![EquipmentEntry::Arrows(ArrowStack::new(BARBED_ARROWS, 2))],
+                        ),
+                    ),
+                    (
+                        PlayerId::Clara,
+                        CharacterGrowth::of(
+                            vec![],
+                            vec![
+                                EquipmentEntry::Consumable(MANA_POTION),
+                                EquipmentEntry::Trinket(BATTLEMAGE_SIGIL),
+                            ],
+                        ),
+                    ),
+                    (
+                        PlayerId::Bob,
+                        CharacterGrowth::of(
+                            vec![
+                                ButtonAction::Passive(PassiveSkill::Reaper),
+                                ButtonAction::AbilityEnhancement(SWEEP_ATTACK_PUSH),
+                            ],
+                            vec![],
+                        ),
+                    ),
+                ],
+            ),
+            (FightId::Ogre, vec![]),
         ]
         .into_iter()
         .peekable();

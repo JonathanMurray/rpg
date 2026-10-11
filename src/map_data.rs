@@ -20,7 +20,8 @@ use crate::{
         HEALING_RAIN, HULDRA_HEAL, HULDRA_INFECT, HUNGERING_BLADE, HUNTERS_CHARM, INSPIRE_RUTHLESS,
         KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE, LUNGE_ATTACK,
         MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER,
-        SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF, TOXIC_GRENADE, WAR_HAMMER,
+        SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
+        WAR_HAMMER,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -350,7 +351,7 @@ pub fn create_character(
             let draug = Character::new(
                 bot(BotBehaviour::Draug(Default::default()), 10.0),
                 "Draug",
-                SoundId::Damage,
+                SoundId::DamageHuldra,
                 PortraitId::Draug,
                 char_data.type_.sprite_id(),
                 Attributes::new(4, 4, 4, 1),
@@ -626,6 +627,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
     bob.learn_ability(&SWEEP_ATTACK);
+    bob.learn_ability_enhancement(SWEEP_ATTACK_PUSH);
     // TODO: lunge attack, not working properly? Weird targetting and resulted in a
     // stackoverflow when trying to commit it
     bob.learn_ability(&HEALING_RAIN);

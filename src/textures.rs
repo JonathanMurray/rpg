@@ -519,6 +519,8 @@ impl LiquidType {
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug, Serialize, Deserialize)]
 pub enum TerrainId {
+    GroundBorderNorth,
+    GroundBorderEast,
     Grass,
     Grass2,
     Grass3,
@@ -550,6 +552,7 @@ pub enum TerrainId {
     WallPlant,
     FloorDrain,
     SmallStone,
+    TombStone,
     Boulder2,
     TreeStump,
     Table,
@@ -570,6 +573,7 @@ pub enum TerrainId {
     WallOpeningEast,
     WallOpeningWest,
     WallWindow,
+    WallWindow2,
     SuitOfArmor,
     AnimalHead,
     Torch,
@@ -684,6 +688,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
     let mut rotation = 0.0;
     let mut is_poison = false;
     let (mut col, mut row) = match terrain_id {
+        TerrainId::GroundBorderNorth => (10, 0),
+        TerrainId::GroundBorderEast => (9, 0),
         TerrainId::Grass => (11, 0),
         TerrainId::Grass2 => (12, 0),
         TerrainId::Grass3 => (13, 0),
@@ -777,6 +783,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::Bush => (0, 7),
         TerrainId::WallPlant => (0, 8),
         TerrainId::SmallStone => (1, 8),
+        TerrainId::TombStone => (2, 8),
         TerrainId::FloorDrain => (0, 9),
         TerrainId::Boulder2 => (0, 6),
         TerrainId::TreeStump => (1, 6),
@@ -790,13 +797,15 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::WallPainting => (3, 6),
         TerrainId::WallPainting2 => (5, 5),
         TerrainId::WallFlag => (4, 6),
-        TerrainId::WallWindow => (7, 6),
         TerrainId::Torch => (8, 6),
         TerrainId::Lantern => (10, 6),
         TerrainId::Mat => (4, 8),
         TerrainId::Cauldron => (5, 8),
         TerrainId::Cauldron2 => (6, 8),
         TerrainId::Chest => (9, 8),
+        TerrainId::WallWindow => (11, 8),
+        TerrainId::WallWindow2 => (12, 8),
+
         TerrainId::WallOpeningNorth => (5, 6),
         TerrainId::WallOpeningEast => (6, 6),
         TerrainId::WallOpeningWest => (6, 7),

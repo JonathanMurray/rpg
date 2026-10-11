@@ -61,7 +61,19 @@
     "(14, 4)": "Chest",
     "(17, 4)": "Chest",
     "(4, 10)": "TreeStump",
-    "(25, 7)": "Boulder2"
+    "(25, 7)": "Boulder2",
+    "(4, 13)": "StoneWallConvexNorthEast",
+    "(7, 13)": "StoneWallConvexNorthEast",
+    "(16, 16)": "StoneWallConvexNorthEast",
+    "(19, 16)": "StoneWallConvexNorthEast",
+    "(16, 13)": "StoneWallConvexNorthEast",
+    "(19, 13)": "StoneWallConvexNorthEast",
+    "(7, 16)": "StoneWallConvexNorthEast",
+    "(10, 16)": "StoneWallConvexNorthEast",
+    "(13, 16)": "StoneWallConvexNorthEast",
+    "(4, 16)": "StoneWallConvexNorthEast",
+    "(10, 13)": "StoneWallConvexNorthEast",
+    "(13, 13)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -166,8 +178,8 @@
     "(25, 4)": "Grass",
     "(25, 7)": "Grass2",
     "(25, 10)": "Grass2",
-    "(25, 13)": "Floor",
-    "(25, 16)": "Floor",
+    "(25, 13)": "Grass3",
+    "(25, 16)": "Grass3",
     "(25, 19)": "Floor5",
     "(25, 22)": "Floor3",
     "(25, 25)": "Floor5",
@@ -198,9 +210,9 @@
     "(13, 16)": "Floor",
     "(16, 16)": "Floor",
     "(19, 16)": "Floor",
-    "(22, 16)": "Floor",
-    "(22, 13)": "Floor",
-    "(19, 13)": "Floor",
+    "(22, 16)": "Grass3",
+    "(22, 13)": "Grass3",
+    "(19, 13)": "Grass3",
     "(16, 13)": "Floor",
     "(13, 13)": "Floor",
     "(10, 13)": "Floor",
@@ -241,70 +253,33 @@
     "(4, 1)": "AnimalHead",
     "(7, 1)": "WallOpeningNorth",
     "(10, 1)": "AnimalHead",
-    "(19, 1)": "AnimalHead",
+    "(22, 9)": "SmallStone",
     "(25, 1)": "AnimalHead",
-    "(1, 16)": "WallOpeningWest",
-    "(28, 16)": "WallOpeningEast",
+    "(18, 1)": "WallWindow2",
+    "(16, 1)": "WallWindow2",
     "(28, 26)": "WallOpeningEast",
     "(1, 26)": "WallOpeningWest",
-    "(16, 1)": "WallPlant",
+    "(13, 25)": "FloorDrain",
     "(5, 25)": "WallPlant",
     "(6, 25)": "WallPlant",
-    "(13, 1)": "Torch",
+    "(17, 23)": "FloorDrain",
     "(8, 8)": "SmallStone",
-    "(22, 9)": "SmallStone",
-    "(13, 25)": "FloorDrain",
-    "(17, 23)": "FloorDrain"
+    "(13, 1)": "WallWindow",
+    "(7, 16)": "WallOpeningNorth",
+    "(13, 16)": "WallWindow2",
+    "(4, 16)": "WallWindow2",
+    "(10, 16)": "WallWindow2",
+    "(16, 16)": "Torch"
   },
   "surfaces": {
-    "(19, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(4, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(10, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(11, 7)": "SpikesSingleCell",
+    "(9, 7)": "SpikesSingleCell",
+    "(10, 3)": "SpikesSingleCell",
+    "(7, 3)": "SpikesSingleCell",
+    "(7, 7)": "SpikesSingleCell",
+    "(11, 3)": "SpikesSingleCell",
+    "(9, 6)": "SpikesSingleCell",
+    "(10, 7)": "SpikesSingleCell",
     "(4, 31)": {
       "NewWater": [
         "NorthEast",
@@ -317,54 +292,14 @@
         "Water"
       ]
     },
-    "(7, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(7, 13)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(13, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(16, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(19, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(22, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
-    "(25, 16)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
+    "(8, 7)": "SpikesSingleCell",
+    "(12, 4)": "SpikesSingleCell",
+    "(7, 6)": "SpikesSingleCell",
+    "(10, 6)": "SpikesSingleCell",
+    "(11, 6)": "SpikesSingleCell",
+    "(12, 6)": "SpikesSingleCell",
+    "(12, 5)": "SpikesSingleCell",
+    "(8, 6)": "SpikesSingleCell",
     "(9, 3)": "SpikesSingleCell",
     "(8, 3)": "SpikesSingleCell",
     "(7, 4)": "SpikesSingleCell",
@@ -376,23 +311,7 @@
     "(8, 5)": "SpikesSingleCell",
     "(9, 5)": "SpikesSingleCell",
     "(10, 5)": "SpikesSingleCell",
-    "(11, 5)": "SpikesSingleCell",
-    "(7, 6)": "SpikesSingleCell",
-    "(7, 7)": "SpikesSingleCell",
-    "(8, 7)": "SpikesSingleCell",
-    "(9, 6)": "SpikesSingleCell",
-    "(10, 6)": "SpikesSingleCell",
-    "(11, 6)": "SpikesSingleCell",
-    "(12, 6)": "SpikesSingleCell",
-    "(12, 5)": "SpikesSingleCell",
-    "(8, 6)": "SpikesSingleCell",
-    "(9, 7)": "SpikesSingleCell",
-    "(10, 7)": "SpikesSingleCell",
-    "(11, 7)": "SpikesSingleCell",
-    "(12, 4)": "SpikesSingleCell",
-    "(11, 3)": "SpikesSingleCell",
-    "(10, 3)": "SpikesSingleCell",
-    "(7, 3)": "SpikesSingleCell"
+    "(11, 5)": "SpikesSingleCell"
   },
   "control_points": {
     "(22, 26)": "Exit"
@@ -414,6 +333,28 @@
       "pos": [
         23,
         23
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Bob",
+      "pos": [
+        13,
+        21
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul2",
+      "pos": [
+        13,
+        24
       ],
       "health": null,
       "main_hand": null,

@@ -1,8 +1,6 @@
 use std::{collections::HashMap, rc::Rc, str::FromStr};
 
 use indexmap::IndexMap;
-use rand::distr::Distribution;
-use serde::Deserialize;
 
 use crate::{
     core::{Character, CharacterId, PlayerId, Position},
@@ -18,11 +16,12 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         .map(|ch| (ch.player_id(), ch))
         .collect();
     let filename = match fight_id {
-        FightId::VerticalSliceNew => "ogre_room.json",
-        FightId::EasyCluster => "easy_map.json",
+        FightId::Easy => "easy_map.json",
         FightId::Medium => "medium_map.json",
+        FightId::Huldra => "huldra.json",
+        FightId::Draug => "draug2.json",
+        FightId::Ogre => "ogre_room.json",
         FightId::Test => "test.json",
-        FightId::EliteHuldra => "huldra.json",
         unhandled => todo!("Handle map: {:?}", unhandled),
     };
     let map_data = MapData::load_from_file(&format!("maps/{filename}"));
@@ -111,14 +110,15 @@ pub struct GameInitState {
 pub enum FightId {
     EasyPair,
     Medium,
-    EasyCluster,
+    Easy,
     EasySurrounded,
     EasyRiver,
     EliteOgre,
-    EliteHuldra,
+    Huldra,
+    Draug,
     Test,
     VerticalSlice,
-    VerticalSliceNew,
+    Ogre,
 }
 
 impl FromStr for FightId {

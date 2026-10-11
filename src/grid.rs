@@ -44,10 +44,11 @@ use crate::{
     core::{
         can_opportunity_attack_mover, distance_between, effective_push_amount,
         is_target_within_shape, is_valid_area_target, pushed_vector, target_within_range_squared,
-        within_range_squared, Ability, AbilityAnimation, AbilityId, AbilityReach, AbilityTarget,
-        ActionReach, ActionTarget, ApplyCondition, ApplyEffect, AreaEffect, AreaShape,
-        AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction, Character, Condition,
-        Goodness, HitType, MovementType, Position, TargetPrediction, MOVE_DISTANCE_PER_RESOURCE,
+        within_range_squared, Ability, AbilityAnimation, AbilityEnhancement, AbilityId,
+        AbilityReach, AbilityTarget, ActionReach, ActionTarget, ApplyCondition, ApplyEffect,
+        AreaEffect, AreaShape, AreaTargetAcquisition, AttackAction, AttackEnhancement, BaseAction,
+        Character, Condition, Goodness, HitType, MovementType, Position, TargetPrediction,
+        MOVE_DISTANCE_PER_RESOURCE,
     },
     drawing::{
         draw_cornered_rectangle_lines, draw_cross, draw_crosshair, draw_dashed_line_ex,
@@ -2334,34 +2335,12 @@ impl GameGrid {
             ..
         }) = ui_state
         {
-            let mut ability_knockback = ability.knockback();
-
-            for enhancement in selected_enhancements {
-                if let Some(e) = enhancement.spell_effect {
-                    for apply_effect in e.target_on_hit.iter().flatten().flatten() {
-                        if let ApplyEffect::Pushed(amount) = *apply_effect {
-                            ability_knockback = Some(amount);
-                        }
-                    }
-                }
-            }
-
-            if let Some(base_push_amount) = ability_knockback {
-                self.draw_occupation(OccupationFilter::Terrain);
-
-                if let ActionTarget::Character(target_id, _movement) = target {
-                    let target = &self.characters[target_id];
-                    let push_amount = effective_push_amount(
-                        base_push_amount,
-                        &self.characters[&self.active_character_id],
-                        target,
-                    );
-
-                    let pushed_vec = pushed_vector(active_char_pos, target.pos(), push_amount);
-
-                    pushed_targets.push((*target_id, pushed_vec));
-                }
-            }
+            self.acquire_pushed_targets_from_ability(
+                ability,
+                selected_enhancements,
+                target,
+                &mut pushed_targets,
+            );
 
             if ability.charge_fx.is_some() {
                 is_casting = Some(ability);
@@ -3606,6 +3585,53 @@ impl GameGrid {
                 && other_char.can_use_opportunity_attack(attacker.id())
             {
                 opportunity_attackers.push(other_char.id());
+            }
+        }
+    }
+
+    fn acquire_pushed_targets_from_ability(
+        &self,
+        ability: &Ability,
+        selected_enhancements: &[AbilityEnhancement],
+        target: &ActionTarget,
+        pushed_targets: &mut Vec<(CharacterId, (i32, i32))>,
+    ) {
+        let active_char_pos = self.characters[&self.active_character_id].pos();
+
+        let mut ability_knockback = ability.knockback();
+
+        for enhancement in selected_enhancements {
+            if let Some(e) = enhancement.spell_effect {
+                for apply_effect in e.target_on_hit.iter().flatten().flatten() {
+                    if let ApplyEffect::Pushed(amount) = *apply_effect {
+                        ability_knockback = Some(amount);
+                    }
+                }
+            }
+            if let Some(e) = enhancement.attack_effect {
+                if let Some(apply_effect) = e.on_target {
+                    if let ApplyEffect::Pushed(amount) = apply_effect {
+                        ability_knockback = Some(amount);
+                    }
+                }
+            }
+        }
+
+        if let Some(base_push_amount) = ability_knockback {
+            self.draw_occupation(OccupationFilter::Terrain);
+
+            // We assume that any character with a target effect preview is affected by the ability push
+            for target_id in self.target_effect_previews.keys() {
+                let target = &self.characters[target_id];
+                let push_amount = effective_push_amount(
+                    base_push_amount,
+                    &self.characters[&self.active_character_id],
+                    target,
+                );
+
+                let pushed_vec = pushed_vector(active_char_pos, target.pos(), push_amount);
+
+                pushed_targets.push((*target_id, pushed_vec));
             }
         }
     }
