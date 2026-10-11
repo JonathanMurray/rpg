@@ -1764,7 +1764,7 @@ pub const ENEMY_ESCAPE: Ability = Ability {
     speech: "Don't mind me!",
     description: "",
     icon: IconId::Escape,
-    action_point_cost: 1,
+    action_point_cost: 4,
     mana_cost: 0,
     stamina_cost: 0,
     requirement: None,

@@ -198,6 +198,17 @@ async fn main() {
                         game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
                     }
 
+                    EditorAction::PlaceSurface(terrain_id) => {
+                        draw_rectangle(
+                            rect.x,
+                            rect.y,
+                            rect.w,
+                            rect.h,
+                            Color::new(0.0, 0.0, 0.0, 0.3),
+                        );
+                        game_grid.draw_terrain(*terrain_id, snapped_mouse_screen_pos);
+                    }
+
                     EditorAction::PlaceCharacter(id) => {
                         draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, YELLOW);
                         draw_text(
@@ -247,6 +258,16 @@ async fn main() {
                         );
                     }
                     EditorAction::EraseDecoration => {
+                        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
+                        draw_text(
+                            "Erase",
+                            snapped_mouse_screen_pos.0,
+                            snapped_mouse_screen_pos.1,
+                            16.0,
+                            WHITE,
+                        );
+                    }
+                    EditorAction::EraseSurface => {
                         draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, RED);
                         draw_text(
                             "Erase",
@@ -336,6 +357,12 @@ async fn main() {
                                 has_unsaved_changes = true;
                             }
                         }
+                        EditorAction::PlaceSurface(terrain_id) => {
+                            if game_grid.editor_add_surface(pos, *terrain_id) {
+                                map_data.surfaces.insert(pos, *terrain_id);
+                                has_unsaved_changes = true;
+                            }
+                        }
                         EditorAction::PlaceCharacter(char_type) => {
                             if game_grid.pathfind_grid.is_free(None, pos) {
                                 let max_id =
@@ -382,6 +409,12 @@ async fn main() {
                         EditorAction::EraseDecoration => {
                             if game_grid.editor_remove_decoration(pos) {
                                 map_data.decorations.swap_remove(&pos);
+                                has_unsaved_changes = true;
+                            }
+                        }
+                        EditorAction::EraseSurface => {
+                            if game_grid.editor_remove_surface(pos) {
+                                map_data.surfaces.swap_remove(&pos);
                                 has_unsaved_changes = true;
                             }
                         }
@@ -468,6 +501,7 @@ async fn main() {
                 background: game_grid.background.clone(),
                 terrain_objects: game_grid.terrain_objects.clone(),
                 decorations: game_grid.decorations.clone(),
+                surfaces: game_grid.surfaces.clone(),
                 control_points: game_grid.control_points.clone(),
             };
             let core_game = init_core_game(resources.clone(), sound_player.clone(), init_state);
@@ -501,11 +535,13 @@ enum EditorAction {
     PlaceBackground(TerrainId),
     PlaceTerrain(TerrainId),
     PlaceDecoration(TerrainId),
+    PlaceSurface(TerrainId),
     PlaceCharacter(CharacterType),
     PlaceControlPoint(ControlPoint),
     EraseBackground,
     EraseTerrain,
     EraseDecoration,
+    EraseSurface,
     EraseControlPoint,
     EditCharacter,
     MoveCharacter(Cell<Option<CharacterId>>),
@@ -519,6 +555,12 @@ impl Sidebar {
             TerrainId::Floor2,
             TerrainId::Floor3,
             TerrainId::Floor4,
+            TerrainId::Floor5,
+            TerrainId::Floor6,
+            TerrainId::Grass,
+            TerrainId::Grass2,
+            TerrainId::Grass3,
+            TerrainId::Grass4,
         ];
 
         let mut background_actions: Vec<EditorAction> = backgrounds
@@ -527,7 +569,7 @@ impl Sidebar {
             .collect();
         background_actions.push(EditorAction::EraseBackground);
 
-        let terrain_ids = [
+        let terrain_objects = [
             TerrainId::Bush,
             TerrainId::Boulder2,
             TerrainId::TreeStump,
@@ -537,7 +579,7 @@ impl Sidebar {
             TerrainId::Cauldron2,
             TerrainId::Chest,
         ];
-        let mut terrain_actions: Vec<EditorAction> = terrain_ids
+        let mut terrain_actions: Vec<EditorAction> = terrain_objects
             .iter()
             .map(|t| EditorAction::PlaceTerrain(*t))
             .collect();
@@ -554,6 +596,9 @@ impl Sidebar {
             TerrainId::WallFlag,
             TerrainId::WallWindow,
             TerrainId::Torch,
+            TerrainId::Lantern,
+            TerrainId::WallPlant,
+            TerrainId::SmallStone,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
             TerrainId::WallOpeningWest,
@@ -561,16 +606,23 @@ impl Sidebar {
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
-            TerrainId::Spikes,
-            TerrainId::SpikesSingleCell,
-            TerrainId::FireSurfaceSingleCell,
-            TerrainId::NewWater(WaterOrientation::NorthEast, LiquidType::Water),
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()
             .map(|t| EditorAction::PlaceDecoration(*t))
             .collect();
         decoration_actions.push(EditorAction::EraseDecoration);
+
+        let surfaces = [
+            TerrainId::SpikesSingleCell,
+            TerrainId::FireSurfaceSingleCell,
+            TerrainId::NewWater(WaterOrientation::NorthEast, LiquidType::Water),
+        ];
+        let mut surface_actions: Vec<EditorAction> = surfaces
+            .iter()
+            .map(|t| EditorAction::PlaceSurface(*t))
+            .collect();
+        surface_actions.push(EditorAction::EraseSurface);
 
         let character_actions = vec![
             EditorAction::PlaceCharacter(CharacterType::Bob),
@@ -599,6 +651,7 @@ impl Sidebar {
             background_actions,
             terrain_actions,
             decoration_actions,
+            surface_actions,
             character_actions,
             control_actions,
         ];
@@ -628,7 +681,7 @@ impl Sidebar {
             }
 
             let cols = 5;
-            let rows = 1 + actions.len() / cols;
+            let rows = (actions.len() as f32 / cols as f32).ceil() as u32;
             let margin = 4.0;
             let pad = 10.0;
             let icon_w = 64.0;
@@ -676,6 +729,9 @@ impl Sidebar {
                     }
 
                     EditorAction::PlaceDecoration(terrain_id) => {
+                        self.draw_terrain_icon(icon_w, x, y, terrain_id);
+                    }
+                    EditorAction::PlaceSurface(terrain_id) => {
                         self.draw_terrain_icon(icon_w, x, y, terrain_id);
                     }
                     EditorAction::PlaceCharacter(char_type) => {
@@ -733,6 +789,9 @@ impl Sidebar {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::EraseDecoration => {
+                        draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
+                    }
+                    EditorAction::EraseSurface => {
                         draw_text("ERASE", x + 5.0, y + icon_w / 2.0, 16.0, BLACK);
                     }
                     EditorAction::EraseControlPoint => {

@@ -664,6 +664,7 @@ impl UserInterface {
             init_state.background,
             init_state.terrain_objects,
             init_state.decorations,
+            init_state.surfaces,
             init_state.control_points,
             resources.effect_textures.clone(),
             sound_player.clone(),

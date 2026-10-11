@@ -65,7 +65,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         player_chars_by_id.keys()
     );
 
-    for (pos, terrain_id) in &map_data.decorations {
+    for (pos, terrain_id) in &map_data.surfaces {
         if let Some((surface, size)) = terrain_id.surface() {
             pathfind_grid.set_surface(*pos, Some(surface), size);
         }
@@ -89,6 +89,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
         background: map_data.background,
         terrain_objects: map_data.terrain_objects,
         decorations: map_data.decorations,
+        surfaces: map_data.surfaces,
         control_points: map_data.control_points,
     }
 }
@@ -101,6 +102,8 @@ pub struct GameInitState {
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
+    pub surfaces: IndexMap<Position, TerrainId>,
+
     pub control_points: IndexMap<Position, ControlPoint>,
 }
 

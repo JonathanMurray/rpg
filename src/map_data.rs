@@ -57,7 +57,7 @@ pub fn create_game_grid(
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
         pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
     }
-    for (pos, terrain_id) in &map_data.decorations {
+    for (pos, terrain_id) in &map_data.surfaces {
         if let Some((surface, size)) = terrain_id.surface() {
             pathfind_grid.set_surface(*pos, Some(surface), size);
         }
@@ -85,6 +85,7 @@ pub fn create_game_grid(
         map_data.background.clone(),
         map_data.terrain_objects.clone(),
         map_data.decorations.clone(),
+        map_data.surfaces.clone(),
         map_data.control_points.clone(),
         resources.effect_textures.clone(),
         sound_player,
@@ -100,6 +101,7 @@ pub struct MapData {
     pub grid_dimensions: (u32, u32),
     pub terrain_objects: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
+    pub surfaces: IndexMap<Position, TerrainId>,
     pub control_points: IndexMap<Position, ControlPoint>,
     pub background: IndexMap<Position, TerrainId>,
     pub characters: Vec<CharacterData>,
@@ -110,12 +112,14 @@ impl MapData {
         let terrain_objects = keys_pos_to_str(&self.terrain_objects);
         let background = keys_pos_to_str(&self.background);
         let decorations = keys_pos_to_str(&self.decorations);
+        let surfaces = keys_pos_to_str(&self.surfaces);
         let control_points = keys_pos_to_str(&self.control_points);
         let map_data = SerializableMapData {
             grid_dimensions: self.grid_dimensions,
             terrain_objects,
             background,
             decorations,
+            surfaces,
             control_points,
             characters: self.characters.clone(),
         };
@@ -135,7 +139,7 @@ impl MapData {
 
         for (pos, terrain_id) in &map_data.terrain_objects {
             if terrain_id.is_new_water() {
-                map_data.decorations.insert(pos.clone(), *terrain_id);
+                map_data.surfaces.insert(pos.clone(), *terrain_id);
             }
         }
         map_data.terrain_objects.retain(|_pos, t| !t.is_new_water());
@@ -149,6 +153,7 @@ impl MapData {
             terrain_objects: keys_str_to_pos(&map_data.terrain_objects),
             background: keys_str_to_pos(&map_data.background),
             decorations: keys_str_to_pos(&map_data.decorations),
+            surfaces: keys_str_to_pos(&map_data.surfaces),
             control_points: keys_str_to_pos(&map_data.control_points),
             characters: map_data.characters,
         }
@@ -181,6 +186,7 @@ struct SerializableMapData {
     pub terrain_objects: IndexMap<String, TerrainId>,
     pub background: IndexMap<String, TerrainId>,
     pub decorations: IndexMap<String, TerrainId>,
+    pub surfaces: IndexMap<String, TerrainId>,
     #[serde(default)]
     pub control_points: IndexMap<String, ControlPoint>,
     pub characters: Vec<CharacterData>,

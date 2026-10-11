@@ -396,6 +396,14 @@
     "(52, 34)": "WallOpeningEast",
     "(28, 13)": "WallOpeningEast",
     "(19, 4)": "WallWindow",
+    "(52, 22)": "WallOpeningEast",
+    "(40, 31)": "WallOpeningWest",
+    "(31, 16)": "SuitOfArmor",
+    "(37, 16)": "SuitOfArmor",
+    "(43, 16)": "SuitOfArmor",
+    "(48, 16)": "HangingWeapons2"
+  },
+  "surfaces": {
     "(13, 22)": {
       "NewWater": [
         "NorthEast",
@@ -419,13 +427,7 @@
         "NorthEast",
         "Water"
       ]
-    },
-    "(52, 22)": "WallOpeningEast",
-    "(40, 31)": "WallOpeningWest",
-    "(31, 16)": "SuitOfArmor",
-    "(37, 16)": "SuitOfArmor",
-    "(43, 16)": "SuitOfArmor",
-    "(48, 16)": "HangingWeapons2"
+    }
   },
   "control_points": {
     "(49, 22)": "Exit"

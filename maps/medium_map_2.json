@@ -628,6 +628,7 @@
     "(37, 1)": "WallFlag",
     "(34, 34)": "Torch"
   },
+  "surfaces": {},
   "control_points": {},
   "characters": [
     {

@@ -284,6 +284,7 @@ pub struct GameGrid {
     terrain_atlas: Texture2D,
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
+    pub surfaces: IndexMap<Position, TerrainId>,
     pub decorations: IndexMap<Position, TerrainId>,
     pub control_points: IndexMap<Position, ControlPoint>,
     sprites: HashMap<SpriteId, Sprite>,
@@ -333,6 +334,7 @@ impl GameGrid {
         background: IndexMap<Position, TerrainId>,
         terrain_objects: IndexMap<Position, TerrainId>,
         decorations: IndexMap<Position, TerrainId>,
+        surfaces: IndexMap<Position, TerrainId>,
         control_points: IndexMap<Position, ControlPoint>,
         effect_textures: HashMap<EffectId, Texture2D>,
         sound_player: SoundPlayer,
@@ -381,6 +383,7 @@ impl GameGrid {
             background,
             terrain_objects,
             decorations,
+            surfaces,
             control_points,
             effect_textures,
             sound_player,
@@ -409,6 +412,28 @@ impl GameGrid {
     pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
+            self.auto_tile();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
+        if let Some(terrain_id) = self.decorations.get(&pos) {
+            self.decorations.swap_remove(&pos);
+            self.auto_tile();
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Should only be called from editor; not from in-game!
+    pub fn editor_add_surface(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
+        if !self.surfaces.contains_key(&pos) {
+            self.surfaces.insert(pos, terrain_id);
             if let Some((surface, size)) = terrain_id.surface() {
                 self.pathfind_grid.set_surface(pos, Some(surface), size);
             }
@@ -420,12 +445,12 @@ impl GameGrid {
     }
 
     /// Should only be called from editor; not from in-game!
-    pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
-        if let Some(terrain_id) = self.decorations.get(&pos) {
+    pub fn editor_remove_surface(&mut self, pos: Position) -> bool {
+        if let Some(terrain_id) = self.surfaces.get(&pos) {
             if let Some((_surface, size)) = terrain_id.surface() {
                 self.pathfind_grid.set_surface(pos, None, size);
             }
-            self.decorations.swap_remove(&pos);
+            self.surfaces.swap_remove(&pos);
             self.auto_tile();
             true
         } else {
@@ -459,7 +484,7 @@ impl GameGrid {
         to_surface: Surface,
     ) {
         for pos in positions {
-            match self.decorations.entry(pos) {
+            match self.surfaces.entry(pos) {
                 Entry::Occupied(mut e) => {
                     let existing_terrain_id = e.get();
                     match (existing_terrain_id, from_surface) {
@@ -488,7 +513,7 @@ impl GameGrid {
     }
 
     pub fn set_surface(&mut self, position: Position, surface: Surface) {
-        assert_eq!(self.decorations.get(&position), None);
+        assert_eq!(self.surfaces.get(&position), None);
         let terrain_id = match surface {
             // TODO set correct liquid orientation somehow
             Surface::Water => TerrainId::NewWater(WaterOrientation::Center, LiquidType::Water),
@@ -496,12 +521,12 @@ impl GameGrid {
             Surface::Spikes => TerrainId::SpikesSingleCell,
             Surface::Fire => TerrainId::FireSurfaceSingleCell,
         };
-        self.decorations.insert(position, terrain_id);
+        self.surfaces.insert(position, terrain_id);
     }
 
     pub fn auto_tile(&mut self) {
         self.auto_tile_terrain();
-        self.auto_tile_decorations();
+        self.auto_tile_surfaces();
     }
 
     pub fn auto_tile_terrain(&mut self) {
@@ -570,7 +595,7 @@ impl GameGrid {
     }
 
     fn is_water(&self, pos: Position) -> bool {
-        self.decorations
+        self.surfaces
             .get(&pos)
             .map(|n| n.is_new_water())
             .unwrap_or(false)
@@ -587,9 +612,9 @@ impl GameGrid {
         self.is_water(pos) || self.is_wall(pos)
     }
 
-    pub fn auto_tile_decorations(&mut self) {
+    pub fn auto_tile_surfaces(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
-        for (pos, terrain_id) in self.decorations.iter() {
+        for (pos, terrain_id) in self.surfaces.iter() {
             let mut terrain_id = *terrain_id;
             if terrain_id.is_new_water() {
                 let mut neighbors = vec![];
@@ -645,7 +670,7 @@ impl GameGrid {
             }
             new_map.insert(*pos, terrain_id);
         }
-        self.decorations = new_map;
+        self.surfaces = new_map;
     }
 
     pub fn set_target_effect_preview(&mut self, preview: TargetEffectPreview) {
@@ -1650,6 +1675,9 @@ impl GameGrid {
                     if let Some(terrain_id) = self.decorations.get(&(col, row)) {
                         self.draw_terrain(*terrain_id, (x0, y0));
                     }
+                    if let Some(terrain_id) = self.surfaces.get(&(col, row)) {
+                        self.draw_terrain(*terrain_id, (x0, y0));
+                    }
                 }
             }
         }
@@ -2160,7 +2188,7 @@ impl GameGrid {
         ui_state: &mut UiState,
         receptive_to_input: bool,
         mut hovered_action: Option<(CharacterId, BaseAction)>,
-        active_char_reserved_and_hovered_ap: (i32, i32),
+        player_selected_char_reserved_and_hovered_ap: (i32, i32),
         draw_control_points: bool,
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
@@ -2174,6 +2202,7 @@ impl GameGrid {
         let mouse_grid_pos = self.mouse_grid_pos();
 
         let is_mouse_within_grid = self.is_within_grid(mouse_grid_pos);
+        let mut reactor_id = None;
 
         if let UiState::ConfiguringAction(action) = ui_state {
             if is_mouse_within_grid
@@ -2701,6 +2730,7 @@ impl GameGrid {
                 movement,
                 selected,
             } => {
+                reactor_id = Some(*reactor);
                 let target = &self.characters[target];
                 let reactor = &self.characters[reactor];
 
@@ -2746,6 +2776,9 @@ impl GameGrid {
                 detail_labelled_char_ids.insert(reactor.id());
 
                 self.draw_overhead_question_mark(reactor);
+
+                // The mover should be drawn with label
+                detail_labelled_char_ids.insert(self.active_character_id);
             }
 
             UiState::ReactingToRangedAttackOpportunity {
@@ -2754,6 +2787,7 @@ impl GameGrid {
                 victim,
                 selected,
             } => {
+                reactor_id = Some(*reactor);
                 let reactor = &self.characters[reactor];
                 let attacker = &self.characters[attacker];
                 let victim = &self.characters[victim];
@@ -2802,6 +2836,7 @@ impl GameGrid {
                 selected,
                 ..
             } => {
+                reactor_id = Some(*reactor);
                 let attacker = &self.characters[attacker];
                 let defender = &self.characters[defender];
                 let reactor = &self.characters[reactor];
@@ -2835,6 +2870,7 @@ impl GameGrid {
             UiState::ReactingToHit {
                 victim, selected, ..
             } => {
+                reactor_id = Some(*victim);
                 let reactor = &self.characters[victim];
                 self.draw_cornered_outline(
                     self.character_screen_pos(reactor),
@@ -2852,14 +2888,6 @@ impl GameGrid {
             }
 
             _ => {}
-        }
-
-        if !matches!(
-            ui_state,
-            UiState::ReactingToMovementAttackOpportunity { .. }
-        ) {
-            // The mover should be drawn with label
-            detail_labelled_char_ids.insert(self.active_character_id);
         }
 
         let mut front_cursor_text = None;
@@ -2960,7 +2988,7 @@ impl GameGrid {
                         may_commit_action_with_left_click = true;
                     } else {
                         let mut is_mouse_pos_out_of_range = false;
-                        if let Some((char_id, range, _indicator, _acquisition)) = range_indicator {
+                        if let Some((_char_id, range, _indicator, _acquisition)) = range_indicator {
                             is_mouse_pos_out_of_range = (((mouse_grid_pos.0 - active_char_pos.0)
                                 .pow(2)
                                 + (mouse_grid_pos.1 - active_char_pos.1).pow(2))
@@ -3359,7 +3387,12 @@ impl GameGrid {
                 continue;
             }
             let draw_name = detail_labelled_char_ids.contains(&char.id());
-            self._draw_character_label(char, draw_name, active_char_reserved_and_hovered_ap);
+            self._draw_character_label(
+                char,
+                draw_name,
+                player_selected_char_reserved_and_hovered_ap,
+                reactor_id,
+            );
         }
 
         match ui_state.players_action_target() {
@@ -3425,7 +3458,12 @@ impl GameGrid {
             {
                 // Active character, or active target => Not drawn yet, time to draw them now
                 let draw_name = detail_labelled_char_ids.contains(&char.id());
-                self._draw_character_label(char, draw_name, active_char_reserved_and_hovered_ap);
+                self._draw_character_label(
+                    char,
+                    draw_name,
+                    player_selected_char_reserved_and_hovered_ap,
+                    reactor_id,
+                );
             }
         }
 
@@ -4154,7 +4192,8 @@ impl GameGrid {
         &self,
         character: &Character,
         detailed: bool,
-        active_char_reserved_and_hovered_ap: (i32, i32),
+        player_selected_char_reserved_and_hovered_ap: (i32, i32),
+        reactor_id: Option<CharacterId>,
     ) {
         let mut ap_lost_animation = None;
         for animation in &self.character_animations {
@@ -4169,6 +4208,7 @@ impl GameGrid {
         let draw_action_points = (character.player_controlled()
             && !character.has_taken_a_turn_this_round.get())
             || self.active_character_id == character.id()
+            || reactor_id == Some(character.id())
             || self.hovered_character.or(self.hovered_character_portrait) == Some(character.id())
             || ap_lost_animation.is_some();
 
@@ -4214,8 +4254,10 @@ impl GameGrid {
                     ..Default::default()
                 },
             );
-            if character.id() == self.active_character_id {
-                action_points_row.reserved_and_hovered_ap = active_char_reserved_and_hovered_ap;
+
+            if character.id() == reactor_id.unwrap_or(self.active_character_id) {
+                action_points_row.reserved_and_hovered_ap =
+                    player_selected_char_reserved_and_hovered_ap;
             }
 
             if let Some((animation, amount)) = ap_lost_animation {

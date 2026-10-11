@@ -266,8 +266,11 @@
     "(14, 26)": "WallFlag",
     "(34, 29)": "WallOpeningEast",
     "(29, 25)": "Torch",
-    "(32, 25)": "Torch",
-    "(16, 30)": "SpikesSingleCell",
+    "(32, 25)": "Torch"
+
+  },
+  "surfaces": {
+        "(16, 30)": "SpikesSingleCell",
     "(13, 29)": "SpikesSingleCell",
     "(15, 30)": "SpikesSingleCell",
     "(13, 31)": "SpikesSingleCell",

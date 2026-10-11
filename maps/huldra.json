@@ -230,21 +230,28 @@
     "(4, 34)": "Floor"
   },
   "decorations": {
+    "(16, 1)": "WallOpeningNorth",
+    "(25, 1)": "WallWindow",
+    "(19, 1)": "AnimalHead",
+    "(13, 1)": "WallOpeningNorth",
+    "(4, 1)": "WallWindow",
+    "(7, 1)": "WallWindow",
+    "(10, 1)": "AnimalHead",
+    "(22, 1)": "WallWindow"
+  },
+  "surfaces": {
     "(16, 13)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(16, 1)": "WallOpeningNorth",
     "(22, 7)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(25, 1)": "WallWindow",
-    "(19, 1)": "AnimalHead",
     "(25, 4)": {
       "NewWater": [
         "NorthEast",
@@ -275,7 +282,6 @@
         "Water"
       ]
     },
-    "(13, 1)": "WallOpeningNorth",
     "(25, 7)": {
       "NewWater": [
         "NorthEast",
@@ -306,9 +312,6 @@
         "Water"
       ]
     },
-    "(4, 1)": "WallWindow",
-    "(7, 1)": "WallWindow",
-    "(10, 1)": "AnimalHead",
     "(7, 10)": {
       "NewWater": [
         "NorthEast",
@@ -375,7 +378,6 @@
         "Water"
       ]
     },
-    "(22, 1)": "WallWindow",
     "(22, 4)": {
       "NewWater": [
         "NorthEast",

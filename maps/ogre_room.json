@@ -458,29 +458,43 @@
     "(43, 7)": "WallFlag",
     "(19, 4)": "WineShelf",
     "(52, 7)": "WallFlag",
-    "(43, 43)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
     "(10, 4)": "WallOpeningNorth",
     "(34, 7)": "WallFlag",
     "(31, 7)": "WallWindow",
     "(58, 21)": "WallOpeningEast",
     "(7, 4)": "WallPainting2",
-    "(7, 37)": {
-      "NewWater": [
-        "NorthEast",
-        "Water"
-      ]
-    },
     "(37, 7)": "WallWindow",
     "(40, 7)": "WallWindow",
     "(46, 7)": "WallWindow",
     "(49, 7)": "WallWindow",
     "(55, 7)": "WallWindow",
     "(16, 4)": "BookShelf",
+    "(36, 19)": "FoodPlate",
+    "(14, 4)": "Barrel",
+    "(5, 4)": "Barrel",
+    "(13, 4)": "HangingWeapons",
+    "(49, 31)": "Torch",
+    "(29, 31)": "WallFlag",
+    "(25, 31)": "WallFlag",
+    "(21, 31)": "WallFlag",
+    "(43, 31)": "Torch",
+    "(5, 31)": "Torch",
+    "(46, 31)": "HangingWeapons",
+    "(25, 13)": "HangingWeapons2"
+  },
+  "surfaces": {
+    "(43, 43)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
+    "(7, 37)": {
+      "NewWater": [
+        "NorthEast",
+        "Water"
+      ]
+    },
     "(37, 10)": {
       "NewWater": [
         "NorthEast",
@@ -685,20 +699,12 @@
         "Water"
       ]
     },
-    "(36, 19)": "FoodPlate",
-    "(14, 4)": "Barrel",
-    "(5, 4)": "Barrel",
-    "(13, 4)": "HangingWeapons",
-    "(49, 31)": "Torch",
-    "(29, 31)": "WallFlag",
-    "(25, 31)": "WallFlag",
     "(7, 40)": {
       "NewWater": [
         "NorthEast",
         "Water"
       ]
     },
-    "(25, 13)": "HangingWeapons2",
     "(4, 34)": {
       "NewWater": [
         "NorthEast",
@@ -710,11 +716,7 @@
         "NorthEast",
         "Water"
       ]
-    },
-    "(21, 31)": "WallFlag",
-    "(43, 31)": "Torch",
-    "(5, 31)": "Torch",
-    "(46, 31)": "HangingWeapons"
+    }
   },
   "control_points": {},
   "characters": [
