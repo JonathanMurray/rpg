@@ -252,7 +252,9 @@
     "(6, 25)": "WallPlant",
     "(13, 1)": "Torch",
     "(8, 8)": "SmallStone",
-    "(22, 9)": "SmallStone"
+    "(22, 9)": "SmallStone",
+    "(13, 25)": "FloorDrain",
+    "(17, 23)": "FloorDrain"
   },
   "surfaces": {
     "(19, 13)": {

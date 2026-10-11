@@ -599,6 +599,7 @@ impl Sidebar {
             TerrainId::Lantern,
             TerrainId::WallPlant,
             TerrainId::SmallStone,
+            TerrainId::FloorDrain,
             TerrainId::WallOpeningNorth,
             TerrainId::WallOpeningEast,
             TerrainId::WallOpeningWest,
