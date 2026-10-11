@@ -217,11 +217,7 @@ pub enum RangeIndicatorType {
     ObstructedLineOfSight,
 }
 
-const ZOOM_LEVELS: [f32; 3] = [
-    (64_f32 / 3.0).round(),
-    (85_f32 / 3.0).round(),
-    (96_f32 / 3.0).round(),
-];
+const ZOOM_LEVELS: [u32; 3] = [64, 96, 128];
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 enum TextEffectStyle {
@@ -280,7 +276,7 @@ pub struct GameGrid {
     big_font: Font,
     simple_font: Font,
     tiny_font: Font,
-    pub cell_w: f32,
+    pub rect_w: u32,
     terrain_atlas: Texture2D,
     pub background: IndexMap<Position, TerrainId>,
     pub terrain_objects: IndexMap<Position, TerrainId>,
@@ -340,12 +336,12 @@ impl GameGrid {
         sound_player: SoundPlayer,
     ) -> Self {
         let zoom_index = 1;
-        let cell_w = ZOOM_LEVELS[zoom_index];
+        let rect_w = ZOOM_LEVELS[zoom_index];
 
         let grid_dimensions = pathfind_grid.dimensions();
         let grid_size_on_screen = (
-            grid_dimensions.0 as f32 * cell_w,
-            grid_dimensions.1 as f32 * cell_w,
+            (grid_dimensions.0 / 3 * rect_w) as f32,
+            (grid_dimensions.1 / 3 * rect_w) as f32,
         );
 
         let camera_x = grid_size_on_screen.0 / 2.0 - screen_width() / 2.0;
@@ -369,7 +365,7 @@ impl GameGrid {
             enemys_target: None,
             action_usability_problem: None,
             zoom_index,
-            cell_w,
+            rect_w,
             grid_dimensions,
             position_on_screen: (0.0, 0.0),
             ability_cast_particle_group: Default::default(),
@@ -1287,9 +1283,9 @@ impl GameGrid {
             self.camera_position.1.get() + h / 2.0,
         );
 
-        let new_cell_w = ZOOM_LEVELS[self.zoom_index];
-        let factor = new_cell_w / self.cell_w;
-        self.cell_w = new_cell_w;
+        let new_rect_w = ZOOM_LEVELS[self.zoom_index];
+        let factor = new_rect_w as f32 / self.rect_w as f32;
+        self.rect_w = new_rect_w;
         let new_camera_center = (camera_center.0 * factor, camera_center.1 * factor);
         self.camera_position.0.set(new_camera_center.0 - w / 2.0);
         self.camera_position.1.set(new_camera_center.1 - h / 2.0);
@@ -1541,27 +1537,31 @@ impl GameGrid {
         self.movement_range = max_range;
     }
 
+    pub fn cell_w(&self) -> f32 {
+        self.rect_w as f32 / 3.0
+    }
+
     fn grid_x_to_screen(&self, grid_x: i32) -> f32 {
-        let x =
-            self.position_on_screen.0 + grid_x as f32 * self.cell_w - self.camera_position.0.get();
+        let x = self.position_on_screen.0 + grid_x as f32 * self.cell_w()
+            - self.camera_position.0.get();
 
         x.round()
     }
 
     fn grid_x_f32_to_screen(&self, grid_x: f32) -> f32 {
-        let x = self.position_on_screen.0 + grid_x * self.cell_w - self.camera_position.0.get();
+        let x = self.position_on_screen.0 + grid_x * self.cell_w() - self.camera_position.0.get();
 
         x.round()
     }
 
     fn grid_y_to_screen(&self, grid_y: i32) -> f32 {
-        let y =
-            self.position_on_screen.1 + grid_y as f32 * self.cell_w - self.camera_position.1.get();
+        let y = self.position_on_screen.1 + grid_y as f32 * self.cell_w()
+            - self.camera_position.1.get();
         y.round()
     }
 
     fn grid_y_f32_to_screen(&self, grid_y: f32) -> f32 {
-        let y = self.position_on_screen.1 + grid_y * self.cell_w - self.camera_position.1.get();
+        let y = self.position_on_screen.1 + grid_y * self.cell_w() - self.camera_position.1.get();
         y.round()
     }
 
@@ -1596,8 +1596,8 @@ impl GameGrid {
         draw_rectangle_lines2(
             self.grid_x_to_screen(grid_x) + margin,
             self.grid_y_to_screen(grid_y) + margin,
-            self.cell_w - margin * 2.0,
-            self.cell_w - margin * 2.0,
+            self.cell_w().round() - margin * 2.0,
+            self.cell_w().round() - margin * 2.0,
             thickness,
             color,
         )
@@ -1607,13 +1607,14 @@ impl GameGrid {
         draw_rectangle(
             self.grid_x_to_screen(grid_x) + margin,
             self.grid_y_to_screen(grid_y) + margin,
-            self.cell_w - margin * 2.0,
-            self.cell_w - margin * 2.0,
+            self.cell_w().round() - margin * 2.0,
+            self.cell_w().round() - margin * 2.0,
             color,
         )
     }
 
     fn draw_control_points(&self) {
+        let cell_w = self.cell_w().round();
         for col in 0..self.grid_dimensions.0 as i32 + 1 {
             let x0 = self.grid_x_to_screen(col);
 
@@ -1622,13 +1623,7 @@ impl GameGrid {
 
                 if col < self.grid_dimensions.0 as i32 && row < self.grid_dimensions.1 as i32 {
                     if let Some(control_point) = self.control_points.get(&(col, row)) {
-                        draw_rectangle(
-                            x0,
-                            y0,
-                            self.cell_w,
-                            self.cell_w,
-                            Color::new(1.0, 1.0, 1.0, 0.5),
-                        );
+                        draw_rectangle(x0, y0, cell_w, cell_w, Color::new(1.0, 1.0, 1.0, 0.5));
                         //self.fill_cell((col, row), Color::new(1.0, 1.0, 1.0, 0.5)  , 1.0);
                     }
                 }
@@ -1691,7 +1686,7 @@ impl GameGrid {
     }
 
     pub fn draw_terrain(&mut self, terrain_id: TerrainId, screen_pos: (f32, f32)) {
-        draw_terrain(&self.terrain_atlas, terrain_id, self.cell_w, screen_pos);
+        draw_terrain(&self.terrain_atlas, terrain_id, self.rect_w, screen_pos);
     }
 
     pub fn draw_debug_cells(&self) {
@@ -1723,10 +1718,7 @@ impl GameGrid {
     }
 
     pub fn default_entity_draw_size(&self) -> (f32, f32) {
-        (
-            self.cell_w * CELLS_PER_ENTITY as f32,
-            self.cell_w * CELLS_PER_ENTITY as f32,
-        )
+        (self.rect_w as f32, self.rect_w as f32)
     }
 
     fn draw_character(&self, character: &Character) {
@@ -1739,8 +1731,9 @@ impl GameGrid {
         };
 
         let (mut x, mut y) = self.character_screen_pos(character);
-        x -= self.cell_w;
-        y -= self.cell_w;
+        let cell_w = self.cell_w();
+        x -= cell_w;
+        y -= cell_w;
         let (mut shadow_x, mut shadow_y) = (x, y);
 
         let mut dying = false;
@@ -1844,7 +1837,7 @@ impl GameGrid {
                         let factor = remaining_ratio.min(0.6);
                         // Corpse sinking down into the ground/water
                         character_crop_factor = (factor, 1.0);
-                        character_offset = ((0.8 - factor) * self.cell_w * 3.0, 0.0);
+                        character_offset = ((0.8 - factor) * self.rect_w as f32, 0.0);
                     };
 
                     dying = true;
@@ -1861,12 +1854,12 @@ impl GameGrid {
                     let t = 1.0 - remaining_ratio;
 
                     let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - self.cell_w,
-                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                        self.grid_x_to_screen(toward.0) - cell_w,
+                        self.grid_y_to_screen(toward.1) - cell_w,
                     );
 
                     if t < 0.6 {
-                        let max_displacement = -self.cell_w * 0.5;
+                        let max_displacement = -cell_w * 0.5;
                         let displacement = if t < 0.1 {
                             max_displacement * t / 0.1
                         } else if t < 0.5 {
@@ -1908,7 +1901,7 @@ impl GameGrid {
                 AnimationDetails::CastingSpell { .. } => {
                     let t = 1.0 - remaining_ratio;
 
-                    let max_levitation = self.cell_w * 0.2;
+                    let max_levitation = cell_w * 0.2;
 
                     y -= max_levitation * t;
 
@@ -1938,10 +1931,10 @@ impl GameGrid {
                     let t = 1.0 - remaining_ratio;
 
                     let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - self.cell_w,
-                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                        self.grid_x_to_screen(toward.0) - cell_w,
+                        self.grid_y_to_screen(toward.1) - cell_w,
                     );
-                    let max_displacement = self.cell_w * 0.6;
+                    let max_displacement = cell_w * 0.6;
                     let displacement = if t < 0.1 {
                         max_displacement * t / 0.1
                     } else if t < 0.8 {
@@ -1969,7 +1962,7 @@ impl GameGrid {
                             } else {
                                 -1.0
                             };
-                            shield_offset = (self.cell_w * 0.2 * x_mult, -self.cell_w * 0.4);
+                            shield_offset = (cell_w * 0.2 * x_mult, -cell_w * 0.4);
                         } else {
                             let max_rot = PI * 0.3;
                             weapon_rotation_modifier = if t < 0.2 {
@@ -1992,10 +1985,10 @@ impl GameGrid {
                     with_shield,
                 } => {
                     let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - self.cell_w,
-                        self.grid_y_to_screen(toward.1) - self.cell_w,
+                        self.grid_x_to_screen(toward.0) - cell_w,
+                        self.grid_y_to_screen(toward.1) - cell_w,
                     );
-                    let displaced = Vec2::new(x, y).move_towards(toward, self.cell_w * 0.1);
+                    let displaced = Vec2::new(x, y).move_towards(toward, cell_w * 0.1);
                     x = displaced.x;
                     y = displaced.y;
 
@@ -2012,7 +2005,7 @@ impl GameGrid {
                         } else {
                             -1.0
                         };
-                        shield_offset = (self.cell_w * 0.2 * x_mult, -self.cell_w * 0.4);
+                        shield_offset = (cell_w * 0.2 * x_mult, -cell_w * 0.4);
                     } else {
                         weapon_rotation_modifier = PI * 0.2;
                         if !character.is_facing_east.get() {
@@ -2040,7 +2033,7 @@ impl GameGrid {
 
         if true {
             // !dying {
-            let offset = self.cell_w * 1.2;
+            let offset = cell_w * 1.2;
             y -= offset;
             shadow_y -= offset;
         }
@@ -2049,7 +2042,7 @@ impl GameGrid {
 
         let standing_in_liquid = standing_on_surface.map(|s| s.is_liquid()).unwrap_or(false);
 
-        params.pivot = Some((x + self.cell_w * 1.5, y + self.cell_w * 2.0).into());
+        params.pivot = Some((x + cell_w * 1.5, y + cell_w * 2.0).into());
 
         let mut character_params = params.clone();
         if standing_in_liquid {
@@ -2057,12 +2050,12 @@ impl GameGrid {
 
             if dying {
                 // corpse is rotated 90 degrees clockwise
-                x += self.cell_w * 0.5;
+                x += cell_w * 0.5;
             } else {
                 character_crop_factor = (1.0, 1.0 - water_depth_factor);
             }
-            y += water_depth_factor * self.cell_w * 3.0;
-            shadow_y += water_depth_factor * self.cell_w * 1.0;
+            y += water_depth_factor * self.rect_w as f32;
+            shadow_y += water_depth_factor * cell_w * 1.0;
         }
 
         if standing_on_surface == Some(Surface::Fire) {
@@ -2089,13 +2082,7 @@ impl GameGrid {
             shadow_y,
             WHITE,
             DrawTextureParams {
-                dest_size: Some(
-                    (
-                        self.cell_w * CELLS_PER_ENTITY as f32,
-                        self.cell_w * CELLS_PER_ENTITY as f32,
-                    )
-                        .into(),
-                ),
+                dest_size: Some((self.rect_w as f32, self.rect_w as f32).into()),
                 flip_x: character.is_facing_east.get(),
                 ..Default::default()
             },
@@ -2136,7 +2123,7 @@ impl GameGrid {
                     let mut rotation = params.rotation + weapon_rotation_modifier;
                     if dying {
                         rotation = 0.2 * PI;
-                        y_offset = self.cell_w * 1.0;
+                        y_offset = cell_w * 1.0;
                     }
                     let weapon_params = DrawTextureParams { rotation, ..params };
                     draw_texture_ex(
@@ -2154,7 +2141,7 @@ impl GameGrid {
                     let mut rotation = params.rotation + weapon_rotation_modifier;
                     if dying {
                         rotation = 0.0;
-                        shield_offset = (0.0, self.cell_w * 1.0);
+                        shield_offset = (0.0, cell_w * 1.0);
                     }
                     let shield_params = DrawTextureParams { rotation, ..params };
                     draw_texture_ex(
@@ -2171,10 +2158,11 @@ impl GameGrid {
 
     pub fn mouse_grid_pos(&self) -> (i32, i32) {
         let (x, y) = self.position_on_screen;
+        let cell_w = self.cell_w();
         let mouse_relative_to_grid = |(x, y): (f32, f32)| {
             (
-                ((self.camera_position.0.get() + x) / self.cell_w).floor() as i32,
-                ((self.camera_position.1.get() + y) / self.cell_w).floor() as i32,
+                ((self.camera_position.0.get() + x) / cell_w).floor() as i32,
+                ((self.camera_position.1.get() + y) / cell_w).floor() as i32,
             )
         };
         let (mouse_x, mouse_y) = mouse_position();
@@ -2192,6 +2180,8 @@ impl GameGrid {
         draw_control_points: bool,
     ) -> GridOutcome {
         let mut outcome = GridOutcome::default();
+
+        let cell_w = self.cell_w();
 
         let had_non_empty_movement_path = has_non_empty_movement_path(ui_state);
 
@@ -2558,7 +2548,7 @@ impl GameGrid {
                 self.draw_circular_character_highlight(
                     character.id(),
                     CHARACTER_DAMAGE_PREVIEW_COLOR,
-                    self.cell_w * 0.25,
+                    cell_w * 0.25,
                 );
             }
         }
@@ -3499,6 +3489,8 @@ impl GameGrid {
     }
 
     fn draw_character_animations(&self) {
+        let cell_w = self.cell_w();
+
         // Static text effects on the same character should rise up and allow space for newer ones
         // so we need to track how many there currently are per character
         let mut static_text_counts: HashMap<CharacterId, u32> = Default::default();
@@ -3533,7 +3525,7 @@ impl GameGrid {
                 }
                 AnimationDetails::MagicSparks { particles, color } => {
                     let pos = self.character_screen_pos(&self.characters[&animation.character_id]);
-                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let pos = (pos.0 + cell_w / 2.0, pos.1 - cell_w);
                     let remaining_ratio = animation.remaining_duration_ratio();
                     let num_particles = ((1.0 - remaining_ratio.max(0.5)) * 20.0) as usize;
                     let mut particles = particles.borrow_mut();
@@ -3544,13 +3536,13 @@ impl GameGrid {
                         ));
                     }
                     for (i, p) in particles.iter().enumerate() {
-                        let w = self.cell_w * 0.3;
-                        let h = self.cell_w * 0.3;
+                        let w = cell_w * 0.3;
+                        let h = cell_w * 0.3;
                         let mut color = *color;
                         color.a = 1.2 - 2.0 * (1.0 - remaining_ratio) + 0.02 * i as f32;
                         draw_rectangle(
-                            pos.0 + p.0 * self.cell_w - w / 2.0,
-                            pos.1 + p.1 * self.cell_w - h / 2.0,
+                            pos.0 + p.0 * cell_w - w / 2.0,
+                            pos.1 + p.1 * cell_w - h / 2.0,
                             w,
                             h,
                             color,
@@ -3559,9 +3551,9 @@ impl GameGrid {
                 }
                 AnimationDetails::CastingSpell { color } => {
                     let pos = self.character_screen_pos(&self.characters[&animation.character_id]);
-                    let pos = (pos.0 + self.cell_w / 2.0, pos.1 - self.cell_w);
+                    let pos = (pos.0 + cell_w / 2.0, pos.1 - cell_w);
                     let t = 1.0 - animation.remaining_duration_ratio();
-                    let max_r = 3.0 * self.cell_w;
+                    let max_r = self.rect_w as f32;
                     let expand = 0.7;
                     let implode = 0.1;
                     if t < expand {
@@ -3591,7 +3583,7 @@ impl GameGrid {
                     draw_text_graphics(
                         pos,
                         text_graphics,
-                        self.cell_w,
+                        cell_w,
                         animation.duration,
                         animation.remaining_duration,
                     );
@@ -3677,15 +3669,15 @@ impl GameGrid {
             let mut target_screen_pos =
                 self.character_screen_pos(&self.characters[&pushed_target_id]);
             target_screen_pos = (
-                target_screen_pos.0 + self.cell_w / 2.0,
-                target_screen_pos.1 + self.cell_w / 2.0,
+                target_screen_pos.0 + self.cell_w() / 2.0,
+                target_screen_pos.1 + self.cell_w() / 2.0,
             );
 
             draw_dashed_line_ex(
                 target_screen_pos,
                 (
-                    target_screen_pos.0 + self.cell_w * pushed_vec.0 as f32,
-                    target_screen_pos.1 + self.cell_w * pushed_vec.1 as f32,
+                    target_screen_pos.0 + self.cell_w() * pushed_vec.0 as f32,
+                    target_screen_pos.1 + self.cell_w() * pushed_vec.1 as f32,
                 ),
                 8.0,
                 RED,
@@ -3761,7 +3753,7 @@ impl GameGrid {
         let (x, y) = if let Some(pos) = mouse_grid_pos {
             let snapped_mouse_pos = self.grid_pos_to_screen(pos);
             (
-                snapped_mouse_pos.0 + self.cell_w / 2.0 - text_dim.width / 2.0,
+                snapped_mouse_pos.0 + self.cell_w() / 2.0 - text_dim.width / 2.0,
                 snapped_mouse_pos.1 - 10.0,
             )
         } else {
@@ -3869,8 +3861,8 @@ impl GameGrid {
         let bubble_h = text_dim.height + padding * 2.0;
         let bubble_w = (text_dim.width + padding * 2.0); //.max(self.cell_w * 1.5);
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        let x0 = x + self.cell_w * 2.0;
-        let y0 = y - self.cell_w;
+        let x0 = x + self.cell_w() * 2.0;
+        let y0 = y - self.cell_w();
         let triangle_h = 10.0;
         let v1 = (x0 + 5.0, y0 - 5.0);
         let v2 = (x0 + 10.0, y0 - 5.0 - triangle_h);
@@ -4185,7 +4177,15 @@ impl GameGrid {
     fn draw_invalid_target_marker(&self, grid_pos: Position) {
         self.fill_cell(grid_pos, Color::new(1.0, 0.0, 0.0, 0.3), 4.0);
         let (x, y) = self.grid_pos_to_screen(grid_pos);
-        draw_cross(x, y, self.cell_w, self.cell_w, RED, 2.0, self.cell_w * 0.15);
+        draw_cross(
+            x,
+            y,
+            self.cell_w(),
+            self.cell_w(),
+            RED,
+            2.0,
+            self.cell_w() * 0.15,
+        );
     }
 
     fn _draw_character_label(
@@ -4216,13 +4216,13 @@ impl GameGrid {
         let sprite_h = character_sprite_height(character.sprite);
         let texture_h = 32.0;
 
-        let y = y - self.cell_w * 2.0;
-        let y = (y + (texture_h - sprite_h as f32) / texture_h * self.cell_w).round();
+        let y = y - self.cell_w() * 2.0;
+        let y = (y + (texture_h - sprite_h as f32) / texture_h * self.cell_w()).round();
 
         let margin = 2.0;
-        let health_w = (self.cell_w * CELLS_PER_ENTITY as f32 - 10.0).min(90.0);
+        let health_w = (self.cell_w() * CELLS_PER_ENTITY as f32 - 10.0).min(90.0);
         let mut health_h = 10.0;
-        let health_x = x + ((self.cell_w - health_w) * 0.5).round();
+        let health_x = x + ((self.cell_w() - health_w) * 0.5).round();
         let mut health_y = y - health_h;
 
         if discrete_healthbar {
@@ -4240,7 +4240,7 @@ impl GameGrid {
 
         let condition_infos = character.condition_infos();
 
-        let box_x = x - (box_w - self.cell_w) / 2.0;
+        let box_x = x - (box_w - self.cell_w()) / 2.0;
         let mut box_y = y - health_h - margin - box_h;
 
         if draw_action_points {
@@ -4270,7 +4270,7 @@ impl GameGrid {
             action_points_row.padding = 1.0;
             action_points_row.current_ap = character.action_points.current();
             action_points_row.draw(
-                x - (action_points_row.size().0 - self.cell_w) / 2.0,
+                x - (action_points_row.size().0 - self.cell_w()) / 2.0,
                 ap_row_y,
             );
         }
@@ -4528,24 +4528,24 @@ impl GameGrid {
                 bg_color = CELL_OCCUPIED_COLOR;
                 border_color = BORDER_OCCUPIED_COLOR;
             }
-            margin = self.cell_w * 0.1;
+            margin = self.cell_w() * 0.1;
         }
 
         let rect = (
-            x - self.cell_w + margin,
-            y - self.cell_w + margin,
-            self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
-            self.cell_w * CELLS_PER_ENTITY as f32 - margin * 2.0,
+            x - self.cell_w() + margin,
+            y - self.cell_w() + margin,
+            self.rect_w as f32 - margin * 2.0,
+            self.rect_w as f32 - margin * 2.0,
         );
         draw_rectangle(rect.0, rect.1, rect.2, rect.3, bg_color);
 
         // Draw diagonals
         if !is_active_char {
             let margin = margin + 1.0;
-            let x0 = x - self.cell_w + margin;
-            let y0 = y - self.cell_w + margin;
+            let x0 = x - self.cell_w() + margin;
+            let y0 = y - self.cell_w() + margin;
             let n = 4;
-            let w = (self.cell_w * CELLS_PER_ENTITY as f32) - margin * 2.0;
+            let w = (self.rect_w as f32) - margin * 2.0;
             let draw_diagonal = |from: (i32, i32), to: (i32, i32)| {
                 draw_line(
                     (x0 + w * (from.0 as f32 / n as f32)).round(),
@@ -4578,8 +4578,8 @@ impl GameGrid {
         margin: f32,
     ) {
         let (x, y) = self.character_screen_pos(&self.characters[&character_id]);
-        let r = oscillate(0.7, self.cell_w * 1.4, self.cell_w * 1.5) - margin;
-        draw_circle(x + self.cell_w / 2.0, y + self.cell_w / 2.0, r, color);
+        let r = oscillate(0.7, self.cell_w() * 1.4, self.cell_w() * 1.5) - margin;
+        draw_circle(x + self.cell_w() / 2.0, y + self.cell_w() / 2.0, r, color);
     }
 
     fn draw_cornered_outline(
@@ -4590,7 +4590,7 @@ impl GameGrid {
         thickness: f32,
         animated: bool,
     ) {
-        let len = self.cell_w * 0.7;
+        let len = self.cell_w() * 0.7;
 
         let game_time = get_time();
 
@@ -4601,10 +4601,10 @@ impl GameGrid {
         };
 
         draw_cornered_rectangle_lines(
-            screen_pos.0 - self.cell_w - pad,
-            screen_pos.1 - self.cell_w - pad,
-            self.cell_w * CELLS_PER_ENTITY as f32 + pad * 2.0,
-            self.cell_w * CELLS_PER_ENTITY as f32 + pad * 2.0,
+            screen_pos.0 - self.cell_w() - pad,
+            screen_pos.1 - self.cell_w() - pad,
+            self.rect_w as f32 + pad * 2.0,
+            self.rect_w as f32 + pad * 2.0,
             thickness,
             color,
             margin,
@@ -4636,7 +4636,7 @@ impl GameGrid {
                     let x = self.grid_x_f32_to_screen(x);
                     let y = self.grid_y_f32_to_screen(y);
 
-                    graphics.draw(x, y, effect, self.cell_w);
+                    graphics.draw(x, y, effect, self.cell_w());
                 }
                 EffectVariant::Line {
                     thickness,
@@ -4693,7 +4693,7 @@ impl GameGrid {
                         ..Default::default()
                     };
 
-                    let osc_offset = oscillate_square(0.1, 0.0, self.cell_w * 1.5);
+                    let osc_offset = oscillate_square(0.1, 0.0, self.cell_w() * 1.5);
                     for i in 1..=num_textures_trunc {
                         let mut pos = Vec2::from(from).move_towards(
                             Vec2::from(final_to),
@@ -4752,8 +4752,14 @@ impl GameGrid {
 
         let segment_len = 5.0;
         draw_dashed_line(
-            (engager.0 + self.cell_w / 2.0, engager.1 + self.cell_w / 2.0),
-            (target.0 + self.cell_w / 2.0, target.1 + self.cell_w / 2.0),
+            (
+                engager.0 + self.cell_w() / 2.0,
+                engager.1 + self.cell_w() / 2.0,
+            ),
+            (
+                target.0 + self.cell_w() / 2.0,
+                target.1 + self.cell_w() / 2.0,
+            ),
             7.0,
             color,
             segment_len,
@@ -4771,15 +4777,15 @@ impl GameGrid {
         thickness: f32,
         animated: bool,
     ) {
-        let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w / 2.0;
+        let actor_x = self.grid_x_to_screen(actor_pos.0) + self.cell_w() / 2.0;
         let actor_y = self.grid_y_to_screen(actor_pos.1);
-        let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w / 2.0;
+        let target_x = self.grid_x_to_screen(target_pos.0) + self.cell_w() / 2.0;
 
         let target_y = if is_targetting_character {
             // show the crosshair closer to the target's chest rather than at their feet
             self.grid_y_to_screen(target_pos.1)
         } else {
-            self.grid_y_to_screen(target_pos.1) + self.cell_w / 2.0
+            self.grid_y_to_screen(target_pos.1) + self.cell_w() / 2.0
         };
 
         let depth = 2.0;
@@ -4788,8 +4794,12 @@ impl GameGrid {
         let target_vec = Vec2::new(target_x, target_y);
 
         draw_dashed_line_ex(
-            actor_vec.move_towards(target_vec, self.cell_w / 2.0).into(),
-            target_vec.move_towards(actor_vec, self.cell_w / 2.0).into(),
+            actor_vec
+                .move_towards(target_vec, self.cell_w() / 2.0)
+                .into(),
+            target_vec
+                .move_towards(actor_vec, self.cell_w() / 2.0)
+                .into(),
             thickness,
             crosshair_color,
             10.0,
@@ -4800,8 +4810,8 @@ impl GameGrid {
         draw_rectangle_lines_ex(
             target_x,
             target_y,
-            self.cell_w / 2.0,
-            self.cell_w / 2.0,
+            self.cell_w() / 2.0,
+            self.cell_w() / 2.0,
             4.0,
             DrawRectangleParams {
                 color: crosshair_color,
@@ -4845,8 +4855,8 @@ impl GameGrid {
         let w = header_w + 2.0 * pad;
         let h = header_h + 2.0 * pad;
 
-        if w > self.cell_w {
-            x -= (w - self.cell_w) / 2.0;
+        if w > self.cell_w() {
+            x -= (w - self.cell_w()) / 2.0;
         }
 
         draw_rectangle(x, y - h, w, h, bg_color);
@@ -4987,8 +4997,8 @@ impl GameGrid {
                 circle_color = Color::new(1.0, 0.4, 0.4, 0.8);
             }
 
-            let x = self.grid_x_to_screen(a.pos.0) + self.cell_w / 2.0;
-            let y = self.grid_y_to_screen(a.pos.1) + self.cell_w / 2.0;
+            let x = self.grid_x_to_screen(a.pos.0) + self.cell_w() / 2.0;
+            let y = self.grid_y_to_screen(a.pos.1) + self.cell_w() / 2.0;
 
             draw_circle(x, y, r, circle_color);
             draw_circle_lines(x, y, r, 2.0, BLACK);
@@ -5010,7 +5020,7 @@ impl GameGrid {
                 self.grid_x_to_screen(end.pos.0) + 2.0,
                 self.grid_y_to_screen(end.pos.1) + 2.0,
             ),
-            self.cell_w,
+            self.cell_w(),
             last_direction,
             Color::new(0.0, 0.0, 0.0, 0.5),
             4.0,
@@ -5020,7 +5030,7 @@ impl GameGrid {
                 self.grid_x_to_screen(end.pos.0),
                 self.grid_y_to_screen(end.pos.1),
             ),
-            self.cell_w,
+            self.cell_w(),
             last_direction,
             arrow_color,
             4.0,
@@ -5145,7 +5155,7 @@ impl GameGrid {
         border_type: DrawBorder,
     ) {
         let (x, y) = self.grid_pos_to_screen(pos);
-        let (w, h) = (self.cell_w, self.cell_w);
+        let (w, h) = (self.cell_w(), self.cell_w());
         let rect = Rect::new(x, y, w, h);
 
         match border_type {
@@ -5169,8 +5179,8 @@ impl GameGrid {
     }
 
     fn pan_camera(&self, dx: f32, dy: f32) {
-        let grid_w = self.grid_dimensions.0 as f32 * self.cell_w;
-        let grid_h = self.grid_dimensions.1 as f32 * self.cell_w;
+        let grid_w = self.grid_dimensions.0 as f32 * self.cell_w();
+        let grid_h = self.grid_dimensions.1 as f32 * self.cell_w();
 
         let new_x = self.camera_position.0.get() + dx;
         let new_y = self.camera_position.1.get() + dy;

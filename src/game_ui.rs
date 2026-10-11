@@ -2067,8 +2067,8 @@ impl UserInterface {
                         variant: EffectVariant::At(
                             EffectPosition::Destination,
                             EffectGraphics::Circle {
-                                radius: f32::from(radius) * self.game_grid.cell_w * 0.1,
-                                end_radius: Some(f32::from(radius) * self.game_grid.cell_w),
+                                radius: f32::from(radius) * self.game_grid.cell_w() * 0.1,
+                                end_radius: Some(f32::from(radius) * self.game_grid.cell_w()),
                                 fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
                                 //fill: Some(fill_color),
                                 stroke: None,

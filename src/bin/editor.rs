@@ -159,8 +159,8 @@ async fn main() {
                 let entity_size = game_grid.default_entity_draw_size();
 
                 let rect = Rect::new(
-                    snapped_mouse_screen_pos.0 - game_grid.cell_w,
-                    snapped_mouse_screen_pos.1 - game_grid.cell_w,
+                    snapped_mouse_screen_pos.0 - game_grid.cell_w(),
+                    snapped_mouse_screen_pos.1 - game_grid.cell_w(),
                     entity_size.0,
                     entity_size.1,
                 );
@@ -223,8 +223,8 @@ async fn main() {
                         draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
-                            game_grid.cell_w,
-                            game_grid.cell_w,
+                            game_grid.cell_w(),
+                            game_grid.cell_w(),
                             3.0,
                             YELLOW,
                         );
@@ -281,8 +281,8 @@ async fn main() {
                         draw_rectangle_lines2(
                             snapped_mouse_screen_pos.0,
                             snapped_mouse_screen_pos.1,
-                            game_grid.cell_w,
-                            game_grid.cell_w,
+                            game_grid.cell_w(),
+                            game_grid.cell_w(),
                             3.0,
                             YELLOW,
                         );

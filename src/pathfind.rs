@@ -131,6 +131,11 @@ pub enum TraversalType {
 
 impl PathfindGrid {
     pub fn new(dimensions: (u32, u32)) -> Self {
+        assert!(
+            dimensions.0 % 3 == 0 && dimensions.1 % 3 == 0,
+            "Invalid grid dimensions: {:?}",
+            dimensions
+        );
         Self {
             dimensions,
             occupied: Default::default(),

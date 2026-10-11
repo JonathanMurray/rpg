@@ -648,7 +648,7 @@ impl TerrainId {
 pub fn draw_terrain(
     texture: &Texture2D,
     terrain_id: TerrainId,
-    cell_w: f32,
+    rect_w: u32,
     screen_pos: (f32, f32),
 ) {
     let (rotation, src_rect) = terrain_atlas_area(terrain_id, screen_pos);
@@ -656,8 +656,8 @@ pub fn draw_terrain(
     let (x, y) = screen_pos;
     let src_rect_size = src_rect.size();
     let dst_size = (
-        cell_w * src_rect_size.x / w * CELLS_PER_ENTITY as f32,
-        cell_w * src_rect_size.y / h * CELLS_PER_ENTITY as f32,
+        rect_w as f32 * src_rect_size.x / w,
+        rect_w as f32 * src_rect_size.y / h,
     );
 
     let params = DrawTextureParams {
@@ -666,6 +666,8 @@ pub fn draw_terrain(
         rotation,
         ..Default::default()
     };
+
+    let cell_w = rect_w as f32 / 3.0;
 
     draw_texture_ex(
         texture,
