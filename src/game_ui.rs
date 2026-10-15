@@ -1048,7 +1048,6 @@ impl UserInterface {
                         extra_cost: *cost,
                     }))));
                 }
-                self.activity_popup.on_new_movement_ap_cost();
             }
         }
 
@@ -1079,6 +1078,8 @@ impl UserInterface {
             if !switched_state_from_movement {
                 self.activity_popup.set_movement_cost(*move_cost);
             }
+        } else {
+            self.activity_popup.set_movement_cost(0);
         }
 
         player_chose
@@ -1130,12 +1131,6 @@ impl UserInterface {
             } else if engager.pos().0 < character.pos().0 {
                 engager.is_facing_east.set(true);
             }
-        }
-    }
-
-    fn refresh_movement_state(&mut self) {
-        if let UiState::ConfiguringAction(ConfiguredAction::Move { .. }) = &*self.state.borrow() {
-            self.activity_popup.on_new_movement_ap_cost();
         }
     }
 
@@ -1561,9 +1556,6 @@ impl UserInterface {
 
         self.refresh_actor_direction();
         self.refresh_target_state();
-        self.refresh_movement_state();
-
-        self.game_grid.update_move_speed(self.active_character_id);
 
         self.refresh_selected_action_button();
         self.target_ui.rebuild_character_ui();
@@ -2573,9 +2565,6 @@ impl UserInterface {
                 }
                 ActivityPopupOutcome::ChangedAttackEnhancements => {
                     self.refresh_attack_state();
-                }
-                ActivityPopupOutcome::ChangedMovementSprint(_sprint_usage) => {
-                    self.game_grid.update_move_speed(self.active_character_id);
                 }
                 ActivityPopupOutcome::ChangedReaction => {
                     self.refresh_reaction_state();

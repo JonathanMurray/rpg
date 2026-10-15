@@ -306,8 +306,6 @@ pub struct GameGrid {
     active_character_id: CharacterId,
     action_usability_problem: Option<UsabilityProblem>,
 
-    movement_range: f32,
-
     hovered_character: Option<CharacterId>,
     prev_hovered_character: Option<CharacterId>,
     hovered_character_portrait: Option<CharacterId>,
@@ -358,7 +356,6 @@ impl GameGrid {
             effects: vec![],
             selected_player_character_id: Some(selected_character_id),
             active_character_id: 0,
-            movement_range: 0.0,
             hovered_character: None,
             prev_hovered_character: None,
             hovered_character_portrait: None,
@@ -1183,20 +1180,13 @@ impl GameGrid {
         self.character_animations.retain(|a| a.character_id != id);
     }
 
-    fn routes(&self, character_id: CharacterId) -> Ref<IndexMap<(i32, i32), ChartNode>> {
+    fn routes(&self, character_id: CharacterId) -> Ref<'_, IndexMap<(i32, i32), ChartNode>> {
         let character = &self.characters[&character_id];
         let pos: (i32, i32) = character.pos();
-        let exploration_range = if character.player_controlled() {
-            self.movement_range
-        } else {
-            character.remaining_movement.get()
-                + (character.action_points.current() as f32
-                    * character.move_distance_per_resource())
-        };
         let routes = self.pathfind_grid.explore_outward(
             character_id,
             pos,
-            exploration_range,
+            character.movement_range(),
             None,
             TraversalType::SlowedDownBySurface,
         );
@@ -1525,17 +1515,6 @@ impl GameGrid {
         };
 
         self.effects.push(concrete_effect);
-    }
-
-    pub fn update_move_speed(&mut self, active_char_id: CharacterId) {
-        let active_char = &self.characters[&active_char_id];
-        println!("update_move_speed({})", active_char.name);
-
-        let max_range = active_char.remaining_movement.get()
-            + (active_char.action_points.current() as f32
-                * active_char.move_distance_per_resource());
-
-        self.movement_range = max_range;
     }
 
     pub fn cell_w(&self) -> f32 {
@@ -3821,7 +3800,7 @@ impl GameGrid {
             // distance_from_start == 0, means we're hovering the character's current position
             Some(node)
                 if node.distance_from_start > 0.0
-                    && node.distance_from_start <= self.movement_range =>
+                    && node.distance_from_start <= self.active_char().movement_range() =>
             {
                 return Some((mouse_grid_pos, *node));
             }
@@ -3844,12 +3823,12 @@ impl GameGrid {
                 (mx - 1, my + 1),
             ],
         ];
+        let movement_range = self.active_char().movement_range();
         for adjacent_cells in adjacency_lists {
             let mut result: Option<(Position, ChartNode)> = None;
             for adj in adjacent_cells {
                 if let Some(node) = self.routes(self.active_character_id).get(&adj) {
-                    if node.distance_from_start > 0.0
-                        && node.distance_from_start <= self.movement_range
+                    if node.distance_from_start > 0.0 && node.distance_from_start <= movement_range
                     {
                         //dbg!((mouse_grid_pos, adj, node));
 
@@ -3874,6 +3853,10 @@ impl GameGrid {
         }
 
         None
+    }
+
+    fn active_char(&self) -> &Rc<Character> {
+        &self.characters[&self.active_character_id]
     }
 
     fn draw_opportunity_attack_warning(&self, opportunity_attacker: CharacterId) {
@@ -4897,20 +4880,12 @@ impl GameGrid {
     fn draw_movement_path_background(&self, character_id: CharacterId) {
         let character = &self.characters[&character_id];
 
-        let extended_range = if character.player_controlled() {
-            Some(self.movement_range)
-        } else {
-            Some(
-                character.remaining_movement.get()
-                    + (character.action_points.current() as f32
-                        * character.move_distance_per_resource()),
-            )
-        };
+        let extended_range = self.active_char().movement_range();
 
         self.draw_move_range_indicator(
             character,
             character.remaining_movement.get(),
-            extended_range,
+            Some(extended_range),
         );
     }
 
@@ -4954,19 +4929,16 @@ impl GameGrid {
     fn draw_player_movement_path(&self, path: &[PathNode]) {
         let mut movement_path = vec![(&path[0], false)];
         let mut opportunity_attackers = vec![];
-        {
-            for w in path.windows(2) {
-                let mover = self.characters.get(&self.active_character_id).unwrap();
-                let mut threatened_cell = false;
-                for other_char in self.characters.values() {
-                    if can_opportunity_attack_mover(mover, w[0].position, w[1].position, other_char)
-                    {
-                        opportunity_attackers.push(other_char.id());
-                        threatened_cell = true;
-                    }
+        for w in path.windows(2) {
+            let mover = self.characters.get(&self.active_character_id).unwrap();
+            let mut threatened_cell = false;
+            for other_char in self.characters.values() {
+                if can_opportunity_attack_mover(mover, w[0].position, w[1].position, other_char) {
+                    opportunity_attackers.push(other_char.id());
+                    threatened_cell = true;
                 }
-                movement_path.push((&w[1], threatened_cell));
             }
+            movement_path.push((&w[1], threatened_cell));
         }
 
         self.draw_movement_path_with_arrow(

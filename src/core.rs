@@ -5964,6 +5964,12 @@ impl Character {
         }
     }
 
+    /// How far can the character move this turn, given its current resources
+    pub fn movement_range(&self) -> f32 {
+        self.remaining_movement.get()
+            + (self.action_points.current() as f32 * self.move_distance_per_resource())
+    }
+
     pub fn unwrap_arrow(&self) -> Arrow {
         self.arrows.get().unwrap().arrow
     }

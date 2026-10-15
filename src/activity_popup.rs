@@ -46,7 +46,6 @@ pub struct ActivityPopup {
     choice_buttons: IndexMap<u32, ActionButton>,
     proceed_button: ActionButton,
     usability_msg: Option<UsabilityMessage>,
-    movement_cost_slider: Option<MovementCostSlider>,
 
     proceed_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
     choice_button_events: Rc<RefCell<Vec<InternalUiEvent>>>,
@@ -56,6 +55,8 @@ pub struct ActivityPopup {
     pub last_drawn_rectangle: Rect,
     sound_player: SoundPlayer,
     pathfind_grid: Rc<PathfindGrid>,
+
+    current_movement_cost: u32,
 }
 
 struct UsabilityMessage {
@@ -101,11 +102,11 @@ impl ActivityPopup {
             next_button_id: Cell::new(next_button_id),
             proceed_button_events,
             choice_button_events: Rc::new(RefCell::new(vec![])),
-            movement_cost_slider: None,
             hovered_choice_button_id: None,
             last_drawn_rectangle: Default::default(),
             sound_player,
             pathfind_grid,
+            current_movement_cost: 0,
         }
     }
 
@@ -566,13 +567,7 @@ impl ActivityPopup {
         if changed_attack_enhancements {
             return Some(ActivityPopupOutcome::ChangedAttackEnhancements);
         }
-        if let Some(slider) = &self.movement_cost_slider {
-            if slider.has_changed.take() {
-                return Some(ActivityPopupOutcome::ChangedMovementSprint(
-                    slider.selected_i,
-                ));
-            }
-        }
+
         if clicked_invalid {
             return Some(ActivityPopupOutcome::ClickedInvalid);
         }
@@ -586,45 +581,8 @@ impl ActivityPopup {
             .map(|id| &self.choice_buttons[id].action_tooltip.action)
     }
 
-    // TODO get rid of this?
-    pub fn on_new_movement_ap_cost(&mut self) {
-        let UiState::ConfiguringAction(ConfiguredAction::Move { cost, .. }) =
-            *self.ui_state.borrow()
-        else {
-            panic!()
-        };
-
-        if let Some(slider) = self.movement_cost_slider.as_mut() {
-            let character = self.characters.get(self.relevant_character_id);
-            let max_cost = character
-                .stamina
-                .current()
-                .max(character.action_points.current());
-            slider.set_max_allowed(max_cost);
-
-            assert!(cost <= max_cost);
-
-            slider.selected_i = cost;
-        }
-    }
-
     pub fn set_movement_cost(&mut self, cost: u32) {
-        // TODO: bug: this unwrap panicked, when clicking on an enemy on the grid?
-        let slider = self.movement_cost_slider.as_mut().unwrap();
-        let character = self.characters.get(self.relevant_character_id);
-        let max_cost = character.action_points.current();
-        slider.set_max_allowed(max_cost);
-
-        assert!(cost <= max_cost);
-
-        slider.selected_i = cost;
-    }
-
-    fn movement_cost(&self) -> u32 {
-        self.movement_cost_slider
-            .as_ref()
-            .map(|slider| slider.selected())
-            .unwrap_or(0)
+        self.current_movement_cost = cost;
     }
 
     pub fn reserved_and_hovered_action_points(&self) -> (i32, i32) {
@@ -634,8 +592,8 @@ impl ActivityPopup {
             .enabled_quick_actions
             .get();
 
-        if self.movement_cost() > 0 {
-            return (self.movement_cost() as i32, 0);
+        if self.current_movement_cost > 0 {
+            return (self.current_movement_cost as i32, 0);
         }
 
         let borrowed_state = self.ui_state.borrow();
@@ -791,7 +749,6 @@ impl ActivityPopup {
         let mut lines = vec![];
         let mut popup_buttons = vec![];
 
-        let mut movement_cost_slider = None;
         self.selected_choice_button_ids.clear();
         self.hovered_choice_button_id = None;
 
@@ -847,12 +804,7 @@ impl ActivityPopup {
                         }
                     }
 
-                    ConfiguredAction::Move { .. } => {
-                        let char = self.characters.get(active_character_id);
-                        let max_spend = char.stamina.current().max(char.action_points.current());
-                        movement_cost_slider =
-                            Some(MovementCostSlider::new(max_spend, self.font.clone()));
-                    }
+                    ConfiguredAction::Move { .. } => {}
 
                     ConfiguredAction::ChangeEquipment { .. } => {}
                     ConfiguredAction::SelectConsumableFromInventory { .. } => {}
@@ -960,8 +912,6 @@ impl ActivityPopup {
             choice_buttons.insert(btn.id, btn);
         }
 
-        self.movement_cost_slider = movement_cost_slider;
-
         self.base_lines = lines;
         self.choice_buttons = choice_buttons;
 
@@ -1027,97 +977,6 @@ pub enum ActivityPopupOutcome {
     ClickedProceed,
     ChangedAbilityEnhancements,
     ChangedAttackEnhancements,
-    ChangedMovementSprint(u32),
     ChangedReaction,
     ClickedInvalid,
-}
-
-struct MovementCostSlider {
-    max: u32,
-    max_allowed: u32,
-    selected_i: u32,
-    //is_sliding: bool,
-    cell_w: f32,
-    cell_h: f32,
-    has_changed: Cell<bool>,
-    font: Font,
-}
-
-impl MovementCostSlider {
-    fn new(max: u32, font: Font) -> Self {
-        Self {
-            max,
-            max_allowed: 0,
-            selected_i: 0,
-            //is_sliding: false,
-            cell_w: 30.0,
-            cell_h: 20.0,
-            has_changed: Cell::new(false),
-            font,
-        }
-    }
-
-    fn size(&self) -> (f32, f32) {
-        ((self.max + 1) as f32 * self.cell_w, self.cell_w)
-    }
-
-    fn set_max_allowed(&mut self, mut max_allowed: u32) {
-        max_allowed = max_allowed.min(self.max);
-        self.max_allowed = max_allowed;
-        self.selected_i = self.selected_i.min(max_allowed);
-    }
-
-    fn selected(&self) -> u32 {
-        self.selected_i
-    }
-
-    fn draw(&mut self, x: f32, y: f32) {
-        /*
-        let (w, h) = (self.cell_w, self.cell_h);
-
-        let pad = 2.0;
-        for i in 0..self.selected_i + 1 {
-            let x0 = x + w * i as f32;
-            let color = if i == 0 { DARKGRAY } else { ORANGE };
-            draw_rectangle(x0 + pad, y + pad, w - pad * 2.0, h - pad * 2.0, color);
-        }
-        for i in 0..self.max_allowed + 1 {
-            let x0 = x + w * i as f32;
-            draw_rectangle_lines2(x0, y, w, h, 1.0, LIGHTGRAY);
-        }
-        for i in self.max_allowed + 1..self.max + 1 {
-            let x0 = x + w * i as f32;
-            draw_rectangle_lines2(x0, y, w, h, 1.0, DARKGRAY);
-        }
-
-        let text = format!("{}", self.selected_i);
-        let font_size = 16;
-        let text_dim = measure_text(&text, Some(&self.font), font_size, 1.0);
-
-        draw_text_rounded(
-            &text,
-            x + w * self.selected_i as f32 + w / 2.0 - text_dim.width / 2.0,
-            y + w / 2.0,
-            TextParams {
-                font: Some(&self.font),
-                font_size,
-                color: WHITE,
-                ..Default::default()
-            },
-        );
-
-        let x0 = x + w * self.selected_i as f32;
-        let margin = 1.0;
-        draw_rectangle_lines2(
-            x0 - margin,
-            y - margin,
-            w + margin * 2.0,
-            h + margin * 2.0,
-            2.0,
-            YELLOW,
-        );
-
-        //draw_cross(x, y + h / 2.0 - w / 2.0, w, w, LIGHTGRAY, 2.0, 10.0);
-         */
-    }
 }
