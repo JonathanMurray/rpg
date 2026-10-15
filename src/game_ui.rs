@@ -3181,6 +3181,8 @@ impl ResourceBars {
             children,
             style: Style {
                 border_color: Some(DARKGRAY),
+                border_inner_rounding: Some(3.0),
+                border_outer_rounding: Some((BLACK, 2.0)),
                 padding: 5.0,
                 ..Default::default()
             },

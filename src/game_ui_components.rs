@@ -15,18 +15,10 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
-        Rectangle, Style, TextLine,
-    },
-    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
-    drawing::{draw_cross, draw_rounded_rectangle_lines},
-    game_ui::draw_rectangle_lines2,
-    sounds::{SoundId, SoundPlayer},
-    textures::{
-        draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
-        PORTRAIT_ENEMY_BG_TEXTURE,
-    },
-    util::oscillate,
+        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine, draw_text_rounded,
+    }, core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS}, drawing::{draw_cross, draw_rounded_rectangle_lines}, game_ui::draw_rectangle_lines2, sounds::{SoundId, SoundPlayer}, textures::{
+        PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE, PORTRAITS_TEXTURE, PortraitId, UI_RESOURCE_BAR_TEXTURE, draw_portrait, portrait_texture,
+    }, util::oscillate,
 };
 use crate::{
     tooltip::{draw_tooltip, Keyword, TooltipPositionPreference},
@@ -1293,28 +1285,6 @@ impl Drawable for ResourceBar {
                         }
                     }
 
-                    if i > 0 {
-                        let thick = if self.max < 8 { true } else { i % 5 == 0 };
-
-                        let show_line = self.max <= 17 || thick;
-
-                        if show_line {
-                            let (thickness, color, space) = if thick {
-                                (2.0, Color::new(0.0, 0.0, 0.0, 0.6), self.cell_size.1 * 0.14)
-                            } else {
-                                (1.0, Color::new(0.0, 0.0, 0.0, 0.4), self.cell_size.1 * 0.3)
-                            };
-
-                            draw_line(
-                                x0,
-                                y0 + space,
-                                x0,
-                                y0 + cell_size.1 - space,
-                                thickness,
-                                color,
-                            );
-                        }
-                    }
                     x0 += cell_size.0;
                 }
 
@@ -1364,11 +1334,16 @@ impl Drawable for ResourceBar {
             }
         };
 
-        draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, LIGHTGRAY);
+        //draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, LIGHTGRAY);
+
+        
+        let texture = UI_RESOURCE_BAR_TEXTURE.get().unwrap();
+        draw_texture(texture, rect.x - 3.0, rect.y, WHITE);
 
         if self.gain_animation.is_some() {
             draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
         }
+
 
         self.hovered.set(rect.contains(mouse_position().into()));
     }

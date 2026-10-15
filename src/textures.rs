@@ -1320,11 +1320,17 @@ async fn load_and_init_ui_textures() {
     let texture = load_and_init_texture("ui/ui_arrow.png").await;
     UI_ARROW_TEXTURE.get_or_init(|| texture);
 
+    let texture = load_and_init_texture("ui/resource_bar.png").await;
+    UI_RESOURCE_BAR_TEXTURE.get_or_init(|| texture);
+
     let texture = load_and_init_texture("portrait_bg.png").await;
     PORTRAIT_BG_TEXTURE.get_or_init(|| texture);
 
     let texture = load_and_init_texture("portrait_enemy_bg.png").await;
     PORTRAIT_ENEMY_BG_TEXTURE.get_or_init(|| texture);
+
+
+    
 }
 
 pub static UNCHECKED_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
@@ -1366,5 +1372,6 @@ pub static UI_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static UI_ARROW_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static PORTRAIT_ENEMY_BG_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static UI_RESOURCE_BAR_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static LIGHTNING_BOLT_FX: OnceLock<Texture2D> = OnceLock::new();
