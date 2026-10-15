@@ -177,18 +177,13 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
             .push(bonus_melee_evasion_str(weapon.bonus_melee_evasion));
     }
     if let Some(effect) = weapon.on_damage {
-        t.technical_description.push(format!("On damage: {effect}"));
-
-        match effect.apply_effect() {
-            ApplyEffect::Condition(apply_condition) => t.keywords.push(Keyword::Cond(
-                apply_condition.condition,
-                apply_condition.stacks,
-            )),
-            ApplyEffect::LoseCondition { condition } => {
-                t.keywords.push(Keyword::Cond(condition, None))
-            }
-            _ => {}
+        let mut line = "On damage: ".to_string();
+        match effect {
+            AttackHitEffect::ApplyTarget(..) => line.push_str("|<faded>(target)|"),
+            AttackHitEffect::ApplySelf(..) => line.push_str("|<faded>(self)|"),
         }
+        t.technical_description.push(line);
+        describe_apply_effect(effect.apply_effect(), &mut t);
     }
     if let Some(effect) = weapon.on_kill_apply_self {
         t.technical_description.push(format!("On kill: {effect}"));

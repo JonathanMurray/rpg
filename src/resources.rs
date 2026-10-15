@@ -47,6 +47,23 @@ impl GameResources {
         //let tiny_font = load_font("tiny5/Tiny5-SolidRegular.ttf").await;
 
         let terrain_atlas = load_and_init_texture("terrain_atlas.png").await;
+
+        // Change background tiles to "night time"
+        let night_time = false;
+        if night_time {
+            replace_color(&terrain_atlas, |[r, g, b, a]| {
+                if r > g && r > b {
+                    [r, g, b, a]
+                } else {
+                    [
+                        (r as f32 * 0.1) as u8,
+                        (g as f32 * 0.8) as u8,
+                        (b as f32 * 0.8) as u8,
+                        a,
+                    ]
+                }
+            });
+        }
         let effect_textures = load_all_effects().await;
 
         Self {
@@ -59,6 +76,14 @@ impl GameResources {
             effect_textures,
         }
     }
+}
+
+fn replace_color(texture: &Texture2D, f: impl Fn([u8; 4]) -> [u8; 4]) {
+    let mut img = texture.get_texture_data();
+    for pixel in img.get_image_data_mut() {
+        *pixel = f(*pixel);
+    }
+    texture.update(&img);
 }
 
 pub fn init_core_game(

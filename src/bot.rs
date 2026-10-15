@@ -228,6 +228,17 @@ impl EnemyTargetSelection {
     ) -> (Vec<&'a Rc<Character>>, CharacterId) {
         let bot = game.active_character();
 
+        // TODO:
+        // Balanced algorithm for picking a random (but reasonable) target:
+        // 1: collect vec![(distance_to, player_ch)]
+        // 2: rank them into buckets: [d=0, d<=4, d<=8, d<=12, d<=16, d <=20, d<=24, unreachable]
+        // 3: move current target between buckets depending on how many actions you've landed on it
+        //     0: -2,    1: 0,    2: +1,   3 turns: +2,   etc (but never move into "unreachable"-bucket from this)
+        // 4: for bucket[i] in buckets
+        //    if p(50%) and there is some non-empty bucket[>i], skip to i+1
+        //    else if bucket[i] is empty, continue to i+1
+        //    else: pick a random target from bucket[i]
+
         let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
 
         if let Some(target_id) = self.current_target.get() {
@@ -259,10 +270,18 @@ impl EnemyTargetSelection {
 
         let mut target_id = self.current_target.get().unwrap();
 
+        {
+            let current_target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
+            let path = find_path(game, bot, current_target, action_range);
+            println!("Current target path:");
+            if let Some(path) = path {
+                dbg!(path.nodes.len(), path.total_distance);
+            }
+        }
+
         let chance_switch_target = self.chance_of_switching_target.get();
-        dbg!(chance_switch_target);
         let should_switch_target = random_range(0.0..1.0) < chance_switch_target;
-        dbg!(should_switch_target);
+        dbg!(chance_switch_target, should_switch_target);
         if should_switch_target {
             self.chance_of_switching_target.set(0.0);
         } else if self.chance_of_switching_target.get() == 0.0 {
@@ -279,8 +298,10 @@ impl EnemyTargetSelection {
             if let Some(new_target) = player_chars.iter().find(|ch| ch.id() != target_id) {
                 println!("switching to new target?: {}", new_target.id());
 
-                if find_path(game, bot, new_target, action_range).is_some() {
+                let path = find_path(game, bot, new_target, action_range);
+                if let Some(path) = path {
                     println!("Yes, there's a path to it ");
+                    dbg!(path.nodes.len(), path.total_distance);
                     self.current_target.set(Some(new_target.id()));
                     target_id = new_target.id();
                 }
@@ -288,6 +309,8 @@ impl EnemyTargetSelection {
         } else {
             println!("bot sticks with current target: {:?}", self.current_target);
         }
+
+        println!("-----------------------------------------");
 
         //target_id = 2; // TODO
 

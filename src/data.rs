@@ -435,6 +435,23 @@ pub const BAD_WAR_HAMMER: Weapon = Weapon {
     weight: 5,
 };
 
+pub const WAR_AXE: Weapon = Weapon {
+    name: "War axe",
+    range: WeaponRange::Melee,
+    action_point_cost: 3,
+    damage: 7,
+    grip: WeaponGrip::TwoHanded,
+    attack_attribute: AttackAttribute::Strength,
+    attack_enhancement: None,
+    on_attacked_reaction: None,
+    bonus_melee_evasion: 3,
+    on_damage: None,
+    on_kill_apply_self: None,
+    sprite: Some(SpriteId::Waraxe),
+    icon: EquipmentIconId::Waraxe,
+    weight: 5,
+};
+
 pub const WAR_HAMMER: Weapon = Weapon {
     name: "War hammer",
     range: WeaponRange::Melee,
@@ -815,7 +832,7 @@ const fn grenade_ability(id: AbilityId, name: &'static str, target: AbilityTarge
     Ability {
         id,
         name,
-        speech: "Take this!",
+        speech: "Hey, catch!",
         description: "",
         icon: IconId::Undefined,
         action_point_cost: 2,
@@ -981,7 +998,7 @@ pub const SMALL_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 0,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(BLOCK_3),
+    on_attacked_reaction: Some(BLOCK),
     weight: 2,
 };
 
@@ -1003,7 +1020,7 @@ pub const MEDIUM_SHIELD: Shield = Shield {
     evasion: 3,
     armor: 1,
     on_hit_reaction: None,
-    on_attacked_reaction: Some(BLOCK_3),
+    on_attacked_reaction: Some(BLOCK),
     weight: 3,
 };
 
@@ -1127,18 +1144,18 @@ pub const PARRY_2: OnAttackedReaction = OnAttackedReaction {
     target: OnAttackedReactionTarget::OnlySelf,
 };
 
-pub const BLOCK_3: OnAttackedReaction = OnAttackedReaction {
+pub const BLOCK: OnAttackedReaction = OnAttackedReaction {
     id: OnAttackedReactionId::Block,
     name: "Block",
     granted_from: None,
-    description: "Protect yourself or adjacent ally, preventing |<value>3| attack damage |<faded>(once per round)|",
+    description: "Protect yourself or adjacent ally, preventing |<value>2| attack damage |<faded>(once per round)|",
     icon: IconId::Block,
     action_point_cost: 0,
     stamina_cost: 1,
     effect: OnAttackedReactionEffect {
         bonus_evasion: 0,
         bonus_armor: 0,
-        damage_prevention: 3,
+        damage_prevention: 2,
         thorns: 0,
     },
     required_attack_type: None,
@@ -2772,7 +2789,7 @@ const fn potion_ability(
     Ability {
         id,
         name,
-        speech: "",
+        speech: "Ahh...",
         description: "",
         icon: IconId::Undefined,
         action_point_cost: 1,

@@ -34,6 +34,7 @@ pub enum SpriteId {
     Ogre,
     Magi,
     Warhammer,
+    Waraxe,
     Staff,
     Bow,
     Sword,
@@ -73,6 +74,7 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Ogre, "ogre.png"),
         (SpriteId::Magi, "magi.png"),
         (SpriteId::Warhammer, "warhammer.png"),
+        (SpriteId::Waraxe, "waraxe.png"),
         (SpriteId::Staff, "staff.png"),
         (SpriteId::Bow, "bow.png"),
         (SpriteId::Sword, "sword.png"),
@@ -332,6 +334,7 @@ pub enum EquipmentIconId {
     HungeringBlade,
     SmallShield,
     SpikeShield,
+    Waraxe,
     MediumShield,
     LeatherArmor,
     ChainMail,
@@ -531,6 +534,10 @@ pub enum TerrainId {
     Floor4,
     Floor5,
     Floor6,
+    Floor7,
+    Floor8,
+    Floor9,
+    Dirt,
     SpikesSingleCell,
     FireSurfaceSingleCell,
 
@@ -701,6 +708,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::Floor4 => (12, 1),
         TerrainId::Floor5 => (12, 2),
         TerrainId::Floor6 => (13, 2),
+        TerrainId::Floor7 => (12, 3),
+        TerrainId::Floor8 => (13, 3),
+        TerrainId::Floor9 => (14, 3),
+        TerrainId::Dirt => (11, 4),
         TerrainId::NewWater(orientation, type_) => {
             is_poison = type_ == LiquidType::Poison;
             match orientation {
@@ -1042,6 +1053,7 @@ pub fn draw_eq_icon(icon: EquipmentIconId, x: f32, y: f32, dest_size: Option<(f3
         EquipmentIconId::HungeringBlade => (6, 0),
         EquipmentIconId::SmallShield => (4, 1),
         EquipmentIconId::SpikeShield => (6, 1),
+        EquipmentIconId::Waraxe => (7, 1),
         EquipmentIconId::MediumShield => (0, 2),
         EquipmentIconId::LeatherArmor => (2, 2),
         EquipmentIconId::ChainMail => (1, 2),

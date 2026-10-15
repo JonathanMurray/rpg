@@ -21,7 +21,7 @@ use crate::{
         KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE, LUNGE_ATTACK,
         MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER,
         SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
-        WAR_HAMMER,
+        WAR_AXE, WAR_HAMMER,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -261,6 +261,7 @@ pub enum WeaponId {
     BadRapier,
     EnslavedRapier,
     BadBow,
+    WarAxe,
 }
 
 #[derive(Serialize, Deserialize, Debug, Copy, Clone)]
@@ -276,6 +277,7 @@ fn create_weapon(id: WeaponId) -> Weapon {
         WeaponId::BadRapier => BAD_RAPIER,
         WeaponId::EnslavedRapier => ENSLAVED_RAPIER,
         WeaponId::BadBow => BAD_BOW,
+        WeaponId::WarAxe => WAR_AXE,
     }
 }
 
@@ -622,7 +624,7 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 3, 5),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, WAR_HAMMER);
+    bob.set_weapon(HandType::MainHand, WAR_AXE);
     //bob.set_shield(SPIKE_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);

@@ -563,10 +563,14 @@ impl Sidebar {
             TerrainId::Floor4,
             TerrainId::Floor5,
             TerrainId::Floor6,
+            TerrainId::Floor7,
+            TerrainId::Floor8,
+            TerrainId::Floor9,
             TerrainId::Grass,
             TerrainId::Grass2,
             TerrainId::Grass3,
             TerrainId::Grass4,
+            TerrainId::Dirt,
         ];
 
         let mut background_actions: Vec<EditorAction> = backgrounds
