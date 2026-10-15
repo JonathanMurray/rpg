@@ -55,10 +55,7 @@ pub struct Sprite {
 }
 
 pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
-    let sprites = load_sprites(vec![
-        (SpriteId::PinkMan, "character.png"),
-        (SpriteId::AlsoWeirdOrangeMan, "character2.png"),
-        (SpriteId::WeirdOrangeMan, "character3.png"),
+    let paths = vec![
         (SpriteId::Alice, "alice.png"),
         (SpriteId::Bob, "bob.png"),
         (SpriteId::Clara, "clara.png"),
@@ -85,8 +82,13 @@ pub async fn load_all_sprites() -> HashMap<SpriteId, Sprite> {
         (SpriteId::Shield, "shield.png"),
         (SpriteId::SpikeShield, "spiked_shield.png"),
         (SpriteId::CharacterShadow, "character_shadow.png"),
-    ])
-    .await;
+    ];
+
+    let paths: Vec<(SpriteId, String)> = paths
+        .iter()
+        .map(|p| (p.0, format!("sprites/{}", p.1)))
+        .collect();
+    let sprites = load_sprites(paths).await;
 
     sprites
         .into_iter()
@@ -909,10 +911,10 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
     (rotation, src_rect)
 }
 
-async fn load_sprites(paths: Vec<(SpriteId, &str)>) -> HashMap<SpriteId, Texture2D> {
+async fn load_sprites(paths: Vec<(SpriteId, impl AsRef<str>)>) -> HashMap<SpriteId, Texture2D> {
     let mut textures: HashMap<SpriteId, Texture2D> = Default::default();
     for (id, path) in paths {
-        textures.insert(id, load_and_init_texture(path).await);
+        textures.insert(id, load_and_init_texture(path.as_ref()).await);
     }
     textures
 }
@@ -1312,10 +1314,10 @@ async fn load_and_init_font_symbols() {
 }
 
 async fn load_and_init_ui_textures() {
-    let texture = load_and_init_texture("user_interface.png").await;
+    let texture = load_and_init_texture("ui/user_interface.png").await;
     UI_BG_TEXTURE.get_or_init(|| texture);
 
-    let texture = load_and_init_texture("ui_arrow.png").await;
+    let texture = load_and_init_texture("ui/ui_arrow.png").await;
     UI_ARROW_TEXTURE.get_or_init(|| texture);
 
     let texture = load_and_init_texture("portrait_bg.png").await;
