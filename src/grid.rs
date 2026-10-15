@@ -68,8 +68,8 @@ use crate::{
     },
     util::{
         are_entities_within_melee, line_visitor, modify_line_len, oscillate, oscillate_loop,
-        oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_GREEN_0, COL_GREEN_1,
-        COL_GREEN_2, COL_GREEN_3, COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
+        oscillate_square, plus_minus, rgb, COL_BLUE, COL_BRIGHT, COL_GOLD, COL_GREEN_0,
+        COL_GREEN_1, COL_GREEN_2, COL_GREEN_3, COL_LIGHT_BLUE, COL_RED, COL_RED_BRIGHT,
     },
 };
 use crate::{
@@ -1735,7 +1735,7 @@ impl GameGrid {
             let remaining = animation.remaining_duration;
             let remaining_ratio = animation.remaining_duration_ratio();
             match &animation.kind {
-                AnimationDetails::Text(text_graphics) => {}
+                AnimationDetails::Text(_text_graphics) => {}
                 AnimationDetails::MotionPreview { positions } => {
                     let dst = positions.last().unwrap();
                     let color = Color::new(1.0, 1.0, 1.0, 0.5);
@@ -1752,6 +1752,7 @@ impl GameGrid {
                             pos: *pos,
                             difficult_terrain: false,
                             dangerous: false,
+                            ap_cost_breakpoint: false,
                         })
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
@@ -2688,11 +2689,13 @@ impl GameGrid {
                             pos: movement.0,
                             difficult_terrain: false,
                             dangerous: false,
+                            ap_cost_breakpoint: false,
                         },
                         MovementPathNode {
                             pos: movement.1,
                             difficult_terrain: false,
                             dangerous: false,
+                            ap_cost_breakpoint: false,
                         },
                     ]
                     .into_iter(),
@@ -3908,6 +3911,7 @@ impl GameGrid {
                     pos,
                     difficult_terrain: false,
                     dangerous: false,
+                    ap_cost_breakpoint: false,
                 }),
                 RED,
             );
@@ -3934,6 +3938,7 @@ impl GameGrid {
                     pos,
                     difficult_terrain: false,
                     dangerous: false,
+                    ap_cost_breakpoint: false,
                 }),
                 MOVEMENT_ARROW_COLOR,
             );
@@ -4927,10 +4932,14 @@ impl GameGrid {
     }
 
     fn draw_player_movement_path(&self, path: &[PathNode]) {
-        let mut movement_path = vec![(&path[0], false)];
+        let mover = self.characters.get(&self.active_character_id).unwrap();
+        let mut ap_cost = 0;
+        if mover.remaining_movement.get() < path[0].distance_from_start {
+            ap_cost += 1;
+        }
+        let mut movement_path = vec![(&path[0], false, ap_cost > 0)];
         let mut opportunity_attackers = vec![];
         for w in path.windows(2) {
-            let mover = self.characters.get(&self.active_character_id).unwrap();
             let mut threatened_cell = false;
             for other_char in self.characters.values() {
                 if can_opportunity_attack_mover(mover, w[0].position, w[1].position, other_char) {
@@ -4938,17 +4947,27 @@ impl GameGrid {
                     threatened_cell = true;
                 }
             }
-            movement_path.push((&w[1], threatened_cell));
+
+            let mut ap_breakpoint = false;
+            if mover.cost_to_move(w[1].distance_from_start) > ap_cost {
+                ap_cost += 1;
+                ap_breakpoint = true;
+            }
+
+            movement_path.push((&w[1], threatened_cell, ap_breakpoint));
         }
 
         self.draw_movement_path_with_arrow(
             movement_path
                 .iter()
-                .map(|(node, threatened_cell)| MovementPathNode {
-                    pos: node.position,
-                    difficult_terrain: node.surface.is_some(),
-                    dangerous: *threatened_cell || node.surface == Some(Surface::Spikes),
-                }),
+                .map(
+                    |(node, threatened_cell, ap_cost_breakpoint)| MovementPathNode {
+                        pos: node.position,
+                        difficult_terrain: node.surface.is_some(),
+                        dangerous: *threatened_cell || node.surface == Some(Surface::Spikes),
+                        ap_cost_breakpoint: *ap_cost_breakpoint,
+                    },
+                ),
             HOVER_MOVEMENT_ARROW_COLOR,
         );
 
@@ -4993,6 +5012,12 @@ impl GameGrid {
             }
             if a.difficult_terrain {
                 circle_color = Color::new(1.0, 0.4, 0.4, 0.8);
+            }
+            if a.ap_cost_breakpoint {
+                if !a.dangerous {
+                    r = 5.0;
+                }
+                circle_color = COL_GOLD;
             }
 
             let x = self.grid_x_to_screen(a.pos.0) + self.cell_w() / 2.0;
@@ -5205,6 +5230,7 @@ struct MovementPathNode {
     pos: Position,
     difficult_terrain: bool,
     dangerous: bool,
+    ap_cost_breakpoint: bool,
 }
 
 enum OccupationFilter {
