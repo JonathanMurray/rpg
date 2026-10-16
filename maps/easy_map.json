@@ -120,12 +120,12 @@
     "(46, 13)": "StoneWallConvexNorthEast",
     "(43, 13)": "StoneWallConvexNorthEast",
     "(43, 16)": "StoneWallConvexNorthEast",
-    "(46, 16)": "StoneWallConvexNorthEast",
-    "(49, 16)": "StoneWallConvexNorthEast",
+    "(55, 1)": "StoneWallConvexNorthEast",
+    "(52, 1)": "StoneWallConvexNorthEast",
     "(43, 37)": "StoneWallConvexNorthEast",
     "(46, 37)": "StoneWallConvexNorthEast",
     "(49, 37)": "StoneWallConvexNorthEast",
-    "(19, 7)": "Chest",
+    "(58, 1)": "StoneWallConvexNorthEast",
     "(1, 7)": "StoneWallConvexNorthEast",
     "(4, 7)": "StoneWallConvexNorthEast",
     "(7, 7)": "StoneWallConvexNorthEast",
@@ -177,9 +177,7 @@
     "(43, 1)": "StoneWallConvexNorthEast",
     "(46, 1)": "StoneWallConvexNorthEast",
     "(49, 1)": "StoneWallConvexNorthEast",
-    "(52, 1)": "StoneWallConvexNorthEast",
-    "(55, 1)": "StoneWallConvexNorthEast",
-    "(58, 1)": "StoneWallConvexNorthEast"
+    "(46, 16)": "Chest"
   },
   "background": {
     "(-4, 12)": "Floor",
@@ -401,13 +399,13 @@
     "(31, 16)": "SuitOfArmor",
     "(37, 16)": "SuitOfArmor",
     "(43, 16)": "SuitOfArmor",
-    "(48, 16)": "HangingWeapons2",
+    "(28, 9)": "WallOpeningEast",
     "(34, 16)": "WallWindow",
-    "(46, 16)": "WallWindow",
+    "(14, 19)": "WallPlant",
     "(26, 4)": "Barrel",
     "(24, 4)": "Barrel",
-    "(50, 16)": "Barrel",
-    "(14, 19)": "WallPlant"
+    "(49, 13)": "HangingWeapons2",
+    "(46, 13)": "WallWindow"
   },
   "surfaces": {
     "(13, 22)": {
@@ -436,7 +434,7 @@
     }
   },
   "control_points": {
-    "(49, 22)": "Exit"
+    "(25, 9)": "Exit"
   },
   "characters": [
     {
@@ -497,8 +495,8 @@
     {
       "type_": "Lootgoblin",
       "pos": [
-        22,
-        7
+        49,
+        16
       ],
       "health": null,
       "main_hand": null,

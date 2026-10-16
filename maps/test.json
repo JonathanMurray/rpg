@@ -66,7 +66,13 @@
     "(7, 13)": "StoneWallConvexNorthEast",
     "(16, 16)": "StoneWallConvexNorthEast",
     "(19, 16)": "StoneWallConvexNorthEast",
-    "(16, 13)": "StoneWallConvexNorthEast"
+    "(16, 13)": "StoneWallConvexNorthEast",
+    "(16, 19)": "StoneWallConvexNorthEast",
+    "(19, 19)": "StoneWallConvexNorthEast",
+    "(16, 22)": "StoneWallConvexNorthEast",
+    "(19, 22)": "StoneWallConvexNorthEast",
+    "(10, 22)": "StoneWallConvexNorthEast",
+    "(13, 22)": "StoneWallConvexNorthEast"
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -258,8 +264,7 @@
     "(10, 16)": "WallWindow2",
     "(8, 8)": "SmallStone",
     "(13, 1)": "WallWindow",
-    "(7, 16)": "WallOpeningNorth",
-    "(16, 16)": "Torch"
+    "(7, 16)": "WallOpeningNorth"
   },
   "surfaces": {
     "(11, 7)": "SpikesSingleCell",
@@ -320,35 +325,35 @@
   },
   "characters": [
     {
-      "type_": "Alice",
-      "pos": [
-        13,
-        13
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Bob",
       "pos": [
-        11,
-        26
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul2",
-      "pos": [
-        8,
+        10,
         19
       ],
       "health": null,
-      "main_hand": "WarAxe",
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        10,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
+      "pos": [
+        25,
+        25
+      ],
+      "health": null,
+      "main_hand": null,
       "shield": null,
       "name": null
     }

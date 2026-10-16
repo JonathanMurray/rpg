@@ -114,6 +114,8 @@ pub struct Path {
     pub total_distance: f32,
 
     pub nodes: Vec<PathNode>,
+
+    pub is_fallback: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -350,11 +352,13 @@ impl PathfindGrid {
                 }
             } else if let Some((closest_sq_dist, _)) = closest_fallback_path {
                 if sq_distance < closest_sq_dist {
-                    let path = self.build_path_from_chart(&chart, start, *pos);
+                    let mut path = self.build_path_from_chart(&chart, start, *pos);
+                    path.is_fallback = true;
                     closest_fallback_path = Some((sq_distance, path));
                 }
             } else {
-                let path = self.build_path_from_chart(&chart, start, *pos);
+                let mut path = self.build_path_from_chart(&chart, start, *pos);
+                path.is_fallback = true;
                 closest_fallback_path = Some((sq_distance, path));
             }
         }
@@ -383,7 +387,7 @@ impl PathfindGrid {
         range: f32,
         target: Option<Target>,
         traversal_type: TraversalType,
-    ) -> Ref<IndexMap<Position, ChartNode>> {
+    ) -> Ref<'_, IndexMap<Position, ChartNode>> {
         /*
         println!(
             "explore_outward(char={}, start={:?}, range={}, target={:?} ...",
@@ -754,6 +758,7 @@ impl PathfindGrid {
         Path {
             total_distance,
             nodes: positions,
+            is_fallback: false,
         }
     }
 }

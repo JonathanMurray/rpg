@@ -1,5 +1,10 @@
 use core::f32;
-use std::{cell::Cell, fmt::Write, iter, rc::Rc};
+use std::{
+    cell::{Cell, RefCell},
+    fmt::Write,
+    iter,
+    rc::Rc,
+};
 
 use macroquad::rand::ChooseRandom;
 use rand::{random_bool, random_range, Rng};
@@ -56,9 +61,7 @@ impl DraugBehaviour {
 
         let range = DRAUG_CLAW.target.range(&[]).unwrap();
 
-        let (player_chars, target_id) = self.target_selection.run(game, range);
-        let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
-        let target = Rc::clone(target);
+        let target = self.target_selection.run(game, range);
 
         let candidates = candidate_ability_actions(bot);
 
@@ -185,9 +188,7 @@ impl FighterBehaviour {
         let attack = bot.attack_action().unwrap();
         let weapon_range = bot.weapon(attack.hand).unwrap().range.into_range();
 
-        let (player_chars, target_id) = self.target_selection.run(game, weapon_range);
-        let target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
-        let target = Rc::clone(target);
+        let target = self.target_selection.run(game, weapon_range);
 
         let mut candidates = candidate_ability_actions(bot);
 
@@ -215,17 +216,26 @@ impl FighterBehaviour {
 }
 
 #[derive(Debug, Clone, PartialEq, Default)]
-pub struct EnemyTargetSelection {
-    current_target: Cell<Option<CharacterId>>,
-    chance_of_switching_target: Cell<f32>,
+struct EnemyTargetSelection {
+    current_target: RefCell<Option<CurrentTarget>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Default)]
+struct CurrentTarget {
+    character_id: CharacterId,
+    num_actions_landed: u32,
 }
 
 impl EnemyTargetSelection {
-    fn run<'a>(
-        &self,
-        game: &'a CoreGame,
-        action_range: Range,
-    ) -> (Vec<&'a Rc<Character>>, CharacterId) {
+    fn increment_actions_landed(&self) {
+        self.current_target
+            .borrow_mut()
+            .as_mut()
+            .unwrap()
+            .num_actions_landed += 1;
+    }
+
+    fn run<'a>(&self, game: &'a CoreGame, action_range: Range) -> Rc<Character> {
         let bot = game.active_character();
 
         // TODO:
@@ -239,82 +249,83 @@ impl EnemyTargetSelection {
         //    else if bucket[i] is empty, continue to i+1
         //    else: pick a random target from bucket[i]
 
-        let mut player_chars: Vec<&Rc<Character>> = game.player_characters().collect();
+        let mut player_buckets: [Vec<&Rc<Character>>; 8] = Default::default();
 
-        if let Some(target_id) = self.current_target.get() {
-            if !player_chars.iter().any(|ch| ch.id() == target_id) {
-                // Player char must have died. Force a target switch.
-                self.current_target.set(None);
-            }
-        }
-
-        if random_bool(0.5) {
-            println!("Sort player chars by proximity");
-            player_chars.sort_by_key(|ch| {
-                let distance_to = find_path(game, bot, ch, action_range)
-                    .map(|p| p.total_distance)
-                    .unwrap_or(f32::MAX);
-
-                // convert from f32 to make it sortable
-                (distance_to * 10.0) as u32
-            });
-        } else {
-            println!("Shuffle player chars");
-            CustomShuffle::shuffle(&mut player_chars);
-        }
-
-        if self.current_target.get().is_none() {
-            // TODO: this panics if all player chars have died
-            self.current_target.set(Some(player_chars[0].id()));
-        }
-
-        let mut target_id = self.current_target.get().unwrap();
-
-        {
-            let current_target = player_chars.iter().find(|ch| ch.id() == target_id).unwrap();
-            let path = find_path(game, bot, current_target, action_range);
-            println!("Current target path:");
-            if let Some(path) = path {
-                dbg!(path.nodes.len(), path.total_distance);
-            }
-        }
-
-        let chance_switch_target = self.chance_of_switching_target.get();
-        let should_switch_target = random_range(0.0..1.0) < chance_switch_target;
-        dbg!(chance_switch_target, should_switch_target);
-        if should_switch_target {
-            self.chance_of_switching_target.set(0.0);
-        } else if self.chance_of_switching_target.get() == 0.0 {
-            // Make it very rare to switch target immediately after acquiring it
-            self.chance_of_switching_target.set(0.01);
-        } else {
-            // After that, the chance increases steadily
-            self.chance_of_switching_target
-                .set(chance_switch_target + 0.1);
-        }
-
-        if should_switch_target {
-            println!("bot should try switching target");
-            if let Some(new_target) = player_chars.iter().find(|ch| ch.id() != target_id) {
-                println!("switching to new target?: {}", new_target.id());
-
-                let path = find_path(game, bot, new_target, action_range);
-                if let Some(path) = path {
-                    println!("Yes, there's a path to it ");
-                    dbg!(path.nodes.len(), path.total_distance);
-                    self.current_target.set(Some(new_target.id()));
-                    target_id = new_target.id();
+        for ch in game.player_characters() {
+            let mut idx = player_buckets.len() - 1;
+            if let Some(path) = find_path(game, bot, ch, action_range) {
+                idx = (path.total_distance / 4.0).ceil() as usize;
+                if path.is_fallback {
+                    idx = player_buckets.len() - 1;
                 }
             }
-        } else {
-            println!("bot sticks with current target: {:?}", self.current_target);
+
+            if let Some(target) = self.current_target.borrow().as_ref() {
+                if target.character_id == ch.id() {
+                    let idx_change = if target.num_actions_landed == 0 {
+                        -2
+                    } else {
+                        target.num_actions_landed as i32 - 1
+                    };
+                    println!(
+                        "current target ({}), actions landed: {}, idx change: {}",
+                        ch.name, target.num_actions_landed, idx_change
+                    );
+                    idx = ((idx as i32) + idx_change).max(0) as usize;
+                }
+            }
+
+            idx = idx.min(player_buckets.len() - 1);
+
+            player_buckets[idx].push(ch);
         }
 
-        println!("-----------------------------------------");
+        println!("Player buckets:");
+        for (i, bkt) in player_buckets.iter().enumerate() {
+            println!("{}: ", i);
+            for ch in bkt {
+                println!("  {}", ch.name);
+            }
+        }
 
-        //target_id = 2; // TODO
+        println!("Looking for target in buckets...");
+        let mut target = None;
+        for bucket in player_buckets {
+            println!("bucket len: {}", bucket.len());
+            // Random chance to keep iterating and potentially find a (worse) target in a later bucket
+            if target.is_some() && random_bool(0.5) {
+                break;
+            }
+            if bucket.is_empty() {
+                continue;
+            }
+            target = Some(bucket[random_range(0..bucket.len())]);
+            println!("preliminary target: {}", target.unwrap().name);
+        }
+        let target = target.unwrap();
 
-        (player_chars, target_id)
+        println!("Target: {}", target.name);
+
+        let sticking_to_current_target = self
+            .current_target
+            .borrow()
+            .as_ref()
+            .map(|current| current.character_id == target.id())
+            .unwrap_or(false);
+
+        if !sticking_to_current_target {
+            println!(
+                "Changed target(from {:?} to {})",
+                self.current_target.borrow(),
+                target.id()
+            );
+            *self.current_target.borrow_mut() = Some(CurrentTarget {
+                character_id: target.id(),
+                num_actions_landed: 0,
+            });
+        }
+
+        Rc::clone(target)
     }
 }
 
@@ -333,6 +344,23 @@ pub fn bot_choose_action(game: &CoreGame) -> Option<Action> {
         BotBehaviour::LootGoblin(goblin) => pursue_goal(game, goblin.get_goal(game)),
     };
     println!("Bot chose: {:?}", result);
+
+    if result
+        .as_ref()
+        .map(|a| a.character_target())
+        .unwrap_or_default()
+        .is_some()
+    {
+        match character.kind.unwrap_bot_behaviour() {
+            BotBehaviour::Draug(behaviour) => {
+                behaviour.target_selection.increment_actions_landed();
+            }
+            BotBehaviour::Fighter(behaviour) => {
+                behaviour.target_selection.increment_actions_landed();
+            }
+            _ => {}
+        }
+    }
 
     result
 }
@@ -537,7 +565,7 @@ fn candidate_ability_actions(bot: &Character) -> Vec<BotAction> {
 fn find_path(
     game: &CoreGame,
     bot: &Character,
-    target: &&Rc<Character>,
+    target: &Character,
     action_range: Range,
 ) -> Option<Path> {
     let proximity_squared = match action_range {

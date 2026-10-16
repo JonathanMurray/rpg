@@ -4988,6 +4988,17 @@ impl Action {
             Action::ChangeEquipment { .. } => BaseAction::ChangeEquipment,
         }
     }
+
+    pub fn character_target(&self) -> Option<CharacterId> {
+        match self {
+            Action::Attack { target, .. } => Some(*target),
+            Action::UseAbility {
+                target: ActionTarget::Character(ch_id, _pos),
+                ..
+            } => Some(*ch_id),
+            _ => None,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Hash)]

@@ -1949,7 +1949,7 @@ pub const HEAL: Ability = Ability {
         "Heal ally for |<value>5| |<heart>|, and remove |<keyword>Bleeding|, |<keyword>Poisoned|.",
     icon: IconId::Heal,
     action_point_cost: 2,
-    mana_cost: 1,
+    mana_cost: 2,
     stamina_cost: 0,
     requirement: None,
 
