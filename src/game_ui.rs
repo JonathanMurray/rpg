@@ -2699,6 +2699,35 @@ impl UserInterface {
             .get_mut(&self.player_portraits.selected_id())
             .unwrap();
 
+        character_ui
+            .mana_bar
+            .borrow_mut()
+            .reset_hovered_and_reserved_amounts();
+        character_ui
+            .stamina_bar
+            .borrow_mut()
+            .reset_hovered_and_reserved_amounts();
+
+        let (reserved_sta, hovered_sta) = self.activity_popup.reserved_and_hovered_stamina();
+        let (reserved_mana, hovered_mana) = self.activity_popup.reserved_and_hovered_mana();
+
+        character_ui
+            .mana_bar
+            .borrow_mut()
+            .set_reserved_amount(reserved_mana);
+        character_ui
+            .mana_bar
+            .borrow_mut()
+            .set_hovered_amount(hovered_mana);
+        character_ui
+            .stamina_bar
+            .borrow_mut()
+            .set_reserved_amount(reserved_sta);
+        character_ui
+            .stamina_bar
+            .borrow_mut()
+            .set_hovered_amount(hovered_sta);
+
         // HOVERING END OF TURN
         if self.player_portraits.is_hovering_end_turn.get() {
             let ap_gain = self
@@ -2721,7 +2750,7 @@ impl UserInterface {
                 character_ui
                     .mana_bar
                     .borrow_mut()
-                    .set_reserved(hovered_btn.action.mana_cost());
+                    .set_hovered_amount(hovered_btn.action.mana_cost());
 
                 let mut hovered_sta = hovered_btn.action.stamina_cost();
                 if enabled_quick_actions {
@@ -2730,21 +2759,13 @@ impl UserInterface {
                 character_ui
                     .stamina_bar
                     .borrow_mut()
-                    .set_reserved(hovered_sta);
+                    .set_hovered_amount(hovered_sta);
             }
         }
         // CONFIGURING ACTION ETC
         else {
             character_ui.action_points_row.reserved_and_hovered_ap =
                 self.activity_popup.reserved_and_hovered_action_points();
-            character_ui
-                .mana_bar
-                .borrow_mut()
-                .set_reserved(self.activity_popup.mana_points());
-            character_ui
-                .stamina_bar
-                .borrow_mut()
-                .set_reserved(self.activity_popup.stamina_points());
         };
 
         self.animation_stopwatch.update(elapsed);

@@ -1148,17 +1148,17 @@ impl Drawable for ActionPointsRow {
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    Color::new(1.0, 1.0, 1.0, 0.5),
+                    Color::new(1.0, 1.0, 1.0, 0.7),
                 );
 
                 // Pulsating glowing border
-                let alpha = oscillate(0.9, 0.5, 0.7);
+                let alpha = oscillate(0.9, 0.4, 0.8);
 
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    2.0,
+                    3.0,
                     Color::new(1.0, 1.0, 1.0, alpha),
                 );
             } else if missing {
@@ -1236,7 +1236,8 @@ impl Drawable for ActionPointsRow {
 
 pub struct ResourceBar {
     pub current: u32,
-    pub reserved: u32,
+    pub reserved_amount: u32,
+    pub hovered_amount: u32,
     pub max: u32,
     pub color: Color,
     pub cell_size: (f32, f32),
@@ -1249,7 +1250,8 @@ impl ResourceBar {
     pub fn horizontal(max: u32, color: Color, size: (f32, f32)) -> Self {
         Self {
             current: max,
-            reserved: 0,
+            reserved_amount: 0,
+            hovered_amount: 0,
             max,
             color,
             cell_size: (size.0 / max as f32, size.1),
@@ -1282,14 +1284,16 @@ impl Drawable for ResourceBar {
                 for i in 0..self.max {
                     if i < self.current {
                         draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
-                        if i >= self.current.saturating_sub(self.reserved) {
+                        if i >= self.current.saturating_sub(self.reserved_amount) {
                             draw_rectangle(
                                 x0,
                                 y0,
                                 cell_size.0,
                                 cell_size.1,
-                                Color::new(1.0, 1.0, 1.0, 0.5),
+                                Color::new(1.0, 1.0, 1.0, 0.7),
                             );
+                        } else if i >= self.current.saturating_sub(self.hovered_amount) {
+                            draw_rectangle(x0, y0, cell_size.0, cell_size.1, SKYBLUE);
                         }
                     }
 
@@ -1302,7 +1306,7 @@ impl Drawable for ResourceBar {
                 for i in 0..self.max {
                     if i >= self.max - self.current {
                         draw_rectangle(x0, y0, cell_size.0, cell_size.1, self.color);
-                        if i < self.max - self.current + self.reserved {
+                        if i < self.max - self.current + self.reserved_amount {
                             draw_rectangle(
                                 x0,
                                 y0,
@@ -1440,8 +1444,18 @@ impl LabelledResourceBar {
             .set_string(format!("{}/{}", value, self.max_value,));
     }
 
-    pub fn set_reserved(&mut self, value: u32) {
-        self.bar.borrow_mut().reserved = value;
+    pub fn reset_hovered_and_reserved_amounts(&mut self) {
+        let mut bar = self.bar.borrow_mut();
+        bar.hovered_amount = 0;
+        bar.reserved_amount = 0;
+    }
+
+    pub fn set_hovered_amount(&mut self, value: u32) {
+        self.bar.borrow_mut().hovered_amount = value;
+    }
+
+    pub fn set_reserved_amount(&mut self, value: u32) {
+        self.bar.borrow_mut().reserved_amount = value;
     }
 }
 

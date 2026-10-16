@@ -647,29 +647,30 @@ impl ActivityPopup {
         (reserved_ap, hovered_ap)
     }
 
-    pub fn mana_points(&self) -> u32 {
+    pub fn reserved_and_hovered_mana(&self) -> (u32, u32) {
         let borrowed_state = self.ui_state.borrow();
         let base_action = match &*borrowed_state {
             UiState::ConfiguringAction(configured_action) => Some(configured_action),
             _ => None,
         };
 
-        let mut mana = base_action
+        let mut reserved_mana = base_action
             .as_ref()
             .map(|action| action.mana_cost())
             .unwrap_or(0);
         for action in self.selected_choices() {
-            mana += action.mana_cost();
+            reserved_mana += action.mana_cost();
         }
+        let mut hovered_mana = 0;
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                mana += self.choice_buttons[&id].action_tooltip.action.mana_cost()
+                hovered_mana += self.choice_buttons[&id].action_tooltip.action.mana_cost()
             }
         }
-        mana
+        (reserved_mana, reserved_mana + hovered_mana)
     }
 
-    pub fn stamina_points(&self) -> u32 {
+    pub fn reserved_and_hovered_stamina(&self) -> (u32, u32) {
         let enabled_quick_actions = self
             .characters
             .get(self.relevant_character_id)
@@ -682,30 +683,31 @@ impl ActivityPopup {
             _ => None,
         };
 
-        let mut sta = base_action
+        let mut reserved_sta = base_action
             .as_ref()
             .map(|action| action.stamina_cost())
             .unwrap_or(0);
 
         if enabled_quick_actions {
-            sta += base_action
+            reserved_sta += base_action
                 .as_ref()
                 .map(|action| action.base_action().quick_point_cost())
                 .unwrap_or(0);
         }
 
         for action in self.selected_choices() {
-            sta += action.stamina_cost();
+            reserved_sta += action.stamina_cost();
         }
+        let mut hovered_sta = 0;
         if let Some(id) = self.hovered_choice_button_id {
             if !self.selected_choice_button_ids.contains(&id) {
-                sta += self.choice_buttons[&id]
+                hovered_sta += self.choice_buttons[&id]
                     .action_tooltip
                     .action
                     .stamina_cost();
             }
         }
-        sta
+        (reserved_sta, reserved_sta + hovered_sta)
     }
 
     fn new_button(&self, btn_action: ButtonAction) -> ActionButton {
@@ -924,8 +926,8 @@ impl ActivityPopup {
         let char = self.characters.get(self.relevant_character_id);
         let enough_ap =
             char.action_points.current() as i32 >= self.reserved_and_hovered_action_points().0;
-        let enough_mana = char.mana.current() >= self.mana_points();
-        let enough_stamina = char.stamina.current() >= self.stamina_points();
+        let enough_mana = char.mana.current() >= self.reserved_and_hovered_mana().0;
+        let enough_stamina = char.stamina.current() >= self.reserved_and_hovered_stamina().0;
 
         let usability_problem = self.ui_state.borrow().action_usability_problem(
             self.characters.get(self.relevant_character_id),
