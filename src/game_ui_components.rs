@@ -15,10 +15,18 @@ use macroquad::{
 
 use crate::{
     base_ui::{
-        Align, Container, ContainerScroll, Drawable, Element, LayoutDirection, Rectangle, Style, TextLine, draw_text_rounded,
-    }, core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS}, drawing::{draw_cross, draw_rounded_rectangle_lines}, game_ui::draw_rectangle_lines2, sounds::{SoundId, SoundPlayer}, textures::{
-        PORTRAIT_BG_TEXTURE, PORTRAIT_ENEMY_BG_TEXTURE, PORTRAITS_TEXTURE, PortraitId, UI_RESOURCE_BAR_TEXTURE, draw_portrait, portrait_texture,
-    }, util::oscillate,
+        draw_text_rounded, Align, Container, ContainerScroll, Drawable, Element, LayoutDirection,
+        Rectangle, Style, TextLine,
+    },
+    core::{Character, CharacterId, Characters, ConditionInfo, CoreGame, MAX_ACTION_POINTS},
+    drawing::{draw_cross, draw_rounded_rectangle_lines},
+    game_ui::draw_rectangle_lines2,
+    sounds::{SoundId, SoundPlayer},
+    textures::{
+        draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
+        PORTRAIT_ENEMY_BG_TEXTURE, UI_RESOURCE_BAR_TEXTURE,
+    },
+    util::oscillate,
 };
 use crate::{
     tooltip::{draw_tooltip, Keyword, TooltipPositionPreference},
@@ -1336,14 +1344,12 @@ impl Drawable for ResourceBar {
 
         //draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 1.0, LIGHTGRAY);
 
-        
         let texture = UI_RESOURCE_BAR_TEXTURE.get().unwrap();
         draw_texture(texture, rect.x - 3.0, rect.y, WHITE);
 
         if self.gain_animation.is_some() {
             draw_rectangle_lines2(rect.x, rect.y, rect.w, rect.h, 3.0, WHITE);
         }
-
 
         self.hovered.set(rect.contains(mouse_position().into()));
     }

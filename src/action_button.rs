@@ -10,6 +10,7 @@ use macroquad::{
     math::Rect,
     shapes::draw_rectangle,
     text::{measure_text, Font, TextParams},
+    texture::draw_texture,
     time::get_time,
 };
 
@@ -30,7 +31,10 @@ use crate::{
     drawing::{draw_dashed_rectangle_lines, draw_rounded_rectangle_lines},
     game_ui::draw_rectangle_lines2,
     pathfind::Surface,
-    textures::{draw_icon, IconId},
+    textures::{
+        draw_icon, IconId, UI_ACTION_BUTTON_BG_TEXTURE, UI_ACTION_BUTTON_SMALL_BG_TEXTURE,
+        UI_ACTION_BUTTON_SMALL_TEXTURE, UI_ACTION_BUTTON_TEXTURE,
+    },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{oscillate, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
@@ -1053,7 +1057,7 @@ pub struct ActionButton {
 }
 
 pub const REGULAR_ACTION_BUTTON_SIZE: (f32, f32) = (64.0, 64.0);
-pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 1.0);
+pub const ACTION_BUTTON_BG_COLOR: Color = Color::new(0.4, 0.32, 0.21, 0.5);
 pub const ACTION_BUTTON_BG_COLOR_SELECTED: Color = Color::new(0.6, 0.5, 0.4, 1.0);
 
 impl ActionButton {
@@ -1070,15 +1074,16 @@ impl ActionButton {
         let quick_points = action.quick_point_cost();
         let icon: IconId = action.icon(character.as_deref());
 
-        let (size, texture_draw_size) = match action {
+        let size = match action {
             ButtonAction::Proceed | ButtonAction::Passive(..) => {
-                ((REGULAR_ACTION_BUTTON_SIZE.0, 52.0), (60.0, 48.0))
+                (REGULAR_ACTION_BUTTON_SIZE.0, 52.0)
             }
-            _ => (REGULAR_ACTION_BUTTON_SIZE, (60.0, 48.0)),
+            _ => REGULAR_ACTION_BUTTON_SIZE,
         };
+        let texture_draw_size = (60.0, 48.0);
 
         let mut style = Style {
-            border_color: Some(LIGHTGRAY),
+            //border_color: Some(LIGHTGRAY),
             ..Default::default()
         };
         match action {
@@ -1274,30 +1279,6 @@ fn check_ability_requirement(character: &Character, ability: &Ability) -> Option
 fn empty_cost_string(action_points: u32, stamina: u32, mana: u32) -> String {
     // TODO let's try without showing cost in tooltip
     "".to_string()
-    /*
-    let mut s = String::new();
-    if action_points > 0 {
-        s.push_str(&format!("{action_points} AP"));
-    }
-    if stamina > 0 {
-        if !s.is_empty() {
-            s.push_str(", ");
-        }
-        s.push_str(&format!("{stamina} stamina"));
-    }
-    if mana > 0 {
-        if !s.is_empty() {
-            s.push_str(", ");
-        }
-        s.push_str(&format!("{mana} mana"));
-    }
-
-    if !s.is_empty() {
-        s = format!("({s})");
-    }
-     */
-
-    //s
 }
 
 impl Drawable for ActionButton {
@@ -1324,11 +1305,21 @@ impl Drawable for ActionButton {
             }
         }
 
+        let bg_texture = if matches!(self.action_tooltip.action, ButtonAction::Passive(..)) {
+            &UI_ACTION_BUTTON_SMALL_BG_TEXTURE
+        } else {
+            &UI_ACTION_BUTTON_BG_TEXTURE
+        };
+
+        draw_texture(bg_texture.get().unwrap(), x - 1.0, y - 1.0, WHITE);
         if matches!(self.selected.get(), ButtonSelected::Yes) {
             draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR_SELECTED);
         } else if self.activated.get().unwrap_or(false) {
             draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR_SELECTED);
-        } else {
+        }
+
+        if !matches!(self.selected.get(), ButtonSelected::Yes) && self.activated.get() != Some(true)
+        {
             draw_rectangle(x, y, w, h, ACTION_BUTTON_BG_COLOR);
         }
 
@@ -1400,7 +1391,7 @@ impl Drawable for ActionButton {
 
         match self.selected.get() {
             ButtonSelected::Yes => {
-                let margin = 1.0;
+                let margin = -2.0;
                 let mut outer = None;
                 if !matches!(self.action_tooltip.action, ButtonAction::Action(..)) {
                     if let Some(color) = self.parent_bg_color {
@@ -1457,7 +1448,7 @@ impl Drawable for ActionButton {
                 }
             }
             if self.enabled.get() {
-                let margin = -1.0;
+                let margin = -2.0;
                 let mut outer = None;
                 let mut inner = 5.0;
                 if let Some(color) = self.parent_bg_color {
@@ -1478,6 +1469,14 @@ impl Drawable for ActionButton {
                 );
             }
         }
+
+        let border_texture = if matches!(self.action_tooltip.action, ButtonAction::Passive(..)) {
+            &UI_ACTION_BUTTON_SMALL_TEXTURE
+        } else {
+            &UI_ACTION_BUTTON_TEXTURE
+        };
+
+        draw_texture(border_texture.get().unwrap(), x - 1.0, y - 1.0, WHITE);
 
         if let Some((keycode, font)) = self.hotkey.borrow().as_ref() {
             let text = hotkey_string(keycode);

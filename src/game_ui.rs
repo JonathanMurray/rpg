@@ -3090,7 +3090,7 @@ fn build_character_ui(
         margin: 0.0,
         children: vec![button_row],
         style: Style {
-            bg_color: Some(buttons_row_bg),
+            //bg_color: Some(buttons_row_bg),
             padding: 2.0,
             ..Default::default()
         },
@@ -3216,7 +3216,7 @@ fn button_action_id(btn_action: ButtonAction) -> String {
 fn buttons_row(buttons: Vec<Element>) -> Element {
     Element::Container(Container {
         layout_dir: LayoutDirection::Horizontal,
-        margin: 3.0,
+        margin: 4.0,
         children: buttons,
         ..Default::default()
     })
