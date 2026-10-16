@@ -39,9 +39,9 @@ use crate::{
     util::{oscillate, plus_minus, COL_GOLD, COL_GREEN_0, COL_GREEN_2, COL_GREEN_3, COL_RED},
 };
 
-pub const EVASION_STR: &str = "|<shield>||<stat>Evasion|";
-const WILL_STR: &str = "|<shield>||<stat>Will|";
-const TOUGHNESS_STR: &str = "|<shield>||<stat>Toughness|";
+pub const EVASION_STR: &str = "|<evasion>| |<stat>Evasion|";
+const WILL_STR: &str = "|<will>| |<stat>Will|";
+const TOUGHNESS_STR: &str = "|<toughness>||<stat>Toughness|";
 
 fn defense_str(defense_type: DefenseType) -> &'static str {
     match defense_type {
@@ -150,13 +150,13 @@ fn on_attacked_reaction_tooltip(reaction: &OnAttackedReaction) -> Tooltip {
 
     if reaction.effect.bonus_evasion > 0 {
         technical_description.push(format!(
-            "|<value>+{}| |<shield>||<stat>Evasion|",
+            "|<value>+{}| |<evasion>| |<stat>Evasion|",
             reaction.effect.bonus_evasion
         ));
     }
     if reaction.effect.bonus_armor > 0 {
         technical_description.push(format!(
-            "|<value>+{}| |<helmet>| armor",
+            "|<value>+{}| |<shield>| armor",
             reaction.effect.bonus_armor
         ));
     }
@@ -199,7 +199,7 @@ fn on_hit_reaction_tooltip(reaction: &OnHitReaction) -> Tooltip {
     if reaction.effect == OnHitReactionEffect::ShieldBash {
         technical_description.push("|<red_dice>| Attack".to_string());
         technical_description.push("Targets the attacker".to_string());
-        technical_description.push("  |<shield>| = toughness".to_string());
+        technical_description.push("  |<toughness>| Toughness".to_string());
         technical_description.push("  Dazed (2+)".to_string());
     }
     Tooltip {
@@ -321,7 +321,7 @@ fn describe_attack_enhancement_effect(effect: &AttackEnhancementEffect, t: &mut 
 
     if effect.armor_penetration > 0 {
         t.technical_description.push(format!(
-            "|<value>{}| |<helmet>| armor penetration",
+            "|<value>{}| |<shield>| armor penetration",
             effect.armor_penetration
         ));
     }

@@ -97,9 +97,21 @@ impl TargetUi {
                     TableCell::new("Toughness", Some(LIGHTGRAY), None),
                     TableCell::new("Evasion", Some(LIGHTGRAY), None),
                     TableCell::new("Will", Some(LIGHTGRAY), None),
-                    TableCell::new(char.toughness().to_string(), Some(WHITE), Some(BLACK)),
-                    TableCell::new(char.evasion().to_string(), Some(WHITE), Some(BLACK)),
-                    TableCell::new(char.will().to_string(), Some(WHITE), Some(BLACK)),
+                    TableCell::new(
+                        format!("|<toughness>| {}", char.toughness()),
+                        Some(WHITE),
+                        Some(BLACK),
+                    ),
+                    TableCell::new(
+                        format!("|<evasion>| {}", char.evasion()),
+                        Some(WHITE),
+                        Some(BLACK),
+                    ),
+                    TableCell::new(
+                        format!("|<will>| {}", char.will()),
+                        Some(WHITE),
+                        Some(BLACK),
+                    ),
                 ],
                 vec![Align::Center, Align::Center, Align::Center],
                 self.simple_font.clone(),
@@ -168,7 +180,7 @@ impl TargetUi {
             });
 
             let defense_header: Element = Element::Text(TextLine::new(
-                "|<shield>| Defenses",
+                "Defenses:",
                 16,
                 WHITE,
                 Some(self.simple_font.clone()),
@@ -300,7 +312,9 @@ impl TargetUi {
                         plus_minus(char.attack_modifier(HandType::MainHand)),
                     ));
                 }
-                stats_text.push_str(&format!("   |<helmet>| {}", char.armor_str()));
+                if char.protection_from_armor() > 0 {
+                    stats_text.push_str(&format!("   |<shield>| {}", char.armor_str()));
+                }
 
                 if bot_using_spells {
                     stats_text.push_str(&format!("   |<blue_dice>| +{}", char.spell_modifier()));

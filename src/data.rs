@@ -597,7 +597,7 @@ pub const ELUSIVE_BOW: Weapon = Weapon {
 
 pub const PENETRATING_ARROWS: Arrow = Arrow {
     name: "Penetrating arrows",
-    description: "Bypasses |<value>3| of the target's |<helmet>| armor",
+    description: "Bypasses |<value>3| of the target's |<shield>| armor",
     icon: EquipmentIconId::PenetratingArrow,
     bonus_penetration: 3,
     on_damage_apply: None,
@@ -2928,8 +2928,8 @@ impl PassiveSkill {
     pub fn description(&self) -> &'static str {
         use PassiveSkill::*;
         match self {
-            HardenedSkin => "|<value>+1| |<helmet>| armor",
-            WeaponProficiency => "Attacks gain |<value>+1| |<helmet>| armor penetration",
+            HardenedSkin => "|<value>+1| |<shield>| armor",
+            WeaponProficiency => "Attacks gain |<value>+1| |<shield>| armor penetration",
             CriticalCharge => "|<value>+3| |<blue_dice>| |<stat>Spell|, while at/below 50% |<mana>| mana",
             Reaper => "On kill: gain |<value>2| |<stamina>| stamina and |<value>2| |<ap>| AP |<faded>(once per turn)|",
             BloodRage => "|<value>+3| |<red_dice>| Attack, while at/below 50% |<heart>| health. Immune to |<keyword>Near-death|",

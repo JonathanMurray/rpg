@@ -9,7 +9,7 @@ use std::{
 
 use indexmap::{map::Entry, IndexMap};
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE},
+    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, YELLOW},
     input::mouse_wheel,
     math::{Rect, Vec2},
     miniquad::window::dpi_scale,
@@ -3324,10 +3324,10 @@ impl GameGrid {
         }
 
         if let Some(id) = self.hovered_character.or(self.hovered_character_portrait) {
-            if id != self.active_character_id {
-                let char = &self.characters[&id];
-                detail_labelled_char_ids.insert(char.id());
-            }
+            //if id != self.active_character_id {
+            let char = &self.characters[&id];
+            detail_labelled_char_ids.insert(char.id());
+            //}
         }
 
         for char in self.characters.values() {
@@ -4291,8 +4291,11 @@ impl GameGrid {
 
         let mut status_y;
 
-        if detailed {
+        if self.active_character_id == character.id()
+        /*detailed*/
+        {
             draw_rectangle(box_x, box_y, box_w, box_h, Color::new(0.0, 0.0, 0.0, 0.7));
+
             draw_text_rounded(
                 &header,
                 box_x + text_pad,
@@ -4520,6 +4523,51 @@ impl GameGrid {
                     ..Default::default()
                 },
             );
+
+            let armor = character.protection_from_armor();
+            if armor > 0 {
+                let armor_str = format!("{}", armor);
+                let pad = 2.0;
+                let armor_x = health_x + health_w + 2.0 + pad;
+                let tiny_font_size = (5.0, 7.0);
+                let rect_w = armor_str.len() as f32 * tiny_font_size.0 + pad * 2.0;
+                /*
+                draw_rectangle(
+                    armor_x - pad,
+                    text_y - tiny_font_size.1 - pad,
+                    rect_w,
+                    tiny_font_size.1 + pad * 2.0,
+                    BLACK,
+                );
+                draw_rectangle_lines2(
+                    armor_x - pad,
+                    text_y - tiny_font_size.1 - pad,
+                    rect_w,
+                    tiny_font_size.1 + pad * 2.0,
+                    1.0,
+                    LIGHTGRAY,
+                );
+                 */
+                let shield_text = "|<shield>|";
+                let dim = measure_text_with_font_tags(
+                    shield_text,
+                    health_text_font,
+                    health_text_font_size,
+                    1.0,
+                );
+                draw_text_with_font_tags(
+                    shield_text,
+                    armor_x + rect_w / 2.0 - dim.width / 2.0 - 1.0,
+                    text_y + 2.0,
+                    TextParams {
+                        font: health_text_font,
+                        font_size: health_text_font_size,
+                        ..Default::default()
+                    },
+                    true,
+                );
+                draw_tiny_font(&armor_str, armor_x, text_y, TinyFontColor::Black);
+            }
         }
     }
 

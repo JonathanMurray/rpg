@@ -18,15 +18,17 @@ use std::{
 };
 
 use crate::{
+    action_button::EVASION_STR,
     drawing::draw_rounded_rectangle_lines,
     game_ui::draw_rectangle_lines2,
     sounds::{SoundId, SoundPlayer},
     textures::{
         draw_status_icon, StatusId, ALT_KEY_SYMBOL, AP_SYMBOL, BLUE_DICE_SYMBOL, BOOT_SYMBOL,
-        CHECKED_SYMBOL, CONFIRM_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL, INFO_SYMBOL, LOSE_AP_SYMBOL,
-        MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL, MULTI_TARGET_SYMBOL, RADIUS_SYMBOL,
-        RANGE_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL, SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL,
-        STAMINA_SYMBOL, SWORD_SYMBOL, UNCHECKED_SYMBOL, WARNING_SYMBOL, WEIGHT_SYMBOL,
+        CHAIN_SYMBOL, CHECKED_SYMBOL, CONFIRM_SYMBOL, EVASION_SYMBOL, HEART_SYMBOL, HELMET_SYMBOL,
+        INFO_SYMBOL, LOSE_AP_SYMBOL, MANA_SMALL_SYMBOL, MANA_SYMBOL, MIXED_DICE_SYMBOL,
+        MULTI_TARGET_SYMBOL, RADIUS_SYMBOL, RANGE_SYMBOL, RED_DICE_SYMBOL, SHIELD_SYMBOL,
+        SINGLE_TARGET_SYMBOL, STAMINA_SMALL_SYMBOL, STAMINA_SYMBOL, SWORD_SYMBOL, UNCHECKED_SYMBOL,
+        WARNING_SYMBOL, WEIGHT_SYMBOL, WILL_SYMBOL,
     },
     tooltip::{draw_tooltip, Keyword, Side, TooltipPositionPreference},
     util::{
@@ -472,6 +474,9 @@ lazy_static! {
             ("<heart>", (symbol_w, &HEART_SYMBOL)),
             ("<boot>", (symbol_w, &BOOT_SYMBOL)),
             ("<helmet>", (symbol_w, &HELMET_SYMBOL)),
+            ("<toughness>", (symbol_w, &CHAIN_SYMBOL)),
+            ("<evasion>", (symbol_w, &EVASION_SYMBOL)),
+            ("<will>", (symbol_w, &WILL_SYMBOL)),
             ("<weight>", (symbol_w, &WEIGHT_SYMBOL)),
             ("<single_target>", (symbol_w, &SINGLE_TARGET_SYMBOL)),
             ("<multi_target>", (symbol_w, &MULTI_TARGET_SYMBOL)),

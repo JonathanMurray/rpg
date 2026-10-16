@@ -57,7 +57,7 @@ fn arrow_tooltip(stack: &ArrowStack) -> Tooltip {
     let penetration = stack.arrow.bonus_penetration;
     if penetration > 0 {
         t.technical_description
-            .push(format!("{} |<helmet>| armor penetration", penetration));
+            .push(format!("{} |<shield>| armor penetration", penetration));
     }
     if let Some(effect) = stack.arrow.on_damage_apply {
         t.technical_description
@@ -212,7 +212,7 @@ fn weapon_tooltip(weapon: &Weapon) -> Tooltip {
 
 fn bonus_melee_evasion_str(value: u32) -> String {
     format!(
-        "|<value>+{}| |<shield>|<stat>Evasion| against melee attacks",
+        "|<value>+{}| |<evasion>| |<stat>Evasion| against melee attacks",
         value
     )
 }
@@ -220,12 +220,12 @@ fn bonus_melee_evasion_str(value: u32) -> String {
 fn shield_tooltip(shield: &Shield) -> Tooltip {
     let mut t = Tooltip::new(shield.name);
     t.technical_description.push(format!(
-        "|<value>+{}| |<shield>|<stat>Evasion|",
+        "|<value>+{}| |<evasion>| |<stat>Evasion|",
         shield.evasion
     ));
     if shield.armor > 0 {
         t.technical_description
-            .push(format!("|<value>+{}| |<helmet>| armor", shield.armor));
+            .push(format!("|<value>+{}| |<shield>| armor", shield.armor));
     }
 
     if let Some(reaction) = shield.on_attacked_reaction {
@@ -245,7 +245,7 @@ fn shield_tooltip(shield: &Shield) -> Tooltip {
 fn armor_tooltip(armor: &ArmorPiece) -> Tooltip {
     let mut t = Tooltip::new(armor.name);
     t.technical_description
-        .push(format!("|<helmet>| |<value>{}| armor", armor.protection));
+        .push(format!("|<shield>| |<value>{}| armor", armor.protection));
     if let Some(limit) = armor.limit_evasion_from_agi {
         t.technical_description
             .push(format!("Max {} evasion from agi", limit));
@@ -880,8 +880,8 @@ impl EquipmentStatsTable {
             cells.push(format!("{}", shield.evasion).into());
         }
          */
-        cells.push(TableCell::from("|<helmet>|").with_tooltip(
-            "Armor |<helmet>|",
+        cells.push(TableCell::from("|<shield>|").with_tooltip(
+            "Armor |<shield>|",
             vec!["The damage of incoming attacks is reduced by this amount.".to_string()],
             vec![],
         ));

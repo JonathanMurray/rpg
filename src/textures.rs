@@ -944,6 +944,10 @@ async fn load_and_init_tiny_font() {
     let texture = load_and_init_texture("tiny_font.png").await;
     replace_color(&texture, [0, 0, 0, 255], [255, 100, 100, 255]); //[255, 100, 100, 255]);
     TINY_FONT_RED_TEXTURE.get_or_init(|| texture);
+
+    let texture = load_and_init_texture("tiny_font.png").await;
+    replace_color(&texture, [0, 0, 0, 255], [0, 0, 0, 255]); //[255, 100, 100, 255]);
+    TINY_FONT_BLACK_TEXTURE.get_or_init(|| texture);
 }
 
 fn replace_color(texture: &Texture2D, from: [u8; 4], to: [u8; 4]) {
@@ -959,6 +963,7 @@ fn replace_color(texture: &Texture2D, from: [u8; 4], to: [u8; 4]) {
 pub enum TinyFontColor {
     Green,
     Red,
+    Black,
 }
 
 const TINY_FONT_W: f32 = 6.0;
@@ -972,6 +977,7 @@ pub fn draw_tiny_font(text: &str, x: f32, y: f32, color: TinyFontColor) {
     let texture = match color {
         TinyFontColor::Green => TINY_FONT_GREEN_TEXTURE.get().unwrap(),
         TinyFontColor::Red => TINY_FONT_RED_TEXTURE.get().unwrap(),
+        TinyFontColor::Black => TINY_FONT_BLACK_TEXTURE.get().unwrap(),
     };
 
     let x = x.floor();
@@ -1305,6 +1311,9 @@ async fn load_and_init_font_symbols() {
     SWORD_SYMBOL.get_or_init(|| symbol(0, 2));
     BOOT_SYMBOL.get_or_init(|| symbol(1, 2));
     HELMET_SYMBOL.get_or_init(|| symbol(2, 3));
+    CHAIN_SYMBOL.get_or_init(|| symbol(1, 4));
+    EVASION_SYMBOL.get_or_init(|| symbol(2, 4));
+    WILL_SYMBOL.get_or_init(|| symbol(3, 4));
     WEIGHT_SYMBOL.get_or_init(|| symbol(3, 3));
     SINGLE_TARGET_SYMBOL.get_or_init(|| symbol(4, 3));
     MULTI_TARGET_SYMBOL.get_or_init(|| symbol(5, 3));
@@ -1361,6 +1370,9 @@ pub static MANA_SMALL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SWORD_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static BOOT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static HELMET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static CHAIN_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static EVASION_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
+pub static WILL_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static WEIGHT_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static SINGLE_TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 pub static MULTI_TARGET_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
@@ -1370,6 +1382,7 @@ pub static CONFIRM_SYMBOL: OnceLock<Texture2D> = OnceLock::new();
 
 pub static TINY_FONT_GREEN_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static TINY_FONT_RED_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
+pub static TINY_FONT_BLACK_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 
 pub static STATUS_ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();
 pub static ICONS_TEXTURE: OnceLock<Texture2D> = OnceLock::new();

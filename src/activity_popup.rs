@@ -828,7 +828,7 @@ impl ActivityPopup {
                     attacker.name, defender.name
                 ));
                 lines.push(format!(
-                    "|<red_dice>| |<stat>Attack| {} vs |<shield>|<stat>Evasion| {}",
+                    "|<red_dice>| |<stat>Attack| {} vs |<evasion>| |<stat>Evasion| {}",
                     plus_minus(attacker.attack_modifier(*hand)),
                     defender.evasion()
                 ));

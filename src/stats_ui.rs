@@ -53,7 +53,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
                 "|<heart>| 2",
                 "|<stamina>| 1",
                 "|<red_dice>| +1 |<faded>(melee attack)|",
-                "|<shield>||<stat>Toughness| 2",
+                "|<toughness>| |<stat>Toughness| 2",
                 "|<weight>| 2 |<faded>(capacity)|",
             ][..],
         ),
@@ -66,7 +66,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
                 "|<stamina>| 1",
                 "|<boot>| 0.5",
                 "|<red_dice>| +1 |<faded>(ranged attack)|",
-                "|<shield>||<stat>Evasion| 1",
+                "|<evasion>| |<stat>Evasion| 1",
             ],
         ),
         (
@@ -76,8 +76,8 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             &[
                 "Each point grants:",
                 "|<mixed_dice>| +1 |<faded>(spell & attack)|",
-                "|<shield>||<stat>Will| 2",
-                "|<shield>||<stat>Evasion| 0.5",
+                "|<will>| |<stat>Will| 2",
+                "|<evasion>| |<stat>Evasion| 0.5",
             ],
         ),
         (
@@ -151,12 +151,8 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
         ),
     );
 
-    let defense_header: Element = Element::Text(TextLine::new(
-        "|<shield>| Defenses",
-        16,
-        WHITE,
-        Some(font.clone()),
-    ));
+    let defense_header: Element =
+        Element::Text(TextLine::new("Defenses:", 16, WHITE, Some(font.clone())));
 
     let defense_header_row = Element::Container(Container {
         layout_dir: LayoutDirection::Vertical,
@@ -172,27 +168,35 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
     });
 
     let mut defense_cells = vec![];
-    for (label, value, tooltip_lines) in [
+    for (label, value, icon, tooltip_lines) in [
         (
             "Toughness",
             character.toughness(),
+            "<toughness>",
             &["Protection against physical harm that can't be dodged"][..],
         ),
         (
             "Evasion",
             character.evasion(),
+            "<evasion>",
             &["Protection against melee attacks and projectiles"][..],
         ),
         (
             "Will",
             character.will(),
+            "<will>",
             &["Protection against non-physical harm"][..],
         ),
     ] {
         let label_line =
             TextLine::new(label, 16, LIGHTGRAY, Some(font.clone())).with_depth(BLACK, 1.0);
-        let value_line = TextLine::new(format!("{}", value), 24, WHITE, Some(font.clone()))
-            .with_depth(BLACK, 2.0);
+        let value_line = TextLine::new(
+            format!("|{}| {}", icon, value),
+            24,
+            WHITE,
+            Some(font.clone()),
+        )
+        .with_depth(BLACK, 2.0);
         let cell = Element::Container(Container {
             layout_dir: LayoutDirection::Vertical,
             align: Align::Center,
@@ -200,7 +204,7 @@ pub fn build_character_stats_table(font: &Font, character: Rc<Character>) -> Cha
             children: vec![Element::Text(label_line), Element::Text(value_line)],
             tooltip: Some((
                 font.clone(),
-                format!("{} |<shield>|", label),
+                format!("{} |{}|", label, icon),
                 tooltip_lines.iter().map(|s| s.to_string()).collect(),
             )),
             ..Default::default()

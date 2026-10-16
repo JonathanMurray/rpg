@@ -2536,7 +2536,7 @@ impl CoreGame {
         if total_bonus_evasion > 0 {
             if game.is_some() {
                 detail_lines.push(format!(
-                    "|<shield>| |<stat>Evasion|: {} {} = |<value>{}|",
+                    "|<evasion>| |<stat>Evasion|: {} {} = |<value>{}|",
                     base_evasion,
                     evasion_str,
                     base_evasion + total_bonus_evasion
@@ -2606,7 +2606,7 @@ impl CoreGame {
             };
 
             detail_lines.push(format!(
-                "{} {} (|<red_dice>|<stat>Attack|)| {}- {} (|<shield>|<stat>Evasion|) = |<value>{}|",
+                "{} {} (|<red_dice>|<stat>Attack|)| {}- {} (|<evasion>|<stat>Evasion|) = |<value>{}|",
                 unmodified_roll,
                 plus_minus(attack_modifier),
                 attack_bonus_str,
@@ -3914,13 +3914,13 @@ impl RollInstruction {
                 }
             }
 
-            let (def_str, def_value) = match defense_type {
-                DefenseType::Will => ("Will", target.will()),
-                DefenseType::Evasion => ("Evasion", target.evasion()),
-                DefenseType::Toughness => ("Toughness", target.toughness()),
+            let (def_str, icon, def_value) = match defense_type {
+                DefenseType::Will => ("Will", "<will>", target.will()),
+                DefenseType::Evasion => ("Evasion", "<evasion>", target.evasion()),
+                DefenseType::Toughness => ("Toughness", "<toughness>", target.toughness()),
             };
 
-            calculation_line.push_str(&format!(" -{def_value} (|<shield>|<stat>{def_str}|)"));
+            calculation_line.push_str(&format!(" -{def_value} (|{icon}|<stat>{def_str}|)"));
 
             flat_bonus -= def_value as i32;
         }
@@ -4643,23 +4643,23 @@ impl Condition {
     pub const fn description(&self) -> &'static str {
         use Condition::*;
         match self {
-            Dazed => "|<value>-5| |<shield>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
+            Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
             Blinded => "|<keyword>Disadvantage| on actions.\n|<keyword>Advantage| on incoming attacks (|<keyword>Flanked|).",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
             Inspired => "|<value>+3| |<boot>|<stat>Movement|\n|<value>+3| |<mixed_dice>| |<stat>Attack/Spell|",
-            Exposed => "|<value>-3| to all |<shield>| defenses.\n|<value>-50%| |<helmet>| armor.",
+            Exposed => "|<value>-3| to all defenses (|<toughness>|<evasion>|<will>|).\n|<value>-50%| |<shield>| armor.",
             Hindered => "|<value>-50%| movement.",
             Protected => "Takes at most |<value>1| damage from the next attack.",
             Bleeding => "End of turn: lose |<value>x| health.\nHalved every turn.",
             Burning => "End of turn: deals |<value>x| damage.\n50% spreads to adjacent.",
-            Braced => "|<value>+3| |<shield>|<stat>Evasion| against the next attack.",
-            Distracted => "|<value>-6| |<shield>|<stat>Evasion| against the next attack.",
-            Weakened => "|<value>-x| to all |<shield>| and |dice>.",
+            Braced => "|<value>+3| |<evasion>| |<stat>Evasion| against the next attack.",
+            Distracted => "|<value>-6| |<evasion>| |<stat>Evasion| against the next attack.",
+            Weakened => "|<value>-x| to all defenses and dice rolls.",
             MainHandExertion => "-x on further similar actions.",
             OffHandExertion => "-x on further similar actions.",
-            Encumbered => "|<value>-x| |<shield>|<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
+            Encumbered => "|<value>-x| |<evasion>| |<stat>Evasion|.\n|<value>-x| on |<mixed_dice>| |<stat>Attack/Spell|.",
             NearDeath => "|<value>-1| AP regen.\n|<keyword>Disadvantage| on actions.\nEnemies have |<keyword>Advantage|.\n(Triggers on < 20% health)",
             Dead => "This character is dead.",
             ReaperApCooldown => "Can not gain more resources from |<keyword>Reaper| this turn.",
@@ -4672,7 +4672,7 @@ impl Condition {
             Ferocity => "|<value>+x| attack damage",
             Ruthless => "Will automatically |<keyword>Crit| on their next attack.",
             Wet => "Takes |<value>-25%| fire damage and |<value>+50%| lightning damage",
-            Poisoned => "|<value>-5| |<shield>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
+            Poisoned => "|<value>-5| |<toughness>| |<stat>Toughness|.\nEnd of turn: lose |<value>10%| remaining health",
             Treasure => "Holds |<value>x| gold coins. Drops |<value>1| when hit, or all remaining on death.",
             HungeringBladeSouls => "Can be unleashed to empower an attack",
             ArcaneBlessing => "|<keyword>Advantage| on your next |<blue_dice>| |<stat>Spell| roll",
