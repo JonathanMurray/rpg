@@ -1773,9 +1773,9 @@ pub const DRAUG_CLAW: Ability = Ability {
             damage: Some(AbilityDamage::Dynamic(3, DamageType::Regular)),
             on_hit: Some([
                 Some(ApplyEffect::Condition(ApplyCondition {
-                    condition: Condition::Bleeding,
-                    stacks: Some(2),
-                    duration_rounds: None,
+                    condition: Condition::Blinded,
+                    stacks: None,
+                    duration_rounds: Some(1),
                 })),
                 None,
             ]),

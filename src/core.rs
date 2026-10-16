@@ -2097,6 +2097,40 @@ impl CoreGame {
         Box::new(outcome)
     }
 
+    fn determine_ability_hit_type(
+        caster: &Character,
+        ability_roll: AbilityRoll,
+        defense_type: DefenseType,
+        detail_lines: &mut Vec<String>,
+    ) -> HitType {
+        let (unmodified_roll, final_result) = (ability_roll.unmodified_roll, ability_roll.result);
+
+        if defense_type == DefenseType::Evasion {
+            if caster.has_condition(&Condition::Blinded) && unmodified_roll <= 5 {
+                detail_lines
+                    .push("  Miss |<faded>(rolled <= 5, |<keyword>Blinded|<faded>)|".to_string());
+                return HitType::Miss;
+            } else if unmodified_roll == 1 {
+                detail_lines.push("  Miss |<faded>(natural 1)|".to_string());
+                return HitType::Miss;
+            } else if unmodified_roll == 20 {
+                detail_lines.push("  Crit |<faded>(natural 20)|".to_string());
+                return HitType::Critical;
+            }
+        }
+
+        if final_result <= 5 {
+            detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
+            HitType::Weak
+        } else if final_result <= 15 {
+            detail_lines.push("  Hit |<faded>(6-15)|".to_string());
+            HitType::Regular
+        } else {
+            detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
+            HitType::Strong
+        }
+    }
+
     async fn perform_spell_enemy_effect(
         caster: &Rc<Character>,
         ability_name: &'static str,
@@ -2114,32 +2148,9 @@ impl CoreGame {
 
         let hit_type = match spell_enemy_effect.defense_type {
             Some(defense_type) => {
-                let ability_roll =
+                let roll =
                     roll_instruction.execute(mode, Some((target, defense_type)), detail_lines);
-
-                //detail_lines.push("".to_string());
-                //detail_lines.push(ability_roll.unwrap_actual_roll().2.to_string());
-
-                let (unmodified_roll, final_result) =
-                    (ability_roll.unmodified_roll, ability_roll.result);
-                //let final_result = modified_roll - def_value as i32;
-
-                if unmodified_roll == 1 {
-                    detail_lines.push("  Miss |<faded>(natural 1)|".to_string());
-                    HitType::Miss
-                } else if unmodified_roll == 20 {
-                    detail_lines.push("  Crit |<faded>(natural 20)|".to_string());
-                    HitType::Critical
-                } else if final_result <= 5 {
-                    detail_lines.push("  Weak hit |<faded>(5 or lower)|".to_string());
-                    HitType::Weak
-                } else if final_result <= 15 {
-                    detail_lines.push("  Hit |<faded>(6-15)|".to_string());
-                    HitType::Regular
-                } else {
-                    detail_lines.push("  Strong hit |<faded>(16 or higher)|".to_string());
-                    HitType::Strong
-                }
+                Self::determine_ability_hit_type(caster, roll, defense_type, detail_lines)
             }
             None => HitType::Regular,
         };
@@ -2616,6 +2627,7 @@ impl CoreGame {
         }
 
         let weapon = attacker.weapon(hand_type).unwrap();
+        let flanking = is_target_flanked(attacker.pos(), defender);
         let outcome = {
             let mut dmg_weapon_override = None;
             let mut dmg_str = "  Damage: ".to_string();
@@ -2674,8 +2686,6 @@ impl CoreGame {
                 }
             }
 
-            let flanking = is_target_flanked(attacker.pos(), defender);
-
             if attacker.knows_passive(PassiveSkill::Honorless) {
                 let bonus_dmg = 1;
                 if flanking {
@@ -2701,9 +2711,12 @@ impl CoreGame {
             //  <=5: weak
             // 6-15: regular
             // >=16: strong
-            let hit_type = if unmodified_roll == 1 {
+            let crit_threshold = if flanking { 16 } else { 20 };
+            let blinded_attacker = attacker.has_condition(&Condition::Blinded);
+            let miss_threshold = if blinded_attacker { 5 } else { 1 };
+            let hit_type = if unmodified_roll <= miss_threshold {
                 HitType::Miss
-            } else if unmodified_roll == 20 {
+            } else if unmodified_roll >= crit_threshold {
                 HitType::Critical
             } else if final_result <= 5 {
                 HitType::Weak
@@ -2715,7 +2728,15 @@ impl CoreGame {
 
             match hit_type {
                 HitType::Miss => {
-                    detail_lines.push("Miss! |<faded>(natural 1)|".to_string());
+                    let explanation = if blinded_attacker {
+                        format!(
+                            "|<faded>(rolled <= {}, |<keyword>Blinded|<faded>)|",
+                            miss_threshold
+                        )
+                    } else {
+                        "|<faded>(rolled 1)|".to_string()
+                    };
+                    detail_lines.push(format!("Miss! {}", explanation));
                 }
                 HitType::Weak => {
                     if let Some(source) = graze_improvement {
@@ -2744,7 +2765,15 @@ impl CoreGame {
                         dmg_calculation += (dmg_calculation as f32 * 0.75).ceil() as i32;
                     }
 
-                    detail_lines.push("  Critical Hit |<faded>(natural 20)|".to_string());
+                    let explanation = if flanking {
+                        format!(
+                            "|<faded>(rolled >= {}, |<keyword>Flanked|<faded>)|",
+                            crit_threshold
+                        )
+                    } else {
+                        "|<faded>(rolled 20)|".to_string()
+                    };
+                    detail_lines.push(format!("  Critical Hit {}", explanation));
                 }
             }
 
@@ -3920,7 +3949,7 @@ impl RollInstruction {
                 DefenseType::Toughness => ("Toughness", "<toughness>", target.toughness()),
             };
 
-            calculation_line.push_str(&format!(" -{def_value} (|{icon}|<stat>{def_str}|)"));
+            calculation_line.push_str(&format!(" -{def_value} (|{icon}| |<stat>{def_str}|)"));
 
             flat_bonus -= def_value as i32;
         }
@@ -4644,7 +4673,7 @@ impl Condition {
         use Condition::*;
         match self {
             Dazed => "|<value>-5| |<evasion>| |<stat>Evasion|.\n|<value>-5| |<red_dice>| |<stat>Attack|",
-            Blinded => "|<keyword>Disadvantage| on actions.\n|<keyword>Advantage| on incoming attacks (|<keyword>Flanked|).",
+            Blinded => "The miss chance of attacks and certain abilities is increased to |<value>25%| (from |<value>5%|).\nAutomatically |<keyword>Flanked| when attacked.",
             Raging => "|<keyword>Advantage| on melee attacks (until end of turn).",
             Slowed => "|<value>-2| AP per turn.\n|<value>-25%| movement",
             Hastened => "|<value>+1| AP per turn.\n|<value>+25%| movement",
@@ -4770,7 +4799,7 @@ impl Condition {
     pub const fn related_keywords(&self) -> [Option<Keyword>; 2] {
         use Condition::*;
         match self {
-            //Blinded => [Some(Keyword::Flanked), None],
+            Blinded => [Some(Keyword::Flanked), None],
             NearDeath => [Some(Keyword::Advantage), None],
             _ => [None, None],
         }
@@ -7386,10 +7415,12 @@ impl Character {
         let mut bonuses = vec![];
 
         if self.has_condition(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+            // Changes miss calculation
+            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
         }
         if is_target_flanked(self.pos(), target) {
-            bonuses.push(("Flanked", RollBonusContributor::Advantage(1)));
+            // Changes crit calculation
+            bonuses.push(("Flanked", RollBonusContributor::OtherPositive));
         }
 
         let (_range, reach) = self.reaches_with_attack(
@@ -7533,7 +7564,8 @@ impl Character {
             bonuses.push(("Near-death", RollBonusContributor::Advantage(-1)));
         }
         if conditions.has(&Condition::Blinded) {
-            bonuses.push(("Blinded", RollBonusContributor::Advantage(-1)));
+            // Changes miss calculation
+            bonuses.push(("Blinded", RollBonusContributor::OtherNegative));
         }
 
         bonuses

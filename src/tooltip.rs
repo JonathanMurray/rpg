@@ -85,7 +85,7 @@ impl Keyword {
             Keyword::Crit => {
                 "|<value>+75%| damage or effectiveness.\nTriggers when |<mixed_dice>| roll is |<value>20| (before modifiers).".to_string()
             }
-            Keyword::Flanked => "|<keyword>Advantage| on incoming attacks.".to_string(),
+            Keyword::Flanked => "Critical hit chance increased to |<value>25%| (from |<value>5%|)".to_string(),
             Keyword::Spikes => "|<value>50%| slower movement and |<value>1| damage per step".to_string()
         }
     }

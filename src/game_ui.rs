@@ -1637,7 +1637,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        //dbg!(&event);
+        dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {
@@ -2403,9 +2403,7 @@ impl UserInterface {
 
                 if let Some(dmg) = damage {
                     effects.push(TextEffect::HitDamage(*dmg, *hit_type));
-                    if hit_type == &HitType::Miss {
-                        //effects.push((None, "Miss!".to_string(), TextEffectStyle::Miss, 1.5));
-                    } else {
+                    if *dmg > 0 {
                         let damage_source = ability.map(|a| DamageSource::Ability(a));
                         self.animate_character_damage(target, *actual_health_lost, damage_source);
                         self.sound_player.play_delayed(
@@ -2413,7 +2411,9 @@ impl UserInterface {
                             start_time + 0.03,
                         );
                     }
-                } else if applied_effects.is_empty() {
+                }
+
+                if *hit_type == HitType::Miss {
                     effects.push(TextEffect::Miss);
                 }
 
