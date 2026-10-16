@@ -26,7 +26,7 @@ use crate::{
         draw_portrait, portrait_texture, PortraitId, PORTRAITS_TEXTURE, PORTRAIT_BG_TEXTURE,
         PORTRAIT_ENEMY_BG_TEXTURE, UI_RESOURCE_BAR_TEXTURE,
     },
-    util::oscillate,
+    util::{oscillate, oscillate_loop, oscillate_plateau, oscillate_square},
 };
 use crate::{
     tooltip::{draw_tooltip, Keyword, TooltipPositionPreference},
@@ -1141,25 +1141,24 @@ impl Drawable for ActionPointsRow {
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    COL_GOLD,
+                    GRAY,
                 );
-                // Make it brighter
+
+                let alpha = oscillate_plateau(0.1, 0.2, 0.5, 0.0, 1.0);
+
                 draw_circle(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
                     r,
-                    Color::new(1.0, 1.0, 1.0, 0.7),
+                    WHITE.with_alpha(alpha),
                 );
-
-                // Pulsating glowing border
-                let alpha = oscillate(0.9, 0.4, 0.8);
 
                 draw_circle_lines(
                     x0 + self.cell_size.0 / 2.0,
                     y0 + self.cell_size.1 / 2.0,
-                    r,
-                    3.0,
-                    Color::new(1.0, 1.0, 1.0, alpha),
+                    r * 0.8,
+                    1.0,
+                    Color::new(1.0, 1.0, 1.0, 1.0),
                 );
             } else if missing {
                 draw_circle(

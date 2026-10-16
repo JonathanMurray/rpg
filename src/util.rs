@@ -118,6 +118,32 @@ pub fn oscillate(cycle_duration: f32, from: f32, to: f32) -> f32 {
     }
 }
 
+//// [from ~ plataeu] --slope-- [to ~ plateau] --slope--
+pub fn oscillate_plateau(
+    slope_duration: f32,
+    from_plateaeu_duration: f32,
+    to_plateaeu_duration: f32,
+    from: f32,
+    to: f32,
+) -> f32 {
+    let game_time = get_time();
+    let cycle_duration = slope_duration * 2.0 + from_plateaeu_duration + to_plateaeu_duration;
+
+    // from 0 to cycle duration
+    let t = ((game_time as f32) / cycle_duration).fract() * cycle_duration;
+
+    if t < from_plateaeu_duration {
+        from
+    } else if t < from_plateaeu_duration + slope_duration {
+        from + (to - from) * (t - from_plateaeu_duration) / slope_duration
+    } else if t < from_plateaeu_duration + slope_duration + to_plateaeu_duration {
+        to
+    } else {
+        to - (to - from) * (t - from_plateaeu_duration - slope_duration - to_plateaeu_duration)
+            / slope_duration
+    }
+}
+
 pub fn oscillate_loop(cycle_duration: f32, from: f32, to: f32) -> f32 {
     let game_time = get_time();
     let t = ((game_time as f32) / cycle_duration).fract();
