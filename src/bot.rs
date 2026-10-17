@@ -238,23 +238,26 @@ impl EnemyTargetSelection {
     fn run<'a>(&self, game: &'a CoreGame, action_range: Range) -> Rc<Character> {
         let bot = game.active_character();
 
-        // TODO:
-        // Balanced algorithm for picking a random (but reasonable) target:
-        // 1: collect vec![(distance_to, player_ch)]
-        // 2: rank them into buckets: [d=0, d<=4, d<=8, d<=12, d<=16, d <=20, d<=24, unreachable]
-        // 3: move current target between buckets depending on how many actions you've landed on it
-        //     0: -2,    1: 0,    2: +1,   3 turns: +2,   etc (but never move into "unreachable"-bucket from this)
-        // 4: for bucket[i] in buckets
-        //    if p(50%) and there is some non-empty bucket[>i], skip to i+1
-        //    else if bucket[i] is empty, continue to i+1
-        //    else: pick a random target from bucket[i]
+        // Player chars are grouped into buckets, depending on how far the bot would need to move
+        // to reach them with an action
+        // 0: ---
+        // 1: ---
+        // 2: 0
+        // 3: <= 4
+        // 4: <= 8
+        // 5: <= 12
+        // 6: <= 16
+        // 7: <= 20
+        // 8: <= 24
+        // 9: > 24
 
-        let mut player_buckets: [Vec<&Rc<Character>>; 8] = Default::default();
+        let mut player_buckets: [Vec<&Rc<Character>>; 10] = Default::default();
 
         for ch in game.player_characters() {
             let mut idx = player_buckets.len() - 1;
             if let Some(path) = find_path(game, bot, ch, action_range) {
-                idx = (path.total_distance / 4.0).ceil() as usize;
+                // The first two buckets are reserved for "selected target but haven't yet acted against it"
+                idx = 2 + (path.total_distance / 4.0).ceil() as usize;
                 if path.is_fallback {
                     idx = player_buckets.len() - 1;
                 }
@@ -263,8 +266,10 @@ impl EnemyTargetSelection {
             if let Some(target) = self.current_target.borrow().as_ref() {
                 if target.character_id == ch.id() {
                     let idx_change = if target.num_actions_landed == 0 {
+                        // Haven't acted against target yet => strongly encourage to stick to it
                         -2
                     } else {
+                        // more actions have been landed => more likely to switch from it
                         target.num_actions_landed as i32 - 1
                     };
                     println!(
