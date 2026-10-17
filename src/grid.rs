@@ -5169,18 +5169,19 @@ impl GameGrid {
 
         // Draw diagonals
         if !is_active_char {
-            let margin = margin + 1.0;
+            let margin = margin + self.cell_w() * 0.06;
             let x0 = x - self.cell_w() + margin;
             let y0 = y - self.cell_w() + margin;
             let n = 4;
             let w = (self.rect_w as f32) - margin * 2.0;
+            let thickness = self.cell_w() / 7.0;
             let draw_diagonal = |from: (i32, i32), to: (i32, i32)| {
                 draw_line(
                     (x0 + w * (from.0 as f32 / n as f32)).round(),
                     (y0 + w * (from.1 as f32 / n as f32)).round(),
                     (x0 + w * (to.0 as f32 / n as f32)).round(),
                     (y0 + w * (to.1 as f32 / n as f32)).round(),
-                    3.0,
+                    thickness,
                     Color::new(1.0, 1.0, 1.0, 0.3),
                 );
             };
@@ -5194,9 +5195,11 @@ impl GameGrid {
                 let to = (i, n);
                 draw_diagonal(from, to);
             }
+            let thickness = (self.cell_w() / 8.0).ceil();
+            draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, thickness, border_color);
+        } else {
+            draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, border_color);
         }
-
-        draw_rectangle_lines2(rect.0, rect.1, rect.2, rect.3, 1.0, border_color);
     }
 
     fn draw_circular_character_highlight(
