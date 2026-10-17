@@ -293,6 +293,7 @@ enum SpriteProperty {
     WeaponXOffsetCellW,
     ShieldXOffsetCellW,
     ShieldYOffsetCellW,
+    ReplaceHandHeldWithProjectile(Color),
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -939,6 +940,8 @@ impl GameGrid {
             ));
         }
 
+        let mut aim_duration = 0.0;
+
         let duration = match ability.animation {
             AbilityAnimation::MeleeWeaponAttack => {
                 self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), false);
@@ -949,6 +952,54 @@ impl GameGrid {
                 self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), true);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 delay + 0.1
+            }
+            AbilityAnimation::Throw(color) => {
+                let target_pos = target_pos.unwrap();
+
+                let attacker_pos = self.active_char().pos();
+                aim_duration = self.animate_throw_projectile(actor.id(), target_pos, delay, color);
+
+                let projectile_duration = 0.8;
+
+                self.add_effect(
+                    attacker_pos,
+                    target_pos,
+                    Effect {
+                        start_time: delay + aim_duration,
+                        end_time: delay + aim_duration + projectile_duration,
+                        variant: EffectVariant::At(
+                            EffectPosition::GravitationalProjectile { upward_speed: 20.0 },
+                            EffectGraphics::Circle {
+                                radius: 6.0,
+                                end_radius: None,
+                                fill: Some(color),
+                                stroke: Some((BLACK, 3.0)),
+                                fade: false,
+                            },
+                        ),
+                    },
+                );
+
+                self.add_effect(
+                    attacker_pos,
+                    target_pos,
+                    Effect {
+                        start_time: delay + aim_duration + projectile_duration,
+                        end_time: delay + aim_duration + projectile_duration + 0.2,
+                        variant: EffectVariant::At(
+                            EffectPosition::Destination,
+                            EffectGraphics::Circle {
+                                radius: 25.0,
+                                end_radius: Some(5.0),
+                                fill: None,
+                                stroke: Some((RED, 2.0)),
+                                fade: true,
+                            },
+                        ),
+                    },
+                );
+
+                delay + aim_duration + projectile_duration
             }
             AbilityAnimation::SpinAttack => {
                 let duration = 0.5;
@@ -993,6 +1044,7 @@ impl GameGrid {
                 // The ability should resolve in the middle of the character's animation
                 delay + duration / 2.0
             }
+
             AbilityAnimation::CastSpell => {
                 let casting_duration = 0.4;
                 let animation_color = ability.animation_color;
@@ -1116,7 +1168,7 @@ impl GameGrid {
             }
         };
 
-        (delay, duration)
+        (delay + aim_duration, duration)
     }
 
     fn add_circle_projectile_effect(
@@ -1278,7 +1330,7 @@ impl GameGrid {
                     start_time: delay + aim_duration,
                     end_time: delay + aim_duration + projectile_duration,
                     variant: EffectVariant::At(
-                        EffectPosition::GravitationalProjectile { gravity: 9.0 },
+                        EffectPosition::GravitationalProjectile { upward_speed: 9.0 },
                         EffectGraphics::Circle {
                             radius: 3.0,
                             end_radius: None,
@@ -1346,6 +1398,69 @@ impl GameGrid {
         };
 
         (delay + aim_duration, delay + aim_duration + duration)
+    }
+
+    fn animate_throw_projectile(
+        &mut self,
+        thrower_id: CharacterId,
+        target_pos: Position,
+        delay: f32,
+        projectile_color: Color,
+    ) -> f32 {
+        let duration = 0.8;
+
+        let thrower_pos = self.character_screen_pos(&self.characters.get(&thrower_id).unwrap());
+        let target_pos = Vec2::new(
+            self.grid_x_to_screen(target_pos.0),
+            self.grid_y_to_screen(target_pos.1),
+        );
+
+        let direction = target_pos - Vec2::from(thrower_pos);
+        let displacement = -Vec2::ZERO.move_towards(direction, 0.7);
+
+        self.character_animations.push(CharacterAnimation::new(
+            thrower_id,
+            delay,
+            duration,
+            AnimationDetails::TransformSprite {
+                timelines: vec![
+                    (
+                        SpriteProperty::CharacterXOffsetCellW,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, displacement.x),
+                            PropertyUpdate::linear(0.6, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::CharacterYOffsetCellW { jump: false },
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, displacement.y),
+                            PropertyUpdate::linear(0.6, 0.0),
+                        ]),
+                    ),
+                    (
+                        // Lean backward, and then snap forward to "throw"
+                        SpriteProperty::CharacterRotation,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, -PI * 0.25),
+                            PropertyUpdate::linear(0.6, PI * 0.01),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::ReplaceHandHeldWithProjectile(projectile_color),
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.0, 1.0),
+                            // Hold it until it's been thrown
+                            PropertyUpdate::fixed(0.55),
+                            PropertyUpdate::linear(0.6, 0.0),
+                        ]),
+                    ),
+                ],
+            },
+        ));
+
+        duration * 0.55
     }
 
     fn animate_ranged_weapon_attack(
@@ -2157,7 +2272,7 @@ impl GameGrid {
 
         let mut dying = false;
 
-        let game_time = get_time();
+        let mut holding_projectile = None;
 
         let mut weapon_rotation_modifier = 0.0;
         let mut shield_offset = (0.0, 0.0);
@@ -2285,6 +2400,11 @@ impl GameGrid {
                     for (property, timeline) in interpolations {
                         let value = timeline.get_value(elapsed_ratio);
                         match property {
+                            SpriteProperty::ReplaceHandHeldWithProjectile(color) => {
+                                if value == 1.0 {
+                                    holding_projectile = Some(color);
+                                }
+                            }
                             SpriteProperty::CharacterRotation => {
                                 params.rotation = if character.is_facing_east.get() {
                                     value
@@ -2429,48 +2549,53 @@ impl GameGrid {
                 character_params,
             );
 
-            if !params.flip_x {
-                weapon_rotation_modifier *= -1.0;
-                weapon_x_offset *= -1.0;
-            }
-
-            if let Some(weapon) = character.weapon(HandType::MainHand) {
-                if let Some(texture) = weapon.sprite {
-                    let mut y_offset = 0.0;
-
-                    let mut rotation = params.rotation + weapon_rotation_modifier;
-                    if dying {
-                        rotation = 0.2 * PI;
-                        y_offset = cell_w * 1.0;
-                    }
-                    let weapon_params = DrawTextureParams { rotation, ..params };
-                    //let dest_size = params.dest_size.unwrap();
-                    //weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
-                    draw_texture_ex(
-                        &self.sprites[&texture].regular,
-                        x + weapon_x_offset,
-                        y + y_offset,
-                        WHITE,
-                        weapon_params,
-                    );
+            if let Some(color) = holding_projectile {
+                draw_circle(x + cell_w, y + 2.0 * cell_w, 6.0, *color);
+                draw_circle_lines(x + cell_w, y + 2.0 * cell_w, 6.0, 3.0, BLACK);
+            } else {
+                if !params.flip_x {
+                    weapon_rotation_modifier *= -1.0;
+                    weapon_x_offset *= -1.0;
                 }
-            }
 
-            if let Some(shield) = character.shield() {
-                if let Some(texture) = shield.sprite {
-                    let mut rotation = params.rotation; // + weapon_rotation_modifier;
-                    if dying {
-                        rotation = 0.0;
-                        shield_offset = (0.0, cell_w * 1.0);
+                if let Some(weapon) = character.weapon(HandType::MainHand) {
+                    if let Some(texture) = weapon.sprite {
+                        let mut y_offset = 0.0;
+
+                        let mut rotation = params.rotation + weapon_rotation_modifier;
+                        if dying {
+                            rotation = 0.2 * PI;
+                            y_offset = cell_w * 1.0;
+                        }
+                        let weapon_params = DrawTextureParams { rotation, ..params };
+                        //let dest_size = params.dest_size.unwrap();
+                        //weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
+                        draw_texture_ex(
+                            &self.sprites[&texture].regular,
+                            x + weapon_x_offset,
+                            y + y_offset,
+                            WHITE,
+                            weapon_params,
+                        );
                     }
-                    let shield_params = DrawTextureParams { rotation, ..params };
-                    draw_texture_ex(
-                        &self.sprites[&texture].regular,
-                        x + shield_offset.0,
-                        y + shield_offset.1,
-                        WHITE,
-                        shield_params,
-                    );
+                }
+
+                if let Some(shield) = character.shield() {
+                    if let Some(texture) = shield.sprite {
+                        let mut rotation = params.rotation; // + weapon_rotation_modifier;
+                        if dying {
+                            rotation = 0.0;
+                            shield_offset = (0.0, cell_w * 1.0);
+                        }
+                        let shield_params = DrawTextureParams { rotation, ..params };
+                        draw_texture_ex(
+                            &self.sprites[&texture].regular,
+                            x + shield_offset.0,
+                            y + shield_offset.1,
+                            WHITE,
+                            shield_params,
+                        );
+                    }
                 }
             }
         }
@@ -5032,7 +5157,9 @@ impl GameGrid {
                                 + (effect.destination_pos.1 - effect.source_pos.1) * t;
                             (x, y)
                         }
-                        EffectPosition::GravitationalProjectile { gravity } => {
+                        EffectPosition::GravitationalProjectile {
+                            upward_speed: gravity,
+                        } => {
                             let dy = -gravity * t + gravity * t.powf(2.0);
 
                             let x = effect.source_pos.0
@@ -5697,7 +5824,7 @@ pub enum EffectPosition {
     Source,
     Destination,
     StraightProjectile,
-    GravitationalProjectile { gravity: f32 },
+    GravitationalProjectile { upward_speed: f32 },
 }
 
 #[derive(Debug)]

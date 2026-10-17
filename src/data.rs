@@ -18,6 +18,7 @@ use crate::{
     sounds::SoundId,
     textures::{EffectId, EquipmentIconId, IconId, SpriteId},
     tooltip::Keyword,
+    util::{COL_GREEN_3, COL_RED},
 };
 
 pub const SHIRT: ArmorPiece = ArmorPiece {
@@ -796,6 +797,7 @@ pub const LIQUID_FIRE_ABILITY: Ability = grenade_ability(
             create_surface: Some(Surface::Fire),
         },
     },
+    COL_RED,
 );
 
 pub const TOXIC_GRENADE: Consumable = Consumable {
@@ -826,9 +828,15 @@ pub const TOXIC_GRENADE_ABILITY: Ability = grenade_ability(
         impact_circle: None,
         environment_effect: None,
     },
+    COL_GREEN_3,
 );
 
-const fn grenade_ability(id: AbilityId, name: &'static str, target: AbilityTarget) -> Ability {
+const fn grenade_ability(
+    id: AbilityId,
+    name: &'static str,
+    target: AbilityTarget,
+    color: Color,
+) -> Ability {
     Ability {
         id,
         name,
@@ -843,12 +851,11 @@ const fn grenade_ability(id: AbilityId, name: &'static str, target: AbilityTarge
         roll: Some(AbilityRollType::Spell),
         possible_enhancements: [None, None, None],
         target: target,
-        animation_color: PURPLE,
-        animation: AbilityAnimation::CastSpell,
+        animation_color: color,
+        animation: AbilityAnimation::Throw(color),
         // TODO: Throw sound effect
         initiate_sound: Some(SoundId::ShootSpell),
-        // TODO: crushed bottle sound effect
-        resolve_sound: Some(SoundId::Debuff),
+        resolve_sound: Some(SoundId::BottleSplash),
         charge_fx: Some(AbilityChargeFx {
             particle_shape: ParticleShape::Circle,
             sound: SoundId::MechanicNoise,

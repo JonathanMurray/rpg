@@ -5135,6 +5135,7 @@ pub enum AbilityAnimation {
     ShieldAttack,
     SpinAttack,
     CastSpell,
+    Throw(Color),
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
