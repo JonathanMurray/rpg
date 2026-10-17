@@ -323,21 +323,10 @@
   },
   "characters": [
     {
-      "type_": "Ghoul2",
-      "pos": [
-        15,
-        34
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
       "type_": "Alice",
       "pos": [
         11,
-        22
+        24
       ],
       "health": null,
       "main_hand": null,
@@ -345,10 +334,10 @@
       "name": null
     },
     {
-      "type_": "Huldra",
+      "type_": "Bob",
       "pos": [
         11,
-        28
+        32
       ],
       "health": null,
       "main_hand": null,
@@ -356,10 +345,21 @@
       "name": null
     },
     {
-      "type_": "Enslaved",
+      "type_": "Ghoul2",
       "pos": [
-        16,
-        26
+        14,
+        30
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        8,
+        30
       ],
       "health": null,
       "main_hand": null,

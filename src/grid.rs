@@ -130,6 +130,13 @@ pub struct TargetEffectPreview {
 }
 
 #[derive(Debug)]
+enum CharacterActionAnticipation {
+    RangedAttack,
+    MeleeAttack,
+    Other,
+}
+
+#[derive(Debug)]
 struct CharacterAnimation {
     character_id: CharacterId,
     duration: f32,
@@ -379,7 +386,6 @@ pub struct GameGrid {
     ability_cast_particle_group: Option<ParticleGroup>,
     target_effect_previews: HashMap<CharacterId, TargetEffectPreview>,
     character_animations: Vec<CharacterAnimation>,
-    anticipating_character: Option<CharacterId>,
     effects: Vec<ConcreteEffect>,
 
     pub grid_dimensions: (u32, u32),
@@ -454,7 +460,6 @@ impl GameGrid {
             ability_cast_particle_group: Default::default(),
             target_effect_previews: Default::default(),
             character_animations: Default::default(),
-            anticipating_character: None,
             big_font,
             simple_font,
             tiny_font,
@@ -758,10 +763,6 @@ impl GameGrid {
 
     pub fn clear_target_effect_previews(&mut self) {
         self.target_effect_previews.clear();
-    }
-
-    pub fn set_character_anticipation(&mut self, anticipating_character: Option<u32>) {
-        self.anticipating_character = anticipating_character;
     }
 
     pub fn set_character_motion_preview(
@@ -2259,7 +2260,11 @@ impl GameGrid {
         (self.rect_w as f32, self.rect_w as f32)
     }
 
-    fn draw_character(&self, character: &Character) {
+    fn draw_character(
+        &self,
+        character: &Character,
+        anticipation: Option<CharacterActionAnticipation>,
+    ) {
         let size = self.default_entity_draw_size();
         let mut params = DrawTextureParams {
             dest_size: Some(size.into()),
@@ -2459,7 +2464,17 @@ impl GameGrid {
             }
         }
 
-        if self.anticipating_character == Some(character.id()) {
+        if let Some(anticipation) = anticipation {
+            match anticipation {
+                CharacterActionAnticipation::RangedAttack => {
+                    weapon_rotation_modifier = -PI * 0.15;
+                }
+                CharacterActionAnticipation::MeleeAttack => {
+                    let rotation = PI * 0.02;
+                    weapon_rotation_modifier = oscillate(0.7, -rotation, rotation);
+                }
+                CharacterActionAnticipation::Other => {}
+            }
             let dx = oscillate(0.5, -1.0, 1.0);
             x += dx;
             shadow_x += dx;
@@ -2982,7 +2997,13 @@ impl GameGrid {
 
         // Then draw character foreground layer
         for character in self.characters.values() {
-            self.draw_character(character);
+            let anticipation = self.determine_character_anticipation(
+                ui_state,
+                character,
+                &opportunity_attackers_against_ranged_attack,
+            );
+
+            self.draw_character(character, anticipation);
             if is_key_down(KeyCode::LeftAlt) {
                 detail_labelled_char_ids.insert(character.id());
             }
@@ -3915,6 +3936,83 @@ impl GameGrid {
         self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
         outcome
+    }
+
+    fn determine_character_anticipation(
+        &self,
+        ui_state: &UiState,
+        character: &Character,
+        opportunity_attackers: &[CharacterId],
+    ) -> Option<CharacterActionAnticipation> {
+        let ch_id = character.id();
+
+        // TODO: also make it so that the character is drawn correctly east/west-facing depending on what it's anticipating,
+        // e.g. facing the target it intends to
+
+        let attack_anticipation = |character: &Character| {
+            if character.has_equipped_ranged_weapon() {
+                CharacterActionAnticipation::RangedAttack
+            } else {
+                CharacterActionAnticipation::MeleeAttack
+            }
+        };
+
+        let maybe_attack_anticipation = |character: &Character, will_attack: bool| {
+            if will_attack {
+                attack_anticipation(character)
+            } else {
+                CharacterActionAnticipation::Other
+            }
+        };
+
+        if opportunity_attackers.contains(&ch_id) {
+            return Some(attack_anticipation(character));
+        }
+
+        match ui_state {
+            UiState::ConfiguringAction(a) if ch_id == self.active_character_id => match a {
+                ConfiguredAction::Attack { .. } => {
+                    return Some(attack_anticipation(character));
+                }
+                _ => return Some(CharacterActionAnticipation::Other),
+            },
+            UiState::ReactingToAttack {
+                attacker, reactor, ..
+            } => {
+                if ch_id == *attacker {
+                    return Some(attack_anticipation(character));
+                } else if ch_id == *reactor {
+                    return Some(CharacterActionAnticipation::Other);
+                }
+            }
+            UiState::ReactingToMovementAttackOpportunity {
+                reactor,
+                target,
+                selected,
+                ..
+            } => {
+                if ch_id == *reactor {
+                    return Some(maybe_attack_anticipation(character, *selected));
+                } else if ch_id == *target {
+                    return Some(CharacterActionAnticipation::Other);
+                }
+            }
+            UiState::ReactingToRangedAttackOpportunity {
+                reactor,
+                attacker,
+                selected,
+                ..
+            } => {
+                if ch_id == *attacker {
+                    return Some(attack_anticipation(character));
+                } else if ch_id == *reactor {
+                    return Some(maybe_attack_anticipation(character, *selected));
+                }
+            }
+            _ => {}
+        }
+
+        None
     }
 
     fn draw_character_animations(&self) {
