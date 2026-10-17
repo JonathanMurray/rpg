@@ -2515,7 +2515,7 @@ impl UserInterface {
     }
 
     pub fn update(&mut self, game: &CoreGame, elapsed: f32) -> Option<PlayerChose> {
-        let game_speed = if self.slow_motion.get() { 0.3 } else { 1.0 };
+        let game_speed = if self.slow_motion.get() { 0.1 } else { 1.0 };
         let elapsed = elapsed * game_speed;
 
         self.sound_player.update(elapsed);

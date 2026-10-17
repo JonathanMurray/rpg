@@ -56,6 +56,7 @@ use crate::{
     },
     game_ui::{draw_rectangle_lines2, ConfiguredAction, UiState, UsabilityProblem, UI_HEIGHT},
     game_ui_components::ActionPointsRow,
+    grid::SpriteProperty::WeaponXOffsetCellW,
     pathfind::{
         ChartNode, Occupation, PathNode, PathfindGrid, Surface, TerrainType, TraversalType,
         CELLS_PER_ENTITY,
@@ -159,6 +160,14 @@ impl CharacterAnimation {
     fn has_started(&self) -> bool {
         self.remaining_duration <= self.duration
     }
+
+    fn elapsed(&self) -> f32 {
+        (self.duration - self.remaining_duration).max(0.0)
+    }
+
+    fn elapsed_ratio(&self) -> f32 {
+        self.elapsed() / self.duration
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -190,11 +199,6 @@ enum AnimationDetails {
     CastingSpell {
         color: Color,
     },
-    MeleeAttack {
-        toward: Position,
-        with_shield: bool,
-    },
-    Spinning,
     RangedAttack {
         toward: Position,
     },
@@ -207,6 +211,96 @@ enum AnimationDetails {
     ApLost {
         amount: u32,
     },
+    TransformSprite {
+        timelines: Vec<(SpriteProperty, PropertyTimeline)>,
+    },
+}
+
+#[derive(Debug, Clone)]
+struct PropertyTimeline(Vec<PropertyUpdate>);
+
+impl PropertyTimeline {
+    fn get_value(&self, elapsed_ratio: f32) -> f32 {
+        let mut val = 0.0;
+        let mut start = 0.0;
+        for update in &self.0 {
+            let end = update.end_time_ratio;
+            if let Some(interp) = &update.interpolation {
+                if elapsed_ratio >= end {
+                    val = interp.target_value;
+                } else if elapsed_ratio >= start {
+                    let ratio = (elapsed_ratio - start) / (end - start);
+                    let ratio = match interp.shape {
+                        InterpolateShape::Linear => ratio,
+                        InterpolateShape::Pow(exponent) => ratio.powf(exponent),
+                    };
+                    val += ratio * (interp.target_value - val);
+                }
+            }
+            start = end;
+        }
+
+        val
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PropertyInterpolation {
+    target_value: f32,
+    shape: InterpolateShape,
+}
+
+#[derive(Debug, Clone)]
+struct PropertyUpdate {
+    end_time_ratio: f32,
+    interpolation: Option<PropertyInterpolation>,
+}
+
+impl PropertyUpdate {
+    fn fixed(end: f32) -> Self {
+        Self {
+            end_time_ratio: end,
+            interpolation: None,
+        }
+    }
+
+    fn linear(end: f32, target_value: f32) -> Self {
+        Self {
+            end_time_ratio: end,
+            interpolation: Some(PropertyInterpolation {
+                target_value,
+                shape: InterpolateShape::Linear,
+            }),
+        }
+    }
+
+    fn pow(end: f32, target_value: f32, exponent: f32) -> Self {
+        Self {
+            end_time_ratio: end,
+            interpolation: Some(PropertyInterpolation {
+                target_value,
+                shape: InterpolateShape::Pow(exponent),
+            }),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+enum InterpolateShape {
+    Linear,
+    Pow(f32),
+}
+
+#[derive(Debug, Clone)]
+enum SpriteProperty {
+    CharacterRotation,
+    CharacterXOffsetCellW,
+    CharacterYOffsetCellW,
+    FlipX,
+    WeaponRotation,
+    WeaponXOffsetCellW,
+    ShieldXOffsetCellW,
+    ShieldYOffsetCellW,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -793,50 +887,105 @@ impl GameGrid {
 
         let duration = match ability.animation {
             AbilityAnimation::MeleeWeaponAttack => {
-                self.character_animations.push(CharacterAnimation::new(
-                    actor.id(),
-                    delay,
-                    0.4,
-                    AnimationDetails::MeleeAttack {
-                        toward: target_pos.unwrap(),
-                        with_shield: false,
-                    },
-                ));
+                self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), false);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 delay + 0.1
             }
             AbilityAnimation::ShieldAttack => {
-                self.character_animations.push(CharacterAnimation::new(
-                    actor.id(),
-                    delay,
-                    0.4,
-                    AnimationDetails::MeleeAttack {
-                        toward: target_pos.unwrap(),
-                        with_shield: true,
-                    },
-                ));
+                self.animate_melee_weapon_attack(actor.id(), delay, target_pos.unwrap(), true);
                 // The ability should resolve in the middle of the character's animation, before they retract from the target
                 delay + 0.1
             }
             AbilityAnimation::SpinAttack => {
+                let duration = 0.5;
+                let angle = PI * 0.05;
+
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
                     delay,
-                    0.4,
-                    AnimationDetails::Spinning,
+                    duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![
+                            (
+                                SpriteProperty::WeaponXOffsetCellW,
+                                PropertyTimeline(vec![
+                                    PropertyUpdate::linear(0.2, -1.0),
+                                    PropertyUpdate::fixed(0.8),
+                                    PropertyUpdate::linear(1.0, 0.0),
+                                ]),
+                            ),
+                            (
+                                SpriteProperty::CharacterRotation,
+                                PropertyTimeline(vec![
+                                    PropertyUpdate::linear(0.25, -angle),
+                                    PropertyUpdate::linear(0.5, 0.0),
+                                    PropertyUpdate::linear(0.75, angle),
+                                    PropertyUpdate::linear(1.0, 0.0),
+                                ]),
+                            ),
+                            (
+                                SpriteProperty::FlipX,
+                                PropertyTimeline(vec![
+                                    PropertyUpdate::pow(0.25, 0.5, 3.0),
+                                    PropertyUpdate::pow(0.5, 1.0, 0.3),
+                                    PropertyUpdate::pow(0.75, 0.5, 3.0),
+                                    PropertyUpdate::pow(1.0, 0.0, 0.3),
+                                ]),
+                            ),
+                        ],
+                    },
                 ));
+
                 // The ability should resolve in the middle of the character's animation
-                delay + 0.2
+                delay + duration / 2.0
             }
             AbilityAnimation::CastSpell => {
                 let casting_duration = 0.4;
                 let animation_color = ability.animation_color;
+
                 self.character_animations.push(CharacterAnimation::new(
                     actor.id(),
                     delay,
                     casting_duration,
                     AnimationDetails::CastingSpell {
                         color: animation_color,
+                    },
+                ));
+
+                let mut x_offsets = vec![];
+                for i in 0..10 {
+                    let d = 0.05;
+                    let val = if i % 2 == 0 { -d } else { d };
+                    x_offsets.push(PropertyUpdate {
+                        end_time_ratio: i as f32 / 10.0,
+                        interpolation: Some(PropertyInterpolation {
+                            target_value: val,
+                            shape: InterpolateShape::Linear,
+                        }),
+                    });
+                }
+
+                self.character_animations.push(CharacterAnimation::new(
+                    actor.id(),
+                    delay,
+                    casting_duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![
+                            (
+                                SpriteProperty::CharacterYOffsetCellW,
+                                PropertyTimeline(vec![PropertyUpdate {
+                                    end_time_ratio: 1.0,
+                                    interpolation: Some(PropertyInterpolation {
+                                        target_value: -0.2,
+                                        shape: InterpolateShape::Linear,
+                                    }),
+                                }]),
+                            ),
+                            (
+                                SpriteProperty::CharacterXOffsetCellW,
+                                PropertyTimeline(x_offsets),
+                            ),
+                        ],
                     },
                 ));
 
@@ -1029,15 +1178,8 @@ impl GameGrid {
         } else {
             let attacker_pos = attacker.pos();
             let duration = 0.4;
-            self.character_animations.push(CharacterAnimation::new(
-                attacker.id(),
-                delay,
-                duration,
-                AnimationDetails::MeleeAttack {
-                    toward: target_pos,
-                    with_shield: false,
-                },
-            ));
+            self.animate_melee_weapon_attack(attacker.id(), delay, target_pos, false);
+
             if let Some((reactor, with_shield)) = target_reaction {
                 self.character_animations.push(CharacterAnimation::new(
                     reactor,
@@ -1071,6 +1213,87 @@ impl GameGrid {
         };
 
         (delay, delay + duration)
+    }
+
+    fn animate_melee_weapon_attack(
+        &mut self,
+        attacker_id: CharacterId,
+        delay: f32,
+        target_pos: Position,
+        with_shield: bool,
+    ) {
+        let duration = 0.4;
+        let attacker_pos = self.character_screen_pos(&self.characters.get(&attacker_id).unwrap());
+        let target_pos = Vec2::new(
+            self.grid_x_to_screen(target_pos.0),
+            self.grid_y_to_screen(target_pos.1),
+        );
+
+        let direction = target_pos - Vec2::from(attacker_pos);
+        let displacement = Vec2::ZERO.move_towards(direction, 0.8);
+        let weapon_rotation = PI * 0.3;
+
+        let mut timelines = vec![
+            (
+                SpriteProperty::CharacterXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, displacement.x, 2.0),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::CharacterYOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, displacement.y, 2.0),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::CharacterRotation,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, PI * 0.05, 2.0),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+        ];
+
+        if with_shield {
+            timelines.push((
+                SpriteProperty::ShieldXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, 0.2, 2.0),
+                    PropertyUpdate::fixed(0.9),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+
+            timelines.push((
+                SpriteProperty::ShieldYOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, -0.4, 2.0),
+                    PropertyUpdate::fixed(0.9),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+        } else {
+            timelines.push((
+                SpriteProperty::WeaponRotation,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.3, weapon_rotation, 2.0),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+        }
+
+        self.character_animations.push(CharacterAnimation::new(
+            attacker_id,
+            delay,
+            duration,
+            AnimationDetails::TransformSprite { timelines },
+        ));
     }
 
     pub fn animate_character_health_change(
@@ -1722,7 +1945,9 @@ impl GameGrid {
 
         let mut weapon_rotation_modifier = 0.0;
         let mut shield_offset = (0.0, 0.0);
+        let mut weapon_x_offset = 0.0;
         let mut character_offset = (0.0, 0.0);
+        let mut stretch_w = None;
 
         let mut character_crop_factor = (1.0, 1.0);
 
@@ -1830,6 +2055,9 @@ impl GameGrid {
                 AnimationDetails::AttackCrosshairPreview { .. } => {
                     // This is drawn separately, after all the characters
                 }
+                AnimationDetails::CastingSpell { .. } => {
+                    // This is drawn separately, after all the characters
+                }
                 AnimationDetails::RangedAttack { toward } => {
                     // t goes from 0 to 1
                     let t = 1.0 - remaining_ratio;
@@ -1871,91 +2099,53 @@ impl GameGrid {
                         } else {
                             max_rot * 1.0 - (t - 0.5) / 0.1
                         };
-                        if !character.is_facing_east.get() {
-                            weapon_rotation_modifier *= -1.0;
-                        }
+
                         if character.has_equipped_ranged_weapon() {
                             weapon_rotation_modifier *= -1.0;
                         }
                     }
                 }
-                AnimationDetails::CastingSpell { .. } => {
-                    let t = 1.0 - remaining_ratio;
 
-                    let max_levitation = cell_w * 0.2;
-
-                    y -= max_levitation * t;
-
-                    if ((remaining / 0.1).floor()) as i32 % 2 == 0 {
-                        x += random_range(-3.0..3.0);
-                        y += random_range(-3.0..3.0);
-                    }
-                }
-
-                AnimationDetails::Spinning => {
-                    // t goes from 0 to 1
-                    let t = 1.0 - remaining_ratio;
-                    if t % 0.4 < 0.2 {
-                        params.flip_x = !params.flip_x;
-                    }
-                    if ((remaining / 0.1).floor()) as i32 % 2 == 0 {
-                        x += random_range(-3.0..3.0);
-                        y += random_range(-3.0..3.0);
-                    }
-                }
-
-                AnimationDetails::MeleeAttack {
-                    toward,
-                    with_shield,
+                AnimationDetails::TransformSprite {
+                    timelines: interpolations,
                 } => {
-                    // t goes from 0 to 1
-                    let t = 1.0 - remaining_ratio;
-
-                    let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - cell_w,
-                        self.grid_y_to_screen(toward.1) - cell_w,
-                    );
-                    let max_displacement = cell_w * 0.6;
-                    let displacement = if t < 0.1 {
-                        max_displacement * t / 0.1
-                    } else if t < 0.8 {
-                        max_displacement
-                    } else {
-                        max_displacement * (1.0 - (t - 0.8) / 0.2)
-                    };
-                    let displaced = Vec2::new(x, y).move_towards(toward, displacement);
-                    x = displaced.x;
-                    y = displaced.y;
-                    // The attacker is actually moving (not jumping), so the shadow should follow
-                    shadow_x = x;
-                    shadow_y = y;
-
-                    params.rotation = if character.is_facing_east.get() {
-                        0.1
-                    } else {
-                        -0.1
-                    };
-
-                    if t > 0.05 && t < 0.85 {
-                        if *with_shield {
-                            let x_mult = if character.is_facing_east.get() {
-                                1.0
-                            } else {
-                                -1.0
-                            };
-                            shield_offset = (cell_w * 0.2 * x_mult, -cell_w * 0.4);
-                        } else {
-                            let max_rot = PI * 0.3;
-                            weapon_rotation_modifier = if t < 0.2 {
-                                max_rot * (t - 0.05) / 0.15
-                            } else {
-                                max_rot * 1.0 - (t - 0.15) / 0.7
-                            };
-                            if !character.is_facing_east.get() {
-                                weapon_rotation_modifier *= -1.0;
+                    //let elapsed = animation.elapsed();
+                    let elapsed_ratio = animation.elapsed_ratio();
+                    for (property, timeline) in interpolations {
+                        let value = timeline.get_value(elapsed_ratio);
+                        match property {
+                            SpriteProperty::CharacterRotation => {
+                                params.rotation = if character.is_facing_east.get() {
+                                    value
+                                } else {
+                                    -value
+                                };
                             }
-                            if character.has_equipped_ranged_weapon() {
-                                weapon_rotation_modifier *= -1.0;
+                            SpriteProperty::WeaponRotation => {
+                                weapon_rotation_modifier = value;
+                            }
+                            SpriteProperty::WeaponXOffsetCellW => {
+                                weapon_x_offset += cell_w * value;
+                            }
+                            SpriteProperty::CharacterXOffsetCellW => {
+                                x += cell_w * value;
+                                shadow_x += cell_w * value;
+                            }
+                            SpriteProperty::CharacterYOffsetCellW => {
+                                y += cell_w * value;
+                                //shadow_y += cell_w * value;
+                            }
+                            SpriteProperty::ShieldXOffsetCellW => {
+                                shield_offset = (shield_offset.0 + cell_w * value, shield_offset.1)
+                            }
+                            SpriteProperty::ShieldYOffsetCellW => {
+                                shield_offset = (shield_offset.0, shield_offset.1 + cell_w * value)
+                            }
+                            SpriteProperty::FlipX => {
+                                stretch_w = Some((value - 0.5).abs() / 0.5);
+                                if value > 0.5 {
+                                    params.flip_x = !params.flip_x;
+                                }
                             }
                         }
                     }
@@ -1989,9 +2179,6 @@ impl GameGrid {
                         shield_offset = (cell_w * 0.2 * x_mult, -cell_w * 0.4);
                     } else {
                         weapon_rotation_modifier = PI * 0.2;
-                        if !character.is_facing_east.get() {
-                            weapon_rotation_modifier *= -1.0;
-                        }
                     }
                 }
                 AnimationDetails::HealthLost { .. } => {
@@ -2025,7 +2212,6 @@ impl GameGrid {
 
         params.pivot = Some((x + cell_w * 1.5, y + cell_w * 2.0).into());
 
-        let mut character_params = params.clone();
         if standing_in_liquid {
             let water_depth_factor = 0.125;
 
@@ -2045,12 +2231,6 @@ impl GameGrid {
                 character_crop_factor = (1.0, 0.8);
             }
         }
-
-        /*
-        if let Some(pivot) = params.pivot {
-            draw_rectangle(pivot.x - 4.0, pivot.y - 4.0, 8.0, 8.0, MAGENTA);
-        }
-         */
 
         x = x.floor();
         y = y.floor();
@@ -2081,6 +2261,14 @@ impl GameGrid {
                 &sprite.regular
             };
 
+            if let Some(stretch_w) = stretch_w {
+                params.dest_size.as_mut().unwrap().x *= stretch_w;
+                x += self.rect_w as f32 * 0.5 * (1.0 - stretch_w);
+                weapon_x_offset *= stretch_w;
+            }
+
+            let mut character_params = params.clone();
+
             character_params.source = Some(Rect::new(
                 0.0,
                 0.0,
@@ -2098,18 +2286,26 @@ impl GameGrid {
                 character_params,
             );
 
+            if !params.flip_x {
+                weapon_rotation_modifier *= -1.0;
+                weapon_x_offset *= -1.0;
+            }
+
             if let Some(weapon) = character.weapon(HandType::MainHand) {
                 if let Some(texture) = weapon.sprite {
                     let mut y_offset = 0.0;
+
                     let mut rotation = params.rotation + weapon_rotation_modifier;
                     if dying {
                         rotation = 0.2 * PI;
                         y_offset = cell_w * 1.0;
                     }
-                    let weapon_params = DrawTextureParams { rotation, ..params };
+                    let mut weapon_params = DrawTextureParams { rotation, ..params };
+                    let dest_size = params.dest_size.unwrap();
+                    weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
                     draw_texture_ex(
                         &self.sprites[&texture].regular,
-                        x,
+                        x + weapon_x_offset,
                         y + y_offset,
                         WHITE,
                         weapon_params,
@@ -2119,7 +2315,7 @@ impl GameGrid {
 
             if let Some(shield) = character.shield() {
                 if let Some(texture) = shield.sprite {
-                    let mut rotation = params.rotation + weapon_rotation_modifier;
+                    let mut rotation = params.rotation; // + weapon_rotation_modifier;
                     if dying {
                         rotation = 0.0;
                         shield_offset = (0.0, cell_w * 1.0);

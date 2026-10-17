@@ -624,8 +624,8 @@ pub fn make_high_bob(party: &Rc<Party>) -> Character {
         Attributes::new(5, 3, 3, 5),
         (2, 10),
     );
-    bob.set_weapon(HandType::MainHand, WAR_AXE);
-    //bob.set_shield(SPIKE_SHIELD);
+    bob.set_weapon(HandType::MainHand, SWORD);
+    bob.set_shield(SPIKE_SHIELD);
     bob.armor_piece.set(Some(LEATHER_ARMOR));
     bob.learn_passive(PassiveSkill::Reaper);
     bob.learn_ability(&SWEEP_ATTACK);
@@ -659,8 +659,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, HUNGERING_BLADE);
-    alice.set_shield(SMALL_SHIELD);
+    alice.set_weapon(HandType::MainHand, BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(FIRE_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2)));

@@ -334,10 +334,10 @@
       "name": null
     },
     {
-      "type_": "Alice",
+      "type_": "Draug",
       "pos": [
-        17,
-        29
+        14,
+        28
       ],
       "health": null,
       "main_hand": null,
@@ -345,9 +345,9 @@
       "name": null
     },
     {
-      "type_": "Draug",
+      "type_": "Clara",
       "pos": [
-        14,
+        17,
         28
       ],
       "health": null,
