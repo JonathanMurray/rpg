@@ -11,10 +11,7 @@ use crate::{
     game_ui_connection::GameUserInterfaceConnection,
     init_fight_map::GameInitState,
     sounds::SoundPlayer,
-    textures::{
-        load_all_effects, load_all_sprites, load_and_init_texture, EffectId, PortraitId, Sprite,
-        SpriteId,
-    },
+    textures::{load_all_sprites, load_and_init_texture, EffectId, PortraitId, Sprite, SpriteId},
 };
 
 #[derive(Clone)]
@@ -25,7 +22,6 @@ pub struct GameResources {
     pub decorative_font: Font,
     pub tiny_font: Font,
     pub terrain_atlas: Texture2D,
-    pub effect_textures: HashMap<EffectId, Texture2D>,
 }
 
 impl GameResources {
@@ -64,7 +60,6 @@ impl GameResources {
                 }
             });
         }
-        let effect_textures = load_all_effects().await;
 
         Self {
             sprites,
@@ -73,7 +68,6 @@ impl GameResources {
             decorative_font,
             tiny_font,
             terrain_atlas,
-            effect_textures,
         }
     }
 }

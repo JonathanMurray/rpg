@@ -1252,9 +1252,9 @@ pub const SWEEP_ATTACK: Ability = Ability {
     speech: "",
     description: "Attack all surrounding enemies",
     icon: IconId::SweepAttack,
-    action_point_cost: 0, //3,
+    action_point_cost: 3,
     mana_cost: 0,
-    stamina_cost: 0, //2,
+    stamina_cost: 2,
     requirement: Some(EquipmentRequirement::Weapon(WeaponType::Melee)),
 
     roll: Some(AbilityRollType::RollDuringAttack(0)),

@@ -398,7 +398,6 @@ pub struct GameGrid {
     hovered_character_portrait: Option<CharacterId>,
     prev_inspect_target: Option<CharacterId>,
     enemys_target: Option<CharacterId>,
-    effect_textures: HashMap<EffectId, Texture2D>,
 
     sound_player: SoundPlayer,
 }
@@ -418,7 +417,6 @@ impl GameGrid {
         decorations: IndexMap<Position, TerrainId>,
         surfaces: IndexMap<Position, TerrainId>,
         control_points: IndexMap<Position, ControlPoint>,
-        effect_textures: HashMap<EffectId, Texture2D>,
         sound_player: SoundPlayer,
     ) -> Self {
         let zoom_index = 1;
@@ -466,7 +464,6 @@ impl GameGrid {
             decorations,
             surfaces,
             control_points,
-            effect_textures,
             sound_player,
         };
 
@@ -1002,7 +999,7 @@ impl GameGrid {
                 delay + aim_duration + projectile_duration
             }
             AbilityAnimation::SpinAttack => {
-                let duration = 0.5;
+                let duration = 0.4;
                 let angle = PI * 0.05;
 
                 self.character_animations.push(CharacterAnimation::new(

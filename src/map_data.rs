@@ -88,7 +88,6 @@ pub fn create_game_grid(
         map_data.decorations.clone(),
         map_data.surfaces.clone(),
         map_data.control_points.clone(),
-        resources.effect_textures.clone(),
         sound_player,
     );
 
@@ -465,7 +464,7 @@ pub fn create_character(
             let enslaved = Character::new(
                 bot(BotBehaviour::Fighter(Default::default()), 12.0),
                 "Enslaved",
-                SoundId::Damage,
+                SoundId::DamageOgre,
                 PortraitId::Enslaved,
                 SpriteId::Enslaved,
                 Attributes::new(5, 5, 2, 1),

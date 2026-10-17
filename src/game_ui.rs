@@ -666,7 +666,6 @@ impl UserInterface {
             init_state.decorations,
             init_state.surfaces,
             init_state.control_points,
-            resources.effect_textures.clone(),
             sound_player.clone(),
         );
         game_grid.auto_tile();

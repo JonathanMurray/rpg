@@ -343,6 +343,28 @@
       "main_hand": null,
       "shield": null,
       "name": null
+    },
+    {
+      "type_": "Huldra",
+      "pos": [
+        11,
+        28
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Enslaved",
+      "pos": [
+        16,
+        26
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
     }
   ]
 }
