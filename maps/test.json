@@ -323,32 +323,21 @@
   },
   "characters": [
     {
-      "type_": "Bob",
+      "type_": "Ghoul2",
+      "pos": [
+        15,
+        34
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Alice",
       "pos": [
         11,
-        28
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Draug",
-      "pos": [
-        14,
-        28
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Clara",
-      "pos": [
-        17,
-        28
+        22
       ],
       "health": null,
       "main_hand": null,

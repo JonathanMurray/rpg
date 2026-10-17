@@ -1637,7 +1637,7 @@ impl UserInterface {
     pub fn handle_game_event(&mut self, event: Box<GameEvent>) {
         self.target_ui.rebuild_character_ui();
 
-        dbg!(&event);
+        //dbg!(&event);
 
         match *event {
             GameEvent::LogLine(line) => {
@@ -1886,8 +1886,15 @@ impl UserInterface {
                     }
                 }
 
-                self.game_grid
-                    .set_character_motion(character, from, to, duration, movement_type);
+                self.game_grid.set_character_motion(
+                    character,
+                    from,
+                    to,
+                    duration,
+                    movement_type,
+                    step_idx,
+                    surface,
+                );
                 if movement_type == MovementType::Dash {
                     self.sound_player.play(SoundId::Dash);
                 } else if movement_type != MovementType::KnockedBack && step_idx % 2 == 0 {
@@ -2019,8 +2026,7 @@ impl UserInterface {
             if let Some(source) = source {
                 match source {
                     DamageSource::KnockbackCollision => {
-                        self.game_grid
-                            .animate_character_shaking(character_id, 0.0, 0.2);
+                        self.game_grid.animate_character_shaking(character_id, 0.0);
                         self.game_grid
                             .animate_effect(character_id, 0.5, EffectId::Pow);
                     }
@@ -2064,6 +2070,7 @@ impl UserInterface {
                                 fill: Some(Color::new(1.0, 1.0, 1.0, 0.3)),
                                 //fill: Some(fill_color),
                                 stroke: None,
+                                fade: true,
                             },
                         ),
                     },
@@ -2091,13 +2098,13 @@ impl UserInterface {
                             end_radius: Some(25.0),
                             fill: Some(Color::new(0.0, 0.0, 0.0, 0.3)),
                             stroke: Some((animation_color, 4.0)),
+                            fade: true,
                         },
                     ),
                 },
             );
 
-            self.game_grid
-                .animate_character_shaking(*target_id, start, 0.2);
+            self.game_grid.animate_character_shaking(*target_id, start);
 
             self.add_effect_for_target_outcome(outcome, start, *target_id, ability);
 
@@ -2217,7 +2224,7 @@ impl UserInterface {
 
         let animation_color = ability.animation_color;
         if let Some((target, outcome)) = &target_outcome {
-            self.game_grid.animate_character_shaking(*target, 0.0, 0.2);
+            self.game_grid.animate_character_shaking(*target, 0.0);
             self.add_effect_for_target_outcome(outcome, 0.0, *target, Some(ability));
             self.animation_stopwatch.set_to_at_least(0.3);
         }
@@ -2355,8 +2362,7 @@ impl UserInterface {
         }
 
         if damage_was_dealt {
-            self.game_grid
-                .animate_character_shaking(target, start_time, 0.2);
+            self.game_grid.animate_character_shaking(target, start_time);
         }
 
         if let Some((shape, outcomes)) = &event.area_outcomes {

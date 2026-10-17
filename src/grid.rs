@@ -176,7 +176,6 @@ enum AnimationDetails {
     Motion {
         from: Position,
         to: Position,
-        movement_type: MovementType,
     },
     MagicSparks {
         particles: RefCell<Vec<(f32, f32)>>,
@@ -185,14 +184,7 @@ enum AnimationDetails {
     MotionPreview {
         positions: Vec<Position>,
     },
-    Shake {
-        random_time_offset: f32,
-    },
     Death,
-    ReactingToAttacked {
-        toward: Position,
-        with_shield: bool,
-    },
     AttackCrosshairPreview {
         target_pos: Position,
     },
@@ -295,7 +287,7 @@ enum InterpolateShape {
 enum SpriteProperty {
     CharacterRotation,
     CharacterXOffsetCellW,
-    CharacterYOffsetCellW,
+    CharacterYOffsetCellW { jump: bool },
     FlipX,
     WeaponRotation,
     WeaponXOffsetCellW,
@@ -796,17 +788,79 @@ impl GameGrid {
         to: Position,
         duration: f32,
         movement_type: MovementType,
+        step_idx: u32,
+        surface: Option<Surface>,
     ) {
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             0.0,
             duration,
-            AnimationDetails::Motion {
-                from,
-                to,
-                movement_type,
-            },
+            AnimationDetails::Motion { from, to },
         ));
+
+        match movement_type {
+            MovementType::KnockedBack => {
+                let amount = PI * 0.1;
+
+                self.character_animations.push(CharacterAnimation::new(
+                    character_id,
+                    0.0,
+                    duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![(
+                            SpriteProperty::CharacterRotation,
+                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, amount)]),
+                        )],
+                    },
+                ));
+            }
+            MovementType::Dash => {
+                let amount = PI * 0.05;
+
+                self.character_animations.push(CharacterAnimation::new(
+                    character_id,
+                    0.0,
+                    duration,
+                    AnimationDetails::TransformSprite {
+                        timelines: vec![(
+                            SpriteProperty::CharacterRotation,
+                            PropertyTimeline(vec![PropertyUpdate::linear(0.0, amount)]),
+                        )],
+                    },
+                ));
+            }
+            MovementType::AbilityEngage | MovementType::Regular => {
+                if step_idx % 2 == 0 {
+                    let rotation = if step_idx % 4 == 0 { 0.08 } else { -0.04 };
+                    let mut timelines = vec![(
+                        SpriteProperty::CharacterRotation,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.5, rotation),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    )];
+                    let walking_through_liquid = surface.map(|s| s.is_liquid()).unwrap_or_default();
+                    if !walking_through_liquid {
+                        let jump_height = 0.25;
+                        timelines.push((
+                            SpriteProperty::CharacterYOffsetCellW { jump: true },
+                            PropertyTimeline(vec![
+                                // Leave ground quickly
+                                PropertyUpdate::pow(0.5, -jump_height, 0.5),
+                                // Start falling back down slowly
+                                PropertyUpdate::pow(1.0, 0.0, 2.0),
+                            ]),
+                        ));
+                    }
+                    self.character_animations.push(CharacterAnimation::new(
+                        character_id,
+                        0.0,
+                        duration * 2.0,
+                        AnimationDetails::TransformSprite { timelines },
+                    ));
+                }
+            }
+        }
     }
 
     pub fn set_hovered_portrait(&mut self, character_id: Option<CharacterId>) {
@@ -972,7 +1026,7 @@ impl GameGrid {
                     AnimationDetails::TransformSprite {
                         timelines: vec![
                             (
-                                SpriteProperty::CharacterYOffsetCellW,
+                                SpriteProperty::CharacterYOffsetCellW { jump: true },
                                 PropertyTimeline(vec![PropertyUpdate {
                                     end_time_ratio: 1.0,
                                     interpolation: Some(PropertyInterpolation {
@@ -1081,17 +1135,97 @@ impl GameGrid {
                     start_time: start_time + i as f32 * 0.025,
                     end_time: start_time + duration + i as f32 * 0.025,
                     variant: EffectVariant::At(
-                        EffectPosition::Projectile,
+                        EffectPosition::StraightProjectile,
                         EffectGraphics::Circle {
                             radius: 12.0 - i as f32 * 2.0,
                             end_radius: None,
                             fill: Some(animation_color),
                             stroke: Some((Color::new(0.9, 0.9, 0.9, 0.5), 2.0)),
+                            fade: true,
                         },
                     ),
                 },
             );
         }
+    }
+
+    fn animate_attack_reaction(
+        &mut self,
+        reactor_id: CharacterId,
+        delay: f32,
+        duration: f32,
+        attacker_pos: Position,
+        with_shield: bool,
+    ) {
+        let reactor_pos = self.character_screen_pos(self.characters.get(&reactor_id).unwrap());
+        let attacker_pos = self.grid_pos_to_screen(attacker_pos);
+
+        let direction = Vec2::from(reactor_pos) - Vec2::from(attacker_pos);
+        let displacement = Vec2::ZERO.move_towards(direction, 0.1);
+        let weapon_rotation = PI * 0.3;
+
+        let mut timelines = vec![
+            (
+                SpriteProperty::CharacterXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, displacement.x, 2.0),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                SpriteProperty::CharacterYOffsetCellW { jump: false },
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, displacement.y, 2.0),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                // Lean slightly backwards
+                SpriteProperty::CharacterRotation,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.1, -PI * 0.05, 2.0),
+                    PropertyUpdate::fixed(0.9),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+        ];
+
+        if with_shield {
+            timelines.push((
+                SpriteProperty::ShieldXOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, 0.2, 2.0),
+                    PropertyUpdate::fixed(0.9),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+
+            timelines.push((
+                SpriteProperty::ShieldYOffsetCellW,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.2, -0.4, 2.0),
+                    PropertyUpdate::fixed(0.9),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+        } else {
+            timelines.push((
+                SpriteProperty::WeaponRotation,
+                PropertyTimeline(vec![
+                    PropertyUpdate::pow(0.3, weapon_rotation, 2.0),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ));
+        }
+
+        self.character_animations.push(CharacterAnimation::new(
+            reactor_id,
+            delay,
+            duration,
+            AnimationDetails::TransformSprite { timelines },
+        ));
     }
 
     pub fn animate_character_attacking(
@@ -1120,40 +1254,39 @@ impl GameGrid {
 
         let attacker_pos = attacker.pos();
 
+        let mut aim_duration = 0.0;
+
         let duration = if ranged {
-            let projectile_duration = (0.03 * distance_between(attacker_pos, target_pos)).max(0.15);
-            self.character_animations.push(CharacterAnimation::new(
-                attacker.id(),
-                delay,
-                1.0,
-                AnimationDetails::RangedAttack { toward: target_pos },
-            ));
+            let projectile_duration = (0.02 * distance_between(attacker_pos, target_pos)).max(0.15);
+
+            aim_duration = self.animate_ranged_weapon_attack(attacker.id(), delay, target_pos);
 
             if let Some((reactor_id, with_shield)) = target_reaction {
-                self.character_animations.push(CharacterAnimation::new(
+                self.animate_attack_reaction(
                     reactor_id,
-                    delay,
-                    // keep the animation going slightly after the projectil hits
+                    delay + aim_duration,
                     projectile_duration + 0.1,
-                    AnimationDetails::ReactingToAttacked {
-                        toward: attacker_pos,
-                        with_shield,
-                    },
-                ));
+                    attacker_pos,
+                    with_shield,
+                );
             }
 
             self.add_effect(
                 attacker_pos,
                 target_pos,
                 Effect {
-                    start_time: delay,
-                    end_time: delay + projectile_duration,
-                    variant: EffectVariant::Line {
-                        thickness: 1.0,
-                        end_thickness: Some(4.0),
-                        color: RED,
-                        extend_gradually: true,
-                    },
+                    start_time: delay + aim_duration,
+                    end_time: delay + aim_duration + projectile_duration,
+                    variant: EffectVariant::At(
+                        EffectPosition::GravitationalProjectile { gravity: 9.0 },
+                        EffectGraphics::Circle {
+                            radius: 3.0,
+                            end_radius: None,
+                            fill: Some(RED),
+                            stroke: Some((BLACK, 3.0)),
+                            fade: false,
+                        },
+                    ),
                 },
             );
 
@@ -1161,8 +1294,8 @@ impl GameGrid {
                 attacker_pos,
                 target_pos,
                 Effect {
-                    start_time: delay + projectile_duration,
-                    end_time: delay + projectile_duration + 0.2,
+                    start_time: delay + aim_duration + projectile_duration,
+                    end_time: delay + aim_duration + projectile_duration + 0.2,
                     variant: EffectVariant::At(
                         EffectPosition::Destination,
                         EffectGraphics::Circle {
@@ -1170,6 +1303,7 @@ impl GameGrid {
                             end_radius: Some(5.0),
                             fill: None,
                             stroke: Some((RED, 2.0)),
+                            fade: true,
                         },
                     ),
                 },
@@ -1181,15 +1315,13 @@ impl GameGrid {
             self.animate_melee_weapon_attack(attacker.id(), delay, target_pos, false);
 
             if let Some((reactor, with_shield)) = target_reaction {
-                self.character_animations.push(CharacterAnimation::new(
+                self.animate_attack_reaction(
                     reactor,
                     delay,
                     duration + 0.1,
-                    AnimationDetails::ReactingToAttacked {
-                        toward: attacker_pos,
-                        with_shield,
-                    },
-                ));
+                    attacker_pos,
+                    with_shield,
+                );
             }
 
             self.add_effect(
@@ -1205,6 +1337,7 @@ impl GameGrid {
                             end_radius: Some(5.0),
                             fill: None,
                             stroke: Some((RED, 2.0)),
+                            fade: true,
                         },
                     ),
                 },
@@ -1212,7 +1345,73 @@ impl GameGrid {
             0.1
         };
 
-        (delay, delay + duration)
+        (delay + aim_duration, delay + aim_duration + duration)
+    }
+
+    fn animate_ranged_weapon_attack(
+        &mut self,
+        attacker_id: CharacterId,
+        delay: f32,
+        target_pos: Position,
+    ) -> f32 {
+        let duration = 0.8;
+
+        let attacker_pos = self.character_screen_pos(&self.characters.get(&attacker_id).unwrap());
+        let target_pos = Vec2::new(
+            self.grid_x_to_screen(target_pos.0),
+            self.grid_y_to_screen(target_pos.1),
+        );
+
+        let direction = target_pos - Vec2::from(attacker_pos);
+        let displacement = -Vec2::ZERO.move_towards(direction, 0.5);
+
+        let weapon_rotation = -PI * 0.3;
+
+        self.character_animations.push(CharacterAnimation::new(
+            attacker_id,
+            delay,
+            duration,
+            AnimationDetails::TransformSprite {
+                timelines: vec![
+                    (
+                        SpriteProperty::CharacterXOffsetCellW,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.2, displacement.x),
+                            PropertyUpdate::fixed(0.8),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::CharacterYOffsetCellW { jump: false },
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.2, displacement.y),
+                            PropertyUpdate::fixed(0.8),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        // Lean backward
+                        SpriteProperty::CharacterRotation,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::fixed(0.2),
+                            PropertyUpdate::linear(0.4, -PI * 0.05),
+                            PropertyUpdate::fixed(0.8),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                    (
+                        SpriteProperty::WeaponRotation,
+                        PropertyTimeline(vec![
+                            PropertyUpdate::linear(0.05, weapon_rotation),
+                            PropertyUpdate::fixed(0.9),
+                            PropertyUpdate::linear(1.0, 0.0),
+                        ]),
+                    ),
+                ],
+            },
+        ));
+
+        duration * 0.5
     }
 
     fn animate_melee_weapon_attack(
@@ -1231,6 +1430,8 @@ impl GameGrid {
 
         let direction = target_pos - Vec2::from(attacker_pos);
         let displacement = Vec2::ZERO.move_towards(direction, 0.8);
+        let jump_amount = 0.3;
+
         let weapon_rotation = PI * 0.3;
 
         let mut timelines = vec![
@@ -1243,17 +1444,28 @@ impl GameGrid {
                 ]),
             ),
             (
-                SpriteProperty::CharacterYOffsetCellW,
+                SpriteProperty::CharacterYOffsetCellW { jump: false },
                 PropertyTimeline(vec![
-                    PropertyUpdate::pow(0.2, displacement.y, 2.0),
+                    PropertyUpdate::pow(0.2, displacement.y - jump_amount, 2.0),
+                    PropertyUpdate::pow(0.3, displacement.y, 2.0),
                     PropertyUpdate::fixed(0.8),
                     PropertyUpdate::linear(1.0, 0.0),
                 ]),
             ),
             (
+                // Squish the sprite horizontally very slightly, to hint at rotation in the z axis
+                SpriteProperty::FlipX,
+                PropertyTimeline(vec![
+                    PropertyUpdate::linear(0.2, 0.1),
+                    PropertyUpdate::fixed(0.8),
+                    PropertyUpdate::linear(1.0, 0.0),
+                ]),
+            ),
+            (
+                // Lean forward
                 SpriteProperty::CharacterRotation,
                 PropertyTimeline(vec![
-                    PropertyUpdate::pow(0.2, PI * 0.05, 2.0),
+                    PropertyUpdate::pow(0.2, PI * 0.08, 2.0),
                     PropertyUpdate::fixed(0.8),
                     PropertyUpdate::linear(1.0, 0.0),
                 ]),
@@ -1312,19 +1524,23 @@ impl GameGrid {
         ));
     }
 
-    pub fn animate_character_shaking(
-        &mut self,
-        character_id: CharacterId,
-        start: f32,
-        duration: f32,
-    ) {
-        let random_time_offset = random_range(0.0..1.0);
-
+    pub fn animate_character_shaking(&mut self, character_id: CharacterId, start: f32) {
+        let duration = 0.3;
+        let amount = 0.3;
         self.character_animations.push(CharacterAnimation::new(
             character_id,
             start,
             duration,
-            AnimationDetails::Shake { random_time_offset },
+            AnimationDetails::TransformSprite {
+                timelines: vec![(
+                    SpriteProperty::CharacterXOffsetCellW,
+                    PropertyTimeline(vec![
+                        PropertyUpdate::linear(0.25, amount),
+                        PropertyUpdate::linear(0.75, -amount),
+                        PropertyUpdate::linear(1.0, 0.0),
+                    ]),
+                )],
+            },
         ));
     }
 
@@ -1982,52 +2198,6 @@ impl GameGrid {
                         .collect();
                     self.draw_movement_path_with_arrow(path.into_iter(), color);
                 }
-
-                AnimationDetails::Motion {
-                    movement_type,
-                    from,
-                    to,
-                } => {
-                    let cycle_time = ((game_time * 1.5) % (game_time * 1.5).floor()) as f32;
-                    match movement_type {
-                        MovementType::KnockedBack => {
-                            let amount = PI * 0.1;
-                            if from.0 < to.0 {
-                                params.rotation = amount;
-                            } else {
-                                params.rotation = -amount;
-                            }
-                        }
-                        MovementType::Dash => {
-                            let amount = PI * 0.05;
-                            if from.0 < to.0 {
-                                params.rotation = amount;
-                            } else {
-                                params.rotation = -amount;
-                            }
-                        }
-                        _ => {
-                            let amount = 0.05;
-                            if cycle_time < 0.5 {
-                                params.rotation = -amount + cycle_time / 0.5 * amount * 2.0;
-                            } else {
-                                params.rotation = amount - (cycle_time - 0.5) / 0.5 * amount * 2.0;
-                            }
-                            if (cycle_time > 0.15 && cycle_time < 0.35)
-                                || (cycle_time > 0.65 && cycle_time < 0.85)
-                            {
-                                y += 3.0;
-                            }
-                        }
-                    }
-                }
-                AnimationDetails::Shake { random_time_offset } => {
-                    if (((remaining + random_time_offset) / 0.1).floor()) as i32 % 2 == 0 {
-                        x -= 3.0;
-                    } else {
-                        x += 3.0;
-                    }
-                }
                 AnimationDetails::Death => {
                     let max_rotation = PI * 0.5;
                     if remaining_ratio > 0.9 {
@@ -2058,6 +2228,7 @@ impl GameGrid {
                 AnimationDetails::CastingSpell { .. } => {
                     // This is drawn separately, after all the characters
                 }
+                AnimationDetails::Motion { .. } => {}
                 AnimationDetails::RangedAttack { toward } => {
                     // t goes from 0 to 1
                     let t = 1.0 - remaining_ratio;
@@ -2131,9 +2302,11 @@ impl GameGrid {
                                 x += cell_w * value;
                                 shadow_x += cell_w * value;
                             }
-                            SpriteProperty::CharacterYOffsetCellW => {
+                            SpriteProperty::CharacterYOffsetCellW { jump } => {
                                 y += cell_w * value;
-                                //shadow_y += cell_w * value;
+                                if !jump {
+                                    shadow_y += cell_w * value;
+                                }
                             }
                             SpriteProperty::ShieldXOffsetCellW => {
                                 shield_offset = (shield_offset.0 + cell_w * value, shield_offset.1)
@@ -2151,36 +2324,6 @@ impl GameGrid {
                     }
                 }
 
-                AnimationDetails::ReactingToAttacked {
-                    toward,
-                    with_shield,
-                } => {
-                    let toward = Vec2::new(
-                        self.grid_x_to_screen(toward.0) - cell_w,
-                        self.grid_y_to_screen(toward.1) - cell_w,
-                    );
-                    let displaced = Vec2::new(x, y).move_towards(toward, cell_w * 0.1);
-                    x = displaced.x;
-                    y = displaced.y;
-
-                    // Lean slightly backwards
-                    params.rotation = if character.is_facing_east.get() {
-                        -0.05
-                    } else {
-                        0.05
-                    };
-
-                    if *with_shield {
-                        let x_mult = if character.is_facing_east.get() {
-                            1.0
-                        } else {
-                            -1.0
-                        };
-                        shield_offset = (cell_w * 0.2 * x_mult, -cell_w * 0.4);
-                    } else {
-                        weapon_rotation_modifier = PI * 0.2;
-                    }
-                }
                 AnimationDetails::HealthLost { .. } => {
                     // Blink in and out of existence as a damage effect
                     show_sprite = (remaining / 0.1).floor() as i32 % 2 == 0;
@@ -2300,9 +2443,9 @@ impl GameGrid {
                         rotation = 0.2 * PI;
                         y_offset = cell_w * 1.0;
                     }
-                    let mut weapon_params = DrawTextureParams { rotation, ..params };
-                    let dest_size = params.dest_size.unwrap();
-                    weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
+                    let weapon_params = DrawTextureParams { rotation, ..params };
+                    //let dest_size = params.dest_size.unwrap();
+                    //weapon_params.pivot = Some((x + dest_size.x / 2.0, y + dest_size.y).into());
                     draw_texture_ex(
                         &self.sprites[&texture].regular,
                         x + weapon_x_offset,
@@ -4882,12 +5025,23 @@ impl GameGrid {
                     let (x, y) = match position {
                         EffectPosition::Source => effect.source_pos,
                         EffectPosition::Destination => effect.destination_pos,
-                        EffectPosition::Projectile => {
+                        EffectPosition::StraightProjectile => {
                             let x = effect.source_pos.0
                                 + (effect.destination_pos.0 - effect.source_pos.0) * t;
                             let y = effect.source_pos.1
                                 + (effect.destination_pos.1 - effect.source_pos.1) * t;
                             (x, y)
+                        }
+                        EffectPosition::GravitationalProjectile { gravity } => {
+                            let dy = -gravity * t + gravity * t.powf(2.0);
+
+                            let x = effect.source_pos.0
+                                + (effect.destination_pos.0 - effect.source_pos.0) * t;
+                            let y = effect.source_pos.1
+                                + (effect.destination_pos.1 - effect.source_pos.1) * t
+                                + dy;
+                            // Center of entity
+                            (x, y - 1.0)
                         }
                     };
 
@@ -4904,11 +5058,11 @@ impl GameGrid {
                 } => {
                     let from = (
                         self.grid_x_f32_to_screen(effect.source_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.source_pos.1 + 0.5),
+                        self.grid_y_f32_to_screen(effect.source_pos.1 - 0.5),
                     );
                     let mut to = (
                         self.grid_x_f32_to_screen(effect.destination_pos.0 + 0.5),
-                        self.grid_y_f32_to_screen(effect.destination_pos.1 + 0.5),
+                        self.grid_y_f32_to_screen(effect.destination_pos.1 - 0.5),
                     );
 
                     if *extend_gradually {
@@ -4919,7 +5073,7 @@ impl GameGrid {
                         Some(end_thickness) => thickness + (end_thickness - thickness) * t,
                         None => *thickness,
                     };
-                    draw_dashed_line(from, to, thickness, *color, 5.0, None, false);
+                    draw_dashed_line(from, to, thickness, *color, 5.0, None, true);
                 }
                 EffectVariant::Fx { texture } => {
                     let from = (
@@ -5542,7 +5696,8 @@ pub enum EffectVariant {
 pub enum EffectPosition {
     Source,
     Destination,
-    Projectile,
+    StraightProjectile,
+    GravitationalProjectile { gravity: f32 },
 }
 
 #[derive(Debug)]
@@ -5552,6 +5707,7 @@ pub enum EffectGraphics {
         end_radius: Option<f32>,
         fill: Option<Color>,
         stroke: Option<(Color, f32)>,
+        fade: bool,
     },
     Rectangle {
         width: f32,
@@ -5588,6 +5744,7 @@ impl EffectGraphics {
                 end_radius,
                 fill,
                 stroke,
+                fade,
             } => {
                 x += cell_w / 2.0;
                 y += cell_w / 2.0;
@@ -5606,7 +5763,7 @@ impl EffectGraphics {
                 };
 
                 if let Some(mut color) = fill {
-                    if t > expand {
+                    if t > expand && *fade {
                         color.a *= 1.0 - (t - expand) / (1.0 - expand);
                     }
                     draw_circle(x, y, r, color);

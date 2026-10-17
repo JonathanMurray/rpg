@@ -21,7 +21,7 @@ use crate::{
         KILL, KILL_SELF, LIGHTNING_BOLT, LIGHTNING_BOLT_REACH, LIQUID_FIRE, LUNGE_ATTACK,
         MANA_POTION, NECROTIC_BAND, PENETRATING_ARROWS, RUBY, SAPHIRE, SLASHING_RAPIER,
         SMALL_SHIELD, SPIKETEST, SPIKE_SHIELD, SPIKE_TRAP, STAFF, SWEEP_ATTACK_PUSH, TOXIC_GRENADE,
-        WAR_AXE, WAR_HAMMER,
+        WAR_AXE, WAR_HAMMER, ZERO_BOW,
     },
     grid::{ControlPoint, GameGrid},
     pathfind::{Occupation, PathfindGrid, Surface},
@@ -659,7 +659,7 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
         Attributes::new(3, 5, 3, 3),
         (1, 10),
     );
-    alice.set_weapon(HandType::MainHand, BOW);
+    alice.set_weapon(HandType::MainHand, ZERO_BOW);
     alice.armor_piece.set(Some(SHIRT));
     alice.arrows.set(Some(ArrowStack::new(FIRE_ARROWS, 3)));
     alice.try_gain_equipment(EquipmentEntry::Arrows(ArrowStack::new(EXPLODING_ARROWS, 2)));
@@ -680,8 +680,6 @@ pub fn make_high_alice(party: &Rc<Party>) -> Character {
     alice.learn_ability(&SPIKE_TRAP);
     alice.learn_ability(&INFLICT_WOUNDS);
     alice.learn_passive(PassiveSkill::Reaper);
-
-    alice.receive_condition(Condition::Ferocity, Some(3), None);
 
     alice
 }
