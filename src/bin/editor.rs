@@ -566,6 +566,7 @@ impl Sidebar {
             TerrainId::Floor7,
             TerrainId::Floor8,
             TerrainId::Floor9,
+            TerrainId::Floor10,
             TerrainId::Grass,
             TerrainId::Grass2,
             TerrainId::Grass3,

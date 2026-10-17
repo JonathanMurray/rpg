@@ -2135,13 +2135,20 @@ impl GameGrid {
     }
 
     fn fill_cell(&self, (grid_x, grid_y): Position, color: Color, margin: f32) {
-        draw_rectangle(
-            self.grid_x_to_screen(grid_x) + margin,
-            self.grid_y_to_screen(grid_y) + margin,
-            self.cell_w().round() - margin * 2.0,
-            self.cell_w().round() - margin * 2.0,
-            color,
-        )
+        //println!("{:?} : y={}, h={}", (grid_x, grid_y),self.grid_y_to_screen(grid_y) + margin,  self.cell_w().ceil() - margin * 2.0);
+
+        let x = self.grid_x_to_screen(grid_x) + margin;
+        let y = self.grid_y_to_screen(grid_y) + margin;
+
+        // We sadly cannot simply use cell_w, since that may result in consecutive cells that overlap or don't touch
+        // due to rounding errors. Cell_w is not guaranteed to be a nice number; we've prioritized for rect_w to be
+        // that, and one entity rect is made up of 3x3 cells.
+        let next_x = self.grid_x_to_screen(grid_x + 1) + margin;
+        let next_y = self.grid_y_to_screen(grid_y + 1) + margin;
+        let w = next_x - x;
+        let h = next_y - y;
+
+        draw_rectangle(x, y, w - margin * 2.0, h - margin * 2.0, color)
     }
 
     fn draw_control_points(&self) {
@@ -5406,14 +5413,7 @@ impl GameGrid {
 
     fn draw_movement_path_background(&self, character_id: CharacterId) {
         let character = &self.characters[&character_id];
-
-        let extended_range = self.active_char().movement_range();
-
-        self.draw_move_range_indicator(
-            character,
-            character.remaining_movement.get(),
-            Some(extended_range),
-        );
+        self.draw_move_range_indicator(character);
     }
 
     fn draw_occupation(&self, filter: OccupationFilter) {
@@ -5582,13 +5582,10 @@ impl GameGrid {
         );
     }
 
-    fn draw_move_range_indicator(
-        &self,
-        character: &Character,
-        range: f32,
-        extended_range: Option<f32>,
-    ) {
-        let range_floor = extended_range.map(|r| r.floor()).unwrap_or(range.floor()) as i32;
+    fn draw_move_range_indicator(&self, character: &Character) {
+        let range = character.remaining_movement.get();
+        let extended_range = self.active_char().movement_range();
+        let range_ceil = extended_range.ceil() as i32;
         let origin = character.pos();
 
         let within = |x: i32, y: i32, range| {
@@ -5605,16 +5602,13 @@ impl GameGrid {
         };
 
         let within_inner = |x: i32, y: i32| within(x, y, range);
-        let within_outer = |x: i32, y: i32| within(x, y, extended_range.unwrap());
-
-        for x in (origin.0 - range_floor).max(0)
-            ..=(origin.0 + range_floor).min(self.grid_dimensions.0 as i32 - 1)
+        let within_outer = |x: i32, y: i32| within(x, y, extended_range);
+        for x in (origin.0 - range_ceil).max(0)
+            ..=(origin.0 + range_ceil).min(self.grid_dimensions.0 as i32 - 1)
         {
-            for y in (origin.1 - range_floor).max(0)
-                ..=(origin.1 + range_floor).min(self.grid_dimensions.1 as i32 - 1)
+            for y in (origin.1 - range_ceil).max(0)
+                ..=(origin.1 + range_ceil).min(self.grid_dimensions.1 as i32 - 1)
             {
-                let thickness = 3.0;
-
                 if within_inner(x, y) {
                     self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
                     self.draw_borders(
@@ -5623,11 +5617,11 @@ impl GameGrid {
                         !within_inner(x + 1, y),
                         !within_inner(x, y - 1),
                         !within_inner(x, y + 1),
-                        thickness,
+                        1.0,
                         MOVE_RANGE_COLOR,
-                        DrawBorder::Dashed,
+                        DrawBorder::Line,
                     );
-                } else if extended_range.is_some() && within_outer(x, y) {
+                } else if within_outer(x, y) {
                     self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
                     //self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
                     self.draw_borders(

@@ -535,6 +535,7 @@ pub enum TerrainId {
     Floor7,
     Floor8,
     Floor9,
+    Floor10,
     Dirt,
     SpikesSingleCell,
     FireSurfaceSingleCell,
@@ -709,6 +710,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::Floor7 => (12, 3),
         TerrainId::Floor8 => (13, 3),
         TerrainId::Floor9 => (14, 3),
+        TerrainId::Floor10 => (13, 1),
         TerrainId::Dirt => (11, 4),
         TerrainId::NewWater(orientation, type_) => {
             is_poison = type_ == LiquidType::Poison;
