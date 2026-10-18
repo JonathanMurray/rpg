@@ -560,7 +560,7 @@ pub enum TerrainId {
     StoneWall(WallOrientation),
     LowWall(WallOrientation),
 
-    Staircase1,
+    Staircase,
 
     Bush,
     WallPlant,
@@ -802,7 +802,7 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::LowWall(WallOrientation::ConvexSouthEast) => (14, 15),
         TerrainId::LowWall(WallOrientation::Inner) => (13, 14),
 
-        TerrainId::Staircase1 => (12, 15),
+        TerrainId::Staircase => (12, 15),
 
         TerrainId::Bush => (0, 7),
         TerrainId::WallPlant => (0, 8),

@@ -7,8 +7,12 @@
     "(4, 4)": "Bush",
     "(4, 7)": "Bush",
     "(25, 4)": "Table",
-    "(14, 4)": "Chest",
-    "(17, 4)": "Chest",
+    "(22, 16)": {
+      "LowWall": "South"
+    },
+    "(13, 13)": {
+      "LowWall": "South"
+    },
     "(4, 10)": "TreeStump",
     "(1, 28)": {
       "StoneWall": "ConcaveNorthEast"
@@ -136,40 +140,58 @@
     "(19, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
+    "(19, 7)": {
+      "LowWall": "South"
+    },
+    "(13, 10)": {
+      "LowWall": "South"
+    },
+    "(16, 7)": {
+      "LowWall": "South"
+    },
+    "(13, 16)": {
+      "LowWall": "South"
+    },
     "(19, 10)": {
       "LowWall": "South"
     },
     "(16, 13)": {
       "LowWall": "South"
     },
-    "(13, 10)": {
+    "(10, 16)": {
       "LowWall": "South"
     },
-    "(16, 10)": {
-      "LowWall": "South"
-    },
-    "(19, 13)": {
-      "LowWall": "South"
-    },
-    "(13, 13)": {
-      "LowWall": "South"
-    },
-    "(13, 16)": {
-      "LowWall": "South"
-    },
-    "(16, 16)": {
+    "(13, 7)": {
       "LowWall": "South"
     },
     "(19, 16)": {
       "LowWall": "South"
     },
-    "(10, 16)": {
+    "(19, 13)": {
+      "LowWall": "South"
+    },
+    "(10, 7)": {
       "LowWall": "South"
     },
     "(10, 13)": {
       "LowWall": "South"
     },
     "(10, 10)": {
+      "LowWall": "South"
+    },
+    "(16, 16)": {
+      "LowWall": "South"
+    },
+    "(22, 10)": {
+      "LowWall": "South"
+    },
+    "(22, 7)": {
+      "LowWall": "South"
+    },
+    "(22, 13)": {
+      "LowWall": "South"
+    },
+    "(16, 10)": {
       "LowWall": "South"
     }
   },
@@ -360,7 +382,8 @@
     "(8, 8)": "SmallStone",
     "(5, 25)": "WallPlant",
     "(6, 25)": "WallPlant",
-    "(13, 1)": "WallWindow"
+    "(13, 1)": "WallWindow",
+    "(16, 16)": "Staircase"
   },
   "surfaces": {
     "(11, 7)": "SpikesSingleCell",
@@ -421,8 +444,8 @@
     {
       "type_": "Alice",
       "pos": [
-        15,
-        12
+        16,
+        13
       ],
       "health": null,
       "main_hand": null,

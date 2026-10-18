@@ -668,7 +668,7 @@ impl UserInterface {
             init_state.control_points,
             sound_player.clone(),
         );
-        game_grid.auto_tile();
+        game_grid.refresh_tiles_and_pathfind_grid();
 
         let player_portraits = PlayerPortraits::new(
             &characters,
@@ -1303,7 +1303,7 @@ impl UserInterface {
                     let mut prev = from;
                     line_visitor(from, to, |x, y| {
                         if matches!(
-                            self.game_grid.pathfind_grid.occupied().get(&(x, y)),
+                            self.game_grid.pathfind_grid.occupation(&(x, y)),
                             Some(Occupation::Terrain(TerrainType::TallWall))
                         ) {
                             *pos = prev;

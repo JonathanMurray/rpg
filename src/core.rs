@@ -1709,7 +1709,7 @@ impl CoreGame {
                         }
 
                         let existing_surface = self.pathfind_grid.surface((x, y));
-                        let occupation = self.pathfind_grid.occupied().get(&(x, y)).copied();
+                        let occupation = self.pathfind_grid.occupation(&(x, y));
                         if existing_surface.is_none()
                             && !matches!(occupation, Some(Occupation::Terrain(..)))
                         {
@@ -2370,14 +2370,14 @@ impl CoreGame {
                 // Order the targets from closest to actor to furthest away
                 //dbg!(actor.pos(), area_pos);
                 line_visitor(actor.pos(), area_pos, |x, y| {
-                    if let Some(Occupation::Character(ch_id)) = grid.occupied().get(&(x, y)) {
-                        let other_char = characters.get(*ch_id);
+                    if let Some(Occupation::Character(ch_id)) = grid.occupation(&(x, y)) {
+                        let other_char = characters.get(ch_id);
                         //dbg!(&other_char.name, (x, y));
-                        if targets.last() != Some(ch_id)
+                        if targets.last() != Some(&ch_id)
                             && is_valid_area_target(actor, other_char, acquisition)
-                            && *ch_id != actor.id()
+                            && ch_id != actor.id()
                         {
-                            targets.push(*ch_id);
+                            targets.push(ch_id);
                         }
                     }
                     false

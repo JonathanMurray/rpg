@@ -91,7 +91,7 @@ pub fn create_game_grid(
         sound_player,
     );
 
-    game_grid.auto_tile();
+    game_grid.refresh_tiles_and_pathfind_grid();
 
     game_grid
 }

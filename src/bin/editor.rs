@@ -408,7 +408,7 @@ async fn main() {
                                     .pathfind_grid
                                     .remove_occupied(pos, Occupation::Terrain(t.terrain_type()));
                                 game_grid.terrain_objects.swap_remove(&pos);
-                                game_grid.auto_tile();
+                                game_grid.refresh_tiles_and_pathfind_grid();
 
                                 map_data.terrain_objects.swap_remove(&pos);
                                 has_unsaved_changes = true;
@@ -628,7 +628,7 @@ impl Sidebar {
             TerrainId::SuitOfArmor,
             TerrainId::AnimalHead,
             TerrainId::FoodPlate,
-            TerrainId::Staircase1,
+            TerrainId::Staircase,
         ];
         let mut decoration_actions: Vec<EditorAction> = decorations
             .iter()

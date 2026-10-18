@@ -9,7 +9,7 @@ use std::{
 
 use indexmap::{map::Entry, IndexMap};
 use macroquad::{
-    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, YELLOW},
+    color::{Color, BLACK, GOLD, GRAY, LIGHTGRAY, MAGENTA, ORANGE, PINK, SKYBLUE, YELLOW},
     input::mouse_wheel,
     math::{Rect, Vec2},
     miniquad::window::dpi_scale,
@@ -480,11 +480,12 @@ impl GameGrid {
 
     /// Should only be called from editor; not from in-game!
     pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
-        if self.pathfind_grid.is_free(None, pos) {
+        if self.pathfind_grid.is_free(None, pos) && !self.terrain_objects.contains_key(&pos) {
+            println!("{:?} was free, for {:?}", pos, terrain_id);
             self.terrain_objects.insert(pos, terrain_id);
             self.pathfind_grid
                 .set_occupied(pos, Occupation::Terrain(terrain_id.terrain_type()));
-            self.auto_tile();
+            self.refresh_tiles_and_pathfind_grid();
             true
         } else {
             false
@@ -493,9 +494,10 @@ impl GameGrid {
 
     /// Should only be called from editor; not from in-game!
     pub fn editor_add_decoration(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
+        println!("Editor add decoration: {:?}", terrain_id);
         if !self.decorations.contains_key(&pos) {
             self.decorations.insert(pos, terrain_id);
-            self.auto_tile();
+            self.refresh_tiles_and_pathfind_grid();
             true
         } else {
             false
@@ -504,9 +506,14 @@ impl GameGrid {
 
     /// Should only be called from editor; not from in-game!
     pub fn editor_remove_decoration(&mut self, pos: Position) -> bool {
-        if let Some(terrain_id) = self.decorations.get(&pos) {
+        if let Some(terrain_id) = self.decorations.get(&pos).copied() {
             self.decorations.swap_remove(&pos);
-            self.auto_tile();
+            self.refresh_tiles_and_pathfind_grid();
+
+            if terrain_id == TerrainId::Staircase {
+                self.pathfind_grid.set_staircase(pos, false);
+            }
+
             true
         } else {
             false
@@ -520,7 +527,7 @@ impl GameGrid {
             if let Some((surface, size)) = terrain_id.surface() {
                 self.pathfind_grid.set_surface(pos, Some(surface), size);
             }
-            self.auto_tile();
+            self.refresh_tiles_and_pathfind_grid();
             true
         } else {
             false
@@ -534,7 +541,7 @@ impl GameGrid {
                 self.pathfind_grid.set_surface(pos, None, size);
             }
             self.surfaces.swap_remove(&pos);
-            self.auto_tile();
+            self.refresh_tiles_and_pathfind_grid();
             true
         } else {
             false
@@ -608,12 +615,21 @@ impl GameGrid {
         self.surfaces.insert(position, terrain_id);
     }
 
-    pub fn auto_tile(&mut self) {
-        self.auto_tile_terrain();
+    pub fn refresh_tiles_and_pathfind_grid(&mut self) {
+        self.auto_tile_terrain_objects();
         self.auto_tile_surfaces();
+
+        for (pos, terrain_id) in &self.decorations {
+            if terrain_id == &TerrainId::Staircase {
+                self.pathfind_grid.set_staircase(*pos, true);
+                if let Some(occupation) = self.pathfind_grid.occupation(pos) {
+                    self.pathfind_grid.remove_occupied(*pos, occupation);
+                }
+            }
+        }
     }
 
-    pub fn auto_tile_terrain(&mut self) {
+    pub fn auto_tile_terrain_objects(&mut self) {
         let mut new_map: IndexMap<Position, TerrainId> = Default::default();
         for (pos, terrain_id) in self.terrain_objects.iter() {
             let mut terrain_id = *terrain_id;
@@ -681,10 +697,10 @@ impl GameGrid {
                 } else {
                     TerrainId::LowWall(orientation)
                 };
-                dbg!(terrain_id);
+                //dbg!(terrain_id);
                 self.pathfind_grid
                     .set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
-                println!("Did set occupation {:?} = {:?}", pos, terrain_id);
+                //println!("Did set occupation {:?} = {:?}", pos, terrain_id);
             }
             new_map.insert(*pos, terrain_id);
         }
@@ -4308,7 +4324,7 @@ impl GameGrid {
         };
 
         line_visitor(from, to, |x, y| {
-            let obstructed = obstructs(self.pathfind_grid.occupied().get(&(x, y)));
+            let obstructed = obstructs(self.pathfind_grid.occupation(&(x, y)).as_ref());
 
             let color = if obstructed {
                 Color::new(1.0, 0.4, 0.4, 0.55)
@@ -5534,11 +5550,16 @@ impl GameGrid {
     }
 
     fn debug_draw_high_ground(&self) {
-        let (w, h) = self.pathfind_grid.dimensions();
-        for y in 0..(h - 1) as i32 {
-            for x in 0..(w - 1) as i32 {
-                if self.pathfind_grid.is_high_ground((x, y)) {
-                    self.fill_cell((x, y), MAGENTA.with_alpha(0.3), 1.0);
+        if false {
+            let (w, h) = self.pathfind_grid.dimensions();
+            for y in 0..(h - 1) as i32 {
+                for x in 0..(w - 1) as i32 {
+                    if self.pathfind_grid.is_high_ground((x, y)) {
+                        self.fill_cell((x, y), MAGENTA.with_alpha(0.3), 1.0);
+                    }
+                    if self.pathfind_grid.is_staircase((x, y)) {
+                        self.fill_cell((x, y), SKYBLUE.with_alpha(0.3), 1.0);
+                    }
                 }
             }
         }
@@ -5546,7 +5567,7 @@ impl GameGrid {
 
     fn draw_occupation(&self, filter: OccupationFilter) {
         let matching = |x, y| {
-            let occupation = self.pathfind_grid.occupied().get(&(x, y)).copied();
+            let occupation = self.pathfind_grid.occupation(&(x, y));
             match filter {
                 OccupationFilter::TallTerrain => {
                     occupation == Some(Occupation::Terrain(TerrainType::TallWall))
@@ -5751,12 +5772,17 @@ impl GameGrid {
                     );
                 } else if within_outer(x, y) {
                     self.fill_cell((x, y), Color::new(0.9, 0.7, 0.3, 0.15), 0.0);
-                    //self.fill_cell((x, y), MOVEMENT_PREVIEW_GRID_COLOR, 0.0);
+                    // Hack: since high-ground can have low-ground as a direct north neighbor,
+                    // if both positions are reachable (via completely different routes), clarify with
+                    // a border that they are not adjacement, movement-wise.
+                    let lower_ground_to_north = self.pathfind_grid.is_high_ground((x, y))
+                        && !self.pathfind_grid.is_high_ground((x, y - 1));
+
                     self.draw_borders(
                         (x, y),
                         !within_outer(x - 1, y),
                         !within_outer(x + 1, y),
-                        !within_outer(x, y - 1),
+                        !within_outer(x, y - 1) || lower_ground_to_north,
                         !within_outer(x, y + 1),
                         2.0,
                         MOVE_RANGE_EXTENDED_COLOR,

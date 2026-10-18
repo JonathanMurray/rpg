@@ -4,11 +4,11 @@
     45
   ],
   "terrain_objects": {
-    "(13, 28)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(28, 22)": {
+      "LowWall": "South"
     },
-    "(16, 28)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(31, 22)": {
+      "LowWall": "South"
     },
     "(4, 28)": {
       "StoneWall": "ConcaveNorthEast"
@@ -22,7 +22,7 @@
     "(58, 1)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 28)": {
+    "(70, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(1, 7)": {
@@ -88,10 +88,10 @@
     "(64, 4)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(10, 28)": {
+    "(58, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(7, 28)": {
+    "(4, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(1, 28)": {
@@ -100,13 +100,13 @@
     "(52, 1)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(34, 28)": {
+    "(61, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 28)": {
+    "(64, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(28, 28)": {
+    "(64, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(76, 37)": {
@@ -160,49 +160,49 @@
     "(82, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 19)": {
+    "(28, 16)": {
+      "LowWall": "South"
+    },
+    "(25, 16)": {
+      "LowWall": "South"
+    },
+    "(22, 16)": {
+      "LowWall": "South"
+    },
+    "(25, 19)": {
+      "LowWall": "South"
+    },
+    "(25, 22)": {
+      "LowWall": "South"
+    },
+    "(22, 19)": {
+      "LowWall": "South"
+    },
+    "(67, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 22)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(22, 22)": {
+      "LowWall": "South"
     },
-    "(19, 25)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(31, 16)": {
+      "LowWall": "South"
     },
-    "(16, 25)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(28, 19)": {
+      "LowWall": "South"
     },
-    "(16, 22)": {
-      "StoneWall": "ConcaveNorthEast"
+    "(31, 19)": {
+      "LowWall": "South"
     },
-    "(16, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 19)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 25)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 22)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 25)": {
+    "(7, 16)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(7, 19)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(10, 19)": {
+    "(4, 16)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(61, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(4, 19)": {
@@ -217,13 +217,13 @@
     "(61, 4)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(43, 28)": {
+    "(85, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(46, 28)": {
+    "(85, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(49, 28)": {
+    "(82, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(73, 40)": {
@@ -235,8 +235,12 @@
     "(58, 28)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(15, 16)": "TombStone",
-    "(6, 16)": "TombStone",
+    "(58, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(64, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
     "(22, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
@@ -276,7 +280,9 @@
     "(79, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(12, 16)": "TombStone",
+    "(61, 34)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
     "(88, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
@@ -397,10 +403,8 @@
     "(88, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(43, 10)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(46, 10)": {
+    "(37, 4)": "Chest",
+    "(64, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(46, 13)": {
@@ -409,7 +413,7 @@
     "(46, 16)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(49, 10)": {
+    "(61, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(70, 13)": {
@@ -592,16 +596,16 @@
     "(64, 31)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(34, 16)": {
+    "(79, 40)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(34, 19)": {
+    "(88, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 19)": {
+    "(61, 1)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(31, 16)": {
+    "(58, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(1, 31)": {
@@ -715,7 +719,7 @@
     "(46, 31)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(49, 31)": {
+    "(64, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(76, 40)": {
@@ -738,17 +742,19 @@
     },
     "(13, 7)": "TombStone",
     "(7, 7)": "TombStone",
-    "(4, 7)": "TombStone",
+    "(34, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
     "(64, 1)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(61, 7)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(43, 34)": {
+    "(73, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(46, 34)": {
+    "(76, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
     "(34, 34)": {
@@ -790,76 +796,27 @@
     "(79, 43)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(76, 43)": {
+    "(43, 34)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(73, 43)": {
+    "(46, 34)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(70, 43)": {
+    "(28, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(67, 43)": {
+    "(31, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(58, 40)": {
+    "(7, 28)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(61, 40)": {
+    "(7, 25)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(64, 40)": {
+    "(7, 22)": {
       "StoneWall": "ConcaveNorthEast"
-    },
-    "(64, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(64, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(61, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(58, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(61, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(79, 40)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(49, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(88, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(61, 1)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(85, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(85, 40)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(82, 40)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(64, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(58, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(61, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(64, 7)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(64, 16)": "Chest"
+    }
   },
   "background": {
     "(-4, 3)": "Floor",
@@ -910,7 +867,7 @@
     "(1, 4)": "Floor",
     "(1, 7)": "Floor",
     "(1, 10)": "Floor2",
-    "(4, 10)": "Floor",
+    "(58, 37)": "Grass2",
     "(2, 32)": "Floor",
     "(2, 34)": "Floor",
     "(1, 34)": "Floor",
@@ -922,15 +879,15 @@
     "(1, 19)": "Floor2",
     "(1, 22)": "Floor2",
     "(1, 25)": "Floor2",
-    "(10, 28)": "Floor",
+    "(10, 28)": "Grass",
     "(1, 31)": "Floor",
     "(1, 40)": "Floor",
-    "(13, 28)": "Floor",
+    "(13, 28)": "Grass",
     "(1, 28)": "Floor4",
-    "(4, 7)": "Floor",
-    "(7, 7)": "Floor",
-    "(10, 7)": "Floor4",
-    "(19, 28)": "Floor2",
+    "(28, 31)": "Grass2",
+    "(31, 31)": "Grass2",
+    "(43, 31)": "Grass2",
+    "(19, 28)": "Grass",
     "(22, 28)": "Grass3",
     "(25, 28)": "Grass2",
     "(28, 28)": "Grass2",
@@ -941,11 +898,11 @@
     "(43, 28)": "Grass2",
     "(46, 28)": "Grass2",
     "(34, 1)": "Floor2",
-    "(28, 22)": "Grass2",
-    "(28, 19)": "Grass4",
-    "(28, 16)": "Grass2",
-    "(28, 13)": "Grass2",
-    "(28, 10)": "Grass2",
+    "(34, 24)": "Grass",
+    "(52, 43)": "Floor9",
+    "(37, 16)": "Grass",
+    "(28, 13)": "Grass",
+    "(28, 10)": "Grass",
     "(28, 7)": "Floor2",
     "(28, 4)": "Floor2",
     "(28, 1)": "Floor2",
@@ -963,58 +920,58 @@
     "(22, 4)": "Floor2",
     "(25, 4)": "Floor2",
     "(25, 7)": "Floor2",
-    "(25, 10)": "Grass2",
-    "(25, 13)": "Grass2",
-    "(25, 16)": "Grass3",
-    "(25, 19)": "Grass3",
+    "(25, 10)": "Grass",
+    "(28, 24)": "Grass",
+    "(34, 21)": "Grass",
+    "(35, 18)": "Grass",
     "(52, 10)": "Grass3",
     "(31, 1)": "Floor2",
     "(52, 13)": "Grass2",
-    "(19, 25)": "Floor2",
+    "(19, 25)": "Grass",
     "(19, 7)": "Floor2",
-    "(16, 7)": "Floor2",
-    "(13, 7)": "Floor",
+    "(16, 7)": "Grass",
+    "(34, 31)": "Grass2",
     "(7, 25)": "Floor2",
     "(4, 25)": "Floor2",
     "(4, 22)": "Floor2",
     "(7, 22)": "Floor2",
-    "(10, 22)": "Floor2",
-    "(13, 22)": "Floor2",
-    "(16, 22)": "Floor2",
-    "(19, 22)": "Floor2",
+    "(10, 22)": "Grass",
+    "(13, 22)": "Grass",
+    "(16, 22)": "Grass",
+    "(19, 22)": "Grass",
     "(49, 7)": "Grass2",
     "(46, 7)": "Grass2",
-    "(19, 19)": "Grass4",
-    "(16, 19)": "Floor2",
-    "(13, 19)": "Floor2",
-    "(10, 19)": "Floor2",
-    "(7, 19)": "Floor2",
+    "(25, 24)": "Grass",
+    "(19, 43)": "Floor2",
+    "(16, 43)": "Floor2",
+    "(13, 43)": "Floor2",
+    "(7, 19)": "Grass",
     "(4, 19)": "Floor2",
-    "(4, 16)": "Floor",
-    "(7, 16)": "Floor4",
-    "(10, 16)": "Floor",
-    "(13, 16)": "Floor",
-    "(16, 16)": "Floor",
-    "(19, 16)": "Grass2",
+    "(13, 37)": "Floor2",
+    "(13, 40)": "Floor2",
+    "(16, 40)": "Floor2",
+    "(16, 37)": "Floor7",
+    "(25, 43)": "Floor8",
+    "(31, 24)": "Grass",
     "(43, 7)": "Grass3",
-    "(22, 13)": "Grass2",
-    "(19, 13)": "Grass3",
-    "(16, 13)": "Floor",
-    "(13, 13)": "Floor",
-    "(10, 13)": "Floor",
-    "(7, 13)": "Floor",
-    "(4, 13)": "Floor",
-    "(7, 10)": "Floor4",
-    "(10, 10)": "Floor",
-    "(13, 10)": "Floor",
-    "(16, 10)": "Floor4",
-    "(19, 10)": "Grass3",
-    "(22, 10)": "Grass3",
+    "(35, 16)": "Grass",
+    "(28, 43)": "Floor2",
+    "(34, 43)": "Floor2",
+    "(31, 43)": "Floor2",
+    "(46, 31)": "Grass2",
+    "(58, 31)": "Grass2",
+    "(19, 31)": "Grass2",
+    "(58, 34)": "Grass2",
+    "(49, 34)": "Floor2",
+    "(46, 34)": "Floor2",
+    "(37, 43)": "Floor9",
+    "(40, 43)": "Floor8",
+    "(43, 43)": "Floor2",
     "(22, 7)": "Floor2",
-    "(10, 25)": "Floor2",
-    "(13, 25)": "Floor2",
-    "(16, 25)": "Floor2",
-    "(16, 28)": "Floor2",
+    "(10, 25)": "Grass",
+    "(13, 25)": "Grass",
+    "(16, 25)": "Grass",
+    "(16, 28)": "Grass",
     "(4, 28)": "Floor4",
     "(7, 28)": "Floor4",
     "(-2, 16)": "Floor2",
@@ -1032,17 +989,17 @@
     "(43, 22)": "Grass2",
     "(40, 22)": "Grass2",
     "(37, 22)": "Grass4",
-    "(34, 22)": "Grass2",
-    "(22, 19)": "Grass2",
-    "(22, 22)": "Grass2",
+    "(34, 16)": "Grass",
+    "(31, 22)": "Grass",
+    "(25, 22)": "Grass",
     "(22, 25)": "Grass2",
-    "(31, 22)": "Grass3",
-    "(34, 16)": "Grass2",
-    "(31, 16)": "Grass2",
-    "(34, 13)": "Grass3",
+    "(34, 19)": "Grass",
+    "(37, 19)": "Grass",
+    "(35, 17)": "Grass",
+    "(34, 13)": "Grass",
     "(37, 13)": "Grass2",
     "(37, 10)": "Grass3",
-    "(37, 16)": "Grass2",
+    "(55, 43)": "Floor2",
     "(40, 13)": "Grass3",
     "(40, 16)": "Grass3",
     "(37, 7)": "Grass2",
@@ -1051,7 +1008,7 @@
     "(34, 7)": "Grass2",
     "(34, 10)": "Grass2",
     "(34, 4)": "Grass2",
-    "(31, 13)": "Grass2",
+    "(31, 13)": "Grass",
     "(31, 10)": "Grass2",
     "(31, 7)": "Floor2",
     "(31, 25)": "Grass2",
@@ -1081,9 +1038,9 @@
     "(46, 10)": "Grass2",
     "(49, 10)": "Grass2",
     "(58, 10)": "Floor2",
-    "(49, 13)": "Floor2",
+    "(49, 13)": "Grass",
     "(46, 13)": "Grass2",
-    "(22, 16)": "Grass3",
+    "(35, 24)": "Grass",
     "(43, 19)": "Grass2",
     "(46, 19)": "Grass2",
     "(49, 19)": "Grass2",
@@ -1100,10 +1057,10 @@
     "(58, 13)": "Grass2",
     "(64, 13)": "Floor2",
     "(61, 13)": "Floor2",
-    "(25, 22)": "Grass2",
-    "(31, 19)": "Floor2",
-    "(34, 19)": "Grass2",
-    "(37, 19)": "Grass3",
+    "(35, 21)": "Grass",
+    "(49, 43)": "Floor2",
+    "(46, 43)": "Floor2",
+    "(25, 13)": "Grass",
     "(40, 19)": "Grass3",
     "(61, 10)": "Floor2",
     "(61, 16)": "Grass2",
@@ -1188,8 +1145,8 @@
     "(61, 28)": "Floor2",
     "(64, 28)": "Floor2",
     "(58, 22)": "Grass3",
-    "(37, 31)": "Floor5",
-    "(40, 31)": "Floor6",
+    "(37, 31)": "Grass",
+    "(40, 31)": "Grass",
     "(37, 34)": "Floor6",
     "(37, 37)": "Floor2",
     "(37, 40)": "Floor2",
@@ -1199,22 +1156,22 @@
     "(49, 40)": "Floor9",
     "(52, 40)": "Floor2",
     "(55, 40)": "Floor2",
-    "(55, 37)": "Floor2",
-    "(55, 34)": "Floor6",
-    "(55, 31)": "Grass3",
+    "(55, 37)": "Floor5",
+    "(55, 34)": "Floor2",
+    "(55, 31)": "Grass",
     "(55, 28)": "Grass3",
     "(52, 28)": "Grass2",
-    "(52, 31)": "Grass2",
+    "(52, 31)": "Grass",
     "(49, 28)": "Grass3",
-    "(49, 31)": "Grass2",
-    "(52, 34)": "Floor5",
+    "(49, 31)": "Grass",
+    "(52, 34)": "Floor7",
     "(52, 37)": "Floor2",
-    "(49, 37)": "Floor2",
-    "(46, 37)": "Floor7",
+    "(49, 37)": "Floor6",
+    "(46, 37)": "Floor2",
     "(43, 37)": "Floor2",
     "(40, 37)": "Floor2",
     "(40, 34)": "Floor5",
-    "(43, 34)": "Grass2",
+    "(43, 34)": "Floor2",
     "(25, 31)": "Grass2",
     "(22, 31)": "Grass3",
     "(22, 34)": "Floor5",
@@ -1222,7 +1179,7 @@
     "(22, 40)": "Floor2",
     "(25, 40)": "Floor2",
     "(28, 40)": "Floor8",
-    "(31, 40)": "Floor2",
+    "(31, 40)": "Floor7",
     "(34, 40)": "Floor9",
     "(34, 37)": "Floor2",
     "(31, 37)": "Floor7",
@@ -1235,61 +1192,70 @@
     "(34, 34)": "Grass2",
     "(31, 34)": "Grass3",
     "(28, 34)": "Grass2",
-    "(31, 31)": "Grass2",
-    "(34, 31)": "Grass2",
-    "(43, 31)": "Grass2",
-    "(28, 31)": "Grass2",
-    "(58, 37)": "Grass2",
-    "(58, 34)": "Grass2",
-    "(49, 34)": "Floor2",
-    "(46, 34)": "Grass2",
-    "(46, 31)": "Grass2",
-    "(58, 31)": "Grass2",
-    "(19, 31)": "Grass2",
-    "(16, 37)": "Floor7",
-    "(13, 37)": "Floor2",
-    "(13, 40)": "Floor2",
-    "(16, 40)": "Floor2",
-    "(13, 43)": "Floor2",
-    "(16, 43)": "Floor2",
-    "(19, 43)": "Floor2",
-    "(25, 43)": "Floor8",
-    "(28, 43)": "Floor2",
-    "(31, 43)": "Floor2",
-    "(34, 43)": "Floor2",
-    "(37, 43)": "Floor9",
-    "(40, 43)": "Floor8",
-    "(43, 43)": "Floor2",
-    "(46, 43)": "Floor2",
-    "(49, 43)": "Floor2",
-    "(52, 43)": "Floor9",
-    "(55, 43)": "Floor2"
+    "(19, 19)": "Grass",
+    "(16, 19)": "Grass",
+    "(13, 19)": "Grass",
+    "(10, 19)": "Grass",
+    "(22, 22)": "Grass",
+    "(22, 19)": "Grass",
+    "(22, 16)": "Grass",
+    "(19, 16)": "Grass",
+    "(16, 16)": "Grass",
+    "(13, 16)": "Grass",
+    "(10, 16)": "Grass",
+    "(7, 16)": "Grass",
+    "(4, 16)": "Grass",
+    "(4, 13)": "Grass",
+    "(4, 10)": "Grass",
+    "(4, 7)": "Grass",
+    "(7, 7)": "Grass",
+    "(10, 7)": "Grass",
+    "(13, 7)": "Grass",
+    "(13, 10)": "Grass",
+    "(10, 10)": "Grass",
+    "(7, 10)": "Grass",
+    "(7, 13)": "Grass",
+    "(10, 13)": "Grass",
+    "(13, 13)": "Grass",
+    "(16, 13)": "Grass",
+    "(19, 13)": "Grass",
+    "(22, 13)": "Grass",
+    "(19, 10)": "Grass",
+    "(16, 10)": "Grass",
+    "(22, 10)": "Grass",
+    "(25, 16)": "Grass",
+    "(25, 19)": "Grass",
+    "(28, 19)": "Grass",
+    "(31, 19)": "Grass",
+    "(31, 16)": "Grass",
+    "(28, 16)": "Grass",
+    "(28, 22)": "Grass"
   },
   "decorations": {
-    "(29, 34)": "Lantern",
+    "(45, 34)": "Barrel",
     "(44, 1)": "Barrel",
-    "(33, 19)": "Barrel",
-    "(43, 14)": "WallOpeningEast",
+    "(7, 4)": "WallWindow2",
+    "(10, 42)": "WallOpeningWest",
     "(46, 19)": "WallPainting",
-    "(33, 34)": "Lantern",
-    "(44, 34)": "Lantern",
-    "(48, 34)": "Lantern",
-    "(34, 19)": "Barrel",
+    "(46, 34)": "Barrel",
+    "(3, 7)": "Torch",
+    "(43, 16)": "WallOpeningEast",
+    "(13, 4)": "WallWindow2",
     "(47, 1)": "Barrel",
-    "(37, 3)": "SmallStone",
+    "(33, 37)": "Lantern",
     "(14, 34)": "Lantern",
     "(67, 20)": "WallOpeningEast",
     "(58, 13)": "Barrel",
-    "(31, 34)": "WallOpeningNorth",
-    "(52, 34)": "GroundBorderNorth",
-    "(37, 31)": "GroundBorderNorth",
+    "(31, 37)": "WallOpeningNorth",
+    "(49, 34)": "GroundBorderNorth",
+    "(40, 34)": "GroundBorderNorth",
     "(48, 19)": "Torch",
     "(44, 19)": "Torch",
-    "(19, 22)": "WallOpeningWest",
+    "(10, 38)": "WallOpeningWest",
     "(52, 1)": "SuitOfArmor",
-    "(32, 19)": "HangingWeapons",
-    "(29, 7)": "SuitOfArmor",
-    "(1, 13)": "WallOpeningWest",
+    "(52, 34)": "GroundBorderNorth",
+    "(28, 7)": "WallWindow2",
+    "(29, 37)": "Lantern",
     "(34, 7)": "Torch",
     "(42, 1)": "SuitOfArmor",
     "(58, 5)": "WallOpeningEast",
@@ -1297,15 +1263,15 @@
     "(49, 1)": "HangingWeapons2",
     "(60, 13)": "Barrel",
     "(18, 34)": "Lantern",
-    "(32, 7)": "HangingWeapons",
-    "(46, 34)": "WallOpeningNorth",
+    "(22, 7)": "WallWindow2",
+    "(16, 7)": "Torch",
     "(16, 34)": "WallOpeningNorth",
     "(36, 1)": "WallPlant",
-    "(32, 22)": "FloorDrain",
-    "(40, 31)": "GroundBorderNorth",
+    "(46, 37)": "FloorDrain",
+    "(37, 34)": "GroundBorderNorth",
     "(24, 12)": "SmallStone",
     "(58, 38)": "WallOpeningEast",
-    "(26, 7)": "WallWindow2",
+    "(25, 7)": "WallWindow2",
     "(40, 1)": "WallWindow2",
     "(55, 1)": "WallWindow2",
     "(46, 1)": "WallWindow2",
@@ -1313,37 +1279,33 @@
     "(64, 13)": "Lantern",
     "(22, 34)": "GroundBorderNorth",
     "(25, 34)": "GroundBorderNorth",
-    "(16, 16)": "GroundBorderEast",
-    "(16, 13)": "GroundBorderEast",
-    "(16, 10)": "GroundBorderEast",
+    "(44, 34)": "HangingWeapons",
+    "(28, 22)": "Staircase",
+    "(25, 22)": "Staircase",
     "(10, 4)": "WallOpeningNorth",
-    "(13, 4)": "WallWindow2",
-    "(7, 4)": "WallWindow2",
-    "(4, 4)": "WallWindow2",
-    "(10, 38)": "WallOpeningWest",
-    "(19, 7)": "Torch",
-    "(23, 7)": "Torch",
-    "(10, 42)": "WallOpeningWest"
+    "(1, 11)": "WallOpeningWest",
+    "(19, 7)": "WallWindow2",
+    "(31, 7)": "WallWindow2"
   },
   "surfaces": {
-    "(34, 12)": "FireSurfaceSingleCell",
-    "(33, 11)": "FireSurfaceSingleCell",
-    "(32, 11)": "FireSurfaceSingleCell",
-    "(34, 11)": "FireSurfaceSingleCell",
-    "(34, 10)": "FireSurfaceSingleCell",
-    "(33, 10)": "FireSurfaceSingleCell",
-    "(35, 10)": "FireSurfaceSingleCell",
-    "(31, 10)": "FireSurfaceSingleCell",
-    "(35, 11)": "FireSurfaceSingleCell",
-    "(32, 9)": "FireSurfaceSingleCell",
-    "(33, 9)": "FireSurfaceSingleCell",
-    "(34, 9)": "FireSurfaceSingleCell",
+    "(49, 22)": "FireSurfaceSingleCell",
+    "(46, 25)": "FireSurfaceSingleCell",
+    "(48, 21)": "FireSurfaceSingleCell",
+    "(43, 22)": "FireSurfaceSingleCell",
+    "(49, 23)": "FireSurfaceSingleCell",
+    "(46, 21)": "FireSurfaceSingleCell",
+    "(45, 21)": "FireSurfaceSingleCell",
+    "(47, 21)": "FireSurfaceSingleCell",
+    "(49, 21)": "FireSurfaceSingleCell",
+    "(46, 24)": "FireSurfaceSingleCell",
+    "(47, 24)": "FireSurfaceSingleCell",
+    "(47, 25)": "FireSurfaceSingleCell",
     "(48, 22)": "FireSurfaceSingleCell",
     "(48, 23)": "FireSurfaceSingleCell",
     "(48, 24)": "FireSurfaceSingleCell",
     "(48, 25)": "FireSurfaceSingleCell",
     "(45, 25)": "FireSurfaceSingleCell",
-    "(36, 9)": "FireSurfaceSingleCell",
+    "(44, 21)": "FireSurfaceSingleCell",
     "(44, 24)": "FireSurfaceSingleCell",
     "(44, 23)": "FireSurfaceSingleCell",
     "(44, 22)": "FireSurfaceSingleCell",
@@ -1354,20 +1316,30 @@
     "(46, 23)": "FireSurfaceSingleCell",
     "(45, 23)": "FireSurfaceSingleCell",
     "(45, 24)": "FireSurfaceSingleCell",
-    "(46, 24)": "FireSurfaceSingleCell",
-    "(47, 24)": "FireSurfaceSingleCell",
-    "(47, 25)": "FireSurfaceSingleCell",
-    "(46, 25)": "FireSurfaceSingleCell",
-    "(44, 21)": "FireSurfaceSingleCell",
-    "(45, 21)": "FireSurfaceSingleCell",
-    "(46, 21)": "FireSurfaceSingleCell",
-    "(47, 21)": "FireSurfaceSingleCell",
-    "(48, 21)": "FireSurfaceSingleCell",
-    "(35, 9)": "FireSurfaceSingleCell",
-    "(43, 22)": "FireSurfaceSingleCell",
-    "(49, 21)": "FireSurfaceSingleCell",
-    "(49, 22)": "FireSurfaceSingleCell",
-    "(49, 23)": "FireSurfaceSingleCell"
+    "(22, 15)": "FireSurfaceSingleCell",
+    "(22, 16)": "FireSurfaceSingleCell",
+    "(22, 17)": "FireSurfaceSingleCell",
+    "(22, 18)": "FireSurfaceSingleCell",
+    "(22, 19)": "FireSurfaceSingleCell",
+    "(22, 20)": "FireSurfaceSingleCell",
+    "(23, 15)": "FireSurfaceSingleCell",
+    "(24, 15)": "FireSurfaceSingleCell",
+    "(25, 15)": "FireSurfaceSingleCell",
+    "(26, 15)": "FireSurfaceSingleCell",
+    "(27, 15)": "FireSurfaceSingleCell",
+    "(28, 15)": "FireSurfaceSingleCell",
+    "(29, 15)": "FireSurfaceSingleCell",
+    "(30, 15)": "FireSurfaceSingleCell",
+    "(31, 15)": "FireSurfaceSingleCell",
+    "(31, 16)": "FireSurfaceSingleCell",
+    "(31, 17)": "FireSurfaceSingleCell",
+    "(31, 18)": "FireSurfaceSingleCell",
+    "(31, 19)": "FireSurfaceSingleCell",
+    "(31, 20)": "FireSurfaceSingleCell",
+    "(30, 20)": "FireSurfaceSingleCell",
+    "(23, 20)": "FireSurfaceSingleCell",
+    "(42, 25)": "FireSurfaceSingleCell",
+    "(47, 27)": "FireSurfaceSingleCell"
   },
   "control_points": {
     "(14, 42)": "Exit"
@@ -1376,8 +1348,8 @@
     {
       "type_": "Bob",
       "pos": [
-        25,
-        22
+        15,
+        23
       ],
       "health": null,
       "main_hand": null,
@@ -1387,7 +1359,7 @@
     {
       "type_": "Alice",
       "pos": [
-        22,
+        11,
         24
       ],
       "health": null,
@@ -1398,8 +1370,8 @@
     {
       "type_": "Draug",
       "pos": [
-        13,
-        13
+        4,
+        10
       ],
       "health": null,
       "main_hand": null,
@@ -1431,8 +1403,8 @@
     {
       "type_": "Clara",
       "pos": [
-        22,
-        21
+        12,
+        20
       ],
       "health": null,
       "main_hand": null,
@@ -1442,8 +1414,30 @@
     {
       "type_": "Lootgoblin",
       "pos": [
-        55,
-        28
+        40,
+        4
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        24,
+        17
+      ],
+      "health": null,
+      "main_hand": null,
+      "shield": null,
+      "name": null
+    },
+    {
+      "type_": "Ghoul1",
+      "pos": [
+        27,
+        18
       ],
       "health": null,
       "main_hand": null,

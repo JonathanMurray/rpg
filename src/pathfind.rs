@@ -34,7 +34,7 @@ impl Occupation {
     ) -> Option<(std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>)> {
         let (xs, ys) = match self {
             Occupation::Terrain(TerrainType::LowWall(orientation)) => {
-                println!("(occupied cells) Low wall orientation: {:?}", orientation);
+                //println!("(occupied cells) Low wall orientation: {:?}", orientation);
 
                 match orientation {
                     WallOrientation::Single => (-1..=1, -1..=1),
@@ -54,13 +54,12 @@ impl Occupation {
                     // two upper rows
                     WallOrientation::North => (-1..=1, -1..=0),
                     WallOrientation::South => return None,
-
-                    // TODO
-                    _ => (0..=0, 0..=0),
-                    WallOrientation::ConcaveNorthWest => (-1..=-1, -1..=1),
-                    WallOrientation::ConcaveNorthEast => todo!(),
-                    WallOrientation::ConcaveSouthWest => todo!(),
-                    WallOrientation::ConcaveSouthEast => todo!(),
+                    WallOrientation::ConcaveSouthWest => return None,
+                    WallOrientation::ConcaveSouthEast => return None,
+                    // left column
+                    WallOrientation::ConcaveNorthEast => (-1..=-1, -1..=1),
+                    // right column
+                    WallOrientation::ConcaveNorthWest => (1..=1, -1..=1),
                 }
             }
             _ => (-1..=1, -1..=1),
@@ -74,7 +73,7 @@ impl Occupation {
     ) -> Option<(std::ops::RangeInclusive<i32>, std::ops::RangeInclusive<i32>)> {
         let (xs, ys) = match self {
             Occupation::Terrain(TerrainType::LowWall(orientation)) => {
-                println!("(high ground) Low wall orientation: {:?}", orientation);
+                //println!("(high ground) Low wall orientation: {:?}", orientation);
 
                 match orientation {
                     WallOrientation::Single => (-1..=1, -1..=1),
@@ -85,7 +84,7 @@ impl Occupation {
 
                     WallOrientation::ConvexSouthWest => return None,
                     WallOrientation::ConvexSouthEast => return None,
-                    // two right column
+                    // two right columns
                     WallOrientation::East => (0..=1, -1..=1),
                     // two left columns
                     WallOrientation::West => (-1..=0, -1..=1),
@@ -95,13 +94,15 @@ impl Occupation {
                     WallOrientation::North => return None,
                     // all 9 cells
                     WallOrientation::South => (-1..=1, -1..=1),
+                    // all 9 cells
+                    WallOrientation::ConcaveSouthWest => (-1..=1, -1..=1),
+                    // all 9 cells
+                    WallOrientation::ConcaveSouthEast => (-1..=1, -1..=1),
 
-                    // TODO
-                    _ => (0..=0, 0..=0),
-                    WallOrientation::ConcaveNorthWest => (-1..=-1, -1..=1),
-                    WallOrientation::ConcaveNorthEast => todo!(),
-                    WallOrientation::ConcaveSouthWest => todo!(),
-                    WallOrientation::ConcaveSouthEast => todo!(),
+                    // two right columns
+                    WallOrientation::ConcaveNorthEast => (0..=1, -1..=1),
+                    // two left columns
+                    WallOrientation::ConcaveNorthWest => (-1..=0, -1..=1),
                 }
             }
             _ => return None,
@@ -116,6 +117,12 @@ pub enum TerrainType {
     TallWall,
     LowWall(WallOrientation),
     Other,
+}
+
+impl TerrainType {
+    pub fn can_have_staircase(&self) -> bool {
+        matches!(self, TerrainType::LowWall(..))
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Default)]
@@ -165,6 +172,7 @@ pub struct PathfindGrid {
     occupied: RefCell<HashMap<Position, Occupation>>,
     surfaces: RefCell<HashMap<Position, Surface>>,
     high_ground: RefCell<HashSet<Position>>,
+    staircases: RefCell<HashSet<Position>>,
     pub control_points: RefCell<HashMap<Position, ControlPoint>>,
     cache_key: Cell<CacheKey>,
     cached_exploration_chart: RefCell<IndexMap<Position, ChartNode>>,
@@ -230,6 +238,7 @@ impl PathfindGrid {
             occupied: Default::default(),
             surfaces: Default::default(),
             high_ground: Default::default(),
+            staircases: Default::default(),
             control_points: Default::default(),
             cache_key: Default::default(),
             cached_exploration_chart: Default::default(),
@@ -276,21 +285,16 @@ impl PathfindGrid {
         self.occupied.borrow().keys().copied().collect()
     }
 
-    pub fn occupied(&self) -> Ref<'_, HashMap<Position, Occupation>> {
-        self.occupied.borrow()
-    }
-
-    pub fn high_ground(&self) -> Ref<'_, HashSet<Position>> {
-        self.high_ground.borrow()
-    }
-
-    fn matching_elevation(&self, a: Position, b: Position) -> bool {
-        let high_ground = self.high_ground.borrow();
-        high_ground.contains(&a) == high_ground.contains(&b)
+    pub fn occupation(&self, pos: &Position) -> Option<Occupation> {
+        self.occupied.borrow().get(&pos).copied()
     }
 
     pub fn is_high_ground(&self, pos: Position) -> bool {
         self.high_ground.borrow().contains(&pos)
+    }
+
+    pub fn is_staircase(&self, pos: Position) -> bool {
+        self.staircases.borrow().contains(&pos)
     }
 
     pub fn control_points(&self) -> Ref<'_, HashMap<Position, ControlPoint>> {
@@ -328,8 +332,22 @@ impl PathfindGrid {
         self.surfaces.borrow().get(&pos).copied()
     }
 
+    pub fn set_staircase(&self, center_pos: Position, value: bool) {
+        let mut staircases = self.staircases.borrow_mut();
+        for dx in -1..=1 {
+            for dy in -1..=1 {
+                let cell = (center_pos.0 + dx, center_pos.1 + dy);
+                if value {
+                    staircases.insert(cell);
+                } else {
+                    staircases.remove(&cell);
+                }
+            }
+        }
+    }
+
     pub fn remove_occupied(&self, center_pos: Position, occupation: Occupation) {
-        println!("Remove occupied {:?}: {:?}", center_pos, occupation);
+        //println!("Remove occupied {:?}: {:?}", center_pos, occupation);
 
         if let Some((xs, ys)) = occupation.occupied_cells() {
             let mut occupied_cells = self.occupied.borrow_mut();
@@ -337,11 +355,9 @@ impl PathfindGrid {
             for dx in xs {
                 for dy in ys.clone() {
                     let cell = (center_pos.0 + dx, center_pos.1 + dy);
-                    assert!(
-                        occupied_cells.contains_key(&cell),
-                        "Cannot free {:?}. It's already free.",
-                        cell
-                    );
+                    if !occupied_cells.contains_key(&cell) {
+                        println!("Warn: Cannot free {:?}. It's already free.", cell);
+                    }
                     occupied_cells.remove(&cell);
                 }
             }
@@ -352,11 +368,11 @@ impl PathfindGrid {
             for dx in xs {
                 for dy in ys.clone() {
                     let cell = (center_pos.0 + dx, center_pos.1 + dy);
-                    assert!(
-                        high_ground.contains(&cell),
-                        "Cannot remove high-ground from {:?}",
-                        cell
-                    );
+
+                    if !high_ground.contains(&cell) {
+                        println!("Warn: Cannot remove high-ground from {:?}", cell);
+                    }
+
                     high_ground.remove(&cell);
                 }
             }
@@ -372,10 +388,12 @@ impl PathfindGrid {
 
         if let Some((xs, ys)) = occupation.occupied_cells() {
             let mut occupied_cells = self.occupied.borrow_mut();
+            /*
             println!(
                 "Set occupied {:?}: {:?} => {:?}, {:?}",
                 center_pos, occupation, xs, ys
             );
+             */
             for dx in xs {
                 for dy in ys.clone() {
                     let cell = (center_pos.0 + dx, center_pos.1 + dy);
@@ -394,10 +412,12 @@ impl PathfindGrid {
 
         if let Some((xs, ys)) = occupation.high_ground_cells() {
             let mut high_ground = self.high_ground.borrow_mut();
+            /*
             println!(
                 "Set highground {:?}: {:?} => {:?}, {:?}",
                 center_pos, occupation, xs, ys
             );
+             */
             for dx in xs {
                 for dy in ys.clone() {
                     let cell = (center_pos.0 + dx, center_pos.1 + dy);
@@ -789,6 +809,8 @@ impl PathfindGrid {
     }
 
     pub fn is_free(&self, ignore_character: Option<CharacterId>, pos: Position) -> bool {
+        //println!("is free? {:?}", pos);
+
         let mut seen_high_ground = None;
 
         // A character takes up 9 cells in a square. Check that each cell is free
@@ -813,16 +835,21 @@ impl PathfindGrid {
                             None => return false,
                         }
                     }
-                    Some(Occupation::Terrain { .. }) => {
-                        // This cell is occupied by terrain
-                        return false;
+                    Some(Occupation::Terrain(terrain_type)) => {
+                        let valid_staircase =
+                            terrain_type.can_have_staircase() && self.is_staircase((x, y));
+                        //dbg!(terrain_type, valid_staircase);
+                        if !valid_staircase {
+                            // This cell is occupied by terrain
+                            return false;
+                        }
                     }
                     None => {}
                 }
 
                 let high_ground = self.is_high_ground((x, y));
                 if let Some(seen) = seen_high_ground {
-                    if high_ground != seen {
+                    if high_ground != seen && !self.is_staircase((x, y)) {
                         return false;
                     }
                 } else {
