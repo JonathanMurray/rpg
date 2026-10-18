@@ -1197,9 +1197,6 @@ impl UserInterface {
                                 damage: None,
                                 is_buff: false,
                                 details: vec![],
-                                graze_chance: None,
-                                crit_chance: None,
-
                                 // TODO
                                 expected_roll_outcome: None,
                             },
@@ -2947,8 +2944,6 @@ fn build_character_ui(
             }
             btn
         };
-
-    let buttons_row_bg = LIGHTGRAY;
 
     let mut tracked_action_buttons = IndexMap::new();
     let mut hoverable_buttons = vec![];

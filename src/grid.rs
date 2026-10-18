@@ -132,8 +132,9 @@ pub struct TargetEffectPreview {
 #[derive(Debug)]
 enum CharacterActionAnticipation {
     RangedAttack,
-    MeleeAttack,
+    MeleeAttack { override_facing_east: Option<bool> },
     Other,
+    Moving,
 }
 
 #[derive(Debug)]
@@ -2495,20 +2496,41 @@ impl GameGrid {
         }
 
         if let Some(anticipation) = anticipation {
+            let dx;
             match anticipation {
                 CharacterActionAnticipation::RangedAttack => {
                     weapon_rotation_modifier = -PI * 0.15;
+                    let rotation = PI * 0.01;
+                    params.rotation = oscillate(2.5, -rotation, rotation);
+                    stretch_w = Some(oscillate(0.8, 0.95, 1.0));
+                    dx = 0.0;
                 }
-                CharacterActionAnticipation::MeleeAttack => {
+                CharacterActionAnticipation::MeleeAttack {
+                    override_facing_east,
+                } => {
                     let rotation = PI * 0.02;
-                    weapon_rotation_modifier = oscillate(0.7, -rotation, rotation);
+                    weapon_rotation_modifier = oscillate(0.4, -rotation, rotation);
+                    y -= oscillate(0.25, 0.0, 1.0);
+                    dx = oscillate(0.5, -1.0, 1.0);
+
+                    if let Some(facing_east) = override_facing_east {
+                        params.flip_x = facing_east;
+                    }
                 }
-                CharacterActionAnticipation::Other => {}
+                CharacterActionAnticipation::Other => {
+                    let rotation = PI * 0.01;
+                    params.rotation = oscillate(2.5, -rotation, rotation);
+                    stretch_w = Some(oscillate(0.8, 0.95, 1.0));
+                    dx = 0.0;
+                }
+                CharacterActionAnticipation::Moving => {
+                    y -= oscillate(0.25, 0.0, 2.0);
+                    dx = oscillate(0.5, -1.0, 1.0);
+                }
             }
-            let dx = oscillate(0.5, -1.0, 1.0);
+
             x += dx;
             shadow_x += dx;
-            y -= oscillate(0.25, 0.0, 2.0)
         }
 
         if true {
@@ -3981,38 +4003,50 @@ impl GameGrid {
         // TODO: also make it so that the character is drawn correctly east/west-facing depending on what it's anticipating,
         // e.g. facing the target it intends to
 
-        let attack_anticipation = |character: &Character| {
+        let attack_anticipation = |character: &Character, facing_east: Option<bool>| {
             if character.has_equipped_ranged_weapon() {
                 CharacterActionAnticipation::RangedAttack
             } else {
-                CharacterActionAnticipation::MeleeAttack
+                CharacterActionAnticipation::MeleeAttack {
+                    override_facing_east: facing_east,
+                }
             }
         };
 
-        let maybe_attack_anticipation = |character: &Character, will_attack: bool| {
-            if will_attack {
-                attack_anticipation(character)
-            } else {
-                CharacterActionAnticipation::Other
-            }
-        };
+        let maybe_attack_anticipation =
+            |character: &Character, will_attack: bool, target: CharacterId| {
+                if will_attack {
+                    let facing_east =
+                        self.characters.get(&target).unwrap().pos().0 > character.pos().0;
+                    attack_anticipation(character, Some(facing_east))
+                } else {
+                    CharacterActionAnticipation::Other
+                }
+            };
 
         if opportunity_attackers.contains(&ch_id) {
-            return Some(attack_anticipation(character));
+            return Some(attack_anticipation(character, None));
         }
 
         match ui_state {
             UiState::ConfiguringAction(a) if ch_id == self.active_character_id => match a {
-                ConfiguredAction::Attack { .. } => {
-                    return Some(attack_anticipation(character));
+                ConfiguredAction::Attack { target, .. } => {
+                    let mut facing_east = None;
+                    if let Some(target_id) = target {
+                        facing_east = Some(
+                            self.characters.get(target_id).unwrap().pos().0 > character.pos().0,
+                        );
+                    }
+                    return Some(attack_anticipation(character, facing_east));
                 }
+                ConfiguredAction::Move { .. } => return Some(CharacterActionAnticipation::Moving),
                 _ => return Some(CharacterActionAnticipation::Other),
             },
             UiState::ReactingToAttack {
                 attacker, reactor, ..
             } => {
                 if ch_id == *attacker {
-                    return Some(attack_anticipation(character));
+                    return Some(attack_anticipation(character, None));
                 } else if ch_id == *reactor {
                     return Some(CharacterActionAnticipation::Other);
                 }
@@ -4024,9 +4058,9 @@ impl GameGrid {
                 ..
             } => {
                 if ch_id == *reactor {
-                    return Some(maybe_attack_anticipation(character, *selected));
+                    return Some(maybe_attack_anticipation(character, *selected, *target));
                 } else if ch_id == *target {
-                    return Some(CharacterActionAnticipation::Other);
+                    return Some(CharacterActionAnticipation::Moving);
                 }
             }
             UiState::ReactingToRangedAttackOpportunity {
@@ -4036,9 +4070,9 @@ impl GameGrid {
                 ..
             } => {
                 if ch_id == *attacker {
-                    return Some(attack_anticipation(character));
+                    return Some(attack_anticipation(character, None));
                 } else if ch_id == *reactor {
-                    return Some(maybe_attack_anticipation(character, *selected));
+                    return Some(maybe_attack_anticipation(character, *selected, *attacker));
                 }
             }
             _ => {}
@@ -6266,7 +6300,7 @@ pub fn draw_action(
     let (xmid, y) = mid_pos;
 
     let header_font_size = 16;
-    let detail_font_size = 13;
+    let detail_font_size = 16;
     let header_params = TextParams {
         font: Some(header_font),
         font_size: header_font_size,

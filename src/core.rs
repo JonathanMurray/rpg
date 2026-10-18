@@ -2459,15 +2459,13 @@ impl CoreGame {
             ActionPerformanceMode::SimulatedRoll(..) => None,
         };
 
-        let outgoing_attack_bonuses =
-            attacker.outgoing_attack_bonuses(hand_type, enhancements, defender);
-
-        let mut attack_bonus = attack_roll_bonus(
+        let (mut attack_bonus, attack_bonus_contributors) = attack_roll_bonus(
             attacker,
             hand_type,
             defender,
             enhancements,
             maybe_reaction.map(|(_reactor, reaction)| reaction),
+            mode.pathfind_grid(),
         );
         attack_bonus.advantage += ability_roll_advantage;
 
@@ -3065,7 +3063,7 @@ impl CoreGame {
                     arrow.name,
                     &RollInstruction::RollWithAttackModifier {
                         attack_modifier,
-                        outgoing_bonuses: outgoing_attack_bonuses,
+                        outgoing_bonuses: attack_bonus_contributors,
                     },
                     &[],
                     attacker,
@@ -3561,13 +3559,10 @@ impl ActionPerformanceMode<'_> {
 
 #[derive(Debug, Clone)]
 pub struct AttackPrediction {
-    pub percentage_chance_deal_damage: u32,
     pub min_damage: u32,
     pub max_damage: u32,
     pub avg_damage: f32,
     pub details: Vec<(&'static str, Goodness)>,
-    pub graze_chance: f32,
-    pub crit_chance: f32,
     pub area_targets: Vec<CharacterId>,
     pub expected_roll_outcome: f32,
 }
@@ -3581,8 +3576,6 @@ pub struct TargetPrediction {
     pub damage: Option<DamageInterval>,
     pub is_buff: bool,
     pub details: Vec<(&'static str, Goodness)>,
-    pub graze_chance: Option<f32>,
-    pub crit_chance: Option<f32>,
     pub expected_roll_outcome: Option<f32>,
 }
 
@@ -3595,8 +3588,6 @@ impl From<AttackPrediction> for TargetPrediction {
             }),
             is_buff: false,
             details: value.details,
-            graze_chance: Some(value.graze_chance),
-            crit_chance: Some(value.crit_chance),
             expected_roll_outcome: Some(value.expected_roll_outcome),
         }
     }
@@ -3706,8 +3697,6 @@ pub fn predict_ability(
                         }),
                         is_buff: result.is_buff,
                         details,
-                        graze_chance: None, // filled in later
-                        crit_chance: None,  // filled in later
                         expected_roll_outcome,
                     },
                 );
@@ -3721,22 +3710,6 @@ pub fn predict_ability(
                         .unwrap()
                         .max = dmg;
                 }
-            }
-
-            match result.hit_type {
-                Some(HitType::Regular) => {
-                    let graze_chance = &mut targets.get_mut(&target_id).unwrap().graze_chance;
-                    graze_chance.get_or_insert_with(|| {
-                        1.0 - probability_of_d20_reaching(unmodified_roll, DiceRollBonus::none())
-                    });
-                }
-                Some(HitType::Critical) => {
-                    let crit_chance = &mut targets.get_mut(&target_id).unwrap().crit_chance;
-                    crit_chance.get_or_insert_with(|| {
-                        probability_of_d20_reaching(unmodified_roll, DiceRollBonus::none())
-                    });
-                }
-                _ => {}
             }
         }
     }
@@ -3759,21 +3732,18 @@ pub fn predict_attack(
     let mut max_dmg = 0;
     let mut percentage_deal_damage = 0;
 
-    let mut advantage = 0;
+    let (dice_roll_bonus, contributors) = attack_roll_bonus(
+        attacker,
+        HandType::MainHand,
+        defender,
+        enhancements,
+        reaction.map(|(_, r)| r),
+        pathfind_grid,
+    );
 
     let mut details = vec![];
-    for (label, contributor) in attacker.outgoing_attack_bonuses(hand_type, enhancements, defender)
-    {
+    for (label, contributor) in contributors {
         details.push((label, contributor.goodness()));
-        if let RollBonusContributor::Advantage(adv) = contributor {
-            advantage += adv;
-        }
-    }
-    for (label, contributor) in defender.incoming_attack_bonuses(reaction.map(|(_id, r)| r)) {
-        details.push((label, contributor.goodness()));
-        if let RollBonusContributor::Advantage(adv) = contributor {
-            advantage += adv;
-        }
     }
 
     let mut regular_hit_threshold = 21;
@@ -3839,35 +3809,15 @@ pub fn predict_attack(
 
     let avg_damage = damage_outcomes.iter().map(|dmg| *dmg as f32).sum::<f32>() / 20.0;
 
-    let hit_chance = probability_of_d20_reaching(
-        regular_hit_threshold,
-        DiceRollBonus::from_advantage(advantage),
-    );
-
-    let graze_chance = 1.0 - hit_chance;
-    let crit_chance =
-        probability_of_d20_reaching(crit_threshold, DiceRollBonus::from_advantage(advantage));
-
-    let dice_roll_bonus = attack_roll_bonus(
-        attacker,
-        HandType::MainHand,
-        defender,
-        enhancements,
-        reaction.map(|(_, r)| r),
-    );
-
     let expected_roll_outcome = dice_roll_bonus.expected_outcome()
         + attacker.attack_modifier(HandType::MainHand) as f32
         - defender.evasion() as f32;
 
     AttackPrediction {
-        percentage_chance_deal_damage: percentage_deal_damage,
         min_damage: min_dmg.unwrap(),
         max_damage: max_dmg,
         avg_damage,
         details,
-        graze_chance,
-        crit_chance,
         area_targets,
         expected_roll_outcome,
     }
@@ -4300,17 +4250,45 @@ fn ability_roll_bonus(
     bonus
 }
 
-pub fn attack_roll_bonus(
+fn attack_roll_bonus(
     attacker: &Character,
     hand: HandType,
     defender: &Character,
-    //circumstance_advantage: i32,
     enhancements: &[(&'static str, AttackEnhancementEffect)],
     reaction: Option<OnAttackedReaction>,
-) -> DiceRollBonus {
-    let mut bonus = attacker.outgoing_attack_roll_bonus(hand, enhancements, defender);
-    bonus.advantage += defender.incoming_attack_advantage(reaction);
-    bonus
+    pathfind_grid: &PathfindGrid,
+) -> (DiceRollBonus, Vec<(&'static str, RollBonusContributor)>) {
+    let mut total_adv = 0i32;
+    let mut total_flat_amount = 0;
+
+    let mut contributors =
+        attacker.outgoing_attack_bonus_contributors(hand, enhancements, defender);
+    contributors.extend_from_slice(&defender.incoming_attack_bonus_contributors(reaction));
+
+    if attacker.has_equipped_ranged_weapon() {
+        let attacker_high_ground = pathfind_grid.is_high_ground(attacker.pos());
+        let defender_high_ground = pathfind_grid.is_high_ground(defender.pos());
+        if attacker_high_ground && !defender_high_ground {
+            contributors.push(("High-ground", RollBonusContributor::Advantage(1)));
+        } else if defender_high_ground && !attacker_high_ground {
+            contributors.push(("High-ground", RollBonusContributor::Advantage(-1)));
+        }
+    }
+
+    for (_label, bonus) in &contributors {
+        match bonus {
+            RollBonusContributor::Advantage(n) => total_adv += n,
+            RollBonusContributor::FlatAmount(n) => total_flat_amount += n,
+            RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
+        }
+    }
+
+    let total_bonus = DiceRollBonus {
+        advantage: total_adv,
+        flat_amount: total_flat_amount,
+    };
+
+    (total_bonus, contributors)
 }
 
 #[derive(Clone)]
@@ -7386,29 +7364,7 @@ impl Character {
         (summary, bonuses)
     }
 
-    fn outgoing_attack_roll_bonus(
-        &self,
-        hand_type: HandType,
-        enhancements: &[(&'static str, AttackEnhancementEffect)],
-        target: &Character,
-    ) -> DiceRollBonus {
-        let mut advantage = 0i32;
-        let mut flat_amount = 0;
-        for (_label, bonus) in self.outgoing_attack_bonuses(hand_type, enhancements, target) {
-            match bonus {
-                RollBonusContributor::Advantage(n) => advantage += n,
-                RollBonusContributor::FlatAmount(n) => flat_amount += n,
-                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
-            }
-        }
-
-        DiceRollBonus {
-            advantage,
-            flat_amount,
-        }
-    }
-
-    pub fn outgoing_attack_bonuses(
+    fn outgoing_attack_bonus_contributors(
         &self,
         hand_type: HandType,
         enhancement_effects: &[(&'static str, AttackEnhancementEffect)],
@@ -7574,18 +7530,6 @@ impl Character {
         bonuses
     }
 
-    fn incoming_attack_advantage(&self, reaction: Option<OnAttackedReaction>) -> i32 {
-        let mut advantage = 0;
-        for (_label, bonus) in self.incoming_attack_bonuses(reaction) {
-            match bonus {
-                RollBonusContributor::Advantage(n) => advantage += n,
-                RollBonusContributor::OtherNegative | RollBonusContributor::OtherPositive => {}
-                RollBonusContributor::FlatAmount(_) => unreachable!(),
-            }
-        }
-        advantage
-    }
-
     fn incoming_ability_advantage(&self) -> i32 {
         let mut advantage = 0;
         for (_label, bonus) in self.incoming_ability_bonuses() {
@@ -7598,7 +7542,7 @@ impl Character {
         advantage
     }
 
-    pub fn incoming_attack_bonuses(
+    fn incoming_attack_bonus_contributors(
         &self,
         reaction: Option<OnAttackedReaction>,
     ) -> Vec<(&'static str, RollBonusContributor)> {

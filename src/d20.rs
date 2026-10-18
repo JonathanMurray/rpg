@@ -49,20 +49,6 @@ pub struct DiceRollBonus {
 }
 
 impl DiceRollBonus {
-    pub fn from_advantage(advantage: i32) -> Self {
-        Self {
-            advantage,
-            flat_amount: 0,
-        }
-    }
-
-    pub fn none() -> Self {
-        Self {
-            advantage: 0,
-            flat_amount: 0,
-        }
-    }
-
     pub fn expected_outcome(&self) -> f32 {
         let expected_roll = expected_roll_with_adv(self.advantage);
         dbg!(self.advantage, expected_roll);
