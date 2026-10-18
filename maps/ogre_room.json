@@ -336,21 +336,11 @@
     "(28, 31)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(22, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(25, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(28, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(31, 43)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
+    "(52, 46)": "Bush",
+    "(55, 46)": "Bush",
+    "(55, 43)": "Bush",
+    "(4, 46)": "Bush",
+    "(4, 7)": "Boulder2",
     "(31, 46)": {
       "StoneWall": "ConcaveNorthEast"
     },
@@ -366,12 +356,7 @@
     "(19, 46)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(51, 34)": "Chest",
-    "(4, 7)": "Boulder2",
-    "(4, 46)": "Bush",
-    "(55, 43)": "Bush",
-    "(55, 46)": "Bush",
-    "(52, 46)": "Bush"
+    "(51, 34)": "Chest"
   },
   "background": {
     "(7, 25)": "Floor",
@@ -379,7 +364,7 @@
     "(13, 25)": "Floor",
     "(49, 4)": "Floor",
     "(4, 25)": "Floor",
-    "(22, 43)": "Floor",
+    "(22, 43)": "Floor2",
     "(10, 4)": "Floor2",
     "(16, 4)": "Floor2",
     "(1, 34)": "Floor",
@@ -426,7 +411,7 @@
     "(10, 1)": "Floor",
     "(43, 4)": "Floor",
     "(34, 7)": "Floor2",
-    "(31, 46)": "Floor",
+    "(31, 46)": "Grass",
     "(19, 22)": "Floor",
     "(40, 37)": "Grass3",
     "(34, 25)": "Floor2",
@@ -566,7 +551,7 @@
     "(49, 16)": "Floor2",
     "(46, 7)": "Floor2",
     "(31, 25)": "Floor2",
-    "(19, 46)": "Floor",
+    "(19, 46)": "Grass",
     "(58, 40)": "Floor",
     "(1, 31)": "Floor",
     "(19, 7)": "Floor2",
@@ -621,7 +606,7 @@
     "(37, 7)": "Floor2",
     "(52, 40)": "Grass3",
     "(10, 10)": "Floor",
-    "(25, 43)": "Floor",
+    "(25, 43)": "Floor2",
     "(10, 37)": "Grass4",
     "(55, 19)": "Floor6",
     "(46, 25)": "Floor2",
@@ -698,7 +683,8 @@
     "(31, 43)": "Grass4",
     "(22, 19)": "Floor4",
     "(22, 16)": "Floor4",
-    "(16, 49)": "Grass2"
+    "(16, 49)": "Grass2",
+    "(28, 43)": "Floor2"
   },
   "decorations": {
     "(43, 7)": "WallFlag",
@@ -750,7 +736,8 @@
     "(34, 31)": "GroundBorderNorth",
     "(37, 31)": "GroundBorderNorth",
     "(55, 31)": "GroundBorderNorth",
-    "(19, 45)": "WallOpeningEast"
+    "(19, 43)": "GroundBorderEast",
+    "(28, 43)": "GroundBorderEast"
   },
   "surfaces": {
     "(43, 43)": {

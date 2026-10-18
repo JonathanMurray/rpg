@@ -616,6 +616,8 @@ impl Sidebar {
             TerrainId::WallFlag,
             TerrainId::WallWindow,
             TerrainId::WallWindow2,
+            TerrainId::WallWindow2Left,
+            TerrainId::WallWindow2Right,
             TerrainId::Torch,
             TerrainId::Lantern,
             TerrainId::WallPlant,

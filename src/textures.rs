@@ -588,6 +588,8 @@ pub enum TerrainId {
     WallOpeningWest,
     WallWindow,
     WallWindow2,
+    WallWindow2Left,
+    WallWindow2Right,
     SuitOfArmor,
     AnimalHead,
     Torch,
@@ -829,6 +831,8 @@ pub fn terrain_atlas_area(terrain_id: TerrainId, screen_pos: (f32, f32)) -> (f32
         TerrainId::Chest => (9, 8),
         TerrainId::WallWindow => (11, 8),
         TerrainId::WallWindow2 => (12, 8),
+        TerrainId::WallWindow2Left => (13, 8),
+        TerrainId::WallWindow2Right => (14, 8),
 
         TerrainId::WallOpeningNorth => (5, 6),
         TerrainId::WallOpeningEast => (6, 6),

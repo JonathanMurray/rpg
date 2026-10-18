@@ -816,6 +816,15 @@
     },
     "(7, 22)": {
       "StoneWall": "ConcaveNorthEast"
+    },
+    "(19, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(16, 37)": {
+      "StoneWall": "ConcaveNorthEast"
+    },
+    "(13, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     }
   },
   "background": {
@@ -949,7 +958,7 @@
     "(4, 19)": "Floor2",
     "(13, 37)": "Floor2",
     "(13, 40)": "Floor2",
-    "(16, 40)": "Floor2",
+    "(16, 40)": "Floor7",
     "(16, 37)": "Floor7",
     "(25, 43)": "Floor8",
     "(31, 24)": "Grass",
@@ -1243,7 +1252,7 @@
     "(13, 4)": "WallWindow2",
     "(47, 1)": "Barrel",
     "(33, 37)": "Lantern",
-    "(14, 34)": "Lantern",
+    "(14, 37)": "Lantern",
     "(67, 20)": "WallOpeningEast",
     "(58, 13)": "Barrel",
     "(31, 37)": "WallOpeningNorth",
@@ -1251,7 +1260,7 @@
     "(40, 34)": "GroundBorderNorth",
     "(48, 19)": "Torch",
     "(44, 19)": "Torch",
-    "(10, 38)": "WallOpeningWest",
+    "(31, 7)": "WallWindow2",
     "(52, 1)": "SuitOfArmor",
     "(52, 34)": "GroundBorderNorth",
     "(28, 7)": "WallWindow2",
@@ -1262,10 +1271,10 @@
     "(61, 13)": "Barrel",
     "(49, 1)": "HangingWeapons2",
     "(60, 13)": "Barrel",
-    "(18, 34)": "Lantern",
+    "(18, 37)": "Lantern",
     "(22, 7)": "WallWindow2",
     "(16, 7)": "Torch",
-    "(16, 34)": "WallOpeningNorth",
+    "(7, 25)": "WallOpeningWest",
     "(36, 1)": "WallPlant",
     "(46, 37)": "FloorDrain",
     "(37, 34)": "GroundBorderNorth",
@@ -1285,7 +1294,7 @@
     "(10, 4)": "WallOpeningNorth",
     "(1, 11)": "WallOpeningWest",
     "(19, 7)": "WallWindow2",
-    "(31, 7)": "WallWindow2"
+    "(16, 37)": "WallOpeningNorth"
   },
   "surfaces": {
     "(49, 22)": "FireSurfaceSingleCell",
@@ -1342,7 +1351,8 @@
     "(47, 27)": "FireSurfaceSingleCell"
   },
   "control_points": {
-    "(14, 42)": "Exit"
+    "(14, 42)": "Exit",
+    "(31, 41)": "Exit"
   },
   "characters": [
     {

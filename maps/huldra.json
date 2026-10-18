@@ -340,7 +340,17 @@
     "(25, 1)": "WallWindow2",
     "(11, 1)": "WallPlant",
     "(24, 1)": "WallPlant",
-    "(4, 1)": "WallWindow2"
+    "(4, 1)": "WallWindow2",
+    "(1, 4)": "WallWindow2Left",
+    "(1, 28)": "WallWindow2Left",
+    "(1, 10)": "WallWindow2Left",
+    "(1, 22)": "WallWindow2Left",
+    "(1, 16)": "WallWindow2Left",
+    "(28, 4)": "WallWindow2Right",
+    "(28, 10)": "WallWindow2Right",
+    "(28, 16)": "WallWindow2Right",
+    "(28, 22)": "WallWindow2Right",
+    "(28, 28)": "WallWindow2Right"
   },
   "surfaces": {
     "(16, 13)": {
