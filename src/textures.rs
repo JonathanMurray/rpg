@@ -643,10 +643,10 @@ impl TerrainId {
     }
 
     pub fn terrain_type(&self) -> TerrainType {
-        if self.is_wall() {
-            TerrainType::Tall
-        } else {
-            TerrainType::Low
+        match self {
+            Self::StoneWall(..) => TerrainType::TallWall,
+            Self::LowWall(orientation) => TerrainType::LowWall(*orientation),
+            _ => TerrainType::Other,
         }
     }
 }

@@ -51,12 +51,12 @@ pub fn create_game_grid(
     for (i, char_data) in map_data.characters.iter().enumerate() {
         let pos = char_data.pos;
         let char = create_character(pos, char_data, Some(party), i as CharacterId);
-        pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+        pathfind_grid.set_occupied(pos, Occupation::Character(char.id()));
         characters.insert(char.id(), char);
     }
 
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
-        pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
+        pathfind_grid.set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
     }
     for (pos, terrain_id) in &map_data.surfaces {
         if let Some((surface, size)) = terrain_id.surface() {

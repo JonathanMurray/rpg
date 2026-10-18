@@ -256,7 +256,8 @@ impl CoreGame {
                         ch.name,
                         ch.pos()
                     );
-                    self.pathfind_grid.set_occupied(ch.pos(), None);
+                    self.pathfind_grid
+                        .remove_occupied(ch.pos(), Occupation::Character(ch.id()));
                     if ch.is_swamp_dweller() {
                         self.handle_swamp_dweller_left_poison(ch).await;
                     }
@@ -880,9 +881,10 @@ impl CoreGame {
             let prev_position = character.position.get();
             let id = character.id();
 
-            self.pathfind_grid.set_occupied(prev_position, None);
             self.pathfind_grid
-                .set_occupied(new_position, Some(Occupation::Character(id)));
+                .remove_occupied(prev_position, Occupation::Character(id));
+            self.pathfind_grid
+                .set_occupied(new_position, Occupation::Character(id));
 
             if movement_type != MovementType::KnockedBack {
                 character.set_facing_toward(new_position);

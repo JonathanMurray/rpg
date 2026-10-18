@@ -52,7 +52,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
             if active_char_id.is_none() && !char.is_dead() && char.player_controlled() {
                 active_char_id = Some(char.id());
             }
-            pathfind_grid.set_occupied(pos, Some(Occupation::Character(char.id())));
+            pathfind_grid.set_occupied(pos, Occupation::Character(char.id()));
             characters.push(char);
         }
     }
@@ -71,7 +71,7 @@ pub fn init_fight_map(player_characters: Vec<Rc<Character>>, fight_id: FightId) 
     }
 
     for (pos, terrain_id) in map_data.terrain_objects.iter() {
-        pathfind_grid.set_occupied(*pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
+        pathfind_grid.set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
     }
 
     for (pos, control_point) in &map_data.control_points {

@@ -1304,7 +1304,7 @@ impl UserInterface {
                     line_visitor(from, to, |x, y| {
                         if matches!(
                             self.game_grid.pathfind_grid.occupied().get(&(x, y)),
-                            Some(Occupation::Terrain(TerrainType::Tall))
+                            Some(Occupation::Terrain(TerrainType::TallWall))
                         ) {
                             *pos = prev;
                             true

@@ -481,9 +481,9 @@ impl GameGrid {
     /// Should only be called from editor; not from in-game!
     pub fn editor_add_terrain(&mut self, pos: Position, terrain_id: TerrainId) -> bool {
         if self.pathfind_grid.is_free(None, pos) {
-            self.pathfind_grid
-                .set_occupied(pos, Some(Occupation::Terrain(terrain_id.terrain_type())));
             self.terrain_objects.insert(pos, terrain_id);
+            self.pathfind_grid
+                .set_occupied(pos, Occupation::Terrain(terrain_id.terrain_type()));
             self.auto_tile();
             true
         } else {
@@ -549,7 +549,8 @@ impl GameGrid {
     /// Should only be called from editor; not from in-game!
     pub fn editor_remove_character(&mut self, character_id: CharacterId) {
         let ch = self.characters.remove(&character_id).unwrap();
-        self.pathfind_grid.set_occupied(ch.pos(), None);
+        self.pathfind_grid
+            .remove_occupied(ch.pos(), Occupation::Character(character_id));
         self.on_removed_character(character_id);
         if self.active_character_id == character_id {
             println!(
@@ -673,11 +674,17 @@ impl GameGrid {
                     }
                 };
 
+                self.pathfind_grid
+                    .remove_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
                 terrain_id = if matches!(terrain_id, TerrainId::StoneWall(..)) {
                     TerrainId::StoneWall(orientation)
                 } else {
                     TerrainId::LowWall(orientation)
                 };
+                dbg!(terrain_id);
+                self.pathfind_grid
+                    .set_occupied(*pos, Occupation::Terrain(terrain_id.terrain_type()));
+                println!("Did set occupation {:?} = {:?}", pos, terrain_id);
             }
             new_map.insert(*pos, terrain_id);
         }
@@ -3942,6 +3949,8 @@ impl GameGrid {
 
         self.prev_hovered_character = self.hovered_character.or(self.hovered_character_portrait);
 
+        self.debug_draw_high_ground();
+
         outcome
     }
 
@@ -4295,7 +4304,7 @@ impl GameGrid {
                     }
                 }
             }
-            matches!(occupation, Some(Occupation::Terrain(TerrainType::Tall)))
+            matches!(occupation, Some(Occupation::Terrain(TerrainType::TallWall)))
         };
 
         line_visitor(from, to, |x, y| {
@@ -5524,12 +5533,23 @@ impl GameGrid {
         self.draw_move_range_indicator(character);
     }
 
+    fn debug_draw_high_ground(&self) {
+        let (w, h) = self.pathfind_grid.dimensions();
+        for y in 0..(h - 1) as i32 {
+            for x in 0..(w - 1) as i32 {
+                if self.pathfind_grid.is_high_ground((x, y)) {
+                    self.fill_cell((x, y), MAGENTA.with_alpha(0.3), 1.0);
+                }
+            }
+        }
+    }
+
     fn draw_occupation(&self, filter: OccupationFilter) {
         let matching = |x, y| {
             let occupation = self.pathfind_grid.occupied().get(&(x, y)).copied();
             match filter {
                 OccupationFilter::TallTerrain => {
-                    occupation == Some(Occupation::Terrain(TerrainType::Tall))
+                    occupation == Some(Occupation::Terrain(TerrainType::TallWall))
                 }
                 OccupationFilter::CharactersExcept(ch_id) => {
                     matches!(occupation, Some(Occupation::Character(other_id)) if ch_id != other_id)

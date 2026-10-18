@@ -28,29 +28,29 @@
     "(1, 13)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 19)": {
-      "LowWall": "ConvexNorthEast"
+    "(13, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 19)": {
-      "LowWall": "ConvexNorthEast"
+    "(1, 34)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 16)": {
-      "LowWall": "ConvexNorthEast"
+    "(1, 31)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 22)": {
-      "LowWall": "ConvexNorthEast"
+    "(7, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(19, 22)": {
-      "LowWall": "ConvexNorthEast"
+    "(16, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(16, 19)": {
-      "LowWall": "ConvexNorthEast"
+    "(1, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(16, 13)": {
-      "LowWall": "ConvexNorthEast"
+    "(4, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
-    "(22, 10)": {
-      "LowWall": "ConvexNorthEast"
+    "(10, 37)": {
+      "StoneWall": "ConcaveNorthEast"
     },
     "(1, 10)": {
       "StoneWall": "ConcaveNorthEast"
@@ -136,77 +136,41 @@
     "(19, 37)": {
       "StoneWall": "ConcaveNorthEast"
     },
-    "(16, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(13, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(10, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(7, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(4, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 37)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 34)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(1, 31)": {
-      "StoneWall": "ConcaveNorthEast"
-    },
-    "(16, 22)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(19, 13)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(22, 13)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(22, 16)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(13, 22)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(13, 19)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(13, 16)": {
-      "LowWall": "ConvexNorthEast"
-    },
     "(19, 10)": {
-      "LowWall": "ConvexNorthEast"
+      "LowWall": "South"
     },
-    "(10, 22)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(10, 19)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(10, 16)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(10, 13)": {
-      "LowWall": "ConvexNorthEast"
-    },
-    "(10, 10)": {
-      "LowWall": "ConvexNorthEast"
+    "(16, 13)": {
+      "LowWall": "South"
     },
     "(13, 10)": {
-      "LowWall": "ConvexNorthEast"
+      "LowWall": "South"
     },
     "(16, 10)": {
-      "LowWall": "ConvexNorthEast"
+      "LowWall": "South"
+    },
+    "(19, 13)": {
+      "LowWall": "South"
     },
     "(13, 13)": {
-      "LowWall": "ConvexNorthEast"
+      "LowWall": "South"
+    },
+    "(13, 16)": {
+      "LowWall": "South"
+    },
+    "(16, 16)": {
+      "LowWall": "South"
+    },
+    "(19, 16)": {
+      "LowWall": "South"
+    },
+    "(10, 16)": {
+      "LowWall": "South"
+    },
+    "(10, 13)": {
+      "LowWall": "South"
+    },
+    "(10, 10)": {
+      "LowWall": "South"
     }
   },
   "background": {
@@ -393,11 +357,9 @@
     "(16, 1)": "WallWindow2",
     "(28, 26)": "WallOpeningEast",
     "(1, 26)": "WallOpeningWest",
-    "(4, 16)": "WallWindow2",
+    "(8, 8)": "SmallStone",
     "(5, 25)": "WallPlant",
     "(6, 25)": "WallPlant",
-    "(19, 22)": "Staircase1",
-    "(8, 8)": "SmallStone",
     "(13, 1)": "WallWindow"
   },
   "surfaces": {
@@ -459,19 +421,8 @@
     {
       "type_": "Alice",
       "pos": [
-        16,
-        31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Bob",
-      "pos": [
-        11,
-        32
+        15,
+        12
       ],
       "health": null,
       "main_hand": null,
@@ -483,17 +434,6 @@
       "pos": [
         19,
         31
-      ],
-      "health": null,
-      "main_hand": null,
-      "shield": null,
-      "name": null
-    },
-    {
-      "type_": "Ghoul1",
-      "pos": [
-        8,
-        30
       ],
       "health": null,
       "main_hand": null,

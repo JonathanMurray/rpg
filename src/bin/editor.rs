@@ -69,7 +69,7 @@ async fn main() {
 
     let mut sidebar = Sidebar::new(resources.terrain_atlas.clone(), resources.sprites.clone());
     let show_grid = Rc::new(Cell::new(false));
-    let snap_to_grid = Rc::new(Cell::new(false));
+    let snap_to_grid = Rc::new(Cell::new(true));
     let settings = build_settings(
         &resources.big_font,
         &resources.simple_font,
@@ -378,7 +378,7 @@ async fn main() {
                                     create_character(pos, &char_data, Some(&party), max_id + 1);
                                 game_grid
                                     .pathfind_grid
-                                    .set_occupied(pos, Some(Occupation::Character(char.id())));
+                                    .set_occupied(pos, Occupation::Character(char.id()));
                                 game_grid.editor_add_character(char.id(), Rc::clone(&char));
                                 map_data.characters.push(char_data.clone());
                                 has_unsaved_changes = true;
@@ -403,8 +403,10 @@ async fn main() {
                             }
                         }
                         EditorAction::EraseTerrain => {
-                            if game_grid.terrain_objects.contains_key(&pos) {
-                                game_grid.pathfind_grid.set_occupied(pos, None);
+                            if let Some(t) = game_grid.terrain_objects.get(&pos) {
+                                game_grid
+                                    .pathfind_grid
+                                    .remove_occupied(pos, Occupation::Terrain(t.terrain_type()));
                                 game_grid.terrain_objects.swap_remove(&pos);
                                 game_grid.auto_tile();
 
@@ -442,7 +444,10 @@ async fn main() {
                             if let Some(char_id) = maybe_id.get() {
                                 let char = game_grid.characters.get(&char_id).unwrap();
                                 if game_grid.pathfind_grid.is_free(Some(char.id()), pos) {
-                                    game_grid.pathfind_grid.set_occupied(char.pos(), None);
+                                    game_grid.pathfind_grid.remove_occupied(
+                                        char.pos(),
+                                        Occupation::Character(char.id()),
+                                    );
 
                                     let char_data = map_data
                                         .characters
@@ -454,7 +459,7 @@ async fn main() {
                                     char.position.set(pos);
                                     game_grid
                                         .pathfind_grid
-                                        .set_occupied(pos, Some(Occupation::Character(char.id())));
+                                        .set_occupied(pos, Occupation::Character(char.id()));
                                     has_unsaved_changes = true;
                                 }
                             }
@@ -586,7 +591,7 @@ impl Sidebar {
             TerrainId::TreeStump,
             TerrainId::Table,
             TerrainId::StoneWall(WallOrientation::ConcaveNorthEast),
-            TerrainId::LowWall(WallOrientation::ConvexNorthEast),
+            TerrainId::LowWall(WallOrientation::South),
             TerrainId::Cauldron,
             TerrainId::Cauldron2,
             TerrainId::Chest,
